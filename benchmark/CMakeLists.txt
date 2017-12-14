@@ -217,6 +217,20 @@ option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
   "Produce optimization view for benchmarks"
   FALSE)
 
+set(SWIFT_BENCHMARK_OPT_VIEWER "" CACHE FILEPATH
+  "Path to opt-viewer")
+
+if(SWIFT_BENCHMARK_OPT_VIEWER)
+  # If the path to the opt-viewer was specified manually and we have no access
+  # to the LLVM tree, assume we have the modules for the opt-viewer installed.
+  if(SWIFT_BENCHMARK_BUILT_STANDALONE)
+    set(LLVM_HAVE_OPT_VIEWER_MODULES 1)
+  endif()
+else()
+  set (SWIFT_BENCHMARK_OPT_VIEWER
+    "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
+endif()
+
 # Options for other configurations
 set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
