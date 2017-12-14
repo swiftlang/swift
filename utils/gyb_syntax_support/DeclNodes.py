@@ -293,8 +293,8 @@ DECL_NODES = [
              Child('Attributes', kind='AttributeList', is_optional=True),
              Child('ImportTok', kind='ImportToken'),
              Child('ImportKind', kind='Token', is_optional=True,
-                   text_choices=[
-                      'TypeAliasToken', 'StructToken', 'ClassToken',
+                   token_choices=[
+                      'TypealiasToken', 'StructToken', 'ClassToken',
                       'EnumToken', 'ProtocolToken', 'VarToken', 'LetToken',
                       'FuncToken',
                    ]),
