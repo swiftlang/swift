@@ -319,6 +319,11 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     }
   }
 
+  // FIXME: Even implicit Decls should have proper ranges if they include any
+  // non-implicit children (fix implicit Decls created for lazy vars).
+  if (D->isImplicit())
+    return !isDone();
+
   if (shouldSkip(D->getSourceRange()))
     return false;
   
