@@ -1,7 +1,13 @@
-// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
+<ImportDecl>// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
+
+import <AccessPathComponent>ABC</AccessPathComponent></ImportDecl><ImportDecl>
+import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B.</AccessPathComponent><AccessPathComponent>C</AccessPathComponent></ImportDecl><ImportDecl><Attribute>
+@objc </Attribute>import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><ImportDecl><Attribute>
+@objc </Attribute>import typealias <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><ImportDecl>
+import struct <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl>
 
 class C {<FunctionDecl>
   func bar<FunctionSignature><ParameterClause>(<FunctionParameter>_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl>

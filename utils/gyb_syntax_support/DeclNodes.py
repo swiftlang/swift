@@ -279,4 +279,25 @@ DECL_NODES = [
              Child('CloseParen', kind='RightParenToken',
                    is_optional=True),
          ]),
+
+    Node('AccessPathComponent', kind='Syntax',
+         children=[
+            Child('Name', kind='IdentifierToken'),
+            Child('TrailingDot', kind='PeriodToken', is_optional=True),
+         ]),
+
+    Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
+
+    Node('ImportDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('ImportTok', kind='ImportToken'),
+             Child('ImportKind', kind='Token', is_optional=True,
+                   token_choices=[
+                      'TypealiasToken', 'StructToken', 'ClassToken',
+                      'EnumToken', 'ProtocolToken', 'VarToken', 'LetToken',
+                      'FuncToken',
+                   ]),
+             Child('Path', kind='AccessPath'),
+         ]),
 ]
