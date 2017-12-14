@@ -66,6 +66,8 @@ static ParserStatus parseDefaultArgument(Parser &P,
                                    unsigned argIndex,
                                    Expr *&init,
                                  Parser::ParameterContextKind paramContext) {
+  SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
+                                         SyntaxKind::InitializerClause);
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.
@@ -1143,5 +1145,4 @@ bool Parser::canParseTypedPattern() {
     return canParseType();
   return true;
 }
-
 

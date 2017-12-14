@@ -217,11 +217,12 @@ FunctionParameterSyntax getCannedFunctionParameter() {
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto One = SyntaxFactory::makePrefixOperatorExpr(Sign,
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
+  auto DefaultArg = SyntaxFactory::makeInitializerClause(Equal, One);
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
-  return SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName, Colon,
-                                              Int, NoEllipsis, Equal,
-                                              One, Comma);
+  return SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName,
+                                              Colon, Int, NoEllipsis,
+                                              DefaultArg, Comma);
 }
 
 TEST(DeclSyntaxTests, FunctionParameterMakeAPIs) {
@@ -254,11 +255,12 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto One = SyntaxFactory::makePrefixOperatorExpr(Sign,
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
+  auto DefaultArg = SyntaxFactory::makeInitializerClause(Equal, One);
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
-  auto Param = SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName,
-                                                    Colon, Int,
-                                                    NoEllipsis, Equal, One,
+  auto Param = SyntaxFactory::makeFunctionParameter(None, ExternalName,
+                                                    LocalName, Colon, Int,
+                                                    NoEllipsis, DefaultArg,
                                                     Comma);
 
   ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName().getRaw());
@@ -269,10 +271,10 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto GottenType2 = Param.getTypeAnnotation();
   ASSERT_TRUE(GottenType.hasSameIdentityAs(GottenType2));
 
-  ASSERT_EQ(Equal.getRaw(), Param.getDefaultEquals()->getRaw());
+  ASSERT_EQ(DefaultArg.getRaw(), Param.getDefaultArgument()->getRaw());
 
-  auto GottenDefaultValue = Param.getDefaultValue().getValue();
-  auto GottenDefaultValue2 = Param.getDefaultValue().getValue();
+  auto GottenDefaultValue = Param.getDefaultArgument()->getValue();
+  auto GottenDefaultValue2 = Param.getDefaultArgument()->getValue();
   ASSERT_TRUE(GottenDefaultValue.hasSameIdentityAs(GottenDefaultValue2));
 
   ASSERT_EQ(Comma.getRaw(), Param.getTrailingComma()->getRaw());
@@ -280,10 +282,10 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   // Test that llvm::None is returned for non-token missing children:
   auto Decimated = Param
     .withTypeAnnotation(llvm::None)
-    .withDefaultValue(llvm::None);
+    .withDefaultArgument(llvm::None);
 
   ASSERT_TRUE(Decimated.getTypeAnnotation().isMissing());
-  ASSERT_FALSE(Decimated.getDefaultValue().hasValue());
+  ASSERT_FALSE(Decimated.getDefaultArgument().hasValue());
 }
 
 TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
@@ -300,6 +302,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
+  auto DefaultArg = SyntaxFactory::makeInitializerClause(Equal, One);
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
   {
@@ -310,8 +313,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
       .withSecondName(LocalName)
       .withColon(Colon)
       .withTypeAnnotation(Int)
-      .withDefaultEquals(Equal)
-      .withDefaultValue(One)
+      .withDefaultArgument(DefaultArg)
       .withTrailingComma(Comma)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "for integer : Int = 1,");
@@ -321,9 +323,9 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter()
       .withTypeAnnotation(llvm::None)
-      .withDefaultValue(llvm::None)
+      .withDefaultArgument(llvm::None)
       .print(OS);
-    ASSERT_EQ(OS.str().str(), "with radius: = , ");
+    ASSERT_EQ(OS.str().str(), "with radius: , ");
   }
 }
 

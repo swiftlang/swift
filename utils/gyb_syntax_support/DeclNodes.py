@@ -167,6 +167,13 @@ DECL_NODES = [
              Child('Body', kind='StmtList')
          ]),
 
+    # initializer -> '=' expr
+    Node('InitializerClause', kind='Syntax',
+         children=[
+             Child('Equal', kind='EqualToken'),
+             Child('Value', kind='Expr'),
+         ]),
+
     # parameter ->
     # external-parameter-name? local-parameter-name ':'
     #   type '...'? '='? expression? ','?
@@ -191,9 +198,7 @@ DECL_NODES = [
              Child('TypeAnnotation', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
-             Child('DefaultEquals', kind='EqualToken',
-                   is_optional=True),
-             Child('DefaultValue', kind='Expr',
+             Child('DefaultArgument', kind='InitializerClause',
                    is_optional=True),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),

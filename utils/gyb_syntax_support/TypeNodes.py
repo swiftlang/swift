@@ -79,12 +79,6 @@ TYPE_NODES = [
              Child('ExclamationMark', kind='ExclamationMarkToken'),
          ]),
 
-    Node('Initializer', kind='Syntax',
-         children=[
-             Child('Equal', kind='EqualToken'),
-             Child('Value', kind='Expr'),
-         ]),
-
     # tuple-type-element -> identifier? ':'? type-annotation ','?
     Node('TupleTypeElement', kind='Syntax',
          children=[
@@ -107,7 +101,7 @@ TYPE_NODES = [
              Child('Type', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
-             Child('Initializer', kind='Initializer',
+             Child('Initializer', kind='InitializerClause',
                    is_optional=True),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
