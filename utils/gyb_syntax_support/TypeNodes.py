@@ -79,26 +79,43 @@ TYPE_NODES = [
              Child('ExclamationMark', kind='ExclamationMarkToken'),
          ]),
 
-    # throwing-specifier -> 'throws' | 'rethrows'
-    # function-type -> attribute-list '(' function-type-argument-list ')'
-    #   throwing-specifier? '->'? type?
-    Node('FunctionType', kind='Type',
+    Node('Initializer', kind='Syntax',
          children=[
-             Child('TypeAttributes', kind='AttributeList'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('ArgumentList', kind='FunctionTypeArgumentList'),
-             Child('RightParen', kind='RightParenToken'),
-             Child('ThrowsOrRethrowsKeyword', kind='Token',
+             Child('Equal', kind='EqualToken'),
+             Child('Value', kind='Expr'),
+         ]),
+
+    # tuple-type-element -> identifier? ':'? type-annotation ','?
+    Node('TupleTypeElement', kind='Syntax',
+         children=[
+             Child('InOut', kind='InOutToken',
+                   is_optional=True),
+             Child('Name', kind='Token',
                    is_optional=True,
                    token_choices=[
-                       'ThrowsToken',
-                       'RethrowsToken',
+                       'IdentifierToken',
+                       'WildcardToken'
                    ]),
-             Child('Arrow', kind='ArrowToken',
+             Child('SecondName', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
+             Child('Colon', kind='ColonToken',
                    is_optional=True),
-             Child('ReturnType', kind='Type',
+             Child('Type', kind='Type'),
+             Child('Ellipsis', kind='Token',
+                   is_optional=True),
+             Child('Initializer', kind='Initializer',
+                   is_optional=True),
+             Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
+
+    # tuple-type-element-list -> tuple-type-element tuple-type-element-list?
+    Node('TupleTypeElementList', kind='SyntaxCollection',
+         element='TupleTypeElement'),
 
     # tuple-type -> '(' tuple-type-element-list ')'
     Node('TupleType', kind='Type',
@@ -108,16 +125,22 @@ TYPE_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # tuple-type-element -> identifier? ':'? type-annotation ','?
-    Node('TupleTypeElement', kind='Syntax',
+    # throwing-specifier -> 'throws' | 'rethrows'
+    # function-type -> attribute-list '(' function-type-argument-list ')'
+    #   throwing-specifier? '->'? type?
+    Node('FunctionType', kind='Type',
          children=[
-             Child('Label', kind='IdentifierToken',
-                   is_optional=True),
-             Child('Colon', kind='ColonToken',
-                   is_optional=True),
-             Child('TypeAnnotation', kind='TypeAnnotation'),
-             Child('Comma', kind='CommaToken',
-                   is_optional=True),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Arguments', kind='TupleTypeElementList'),
+             Child('RightParen', kind='RightParenToken'),
+             Child('ThrowsOrRethrowsKeyword', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'ThrowsToken',
+                       'RethrowsToken',
+                   ]),
+             Child('Arrow', kind='ArrowToken'),
+             Child('ReturnType', kind='Type'),
          ]),
 
     # type-annotation -> attribute-list 'inout'? type
@@ -133,10 +156,6 @@ TYPE_NODES = [
     #   protocol-composition-element-list?
     Node('ProtocolCompositionElementList', kind='SyntaxCollection',
          element='ProtocolCompositionElement'),
-
-    # tuple-type-element-list -> tuple-type-element tuple-type-element-list?
-    Node('TupleTypeElementList', kind='SyntaxCollection',
-         element='TupleTypeElement'),
 
     # protocol-composition-element -> type-identifier '&'
     Node('ProtocolCompositionElement', kind='Syntax',
@@ -167,26 +186,6 @@ TYPE_NODES = [
              Child('Arguments', kind='GenericArgumentList'),
              Child('RightAngleBracket', kind='RightAngleToken'),
          ]),
-
-    # function-type-argument -> identifier? identifier? ':'
-    #   type-annotation ','?
-    Node('FunctionTypeArgument', kind='Syntax',
-         children=[
-             Child('ExternalName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LocalName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('Colon', kind='ColonToken',
-                   is_optional=True),
-             Child('TypeAnnotation', kind='TypeAnnotation'),
-             Child('TrailingComma', kind='CommaToken',
-                   is_optional=True),
-         ]),
-
-    # function-type-argument-list -> function-type-argument
-    #   function-type-argument-list?
-    Node('FunctionTypeArgumentList', kind='SyntaxCollection',
-         element='FunctionTypeArgument'),
 
     # protocol-composition-type -> protocol-composition-elements
     Node('ProtocolCompositionType', kind='Type',
