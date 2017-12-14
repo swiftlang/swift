@@ -4254,8 +4254,6 @@ public:
     SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
-    assert(dc->isTypeContext() &&
-           "Decl parsing must prevent subscripts outside of types!");
 
     if (auto gp = SD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
