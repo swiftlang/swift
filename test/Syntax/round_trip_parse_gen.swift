@@ -3,6 +3,12 @@
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 
+import ABC
+import A.B.C
+@objc import A.B
+@objc import typealias A.B
+import struct A.B
+
 class C {
   func bar(_ a: Int) {}
   func bar1(_ a: Float) -> Float { return -0.6 + 0.1 - 0.3 }
