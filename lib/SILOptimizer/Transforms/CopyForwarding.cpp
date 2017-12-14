@@ -159,7 +159,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
     FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
-#ifndef NDEBUG
+#ifdef NDEBUG
     break;
 #endif
   }
@@ -177,10 +177,10 @@ class AddressUserVisitor {
 public:
   virtual ~AddressUserVisitor() {}
 
-  virtual void visitNormalUse(SILInstruction *user) = 0;
-  virtual void visitTake(CopyAddrInst *copy) = 0;
-  virtual void visitDestroy(DestroyAddrInst *destroy) = 0;
-  virtual void visitDebugValue(DebugValueAddrInst *debugValue) = 0;
+  virtual bool visitNormalUse(SILInstruction *user) = 0;
+  virtual bool visitTake(CopyAddrInst *copy) = 0;
+  virtual bool visitDestroy(DestroyAddrInst *destroy) = 0;
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) = 0;
 };
 } // namespace
 
@@ -219,31 +219,44 @@ static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
                                            - Apply->getArgumentOperandNumber())
                  .isIndirectConvention()
              && "copy_addr location should be passed indirect");
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       continue;
     }
     if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
-      if (CopyInst->getSrc() == use->get() && CopyInst->isTakeOfSrc())
-        visitor.visitTake(CopyInst);
-      else
-        visitor.visitNormalUse(CopyInst);
+      if (CopyInst->getSrc() == use->get() && CopyInst->isTakeOfSrc()) {
+        if (!visitor.visitTake(CopyInst))
+          return false;
+      } else {
+        if (!visitor.visitNormalUse(CopyInst))
+          return false;
+      }
       continue;
     }
     if (auto *Destroy = dyn_cast<DestroyAddrInst>(UserInst)) {
-      visitor.visitDestroy(Destroy);
+      if (!visitor.visitDestroy(Destroy))
+        return false;
+
       continue;
     }
     switch (UserInst->getKind()) {
     case SILInstructionKind::LoadInst:
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       break;
     case SILInstructionKind::ExistentialMetatypeInst:
     case SILInstructionKind::InjectEnumAddrInst:
     case SILInstructionKind::StoreInst:
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       break;
     case SILInstructionKind::DebugValueAddrInst:
-      visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst));
+      if (!visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst)))
+        return false;
+
       break;
     case SILInstructionKind::DeallocStackInst:
       break;
@@ -497,20 +510,26 @@ class CopyForwarding {
   public:
     CopySrcUserVisitor(CopyForwarding &CPF) : CPF(CPF) {}
 
-    virtual void visitNormalUse(SILInstruction *user) {
+    virtual bool visitNormalUse(SILInstruction *user) {
       if (isa<LoadInst>(user))
         CPF.IsSrcLoadedFrom = true;
-      
-      CPF.SrcUserInsts.insert(user);
+
+      // Bail on multiple uses in the same instruction to avoid complexity.
+      return CPF.SrcUserInsts.insert(user).second;
     }
-    virtual void visitTake(CopyAddrInst *take) {
+    virtual bool visitTake(CopyAddrInst *take) {
+      if (take->getSrc() == take->getDest())
+        return false;
+
       CPF.TakePoints.push_back(take);
+      return true;
     }
-    virtual void visitDestroy(DestroyAddrInst *destroy) {
+    virtual bool visitDestroy(DestroyAddrInst *destroy) {
       CPF.DestroyPoints.push_back(destroy);
+      return true;
     }
-    virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
-      CPF.SrcDebugValueInsts.insert(debugValue);
+    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+      return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
   };
 
@@ -575,13 +594,18 @@ public:
   CopyDestUserVisitor(SmallPtrSetImpl<SILInstruction *> &DestUsers)
       : DestUsers(DestUsers) {}
 
-  virtual void visitNormalUse(SILInstruction *user) { DestUsers.insert(user); }
-  virtual void visitTake(CopyAddrInst *take) { DestUsers.insert(take); }
-  virtual void visitDestroy(DestroyAddrInst *destroy) {
-    DestUsers.insert(destroy);
+  virtual bool visitNormalUse(SILInstruction *user) {
+    // Bail on multiple uses in the same instruction to avoid complexity.
+    return DestUsers.insert(user).second;
   }
-  virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
-    DestUsers.insert(debugValue);
+  virtual bool visitTake(CopyAddrInst *take) {
+    return DestUsers.insert(take).second;
+  }
+  virtual bool visitDestroy(DestroyAddrInst *destroy) {
+    return DestUsers.insert(destroy).second;
+  }
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+    return DestUsers.insert(debugValue).second;
   }
 };
 } // end anonymous namespace
@@ -842,7 +866,10 @@ bool CopyForwarding::forwardPropagateCopy() {
     if (isa<DeallocStackInst>(UserInst))
       continue;
 
-    DirectDestUsers.insert(UserInst);
+    // Bail on multiple uses in the same instruction so that AnalyzeForwardUse
+    // does not need to deal with it.
+    if (!DirectDestUsers.insert(UserInst))
+      return false;
   }
   // Looking at
   //
