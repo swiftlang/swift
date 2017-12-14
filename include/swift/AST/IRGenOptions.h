@@ -71,21 +71,6 @@ public:
   std::vector<OutputPaths> OutputsForBatchMode;
   std::string OutputForSingleThreadedWMO;
   
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  /// I don't know why it needs the last one, but lldb needs this for now:
-  /// SwiftASTContext.cpp:4603 --  dmu
-  // FIXME: try the first one someday
-  StringRef getSingleOutputFilename() const {
-    if (!OutputForSingleThreadedWMO.empty())
-      return OutputForSingleThreadedWMO;
-    // FIXME for batch mode
-    if (OutputsForBatchMode.empty())
-      return StringRef();
-    assert(OutputsForBatchMode.size() == 1);
-    return OutputsForBatchMode[0].OutputFilename;
-  }
-  
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -206,6 +191,21 @@ public:
         EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
+  
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  /// I don't know why it needs the last one, but lldb needs this for now:
+  /// See SwiftASTContext.cpp:4603 --  dmu
+  // FIXME: try the first one someday
+  StringRef getSingleOutputFilename() const {
+    if (!OutputForSingleThreadedWMO.empty())
+      return OutputForSingleThreadedWMO;
+    // FIXME for batch mode
+    if (OutputsForBatchMode.empty())
+      return StringRef();
+    assert(OutputsForBatchMode.size() == 1);
+    return OutputsForBatchMode[0].OutputFilename;
+  }
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.
