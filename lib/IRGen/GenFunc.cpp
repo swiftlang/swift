@@ -969,7 +969,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       Explosion param;
       auto ref = rawData;
       // We can get a '{ swift.refcounted* }' type for AnyObject on linux.
-      if (!ref->getType()->isPointerTy() &&
+      if (!ti.getStorageType()->isPointerTy() &&
           ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal))
         ref = subIGF.coerceValue(rawData, ti.getStorageType(),
                                  subIGF.IGM.DataLayout);
