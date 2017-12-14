@@ -261,8 +261,8 @@ private:
   bool computeModuleName();
 
   bool computeOutputFilenames();
-  bool checkNumberOfOutputArguments(unsigned outArgCount,
-                                    unsigned fileCount) const;
+  bool checkNumberOfOutputArguments(unsigned outputArgumentCount,
+                                    unsigned filesNeedingOutputCount) const;
   bool computeOutputFilenamesForPrimary(StringRef primaryOrEmpty, StringRef correspondingOutputFile);
 
   void computeDumpScopeMapLocations();
@@ -709,25 +709,20 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 
 // Frontend is called with one directory output for testing
 static bool
-areOutputArgumentsUniqueDirectory(llvm::ArrayRef<std::string> outArgs) {
-  return outArgs.size() == 1 && llvm::sys::fs::is_directory(outArgs[0]);
+areOutputArgumentsUniqueDirectory(llvm::ArrayRef<std::string> outputFileArguments) {
+  return outputFileArguments.size() == 1 && llvm::sys::fs::is_directory(outputFileArguments[0]);
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     return false;
   }
-  std::vector<InputFile *> files = Opts.InputsAndOutputs.filesWithOutputs();
+  const std::vector<InputFile *> filesWithOutputs = Opts.InputsAndOutputs.filesWithOutputs();
 
-  ArrayRef<std::string> outArgs = getOutputFilenamesFromCommandLineOrFilelist();
+  ArrayRef<std::string> outputFileArguments = getOutputFilenamesFromCommandLineOrFilelist();
 
-  if (checkNumberOfOutputArguments(outArgs.size(), files.size())) {
-    Diags.diagnose(SourceLoc(),
-                   Opts.InputsAndOutputs.hasPrimaries()
-                       ? diag::error_output_files_must_correspond_to_primaries
-                       : diag::error_output_files_must_correspond_to_inputs);
+  if (checkNumberOfOutputArguments(outputFileArguments.size(), filesWithOutputs.size()))
     return true;
-  }
 
   // WMO threaded or batch mode or WMO one input
   llvm::function_ref<bool(StringRef, InputFile &)> assignUnaltered =
@@ -747,22 +742,22 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
     return deriveOutputFileFromInput(input);
   };
   llvm::function_ref<bool(StringRef, InputFile &)> fn =
-      areOutputArgumentsUniqueDirectory(outArgs)
+      areOutputArgumentsUniqueDirectory(outputFileArguments)
           ? deriveForDirectory
-          : outArgs.empty() ? deriveFromInput : assignUnaltered;
+          : outputFileArguments.empty() ? deriveFromInput : assignUnaltered;
 
-  for (auto i : indices(files))
-    if (fn(outArgs.empty() ? StringRef()
-                           : outArgs.size() == 1 ? StringRef(outArgs[0])
-                                                 : StringRef(outArgs[i]),
-           *files[i]))
+  for (auto i : indices(filesWithOutputs))
+    if (fn(outputFileArguments.empty() ? StringRef()
+                           : outputFileArguments.size() == 1 ? StringRef(outputFileArguments[0])
+                                                 : StringRef(outputFileArguments[i]),
+           *filesWithOutputs[i]))
       return true;
   return false;
 }
 
 bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(
-    unsigned outArgCount, unsigned fileCount) const {
-  if (outArgCount > 1 && outArgCount != fileCount) {
+    unsigned outputArgumentCount, unsigned filesNeedingOutputCount) const {
+  if (outputArgumentCount > 1 && outputArgumentCount != filesNeedingOutputCount) {
     Diags.diagnose(SourceLoc(),
                    Opts.InputsAndOutputs.hasPrimaries()
                        ? diag::error_output_files_must_correspond_to_primaries
@@ -919,11 +914,11 @@ bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
   
-  std::vector<InputFile *> files = Opts.InputsAndOutputs.filesWithOutputs();
+  std::vector<InputFile *> filesWithOutputs = Opts.InputsAndOutputs.filesWithOutputs();
 
-  for (auto i : indices(files)) {
-    determineSupplementaryOutputFilenames(suppFilelistArgs[i], *files[i]);
-    if (checkUnusedOutputPaths(*files[i]))
+  for (auto i : indices(filesWithOutputs)) {
+    determineSupplementaryOutputFilenames(suppFilelistArgs[i], *filesWithOutputs[i]);
+    if (checkUnusedOutputPaths(*filesWithOutputs[i]))
       return true;
   }
   return false;
