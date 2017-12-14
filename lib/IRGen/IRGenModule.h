@@ -509,7 +509,6 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
   llvm::CallingConv::ID SwiftCC;     /// swift calling convention
-  bool UseSwiftCC;
 
   Signature getAssociatedTypeMetadataAccessFunctionSignature();
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
@@ -1055,6 +1054,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
+  llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                                 ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                  ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,

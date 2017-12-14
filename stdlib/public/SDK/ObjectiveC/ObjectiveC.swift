@@ -25,7 +25,7 @@ import _SwiftObjectiveCOverlayShims
 /// ObjCBool.
 @_fixed_layout
 public struct ObjCBool : ExpressibleByBooleanLiteral {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var _value: Int8
 
@@ -48,7 +48,7 @@ public struct ObjCBool : ExpressibleByBooleanLiteral {
 
   /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
     return _value != 0
 #else
     return _value

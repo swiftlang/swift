@@ -46,6 +46,22 @@
 
 using namespace swift;
 
+// Check to make sure the runtime is being built with a compiler that
+// supports the Swift calling convention.
+//
+// If the Swift calling convention is not in use, functions such as 
+// swift_allocBox and swift_makeBoxUnique that rely on their return value 
+// being passed in a register to be compatible with Swift may miscompile on
+// some platforms and silently fail.
+#if !__has_attribute(swiftcall)
+#error "The runtime must be built with a compiler that supports swiftcall."
+#endif
+
+// Check that the user isn't manually disabling SWIFTCALL.
+#if defined(SWIFT_USE_SWIFTCALL) && !SWIFT_USE_SWIFTCALL
+#error "SWIFT_USE_SWIFTCALL=0 is not supported; swiftcall must always be used."
+#endif
+
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
@@ -203,11 +219,11 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-BoxPair::Return swift::swift_allocBox(const Metadata *type) {
+BoxPair swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
-BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
+BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
   auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
   HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
@@ -219,8 +235,8 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
     // Copy the data.
-    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
-    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    type->vw_initializeWithCopy(refAndObjectAddr.buffer, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.object;
     // Release ownership of the old box.
     swift_release(box);
     return refAndObjectAddr;
@@ -234,7 +250,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
-BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
+BoxPair SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 

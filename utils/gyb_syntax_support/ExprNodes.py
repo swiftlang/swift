@@ -32,7 +32,7 @@ EXPR_NODES = [
     # try foo()
     # try? foo()
     # try! foo()
-    Node('TryOperator', kind='Syntax',
+    Node('TryExpr', kind='Expr',
          children=[
              Child('TryKeyword', kind='TryToken'),
              Child('QuestionOrExclamationMark', kind='Token',
@@ -41,6 +41,7 @@ EXPR_NODES = [
                        'PostfixQuestionMarkToken',
                        'ExclamationMarkToken',
                    ]),
+             Child('Expression', kind='Expr'),
          ]),
 
     # An identifier expression.
@@ -255,5 +256,63 @@ EXPR_NODES = [
                        'ExclamationMarkToken',
                    ]),
              Child("TypeName", kind='Type')
+         ]),
+
+    # Type
+    Node('TypeExpr', kind='Expr',
+         children=[
+             Child('Type', kind='Type'),
+         ]),
+
+    Node('ClosureCaptureItem', kind='Syntax',
+         children=[
+             Child("Specifier", kind='TokenList', is_optional=True),
+             Child("Name", kind='IdentifierToken', is_optional=True),
+             Child('AssignToken', kind='EqualToken', is_optional=True),
+             Child("Expression", kind='Expr'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('ClosureCaptureItemList', kind='SyntaxCollection',
+         element='ClosureCaptureItem'),
+
+    Node('ClosureCaptureSignature', kind='Syntax',
+         children=[
+             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('Items', kind='ClosureCaptureItemList', is_optional=True),
+             Child('RightSquare', kind='RightSquareToken'),
+         ]),
+
+    Node('ClosureParam', kind='Syntax',
+         children=[
+             Child('Name', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ]),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # a, b, c
+    Node('ClosureParamList', kind='SyntaxCollection', element='ClosureParam'),
+
+    Node('ClosureSignature', kind='Syntax',
+         children=[
+             Child('Capture', kind='ClosureCaptureSignature',
+                   is_optional=True),
+             # FIXME: one and only one of these two children is required
+             Child('SimpleInput', kind='ClosureParamList', is_optional=True),
+             Child('Input', kind='ParameterClause', is_optional=True),
+             Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
+             Child('InTok', kind='InToken'),
+         ]),
+
+    Node('ClosureExpr', kind='Expr',
+         children=[
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('Signature', kind='ClosureSignature', is_optional=True),
+             Child('Statements', kind='StmtList'),
+             Child('RightBrace', kind='RightBraceToken'),
          ]),
 ]

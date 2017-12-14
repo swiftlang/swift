@@ -219,8 +219,8 @@ FunctionParameterSyntax getCannedFunctionParameter() {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
-  return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
-                                              IntAnnotation, NoEllipsis, Equal,
+  return SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName, Colon,
+                                              Int, NoEllipsis, Equal,
                                               One, Comma);
 }
 
@@ -256,13 +256,13 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
-  auto Param = SyntaxFactory::makeFunctionParameter(ExternalName, LocalName,
-                                                    Colon, IntAnnotation,
+  auto Param = SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName,
+                                                    Colon, Int,
                                                     NoEllipsis, Equal, One,
                                                     Comma);
 
-  ASSERT_EQ(ExternalName.getRaw(), Param.getExternalName()->getRaw());
-  ASSERT_EQ(LocalName.getRaw(), Param.getLocalName().getRaw());
+  ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName().getRaw());
+  ASSERT_EQ(LocalName.getRaw(), Param.getSecondName()->getRaw());
   ASSERT_EQ(Colon.getRaw(), Param.getColon().getRaw());
 
   auto GottenType = Param.getTypeAnnotation();
@@ -306,10 +306,10 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter()
-      .withExternalName(ExternalName)
-      .withLocalName(LocalName)
+      .withFirstName(ExternalName)
+      .withSecondName(LocalName)
       .withColon(Colon)
-      .withTypeAnnotation(IntAnnotation)
+      .withTypeAnnotation(Int)
       .withDefaultEquals(Equal)
       .withDefaultValue(One)
       .withTrailingComma(Comma)
@@ -358,13 +358,13 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
     .appending(Param)
     .castTo<FunctionParameterListSyntax>();
   auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
+  auto Parameter = SyntaxFactory::makeParameterClause(LParen, List, RParen);
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
-  auto NoAttributes = SyntaxFactory::makeBlankAttributeList();
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
+  auto Return = SyntaxFactory::makeReturnClause(Arrow, Int);
 
-  return SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
-                                              Arrow, NoAttributes, Int);
+  return SyntaxFactory::makeFunctionSignature(Parameter, Throws, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -396,19 +396,21 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
   auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
-  auto NoAttributes = SyntaxFactory::makeBlankAttributeList();
+
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
 
-  auto Sig = SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
-                                                  Arrow, NoAttributes, Int);
+  auto Sig = SyntaxFactory::makeFunctionSignature(
+    SyntaxFactory::makeParameterClause(LParen, List, RParen),
+    Throws,
+    SyntaxFactory::makeReturnClause(Arrow, Int));
 
-  ASSERT_EQ(LParen.getRaw(), Sig.getLeftParen().getRaw());
+  ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
 
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenList1 = Sig.getParameterList();
-    auto GottenList2 = Sig.getParameterList();
+    auto GottenList1 = Sig.getInput().getParameterList();
+    auto GottenList2 = Sig.getInput().getParameterList();
     ASSERT_TRUE(GottenList1.hasSameIdentityAs(GottenList2));
     GottenList1.print(OS);
     ASSERT_EQ(OS.str().str(),
@@ -417,25 +419,16 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
               "with radius: Int = -1, ");
   }
 
-  ASSERT_EQ(RParen.getRaw(), Sig.getRightParen().getRaw());
+  ASSERT_EQ(RParen.getRaw(), Sig.getInput().getRightParen().getRaw());
   ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrowsKeyword()->getRaw());
   ASSERT_EQ(Sig.getThrowsOrRethrowsKeyword()->getTokenKind(), tok::kw_throws);
-  ASSERT_EQ(Arrow.getRaw(), Sig.getArrow()->getRaw());
-
-  {
-    SmallString<48> Scratch;
-    llvm::raw_svector_ostream OS(Scratch);
-    auto GottenAttrs1 = Sig.getReturnTypeAttributes().getValue();
-    auto GottenAttrs2 = Sig.getReturnTypeAttributes().getValue();
-    ASSERT_TRUE(GottenAttrs1.hasSameIdentityAs(GottenAttrs2));
-    ASSERT_EQ(OS.str().str(), "");
-  }
+  ASSERT_EQ(Arrow.getRaw(), Sig.getOutput()->getArrow().getRaw());
 
   {
     SmallString<3> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenReturnType1 = Sig.getReturnType().getValue();
-    auto GottenReturnType2 = Sig.getReturnType().getValue();
+    auto GottenReturnType1 = Sig.getOutput()->getReturnType();
+    auto GottenReturnType2 = Sig.getOutput()->getReturnType();
     ASSERT_TRUE(GottenReturnType1.hasSameIdentityAs(GottenReturnType2));
     GottenReturnType1.print(OS);
     ASSERT_EQ(OS.str().str(), "Int");
@@ -453,19 +446,16 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
-  auto NoAttributes = SyntaxFactory::makeBlankAttributeList();
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
 
+  auto Parameter = SyntaxFactory::makeParameterClause(LParen, List, RParen);
+  auto Return = SyntaxFactory::makeReturnClause(Arrow, Int);
   SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankFunctionSignature()
-    .withLeftParen(LParen)
-    .withParameterList(List)
-    .withRightParen(RParen)
+    .withInput(Parameter)
     .withThrowsOrRethrowsKeyword(Throws)
-    .withReturnTypeAttributes(NoAttributes)
-    .withArrow(Arrow)
-    .withReturnType(Int)
+    .withOutput(Return)
     .print(OS);
   ASSERT_EQ(OS.str().str(),
             "(with radius: Int = -1, "

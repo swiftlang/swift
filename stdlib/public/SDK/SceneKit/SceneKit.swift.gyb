@@ -22,7 +22,7 @@ from gyb_foundation_support import \
 
 // MARK: Exposing SCNFloat
 
-#if os(OSX)
+#if os(macOS)
 public typealias SCNFloat = CGFloat
 #elseif os(iOS) || os(tvOS) || os(watchOS)
 public typealias SCNFloat = Float

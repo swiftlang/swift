@@ -96,6 +96,17 @@ function(_construct_sources_for_multibench sources_out objfile_out)
   set(${objfile_out} ${objfiles} PARENT_SCOPE)
 endfunction()
 
+function(add_opt_view opt_view_main_dir, module_name, opt_view_dir_out)
+  set(opt_view_dir "${opt_view_main_dir}/${module_name}")
+  set(opt_record "${objdir}/${module_name}.opt.yaml")
+  set(opt_viewer "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
+  add_custom_command(
+    OUTPUT ${opt_view_dir}
+    DEPENDS "${objfile}"
+    COMMAND ${opt_viewer} ${opt_record} "-o" ${opt_view_dir})
+  set(${opt_view_dir_out} ${opt_view_dir} PARENT_SCOPE)
+endfunction()
+
 # Regular whole-module-compilation: only a single object file is
 # generated.
 function (add_swift_multisource_wmo_benchmark_library objfile_out)
@@ -201,14 +212,14 @@ function (swift_benchmark_compile_archopts)
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
 
-  set(optview_main_dir)
+  set(opt_view_main_dir)
   if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
     precondition(SWIFT_BENCHMARK_BUILT_STANDALONE NEGATE
       "Opt-viewer is not supported when running the benchmarks outside the Swift tree")
 
     if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
       list(APPEND common_options "-save-optimization-record")
-      set(optview_main_dir "${objdir}/opt-view")
+      set(opt_view_main_dir "${objdir}/opt-view")
     endif()
   endif()
 
@@ -337,14 +348,10 @@ function (swift_benchmark_compile_archopts)
             "${source}")
       endif()
 
-      if(optview_main_dir)
-        set(opt_record "${objdir}/${module_name}.opt.yaml")
-        set(opt_viewer "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
-        set(opt_view_dir "${optview_main_dir}/${module_name}")
-        add_custom_command(
-            OUTPUT ${opt_view_dir}
-            DEPENDS "${objfile}"
-            COMMAND ${opt_viewer} ${opt_record} "-o" ${opt_view_dir})
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
         list(APPEND opt_view_dirs ${opt_view_dir})
       endif()
     endif()
@@ -365,6 +372,13 @@ function (swift_benchmark_compile_archopts)
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
+
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
+        list(APPEND opt_view_dirs ${opt_view_dir})
+      endif()
     else()
       set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out
@@ -394,6 +408,13 @@ function (swift_benchmark_compile_archopts)
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
+
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
+        list(APPEND opt_view_dirs ${opt_view_dir})
+      endif()
     else()
       set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out

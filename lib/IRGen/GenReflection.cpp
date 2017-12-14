@@ -766,7 +766,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   case llvm::Triple::COFF:
     assert(FourCC.size() <= 4 &&
            "COFF section name length must be <= 8 characters");
-    OS << ".sw3" << FourCC;
+    OS << ".sw3" << FourCC << "$B";
     break;
   case llvm::Triple::ELF:
     OS << "swift3_" << LongName;

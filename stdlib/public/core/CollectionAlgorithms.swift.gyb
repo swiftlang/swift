@@ -273,12 +273,12 @@ extension MutableCollection {
       swapAt(
         index(
           startIndex,
-          offsetBy: IndexDistance(amount),
+          offsetBy: amount,
           limitedBy: endIndex
         )!,
         index(
           startIndex,
-          offsetBy: IndexDistance(random),
+          offsetBy: Int(random),
           limitedBy: endIndex
         )!
       )

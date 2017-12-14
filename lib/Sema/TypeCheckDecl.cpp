@@ -3969,6 +3969,10 @@ public:
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
       }
+      if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+        if (!protocol->hasFixedLayout())
+          TC.inferDefaultWitnesses(protocol);
+      }
     }
   }
 
@@ -4250,8 +4254,6 @@ public:
     SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
-    assert(dc->isTypeContext() &&
-           "Decl parsing must prevent subscripts outside of types!");
 
     if (auto gp = SD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
@@ -6623,18 +6625,22 @@ public:
       
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
-        auto diagID = diag::override_with_stored_property;
+        bool downgradeToWarning = false;
         if (!TC.Context.isSwiftVersionAtLeast(5) &&
             overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
           // Swift 4.0 had a bug where lazy properties were considered
           // computed by the time of this check. Downgrade this diagnostic to
           // a warning.
-          diagID = diag::override_with_stored_property_warn;
+          downgradeToWarning = true;
         }
+        auto diagID = downgradeToWarning ?
+            diag::override_with_stored_property_warn :
+            diag::override_with_stored_property;
         TC.diagnose(overrideASD, diagID,
                     overrideASD->getBaseName().getIdentifier());
         TC.diagnose(baseASD, diag::property_override_here);
-        return true;
+        if (!downgradeToWarning)
+          return true;
       }
 
       // Make sure that an observing property isn't observing something
@@ -6681,9 +6687,18 @@ public:
     if ((base->getDeclContext()->isExtensionContext() ||
          override->getDeclContext()->isExtensionContext()) &&
         !base->isObjC() && !isKnownObjC) {
-      TC.diagnose(override, diag::override_decl_extension,
-                  !override->getDeclContext()->isExtensionContext());
-      TC.diagnose(base, diag::overridden_here);
+      bool baseCanBeObjC = TC.canBeRepresentedInObjC(base);
+      TC.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
+                  !base->getDeclContext()->isExtensionContext());
+      if (baseCanBeObjC) {
+        SourceLoc insertionLoc =
+          override->getAttributeInsertionLoc(/*forModifier=*/false);
+        TC.diagnose(base, diag::overridden_here_can_be_objc)
+          .fixItInsert(insertionLoc, "@objc ");
+      } else {
+        TC.diagnose(base, diag::overridden_here);
+      }
+
       return true;
     }
     

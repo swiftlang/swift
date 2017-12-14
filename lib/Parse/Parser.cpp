@@ -460,9 +460,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
-      SourceMgr.findBufferContainingLoc(ParserPos.Loc) == L->getBufferID()) {
-    auto BeginParserPosition = getParserPosition(ParserPos);
-    restoreParserPosition(BeginParserPosition);
+      L->isStateForCurrentBuffer(ParserPos.LS)) {
+    restoreParserPosition(ParserPos);
     InPoundLineEnvironment = State->InPoundLineEnvironment;
   }
 }
@@ -842,6 +841,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::DictionaryElement;
   case SyntaxKind::TupleElementList:
     return SyntaxKind::TupleElement;
+  case SyntaxKind::FunctionParameterList:
+    return SyntaxKind::FunctionParameter;
   default:
     return SyntaxKind::Unknown;
   }

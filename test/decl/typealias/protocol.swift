@@ -252,3 +252,29 @@ protocol P9 {
 
 func testT9a<T: P9, U>(_: T, _: U) where T.A == U { }
 func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{'T.A' cannot be equal to both 'Float' and 'P9.A' (aka 'Int')}}
+
+
+struct X<T> { }
+
+protocol P10 {
+  associatedtype A
+  typealias T = Int
+
+  @available(*, deprecated, message: "just use Int, silly")
+  typealias V = Int
+}
+
+extension P10 {
+  typealias U = Float
+}
+
+extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('P10.T' (aka 'Int') or 'Int') refers to a generic parameter  or associated type}}
+
+extension P10 where A == X<T> { }
+
+extension P10 where A == X<U> { } // expected-error{{use of undeclared type 'U'}}
+
+extension P10 where A == X<Self.U> { }
+
+extension P10 where V == Int { } // expected-warning 3{{'V' is deprecated: just use Int, silly}}
+// expected-warning@-1{{neither type in same-type constraint ('P10.V' (aka 'Int') or 'Int') refers to a generic parameter  or associated type}}

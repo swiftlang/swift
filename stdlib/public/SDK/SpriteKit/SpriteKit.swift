@@ -15,7 +15,7 @@ import simd
 
 // SpriteKit defines SKColor using a macro.
 
-#if os(OSX)
+#if os(macOS)
 public typealias SKColor = NSColor
 #elseif os(iOS) || os(tvOS) || os(watchOS)
 public typealias SKColor = UIColor

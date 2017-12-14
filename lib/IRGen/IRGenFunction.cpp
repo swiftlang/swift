@@ -394,11 +394,12 @@ llvm::Value *Offset::getAsValue(IRGenFunction &IGF) const {
   }
 }
 
-Offset Offset::offsetBy(IRGenFunction &IGF, Offset other) const {
-  if (isStatic() && other.isStatic()) {
-    return Offset(getStatic() + other.getStatic());
+Offset Offset::offsetBy(IRGenFunction &IGF, Size other) const {
+  if (isStatic()) {
+    return Offset(getStatic() + other);
   }
-  return Offset(IGF.Builder.CreateAdd(getDynamic(), other.getDynamic()));
+  auto otherVal = llvm::ConstantInt::get(IGF.IGM.SizeTy, other.getValue());
+  return Offset(IGF.Builder.CreateAdd(getDynamic(), otherVal));
 }
 
 Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,

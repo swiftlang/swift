@@ -216,15 +216,3 @@ internal func donotEliminate() {
 
 // CHECK-TESTING-LABEL: sil_witness_table [serialized] Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
-
-// CHECK-LABEL: sil_default_witness_table hidden Prot
-// CHECK:  no_default
-// CHECK:  no_default
-// CHECK:  method #Prot.aliveDefaultWitness!1: {{.*}} : @{{.*}}aliveDefaultWitness
-// CHECK:  no_default
-
-// CHECK-TESTING-LABEL: sil_default_witness_table Prot
-// CHECK-TESTING:  no_default
-// CHECK-TESTING:  no_default
-// CHECK-TESTING:  method #Prot.aliveDefaultWitness!1: {{.*}} : @{{.*}}aliveDefaultWitness
-// CHECK-TESTING:  method #Prot.DeadDefaultWitness!1: {{.*}} : @{{.*}}DeadDefaultWitness

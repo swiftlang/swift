@@ -376,39 +376,6 @@ class RefCountBitsT {
     setField(UseSlowRC, value);
   }
 
-    
-  // Returns true if the decrement is a fast-path result.
-  // Returns false if the decrement should fall back to some slow path
-  // (for example, because UseSlowRC is set
-  // or because the refcount is now zero and should deinit).
-  template <ClearPinnedFlag clearPinnedFlag>
-  LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool doDecrementStrongExtraRefCount(uint32_t dec) {
-#ifndef NDEBUG
-    if (!hasSideTable()) {
-      // Can't check these assertions with side table present.
-      
-      // clearPinnedFlag assumes the flag is already set.
-      if (clearPinnedFlag)
-        assert(getIsPinned() && "unpinning reference that was not pinned");
-
-      if (getIsDeiniting())
-        assert(getStrongExtraRefCount() >= dec  &&  
-               "releasing reference whose refcount is already zero");
-      else 
-        assert(getStrongExtraRefCount() + 1 >= dec  &&  
-               "releasing reference whose refcount is already zero");
-    }
-#endif
-
-    BitsType unpin = (clearPinnedFlag
-                      ? (BitsType(1) << Offsets::IsPinnedShift)
-                      : 0);
-    // This deliberately underflows by borrowing from the UseSlowRC field.
-    bits -= unpin + (BitsType(dec) << Offsets::StrongExtraRefCountShift);
-    return (SignedBitsType(bits) >= 0);
-  }
-
   public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -553,15 +520,38 @@ class RefCountBitsT {
     return (SignedBitsType(bits) >= 0);
   }
 
-  // FIXME: I don't understand why I can't make clearPinned a template argument
-  // (compiler balks at calls from class RefCounts that way)
+  // Returns true if the decrement is a fast-path result.
+  // Returns false if the decrement should fall back to some slow path
+  // (for example, because UseSlowRC is set
+  // or because the refcount is now zero and should deinit).
+  template <ClearPinnedFlag clearPinnedFlag>
   LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool decrementStrongExtraRefCount(uint32_t dec, bool clearPinned = false) {
-    if (clearPinned) 
-      return doDecrementStrongExtraRefCount<DoClearPinnedFlag>(dec);
-    else
-      return doDecrementStrongExtraRefCount<DontClearPinnedFlag>(dec);
+  bool decrementStrongExtraRefCount(uint32_t dec) {
+#ifndef NDEBUG
+    if (!hasSideTable()) {
+      // Can't check these assertions with side table present.
+
+      // clearPinnedFlag assumes the flag is already set.
+      if (clearPinnedFlag)
+        assert(getIsPinned() && "unpinning reference that was not pinned");
+
+      if (getIsDeiniting())
+        assert(getStrongExtraRefCount() >= dec  &&
+               "releasing reference whose refcount is already zero");
+      else
+        assert(getStrongExtraRefCount() + 1 >= dec  &&
+               "releasing reference whose refcount is already zero");
+    }
+#endif
+
+    BitsType unpin = (clearPinnedFlag
+                      ? (BitsType(1) << Offsets::IsPinnedShift)
+                      : 0);
+    // This deliberately underflows by borrowing from the UseSlowRC field.
+    bits -= unpin + (BitsType(dec) << Offsets::StrongExtraRefCountShift);
+    return (SignedBitsType(bits) >= 0);
   }
+
   // Returns the old reference count before the increment.
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   uint32_t incrementUnownedRefCount(uint32_t inc) {
@@ -1023,7 +1013,8 @@ class RefCounts {
     do {
       newbits = oldbits;
       
-      bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+      bool fast =
+        newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
       if (fast) {
         // Decrement completed normally. New refcount is not zero.
         deinitNow = false;
@@ -1062,7 +1053,8 @@ class RefCounts {
     bool deinitNow;
     auto newbits = oldbits;
 
-    bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+    bool fast =
+      newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
     if (fast) {
       // Decrement completed normally. New refcount is not zero.
       deinitNow = false;
@@ -1104,7 +1096,8 @@ class RefCounts {
     
     do {
       newbits = oldbits;
-      bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+      bool fast =
+        newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
       if (!fast)
         // Slow paths include side table; deinit; underflow
         return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
@@ -1488,7 +1481,7 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
     return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
   auto newbits = oldbits;
-  bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+  bool fast = newbits.decrementStrongExtraRefCount<clearPinnedFlag>(dec);
   if (!fast)
     return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 

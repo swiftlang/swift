@@ -1258,6 +1258,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
@@ -1344,6 +1345,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return true;
 
   case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return ::isAvailableExternally(IGM, getDecl());
@@ -2389,7 +2391,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     sectionName = "swift2_protocol_conformances";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2prtc";
+    sectionName = ".sw2prtc$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
@@ -2412,7 +2414,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     sectionName = "swift2_type_metadata";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2tymd";
+    sectionName = ".sw2tymd$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
@@ -2817,6 +2819,15 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
   
   return addr;
+}
+
+/// Returns the address of a class metadata base offset.
+llvm::Constant *
+IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                              ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forClassMetadataBaseOffset(D);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+                               SizeTy, DebugTypeInfo());
 }
 
 /// Return the address of a nominal type descriptor.  Right now, this

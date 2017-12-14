@@ -18,12 +18,14 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -417,6 +419,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
+    ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
     switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
     case tok::exclaim_postfix:
       sub = makeParserResult(
@@ -1563,6 +1566,11 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
   case tok::kw_Any: { // Any
     auto SynResult = parseAnyType();
     auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
+    if (SynResult.hasSyntax()) {
+      TypeExprSyntaxBuilder Builder;
+      Builder.useType(SynResult.getSyntax());
+      SyntaxContext->addSyntax(Builder.build());
+    }
     Result = makeParserResult(expr);
     break;
   }
@@ -1920,13 +1928,13 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       TmpContext.setDiscard();
 
       // Create a temporary lexer that lexes from the body of the string.
-      Lexer::State BeginState =
+      LexerState BeginState =
           L->getStateForBeginningOfTokenLoc(Segment.Loc);
       // We need to set the EOF at r_paren, to prevent the Lexer from eagerly
       // trying to lex the token beyond it. Parser::parseList() does a special
       // check for a tok::EOF that is spelled with a ')'.
       // FIXME: This seems like a hack, there must be a better way..
-      Lexer::State EndState = BeginState.advance(Segment.Length-1);
+      LexerState EndState = BeginState.advance(Segment.Length-1);
       Lexer LocalLex(*L, BeginState, EndState);
 
       // Temporarily swap out the parser's current lexer with our new one.
@@ -2229,8 +2237,8 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
       SourceLoc TypeStartLoc = PlaceholderTok.getLoc().getAdvancedLoc(Offset);
       SourceLoc TypeEndLoc = TypeStartLoc.getAdvancedLoc(TyStr.size());
 
-      Lexer::State StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
-      Lexer::State EndState = L->getStateForBeginningOfTokenLoc(TypeEndLoc);
+      LexerState StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
+      LexerState EndState = L->getStateForBeginningOfTokenLoc(TypeEndLoc);
 
       // Create a lexer for the type sub-string.
       Lexer LocalLex(*L, StartState, EndState);
@@ -2367,12 +2375,23 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
     // No closure signature.
     return false;
   }
-
-  // At this point, we know we have a closure signature. Parse the capture list
-  // and parameters.
-  if (consumeIf(tok::l_square) &&
-      !consumeIf(tok::r_square)) {
+  SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
+  if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
+    SyntaxParsingContext CaptureCtx(SyntaxContext,
+                                    SyntaxKind::ClosureCaptureSignature);
+    consumeToken(tok::l_square);
+    consumeToken(tok::r_square);
+  } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
+    SyntaxParsingContext CaptureCtx(SyntaxContext,
+                                    SyntaxKind::ClosureCaptureSignature);
+    consumeToken(tok::l_square);
+    // At this point, we know we have a closure signature. Parse the capture list
+    // and parameters.
+    bool HasNext;
     do {
+      SyntaxParsingContext CapturedItemCtx(SyntaxContext,
+                                           SyntaxKind::ClosureCaptureItem);
+      SWIFT_DEFER { HasNext = consumeIf(tok::comma); };
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
@@ -2411,6 +2430,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         skipUntil(tok::comma, tok::r_square);
         continue;
       }
+
+      // Squash all tokens, if any, as the specifier of the captured item.
+      CapturedItemCtx.collectNodesInPlace(SyntaxKind::TokenList);
 
       // The thing being capture specified is an identifier, or as an identifier
       // followed by an expression.
@@ -2465,8 +2487,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                              CurDeclContext);
 
       captureList.push_back(CaptureListEntry(VD, PBD));
-    } while (consumeIf(tok::comma));
+    } while (HasNext);
 
+    SyntaxContext->collectNodesInPlace(SyntaxKind::ClosureCaptureItemList);
     // The capture list needs to be closed off with a ']'.
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);
@@ -2486,9 +2509,13 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       else
         invalid = true;
     } else {
+      SyntaxParsingContext ClParamListCtx(SyntaxContext,
+                                          SyntaxKind::ClosureParamList);
       // Parse identifier (',' identifier)*
       SmallVector<ParamDecl*, 4> elements;
+      bool HasNext;
       do {
+        SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           invalid = true;
@@ -2502,9 +2529,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                            Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
- 
+
         // Consume a comma to continue.
-      } while (consumeIf(tok::comma));
+        HasNext = consumeIf(tok::comma);
+      } while (HasNext);
 
       params = ParameterList::create(Context, elements);
     }
@@ -2519,6 +2547,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
+      SyntaxParsingContext ReturnCtx(SyntaxContext, SyntaxKind::ReturnClause);
       // Consume the '->'.
       arrowLoc = consumeToken();
 
@@ -2613,7 +2642,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
 ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
-
+  SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
   // We may be parsing this closure expr in a matching pattern context.  If so,
   // reset our state to not be in a pattern for any recursive pattern parses.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>

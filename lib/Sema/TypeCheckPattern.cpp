@@ -719,20 +719,33 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
 
   bool hadError = false;
 
+  auto &TL = decl->getTypeLoc();
+
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
-  if (!decl->getTypeLoc().isNull()) {
-    hadError |= TC.validateType(decl->getTypeLoc(), DC,
+  if (!TL.isNull()) {
+    hadError |= TC.validateType(TL, DC,
                                 elementOptions, &resolver);
   }
 
-  Type Ty = decl->getTypeLoc().getType();
+  // If this is declared with '!' indicating that it is an Optional
+  // that we should implicitly unwrap if doing so is required to type
+  // check, then add an attribute to the decl.
+  if (elementOptions.contains(TypeResolutionFlags::AllowIUO)
+      && TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
+      TypeReprKind::ImplicitlyUnwrappedOptional) {
+    auto &C = DC->getASTContext();
+    decl->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+  }
+
+  Type Ty = TL.getType();
   if (decl->isVariadic() && !Ty.isNull() && !hadError) {
     Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
     if (Ty.isNull()) {
       hadError = true;
     }
-    decl->getTypeLoc().setType(Ty);
+    TL.setType(Ty);
   }
 
   // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
@@ -751,7 +764,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   }
 
   if (hadError)
-    decl->getTypeLoc().setType(ErrorType::get(TC.Context), /*validated*/true);
+    TL.setType(ErrorType::get(TC.Context), /*validated*/true);
 
   return hadError;
 }

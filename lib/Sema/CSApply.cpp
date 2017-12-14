@@ -321,6 +321,85 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
+/// Determine whether the given type refers to a non-final class (or
+/// dynamic self of one).
+static bool isNonFinalClass(Type type) {
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
+
+  if (auto classDecl = type->getClassOrBoundGenericClass())
+    return !classDecl->isFinal();
+
+  if (auto archetype = type->getAs<ArchetypeType>())
+    if (auto super = archetype->getSuperclass())
+      return isNonFinalClass(super);
+
+  return false;
+}
+
+// Non-required constructors may not be not inherited. Therefore when
+// constructing a class object, either the metatype must be statically
+// derived (rather than an arbitrary value of metatype type) or the referenced
+// constructor must be required.
+static bool
+diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
+                                            Expr *base,
+                                            DeclNameLoc memberRefLoc,
+                                            ConstructorDecl *ctorDecl,
+                                            bool SuppressDiagnostics) {
+  auto &tc = cs.getTypeChecker();
+  auto baseTy = cs.getType(base)->getRValueType();
+  auto instanceTy = baseTy->getRValueInstanceType();
+
+  bool isStaticallyDerived =
+    base->isStaticallyDerivedMetatype(
+      [&](const Expr *expr) -> Type {
+        return cs.getType(expr);
+      });
+
+  // 'super.' is always OK
+  if (isa<SuperRefExpr>(base))
+    return true;
+
+  // 'self.' reference with concrete type is OK
+  if (isa<DeclRefExpr>(base) &&
+      cast<DeclRefExpr>(base)->getDecl()->getBaseName() == tc.Context.Id_self &&
+      !baseTy->is<ArchetypeType>())
+    return true;
+
+  // FIXME: The "hasClangNode" check here is a complete hack.
+  if (isNonFinalClass(instanceTy) &&
+      !isStaticallyDerived &&
+      !ctorDecl->hasClangNode() &&
+      !(ctorDecl->isRequired() ||
+        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
+    if (SuppressDiagnostics)
+      return false;
+
+    tc.diagnose(memberRefLoc, diag::dynamic_construct_class, instanceTy)
+      .highlight(base->getSourceRange());
+    auto ctor = cast<ConstructorDecl>(ctorDecl);
+    tc.diagnose(ctorDecl, diag::note_nonrequired_initializer,
+                ctor->isImplicit(), ctor->getFullName());
+  // Constructors cannot be called on a protocol metatype, because there is no
+  // metatype to witness it.
+  } else if (isa<ConstructorDecl>(ctorDecl) &&
+             baseTy->is<MetatypeType>() &&
+             instanceTy->isExistentialType()) {
+    if (SuppressDiagnostics)
+      return false;
+
+    if (isStaticallyDerived) {
+      tc.diagnose(memberRefLoc, diag::construct_protocol_by_name, instanceTy)
+        .highlight(base->getSourceRange());
+    } else {
+      tc.diagnose(memberRefLoc, diag::construct_protocol_value, baseTy)
+        .highlight(base->getSourceRange());
+    }
+  }
+  return true;
+}
+
 namespace {
 
   /// \brief Rewrites an expression by applying the solution of a constraint
@@ -424,8 +503,7 @@ namespace {
     /// \brief Coerce an expression of implicitly unwrapped optional type to its
     /// underlying value type, in the correct way for an implicit
     /// look-through.
-    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
-                                         ConstraintLocatorBuilder locator);
+    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
 
     /// \brief Build a collection upcast expression.
     ///
@@ -814,7 +892,7 @@ namespace {
       // through ImplicitlyUnwrappedOptional<T>.
       if (!Implicit) {
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
           baseTy = objTy;
         }
       }
@@ -825,12 +903,12 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
+
         // If the member is a constructor, verify that it can be legally
         // referenced from this base.
         if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          cs.setExprTypes(base);
-          if (!tc.diagnoseInvalidDynamicConstructorReferences(base, memberLoc,
-                                           baseMeta, ctor, SuppressDiagnostics))
+          if (!diagnoseInvalidDynamicConstructorReferences(cs, base, memberLoc,
+                                           ctor, SuppressDiagnostics))
             return nullptr;
         }
       }
@@ -1331,7 +1409,7 @@ namespace {
         if (auto pathTy = cs.lookThroughImplicitlyUnwrappedOptionalType(keyPathExprTy)) {
           keyPathExprTy = pathTy;
           indexKP = coerceImplicitlyUnwrappedOptionalToValue(
-            indexKP, keyPathExprTy, locator);
+            indexKP, keyPathExprTy);
         }
 
         Type valueTy;
@@ -1416,7 +1494,7 @@ namespace {
 
       // Handle accesses that implicitly look through ImplicitlyUnwrappedOptional<T>.
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         baseTy = cs.getType(base);
       }
 
@@ -2466,6 +2544,13 @@ namespace {
                            ConstructorDecl *ctor,
                            FunctionRefKind functionRefKind,
                            Type openedType) {
+
+      // If the member is a constructor, verify that it can be legally
+      // referenced from this base.
+      if (!diagnoseInvalidDynamicConstructorReferences(cs, base, nameLoc,
+                                                       ctor, SuppressDiagnostics))
+        return nullptr;
+
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
@@ -2568,8 +2653,7 @@ namespace {
         // Look through an implicitly unwrapped optional.
         auto baseTy = cs.getType(base);
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                         cs.getConstraintLocator(base));
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
           baseTy = objTy;
         }
 
@@ -2617,8 +2701,7 @@ namespace {
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = cs.getType(base)->getRValueType();
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                         cs.getConstraintLocator(base));
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         }
 
         Type toType = simplifyType(cs.getType(expr));
@@ -2874,8 +2957,7 @@ namespace {
       auto base = expr->getBase();
       auto baseTy = cs.getType(base)->getRValueType();
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                              cs.getConstraintLocator(base));
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         expr->setBase(base);
       }
 
@@ -5105,7 +5187,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
     if (ty->isEqual(toType)) {
-      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty);
     }
   }
 
@@ -5251,8 +5333,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   return expr;
 }
 
-Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
-                                            ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy) {
   auto optTy = cs.getType(expr);
   // Coerce to an r-value.
   if (optTy->is<LValueType>())
@@ -6086,14 +6167,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ForceUnchecked: {
       auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
       assert(valueTy);
-      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy, locator);
+      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy);
       return coerceToType(expr, toType, locator);
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
       // Look through implicitly unwrapped optionals.
       if (auto objTy= cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6105,7 +6186,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // We want to check conformance on the rvalue, as that's what has
@@ -6129,7 +6210,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6141,7 +6222,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6410,7 +6491,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Look through ImplicitlyUnwrappedOptional<T> before coercing expression.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty);
     return coerceToType(expr, toType, locator);
   }
 
@@ -6805,67 +6886,6 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   return literal;
 }
 
-/// Determine whether the given type refers to a non-final class (or
-/// dynamic self of one).
-static bool isNonFinalClass(Type type) {
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
-  if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
-
-  if (auto archetype = type->getAs<ArchetypeType>())
-    if (auto super = archetype->getSuperclass())
-      return isNonFinalClass(super);
-
-  return false;
-}
-
-// Non-required constructors may not be not inherited. Therefore when
-// constructing a class object, either the metatype must be statically
-// derived (rather than an arbitrary value of metatype type) or the referenced
-// constructor must be required.
-bool
-TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                                     DeclNameLoc memberRefLoc,
-                                                     AnyMetatypeType *metaTy,
-                                                     ConstructorDecl *ctorDecl,
-                                                     bool SuppressDiagnostics) {
-  auto ty = metaTy->getInstanceType();
-  
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(ty) &&
-      !base->isStaticallyDerivedMetatype() &&
-      !ctorDecl->hasClangNode() &&
-      !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
-    if (SuppressDiagnostics)
-      return false;
-
-    diagnose(memberRefLoc, diag::dynamic_construct_class, ty)
-      .highlight(base->getSourceRange());
-    auto ctor = cast<ConstructorDecl>(ctorDecl);
-    diagnose(ctorDecl, diag::note_nonrequired_initializer,
-             ctor->isImplicit(), ctor->getFullName());
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (isa<ConstructorDecl>(ctorDecl) &&
-             isa<MetatypeType>(metaTy) &&
-             ty->isExistentialType()) {
-    if (SuppressDiagnostics)
-      return false;
-
-    if (base->isStaticallyDerivedMetatype()) {
-      diagnose(memberRefLoc, diag::construct_protocol_by_name, ty)
-        .highlight(base->getSourceRange());
-    } else {
-      diagnose(memberRefLoc, diag::construct_protocol_value, metaTy)
-        .highlight(base->getSourceRange());
-    }
-  }
-  return true;
-}
-
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -7028,7 +7048,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   
   // Handle applications that look through ImplicitlyUnwrappedOptional<T>.
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))
-    fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy, locator);
+    fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy);
 
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.

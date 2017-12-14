@@ -848,7 +848,6 @@ CollectionTypeTests.test("AssociatedTypes/${Collection}") {
     iteratorType: IndexingIterator<C>.self,
     subSequenceType: Slice<C>.self,
     indexType: FatalIndex.self,
-    indexDistanceType: Int.self,
     indicesType: ${Indices}<C>.self)
 }
 % end

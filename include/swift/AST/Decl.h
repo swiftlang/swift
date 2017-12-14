@@ -231,11 +231,12 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 #define BITFIELD_START(D, PD, C) \
   enum { Num##D##Bits = Num##PD##Bits + C }; \
   static_assert(Num##D##Bits <= 64, "fits in a uint64_t"); \
+  LLVM_PACKED_START; \
   class D##Bitfields { \
     friend class D; \
     uint64_t : Num##PD##Bits
 
-#define BITFIELD_END }
+#define BITFIELD_END }; LLVM_PACKED_END
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
@@ -282,6 +283,13 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned NumPatternEntries : 16;
   BITFIELD_END;
   
+  BITFIELD_START(EnumCaseDecl, Decl, 51);
+    unsigned : 19; // unused / padding
+
+    /// The number of tail-allocated element pointers.
+    unsigned NumElements : 32;
+  BITFIELD_END;
+
   BITFIELD_START(ValueDecl, Decl, 3);
     friend class MemberLookupTable;
 
@@ -353,12 +361,15 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasArgumentType : 1;
   BITFIELD_END;
   
-  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 13);
+  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 21);
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 3;
 
     /// Number of curried parameter lists.
     unsigned NumParameterLists : 5;
+
+    /// Import as member status.
+    unsigned IAMStatus : 8;
 
     /// Whether we are overridden later.
     unsigned Overridden : 1;
@@ -424,6 +435,16 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned CheckedInheritanceClause : 1;
   BITFIELD_END;
 
+  BITFIELD_START(AbstractTypeParamDecl, TypeDecl, 0);
+  BITFIELD_END;
+
+  BITFIELD_START(GenericTypeParamDecl, AbstractTypeParamDecl, 47);
+    unsigned : 15; // unused padding
+
+    unsigned Depth : 16;
+    unsigned Index : 16;
+  BITFIELD_END;
+
   BITFIELD_START(GenericTypeDecl, TypeDecl, 0);
   BITFIELD_END;
 
@@ -432,11 +453,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned IsCompatibilityAlias : 1;
   BITFIELD_END;
 
-  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 4);
-    /// Whether or not the nominal type decl has delayed protocol or member
-    /// declarations.
-    unsigned HasDelayedMembers : 1;
-
+  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 3);
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
@@ -449,7 +466,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasValidatedLayout : 1;
   BITFIELD_END;
 
-  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 8);
+  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 43);
     /// Whether the \c RequiresClass bit is valid.
     unsigned RequiresClassValid : 1;
 
@@ -468,11 +485,24 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the existential of this protocol can be represented.
     unsigned ExistentialTypeSupported : 1;
 
+    /// True if the protocol has requirements that cannot be satisfied (e.g.
+    /// because they could not be imported from Objective-C).
+    unsigned HasMissingRequirements : 1;
+
+    unsigned : 12; // unused flags
+
+    /// If this is a compiler-known protocol, this will be a KnownProtocolKind
+    /// value, plus one. Otherwise, it will be 0.
+    unsigned KnownProtocol : 6;
+
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
+
+    /// The number of requirements in the requirement signature.
+    unsigned NumRequirementsInSignature : 16;
   BITFIELD_END;
 
-  BITFIELD_START(ClassDecl, NominalTypeDecl, 8);
+  BITFIELD_START(ClassDecl, NominalTypeDecl, 13);
     /// The stage of the inheritance circularity check for this class.
     unsigned Circularity : 2;
 
@@ -495,6 +525,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+
+    /// Whether the class has @objc ancestry.
+    unsigned ObjCKind : 3;
+
+    unsigned HasMissingDesignatedInitializers : 1;
+    unsigned HasMissingVTableEntries : 1;
   BITFIELD_END;
 
   BITFIELD_START(StructDecl, NominalTypeDecl, 1);
@@ -524,8 +560,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasOverridden : 1;
   BITFIELD_END;
 
-  BITFIELD_START(ImportDecl, Decl, 3);
+  BITFIELD_START(ImportDecl, Decl, 11);
     unsigned ImportKind : 3;
+
+    /// The number of elements in this path.
+    unsigned NumPathElements : 8;
   BITFIELD_END;
 
   BITFIELD_START(ExtensionDecl, Decl, 5);
@@ -561,6 +600,7 @@ protected:
   union {
     DeclBitfields DeclBits;
     PatternBindingDeclBitfields PatternBindingDeclBits;
+    EnumCaseDeclBitfields EnumCaseDeclBits;
     ValueDeclBitfields ValueDeclBits;
     AbstractStorageDeclBitfields AbstractStorageDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
@@ -570,6 +610,8 @@ protected:
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
+    AbstractTypeParamDeclBitfields AbstractTypeParamDeclBit;
+    GenericTypeParamDeclBitfields GenericTypeParamDeclBits;
     GenericTypeDeclBitfields GenericTypeDeclBits;
     TypeAliasDeclBitfields TypeAliasDeclBits;
     NominalTypeDeclBitfields NominalTypeDeclBits;
@@ -1450,9 +1492,6 @@ private:
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
 
-  /// The number of elements in this path.
-  unsigned NumPathElements;
-
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
   /// The resolved decls if this is a decl import.
@@ -1481,7 +1520,8 @@ public:
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
-    return {getTrailingObjects<AccessPathElement>(), NumPathElements};
+    return {getTrailingObjects<AccessPathElement>(),
+            ImportDeclBits.NumPathElements};
   }
 
   ArrayRef<AccessPathElement> getModulePath() const {
@@ -2481,9 +2521,6 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
-  unsigned Depth : 16;
-  unsigned Index : 16;
-
 public:
   static const unsigned InvalidDepth = 0xFFFF;
 
@@ -2508,12 +2545,15 @@ public:
   /// \endcode
   ///
   /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
-  unsigned getDepth() const { return Depth; }
+  unsigned getDepth() const { return GenericTypeParamDeclBits.Depth; }
 
   /// Set the depth of this generic type parameter.
   ///
   /// \sa getDepth
-  void setDepth(unsigned depth) { Depth = depth; }
+  void setDepth(unsigned depth) {
+    GenericTypeParamDeclBits.Depth = depth;
+    assert(GenericTypeParamDeclBits.Depth == depth && "Truncation");
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
@@ -2525,7 +2565,7 @@ public:
   /// \endcode
   ///
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
-  unsigned getIndex() const { return Index; }
+  unsigned getIndex() const { return GenericTypeParamDeclBits.Index; }
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
@@ -2758,7 +2798,6 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     setGenericParams(GenericParams);
-    NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     NominalTypeDeclBits.HasLazyConformances = false;
@@ -2787,17 +2826,6 @@ public:
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
   bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
-
-  /// \brief Returns true if this decl contains delayed value or protocol
-  /// declarations.
-  bool hasDelayedMembers() const {
-    return NominalTypeDeclBits.HasDelayedMembers;
-  }
-  
-  /// \brief Mark this declaration as having delayed members or not.
-  void setHasDelayedMembers(bool hasDelayedMembers = true) {
-    NominalTypeDeclBits.HasDelayedMembers = hasDelayedMembers;
-  }
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.
@@ -3226,12 +3254,6 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> Superclass;
   } LazySemanticInfo;
 
-  /// Whether the class has @objc ancestry.
-  unsigned ObjCKind : 3;
-
-  unsigned HasMissingDesignatedInitializers : 1;
-  unsigned HasMissingVTableEntries : 1;
-
   friend class IterativeTypeChecker;
 
 public:
@@ -3324,7 +3346,7 @@ public:
   bool hasMissingDesignatedInitializers() const;
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
-    HasMissingDesignatedInitializers = newValue;
+    ClassDeclBits.HasMissingDesignatedInitializers = newValue;
   }
 
   /// Returns true if the class has missing members that require vtable entries.
@@ -3334,7 +3356,7 @@ public:
   bool hasMissingVTableEntries() const;
 
   void setHasMissingVTableEntries(bool newValue = true) {
-    HasMissingVTableEntries = newValue;
+    ClassDeclBits.HasMissingVTableEntries = newValue;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -3523,17 +3545,6 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
 
-  /// True if the protocol has requirements that cannot be satisfied (e.g.
-  /// because they could not be imported from Objective-C).
-  unsigned HasMissingRequirements : 1;
-
-  /// If this is a compiler-known protocol, this will be a KnownProtocolKind
-  /// value, plus one. Otherwise, it will be 0.
-  unsigned KnownProtocol : 6;
-
-  /// The number of requirements in the requirement signature.
-  unsigned NumRequirementsInSignature : 16;
-
   bool requiresClassSlow();
 
   bool existentialConformsToSelfSlow();
@@ -3653,9 +3664,9 @@ public:
   ///
   /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
-    if (KnownProtocol == 0)
+    if (ProtocolDeclBits.KnownProtocol == 0)
       return None;
-    return static_cast<KnownProtocolKind>(KnownProtocol - 1);
+    return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -3670,7 +3681,7 @@ public:
   void setKnownProtocolKind(KnownProtocolKind kind) {
     assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
            "can't reset known protocol kind");
-    KnownProtocol = static_cast<unsigned>(kind) + 1;
+    ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
     assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
            "not enough bits");
   }
@@ -3692,11 +3703,11 @@ public:
   /// with requirements that cannot be represented in Swift.
   bool hasMissingRequirements() const {
     (void)getMembers();
-    return HasMissingRequirements;
+    return ProtocolDeclBits.HasMissingRequirements;
   }
 
   void setHasMissingRequirements(bool newValue) {
-    HasMissingRequirements = newValue;
+    ProtocolDeclBits.HasMissingRequirements = newValue;
   }
 
   /// Returns the default witness for a requirement, or nullptr if there is
@@ -3733,7 +3744,8 @@ public:
   ArrayRef<Requirement> getRequirementSignature() const {
     assert(isRequirementSignatureComputed() &&
            "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature, NumRequirementsInSignature);
+    return llvm::makeArrayRef(RequirementSignature,
+                              ProtocolDeclBits.NumRequirementsInSignature);
   }
 
   /// Has the requirement signature been computed yet?
@@ -4784,10 +4796,17 @@ public:
 
 /// Encodes imported-as-member status for C functions that get imported
 /// as methods.
-struct ImportAsMemberStatus {
+class ImportAsMemberStatus {
+  friend class AbstractFunctionDecl;
+
   // non-0 denotes import-as-member. 1 denotes no self index. n+2 denotes self
   // index of n
-  uint8_t rawValue = 0;
+  uint8_t rawValue;
+
+public:
+  ImportAsMemberStatus(uint8_t rawValue = 0) : rawValue(rawValue) {}
+
+  uint8_t getRawValue() const { return rawValue; }
 
   bool isImportAsMember() const { return rawValue != 0; }
   bool isInstance() const { return rawValue >= 2; }
@@ -4864,8 +4883,6 @@ protected:
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
-  ImportAsMemberStatus IAMStatus;
-
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
@@ -4903,14 +4920,32 @@ public:
   bool isTransparent() const;
 
   // Expose our import as member status
-  bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
-  bool isImportAsInstanceMember() const { return IAMStatus.isInstance(); }
-  bool isImportAsStaticMember() const { return IAMStatus.isStatic(); }
-  uint8_t getSelfIndex() const { return IAMStatus.getSelfIndex(); }
-  ImportAsMemberStatus getImportAsMemberStatus() const { return IAMStatus; }
+  ImportAsMemberStatus getImportAsMemberStatus() const {
+    return ImportAsMemberStatus(AbstractFunctionDeclBits.IAMStatus);
+  }
+  bool isImportAsMember() const {
+    return getImportAsMemberStatus().isImportAsMember();
+  }
+  bool isImportAsInstanceMember() const {
+    return getImportAsMemberStatus().isInstance();
+  }
+  bool isImportAsStaticMember() const {
+    return getImportAsMemberStatus().isStatic();
+  }
+  uint8_t getSelfIndex() const {
+    return getImportAsMemberStatus().getSelfIndex();
+  }
 
-  void setImportAsStaticMember() { IAMStatus.setStatic(); }
-  void setSelfIndex(uint8_t idx) { return IAMStatus.setSelfIndex(idx); }
+  void setImportAsStaticMember() {
+    auto newValue = getImportAsMemberStatus();
+    newValue.setStatic();
+    AbstractFunctionDeclBits.IAMStatus = newValue.getRawValue();
+  }
+  void setSelfIndex(uint8_t idx) {
+    auto newValue = getImportAsMemberStatus();
+    newValue.setSelfIndex(idx);
+    AbstractFunctionDeclBits.IAMStatus = newValue.getRawValue();
+  }
 
 public:
   /// Retrieve the location of the 'throws' keyword, if present.
@@ -5461,15 +5496,13 @@ class EnumCaseDecl final : public Decl,
   friend TrailingObjects;
   SourceLoc CaseLoc;
   
-  /// The number of tail-allocated element pointers.
-  unsigned NumElements;
-  
   EnumCaseDecl(SourceLoc CaseLoc,
                ArrayRef<EnumElementDecl *> Elements,
                DeclContext *DC)
     : Decl(DeclKind::EnumCase, DC),
-      CaseLoc(CaseLoc), NumElements(Elements.size())
+      CaseLoc(CaseLoc)
   {
+    EnumCaseDeclBits.NumElements = Elements.size();
     std::uninitialized_copy(Elements.begin(), Elements.end(),
                             getTrailingObjects<EnumElementDecl *>());
   }
@@ -5481,7 +5514,8 @@ public:
   
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
-    return {getTrailingObjects<EnumElementDecl *>(), NumElements};
+    return {getTrailingObjects<EnumElementDecl *>(),
+            EnumCaseDeclBits.NumElements};
   }
   
   SourceLoc getLoc() const {

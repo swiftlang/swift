@@ -50,7 +50,7 @@
 #endif
 
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
-         _swift_allocBox, _swift_allocBox_, DefaultCC,
+         _swift_allocBox, _swift_allocBox_, SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
@@ -58,7 +58,7 @@ FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
          swift_makeBoxUnique,
-         DefaultCC,
+         SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind))
@@ -854,10 +854,11 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RegisterPreservingCC,
 
 // Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 //                                              const void * const *arguments,
-//                                              objc_class *superclass);
+//                                              objc_class *superclass,
+//                                              size_t numImmediateMembers);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          DefaultCC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
@@ -945,14 +946,23 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
+// Metadata *swift_relocateClassMetadata(Metadata *self,
+//                                       size_t templateSize,
+//                                       size_t numImmediateMembers);
+FUNCTION(RelocateClassMetadata,
+         swift_relocateClassMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                     size_t numFields,
-//                                                     TypeLayout * const *fieldTypes,
-//                                                     size_t *fieldOffsets);
+// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                size_t numFields,
+//                                                TypeLayout * const *fieldTypes,
+//                                                size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
+         RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
@@ -1049,14 +1059,10 @@ FUNCTION(LookUpClass, objc_lookUpClass, C_CC,
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getObjectType(id object);
-//
-// Since this is intended to look through dynamic subclasses, it's
-// invariant across reasonable isa-rewriting schemes and therefore can
-// be readnone.
 FUNCTION(GetObjectType, swift_getObjectType, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(ObjCPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getDynamicType(opaque_t *obj, Metadata *self);
 FUNCTION(GetDynamicType, swift_getDynamicType, DefaultCC,
@@ -1332,7 +1338,7 @@ FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         ARGS(),
         ATTRS(NoUnwind))
 
-FUNCTION(AllocError, swift_allocError, C_CC,
+FUNCTION(AllocError, swift_allocError, SwiftCC,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind))

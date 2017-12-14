@@ -452,7 +452,6 @@ extension StrideThrough: CustomReflectable {
 extension StrideThrough : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = ClosedRangeIndex<Int>
-  public typealias IndexDistance = Int
   public typealias SubSequence = Slice<StrideThrough<Element>>
 
   @_inlineable

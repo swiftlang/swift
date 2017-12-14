@@ -318,7 +318,6 @@ SetTestSuite.test("AssociatedTypes") {
     iteratorType: SetIterator<MinimalHashableValue>.self,
     subSequenceType: Slice<Collection>.self,
     indexType: SetIndex<MinimalHashableValue>.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultIndices<Collection>.self)
 }
 

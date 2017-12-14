@@ -29,6 +29,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
+#include "swift/ABI/TrailingObjects.h"
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
@@ -1023,12 +1024,12 @@ struct GenericContextDescriptor {
   /// to NumGenericRequirements; it counts only the type parameters
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
+  
+  // TODO: add meaningful descriptions of the generic requirements.
 };
 
-/// Header for a generic parameter descriptor. This is a variable-sized
-/// structure that describes how to find and parse a generic parameter vector
-/// within the type metadata for an instance of a nominal type.
-struct GenericParameterDescriptor {
+/// Header for a generic parameter descriptor.
+struct GenericParameterDescriptorHeader {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
@@ -1063,13 +1064,6 @@ struct GenericParameterDescriptor {
   bool isGeneric() const {
     return hasGenericRequirements();
   }
-
-  GenericContextDescriptor getContext(unsigned depth) const {
-    assert(depth < NestingDepth);
-    return ((const GenericContextDescriptor *)(this + 1))[depth];
-  }
-
-  // TODO: add meaningful descriptions of the generic requirements.
 };
 
 template <typename Runtime>
@@ -1086,27 +1080,43 @@ struct TargetMethodDescriptor {
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
-template <typename Runtime>
-struct TargetVTableDescriptor {
+struct VTableDescriptorHeader {
   /// The offset of the vtable for this class in its metadata, if any.
   uint32_t VTableOffset;
-  /// The number of vtable entries, in words.
+  /// The number of vtable entries. This is the number of MethodDescriptor
+  /// records following the vtable header in the class's nominal type
+  /// descriptor, which is equal to the number of words this subclass's vtable
+  /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
-
-  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
-
-  MethodDescriptor VTable[];
-
-  void *getMethod(unsigned index) const {
-    return VTable[index].Impl.get();
-  }
 };
 
+template<typename Runtime> struct TargetNominalTypeDescriptor;
+
+template<typename Runtime>
+using TargetNominalTypeDescriptorTrailingObjects
+  = swift::ABI::TrailingObjects<TargetNominalTypeDescriptor<Runtime>,
+        GenericContextDescriptor,
+        VTableDescriptorHeader,
+        TargetMethodDescriptor<Runtime>>;
+
 /// Common information about all nominal types. For generic types, this
-/// descriptor is shared for all instantiations of the generic type.
+/// descriptor is shared for all instantiations of the generic type. Unlike
+/// metadata records, the uniqueness of a nominal type descriptor should not
+/// be relied on.
 template <typename Runtime>
-struct TargetNominalTypeDescriptor {
+struct TargetNominalTypeDescriptor final
+    : private TargetNominalTypeDescriptorTrailingObjects<Runtime>
+{
+private:
+  using TrailingObjects = TargetNominalTypeDescriptorTrailingObjects<Runtime>;
+  friend TrailingObjects;
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
   using StoredPointer = typename Runtime::StoredPointer;
+  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+  
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
   
@@ -1231,29 +1241,56 @@ struct TargetNominalTypeDescriptor {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
   }
 
-  using VTableDescriptor = TargetVTableDescriptor<Runtime>;
-
-  const VTableDescriptor *getVTableDescriptor() const {
-    if (getKind() != NominalTypeKind::Class ||
-        !GenericParams.Flags.hasVTable())
-      return nullptr;
-
-    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
-
-    // TODO: Once we emit reflective descriptions of generic requirements,
-    // skip the right number of words here.
-
-    return reinterpret_cast<const VTableDescriptor *>(asWords
-        + GenericParams.NestingDepth);
-  }
-
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
-  GenericParameterDescriptor GenericParams;
+  GenericParameterDescriptorHeader GenericParams;
+
+  const GenericContextDescriptor *getGenericContexts() const {
+    return this->template getTrailingObjects<GenericContextDescriptor>();
+  }
   
-  // NOTE: GenericParams ends with a tail-allocated array, so it cannot be
-  // followed by additional fields.
+  const GenericContextDescriptor &getGenericContext(unsigned i) const {
+    assert(i < numTrailingObjects(OverloadToken<GenericContextDescriptor>{}));
+    return getGenericContexts()[i];
+  }
+
+  bool hasVTable() const {
+    return getKind() == NominalTypeKind::Class
+      && GenericParams.Flags.hasVTable();
+  }
+  
+  const VTableDescriptorHeader *getVTableDescriptor() const {
+    if (!hasVTable())
+      return nullptr;
+    return this->template getTrailingObjects<VTableDescriptorHeader>();
+  }
+  
+  const MethodDescriptor *getMethodDescriptors() const {
+    if (!hasVTable())
+      return nullptr;
+    return this->template getTrailingObjects<MethodDescriptor>();
+  }
+  
+  void *getMethod(unsigned i) const {
+    assert(hasVTable()
+           && i < numTrailingObjects(OverloadToken<MethodDescriptor>{}));
+    return getMethodDescriptors()[i].Impl.get();
+  }
+
+private:
+  size_t numTrailingObjects(OverloadToken<GenericContextDescriptor>) const {
+    return GenericParams.NestingDepth;
+  }
+  size_t numTrailingObjects(OverloadToken<VTableDescriptorHeader>) const {
+    return hasVTable() ? 1 : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<MethodDescriptor>) const {
+    if (!hasVTable())
+      return 0;
+
+    return getVTableDescriptor()->VTableSize;
+  }
 };
 using NominalTypeDescriptor = TargetNominalTypeDescriptor<InProcess>;
 
@@ -2206,7 +2243,7 @@ struct TargetGenericMetadata {
   (TargetGenericMetadata<Runtime> *pattern, const void *arguments);
   
   /// The size of the template in bytes.
-  uint32_t MetadataSize;
+  uint32_t TemplateSize;
 
   /// The number of generic arguments that we need to unique on,
   /// in words.  The first 'NumArguments * sizeof(void*)' bytes of
@@ -2223,7 +2260,7 @@ struct TargetGenericMetadata {
   PrivateData[swift::NumGenericMetadataPrivateDataWords];
 
   // Here there is a variably-sized field:
-  // char alignas(void*) MetadataTemplate[MetadataSize];
+  // char alignas(void*) MetadataTemplate[TemplateSize];
 
   /// Return the starting address of the metadata template data.
   TargetPointer<Runtime, const void> getMetadataTemplate() const {
@@ -2602,8 +2639,9 @@ using ProtocolConformanceRecord
 ///     if (metadata = getExistingMetadata(&header.PrivateData,
 ///                                        arguments[0..header.NumArguments]))
 ///       return metadata
-///     metadata = malloc(header.MetadataSize)
-///     memcpy(metadata, header.MetadataTemplate, header.MetadataSize)
+///     metadata = malloc(superclass.MetadataSize +
+///                       numImmediateMembers * sizeof(void *))
+///     memcpy(metadata, header.MetadataTemplate, header.TemplateSize)
 ///     for (i in 0..header.NumFillInstructions)
 ///       metadata[header.FillInstructions[i].ToIndex]
 ///         = arguments[header.FillInstructions[i].FromIndex]
@@ -2623,7 +2661,8 @@ SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                    const void *arguments,
-                                   ClassMetadata *superclass);
+                                   ClassMetadata *superclass,
+                                   size_t numImmediateMembers);
 
 // Callback to allocate a generic struct/enum metadata object.
 SWIFT_RUNTIME_EXPORT
@@ -2867,18 +2906,23 @@ void swift_initStructMetadata_UniversalStrategy(size_t numFields,
                                          size_t *fieldOffsets,
                                          ValueWitnessTable *vwtable);
 
-/// Initialize the field offset vector for a dependent-layout class, using the
-/// "Universal" layout strategy.
-///
-/// This will relocate the metadata if it doesn't have enough space
-/// for its superclass.  Note that swift_allocateGenericClassMetadata will
-/// never produce a metadata that requires relocation.
+/// Relocate the metadata for a class and copy fields from the given template.
+/// The final size of the metadata is calculated at runtime from the size of
+/// the superclass metadata together with the given number of immediate
+/// members.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          size_t numFields,
-                                          const TypeLayout * const *fieldTypes,
-                                          size_t *fieldOffsets);
+swift_relocateClassMetadata(ClassMetadata *self,
+                            size_t templateSize,
+                            size_t numImmediateMembers);
+
+/// Initialize the field offset vector for a dependent-layout class, using the
+/// "Universal" layout strategy.
+SWIFT_RUNTIME_EXPORT
+void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                               size_t numFields,
+                                               const TypeLayout * const *fieldTypes,
+                                               size_t *fieldOffsets);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT

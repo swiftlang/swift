@@ -285,6 +285,15 @@ protected:
   };
   NUMBITS(ErrorType, NumTypeBaseBits + 1);
 
+  struct ParenTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// Whether there is an original type.
+    enum { NumFlagBits = 5 };
+    unsigned Flags : NumFlagBits;
+  };
+  NUMBITS(ParenType, NumTypeBaseBits + ParenTypeBitfields::NumFlagBits);
+
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -292,8 +301,10 @@ protected:
     /// regparm and the calling convention.
     enum { NumExtInfoBits = 7 };
     unsigned ExtInfo : NumExtInfoBits;
+
+    unsigned NumParams : 10;
   };
-  NUMBITS(AnyFunctionType, NumTypeBaseBits + 7);
+  NUMBITS(AnyFunctionType, NumTypeBaseBits + 17);
 
   struct ArchetypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -309,7 +320,14 @@ protected:
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    uint64_t ID : 64 - NumTypeBaseBits;
+    uint64_t ID : 32 - NumTypeBaseBits;
+
+    /// Type variable options.
+    unsigned Options : 3;
+
+    ///  Index into the list of type variables, as used by the
+    ///  constraint graph.
+    unsigned GraphIndex : 29;
   };
   NUMBITS(TypeVariableType, 64);
 
@@ -322,6 +340,13 @@ protected:
     unsigned CoroutineKind : 2;
   };
   NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
+
+  struct SILBoxTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    unsigned : 32 - NumTypeBaseBits; // unused / padding
+    unsigned NumGenericArgs : 32;
+  };
+  NUMBITS(SILBoxType, 64);
 
   struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -338,28 +363,51 @@ protected:
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     unsigned HasExplicitAnyObject : 1;
+
+    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+
+    /// The number of protocols being composed.
+    unsigned Count : 32;
   };
-  NUMBITS(ProtocolCompositionType, NumTypeBaseBits + 1);
+  NUMBITS(ProtocolCompositionType, 64);
 
   struct TupleTypeBitfields {
     unsigned : NumTypeBaseBits;
     
     /// Whether an element of the tuple is inout.
     unsigned HasInOutElement : 1;
+
+    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+
+    /// The number of elements of the tuple.
+    unsigned Count : 32;
   };
-  NUMBITS(TupleType, NumTypeBaseBits + 1);
+  NUMBITS(TupleType, 64);
+
+  struct BoundGenericTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    unsigned : 32 - NumTypeBaseBits; // unused / padding
+
+    /// The number of generic arguments.
+    unsigned GenericArgCount : 32;
+  };
+  NUMBITS(BoundGenericType, 64);
 
 #undef NUMBITS
   union {
     TypeBaseBitfields TypeBaseBits;
     ErrorTypeBitfields ErrorTypeBits;
+    ParenTypeBitfields ParenTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
+    SILBoxTypeBitfields SILBoxTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
     ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
     TupleTypeBitfields TupleTypeBits;
+    BoundGenericTypeBitfields BoundGenericTypeBits;
   };
 
 protected:
@@ -1415,6 +1463,9 @@ class ParameterTypeFlags {
 
 public:
   ParameterTypeFlags() = default;
+  static ParameterTypeFlags fromRaw(uint8_t raw) {
+    return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
+  }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
       : value((variadic ? Variadic : 0) |
@@ -1465,7 +1516,6 @@ public:
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public TypeBase {
   Type UnderlyingType;
-  ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
   
@@ -1482,7 +1532,9 @@ public:
   TypeBase *getSinglyDesugaredType();
 
   /// Get the parameter flags
-  ParameterTypeFlags getParameterFlags() const { return parameterFlags; }
+  ParameterTypeFlags getParameterFlags() const {
+    return ParameterTypeFlags::fromRaw(ParenTypeBits.Flags);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1556,8 +1608,9 @@ typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
-class TupleType : public TypeBase, public llvm::FoldingSetNode {
-  const ArrayRef<TupleTypeElt> Elements;
+class TupleType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<TupleType, TupleTypeElt> {
+  friend TrailingObjects;
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
@@ -1569,16 +1622,20 @@ public:
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
-  /// getFields - Return the fields of this tuple.
-  ArrayRef<TupleTypeElt> getElements() const { return Elements; }
+  unsigned getNumElements() const { return TupleTypeBits.Count; }
 
-  unsigned getNumElements() const { return Elements.size(); }
+  /// getElements - Return the elements of this tuple.
+  ArrayRef<TupleTypeElt> getElements() const {
+    return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
+  }
 
-  const TupleTypeElt &getElement(unsigned i) const { return Elements[i]; }
+  const TupleTypeElt &getElement(unsigned i) const {
+    return getTrailingObjects<TupleTypeElt>()[i];
+  }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return Elements[ElementNo].getType();
+    return getTrailingObjects<TupleTypeElt>()[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -1610,7 +1667,7 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Elements);
+    Profile(ID, getElements());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       ArrayRef<TupleTypeElt> Elements);
@@ -1619,8 +1676,11 @@ private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
             bool hasInOut)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties), Elements(elements) {
+     : TypeBase(TypeKind::Tuple, CanCtx, properties) {
      TupleTypeBits.HasInOutElement = hasInOut;
+     TupleTypeBits.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<TupleTypeElt>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -1691,8 +1751,12 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
   
-  ArrayRef<Type> GenericArgs;
-  
+  /// Retrieve the intrusive pointer storage from the subtype
+  const Type *getTrailingObjectsPointer() const;
+  Type *getTrailingObjectsPointer() {
+    const BoundGenericType *temp = this;
+    return const_cast<Type *>(temp->getTrailingObjectsPointer());
+  }
 
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
@@ -1717,10 +1781,12 @@ public:
   Type getParent() const { return Parent; }
 
   /// Retrieve the set of generic arguments provided at this level.
-  ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
+  ArrayRef<Type> getGenericArgs() const {
+    return {getTrailingObjectsPointer(), BoundGenericTypeBits.GenericArgCount};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, GenericArgs);
+    Profile(ID, TheDecl, Parent, getGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -1741,7 +1807,10 @@ END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
-class BoundGenericClassType : public BoundGenericType {
+class BoundGenericClassType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericClassType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1772,7 +1841,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
 /// BoundGenericEnumType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic enum type.
-class BoundGenericEnumType : public BoundGenericType {
+class BoundGenericEnumType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericEnumType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericEnumType(EnumDecl *theDecl, Type parent,
                        ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1803,7 +1875,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
-class BoundGenericStructType : public BoundGenericType {
+class BoundGenericStructType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericStructType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -2324,7 +2399,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 class AnyFunctionType : public TypeBase {
   const Type Input;
   const Type Output;
-  const unsigned NumParams;
   
 public:
   using Representation = FunctionTypeRepresentation;
@@ -2536,9 +2610,10 @@ protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
-    NumParams(NumParams) {
+  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    AnyFunctionTypeBits.NumParams = NumParams;
+    assert(AnyFunctionTypeBits.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
     static_assert(ExtInfo::NumMaskBits ==
@@ -2565,7 +2640,7 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
-  unsigned getNumParams() const { return NumParams; }
+  unsigned getNumParams() const { return AnyFunctionTypeBits.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
   
@@ -2921,7 +2996,7 @@ enum class ParameterConvention {
 };
 // Check that the enum values fit inside SILFunctionTypeBits.
 static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
-              "fits in SILFunctionTypeBits");
+              "fits in SILFunctionTypeBits and SILParameterInfo");
 
 // Does this parameter convention require indirect storage? This reflects a
 // SILFunctionType's formal (immutable) conventions, as opposed to the transient
@@ -2981,20 +3056,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  CanType Ty;
-  ParameterConvention Convention;
+  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
 public:
-  SILParameterInfo() : Ty(), Convention((ParameterConvention)0) {}
+  SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : Ty(type), Convention(conv) {
+    : TypeAndConvention(type, conv) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
   CanType getType() const {
-    return Ty;
+    return TypeAndConvention.getPointer();
   }
   ParameterConvention getConvention() const {
-    return Convention;
+    return TypeAndConvention.getInt();
   }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -3055,8 +3129,8 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(Ty.getPointer());
-    id.AddInteger((unsigned)Convention);
+    id.AddPointer(getType().getPointer());
+    id.AddInteger((unsigned)getConvention());
   }
 
   void dump() const;
@@ -3070,7 +3144,7 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return Ty == rhs.Ty && Convention == rhs.Convention;
+    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3773,7 +3847,6 @@ class SILBoxType final : public TypeBase,
   friend TrailingObjects;
   
   SILLayout *Layout;
-  unsigned NumGenericArgs;
 
   static RecursiveTypeProperties
   getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
@@ -3789,7 +3862,7 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              NumGenericArgs);
+                              SILBoxTypeBits.NumGenericArgs);
   }
   
   // In SILType.h:
@@ -4058,8 +4131,10 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// inheritance) protocol list. If the sorted, minimized list is a single
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
-class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  ArrayRef<Type> Members;
+class ProtocolCompositionType final : public TypeBase,
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ProtocolCompositionType, Type> {
+  friend TrailingObjects;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
@@ -4080,10 +4155,12 @@ public:
   /// Note that the list of members is not sufficient to uniquely identify
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
-  ArrayRef<Type> getMembers() const { return Members; }
+  ArrayRef<Type> getMembers() const {
+    return {getTrailingObjects<Type>(), ProtocolCompositionTypeBits.Count};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Members, hasExplicitAnyObject());
+    Profile(ID, getMembers(), hasExplicitAnyObject());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<Type> Members,
@@ -4112,10 +4189,11 @@ private:
   ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
                           bool hasExplicitAnyObject,
                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
-               properties),
-      Members(members) {
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
     ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
+    ProtocolCompositionTypeBits.Count = members.size();
+    std::uninitialized_copy(members.begin(), members.end(),
+                            getTrailingObjects<Type>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -5025,6 +5103,16 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // ParameterTypeFlags::fromParameterType entirely.
   bool inOut = paramTy->is<InOutType>();
   return {isVariadic, autoclosure, escaping, inOut, isShared};
+}
+
+inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
+  if (auto ty = dyn_cast<BoundGenericStructType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericEnumType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericClassType>(this))
+    return ty->getTrailingObjects<Type>();
+  llvm_unreachable("Unhandled BoundGenericType!");
 }
   
 /// \brief If this is a method in a type or extension thereof, compute

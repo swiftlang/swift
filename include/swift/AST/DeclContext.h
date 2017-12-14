@@ -591,7 +591,7 @@ typedef IteratorRange<DeclIterator> DeclRange;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  
-  NominalTypeDecl,
+  NominalTypeDecl = 0,
   ExtensionDecl,
 };
 
@@ -601,23 +601,27 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
+  enum LazyMembers : unsigned {
+    Present = 1 << 0,
+
+    /// Lazy member loading has a variety of feedback loops that need to
+    /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
+    /// we use this flag to control them.
+    InProgress = 1 << 1,
+  };
+
   /// The first declaration in this context along with a bit indicating whether
   /// the members of this context will be lazily produced.
-  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
+  mutable llvm::PointerIntPair<Decl *, 2, LazyMembers> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
-  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
+  mutable llvm::PointerIntPair<Decl *, 1, IterableDeclContextKind>
     LastDeclAndKind;
 
   /// The DeclID this IDC was deserialized from, if any. Used for named lazy
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
-
-  /// Lazy member loading has a variety of feedback loops that need to
-  /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
-  /// we use this flag to control them.
-  bool lazyMemberLoadingInProgress = false;
 
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
@@ -650,15 +654,20 @@ public:
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
-    return FirstDeclAndLazyMembers.getInt();
+    return FirstDeclAndLazyMembers.getInt() & LazyMembers::Present;
   }
 
   bool isLoadingLazyMembers() {
-    return lazyMemberLoadingInProgress;
+    return FirstDeclAndLazyMembers.getInt() & LazyMembers::InProgress;
   }
 
   void setLoadingLazyMembers(bool inProgress) {
-    lazyMemberLoadingInProgress = inProgress;
+    LazyMembers status = FirstDeclAndLazyMembers.getInt();
+    if (inProgress)
+      status = LazyMembers(status | LazyMembers::InProgress);
+    else
+      status = LazyMembers(status & ~LazyMembers::InProgress);
+    FirstDeclAndLazyMembers.setInt(status);
   }
 
   /// Setup the loader for lazily-loaded members.

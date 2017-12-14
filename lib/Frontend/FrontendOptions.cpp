@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (hasUniqueInputFilename()) {
+  if (hasSingleInput()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -37,7 +37,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
 }
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (hasUniqueInputFilename()) {
+  if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getFilenameOfFirstInput());
@@ -45,55 +45,66 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  if (const Optional<StringRef> filename =
-          getOptionalUniquePrimaryInputFilename()) {
-    return llvm::sys::path::extension(filename.getValue())
-        .endswith(SIL_EXTENSION);
+  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
+  if (silPrimaryCount == 0)
+    return false;
+  if (silPrimaryCount == primaryInputCount()) {
+    // Not clear what to do someday with multiple primaries
+    assertMustNotBeMoreThanOnePrimaryInput();
+    return true;
   }
-  return false;
+  llvm_unreachable("Either all primaries or none must end with .sil");
+}
+
+unsigned
+FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
+  return count_if(
+      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
+        StringRef filename = AllFiles[elem.second].file();
+        return llvm::sys::path::extension(filename).endswith(extension);
+      });
 }
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (hasInputFilenames()) {
+    if (hasInputs()) {
       diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
-  } else if (treatAsSIL && hasPrimaryInputs()) {
-    // If we have the SIL as our primary input, we can waive the one file
-    // requirement as long as all the other inputs are SIBs.
-    for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
-      if (i == getOptionalUniquePrimaryInput()->Index)
-        continue;
-
-      StringRef file(getInputFilenames()[i]);
-      if (!llvm::sys::path::extension(file).endswith(SIB_EXTENSION)) {
+  } else if (treatAsSIL) {
+    if (isWholeModule()) {
+      if (inputCount() != 1) {
+        diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+        return true;
+      }
+    } else {
+      assertMustNotBeMoreThanOnePrimaryInput();
+      // If we have the SIL as our primary input, we can waive the one file
+      // requirement as long as all the other inputs are SIBs.
+      if (!areAllNonPrimariesSIB()) {
         diags.diagnose(SourceLoc(),
                        diag::error_mode_requires_one_sil_multi_sib);
         return true;
       }
     }
-  } else if (treatAsSIL) {
-    if (!hasUniqueInputFilename()) {
-      diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-      return true;
-    }
-  } else if (!isNoneRequested) {
-    if (!hasInputFilenames()) {
-      diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return true;
-    }
+  } else if (!isNoneRequested && !hasInputs()) {
+    diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+    return true;
   }
   return false;
 }
 
-void FrontendInputs::transformInputFilenames(
-    const llvm::function_ref<std::string(std::string)> &fn) {
-  for (auto &InputFile : InputFilenames) {
-    InputFile = fn(InputFile);
+bool FrontendInputs::areAllNonPrimariesSIB() const {
+  for (const InputFile &input : getAllFiles()) {
+    if (input.isPrimary())
+      continue;
+    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
+      return false;
+    }
   }
+  return true;
 }
 
 bool FrontendOptions::needsProperModuleName(ActionType action) {
@@ -188,11 +199,12 @@ StringRef FrontendOptions::originalPath() const {
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
-  StringRef fn = Inputs.primaryInputFilenameIfAny();
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
+  const auto input = Inputs.getUniquePrimaryInput();
+  return input ? llvm::sys::path::filename(input->file())
+               : StringRef(ModuleName);
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {

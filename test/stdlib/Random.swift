@@ -64,7 +64,7 @@ func chi2Test(_ samples: [Double]) -> Bool {
 
   if chi2 < cvLow || chi2 > cvHigh {
     return false
-  }else {
+  } else {
     return true
   }
 }
@@ -77,7 +77,7 @@ RandomTests.test("uniform distribution") {
     let randomIndex = Int.random(in: 0 ..< upperBound)
     array[randomIndex] += 1.0
   }
-  
+
   expectTrue(chi2Test(array))
 }
 

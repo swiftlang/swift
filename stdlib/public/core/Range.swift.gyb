@@ -178,7 +178,6 @@ extension CountableRange: RandomAccessCollection {
 
   /// A type that represents a position in the range.
   public typealias Index = Element
-  public typealias IndexDistance = Bound.Stride
   public typealias Indices = CountableRange<Bound>
   public typealias SubSequence = CountableRange<Bound>
 
@@ -208,16 +207,16 @@ extension CountableRange: RandomAccessCollection {
   }
 
   @_inlineable
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    let r = i.advanced(by: n)
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    let r = i.advanced(by: numericCast(n))
     _precondition(r >= lowerBound)
     _precondition(r <= upperBound)
     return r
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return start.distance(to: end)
+  public func distance(from start: Index, to end: Index) -> Int {
+    return numericCast(start.distance(to: end))
   }
 
   /// Accesses the subsequence bounded by the given range.

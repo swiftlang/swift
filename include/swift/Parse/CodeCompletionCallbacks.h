@@ -34,7 +34,7 @@ class CodeCompletionCallbacks {
 protected:
   Parser &P;
   ASTContext &Context;
-  Parser::ParserPosition ExprBeginPosition;
+  ParserPosition ExprBeginPosition;
 
   /// The declaration parsed during delayed parsing that was caused by code
   /// completion. This declaration contained the code completion token.
@@ -65,7 +65,7 @@ public:
     return CompleteExprSelectorContext != ObjCSelectorContext::None;
   }
 
-  void setExprBeginning(Parser::ParserPosition PP) {
+  void setExprBeginning(ParserPosition PP) {
     ExprBeginPosition = PP;
   }
 

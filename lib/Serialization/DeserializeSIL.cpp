@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
@@ -381,6 +383,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
+
+  PrettyStackTraceStringAction trace("deserializing SIL function", name);
 
   auto &cacheEntry = Funcs[FID-1];
   if (cacheEntry.isFullyDeserialized() ||
@@ -1183,7 +1187,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy.getAs<SILFunctionType>()->getCalleeConvention());
+        closureTy.castTo<SILFunctionType>()->getCalleeConvention());
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -1317,7 +1321,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::IntegerLiteralInst: {
     auto Ty = MF->getType(TyID);
-    auto intTy = Ty->getAs<BuiltinIntegerType>();
+    auto intTy = Ty->castTo<BuiltinIntegerType>();
     Identifier StringVal = MF->getIdentifier(ValID);
     // Build APInt from string.
     APInt value(intTy->getGreatestWidth(), StringVal.str(), 10);
@@ -1328,7 +1332,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::FloatLiteralInst: {
     auto Ty = MF->getType(TyID);
-    auto floatTy = Ty->getAs<BuiltinFloatType>();
+    auto floatTy = Ty->castTo<BuiltinFloatType>();
     Identifier StringVal = MF->getIdentifier(ValID);
     // Build APInt from string.
     APInt bits(floatTy->getBitWidth(), StringVal.str(), 16);
@@ -1558,7 +1562,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::StoreUnownedInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.getAs<WeakStorageType>();
+    auto refType = addrType.castTo<UnownedStorageType>();
     auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr > 0);
     ResultVal = Builder.createStoreUnowned(Loc,
@@ -1570,7 +1574,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::StoreWeakInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.getAs<WeakStorageType>();
+    auto refType = addrType.castTo<WeakStorageType>();
     auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr > 0);
     ResultVal = Builder.createStoreWeak(Loc,
@@ -1652,7 +1656,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Use OneTypeOneOperand layout where the field number is stored in TypeID.
     auto Ty2 = MF->getType(TyID2);
     SILType ST = getSILType(Ty2, (SILValueCategory)TyCategory2);
-    TupleType *TT = ST.getAs<TupleType>();
+    TupleType *TT = ST.castTo<TupleType>();
 
     auto ResultTy = TT->getElement(TyID).getType();
     switch (OpCode) {
@@ -1675,7 +1679,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a type followed by a list of values. A value is expressed by
     // 2 IDs: ValueID, ValueResultNumber.
     auto Ty = MF->getType(TyID);
-    TupleType *TT = Ty->getAs<TupleType>();
+    TupleType *TT = Ty->castTo<TupleType>();
     assert(TT && "Type of a TupleInst should be TupleType");
     SmallVector<SILValue, 4> OpList;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++) {
@@ -2419,6 +2423,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
 
+  PrettyStackTraceStringAction trace("deserializing SIL global", Name);
+
   // If we already deserialized this global variable, just return it.
   if (auto *GV = SILMod.lookUpGlobalVariable(Name))
     return GV;
@@ -2543,6 +2549,9 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   }
 
   ClassDecl *theClass = cast<ClassDecl>(MF->getDecl(ClassID));
+
+  PrettyStackTraceDecl trace("deserializing SIL vtable for", theClass);
+
   // Fetch the next record.
   scratch.clear();
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -2661,6 +2670,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   // Deserialize Conformance.
   auto theConformance = cast<NormalProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
+
+  PrettyStackTraceType trace(SILMod.getASTContext(),
+                             "deserializing SIL witness table for",
+                             theConformance->getType());
+  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);
@@ -2855,6 +2869,8 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
     MF->error();
     return nullptr;
   }
+
+  PrettyStackTraceDecl trace("deserializing default witness table for", proto);
 
   if (!existingWt)
     existingWt = SILMod.lookUpDefaultWitnessTable(proto, /*deserializeLazily=*/ false);

@@ -49,6 +49,7 @@ class C {
   }
 
   func foo3() {
+    _ = [Any]()
     _ = a.a.a
     _ = a.b
     _ = 1.a
@@ -92,3 +93,63 @@ private struct S<A, B>: Base where A: B {
 }
 
 protocol P: class {}
+
+func foo(_ _: Int,
+         a b: Int = 3 + 2,
+         _ c: Int = 2,
+         d _: Int = true ? 2: 3,
+         @objc e: X = true,
+         f: inout Int,
+         g: Int...) throws -> [Int: String] {}
+
+func foo(_ a: Int) throws -> Int {}
+func foo( a: Int) rethrows -> Int {}
+
+struct C {
+@objc
+@available(*, unavailable)
+private static override func foo<a, b, c>(a b: Int, c: Int) throws -> [Int] where a==p1, b:p2 { ddd }
+func rootView() -> Label {}
+static func ==() -> bool {}
+static func !=<a, b, c>() -> bool {}
+}
+
+@objc
+private protocol foo : bar where A==B {}
+protocol foo { func foo() }
+private protocol foo{}
+@objc
+public protocol foo where A:B {}
+
+func tryfoo() {
+  try foo()
+  try! foo()
+  try? foo()
+  try! foo().bar().foo().bar()
+}
+
+func closure() {
+  {[weak a,
+    unowned(safe) self,
+    b = 3,
+    unowned(unsafe) c = foo().bar] in
+  }
+  {[] in }
+
+  { [] a, b, _ -> Int in
+    return 2
+  }
+  { [] (a: Int, b: Int, _: Int) -> Int in
+    return 2
+  }
+  { [] a, b, _ throws -> Int in
+    return 2
+  }
+  { [] (a: Int, _ b: Int) throws -> Int in
+    return 2
+  }
+  { a, b in }
+  {}
+  { s1, s2 in s1 > s2 }
+  { $0 > $1 }
+}

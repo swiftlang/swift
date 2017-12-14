@@ -134,16 +134,15 @@ extension _UIntBuffer : BidirectionalCollection {
 
 extension _UIntBuffer : RandomAccessCollection {
   public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
-  public typealias IndexDistance = Int
   
   @inline(__always)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    let x = IndexDistance(i.bitOffset) &+ n &* Element.bitWidth
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    let x = Int(i.bitOffset) &+ n &* Element.bitWidth
     return Index(bitOffset: UInt8(truncatingIfNeeded: x))
   }
 
   @inline(__always)
-  public func distance(from i: Index, to j: Index) -> IndexDistance {
+  public func distance(from i: Index, to j: Index) -> Int {
     return (Int(j.bitOffset) &- Int(i.bitOffset)) / Element.bitWidth
   }
 }
@@ -218,7 +217,7 @@ extension _UIntBuffer : RangeReplaceableCollection {
     _storage |= replacement1._storage &<< (headCount &* w)
     _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
     _bitCount = UInt8(
-      truncatingIfNeeded: IndexDistance(_bitCount) &+ growth &* w)
+      truncatingIfNeeded: Int(_bitCount) &+ growth &* w)
   }
 }
 //===----------------------------------------------------------------------===//
@@ -451,13 +450,13 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
     
     switch d.parseOne(&more) {
     case .valid(let scalarContent):
-      let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
+      let d: Int = -numericCast(scalarContent.count)
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
         scalar: Encoding.ReverseDecoder.decodeOne(scalarContent),
         stride: numericCast(scalarContent.count))
     case .invalid(let stride):
-      let d: CodeUnits.IndexDistance = -numericCast(stride)
+      let d: Int = -numericCast(stride)
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
         scalar: UnicodeScalar(_unchecked: 0xfffd),

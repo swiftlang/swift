@@ -9,6 +9,11 @@ import SwiftSyntax
 
 var ParseFile = TestSuite("ParseFile")
 
+struct Foo {
+  public let x: Int
+  private(set) var y: [Bool]
+}
+
 ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
   expectDoesNotThrow({

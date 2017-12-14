@@ -58,6 +58,9 @@ public enum TriviaPiece: Codable {
     case "DocBlockComment":
       let value = try container.decode(String.self, forKey: .value)
       self = .docLineComment(value)
+    case "GarbageText":
+      let value = try container.decode(String.self, forKey: .value)
+      self = .garbageText(value)
     default:
       let context =
         DecodingError.Context(codingPath: [CodingKeys.kind],
@@ -65,7 +68,7 @@ public enum TriviaPiece: Codable {
       throw DecodingError.valueNotFound(String.self, context)
     }
   }
-  
+
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
@@ -81,6 +84,9 @@ public enum TriviaPiece: Codable {
     case .lineComment(let comment):
       try container.encode("LineComment", forKey: .kind)
       try container.encode(comment, forKey: .value)
+    case .garbageText(let text):
+      try container.encode("GarbageText", forKey: .kind)
+      try container.encode(text, forKey: .value)
     case .formfeeds(let count):
       try container.encode("Formfeed", forKey: .kind)
       try container.encode(count, forKey: .value)
@@ -99,10 +105,10 @@ public enum TriviaPiece: Codable {
     case .verticalTabs(let count):
       try container.encode("VerticalTab", forKey: .kind)
       try container.encode(count, forKey: .value)
-      
+
     }
   }
-  
+
   /// A space ' ' character.
   case spaces(Int)
 
@@ -117,7 +123,7 @@ public enum TriviaPiece: Codable {
 
   /// A newline '\n' character.
   case newlines(Int)
-  
+
   /// A backtick '`' character, used to escape identifiers.
   case backticks(Int)
 
@@ -132,6 +138,9 @@ public enum TriviaPiece: Codable {
 
   /// A documentation block comment, starting with '/**' and ending with '*/.
   case docBlockComment(String)
+
+  /// Any skipped text.
+  case garbageText(String)
 }
 
 extension TriviaPiece: TextOutputStreamable {
@@ -153,8 +162,47 @@ extension TriviaPiece: TextOutputStreamable {
     case let .lineComment(text),
          let .blockComment(text),
          let .docLineComment(text),
-         let .docBlockComment(text):
+         let .docBlockComment(text),
+         let .garbageText(text):
       target.write(text)
+    }
+  }
+
+  /// Computes the information from this trivia to inform the source locations
+  /// of the associated tokens.
+  /// Specifically, walks through the trivia and keeps track of every newline
+  /// to give a number of how many newlines and UTF8 characters appear in the
+  /// trivia, along with the UTF8 offset of the last column.
+  func characterSizes() -> (lines: Int, lastColumn: Int, utf8Length: Int) {
+    switch self {
+    case .spaces(let n),
+         .tabs(let n),
+         .verticalTabs(let n),
+         .formfeeds(let n),
+         .backticks(let n):
+      return (lines: 0, lastColumn: n, utf8Length: n)
+    case .newlines(let n):
+      return (lines: n, lastColumn: 0, utf8Length: n)
+    case .lineComment(let text),
+         .docLineComment(let text):
+      let length = text.utf8.count
+      return (lines: 0, lastColumn: length, utf8Length: length)
+    case .blockComment(let text),
+         .docBlockComment(let text),
+         .garbageText(let text):
+      var lines = 0
+      var col = 0
+      var total = 0
+      for char in text.utf8 {
+        total += 1
+        if char == 10 /* ASCII newline */ {
+          col = 0
+          lines += 1
+        } else {
+          col += 1
+        }
+      }
+      return (lines: lines, lastColumn: col, utf8Length: total)
     }
   }
 }
@@ -168,7 +216,7 @@ public struct Trivia: Codable {
   public init(pieces: [TriviaPiece]) {
     self.pieces = pieces
   }
-  
+
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     var pieces = [TriviaPiece]()
@@ -177,7 +225,7 @@ public struct Trivia: Codable {
     }
     self.pieces = pieces
   }
-  
+
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     for piece in pieces {
@@ -222,7 +270,7 @@ public struct Trivia: Codable {
   public static func newlines(_ count: Int) -> Trivia {
     return [.newlines(count)]
   }
-  
+
   /// Return a piece of trivia for some number of backtick '`' characters
   /// in a row.
   public static func backticks(_ count: Int) -> Trivia {
@@ -248,6 +296,25 @@ public struct Trivia: Codable {
   public static func docBlockComment(_ text: String) -> Trivia {
     return [.docBlockComment(text)]
   }
+
+  /// Return a piece of trivia for any garbage text.
+  public static func garbageText(_ text: String) -> Trivia {
+    return [.garbageText(text)]
+  }
+
+  /// Computes the total sizes and offsets of all pieces in this Trivia.
+  func characterSizes() -> (lines: Int, lastColumn: Int, utf8Length: Int) {
+    var lines = 0
+    var lastColumn = 0
+    var length = 0
+    for piece in pieces {
+      let (ln, col, len) = piece.characterSizes()
+      lines += ln
+      lastColumn = col
+      length += len
+    }
+    return (lines: lines, lastColumn: lastColumn, utf8Length: length)
+  }
 }
 
 /// Conformance for Trivia to the Collection protocol.
@@ -255,15 +322,15 @@ extension Trivia: Collection {
   public var startIndex: Int {
     return pieces.startIndex
   }
-  
+
   public var endIndex: Int {
     return pieces.endIndex
   }
-  
+
   public func index(after i: Int) -> Int {
     return pieces.index(after: i)
   }
-  
+
   public subscript(_ index: Int) -> TriviaPiece {
     return pieces[index]
   }

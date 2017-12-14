@@ -625,6 +625,11 @@ void Remangler::mangleMetaclass(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleClassMetadataBaseOffset(Node *node) {
+  Out << "Mo";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Out << "Mn";
   mangleSingleChildNode(node); // type

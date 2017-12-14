@@ -242,20 +242,6 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-  void addInputFilename(StringRef Filename) {
-    FrontendOpts.Inputs.addInputFilename(Filename);
-  }
-
-  /// Does not take ownership of \p Buf.
-  void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.Inputs.addInputBuffer(Buf);
-  }
-
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
 
   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
@@ -307,7 +293,7 @@ public:
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
-                       bool alwaysSetModuleToMain,
+                       bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
@@ -358,8 +344,6 @@ class CompilerInstance {
 
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
-
-  bool setUpForFileAt(unsigned i);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
@@ -436,6 +420,46 @@ public:
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
+private:
+  void setUpLLVMArguments();
+  void setUpDiagnosticOptions();
+  bool setUpModuleLoaders();
+  bool isInputSwift() {
+    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+  }
+  bool isInSILMode() {
+    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+  }
+
+  bool setUpInputs();
+  Optional<unsigned> setUpCodeCompletionBuffer();
+
+  /// Set up all state in the CompilerInstance to process the given input file.
+  /// Return true on error.
+  bool setUpForInput(const InputFile &input);
+
+  /// Find a buffer for a given input file and ensure it is recorded in
+  /// SourceMgr, PartialModules, or InputSourceCodeBufferIDs as appropriate.
+  /// Return the buffer ID if it is not already compiled, or None if so.
+  /// Set failed on failure.
+
+  Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
+
+  /// Given an input file, return a buffer to use for its contents,
+  /// and a buffer for the corresponding module doc file if one exists.
+  /// On failure, return a null pointer for the first element of the returned
+  /// pair.
+  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+            std::unique_ptr<llvm::MemoryBuffer>>
+  getInputBufferAndModuleDocBufferIfPresent(const InputFile &input);
+
+  /// Try to open the module doc file corresponding to the input parameter.
+  /// Return None for error, nullptr if no such file exists, or the buffer if
+  /// one was found.
+  Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  openModuleDoc(const InputFile &input);
+
+public:
   /// Parses and type-checks all input files.
   void performSema();
 
@@ -445,6 +469,13 @@ public:
   ///
   void performParseOnly(bool EvaluateConditionals = false);
 
+private:
+  SourceFile *
+  createSourceFileForMainModule(SourceFileKind FileKind,
+                                SourceFile::ImplicitModuleImportKind ImportKind,
+                                Optional<unsigned> BufferID);
+
+public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
@@ -469,7 +500,7 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(const ImplicitImports &implicitImports) const;
+  void createREPLFile(const ImplicitImports &implicitImports);
   std::unique_ptr<DelayedParsingCallbacks>
   computeDelayedParsingCallback(bool isPrimary);
 

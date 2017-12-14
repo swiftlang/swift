@@ -334,8 +334,8 @@ public final class _DataStorage {
             let tryCalloc = (origLength == 0 || (newLength / origLength) >= 4)
             if allocateCleared && tryCalloc {
                 newBytes = _DataStorage.allocate(newCapacity, true)
-                if newBytes != nil {
-                    _DataStorage.move(newBytes!, _bytes!, origLength)
+                if let newBytes = newBytes {
+                    _DataStorage.move(newBytes, _bytes!, origLength)
                     _freeBytes()
                 }
             }
@@ -344,8 +344,8 @@ public final class _DataStorage {
                 allocateCleared = false
                 if _deallocator != nil {
                     newBytes = _DataStorage.allocate(newCapacity, true)
-                    if newBytes != nil {
-                        _DataStorage.move(newBytes!, _bytes!, origLength)
+                    if let newBytes = newBytes {
+                        _DataStorage.move(newBytes, _bytes!, origLength)
                         _freeBytes()
                         _deallocator = nil
                     }
@@ -360,8 +360,8 @@ public final class _DataStorage {
                 allocateCleared = clear && _DataStorage.shouldAllocateCleared(newCapacity)
                 if allocateCleared && tryCalloc {
                     newBytes = _DataStorage.allocate(newCapacity, true)
-                    if newBytes != nil {
-                        _DataStorage.move(newBytes!, _bytes!, origLength)
+                    if let newBytes = newBytes {
+                        _DataStorage.move(newBytes, _bytes!, origLength)
                         _freeBytes()
                     }
                 }
@@ -610,8 +610,8 @@ public final class _DataStorage {
                 memmove(mutableBytes! + start + replacementLength, mutableBytes! + start + length, currentLength - start - length)
             }
             if replacementLength != 0 {
-                if replacementBytes != nil {
-                    memmove(mutableBytes! + start, replacementBytes!, replacementLength)
+                if let replacementBytes = replacementBytes {
+                    memmove(mutableBytes! + start, replacementBytes, replacementLength)
                 } else {
                     memset(mutableBytes! + start, 0, replacementLength)
                 }
@@ -1372,7 +1372,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         
         guard !copyRange.isEmpty else { return 0 }
         
-        let nsRange = NSMakeRange(copyRange.lowerBound, copyRange.upperBound - copyRange.lowerBound)
+        let nsRange = NSRange(location: copyRange.lowerBound, length: copyRange.upperBound - copyRange.lowerBound)
         _copyBytesHelper(to: buffer.baseAddress!, from: nsRange)
         return copyRange.count
     }
@@ -1428,9 +1428,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let nsRange : NSRange
         if let r = range {
             _validateRange(r)
-            nsRange = NSMakeRange(r.lowerBound, r.upperBound - r.lowerBound)
+            nsRange = NSRange(location: r.lowerBound, length: r.upperBound - r.lowerBound)
         } else {
-            nsRange = NSMakeRange(0, _backing.length)
+            nsRange = NSRange(location: 0, length: _backing.length)
         }
         let result = _backing.withInteriorPointerReference(_sliceRange) {
             $0.range(of: dataToFind, options: options, in: nsRange)
@@ -1512,7 +1512,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         // it is worth noting that the range here may be out of bounds of the Data itself (which triggers a growth)
         precondition(range.lowerBound >= 0, "Ranges must not be negative bounds")
         precondition(range.upperBound >= 0, "Ranges must not be negative bounds")
-        let range = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
+        let range = NSRange(location: range.lowerBound, length: range.upperBound - range.lowerBound)
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
@@ -1581,7 +1581,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer, count cnt: Int) {
         _validateRange(subrange)
-        let nsRange = NSMakeRange(subrange.lowerBound, subrange.upperBound - subrange.lowerBound)
+        let nsRange = NSRange(location: subrange.lowerBound, length: subrange.upperBound - subrange.lowerBound)
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }

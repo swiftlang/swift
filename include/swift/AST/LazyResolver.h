@@ -96,15 +96,6 @@ public:
   /// Resolve an implicitly-generated member with the given name.
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
 
-  /// Resolve any implicitly-generated members and conformances for generated
-  /// external decls.
-  virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
-
-  /// Determine whether the given (potentially constrained) protocol extension
-  /// is usable for the given type.
-  virtual bool isProtocolExtensionUsable(DeclContext *dc, Type type,
-                                         ExtensionDecl *protocolExtension) = 0;
-
   /// Mark the given conformance as "used" from the given declaration context.
   virtual void markConformanceUsed(ProtocolConformanceRef conformance,
                                    DeclContext *dc) = 0;
@@ -167,15 +158,6 @@ public:
 
   void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
     Principal.resolveImplicitMember(nominal, member);
-  }
-
-  void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
-    Principal.resolveExternalDeclImplicitMembers(nominal);
-  }
-
-  bool isProtocolExtensionUsable(DeclContext *dc, Type type,
-                                 ExtensionDecl *protocolExtension) override {
-    return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
   }
 
   void markConformanceUsed(ProtocolConformanceRef conformance,

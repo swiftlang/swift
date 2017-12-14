@@ -67,7 +67,6 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
 %   end
     subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<${SelfType}>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 
   expect${'Mutable' if IsMutable else ''}CollectionType(${SelfType}.self)

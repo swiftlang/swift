@@ -26,25 +26,32 @@ DECL_NODES = [
     Node('FunctionParameterList', kind='SyntaxCollection',
          element='FunctionParameter'),
 
-    # function-signature ->
-    #   '(' parameter-list? ')' (throws | rethrows)? '->'? attributes? type?
-    Node('FunctionSignature', kind='Syntax',
+    Node('ParameterClause', kind='Syntax',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ParameterList', kind='FunctionParameterList'),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # -> Type
+    Node('ReturnClause', kind='Syntax',
+         children=[
+             Child('Arrow', kind='ArrowToken'),
+             Child('ReturnType', kind='Type'),
+         ]),
+
+    # function-signature ->
+    #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
+    Node('FunctionSignature', kind='Syntax',
+         children=[
+             Child('Input', kind='ParameterClause'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('Arrow', kind='ArrowToken',
-                   is_optional=True),
-             Child('ReturnTypeAttributes', kind='AttributeList',
-                   is_optional=True),
-             Child('ReturnType', kind='Type',
-                   is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
     # else-if-directive-clause -> '#elseif' expr stmt-list
@@ -121,6 +128,21 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
+    Node('ProtocolDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ProtocolKeyword', kind='ProtocolToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
     Node('MemberDeclBlock', kind='Syntax',
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
@@ -150,11 +172,23 @@ DECL_NODES = [
     #   type '...'? '='? expression? ','?
     Node('FunctionParameter', kind='Syntax',
          children=[
-             Child('ExternalName', kind='IdentifierToken',
+             Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('LocalName', kind='IdentifierToken'),
+             Child('FirstName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ]),
+             # One of these two names needs be optional, we choose the second
+             # name to avoid backtracking.
+             Child('SecondName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ],
+                   is_optional=True),
              Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation'),
+             Child('TypeAnnotation', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultEquals', kind='EqualToken',
@@ -195,13 +229,22 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    is_optional=True),
              Child('FuncKeyword', kind='FuncToken'),
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'OperatorToken',
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
+                   ]),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Signature', kind='FunctionSignature'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
-             Child('Body', kind='CodeBlock'),
+             # the body is not necessary inside a protocol definition
+             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     # else-if-directive-clause-list -> else-if-directive-clause
