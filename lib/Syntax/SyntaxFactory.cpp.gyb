@@ -130,6 +130,22 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
               return false;
             }
         },
+%       elif child.text_choices:
+        {   ${option},
+            [](const Syntax &S) {
+              // check ${child.name}.
+              if (auto Tok = S.getAs<TokenSyntax>()) {
+                auto Text = Tok->getText();
+%           tok_checks = []
+%           for choice in child.text_choices:
+%             tok_checks.append("Text == \"%s\"" % choice)
+%           end
+%           all_checks = ' || '.join(tok_checks)
+                return ${all_checks};
+              }
+              return false;
+            }
+        },
 %       else:
         {   ${option},
             [](const Syntax &S) {
