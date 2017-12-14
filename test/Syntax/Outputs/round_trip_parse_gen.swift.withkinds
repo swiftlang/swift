@@ -128,25 +128,28 @@ func tryfoo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSi
   try! <MemberAccessExpr><IdentifierExpr>foo</IdentifierExpr>().bar</MemberAccessExpr>().foo().bar()</TryExpr>
 }</CodeBlock></FunctionDecl><FunctionDecl>
 
-func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{
+func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ClosureExpr>
   {<ClosureSignature><ClosureCaptureSignature>[<ClosureCaptureItem>weak <IdentifierExpr>a</IdentifierExpr>,</ClosureCaptureItem><ClosureCaptureItem>
     unowned(safe) self,</ClosureCaptureItem><ClosureCaptureItem>
     b = <IntegerLiteralExpr>3</IntegerLiteralExpr>,</ClosureCaptureItem><ClosureCaptureItem>
     unowned(unsafe) c = <MemberAccessExpr><IdentifierExpr>foo</IdentifierExpr>().bar</MemberAccessExpr></ClosureCaptureItem>] </ClosureCaptureSignature>in</ClosureSignature>
-  }
-  {<ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature>in </ClosureSignature>}
+  }</ClosureExpr><ClosureExpr>
+  {<ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature>in </ClosureSignature>}</ClosureExpr><ClosureExpr>
 
   { <ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature><ClosureParam>a, </ClosureParam><ClosureParam>b, </ClosureParam><ClosureParam>_ </ClosureParam><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause>in</ClosureSignature><ReturnStmt>
     return <IntegerLiteralExpr>2</IntegerLiteralExpr></ReturnStmt>
-  }
+  }</ClosureExpr><ClosureExpr>
   { <ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature><ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>_: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause>in</ClosureSignature><ReturnStmt>
     return <IntegerLiteralExpr>2</IntegerLiteralExpr></ReturnStmt>
-  }
+  }</ClosureExpr><ClosureExpr>
   { <ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature><ClosureParam>a, </ClosureParam><ClosureParam>b, </ClosureParam><ClosureParam>_ </ClosureParam>throws <ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause>in</ClosureSignature><ReturnStmt>
     return <IntegerLiteralExpr>2</IntegerLiteralExpr></ReturnStmt>
-  }
+  }</ClosureExpr><ClosureExpr>
   { <ClosureSignature><ClosureCaptureSignature>[] </ClosureCaptureSignature><ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>_ b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause>throws <ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause>in</ClosureSignature><ReturnStmt>
     return <IntegerLiteralExpr>2</IntegerLiteralExpr></ReturnStmt>
-  }
-  { <ClosureSignature><ClosureParam>a, </ClosureParam><ClosureParam>b </ClosureParam>in </ClosureSignature>}
+  }</ClosureExpr><ClosureExpr>
+  { <ClosureSignature><ClosureParam>a, </ClosureParam><ClosureParam>b </ClosureParam>in </ClosureSignature>}</ClosureExpr><ClosureExpr>
+  {}</ClosureExpr><ClosureExpr>
+  { <ClosureSignature><ClosureParam>s1, </ClosureParam><ClosureParam>s2 </ClosureParam>in </ClosureSignature><SequenceExpr><IdentifierExpr>s1 </IdentifierExpr><BinaryOperatorExpr>> </BinaryOperatorExpr><IdentifierExpr>s2 </IdentifierExpr></SequenceExpr>}</ClosureExpr><ClosureExpr>
+  { <SequenceExpr>$0 <BinaryOperatorExpr>> </BinaryOperatorExpr>$1 </SequenceExpr>}</ClosureExpr>
 }</CodeBlock></FunctionDecl>
