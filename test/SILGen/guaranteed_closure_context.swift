@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership -enable-guaranteed-closure-contexts %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership  %s | %FileCheck %s
 
 func use<T>(_: T) {}
 

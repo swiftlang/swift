@@ -189,9 +189,6 @@ def debugger_support : Flag<["-"], "debugger-support">,
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 
-def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-contexts">,
-  HelpText<"Use @guaranteed convention for closure context">;
-
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
