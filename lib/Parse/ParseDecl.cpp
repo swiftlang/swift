@@ -2418,6 +2418,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     // Unambiguous top level decls.
     case tok::kw_import:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
       DeclResult = parseDeclImport(Flags, Attributes);
       break;
     case tok::kw_extension:
@@ -2683,7 +2684,10 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   }
 
   std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
+  bool HasNext;
   do {
+    SyntaxParsingContext AccessCompCtx(SyntaxContext,
+                                       SyntaxKind::AccessPathComponent);
     if (Tok.is(tok::code_complete)) {
       consumeToken();
       if (CodeCompletion) {
@@ -2695,7 +2699,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     if (parseAnyIdentifier(ImportPath.back().first,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
-  } while (consumeIf(tok::period));
+    HasNext = consumeIf(tok::period);
+  } while (HasNext);
+
+  // Collect all access path components to an access path.
+  SyntaxContext->collectNodesInPlace(SyntaxKind::AccessPath);
 
   if (Tok.is(tok::code_complete)) {
     // We omit the code completion token if it immediately follows the module
