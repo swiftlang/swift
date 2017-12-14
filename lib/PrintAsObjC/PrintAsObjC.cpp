@@ -679,7 +679,14 @@ private:
 
     if (makeNewUnavailable) {
       assert(!makeNewExplicitlyAvailable);
-      os << "+ (nonnull instancetype)new SWIFT_UNAVAILABLE;\n";
+      // Downgrade this to a warning in pre-Swift-5 mode. This isn't perfect
+      // because it's a diagnostic inflicted on /clients/, but it's close
+      // enough. It really is invalid to call +new when -init is unavailable.
+      StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
+      if (!M.getASTContext().isSwiftVersionAtLeast(5))
+        annotationName = "SWIFT_DEPRECATED_MSG";
+      os << "+ (nonnull instancetype)new " << annotationName
+         << "(\"-init is unavailable\");\n";
     } else if (makeNewExplicitlyAvailable) {
       os << "+ (nonnull instancetype)new;\n";
     }
