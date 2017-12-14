@@ -282,4 +282,29 @@ EXPR_NODES = [
              Child('Items', kind='ClosureCaptureItemList', is_optional=True),
              Child('RightSquare', kind='RightSquareToken'),
          ]),
+
+    Node('ClosureParam', kind='Syntax',
+         children=[
+             Child('Name', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ]),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # a, b, c
+    Node('ClosureParamList', kind='SyntaxCollection', element='ClosureParam'),
+
+    Node('ClosureSignature', kind='Syntax',
+         children=[
+             Child('Capture', kind='ClosureCaptureSignature',
+                   is_optional=True),
+             # FIXME: one and only one of these two children is required
+             Child('SimpleInput', kind='ClosureParamList', is_optional=True),
+             Child('Input', kind='ParameterClause', is_optional=True),
+             Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
+             Child('InTok', kind='InToken'),
+         ]),
 ]

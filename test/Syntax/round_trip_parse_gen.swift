@@ -135,4 +135,18 @@ func closure() {
     unowned(unsafe) c = foo().bar] in
   }
   {[] in }
+
+  { [] a, b, _ -> Int in
+    return 2
+  }
+  { [] (a: Int, b: Int, _: Int) -> Int in
+    return 2
+  }
+  { [] a, b, _ throws -> Int in
+    return 2
+  }
+  { [] (a: Int, _ b: Int) throws -> Int in
+    return 2
+  }
+  { a, b in }
 }
