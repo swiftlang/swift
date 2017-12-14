@@ -17,7 +17,7 @@ void test() {
   (void)[[Base alloc] init];
    // CHECK-NOT: error:
   (void)[[Sub alloc] init];
-  // CHECK: :[[@LINE+1]]:{{[0-9]+}}: error: 'new' is unavailable
+  // CHECK: :[[@LINE+1]]:{{[0-9]+}}: error: 'new' is unavailable: -init is unavailable
   (void)[Base new];
    // CHECK-NOT: error:
   (void)[Sub new];
