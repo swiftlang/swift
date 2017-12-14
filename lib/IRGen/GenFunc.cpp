@@ -973,6 +973,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal))
         ref = subIGF.coerceValue(rawData, ti.getStorageType(),
                                  subIGF.IGM.DataLayout);
+      else
+        ref = subIGF.Builder.CreateBitCast(rawData, ti.getStorageType());
       param.add(ref);
       bindPolymorphicParameter(subIGF, origType, substType, param, paramI);
       (void)param.claimAll();
