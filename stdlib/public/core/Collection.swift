@@ -1079,50 +1079,6 @@ extension Collection {
     return self[index!]
   }
 
-  /// Randomly samples n elements from the collection
-  ///
-  /// - Parameter n: Number of elements to randomly sample without replacement
-  ///   from this collection.
-  /// - Returns: An array of randomly sampled elements from this collection.
-  ///
-  /// If n is greater than the collection's count, this returns the whole collection.
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let greetingSamples = greetings.sampling(5)
-  ///     print(greetingSamples) // Prints ["hi", "hey", "hello", "hola"]
-  @_inlineable
-  public func sampling(_ n: Int) -> [Element] {
-    return self.sampling(n, using: Random.default)
-  }
-
-  /// Randomly samples n elements from the collection
-  ///
-  /// - Parameter n: Number of elements to randomly sample without replacement
-  ///   from this collection.
-  /// - Parameter generator: The random number generator to use when getting
-  ///   random elements.
-  /// - Returns: An array of randomly sampled elements from this collection.
-  ///
-  /// If n is greater than the collection's count, this returns the whole collection.
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let greetingSamples = greetings.sampling(5)
-  ///     print(greetingSamples) // Prints ["hi", "hey", "hello", "hola"]
-  @_inlineable
-  public func sampling<T: RandomNumberGenerator>(
-    _ n: Int,
-    using generator: T
-  ) -> [Element] {
-    guard n < count, n >= 0 else { return Array(self) }
-    var copySelf = Array(self)
-    copySelf.shuffle(using: generator)
-    var arr = [Element]()
-    for _ in 0 ..< n {
-      arr.append(copySelf.removeFirst())
-    }
-    return arr
-  }
-
   /// Do not use this method directly; call advanced(by: n) instead.
   @_inlineable
   @_versioned

@@ -52,21 +52,6 @@ RandomTests.test("random elements") {
   }
 }
 
-RandomTests.test("sampling from an array") {
-  let range = 0 ..< 20
-  let array = Array(range)
-  for i in range {
-    let chosen = array.sampling(i)
-    expectTrue(chosen.count == i)
-    for choice in chosen {
-      expectTrue(array.contains(choice))
-    }
-  }
-
-  // If we pick more elements than the array contains, check if count == array.count
-  expectTrue(array.sampling(100).count == array.count)
-}
-
 func chi2Test(_ samples: [Double]) -> Bool {
   let upperBound = 50
   let numberOfTrials = 500_000
@@ -92,6 +77,7 @@ RandomTests.test("uniform distribution") {
     let randomIndex = Int.random(in: 0 ..< upperBound)
     array[randomIndex] += 1.0
   }
+  
   expectTrue(chi2Test(array))
 }
 
