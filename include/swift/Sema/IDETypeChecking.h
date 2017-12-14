@@ -45,12 +45,6 @@ namespace swift {
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
 
-  bool isEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
-
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
@@ -84,8 +78,12 @@ namespace swift {
   /// \brief Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
+  /// \param openTypeParameters Whether to "open" type parameters into type
+  /// variables, allowing those type variables to be free.
+  ///
   /// \returns True on applied, false on not applied.
-  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
+  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED,
+                          bool openTypeParameters);
 
 /// The kind of type checking to perform for code completion.
   enum class CompletionTypeCheckKind {

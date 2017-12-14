@@ -62,7 +62,8 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
   result.TransformContext = TypeTransformContext(T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
     return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
-                              getDeclContext(), T, ED);
+                              getDeclContext(), T, ED,
+                              /*openTypeParameters=*/false);
   };
   result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
   return result;
@@ -280,61 +281,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
 
-    // Get the substitutions from the generic signature of
-    // the extension to the interface types of the base type's
-    // declaration.
-    auto *M = DC->getParentModule();
-    SubstitutionMap subMap;
-    if (!BaseType->isExistentialType())
-      subMap = BaseType->getContextSubstitutionMap(M, Ext);
-
-    assert(Ext->getGenericSignature() && "No generic signature.");
-    auto GenericSig = Ext->getGenericSignature();
-    for (auto Req : GenericSig->getRequirements()) {
-      auto Kind = Req.getKind();
-
-      // FIXME: Could do something here
-      if (Kind == RequirementKind::Layout)
-        continue;
-
-      auto First = Req.getFirstType();
-      auto Second = Req.getSecondType();
-      if (!BaseType->isExistentialType()) {
-        First = First.subst(subMap);
-        Second = Second.subst(subMap);
-
-        if (!First || !Second) {
-          // Substitution with interface type bases can only fail
-          // if a concrete type fails to conform to a protocol.
-          // In this case, just give up on the extension altogether.
-          return {Result, MergeInfo};
-        }
-      }
-
-      switch (Kind) {
-        case RequirementKind::Conformance:
-        case RequirementKind::Superclass:
-          // FIXME: This could be more accurate; check
-          // conformance instead of subtyping
-          if (!canPossiblyConvertTo(First, Second, *DC))
-            return {Result, MergeInfo};
-          else if (!isConvertibleTo(First, Second, *DC))
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          break;
-
-        case RequirementKind::SameType:
-          if (!canPossiblyEqual(First, Second, *DC)) {
-            return {Result, MergeInfo};
-          } else if (!First->isEqual(Second)) {
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          }
-          break;
-
-        case RequirementKind::Layout:
-          llvm_unreachable("Handled above");
-      }
-    }
-    Result.Ext = Ext;
+    if (BaseType->isAnyExistentialType() ||
+        isExtensionApplied(*DC, BaseType, Ext, /*openTypeParameters=*/true))
+      Result.Ext = Ext;
     return {Result, MergeInfo};
   }
 

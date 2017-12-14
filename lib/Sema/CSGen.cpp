@@ -3451,7 +3451,8 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
 }
 
 bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
+                               const ExtensionDecl *ED,
+                               bool openTypeParameters) {
   if (!ED->isConstrainedExtension() ||
       // We'll crash if we leak type variables from one constraint
       // system into the new one created below.
@@ -3472,6 +3473,21 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
+
+  // Open up the type parameters, if needed.
+  auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;
+  if (openTypeParameters && BaseTy->hasTypeParameter()) {
+    // Open up the type parameters.
+    constraints::OpenedTypeMap replacements;
+    CS.openGeneric(&DC, DC.getModuleScopeContext(),
+                   DC.getGenericSignatureOfContext(),
+                   /*skipProtocolSelfConstraint=*/false,
+                   Loc, replacements);
+    BaseTy = CS.openType(BaseTy, replacements);
+
+    // Allow free type variables.
+    allowFreeTypeVariables = FreeTypeVariableBinding::Allow;
+  }
 
   // Prepare type substitution map.
   SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
@@ -3501,18 +3517,6 @@ static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
   }
   return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
                                     /*unwrappedIUO=*/nullptr);
-}
-
-bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Equal, &DC);
-}
-
-bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Conversion, &DC);
-}
-
-bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return T1->isEqual(T2);
 }
 
 bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {

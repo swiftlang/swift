@@ -193,7 +193,7 @@ static void doGlobalExtensionLookup(Type BaseType,
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
     if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
-                            extension))
+                            extension, /*openTypeParameters=*/false))
       continue;
 
     bool validatedExtension = false;
