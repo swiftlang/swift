@@ -1795,10 +1795,13 @@ NOTE(overridden_near_match_here,none,
      "potential overridden %0 %1 here",
       (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
-      "overriding declarations %select{in extensions|from extensions}0 "
-      "is not supported", (bool))
+      "overriding %select{|non-@objc }0declarations "
+      "%select{in extensions|from extensions}0 is not supported", (bool, bool))
 NOTE(overridden_here,none,
      "overridden declaration is here", ())
+NOTE(overridden_here_can_be_objc,none,
+     "add '@objc' to make this declaration overridable", ())
+
 ERROR(override_objc_type_mismatch_method,none,
       "overriding method with selector %0 has incompatible type %1",
       (ObjCSelector, Type))
