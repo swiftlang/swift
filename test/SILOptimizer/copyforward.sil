@@ -736,3 +736,40 @@ bb(%0 : $*ObjWrapper, %1 : $*ObjWrapper):
   %74 = tuple ()
   return %74 : $()
 }
+
+// Helper for multipleUse
+sil @multipleArg : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// Test a corner case of forward copy propagation in which simple substitution
+// does not work (the source is reinitialized) and need to propagate to an
+// instruction with multiple uses of the source.
+// CHECK-LABEL: sil hidden @multipleUse : $@convention(thin) <T> (@in T, @in T) -> () {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK:   [[A:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [take] %0 to [initialization] [[A]] : $*T
+// CHECK:   [[F:%.*]] = function_ref @multipleArg : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> ()
+// CHECK:   [[C:%.*]] = apply [[F]]<T>([[A]], [[A]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[A]] : $*T
+// CHECK:   dealloc_stack [[A]] : $*T
+// CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
+// CHECK:   %{{.*}} = tuple ()
+// CHECK:   return %{{.*}} : $()
+// CHECK: } // end sil function 'multipleUse'
+sil hidden @multipleUse : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %l1 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %l1 : $*T
+  %f1 = function_ref @multipleArg : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> ()
+  %c1 = apply %f1<T>(%l1, %l1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> ()
+  destroy_addr %l1 : $*T
+  dealloc_stack %l1 : $*T
+  destroy_addr %0 : $*T
+  // Reinitialize copy's source to avoid a fast isSourceDeadAtCopy check.
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %r1 = tuple ()
+  return %r1 : $()
+}
