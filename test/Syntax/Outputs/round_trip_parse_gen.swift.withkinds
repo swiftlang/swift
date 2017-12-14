@@ -65,7 +65,7 @@ typealias C = <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</Arr
 typealias D = <DictionaryType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>]</DictionaryType>
 typealias E = <MetatypeType><OptionalType><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>?</OptionalType>.Protocol</MetatypeType>
 typealias F = <MetatypeType><ImplicitlyUnwrappedOptionalType><ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>!</ImplicitlyUnwrappedOptionalType>.Type</MetatypeType>
-typealias G = <FunctionType>(<TupleTypeElement>a x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement>_ y: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>... <Initializer>= <IntegerLiteralExpr>1</IntegerLiteralExpr></Initializer></TupleTypeElement>) throw -> <FunctionType>() -> <TupleType>()</TupleType></FunctionType></FunctionType>
+typealias G = <FunctionType>(<TupleTypeElement>a x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement>_ y: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>... <InitializerClause>= <IntegerLiteralExpr>1</IntegerLiteralExpr></InitializerClause></TupleTypeElement>) throw -> <FunctionType>() -> <TupleType>()</TupleType></FunctionType></FunctionType>
 typealias H = <FunctionType>() rethrows -> <TupleType>()</TupleType></FunctionType><StructDecl>
 
 struct foo <MemberDeclBlock>{<StructDecl>
@@ -97,10 +97,10 @@ private </DeclModifier>struct S<GenericParameterClause><<GenericParameter>A, </G
 protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><FunctionDecl>
 
 func foo<FunctionSignature><ParameterClause>(<FunctionParameter>_ _: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
-         a b: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr>,</FunctionParameter><FunctionParameter>
-         _ c: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <IntegerLiteralExpr>2</IntegerLiteralExpr>,</FunctionParameter><FunctionParameter>
-         d _: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <SequenceExpr><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>2</IntegerLiteralExpr>: <IntegerLiteralExpr>3</IntegerLiteralExpr></TernaryExpr></SequenceExpr>,</FunctionParameter><FunctionParameter><Attribute>
-         @objc </Attribute>e: <SimpleTypeIdentifier>X </SimpleTypeIdentifier>= <BooleanLiteralExpr>true</BooleanLiteralExpr>,</FunctionParameter><FunctionParameter>
+         a b: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><InitializerClause>= <SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr></InitializerClause>,</FunctionParameter><FunctionParameter>
+         _ c: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><InitializerClause>= <IntegerLiteralExpr>2</IntegerLiteralExpr></InitializerClause>,</FunctionParameter><FunctionParameter>
+         d _: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><InitializerClause>= <SequenceExpr><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>2</IntegerLiteralExpr>: <IntegerLiteralExpr>3</IntegerLiteralExpr></TernaryExpr></SequenceExpr></InitializerClause>,</FunctionParameter><FunctionParameter><Attribute>
+         @objc </Attribute>e: <SimpleTypeIdentifier>X </SimpleTypeIdentifier><InitializerClause>= <BooleanLiteralExpr>true</BooleanLiteralExpr></InitializerClause>,</FunctionParameter><FunctionParameter>
          f: inout <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
          g: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>...</FunctionParameter>) </ParameterClause>throws <ReturnClause>-> <DictionaryType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>] </DictionaryType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl>
 

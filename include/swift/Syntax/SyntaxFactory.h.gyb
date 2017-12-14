@@ -59,8 +59,6 @@ struct SyntaxFactory {
   /// between these two numbers is the number of optional children.
   static std::pair<unsigned, unsigned> countChildren(SyntaxKind Kind);
 
-  static SyntaxKind getUnknownKind(SyntaxKind Kind);
-
   static Syntax
   makeBlankCollectionSyntax(SyntaxKind Kind);
 
