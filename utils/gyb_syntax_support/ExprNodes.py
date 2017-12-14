@@ -307,4 +307,12 @@ EXPR_NODES = [
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),
          ]),
+
+    Node('ClosureExpr', kind='Expr',
+         children=[
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('Signature', kind='ClosureSignature', is_optional=True),
+             Child('Statements', kind='StmtList'),
+             Child('RightBrace', kind='RightBraceToken'),
+         ]),
 ]

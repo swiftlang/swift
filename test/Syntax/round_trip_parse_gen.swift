@@ -149,4 +149,7 @@ func closure() {
     return 2
   }
   { a, b in }
+  {}
+  { s1, s2 in s1 > s2 }
+  { $0 > $1 }
 }
