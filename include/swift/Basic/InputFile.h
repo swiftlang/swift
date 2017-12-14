@@ -101,6 +101,7 @@ public:
   llvm::MemoryBuffer *buffer() const { return Buffer; }
   StringRef file() const { return Filename; }
   const OutputPaths &outputs() const { return Outputs; }
+  // FIXME: dmu can drop malleable?
   OutputPaths &malleableOutputs() { return Outputs; }
 
   /// Return Swift-standard file name from a buffer name set by

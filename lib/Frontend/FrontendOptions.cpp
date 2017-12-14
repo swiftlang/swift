@@ -122,10 +122,10 @@ StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
 
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   if (AllFiles.empty()) return StringRef();
-  // FIXME use reverse iterator?
+  // FIXME dmu use reverse iterator?
   for (auto i = AllFiles.size() - 1; ; --i) {
     if (!AllFiles[i].outputs().OutputFilename.empty()) {
-      // FIXME: try uncommenting and seeing what breaks:
+      // FIXME: dmu try uncommenting and seeing what breaks:
       //      assert(AllFiles[i].outputs().OutputFilename ==
       //      AllFiles[0].outputs().OutputFilename);
       return AllFiles[i].outputs().OutputFilename;
@@ -138,7 +138,7 @@ StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
 
 StringRef FrontendInputsAndOutputs::singleOutputFilename() const {
   return lastOutputFilename();
-  // FIXME: Someday, try firstOutputFilename and see what breaks;
+  // FIXME: dmu Someday, try firstOutputFilename and see what breaks;
 }
 
 /// Do something better when >1 primary
@@ -218,6 +218,7 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   // Not really all!
+  // FIXME: dmu do for all? rm firstPrimary
   const InputFile &pri = InputsAndOutputs.firstPrimary();
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules &&

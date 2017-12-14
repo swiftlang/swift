@@ -62,11 +62,11 @@ public:
     }
     return pointers;
   }
-  // FIXME: Can I use an iterator instead of making a new collection?
+  // FIXME: dmu Can I use an iterator instead of making a new collection?
 
   std::vector<InputFile *> getPointersToAllPrimaries() {
     std::vector<InputFile *> primaries;
-    forEachPrimaryMalleably(
+    forEachPrimary(
         [&](InputFile &input) -> void { primaries.push_back(&input); });
     return primaries;
   }
@@ -76,13 +76,9 @@ public:
     return AllFiles[PrimaryInputs.front().second];
   }
 
-  void
-  forEachPrimary(llvm::function_ref<void(const InputFile &input)> fn) const {
-    for (auto p : PrimaryInputs)
-      fn(getAllFiles()[p.second]);
-  }
-
-  void forEachPrimaryMalleably(llvm::function_ref<void(InputFile &input)> fn) {
+  // FIXME: dmu reify forAllInputsNeedingOutputs to elim these
+  // (maybe) and reify count of same
+  void forEachPrimary(llvm::function_ref<void(InputFile &input)> fn) {
     for (auto p : PrimaryInputs)
       fn(getAllFiles()[p.second]);
   }
@@ -92,7 +88,7 @@ public:
                           : getPointersToAllFiles();
   }
 
-  // FIXME: check all uses
+  // FIXME: dmu check all uses
   const OutputPaths &pathsForAtMostOnePrimary() const {
     static OutputPaths empty;
     return hasPrimaries()
@@ -100,13 +96,15 @@ public:
                : AllFiles.empty() ? empty : AllFiles.front().outputs();
   }
 
-  // FIXME: Why the *last* one?
+  // FIXME: dmu  Why the *last* one?
+  // FIXME: dmu Also someday elim all uses of singleOutputFilename
   StringRef singleOutputFilename() const;
   StringRef firstOutputFilename() const;
   StringRef lastOutputFilename() const;
+  // FIXME: dmu eliminate primaryOrEmpty by getting file, then asking?
   StringRef outputFilenameForPrimary() const;
 
-  // FIXME: iterator?
+  // FIXME: dmu iterator?
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getAllFiles()) {
@@ -139,6 +137,7 @@ public:
 
   // Primary input readers
 
+  // FIXME: dmu remove these as batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const {
     assert(primaryInputCount() < 2 &&
            "have not implemented >1 primary input yet");
@@ -146,6 +145,10 @@ public:
   bool areAllNonPrimariesSIB() const;
 
 public:
+  // FIXME: dmu what about nonthreaded WMO? Should be 1.
+  unsigned countOfFilesNeededOutput() const {
+    return hasPrimaries() ? primaryInputCount() : inputCount();
+  }
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:
@@ -190,7 +193,7 @@ public:
 
   /// Return the name of the unique primary input, or an empty StringRef if
   /// there isn't one.
-  // FIXME: probably wrong
+  // FIXME: dmu probably wrong
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->file();
@@ -204,6 +207,7 @@ public:
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
+  // FIXME: dmu used for index generation, may be wrong
   std::vector<std::string> outputFilenamesForEachInput() const {
     std::vector<std::string> result;
     for (const InputFile &input : AllFiles)

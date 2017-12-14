@@ -170,8 +170,8 @@ private:
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
       hadDuplicates = addFile(A->getValue()) || hadDuplicates;
     }
-    return false; // FIXME: Don't bail out for duplicates, too many tests depend
-                  // on it.
+    return false; // FIXME: dmu Don't bail out for duplicates, too many tests
+                  // depend on it.
   }
 
   bool readInputFilesFromFilelist() {
@@ -182,7 +182,8 @@ private:
         });
     if (hadError)
       return true;
-    return false; // FIXME: Don't bail out for duplicates, too many tests depend on it.
+    return false; // FIXME: dmu Don't bail out for duplicates, too many tests
+                  // depend on it.
   }
 
   bool forAllFilesInFilelist(Arg const *const pathArg,
@@ -306,7 +307,11 @@ private:
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
+  /// FIXME: dmuu merge output filename handling with supplementaries
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
+
+  /// Read any filelists for suppliementary outputs that may be present on the
+  /// command line.
   std::vector<OutputPaths> getSupplementaryFilenamesFromFilelists();
 
   bool checkUnusedOutputPaths(const InputFile &) const;
@@ -675,8 +680,8 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
                                               : diag::error_bad_module_name;
   Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
   Opts.ModuleName = "__bad__";
-  return false; // FIXME: Must continue to run to pass the tests, but should not
-                // have to.
+  return false; // FIXME: dmu Must continue to run to pass the tests, but should
+                // not have to.
 }
 
 bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
@@ -688,7 +693,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   // In order to pass some tests, must leave ModuleName empty.
   if (!Opts.InputsAndOutputs.hasInputs()) {
     Opts.ModuleName = StringRef();
-    // FIXME: This is a bug that should not happen, but does in tests.
+    // FIXME: dmu This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
     // selected".
     return false;
@@ -723,7 +728,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
 
   if (checkNumberOfOutputArguments(outputFileArguments.size(), filesWithOutputs.size()))
     return true;
-
+  // FIXME: dmu can I just use function pointers without the lambdas?
   // WMO threaded or batch mode or WMO one input
   llvm::function_ref<bool(StringRef, InputFile &)> assignUnaltered =
       [&](StringRef s, InputFile &input) -> bool {
@@ -831,7 +836,7 @@ std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput(
 
   return llvm::sys::path::stem(nameToStem).str();
 }
-// FIXME rename
+// FIXME dmu rename
 ArrayRef<std::string>
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
@@ -850,11 +855,10 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
+// FIXME: dmu assumes same indices as... what?
 std::vector<OutputPaths>
 FrontendArgsToOptionsConverter::getSupplementaryFilenamesFromFilelists() {
-  unsigned N = Opts.InputsAndOutputs.hasPrimaries()
-                   ? Opts.InputsAndOutputs.primaryInputCount()
-                   : Opts.InputsAndOutputs.inputCount();
+  const unsigned N = Opts.InputsAndOutputs.countOfFilesNeededOutput();
 
   auto objCHeaderOutput = readSupplementaryOutputFileList(
       options::OPT_objCHeaderOutput_filelist, N);
@@ -942,10 +946,10 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
           return;
         }
         if (A != nullptr && !pathFromList.empty()) {
-          // FIXME: write out arg name and file list name
+          // FIXME: dmu write out arg name and file list name
           Diags.diagnose(SourceLoc(),
                          diag::error_cannot_have_filelist_and_argument);
-          return; // FIXME: bail?
+          return; // FIXME: dmu bail?
         }
 
         if (!Args.hasArg(optWithoutPath))
