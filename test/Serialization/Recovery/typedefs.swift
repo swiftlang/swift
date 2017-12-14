@@ -27,7 +27,7 @@ func testSymbols() {
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '_T08typedefs11testSymbolsyyF'
 
-// CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuildingy3Lib4UserC4user_tF
+// CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuilding4usery3Lib4UserC_tF
 public func testVTableBuilding(user: User) {
   // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
