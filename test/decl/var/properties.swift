@@ -1121,7 +1121,7 @@ class OwnershipBadSub : OwnershipBase {
 
 // <rdar://problem/17391625> Swift Compiler Crashes when Declaring a Variable and didSet in an Extension
 class rdar17391625 {
-  var prop = 42  // expected-note {{overridden declaration is here}}
+  var prop = 42  // expected-note {{overri}}
 }
 
 extension rdar17391625 {
@@ -1137,7 +1137,7 @@ class rdar17391625derived :  rdar17391625 {
 
 extension rdar17391625derived {
   // Not a stored property, computed because it is an override.
-  override var prop: Int { // expected-error {{overriding declarations in extensions is not supported}}
+  override var prop: Int { // expected-error {{overri}}
   didSet {
   }
   }

@@ -67,7 +67,7 @@ class A {
     set { }
   }
 
-  func overriddenInExtension() {} // expected-note {{overridden declaration is here}}
+  func overriddenInExtension() {} // expected-note {{overr}}
 }
 
 class B : A {
@@ -140,7 +140,7 @@ class B : A {
 }
 
 extension B {
-  override func overriddenInExtension() {} // expected-error{{overriding declarations in extensions is not supported}}
+  override func overriddenInExtension() {} // expected-error{{overr}}
 }
 
 struct S {

@@ -3945,6 +3945,26 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   return Result;
 }
 
+bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
+  if (!Context.LangOpts.EnableObjCInterop)
+    return false;
+
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    Optional<ForeignErrorConvention> errorConvention;
+    return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
+                                 errorConvention);
+  }
+
+  if (auto var = dyn_cast<VarDecl>(decl))
+    return isRepresentableInObjC(var, ObjCReason::MemberOfObjCMembersClass);
+
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+    return isRepresentableInObjC(subscript,
+                                 ObjCReason::MemberOfObjCMembersClass);
+
+  return false;
+}
+
 void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                                      Type T,
                                                      SourceRange TypeRange) {
