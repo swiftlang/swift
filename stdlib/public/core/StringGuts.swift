@@ -932,7 +932,7 @@ extension _StringGuts {
       let storage = _copyToNativeStorage(
         of: UTF16.CodeUnit.self,
         from: 0..<self.count,
-        unusedCapacity: capacity)
+        unusedCapacity: Swift.max(capacity - count, 0))
       self = _StringGuts(storage)
     }
     _invariantCheck()
