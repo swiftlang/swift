@@ -427,6 +427,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         diag::rethrowing_function_type : diag::throw_in_function_type;
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
+      if (Tok.is(tok::kw_throw))
+        Tok.setKind(tok::kw_throws);
     }
     throwsLoc = consumeToken();
   }
@@ -440,7 +442,27 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
-    SyntaxContext->setCreateSyntax(SyntaxKind::FunctionType);
+
+    if (SyntaxContext->isEnabled()) {
+      FunctionTypeSyntaxBuilder Builder;
+      Builder.useReturnType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      Builder.useArrow(SyntaxContext->popToken());
+      if (throwsLoc.isValid())
+        Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+
+      auto InputNode = SyntaxContext->popIf<TypeSyntax>().getValue();
+      if (auto TupleTypeNode = InputNode.getAs<TupleTypeSyntax>()) {
+        // Decompose TupleTypeSyntax and repack into FunctionType.
+        Builder
+          .useLeftParen(TupleTypeNode->getLeftParen())
+          .useArguments(TupleTypeNode->getElements())
+          .useRightParen(TupleTypeNode->getRightParen());
+      } else {
+        Builder
+          .addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(InputNode));
+      }
+      SyntaxContext->addSyntax(Builder.build());
+    }
     tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
                                          SecondHalf.get());
   } else if (generics) {
@@ -829,7 +851,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     identifier ':' type
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
+  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
@@ -989,11 +1011,6 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       element.NameLoc = element.SecondNameLoc;
     }
   }
-
-  if (isFunctionType)
-    SyntaxContext->setTransparent();
-  else
-    SyntaxContext->setCreateSyntax(SyntaxKind::TupleType);
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,

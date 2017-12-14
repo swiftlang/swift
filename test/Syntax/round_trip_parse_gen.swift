@@ -65,8 +65,8 @@ typealias C = [Int]
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
-typealias G = (a x: Int, _ y: Int ... = 1) -> () -> ()
-typealias H = ()
+typealias G = (a x: Int, _ y: Int ... = 1) throw -> () -> ()
+typealias H = () rethrows -> ()
 
 struct foo {
   struct foo {
