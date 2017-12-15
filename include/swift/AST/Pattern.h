@@ -38,16 +38,19 @@ namespace swift {
 /// value-matching pattern.
 enum class PatternKind : uint8_t {
 #define PATTERN(ID, PARENT) ID,
+#define LAST_PATTERN(ID) Last_Pattern = ID,
 #include "PatternNodes.def"
 };
+enum : unsigned { NumPatternKindBits =
+  countBitsUsed(static_cast<unsigned>(PatternKind::Last_Pattern)) };
 
 /// Diagnostic printing of PatternKinds.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
   
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
-  SWIFT_INLINE_BITFIELD_BASE(Pattern, 8+1+1,
-    Kind : 8,
+  SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
+    Kind : bitmax(NumPatternKindBits,8),
     isImplicit : 1,
     hasInterfaceType : 1
   );

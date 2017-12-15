@@ -31,6 +31,10 @@
 #define ABSTRACT_TYPEREPR(Id, Parent)
 #endif
 
+#ifndef LAST_TYPEREPR
+#define LAST_TYPEREPR(Id)
+#endif
+
 TYPEREPR(Error, TypeRepr)
 TYPEREPR(Attributed, TypeRepr)
 
@@ -54,6 +58,8 @@ ABSTRACT_TYPEREPR(Specifier, TypeRepr)
   TYPEREPR(Shared, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
+LAST_TYPEREPR(SILBox)
 
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR
+#undef LAST_TYPEREPR
