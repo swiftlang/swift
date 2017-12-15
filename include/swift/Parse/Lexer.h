@@ -517,7 +517,7 @@ private:
 
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
-  bool tryLexConflictMarker();
+  bool tryLexConflictMarker(bool EatNewline);
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first

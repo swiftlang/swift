@@ -82,3 +82,44 @@ TEST_F(LexerTriviaTest, TriviaHashbang) {
             (Trivia{{TriviaPiece::garbageText("#!/bin/swift"),
                      TriviaPiece::newlines(1)}}));
 }
+
+TEST_F(LexerTriviaTest, TriviaConflictMarker) {
+  using namespace swift::syntax;
+  StringRef SourceStr =
+      "aaa\n"
+      "<<<<<<< HEAD:conflict_markers.swift\n"
+      "new\n"
+      "=======\n"
+      "old\n"
+      ">>>>>>> 18844bc65229786b96b89a9fc7739c0f:conflict_markers.swift\n"
+      "bbb\n";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
+
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
+
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+  StringRef expectedTrivia =
+      "<<<<<<< HEAD:conflict_markers.swift\n"
+      "new\n"
+      "=======\n"
+      "old\n"
+      ">>>>>>> 18844bc65229786b96b89a9fc7739c0f:conflict_markers.swift";
+  ASSERT_EQ(LeadingTrivia, (Trivia{{TriviaPiece::newlines(1),
+                                    TriviaPiece::garbageText(expectedTrivia),
+                                    TriviaPiece::newlines(1)}}));
+}

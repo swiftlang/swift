@@ -358,7 +358,7 @@ void Lexer::skipSlashSlashComment(bool EatNewline) {
 void Lexer::skipHashbang(bool EatNewline) {
   assert(CurPtr == ContentStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
          "Not a hashbang");
-  skipToEndOfLine(/*EatNewline=*/EatNewline);
+  skipToEndOfLine(EatNewline);
 }
 
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
@@ -1813,7 +1813,7 @@ static const char *findConflictEnd(const char *CurPtr, const char *BufferEnd,
   return nullptr;
 }
 
-bool Lexer::tryLexConflictMarker() {
+bool Lexer::tryLexConflictMarker(bool EatNewline) {
   const char *Ptr = CurPtr - 1;
 
   // Only a conflict marker if it starts at the beginning of a line.
@@ -1834,7 +1834,7 @@ bool Lexer::tryLexConflictMarker() {
     
     // Skip ahead to the end of the marker.
     if (CurPtr != BufferEnd)
-      skipToEndOfLine(/*EatNewline=*/true);
+      skipToEndOfLine(EatNewline);
     
     return true;
   }
@@ -2223,12 +2223,12 @@ Restart:
   case '<':
     if (CurPtr[0] == '#')
       return tryLexEditorPlaceholder();
-    else if (CurPtr[0] == '<' && tryLexConflictMarker())
+    else if (CurPtr[0] == '<' && tryLexConflictMarker(/*EatNewline=*/true))
       goto Restart;
     return lexOperatorIdentifier();
 
   case '>':
-    if (CurPtr[0] == '>' && tryLexConflictMarker())
+    if (CurPtr[0] == '>' && tryLexConflictMarker(/*EatNewline=*/true))
       goto Restart;
     return lexOperatorIdentifier();
  
@@ -2371,6 +2371,15 @@ Restart:
       if (BufferID != SourceMgr.getHashbangBufferID())
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
       skipHashbang(/*EatNewline=*/false);
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    }
+    break;
+  case '<':
+  case '>':
+    if (tryLexConflictMarker(/*EatNewline=*/false)) {
+      // Conflict marker.
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
       goto Restart;
