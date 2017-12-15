@@ -74,13 +74,13 @@ import Foundation
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, ExplicitlyExhaustive, closed) {
-@objc public _exhaustive enum ExplicitlyExhaustive: Int {
+@objc @_exhaustive public enum ExplicitlyExhaustive: Int {
   case yes
   case no
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, ExplicitlyNonExhaustive, open) {
-@objc public _nonexhaustive enum ExplicitlyNonExhaustive: Int {
+@objc @_nonexhaustive public enum ExplicitlyNonExhaustive: Int {
   case yes
   case no
   case fileNotFound

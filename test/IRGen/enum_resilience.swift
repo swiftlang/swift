@@ -38,7 +38,7 @@ public struct Reference {
   public var n: Class
 }
 
-_exhaustive public enum Either {
+@_exhaustive public enum Either {
   case Left(Reference)
   case Right(Reference)
 }
@@ -57,7 +57,7 @@ enum InternalEither {
   public var n: Class
 }
 
-_exhaustive public enum EitherFast {
+@_exhaustive public enum EitherFast {
   case Left(ReferenceFast)
   case Right(ReferenceFast)
 }
