@@ -83,10 +83,14 @@ namespace swift {
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
+#define LAST_DECL(Id) Last_Decl = Id,
 #define DECL_RANGE(Id, FirstId, LastId) \
   First_##Id##Decl = FirstId, Last_##Id##Decl = LastId,
 #include "swift/AST/DeclNodes.def"
 };
+enum : unsigned { NumDeclKindBits =
+  countBitsUsed(static_cast<unsigned>(DeclKind::Last_Decl)) };
+
 
 /// Fine-grained declaration kind that provides a description of the
 /// kind of entity a declaration represents, as it would be used in
@@ -232,8 +236,8 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
-  SWIFT_INLINE_BITFIELD_BASE(Decl, 6+1+1+1+1+1+1+1,
-    Kind : 6,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
+    Kind : bitmax(NumDeclKindBits,8),
 
     /// \brief Whether this declaration is invalid.
     Invalid : 1,

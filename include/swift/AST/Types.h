@@ -75,10 +75,13 @@ namespace swift {
 
   enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
+#define LAST_TYPE(id) Last_Type = id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
+  enum : unsigned { NumTypeKindBits =
+    countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type)) };
   
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
@@ -256,9 +259,10 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  SWIFT_INLINE_BITFIELD_BASE(TypeBase, 8+RecursiveTypeProperties::BitWidth,
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
+                             RecursiveTypeProperties::BitWidth,
     /// Kind - The discriminator that indicates what subclass of type this is.
-    Kind : 8, // Naturally sized for speed (it only needs 6 bits).
+    Kind : bitmax(NumTypeKindBits,8),
 
     Properties : RecursiveTypeProperties::BitWidth
   );

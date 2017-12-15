@@ -60,10 +60,13 @@ namespace swift {
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
+#define LAST_EXPR(Id) Last_Expr = Id,
 #define EXPR_RANGE(Id, FirstId, LastId) \
   First_##Id##Expr = FirstId, Last_##Id##Expr = LastId,
 #include "swift/AST/ExprNodes.def"
 };
+enum : unsigned { NumExprKindBits =
+  countBitsUsed(static_cast<unsigned>(ExprKind::Last_Expr)) };
   
 /// Discriminates certain kinds of checked cast that have specialized diagnostic
 /// and/or code generation peephole behavior.
@@ -127,9 +130,9 @@ class alignas(8) Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
 
-  SWIFT_INLINE_BITFIELD_BASE(Expr, 8+2+1,
+  SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+2+1,
     /// The subclass of Expr that this is.
-    Kind : 8,
+    Kind : bitmax(NumExprKindBits,8),
     /// How this l-value is used, if it's an l-value.
     LValueAccessKind : 2,
     /// Whether the Expr represents something directly written in source or
