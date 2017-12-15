@@ -107,7 +107,7 @@ public enum FixIt: Codable {
 
   /// The source range associated with a FixIt. If this is an insertion,
   /// it is a range with the same start and end location.
-  var range: SourceRange {
+  public var range: SourceRange {
     switch self {
     case .remove(let range): return range
     case .replace(let range, _): return range
@@ -117,7 +117,7 @@ public enum FixIt: Codable {
 
   /// The text associated with this FixIt. If this is a removal, the text is
   /// the empty string.
-  var text: String {
+  public var text: String {
     switch self {
     case .remove(_): return ""
     case .insert(_, let text), .replace(_, let text): return text
