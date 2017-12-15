@@ -79,6 +79,26 @@ TYPE_NODES = [
              Child('ExclamationMark', kind='ExclamationMarkToken'),
          ]),
 
+    # composition-type-element -> type '&'
+    Node('CompositionTypeElement', kind='Syntax',
+         children=[
+             Child('Type', kind='Type'),
+             Child('Ampersand', kind='Token',
+                   text_choices=['&'],
+                   is_optional=True),
+         ]),
+
+    # composition-typeelement-list -> composition-type-element
+    #   composition-type-element-list?
+    Node('CompositionTypeElementList', kind='SyntaxCollection',
+         element='CompositionTypeElement'),
+
+    # composition-type -> composition-type-element-list
+    Node('CompositionType', kind='Type',
+         children=[
+             Child('Elements', kind='CompositionTypeElementList'),
+         ]),
+
     # tuple-type-element -> identifier? ':'? type-annotation ','?
     Node('TupleTypeElement', kind='Syntax',
          children=[
@@ -137,28 +157,6 @@ TYPE_NODES = [
              Child('ReturnType', kind='Type'),
          ]),
 
-    # type-annotation -> attribute-list 'inout'? type
-    Node('TypeAnnotation', kind='Syntax',
-         children=[
-             Child('Attributes', kind='AttributeList'),
-             Child('InOutKeyword', kind='InoutToken',
-                   is_optional=True),
-             Child('Type', kind='Type'),
-         ]),
-
-    # protocol-composition-element-list -> protocol-composition-element
-    #   protocol-composition-element-list?
-    Node('ProtocolCompositionElementList', kind='SyntaxCollection',
-         element='ProtocolCompositionElement'),
-
-    # protocol-composition-element -> type-identifier '&'
-    Node('ProtocolCompositionElement', kind='Syntax',
-         children=[
-             Child('ProtocolType', kind='Type'),
-             Child('Ampersand', kind='AmpersandToken',
-                   is_optional=True),
-         ]),
-
     # generic-argument-list -> generic-argument generic-argument-list?
     Node('GenericArgumentList', kind='SyntaxCollection',
          element='GenericArgument'),
@@ -179,11 +177,5 @@ TYPE_NODES = [
              Child('LeftAngleBracket', kind='LeftAngleToken'),
              Child('Arguments', kind='GenericArgumentList'),
              Child('RightAngleBracket', kind='RightAngleToken'),
-         ]),
-
-    # protocol-composition-type -> protocol-composition-elements
-    Node('ProtocolCompositionType', kind='Type',
-         children=[
-             Child('Elements', kind='ProtocolCompositionElementList'),
          ]),
 ]

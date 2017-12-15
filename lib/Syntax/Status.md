@@ -129,9 +129,9 @@
   * MetatypeType
   * OptionalType
   * ImplicitlyUnwrappedOptionalType
+  * CompositionType
   * TupleType
   * FunctionType
 
 ### In-progress:
-  * CompositionType
   * AttributedType

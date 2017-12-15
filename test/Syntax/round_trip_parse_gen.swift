@@ -73,6 +73,7 @@ typealias E = Int?.Protocol
 typealias F = [Int]!.Type
 typealias G = (a x: Int, _ y: Int ... = 1) throw -> () -> ()
 typealias H = () rethrows -> ()
+typealias I = (A & B<C>) -> C & D
 
 @objc private typealias T<a,b> = Int
 @objc private typealias T<a,b>

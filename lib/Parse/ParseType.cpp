@@ -678,6 +678,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
                                                      HandleCodeCompletion);
@@ -685,7 +686,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     return makeParserCodeCompletionResult<TypeRepr>();
   if (FirstType.isNull() || !Tok.isContextualPunctuator("&"))
     return FirstType;
-  
+
   SmallVector<TypeRepr *, 4> Types;
   ParserStatus Status(FirstType);
   SourceLoc FirstTypeLoc = FirstType.get()->getStartLoc();
@@ -704,16 +705,34 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   };
 
   addType(FirstType.get());
-  
-  while (Tok.isContextualPunctuator("&")) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::CompositionType);
+  assert(Tok.isContextualPunctuator("&"));
+  do {
     consumeToken(); // consume '&'
+
+    if (SyntaxContext->isEnabled() && Status.isSuccess()) {
+      CompositionTypeElementSyntaxBuilder Builder;
+      Builder
+        .useAmpersand(SyntaxContext->popToken())
+        .useType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      SyntaxContext->addSyntax(Builder.build());
+    }
+
+    // Parse next type.
     ParserResult<TypeRepr> ty =
       parseTypeSimple(diag::expected_identifier_for_type, HandleCodeCompletion);
     if (ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     Status |= ty;
     addType(ty.getPtrOrNull());
-  };
+  } while (Tok.isContextualPunctuator("&"));
+
+  if (SyntaxContext->isEnabled() && Status.isSuccess()) {
+    auto LastNode = SyntaxFactory::makeCompositionTypeElement(
+        SyntaxContext->popIf<TypeSyntax>().getValue(), None);
+    SyntaxContext->addSyntax(LastNode);
+  }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
   return makeParserResult(Status, CompositionTypeRepr::create(
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
