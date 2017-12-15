@@ -645,3 +645,10 @@ func rdar33429010_3() {
  let arr = [C_33429010()]
  let _ = arr.map({ ($0.name, $0 as P_33429010) }) // Ok
 }
+
+func rdar36054961() {
+  func bar(dict: [String: (inout String, Range<String.Index>, String) -> Void]) {}
+  bar(dict: ["abc": { str, range, _ in
+     str.replaceSubrange(range, with: str[range].reversed())
+  }])
+}
