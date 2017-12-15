@@ -24,12 +24,11 @@ class FileUnit;
 class ModuleDecl;
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads);
+                            bool hasMultipleIGMs);
 void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads);
+                            bool hasMultipleIGMs);
 
-void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                  bool hasMultipleIRGenThreads,
+void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os, bool hasMultipleIGMs,
                   llvm::StringRef installName);
 
 } // end namespace swift

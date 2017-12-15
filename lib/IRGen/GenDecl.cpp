@@ -1416,16 +1416,16 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   case SILLinkage::Hidden:
     return RESULT(External, Hidden, Default);
 
-  case SILLinkage::Private:
-    // In case of multiple llvm modules (in multi-threaded compilation) all
-    // private decls must be visible from other files.
-    // We use LinkOnceODR instead of External here because private lazy protocol
-    // witness table accessors could be emitted by two different IGMs during
-    // IRGen into different object files and the linker would complain about
-    // duplicate symbols.
-    if (info.HasMultipleIGMs)
-      return RESULT(LinkOnceODR, Hidden, Default);
-    return RESULT(Internal, Default, Default);
+  case SILLinkage::Private: {
+    auto linkage = info.needLinkerToMergeDuplicateSymbols()
+                       ? llvm::GlobalValue::LinkOnceODRLinkage
+                       : llvm::GlobalValue::InternalLinkage;
+    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles()
+                          ? llvm::GlobalValue::HiddenVisibility
+                          : llvm::GlobalValue::DefaultVisibility;
+    return std::make_tuple(linkage, visibility,
+                           llvm::GlobalValue::DefaultStorageClass);
+  }
 
   case SILLinkage::PublicExternal: {
     if (isDefinition) {
