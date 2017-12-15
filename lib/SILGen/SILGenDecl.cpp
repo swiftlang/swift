@@ -1271,6 +1271,42 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
+PostponedCleanup::PostponedCleanup(SILGenFunction &sgf, bool recursive)
+    : SGF(sgf), previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
+      active(true), applyRecursively(recursive) {
+  SGF.CurrentlyActivePostponedCleanup = this;
+}
+PostponedCleanup::PostponedCleanup(SILGenFunction &sgf)
+    : SGF(sgf), previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
+      active(true),
+      applyRecursively(previouslyActiveCleanup
+                           ? previouslyActiveCleanup->applyRecursively
+                           : false) {
+  SGF.CurrentlyActivePostponedCleanup = this;
+}
+
+PostponedCleanup::~PostponedCleanup() {
+  if (active) {
+    end();
+  }
+}
+
+void PostponedCleanup::end() {
+  SGF.CurrentlyActivePostponedCleanup = previouslyActiveCleanup;
+  active = false;
+}
+
+void PostponedCleanup::postponeCleanup(CleanupHandle cleanup,
+                                       SILValue forValue) {
+  deferredCleanups.push_back(std::make_pair(cleanup, forValue));
+}
+
+void SILGenFunction::enterPostponedCleanup(SILValue forValue) {
+  auto handle = enterDestroyCleanup(forValue);
+  if (CurrentlyActivePostponedCleanup)
+    CurrentlyActivePostponedCleanup->postponeCleanup(handle, forValue);
+}
+
 namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.

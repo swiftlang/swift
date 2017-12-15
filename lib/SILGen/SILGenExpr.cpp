@@ -2593,8 +2593,10 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+  PostponedCleanup postpone(*this);
+  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
+                   {}, calleeTypeInfo, ApplyOptions::None, C,
+                   std::move(postpone));
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2616,8 +2618,10 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
+  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C);
+                   {}, calleeTypeInfo, ApplyOptions::None, C,
+                   std::move(postpone));
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -3456,16 +3460,15 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        isEqual = subSGF.emitApply(std::move(equalsResultPlan),
-                               std::move(argScope),
-                               loc,
-                               ManagedValue::forUnmanaged(equalsWitness),
-                               equatableSub,
-                               {lhsArg, rhsArg, metatyValue},
-                               equalsInfo,
-                               ApplyOptions::None,
-                               SGFContext())
-          .getUnmanagedSingleValue(subSGF, loc);
+        PostponedCleanup postpone(subSGF);
+        isEqual =
+            subSGF
+                .emitApply(std::move(equalsResultPlan), std::move(argScope),
+                           loc, ManagedValue::forUnmanaged(equalsWitness),
+                           equatableSub, {lhsArg, rhsArg, metatyValue},
+                           equalsInfo, ApplyOptions::None, SGFContext(),
+                           std::move(postpone))
+                .getUnmanagedSingleValue(subSGF, loc);
       }
       
       branchScope.pop();
@@ -3594,16 +3597,14 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
         auto hashResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           hashInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        hashCode = subSGF.emitApply(std::move(hashResultPlan),
-                               std::move(argScope),
-                               loc,
-                               ManagedValue::forUnmanaged(hashWitness),
-                               hashableSub,
-                               {arg},
-                               hashInfo,
-                               ApplyOptions::None,
-                               SGFContext())
-          .getUnmanagedSingleValue(subSGF, loc);
+        PostponedCleanup postpone(subSGF);
+        hashCode =
+            subSGF
+                .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
+                           ManagedValue::forUnmanaged(hashWitness), hashableSub,
+                           {arg}, hashInfo, ApplyOptions::None, SGFContext(),
+                           std::move(postpone))
+                .getUnmanagedSingleValue(subSGF, loc);
       }
     }
     scope.pop();
@@ -5162,16 +5163,11 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto functionValue =
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
 
-  // Convert it to an escaping function value.
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
-  assert(escapingFnTy.castTo<SILFunctionType>()->getExtInfo() ==
-         functionValue.getType().castTo<SILFunctionType>()->getExtInfo()
-           .withNoEscape(false));
 
-  // TODO: maybe this should use a more explicit instruction.
+  // Convert it to an escaping function value.
   functionValue =
-    SGF.emitManagedRValueWithCleanup(
-      SGF.B.createConvertFunction(E, functionValue.forward(SGF), escapingFnTy));
+      SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
 
   // Bind the opaque value to the escaping function.
   SILGenFunction::OpaqueValueState opaqueValue{
