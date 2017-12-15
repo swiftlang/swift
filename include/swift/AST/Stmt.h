@@ -64,11 +64,19 @@ class alignas(8) Stmt {
       NumElements : 32;
   );
 
+  SWIFT_INLINE_BITFIELD_EMPTY(LabeledStmt, Stmt);
+
+  SWIFT_INLINE_BITFIELD_FULL(DoCatchStmt, LabeledStmt, 32,
+    : NumPadBits,
+    NumCatches : 32
+  );
+
 protected:
   union {
     uint64_t OpaqueBits;
     SWIFT_INLINE_BITS(Stmt);
     SWIFT_INLINE_BITS(BraceStmt);
+    SWIFT_INLINE_BITS(DoCatchStmt);
   };
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -523,14 +531,13 @@ class DoCatchStmt final : public LabeledStmt,
 
   SourceLoc DoLoc;
   Stmt *Body;
-  unsigned NumCatches;
 
   DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
               Stmt *body, ArrayRef<CatchStmt*> catches,
               Optional<bool> implicit)
     : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
-                  labelInfo),
-      DoLoc(doLoc), Body(body), NumCatches(catches.size()) {
+                  labelInfo), DoLoc(doLoc), Body(body) {
+    DoCatchStmtBits.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CatchStmt *>());
   }
@@ -550,10 +557,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CatchStmt*> getCatches() const {
-    return {getTrailingObjects<CatchStmt*>(), NumCatches};
+    return {getTrailingObjects<CatchStmt*>(), DoCatchStmtBits.NumCatches};
   }
   MutableArrayRef<CatchStmt*> getMutableCatches() {
-    return {getTrailingObjects<CatchStmt*>(), NumCatches};
+    return {getTrailingObjects<CatchStmt*>(), DoCatchStmtBits.NumCatches};
   }
 
   /// Does this statement contain a syntactically exhaustive catch
