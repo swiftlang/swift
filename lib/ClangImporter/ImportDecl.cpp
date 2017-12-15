@@ -6345,8 +6345,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
              ->getAsNominalTypeOrNominalTypeExtensionContext() ==
          setter->getDeclContext()
              ->getAsNominalTypeOrNominalTypeExtensionContext());
-    // TODO: Possible that getter and setter are different instantiations
-    // of the same objc generic type?
 
     // Whether we can update the types involved in the subscript
     // operation.
@@ -6401,8 +6399,16 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     }
   }
 
-  // The context into which the subscript should go.
-  bool associateWithSetter = setter && !getterAndSetterInSameType;
+  // The context into which the subscript should go. We prefer wherever the
+  // getter is declared unless the two accessors are in different types and the
+  // one we started with is the setter. This happens when:
+  // - A read-only subscript is made read/write is a subclass.
+  // - A setter is redeclared in a subclass, but not the getter.
+  // And not when:
+  // - A getter is redeclared in a subclass, but not the setter.
+  // - The getter and setter are part of the same type.
+  // - There is no setter.
+  bool associateWithSetter = !getterAndSetterInSameType && setter == decl;
   DeclContext *dc =
       associateWithSetter ? setter->getDeclContext() : getter->getDeclContext();
 
