@@ -907,7 +907,7 @@ static bool hasConformanceInSignature(ArrayRef<Requirement> requirements,
                                       Type subjectType,
                                       ProtocolDecl *proto) {
   // Make sure this requirement exists in the requirement signature.
-  for (const auto& req: requirements) {
+  for (const auto &req: requirements) {
     if (req.getKind() == RequirementKind::Conformance &&
         req.getFirstType()->isEqual(subjectType) &&
         req.getSecondType()->castTo<ProtocolType>()->getDecl()
