@@ -1260,7 +1260,7 @@ do {
 
   % for Traversal in 'Forward', 'Bidirectional':
   %   TraversalCollection = collectionForTraversal(Traversal)
-    tests.test("Flatten${TraversalCollection}/\(data)") {
+    tests.test("FlattenCollection/${Traversal}/\(data)") {
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
@@ -1275,7 +1275,7 @@ do {
         "unexpected laziness in \(type(of: flattened))")
     }
 
-    tests.test("Flatten${TraversalCollection}/Lazy\(data)") {
+    tests.test("FlattenCollection/${Traversal}/Lazy\(data)") {
       // Checking that flatten doesn't remove laziness
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) }
