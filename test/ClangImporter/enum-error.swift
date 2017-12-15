@@ -84,18 +84,32 @@ func testError() {
 
 #elseif EXHAUSTIVE
 // CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared [serialized] ExhaustiveError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
-  switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
+  switch (terr) { case .TENone, .TEOne, .TETwo: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: do you want to add a default clause?
 
+  // FIXME: This should still be an error because there are /known/ cases that
+  // aren't covered.
   switch (terr) { case .TENone, .TEOne: break }
-  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: do you want to add a default clause?
+
   let _ = TestError.Code(rawValue: 2)!
 
   do {
     throw TestError(.TEOne)
   } catch is TestError {
   } catch {}
+
+  // Allow exhaustive error codes as well.
+  let eerr = getExhaustiveErr()
+  switch eerr { case .EENone, .EEOne, .EETwo: break } // ok
+
+  switch eerr { case .EENone, .EEOne: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.EETwo'
 
 #endif
 
