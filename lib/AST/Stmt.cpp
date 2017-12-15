@@ -130,8 +130,9 @@ SourceLoc Stmt::getEndLoc() const {
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
                      SourceLoc rbloc, Optional<bool> implicit)
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
-    NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
+    LBLoc(lbloc), RBLoc(rbloc)
 {
+  BraceStmtBits.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
 }

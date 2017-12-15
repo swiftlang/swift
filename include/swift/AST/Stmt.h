@@ -59,12 +59,18 @@ class alignas(8) Stmt {
     Implicit : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(BraceStmt, Stmt, 32,
+      : NumPadBits,
+      NumElements : 32;
+  );
+
+protected:
   union {
     uint64_t OpaqueBits;
     SWIFT_INLINE_BITS(Stmt);
+    SWIFT_INLINE_BITS(BraceStmt);
   };
 
-protected:
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
   static bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc){
@@ -125,8 +131,6 @@ class BraceStmt final : public Stmt,
     private llvm::TrailingObjects<BraceStmt, ASTNode> {
   friend TrailingObjects;
 
-  unsigned NumElements;
-  
   SourceLoc LBLoc;
   SourceLoc RBLoc;
 
@@ -144,19 +148,19 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return BraceStmtBits.NumElements; }
 
   ASTNode getElement(unsigned i) const { return getElements()[i]; }
   void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), NumElements};
+    return {getTrailingObjects<ASTNode>(), BraceStmtBits.NumElements};
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), NumElements};
+    return {getTrailingObjects<ASTNode>(), BraceStmtBits.NumElements};
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
