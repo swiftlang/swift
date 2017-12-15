@@ -2,7 +2,7 @@
 
 ## Expression
 
-### Specialized:
+### Done:
   * NilLiteralExpr
   * IntegerLiteralExpr
   * FloatLiteralExpr
@@ -36,7 +36,7 @@
   * KeyPathDotExpr
   * EditorPlaceholderExpr
 
-### Not-specialized (UnknownExpr):
+### Not-started (UnknownExpr):
   * SuperRefExpr
   * UnresolvedSpecializeExpr
   * DotSelfExpr
@@ -59,7 +59,7 @@
 
 ## Declaration
 
-### Specialized:
+### Done:
   * TopLevelCodeDecl
   * StructDecl
   * FuncDecl
@@ -74,7 +74,7 @@
   * ClassDecl (SR-6571)
   * ExtensionDecl (SR-6572)
 
-### Not-specialized (UnknownDecl):
+### Not-started (UnknownDecl):
   * EnumCaseDecl
   * PrecedenceGroupDecl
   * InfixOperatorDecl
@@ -88,11 +88,11 @@
   * EnumElementDecl
 
 ## Statement
-### Specialized:
+### Done:
   * BraceStmt
   * ReturnStmt
 
-### Not-specialized (UnknownStmt):
+### Not-started (UnknownStmt):
   * DeferStmt
   * IfStmt
   * GuardStmt
@@ -111,7 +111,7 @@
   * ThrowStmt
 
 ## Pattern
-### Not-specialized:
+### Not-started:
   * ParenPattern
   * TuplePattern
   * NamedPattern
