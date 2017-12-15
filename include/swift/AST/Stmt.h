@@ -76,6 +76,11 @@ class alignas(8) Stmt {
     NumCatches : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(SwitchStmt, LabeledStmt, 32,
+    : NumPadBits,
+    CaseCount : 32
+  );
+
 protected:
   union {
     uint64_t OpaqueBits;
@@ -83,6 +88,7 @@ protected:
     SWIFT_INLINE_BITS(BraceStmt);
     SWIFT_INLINE_BITS(DoCatchStmt);
     SWIFT_INLINE_BITS(CaseStmt);
+    SWIFT_INLINE_BITS(SwitchStmt);
   };
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -912,7 +918,6 @@ class SwitchStmt final : public LabeledStmt,
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
   Expr *SubjectExpr;
-  unsigned CaseCount;
 
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
@@ -920,8 +925,9 @@ class SwitchStmt final : public LabeledStmt,
     : LabeledStmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc),
                   LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      SubjectExpr(SubjectExpr), CaseCount(CaseCount)
-  {}
+      SubjectExpr(SubjectExpr) {
+    SwitchStmtBits.CaseCount = CaseCount;
+  }
 
 public:
   /// Allocate a new SwitchStmt in the given ASTContext.
@@ -949,7 +955,7 @@ public:
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
 
   ArrayRef<ASTNode> getRawCases() const {
-    return {getTrailingObjects<ASTNode>(), CaseCount};
+    return {getTrailingObjects<ASTNode>(), SwitchStmtBits.CaseCount};
   }
 
 private:
