@@ -2106,16 +2106,21 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
+  const BuiltinInfo &builtin = getSILModule().getBuiltinInfo(i->getName());
+
   auto argValues = i->getArguments();
   Explosion args;
-  for (auto argValue : argValues) {
+
+  for (auto idx : indices(argValues)) {
+    auto argValue = argValues[idx];
+
     // Builtin arguments should never be substituted, so use the value's type
     // as the parameter type.
     emitApplyArgument(*this, argValue, argValue->getType(), args);
   }
   
   Explosion result;
-  emitBuiltinCall(*this, i->getName(), i->getType(),
+  emitBuiltinCall(*this, builtin, i->getName(), i->getType(),
                   args, result, i->getSubstitutions());
   
   setLoweredExplosion(i, result);
