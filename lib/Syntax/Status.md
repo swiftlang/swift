@@ -66,11 +66,11 @@
   * ProtocolDecl
   * ImportDecl
   * TypeAliasDecl
+  * IfConfigDecl
 
 ### In-progress (UnknownDecl):
   * PatternBindingDecl
   * VarDecl
-  * IfConfigDecl
   * ClassDecl (SR-6571)
   * ExtensionDecl (SR-6572)
 
