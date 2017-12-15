@@ -6,7 +6,7 @@ EXPR_NODES = [
     # &x
     Node('InOutExpr', kind='Expr',
          children=[
-             Child('Ampersand', kind='AmpersandToken'),
+             Child('Ampersand', kind='PrefixAmpersandToken'),
              Child('Identifier', kind='IdentifierToken'),
          ]),
 

@@ -207,7 +207,6 @@ FunctionParameterSyntax getCannedFunctionParameter() {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
                                                Trivia::spaces(1));
-  auto IntAnnotation = SyntaxFactory::makeTypeAnnotation({}, None, Int);
   auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
   auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
 
@@ -245,7 +244,6 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
                                                Trivia::spaces(1));
-  auto IntAnnotation = SyntaxFactory::makeTypeAnnotation({}, None, Int);
   auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
   auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
 
@@ -294,7 +292,6 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
                                              Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
                                                Trivia::spaces(1));
-  auto IntAnnotation = SyntaxFactory::makeTypeAnnotation({}, None, Int);
   auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
 
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
