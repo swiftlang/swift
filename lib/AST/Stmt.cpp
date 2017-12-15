@@ -372,13 +372,14 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
                    Optional<bool> Implicit)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
       CaseLoc(CaseLoc), ColonLoc(ColonLoc),
-      BodyAndHasBoundDecls(Body, HasBoundDecls),
-      NumPatterns(CaseLabelItems.size()) {
-  assert(NumPatterns > 0 && "case block must have at least one pattern");
+      BodyAndHasBoundDecls(Body, HasBoundDecls) {
+  CaseStmtBits.NumPatterns = CaseLabelItems.size();
+  assert(CaseStmtBits.NumPatterns > 0 &&
+         "case block must have at least one pattern");
   MutableArrayRef<CaseLabelItem> Items{ getTrailingObjects<CaseLabelItem>(),
-                                        NumPatterns };
+                                        CaseStmtBits.NumPatterns };
 
-  for (unsigned i = 0; i < NumPatterns; ++i) {
+  for (unsigned i = 0; i < CaseStmtBits.NumPatterns; ++i) {
     new (&Items[i]) CaseLabelItem(CaseLabelItems[i]);
     Items[i].getPattern()->markOwnedByStatement(this);
   }

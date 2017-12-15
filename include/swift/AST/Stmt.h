@@ -60,8 +60,13 @@ class alignas(8) Stmt {
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BraceStmt, Stmt, 32,
-      : NumPadBits,
-      NumElements : 32;
+    : NumPadBits,
+    NumElements : 32;
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 32,
+    : NumPadBits,
+    NumPatterns : 32
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(LabeledStmt, Stmt);
@@ -77,6 +82,7 @@ protected:
     SWIFT_INLINE_BITS(Stmt);
     SWIFT_INLINE_BITS(BraceStmt);
     SWIFT_INLINE_BITS(DoCatchStmt);
+    SWIFT_INLINE_BITS(CaseStmt);
   };
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -861,7 +867,6 @@ class CaseStmt final : public Stmt,
   SourceLoc ColonLoc;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
-  unsigned NumPatterns;
 
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
@@ -874,10 +879,10 @@ public:
                           Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
-    return {getTrailingObjects<CaseLabelItem>(), NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), CaseStmtBits.NumPatterns};
   }
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
-    return {getTrailingObjects<CaseLabelItem>(), NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), CaseStmtBits.NumPatterns};
   }
 
   Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
