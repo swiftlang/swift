@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 390; // Last change: remove 'volatile' bit from witness_method
+const uint16_t VERSION_MINOR = 391; // Last change: normal protocol conformance
 
 using DeclIDField = BCFixed<31>;
 
@@ -1215,11 +1215,11 @@ namespace decls_block {
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
     DeclContextIDField, // the decl that provided this conformance
-    BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
+    BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCArray<DeclIDField>
-    // The array contains archetype-value pairs, then type declarations.
+    // The array contains type witnesses, then value witnesses.
     // Requirement signature conformances follow, then the substitution records
     // for the associated types.
   >;

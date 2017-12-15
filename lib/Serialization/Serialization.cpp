@@ -1492,6 +1492,17 @@ void Serializer::writeNormalConformance(
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
 
+  conformance->forEachTypeWitness(/*resolver=*/nullptr,
+                                  [&](AssociatedTypeDecl *assocType,
+                                      Type type, TypeDecl *typeDecl) {
+    data.push_back(addDeclRef(assocType));
+    data.push_back(addTypeRef(type));
+    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
+                              /*allowTypeAliasXRef*/true));
+    ++numTypeWitnesses;
+    return false;
+  });
+
   conformance->forEachValueWitness(nullptr,
     [&](ValueDecl *req, Witness witness) {
       ++numValueWitnesses;
@@ -1519,17 +1530,6 @@ void Serializer::writeNormalConformance(
       data.push_back(witness.getSubstitutions().size());
   });
 
-  conformance->forEachTypeWitness(/*resolver=*/nullptr,
-                                  [&](AssociatedTypeDecl *assocType,
-                                      Type type, TypeDecl *typeDecl) {
-    data.push_back(addDeclRef(assocType));
-    data.push_back(addTypeRef(type));
-    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
-                              /*allowTypeAliasXRef*/true));
-    ++numTypeWitnesses;
-    return false;
-  });
-
   unsigned numSignatureConformances =
       conformance->getSignatureConformances().size();
 
@@ -1538,8 +1538,8 @@ void Serializer::writeNormalConformance(
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
   NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                               addDeclRef(protocol), ownerID,
-                                              numValueWitnesses,
                                               numTypeWitnesses,
+                                              numValueWitnesses,
                                               numSignatureConformances,
                                               data);
 
