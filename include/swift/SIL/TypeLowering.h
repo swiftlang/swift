@@ -89,11 +89,6 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                                 : ParameterConvention::Direct_Unowned,
                             witnessMethodConformance);
 }
-inline CanSILFunctionType
-adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
-  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone());
-}
-  
 
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
