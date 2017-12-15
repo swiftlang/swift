@@ -121,4 +121,17 @@
 
 
 ## TypeRepr
-  * To-be filled
+### Done:
+  * SimpleTypeIdentifier
+  * MemberTypeIdentifier
+  * ArrayType
+  * DictionaryType
+  * MetatypeType
+  * OptionalType
+  * ImplicitlyUnwrappedOptionalType
+  * TupleType
+  * FunctionType
+
+### In-progress:
+  * CompositionType
+  * AttributedType
