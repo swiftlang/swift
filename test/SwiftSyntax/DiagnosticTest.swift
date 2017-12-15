@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: sdk_overlay
+// REQUIRES: objc_interop
 
 import Foundation
 import StdlibUnittest
@@ -55,3 +55,5 @@ Diagnostics.test("DiagnosticEmission") {
   guard let fixIt = note.fixIts.first else { return }
   expectEqual(fixIt.text, " != 0")
 }
+
+runAllTests()
