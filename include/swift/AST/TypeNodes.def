@@ -83,6 +83,10 @@
 #define TYPE_RANGE(Id, First, Last)
 #endif
 
+#ifndef LAST_TYPE
+#define LAST_TYPE(Id)
+#endif
+
 TYPE(Error, Type)
 UNCHECKED_TYPE(Unresolved, Type)
 ABSTRACT_TYPE(Builtin, Type)
@@ -143,6 +147,7 @@ ABSTRACT_TYPE(BoundGeneric, Type)
   TYPE(BoundGenericStruct, BoundGenericType)
   TYPE_RANGE(BoundGeneric, BoundGenericClass, BoundGenericStruct)
 UNCHECKED_TYPE(TypeVariable, Type)
+LAST_TYPE(TypeVariable)
 
 #undef TYPE_RANGE
 #undef ABSTRACT_SUGARED_TYPE
@@ -153,3 +158,4 @@ UNCHECKED_TYPE(TypeVariable, Type)
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
 #undef TYPE
+#undef LAST_TYPE

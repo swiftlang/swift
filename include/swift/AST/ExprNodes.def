@@ -54,6 +54,10 @@
 #define EXPR_RANGE(Id, First, Last)
 #endif
 
+#ifndef LAST_EXPR
+#define LAST_EXPR(Id)
+#endif
+
 EXPR(Error, Expr)
 ABSTRACT_EXPR(Literal, Expr)
   LITERAL_EXPR(NilLiteral, LiteralExpr)
@@ -172,9 +176,11 @@ EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
+LAST_EXPR(KeyPathDot)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR
 #undef UNCHECKED_EXPR
 #undef ABSTRACT_EXPR
 #undef EXPR
+#undef LAST_EXPR

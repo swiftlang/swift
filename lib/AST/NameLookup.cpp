@@ -1033,7 +1033,7 @@ public:
     assert(LastExtensionIncluded == nullptr);
     for (auto const &i : Lookup) {
       for (auto d : i.getSecond()) {
-        d->ValueDeclBits.AlreadyInLookupTable = false;
+        d->setAlreadyInLookupTable(false);
       }
     }
     Lookup.clear();
@@ -1102,10 +1102,10 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // If this declaration is already in the lookup table, don't add it
   // again.
-  if (vd->ValueDeclBits.AlreadyInLookupTable) {
+  if (vd->isAlreadyInLookupTable()) {
     return;
   }
-  vd->ValueDeclBits.AlreadyInLookupTable = true;
+  vd->setAlreadyInLookupTable();
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.

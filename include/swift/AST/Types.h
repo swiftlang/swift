@@ -28,6 +28,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -74,10 +75,13 @@ namespace swift {
 
   enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
+#define LAST_TYPE(id) Last_Type = id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
+  enum : unsigned { NumTypeKindBits =
+    countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type)) };
   
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
@@ -243,10 +247,6 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
-#define NUMBITS(E, V) \
-  enum { Num##E##Bits = V }; \
-  static_assert(Num##E##Bits <= 64, "fits in a uint64_t")
-
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
@@ -259,13 +259,13 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  struct TypeBaseBitfields {
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
+                             RecursiveTypeProperties::BitWidth,
     /// Kind - The discriminator that indicates what subclass of type this is.
-    const TypeKind Kind; // Naturally sized for speed (it only needs 6 bits).
+    Kind : bitmax(NumTypeKindBits,8),
 
-    unsigned Properties : RecursiveTypeProperties::BitWidth;
-  };
-  NUMBITS(TypeBase, RecursiveTypeProperties::BitWidth + sizeof(TypeKind) * 8 );
+    Properties : RecursiveTypeProperties::BitWidth
+  );
 
   /// Returns true if the given type is a sugared type.
   ///
@@ -277,144 +277,116 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  struct ErrorTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
     /// Whether there is an original type.
-    unsigned HasOriginalType : 1;
-  };
-  NUMBITS(ErrorType, NumTypeBaseBits + 1);
+    HasOriginalType : 1
+  );
 
-  struct ParenTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  enum { NumFlagBits = 5 };
+  SWIFT_INLINE_BITFIELD(ParenType, TypeBase, NumFlagBits,
     /// Whether there is an original type.
-    enum { NumFlagBits = 5 };
-    unsigned Flags : NumFlagBits;
-  };
-  NUMBITS(ParenType, NumTypeBaseBits + ParenTypeBitfields::NumFlagBits);
+    Flags : NumFlagBits
+  );
 
-  struct AnyFunctionTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  enum { NumAFTExtInfoBits = 7 };
+  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+10,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    enum { NumExtInfoBits = 7 };
-    unsigned ExtInfo : NumExtInfoBits;
+    ExtInfo : NumAFTExtInfoBits,
 
-    unsigned NumParams : 10;
-  };
-  NUMBITS(AnyFunctionType, NumTypeBaseBits + 17);
+    NumParams : 10
+  );
 
-  struct ArchetypeTypeBitfields {
-    unsigned : NumTypeBaseBits;
+  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
+    ExpandedNestedTypes : 1,
+    HasSuperclass : 1,
+    HasLayoutConstraint : 1,
+    : NumPadBits,
+    NumProtocols : 16
+  );
 
-    unsigned ExpandedNestedTypes : 1;
-    unsigned HasSuperclass : 1;
-    unsigned HasLayoutConstraint : 1;
-    unsigned NumProtocols : 16;
-  };
-  NUMBITS(ArchetypeType, NumTypeBaseBits + 19);
-
-  struct TypeVariableTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
     /// \brief The unique number assigned to this type variable.
-    uint64_t ID : 32 - NumTypeBaseBits;
+    ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
-    unsigned Options : 3;
+    Options : 3,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    unsigned GraphIndex : 29;
-  };
-  NUMBITS(TypeVariableType, 64);
+    GraphIndex : 29
+  );
 
-  struct SILFunctionTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    enum { NumExtInfoBits = 6 };
-    unsigned ExtInfo : NumExtInfoBits;
-    unsigned CalleeConvention : 3;
-    unsigned HasErrorResult : 1;
-    unsigned CoroutineKind : 2;
-  };
-  NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
+  enum { NumSILExtInfoBits = 6 };
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
+    ExtInfo : NumSILExtInfoBits,
+    CalleeConvention : 3,
+    HasErrorResult : 1,
+    CoroutineKind : 2
+  );
 
-  struct SILBoxTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    unsigned : 32 - NumTypeBaseBits; // unused / padding
-    unsigned NumGenericArgs : 32;
-  };
-  NUMBITS(SILBoxType, 64);
+  SWIFT_INLINE_BITFIELD_FULL(SILBoxType, TypeBase, 32,
+    : NumPadBits,
+    NumGenericArgs : 32
+  );
 
-  struct AnyMetatypeTypeBitfields {
-    unsigned : NumTypeBaseBits;
+  SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
     /// The representation of the metatype.
     ///
     /// Zero indicates that no representation has been set; otherwise,
     /// the value is the representation + 1
-    unsigned Representation : 2;
-  };
-  NUMBITS(AnyMetatypeType, NumTypeBaseBits + 2);
+    Representation : 2
+  );
 
-  struct ProtocolCompositionTypeBitfields {
-    unsigned : NumTypeBaseBits;
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+32,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
-    unsigned HasExplicitAnyObject : 1;
+    HasExplicitAnyObject : 1,
 
-    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+    : NumPadBits,
 
     /// The number of protocols being composed.
-    unsigned Count : 32;
-  };
-  NUMBITS(ProtocolCompositionType, 64);
+    Count : 32
+  );
 
-  struct TupleTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
     /// Whether an element of the tuple is inout.
-    unsigned HasInOutElement : 1;
+    HasInOutElement : 1,
 
-    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+    : NumPadBits,
 
     /// The number of elements of the tuple.
-    unsigned Count : 32;
-  };
-  NUMBITS(TupleType, 64);
+    Count : 32
+  );
 
-  struct BoundGenericTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
-    unsigned : 32 - NumTypeBaseBits; // unused / padding
+  SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
+    : NumPadBits,
 
     /// The number of generic arguments.
-    unsigned GenericArgCount : 32;
-  };
-  NUMBITS(BoundGenericType, 64);
+    GenericArgCount : 32
+  );
 
-#undef NUMBITS
   union {
-    TypeBaseBitfields TypeBaseBits;
-    ErrorTypeBitfields ErrorTypeBits;
-    ParenTypeBitfields ParenTypeBits;
-    AnyFunctionTypeBitfields AnyFunctionTypeBits;
-    TypeVariableTypeBitfields TypeVariableTypeBits;
-    ArchetypeTypeBitfields ArchetypeTypeBits;
-    SILFunctionTypeBitfields SILFunctionTypeBits;
-    SILBoxTypeBitfields SILBoxTypeBits;
-    AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
-    ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
-    TupleTypeBitfields TupleTypeBits;
-    BoundGenericTypeBitfields BoundGenericTypeBits;
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(TypeBase);
+    SWIFT_INLINE_BITS(ErrorType);
+    SWIFT_INLINE_BITS(ParenType);
+    SWIFT_INLINE_BITS(AnyFunctionType);
+    SWIFT_INLINE_BITS(TypeVariableType);
+    SWIFT_INLINE_BITS(ArchetypeType);
+    SWIFT_INLINE_BITS(SILFunctionType);
+    SWIFT_INLINE_BITS(SILBoxType);
+    SWIFT_INLINE_BITS(AnyMetatypeType);
+    SWIFT_INLINE_BITS(ProtocolCompositionType);
+    SWIFT_INLINE_BITS(TupleType);
+    SWIFT_INLINE_BITS(BoundGenericType);
   };
 
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr) {
-    *const_cast<TypeKind *>(&TypeBaseBits.Kind) = kind;
+    : CanonicalType((TypeBase*)nullptr), OpaqueBits(0) {
+    TypeBaseBits.Kind = static_cast<unsigned>(kind);
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
@@ -428,7 +400,7 @@ protected:
 
 public:
   /// getKind - Return what kind of type this is.
-  TypeKind getKind() const { return TypeBaseBits.Kind; }
+  TypeKind getKind() const { return static_cast<TypeKind>(TypeBaseBits.Kind); }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
@@ -2616,8 +2588,7 @@ protected:
     assert(AnyFunctionTypeBits.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
-    static_assert(ExtInfo::NumMaskBits ==
-                  AnyFunctionTypeBitfields::NumExtInfoBits,
+    static_assert(ExtInfo::NumMaskBits == NumAFTExtInfoBits,
                  "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
   }
 
