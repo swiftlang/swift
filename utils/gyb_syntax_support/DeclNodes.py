@@ -4,6 +4,13 @@ from Node import Node
 
 
 DECL_NODES = [
+    # initializer -> '=' type
+    Node('TypeInitializerClause', kind='Syntax',
+         children=[
+             Child('Equal', kind='EqualToken'),
+             Child('Value', kind='Type'),
+         ]),
+
     # typealias-declaration -> attributes? access-level-modifier? 'typealias'
     #                            typealias-name generic-parameter-clause?
     #                            typealias-assignment
@@ -13,14 +20,14 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='AccessLevelModifier',
+             Child('AccessLevelModifier', kind='DeclModifier',
                    is_optional=True),
              Child('TypealiasKeyword', kind='TypealiasToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
-             Child('Equals', kind='EqualToken'),
-             Child('Type', kind='Type'),
+             Child('Initializer', kind='TypeInitializerClause',
+                   is_optional=True)
          ]),
 
     Node('FunctionParameterList', kind='SyntaxCollection',

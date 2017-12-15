@@ -74,6 +74,9 @@ typealias F = [Int]!.Type
 typealias G = (a x: Int, _ y: Int ... = 1) throw -> () -> ()
 typealias H = () rethrows -> ()
 
+@objc private typealias T<a,b> = Int
+@objc private typealias T<a,b>
+
 struct foo {
   struct foo {
     struct foo {

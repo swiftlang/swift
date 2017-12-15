@@ -65,9 +65,9 @@
   * FuncDecl
   * ProtocolDecl
   * ImportDecl
+  * TypeAliasDecl
 
 ### In-progress (UnknownDecl):
-  * TypeAliasDecl
   * PatternBindingDecl
   * VarDecl
   * IfConfigDecl
