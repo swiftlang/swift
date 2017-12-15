@@ -82,7 +82,6 @@ enum class InputFileKind {
 // Inputs may include buffers that override contents, and eventually should
 // always include a buffer.
 class InputFile {
-  friend class FrontendInputsAndOutputs;
   std::string Filename;
   bool IsPrimary;
   /// Null if the contents are not overridden.

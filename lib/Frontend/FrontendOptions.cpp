@@ -60,7 +60,7 @@ unsigned
 FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const std::pair<StringRef, unsigned> &elem) -> bool {
-        StringRef filename = AllFiles[elem.second].file();
+        StringRef filename = getAllFiles()[elem.second].file();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
@@ -109,26 +109,26 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
 }
 
 StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
-  if (AllFiles.empty())
+  if (getAllFiles().empty())
     return StringRef();
-  for (auto i : indices(AllFiles)) {
-    if (!AllFiles[i].outputs().OutputFilename.empty()) {
+  for (auto i : indices(getAllFiles())) {
+    if (!getAllFiles()[i].outputs().OutputFilename.empty()) {
       assert(i == 0);
-      return AllFiles[i].outputs().OutputFilename;
+      return getAllFiles()[i].outputs().OutputFilename;
     }
   }
   return StringRef();
 }
 
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
-  if (AllFiles.empty()) return StringRef();
+  if (getAllFiles().empty()) return StringRef();
   // FIXME: dmu use reverse iterator?
-  for (auto i = AllFiles.size() - 1; ; --i) {
-    if (!AllFiles[i].outputs().OutputFilename.empty()) {
+  for (auto i = getAllFiles().size() - 1; ; --i) {
+    if (!getAllFiles()[i].outputs().OutputFilename.empty()) {
       // FIXME: dmu try uncommenting and seeing what breaks:
-      //      assert(AllFiles[i].outputs().OutputFilename ==
-      //      AllFiles[0].outputs().OutputFilename);
-      return AllFiles[i].outputs().OutputFilename;
+      //      assert(getAllFiles()[i].outputs().OutputFilename ==
+      //      getAllFiles()[0].outputs().OutputFilename);
+      return getAllFiles()[i].outputs().OutputFilename;
     }
     if (i == 0)
       break;
