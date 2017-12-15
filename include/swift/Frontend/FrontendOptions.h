@@ -40,12 +40,14 @@ public:
   FrontendInputsAndOutputs() = default;
   
   void printMe(StringRef s) const {
-    fprintf(stderr, "printMe %s this %p AllFiles %p, PrimaryInputs %p\n", s.str().c_str(), this, &AllFiles, &PrimaryInputs);
+    fprintf(stderr, "printMe \n");
+//    fprintf(stderr, "printMe %s this %p AllFiles %p, PrimaryInputs %p\n", s.str().c_str(), this, &AllFiles, &PrimaryInputs);
     for (const auto &input: AllFiles) {
-      fprintf(stderr, "allfiles %s %d\n", input.file().str().c_str(), input.isPrimary());
+      fprintf(stderr, "allfiles inp %p %s fileAddr %p %d\n", &input, input.file().str().c_str(), input.file().begin(), input.isPrimary());
     }
     for (const auto p: PrimaryInputs) {
-      fprintf(stderr, "PRI %s, %d\n", p.first.str().c_str(), p.second);
+      fprintf(stderr, "PRI %s, flie addr %p %d\n", p.first.str().c_str(), p.first.begin(), p.second);
+   //   assert(p.first.equals("-"));
     }
   }
 
@@ -251,12 +253,19 @@ public:
   }
 
   // Argument must not be a reference, so that it does not get reclaimed!
-  void addInput(const InputFile input) {
+  void addInput(const InputFile &input) {
+    fprintf(stderr, "before add input %p input.file %p\n", &input, input.file().begin());
     printMe("PRE ADD");
-    if (input.isPrimary())
-      PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
+    
     AllFiles.push_back(input);
-    fprintf(stderr, "ADDINPUT %s, isP %d \n", input.file().str().c_str(), input.isPrimary());
+    if (input.isPrimary()) {
+      // Take care to push a reference to the string in the InputFile stored in AllFiles,
+      // NOT in the input parameter.
+      PrimaryInputs.insert(std::make_pair(AllFiles.back().file(), AllFiles.size()));
+    }
+
+    std::pair<StringRef, unsigned> &p = PrimaryInputs.front();
+    fprintf(stderr, "after add input %p input.file %p, pair %p, pri string %p\n", &AllFiles[0], AllFiles[0].Filename.c_str(), &p, p.first.begin());
     printMe("POST ADD");
  }
 

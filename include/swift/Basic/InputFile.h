@@ -82,6 +82,7 @@ enum class InputFileKind {
 // Inputs may include buffers that override contents, and eventually should
 // always include a buffer.
 class InputFile {
+  friend class FrontendInputsAndOutputs;
   std::string Filename;
   bool IsPrimary;
   /// Null if the contents are not overridden.
@@ -94,6 +95,7 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+        assert(name.begin() != Filename.c_str());
     assert(!name.empty() && "Empty strings signify no inputs in other places");
   }
 
