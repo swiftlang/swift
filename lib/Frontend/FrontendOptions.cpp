@@ -220,19 +220,20 @@ void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   // Not really all!
   // FIXME: dmu do for all? rm firstPrimary
-  const InputFile &pri = InputsAndOutputs.firstPrimary();
-  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
-      RequestedAction != FrontendOptions::ActionType::MergeModules &&
-      !pri.outputs().OutputFilename.empty()) {
-    fn(pri.outputs().OutputFilename);
-  }
-  const std::string *outputs[] = {&pri.outputs().ModuleOutputPath,
-                                  &pri.outputs().ModuleDocOutputPath,
-                                  &pri.outputs().ObjCHeaderOutputPath};
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
-  }
+  InputsAndOutputs.forAllInputsNeedingOutputs( [&] (const InputFile &input) -> void {
+    if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
+        RequestedAction != FrontendOptions::ActionType::MergeModules &&
+        !input.outputs().OutputFilename.empty()) {
+      fn(input.outputs().OutputFilename);
+    }
+    const std::string *outputs[] = {&input.outputs().ModuleOutputPath,
+      &input.outputs().ModuleDocOutputPath,
+      &input.outputs().ObjCHeaderOutputPath};
+    for (const std::string *next : outputs) {
+      if (!next->empty())
+        fn(*next);
+    }
+  });
 }
 
 StringRef FrontendOptions::originalPath(const InputFile &input) const {

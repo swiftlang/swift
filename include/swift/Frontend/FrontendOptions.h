@@ -150,6 +150,25 @@ public:
   unsigned countOfFilesNeededOutput() const {
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
+  void forAllInputsNeedingOutputs(llvm::function_ref<void(const InputFile &)> fn) const {
+    if (hasPrimaries())
+      forAllPrimaryFiles(fn);
+    else
+      forAllFiles(fn);
+  }
+  
+  void forAllFiles(llvm::function_ref<void(const InputFile &)> fn) const {
+    for (const auto file: getAllFiles()) {
+      fn(file);
+    }
+  }
+  
+  void forAllPrimaryFiles(llvm::function_ref<void(const InputFile &)> fn) const {
+    for (const auto p: PrimaryInputs) {
+      fn(getAllFiles()[p.second]);
+    }
+  }
+  
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:
