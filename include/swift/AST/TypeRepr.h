@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -45,39 +46,36 @@ class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
-  class TypeReprBitfields {
-    friend class TypeRepr;
+  SWIFT_INLINE_BITFIELD_BASE(TypeRepr, 6+1+1,
     /// The subclass of TypeRepr that this is.
-    unsigned Kind : 6;
+    Kind : 6,
 
     /// Whether this type representation is known to contain an invalid
     /// type.
-    unsigned Invalid : 1;
+    Invalid : 1,
 
     /// Whether this type representation had a warning emitted related to it.
     /// This is a hack related to how we resolve type exprs multiple times in
     /// generic contexts.
-    unsigned Warned : 1;
-  };
-  enum { NumTypeReprBits = 8 };
-  class TupleTypeReprBitfields {
-    friend class TupleTypeRepr;
-    unsigned : NumTypeReprBits;
+    Warned : 1
+  );
 
-    /// The number of elements contained.
-    unsigned NumElements : 16;
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+16,
     /// Whether this tuple has '...' and its position.
-    unsigned HasEllipsis : 1;
-  };
+    HasEllipsis : 1,
+    : NumPadBits,
+    /// The number of elements contained.
+    NumElements : 16
+  );
 
 protected:
   union {
-    TypeReprBitfields TypeReprBits;
-    TupleTypeReprBitfields TupleTypeReprBits;
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(TypeRepr);
+    SWIFT_INLINE_BITS(TupleTypeRepr);
   };
 
-  TypeRepr(TypeReprKind K) {
+  TypeRepr(TypeReprKind K) : OpaqueBits(0) {
     TypeReprBits.Kind = static_cast<unsigned>(K);
     TypeReprBits.Invalid = false;
     TypeReprBits.Warned = false;

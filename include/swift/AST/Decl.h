@@ -30,6 +30,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -228,195 +229,185 @@ struct OverloadSignature {
 /// Determine whether two overload signatures conflict.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 
-#define BITFIELD_START(D, PD, C) \
-  enum { Num##D##Bits = Num##PD##Bits + C }; \
-  static_assert(Num##D##Bits <= 64, "fits in a uint64_t"); \
-  LLVM_PACKED_START; \
-  class D##Bitfields { \
-    friend class D; \
-    uint64_t : Num##PD##Bits
-
-#define BITFIELD_END }; LLVM_PACKED_END
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
-  enum { Num_DeclBits = 0 };
-  BITFIELD_START(Decl, _Decl, 13);
-    unsigned Kind : 6;
+  SWIFT_INLINE_BITFIELD_BASE(Decl, 6+1+1+1+1+1+1+1,
+    Kind : 6,
 
     /// \brief Whether this declaration is invalid.
-    unsigned Invalid : 1;
+    Invalid : 1,
 
     /// \brief Whether this declaration was implicitly created, e.g.,
     /// an implicit constructor in a struct.
-    unsigned Implicit : 1;
+    Implicit : 1,
 
     /// \brief Whether this declaration was mapped directly from a Clang AST.
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
-    unsigned FromClang : 1;
+    FromClang : 1,
 
     /// \brief Whether we've already performed early attribute validation.
     /// FIXME: This is ugly.
-    unsigned EarlyAttrValidation : 1;
+    EarlyAttrValidation : 1,
 
     /// \brief Whether this declaration is currently being validated.
-    unsigned BeingValidated : 1;
+    BeingValidated : 1,
 
     /// \brief Whether we have started validating the declaration; this *isn't*
     /// reset after finishing it.
-    unsigned ValidationStarted : 1;
+    ValidationStarted : 1,
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
-    unsigned EscapedFromIfConfig : 1;
-  BITFIELD_END;
+    EscapedFromIfConfig : 1
+  );
 
-  BITFIELD_START(PatternBindingDecl, Decl, 19);
+  SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+2+16,
     /// \brief Whether this pattern binding declares static variables.
-    unsigned IsStatic : 1;
+    IsStatic : 1,
 
     /// \brief Whether 'static' or 'class' was used.
-    unsigned StaticSpelling : 2;
+    StaticSpelling : 2,
+
+    : NumPadBits,
 
     /// \brief The number of pattern binding declarations.
-    unsigned NumPatternEntries : 16;
-  BITFIELD_END;
+    NumPatternEntries : 16
+  );
   
-  BITFIELD_START(EnumCaseDecl, Decl, 51);
-    unsigned : 19; // unused / padding
+  SWIFT_INLINE_BITFIELD_FULL(EnumCaseDecl, Decl, 32,
+    : NumPadBits,
 
     /// The number of tail-allocated element pointers.
-    unsigned NumElements : 32;
-  BITFIELD_END;
+    NumElements : 32
+  );
 
-  BITFIELD_START(ValueDecl, Decl, 3);
-    friend class MemberLookupTable;
-
-    unsigned AlreadyInLookupTable : 1;
+  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1,
+    AlreadyInLookupTable : 1,
 
     /// Whether we have already checked whether this declaration is a 
     /// redeclaration.
-    unsigned CheckedRedeclaration : 1;
+    CheckedRedeclaration : 1,
 
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
-    unsigned IsUserAccessible : 1;
-  BITFIELD_END;
+    IsUserAccessible : 1
+  );
 
-  BITFIELD_START(AbstractStorageDecl, ValueDecl, 7);
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+4,
     /// Whether we are overridden later
-    unsigned Overridden : 1;
+    Overridden : 1,
 
     /// Whether the getter is mutating.
-    unsigned IsGetterMutating : 1;
+    IsGetterMutating : 1,
 
     /// Whether the setter is mutating.
-    unsigned IsSetterMutating : 1;
+    IsSetterMutating : 1,
 
     /// The storage kind.
-    unsigned StorageKind : 4;
-  BITFIELD_END;
+    StorageKind : 4
+  );
 
-  BITFIELD_START(VarDecl, AbstractStorageDecl, 6);
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+2+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
-    unsigned IsStatic : 1;
+    IsStatic : 1,
 
     /// \brief The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
-    unsigned Specifier : 2;
+    Specifier : 2,
 
     /// \brief Whether this declaration was an element of a capture list.
-    unsigned IsCaptureList : 1;
+    IsCaptureList : 1,
 
     /// \brief Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
     /// binding.  This happens in cases like "for i in ...", switch cases, etc.
-    unsigned HasNonPatternBindingInit : 1;
+    HasNonPatternBindingInit : 1,
 
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
-    unsigned IsDebuggerVar : 1;
-  BITFIELD_END;
+    IsDebuggerVar : 1
+  );
 
-  BITFIELD_START(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits);
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
     /// True if the type is implicitly specified in the source, but this has an
     /// apparently valid typeRepr.  This is used in accessors, which look like:
     ///    set (value) {
     /// but need to get the typeRepr from the property as a whole so Sema can
     /// resolve the type.
-    unsigned IsTypeLocImplicit : 1;
+    IsTypeLocImplicit : 1,
 
     /// Information about a symbolic default argument, like #file.
-    unsigned defaultArgumentKind : NumDefaultArgumentKindBits;
-  BITFIELD_END;
+    defaultArgumentKind : NumDefaultArgumentKindBits
+  );
 
-  BITFIELD_START(EnumElementDecl, ValueDecl, 3);
+  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 3,
+    /// \brief Whether or not this element has an associated value.
+    HasArgumentType : 1,
+
     /// \brief Whether or not this element directly or indirectly references
     /// the enum type.
-    unsigned Recursiveness : 2;
-
-    /// \brief Whether or not this element has an associated value.
-    unsigned HasArgumentType : 1;
-  BITFIELD_END;
+    Recursiveness : 2
+  );
   
-  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 21);
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
-    unsigned BodyKind : 3;
-
-    /// Number of curried parameter lists.
-    unsigned NumParameterLists : 5;
+    BodyKind : 3,
 
     /// Import as member status.
-    unsigned IAMStatus : 8;
+    IAMStatus : 8,
+
+    /// Number of curried parameter lists.
+    NumParameterLists : 5,
 
     /// Whether we are overridden later.
-    unsigned Overridden : 1;
+    Overridden : 1,
 
     /// Whether the function body throws.
-    unsigned Throws : 1;
+    Throws : 1,
 
     /// Whether this function requires a new vtable entry.
-    unsigned NeedsNewVTableEntry : 1;
+    NeedsNewVTableEntry : 1,
 
     /// Whether NeedsNewVTableEntry is valid.
-    unsigned HasComputedNeedsNewVTableEntry : 1;
+    HasComputedNeedsNewVTableEntry : 1,
 
     /// The ResilienceExpansion to use for default arguments.
-    unsigned DefaultArgumentResilienceExpansion : 1;
-  BITFIELD_END;
+    DefaultArgumentResilienceExpansion : 1
+  );
 
-  BITFIELD_START(FuncDecl, AbstractFunctionDecl, 7);
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
     /// Whether this function is a 'static' method.
-    unsigned IsStatic : 1;
+    IsStatic : 1,
 
     /// \brief Whether 'static' or 'class' was used.
-    unsigned StaticSpelling : 2;
+    StaticSpelling : 2,
 
     /// Whether we are statically dispatched even if overridable
-    unsigned ForcedStaticDispatch : 1;
+    ForcedStaticDispatch : 1,
 
     /// Whether this function has a dynamic Self return type.
-    unsigned HasDynamicSelf : 1;
+    HasDynamicSelf : 1,
 
     /// Backing bits for 'self' access kind.
-    unsigned SelfAccess : 2;
-  BITFIELD_END;
+    SelfAccess : 2
+  );
 
-  BITFIELD_START(ConstructorDecl, AbstractFunctionDecl, 8);
+  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
-    unsigned ComputedBodyInitKind : 3;
+    ComputedBodyInitKind : 3,
 
     /// The kind of initializer we have.
-    unsigned InitKind : 2;
+    InitKind : 2,
 
     /// The failability of this initializer, which is an OptionalTypeKind.
-    unsigned Failability : 2;
+    Failability : 2,
 
     /// Whether this initializer is a stub placed into a subclass to
     /// catch invalid delegations to a designated initializer not
@@ -425,207 +416,201 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Initializer stubs can be invoked from Objective-C or through
     /// the Objective-C runtime; there is no way to directly express
     /// an object construction that will invoke a stub.
-    unsigned HasStubImplementation : 1;
-  BITFIELD_END;
+    HasStubImplementation : 1
+  );
 
-  BITFIELD_START(TypeDecl, ValueDecl, 1);
+  SWIFT_INLINE_BITFIELD(TypeDecl, ValueDecl, 1,
     /// Whether we have already checked the inheritance clause.
     ///
     /// FIXME: Is this too fine-grained?
-    unsigned CheckedInheritanceClause : 1;
-  BITFIELD_END;
+    CheckedInheritanceClause : 1
+  );
 
-  BITFIELD_START(AbstractTypeParamDecl, TypeDecl, 0);
-  BITFIELD_END;
+  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  BITFIELD_START(GenericTypeParamDecl, AbstractTypeParamDecl, 47);
-    unsigned : 15; // unused padding
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16,
+    : NumPadBits,
 
-    unsigned Depth : 16;
-    unsigned Index : 16;
-  BITFIELD_END;
+    Depth : 16,
+    Index : 16
+  );
 
-  BITFIELD_START(GenericTypeDecl, TypeDecl, 0);
-  BITFIELD_END;
+  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  BITFIELD_START(TypeAliasDecl, GenericTypeDecl, 1);
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1,
     /// Whether the typealias forwards perfectly to its underlying type.
-    unsigned IsCompatibilityAlias : 1;
-  BITFIELD_END;
+    IsCompatibilityAlias : 1
+  );
 
-  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 3);
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
-    unsigned AddedImplicitInitializers : 1;
+    AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    unsigned HasLazyConformances : 1;
+    HasLazyConformances : 1,
 
     /// Whether we have already validated all members of the type that
     /// affect layout.
-    unsigned HasValidatedLayout : 1;
-  BITFIELD_END;
+    HasValidatedLayout : 1
+  );
 
-  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 43);
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
-    unsigned RequiresClassValid : 1;
+    RequiresClassValid : 1,
 
     /// Whether this is a class-bounded protocol.
-    unsigned RequiresClass : 1;
+    RequiresClass : 1,
 
     /// Whether the \c ExistentialConformsToSelf bit is valid.
-    unsigned ExistentialConformsToSelfValid : 1;
+    ExistentialConformsToSelfValid : 1,
 
     /// Whether the existential of this protocol conforms to itself.
-    unsigned ExistentialConformsToSelf : 1;
+    ExistentialConformsToSelf : 1,
 
     /// Whether the \c ExistentialTypeSupported bit is valid.
-    unsigned ExistentialTypeSupportedValid : 1;
+    ExistentialTypeSupportedValid : 1,
 
     /// Whether the existential of this protocol can be represented.
-    unsigned ExistentialTypeSupported : 1;
+    ExistentialTypeSupported : 1,
 
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
-    unsigned HasMissingRequirements : 1;
+    HasMissingRequirements : 1,
 
-    unsigned : 12; // unused flags
+    /// The stage of the circularity check for this protocol.
+    Circularity : 2,
+
+    : NumPadBits,
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
-    unsigned KnownProtocol : 6;
-
-    /// The stage of the circularity check for this protocol.
-    unsigned Circularity : 2;
+    KnownProtocol : 8, // '8' for speed. This only needs 6.
 
     /// The number of requirements in the requirement signature.
-    unsigned NumRequirementsInSignature : 16;
-  BITFIELD_END;
+    NumRequirementsInSignature : 16
+  );
 
-  BITFIELD_START(ClassDecl, NominalTypeDecl, 13);
-    /// The stage of the inheritance circularity check for this class.
-    unsigned Circularity : 2;
-
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+2+2+1+3+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
-    unsigned RequiresStoredPropertyInits : 1;
+    RequiresStoredPropertyInits : 1,
+
+    /// The stage of the inheritance circularity check for this class.
+    Circularity : 2,
 
     /// Whether this class inherits its superclass's convenience
     /// initializers.
     ///
     /// This is a value of \c StoredInheritsSuperclassInits.
-    unsigned InheritsSuperclassInits : 2;
+    InheritsSuperclassInits : 2,
 
     /// \see ClassDecl::ForeignKind
-    unsigned RawForeignKind : 2;
+    RawForeignKind : 2,
     
     /// Whether this class contains a destructor decl.
     ///
     /// A fully type-checked class always contains a destructor member, even if
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
-    unsigned HasDestructorDecl : 1;
+    HasDestructorDecl : 1,
 
     /// Whether the class has @objc ancestry.
-    unsigned ObjCKind : 3;
+    ObjCKind : 3,
 
-    unsigned HasMissingDesignatedInitializers : 1;
-    unsigned HasMissingVTableEntries : 1;
-  BITFIELD_END;
+    HasMissingDesignatedInitializers : 1,
+    HasMissingVTableEntries : 1
+  );
 
-  BITFIELD_START(StructDecl, NominalTypeDecl, 1);
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
-    unsigned HasUnreferenceableStorage : 1;
-  BITFIELD_END;
+    HasUnreferenceableStorage : 1
+  );
   
-  BITFIELD_START(EnumDecl, NominalTypeDecl, 4);
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2,
     /// The stage of the raw type circularity check for this class.
-    unsigned Circularity : 2;
+    Circularity : 2,
 
     /// True if the enum has cases and at least one case has associated values.
-    mutable unsigned HasAssociatedValues : 2;
-  BITFIELD_END;
+    HasAssociatedValues : 2
+  );
 
-  BITFIELD_START(PrecedenceGroupDecl, Decl, 11);
-    /// The group's associativity.  A value of the Associativity enum.
-    unsigned Associativity : 2;
-
+  SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
     /// Is this an assignment operator?
-    unsigned IsAssignment : 1;
-  BITFIELD_END;
+    IsAssignment : 1,
 
-  BITFIELD_START(AssociatedTypeDecl, TypeDecl, 2);
-    unsigned ComputedOverridden : 1;
-    unsigned HasOverridden : 1;
-  BITFIELD_END;
+    /// The group's associativity.  A value of the Associativity enum.
+    Associativity : 2
+  );
 
-  BITFIELD_START(ImportDecl, Decl, 11);
-    unsigned ImportKind : 3;
+  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, TypeDecl, 1+1,
+    ComputedOverridden : 1,
+    HasOverridden : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(ImportDecl, Decl, 3+8,
+    ImportKind : 3,
 
     /// The number of elements in this path.
-    unsigned NumPathElements : 8;
-  BITFIELD_END;
+    NumPathElements : 8
+  );
 
-  BITFIELD_START(ExtensionDecl, Decl, 5);
-    /// Whether we have already checked the inheritance clause.
-    ///
-    /// FIXME: Is this too fine-grained?
-    unsigned CheckedInheritanceClause : 1;
-
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 3+1+1,
     /// An encoding of the default and maximum access level for this extension.
     ///
     /// This is encoded as (1 << (maxAccess-1)) | (1 << (defaultAccess-1)),
     /// which works because the maximum is always greater than or equal to the
     /// default, and 'private' is never used. 0 represents an uncomputed value.
-    unsigned DefaultAndMaxAccessLevel : 3;
+    DefaultAndMaxAccessLevel : 3,
+
+    /// Whether we have already checked the inheritance clause.
+    ///
+    /// FIXME: Is this too fine-grained?
+    CheckedInheritanceClause : 1,
 
     /// Whether there is are lazily-loaded conformances for this extension.
-    unsigned HasLazyConformances : 1;
-  BITFIELD_END;
+    HasLazyConformances : 1
+  );
 
-  BITFIELD_START(IfConfigDecl, Decl, 1);
+  SWIFT_INLINE_BITFIELD(IfConfigDecl, Decl, 1,
     /// Whether this decl is missing its closing '#endif'.
-    unsigned HadMissingEnd : 1;
-  BITFIELD_END;
+    HadMissingEnd : 1
+  );
 
-  BITFIELD_START(MissingMemberDecl, Decl, 3);
-    unsigned NumberOfVTableEntries : 2;
-    unsigned NumberOfFieldOffsetVectorEntries : 1;
-  BITFIELD_END;
+  SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
+    NumberOfFieldOffsetVectorEntries : 1,
+    NumberOfVTableEntries : 2
+  );
 
-#undef BITFIELD_START
-#undef BITFIELD_END
 protected:
   union {
-    DeclBitfields DeclBits;
-    PatternBindingDeclBitfields PatternBindingDeclBits;
-    EnumCaseDeclBitfields EnumCaseDeclBits;
-    ValueDeclBitfields ValueDeclBits;
-    AbstractStorageDeclBitfields AbstractStorageDeclBits;
-    AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
-    VarDeclBitfields VarDeclBits;
-    ParamDeclBitfields ParamDeclBits;
-    EnumElementDeclBitfields EnumElementDeclBits;
-    FuncDeclBitfields FuncDeclBits;
-    ConstructorDeclBitfields ConstructorDeclBits;
-    TypeDeclBitfields TypeDeclBits;
-    AbstractTypeParamDeclBitfields AbstractTypeParamDeclBit;
-    GenericTypeParamDeclBitfields GenericTypeParamDeclBits;
-    GenericTypeDeclBitfields GenericTypeDeclBits;
-    TypeAliasDeclBitfields TypeAliasDeclBits;
-    NominalTypeDeclBitfields NominalTypeDeclBits;
-    ProtocolDeclBitfields ProtocolDeclBits;
-    ClassDeclBitfields ClassDeclBits;
-    StructDeclBitfields StructDeclBits;
-    EnumDeclBitfields EnumDeclBits;
-    AssociatedTypeDeclBitfields AssociatedTypeDeclBits;
-    PrecedenceGroupDeclBitfields PrecedenceGroupDeclBits;
-    ImportDeclBitfields ImportDeclBits;
-    ExtensionDeclBitfields ExtensionDeclBits;
-    IfConfigDeclBitfields IfConfigDeclBits;
-    MissingMemberDeclBitfields MissingMemberDeclBits;
     uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(Decl);
+    SWIFT_INLINE_BITS(PatternBindingDecl);
+    SWIFT_INLINE_BITS(EnumCaseDecl);
+    SWIFT_INLINE_BITS(ValueDecl);
+    SWIFT_INLINE_BITS(AbstractStorageDecl);
+    SWIFT_INLINE_BITS(AbstractFunctionDecl);
+    SWIFT_INLINE_BITS(VarDecl);
+    SWIFT_INLINE_BITS(ParamDecl);
+    SWIFT_INLINE_BITS(EnumElementDecl);
+    SWIFT_INLINE_BITS(FuncDecl);
+    SWIFT_INLINE_BITS(ConstructorDecl);
+    SWIFT_INLINE_BITS(TypeDecl);
+    SWIFT_INLINE_BITS(GenericTypeParamDecl);
+    SWIFT_INLINE_BITS(TypeAliasDecl);
+    SWIFT_INLINE_BITS(NominalTypeDecl);
+    SWIFT_INLINE_BITS(ProtocolDecl);
+    SWIFT_INLINE_BITS(ClassDecl);
+    SWIFT_INLINE_BITS(StructDecl);
+    SWIFT_INLINE_BITS(EnumDecl);
+    SWIFT_INLINE_BITS(AssociatedTypeDecl);
+    SWIFT_INLINE_BITS(PrecedenceGroupDecl);
+    SWIFT_INLINE_BITS(ImportDecl);
+    SWIFT_INLINE_BITS(ExtensionDecl);
+    SWIFT_INLINE_BITS(IfConfigDecl);
+    SWIFT_INLINE_BITS(MissingMemberDecl);
   };
 
   // Storage for the declaration attributes.
@@ -2087,6 +2072,15 @@ protected:
     ValueDeclBits.AlreadyInLookupTable = false;
     ValueDeclBits.CheckedRedeclaration = false;
     ValueDeclBits.IsUserAccessible = true;
+  }
+
+  // MemberLookupTable borrows a bit from this type
+  friend class MemberLookupTable;
+  bool isAlreadyInLookupTable() {
+    return ValueDeclBits.AlreadyInLookupTable;
+  }
+  void setAlreadyInLookupTable(bool value = true) {
+    ValueDeclBits.AlreadyInLookupTable = value;
   }
 
 public:
