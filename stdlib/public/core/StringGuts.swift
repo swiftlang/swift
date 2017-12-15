@@ -338,14 +338,17 @@ extension _StringGuts {
   @_inlineable
   internal
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
-    _sanityCheck(_object.isContiguousASCII)
-    if _object.isUnmanaged {
-      return _asUnmanaged()
-    } else if _object.isNative {
-      return _object.nativeStorage(of: UInt8.self).unmanagedView
-    } else {
-      _sanityCheck(_object.isContiguousCocoa)
-      return _asContiguousCocoa(of: UInt8.self)
+    @effects(readonly)
+    get {
+      _sanityCheck(_object.isContiguousASCII)
+      if _object.isUnmanaged {
+        return _asUnmanaged()
+      } else if _object.isNative {
+        return _object.nativeStorage(of: UInt8.self).unmanagedView
+      } else {
+        _sanityCheck(_object.isContiguousCocoa)
+        return _asContiguousCocoa(of: UInt8.self)
+      }
     }
   }
 
@@ -353,15 +356,17 @@ extension _StringGuts {
   @_inlineable
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
-    _sanityCheck(_object.isContiguousUTF16)
-    if _object.isUnmanaged {
-      return _asUnmanaged()
-    } else if _object.isNative {
-      return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
-    } else if _object.isCocoa {
-      return _asContiguousCocoa(of: UTF16.CodeUnit.self)
-    } else {
-      fatalError("Small strings aren't contiguous")
+    @effects(readonly)
+    get {
+      _sanityCheck(_object.isContiguousUTF16)
+      if _object.isUnmanaged {
+        return _asUnmanaged()
+      } else if _object.isNative {
+        return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
+      } else {
+        _sanityCheck(_object.isContiguousCocoa)
+        return _asContiguousCocoa(of: UTF16.CodeUnit.self)
+      }
     }
   }
 }
