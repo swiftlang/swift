@@ -2437,6 +2437,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       break;
     }
     case tok::kw_typealias:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::TypealiasDecl);
       DeclResult = parseDeclTypeAlias(Flags, Attributes);
       MayNeedOverrideCompletion = true;
       break;
@@ -3283,6 +3284,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    SyntaxParsingContext InitCtx(SyntaxContext,
+                                 SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
       // It is a common mistake to write "typealias A : Int" instead of = Int.
       // Recognize this and produce a fixit.

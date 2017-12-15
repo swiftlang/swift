@@ -103,10 +103,10 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
     auto Array_Int =
         SyntaxFactory::makeSimpleTypeIdentifier(Array, GenericArgs);
-
+    auto TypeInit = SyntaxFactory::makeTypeInitializerClause(Assignment,
+                                                             Array_Int);
     SyntaxFactory::makeTypealiasDecl(None, None, Typealias,
-                                     Subsequence, GenericParams,
-                                     Assignment, Array_Int)
+                                     Subsequence, GenericParams, TypeInit)
       .print(OS);
     ASSERT_EQ(OS.str().str(),
               "typealias MyCollection<Element> = Array<Element>");
@@ -140,7 +140,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Array_Int = SyntaxFactory::makeSimpleTypeIdentifier(Array, GenericArgs);
-
+  auto Type_Init = SyntaxFactory::makeTypeInitializerClause(Equal, Array_Int);
   {
     SmallString<1> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -148,8 +148,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
       .withTypealiasKeyword(Typealias)
       .withIdentifier(MyCollection)
       .withGenericParameterClause(GenericParams)
-      .withEquals(Equal)
-      .withType(Array_Int)
+      .withInitializer(Type_Init)
       .print(OS);
     ASSERT_EQ(OS.str().str(),
               "typealias MyCollection<Element> = Array<Element>");
@@ -187,13 +186,12 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Array_Int = SyntaxFactory::makeSimpleTypeIdentifier(Array, GenericArgs);
-
+  auto Type_Init = SyntaxFactory::makeTypeInitializerClause(Equal, Array_Int);
   TypealiasDeclSyntaxBuilder()
     .useTypealiasKeyword(Typealias)
     .useIdentifier(MyCollection)
     .useGenericParameterClause(GenericParams)
-    .useEquals(Equal)
-    .useType(Array_Int)
+    .useInitializer(Type_Init)
     .build()
     .print(OS);
   ASSERT_EQ(OS.str().str(),
