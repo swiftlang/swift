@@ -3036,12 +3036,12 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   }
   for (auto elt : getAllElements()) {
     if (elt->hasAssociatedValues()) {
-      EnumDeclBits.HasAssociatedValues
+      const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
         = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
       return false;
     }
   }
-  EnumDeclBits.HasAssociatedValues
+  const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
   return true;
 }

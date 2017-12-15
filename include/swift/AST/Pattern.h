@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -37,43 +38,41 @@ namespace swift {
 /// value-matching pattern.
 enum class PatternKind : uint8_t {
 #define PATTERN(ID, PARENT) ID,
+#define LAST_PATTERN(ID) Last_Pattern = ID,
 #include "PatternNodes.def"
 };
+enum : unsigned { NumPatternKindBits =
+  countBitsUsed(static_cast<unsigned>(PatternKind::Last_Pattern)) };
 
 /// Diagnostic printing of PatternKinds.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
   
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
-  class PatternBitfields {
-    friend class Pattern;
-    unsigned Kind : 8;
-    unsigned isImplicit : 1;
-    mutable unsigned hasInterfaceType : 1;
-  };
-  enum { NumPatternBits = 10 };
-  enum { NumBitsAllocated = 32 };
+  SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
+    Kind : bitmax(NumPatternKindBits,8),
+    isImplicit : 1,
+    hasInterfaceType : 1
+  );
 
-  class TuplePatternBitfields {
-    friend class TuplePattern;
-    unsigned : NumPatternBits;
-    unsigned NumElements : NumBitsAllocated - NumPatternBits;
-  };
+  SWIFT_INLINE_BITFIELD_FULL(TuplePattern, Pattern, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
 
-  class TypedPatternBitfields {
-    friend class TypedPattern;
-    unsigned : NumPatternBits;
-    unsigned IsPropagatedType : 1;
-  };
+  SWIFT_INLINE_BITFIELD(TypedPattern, Pattern, 1,
+    IsPropagatedType : 1
+  );
 
 protected:
   union {
-    PatternBitfields PatternBits;
-    TuplePatternBitfields TuplePatternBits;
-    TypedPatternBitfields TypedPatternBits;
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(Pattern);
+    SWIFT_INLINE_BITS(TuplePattern);
+    SWIFT_INLINE_BITS(TypedPattern);
   };
 
-  Pattern(PatternKind kind) {
+  Pattern(PatternKind kind) : OpaqueBits(0) {
     PatternBits.Kind = unsigned(kind);
     PatternBits.isImplicit = false;
     PatternBits.hasInterfaceType = false;
