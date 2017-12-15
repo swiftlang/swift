@@ -247,10 +247,12 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
         break;
     }
   });
+  std::vector<const char *> extendedArgs(Args.begin(), Args.end());
+  extendedArgs.push_back("-code-complete-call-pattern-heuristics");
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, Error)) {
+                             extendedArgs, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -1194,6 +1196,8 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<const char *> extendedArgs(args.begin(), args.end());
   if (CCOpts.addInitsToTopLevel)
     extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
+
+  extendedArgs.push_back("-code-complete-call-pattern-heuristics");
 
   // Invoke completion.
   std::string error;
