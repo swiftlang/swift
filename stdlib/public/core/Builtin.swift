@@ -364,7 +364,7 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 internal var _objCTaggedPointerBits: UInt {
-  @inline(__always) get { return UInt(_swift_BridgeObject_TaggedPointerBits) }
+  @inline(__always) get { return UInt(_swift_BridgeObject_TaggedMask) }
 }
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned

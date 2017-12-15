@@ -105,6 +105,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedMask _swift_abi_ObjCReservedBitsMask
 
 #elif defined(__arm64__)
 
@@ -121,6 +122,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedMask _swift_abi_ObjCReservedBitsMask
 
 #elif defined(__powerpc64__)
 
@@ -132,6 +134,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedMask                                         \
+  SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAGGED_MASK
 
 #elif defined(__s390x__)
 
@@ -143,6 +147,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedMask                                         \
+  SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAGGED_MASK
 
 #else
 
@@ -164,6 +170,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedMask                                  \
+  SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAGGED_MASK
 #endif
 
 /// Corresponding namespaced decls
@@ -175,13 +183,10 @@ static const __swift_uintptr_t SwiftSpareBitsMask =
     _swift_abi_SwiftSpareBitsMask;
 static const __swift_uintptr_t ObjCReservedBitsMask =
     _swift_abi_ObjCReservedBitsMask;
+static const __swift_uintptr_t TaggedBridgeObjectMask =
+    _swift_BridgeObject_TaggedMask;
 static const unsigned ObjCReservedLowBits = _swift_abi_ObjCReservedLowBits;
 } // heap_object_abi
 #endif // __cplusplus
-
-/// BridgeObject masks
-
-#define _swift_BridgeObject_TaggedPointerBits _swift_abi_ObjCReservedBitsMask
-
 
 #endif // SWIFT_STDLIB_SHIMS_HEAPOBJECT_H
