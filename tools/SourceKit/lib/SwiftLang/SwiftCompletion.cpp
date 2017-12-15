@@ -475,13 +475,13 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   }
   unsigned DescEnd = SS.size();
 
-  if (Result->getName().empty() || DescBegin == DescEnd) {
+  if (DescBegin == DescEnd) {
     LOG_FUNC_SECTION_WARN {
       llvm::SmallString<64> LogMessage;
       llvm::raw_svector_ostream LogMessageOs(LogMessage);
 
-      LogMessageOs << "Code completion result with empty name and/or "
-                      "description was ignored: \n";
+      LogMessageOs << "Code completion result with empty description "
+                      "was ignored: \n";
       Result->print(LogMessageOs);
 
       *Log << LogMessage;

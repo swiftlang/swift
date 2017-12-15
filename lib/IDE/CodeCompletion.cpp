@@ -1294,7 +1294,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   int AttrParamIndex;
   bool IsInSil;
   bool HasSpace = false;
-  bool HasRParen = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
@@ -1592,7 +1591,6 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
 
   bool HaveLParen = false;
-  bool HaveRParen = false;
   bool IsSuperRefExpr = false;
   bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
@@ -1745,10 +1743,6 @@ public:
 
   void setHaveLParen(bool Value) {
     HaveLParen = Value;
-  }
-
-  void setHaveRParen(bool Value) {
-    HaveRParen = Value;
   }
 
   void setIsSuperRefExpr() {
@@ -2354,13 +2348,14 @@ public:
 
       bool anyParam = addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
 
-      if (HaveLParen && HaveRParen && !anyParam) {
+      if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
         Builder.cancel();
         return;
       }
 
-      if (!HaveRParen)
+      // The rparen matches the lparen here so that we insert both or neither.
+      if (!HaveLParen)
         Builder.addRightParen();
       else
         Builder.addAnnotatedRightParen();
@@ -2562,13 +2557,14 @@ public:
       bool anyParam = addParamPatternFromFunction(Builder, ConstructorType, CD,
                                   includeDefaultArgs);
 
-      if (HaveLParen && HaveRParen && !anyParam) {
+      if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
         Builder.cancel();
         return;
       }
 
-      if (!HaveRParen)
+      // The rparen matches the lparen here so that we insert both or neither.
+      if (!HaveLParen)
         Builder.addRightParen();
       else
         Builder.addAnnotatedRightParen();
@@ -4491,17 +4487,13 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
 
-  Token next = P.peekToken();
-  if (next.is(tok::r_paren) && !next.isAtStartOfLine()) {
-    HasRParen = true;
-  }
-
   ShouldCompleteCallPatternAfterParen = true;
   if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
     // Lookahead one token to decide what kind of call completions to provide.
     // When it appears that there is already code for the call present, just
     // complete values and/or argument labels.  Otherwise give the entire call
     // pattern.
+    Token next = P.peekToken();
     if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
       ShouldCompleteCallPatternAfterParen = false;
     }
@@ -5225,7 +5217,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (ExprType) {
       if (ShouldCompleteCallPatternAfterParen) {
-        Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
         // Add argument labels, then fallthrough to get values.

@@ -343,8 +343,7 @@ func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
   firstArg(#^FIRST_ARG_NAME_1^#
 }
-// Skip the RParen, since it will be annotated in the second test.
-// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}
+// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}[')']
 func testArg2Name1() {
   firstArg(#^FIRST_ARG_NAME_2^#)
 }
@@ -353,7 +352,7 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
-// FIRST_ARG_NAME_4: Pattern/ExprSpecific: ['(']{#arg1: Int#}, {#arg2: Int#})[#Void#];
+// FIRST_ARG_NAME_4: Pattern/ExprSpecific: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
