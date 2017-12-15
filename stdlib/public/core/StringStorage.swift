@@ -222,6 +222,7 @@ extension _SwiftStringStorage {
 
   @_inlineable
   @_versioned
+  @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
   where C.Element == UInt16 {
