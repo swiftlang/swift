@@ -8,8 +8,8 @@
 
 // CHECK-NOT: UnknownCode
 
-// CHECK-PRINT-DAG: _exhaustive enum Exhaustive {
-// CHECK-PRINT-DAG: _nonexhaustive enum NonExhaustive {
+// CHECK-PRINT-DAG: @_exhaustive enum Exhaustive {
+// CHECK-PRINT-DAG: @_nonexhaustive enum NonExhaustive {
 
 import def_enum
 

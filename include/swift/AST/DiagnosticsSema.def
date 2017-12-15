@@ -1206,7 +1206,7 @@ ERROR(indirect_case_without_payload,none,
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 ERROR(enum_exhaustive_and_nonexhaustive,none,
-      "enum cannot be both 'exhaustive' and 'nonexhaustive'", ())
+      "enum cannot be both '@exhaustive' and '@nonexhaustive'", ())
 WARNING(enum_exhaustive_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 

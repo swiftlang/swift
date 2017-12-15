@@ -2684,7 +2684,7 @@ public:
       if (ED->getFormalAccess() >= AccessLevel::Public) {
         if (!ED->getAttrs().hasAttribute<ExhaustiveAttr>() &&
             !ED->getAttrs().hasAttribute<NonExhaustiveAttr>()) {
-          Out << "Public enum is neither 'exhaustive' nor 'nonexhaustive'\n";
+          Out << "Public enum is neither '@exhaustive' nor '@nonexhaustive'\n";
           ED->dumpContext();
           abort();
         }

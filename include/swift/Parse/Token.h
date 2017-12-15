@@ -164,8 +164,6 @@ public:
       return Text == "unowned";
     case 'w':
       return Text == "weak";
-    case '_':
-      return Text == "_exhaustive" || Text == "_nonexhaustive";
     default:
       return false;
     }

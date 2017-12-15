@@ -38,5 +38,5 @@ public enum Breakfast<Champions> : Int {
   case Coffee
 }
 
-public _exhaustive enum Exhaustive {}
-public _nonexhaustive enum NonExhaustive {}
+@_exhaustive public enum Exhaustive {}
+@_nonexhaustive public enum NonExhaustive {}

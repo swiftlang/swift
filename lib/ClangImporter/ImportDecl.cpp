@@ -2756,7 +2756,7 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
-        // Annotate as 'exhaustive' or 'nonexhaustive' as appropriate.
+        // Annotate as '@exhaustive' or '@nonexhaustive' as appropriate.
         bool nonExhaustiveIsDefault = C.isSwiftVersionAtLeast(5);
         if (enumKind == EnumKind::ExhaustiveEnum) {
           enumDecl->getAttrs().add(
