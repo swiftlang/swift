@@ -28,8 +28,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -349,11 +348,11 @@ struct StructLoweringState {
   // All modified function signature function arguments
   SmallVector<SILValue, 16> funcSigArgs;
   // All args for which we did a load
-  llvm::DenseMap<SILValue, SILValue> argsToLoadedValueMap;
+  llvm::MapVector<SILValue, SILValue> argsToLoadedValueMap;
   // All applies for which we did an alloc
-  llvm::DenseMap<SILInstruction *, SILValue> applyRetToAllocMap;
+  llvm::MapVector<SILInstruction *, SILValue> applyRetToAllocMap;
   // recerse map of the one above
-  llvm::DenseMap<SILInstruction *, SILInstruction*> allocToApplyRetMap;
+  llvm::MapVector<SILInstruction *, SILInstruction *> allocToApplyRetMap;
   // All call sites with SILArgument that needs to be re-written
   // Calls are removed from the set when rewritten.
   SmallVector<SILInstruction *, 16> applies;
@@ -1438,8 +1437,8 @@ private:
   llvm::SetVector<UncheckedTakeEnumDataAddrInst *>
       uncheckedTakeEnumDataAddrOfFunc;
   llvm::SetVector<StoreInst *> storeToBlockStorageInstrs;
-  llvm::DenseSet<SILInstruction *> modApplies;
-  llvm::DenseMap<SILInstruction *, SILValue> allApplyRetToAllocMap;
+  llvm::SetVector<SILInstruction *> modApplies;
+  llvm::MapVector<SILInstruction *, SILValue> allApplyRetToAllocMap;
 };
 } // end anonymous namespace
 
@@ -1673,7 +1672,7 @@ static void rewriteFunction(StructLoweringState &pass,
     genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
   }
   bool repeat = false;
-  llvm::DenseSet<SILInstruction *> currentModApplies;
+  llvm::SetVector<SILInstruction *> currentModApplies;
   do {
     while (!pass.switchEnumInstsToMod.empty()) {
       auto *instr = pass.switchEnumInstsToMod.pop_back_val();
@@ -2149,8 +2148,9 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     modApplies.insert(pass.applies.begin(), pass.applies.end());
   }
   if (!pass.applyRetToAllocMap.empty()) {
-    allApplyRetToAllocMap.insert(pass.applyRetToAllocMap.begin(),
-                                 pass.applyRetToAllocMap.end());
+    for (auto elm : pass.applyRetToAllocMap) {
+      allApplyRetToAllocMap.insert(elm);
+    }
   }
 }
 
@@ -2215,9 +2215,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     // We need to re-create the callee's apply before recreating this one
     // else verification will fail with wrong SubstCalleeType
     auto calleInstr = site.getInstruction();
-    if (modApplies.find(calleInstr) != modApplies.end()) {
+    if (modApplies.remove(calleInstr)) {
       recreateSingleApply(calleInstr);
-      modApplies.erase(calleInstr);
       callee = applySite.getCallee();
     }
   }
@@ -2297,9 +2296,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
 
 void LoadableByAddress::recreateApplies() {
   while (!modApplies.empty()) {
-    auto *applyInst = *modApplies.begin();
+    auto *applyInst = modApplies.pop_back_val();
     recreateSingleApply(applyInst);
-    modApplies.erase(applyInst);
   }
 }
 
