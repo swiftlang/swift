@@ -9,6 +9,7 @@ import A.B.C
 @objc import typealias A.B
 import struct A.B
 
+#if Blah
 class C {
   func bar(_ a: Int) {}
   func bar1(_ a: Float) -> Float { return -0.6 + 0.1 - 0.3 }
@@ -65,9 +66,15 @@ class C {
   }
 }
 
+#endif
+
+#if blah
 typealias A = Any
+#elseif blahblah
 typealias B = (Array<Array<Any>>.Element, x: Int)
+#else
 typealias C = [Int]
+#endif
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
@@ -133,13 +140,14 @@ private protocol foo{}
 @objc
 public protocol foo where A:B {}
 
+#if blah
 func tryfoo() {
   try foo()
   try! foo()
   try? foo()
   try! foo().bar().foo().bar()
 }
-
+#else
 func closure() {
   {[weak a,
     unowned(safe) self,
@@ -165,3 +173,8 @@ func closure() {
   { s1, s2 in s1 > s2 }
   { $0 > $1 }
 }
+#endif
+
+#if blah
+#else
+#endif
