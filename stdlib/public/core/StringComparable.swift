@@ -89,20 +89,31 @@ extension _StringGuts {
     let right = _StringGuts(
       object: _StringObject(rawBits: rightBits.0),
       otherBits: rightBits.1)
-    return _compareDeterministicUnicodeCollation(left, to: right)
-  }
-
-  /// Compares two slices of strings with the Unicode Collation Algorithm.
-  @_inlineable
-  public  // @testable
-  static func _compareDeterministicUnicodeCollation(
-    _ left: _StringGuts, to right: _StringGuts) -> Int {
     return _compareDeterministicUnicodeCollation(
       left, 0..<left.count, to: right, 0..<right.count)
+  }
+  @inline(never)
+  @effects(readonly)
+  public
+  static func _compareDeterministicUnicodeCollation(
+    _leftUnsafeStringGutsBitPattern leftBits: (UInt, UInt),
+    _ leftRange: Range<Int>,
+    _rightUnsafeStringGutsBitPattern rightBits: (UInt, UInt),
+    _ rightRange: Range<Int>
+  ) -> Int {
+    let left = _StringGuts(
+      object: _StringObject(rawBits: leftBits.0),
+      otherBits: leftBits.1)
+    let right = _StringGuts(
+      object: _StringObject(rawBits: rightBits.0),
+      otherBits: rightBits.1)
+    return _compareDeterministicUnicodeCollation(
+      left, leftRange, to: right, rightRange)
   }
 
   /// Compares two slices of strings with the Unicode Collation Algorithm.
   @inline(never) // Hide the CF/ICU dependency
+  @effects(readonly)
   public  // @testable
   static func _compareDeterministicUnicodeCollation(
     _ left: _StringGuts, _ leftRange: Range<Int>,
@@ -206,6 +217,8 @@ extension _StringGuts {
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
   ) -> Int {
+    defer { _fixLifetime(left) }
+    defer { _fixLifetime(right) }
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
@@ -216,25 +229,23 @@ extension _StringGuts {
       let leftASCII = left._unmanagedASCIIView[leftRange]
       let rightASCII = right._unmanagedASCIIView[rightRange]
       let result = leftASCII.compareASCII(to: rightASCII)
-      _fixLifetime(left)
-      _fixLifetime(right)
       return result
     }
-    return _compareDeterministicUnicodeCollation(
-      left, leftRange,
-      to: right, rightRange)
-#else
-    return _compareDeterministicUnicodeCollation(
-      left, leftRange,
-      to: right, rightRange)
 #endif
-  }  
+    let leftBits = (left._object.rawBits, left._otherBits)
+    let rightBits = (right._object.rawBits, right._otherBits)
+    return _compareDeterministicUnicodeCollation(
+      _leftUnsafeStringGutsBitPattern: leftBits, leftRange,
+      _rightUnsafeStringGutsBitPattern: rightBits, rightRange)
+  }
 
   @_inlineable
   @_versioned
   internal static func compare(
     _ left: _StringGuts, to right: _StringGuts
   ) -> Int {
+    defer { _fixLifetime(left) }
+    defer { _fixLifetime(right) }
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
@@ -245,8 +256,6 @@ extension _StringGuts {
       let leftASCII = left._unmanagedASCIIView
       let rightASCII = right._unmanagedASCIIView
       let result = leftASCII.compareASCII(to: rightASCII)
-      _fixLifetime(left)
-      _fixLifetime(right)
       return result
     }
 #endif
