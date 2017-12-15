@@ -2,12 +2,18 @@
 
 // REQUIRES: objc_interop
 
-func test(_ value: SwiftEnum) {
-    switch value {
-    case .one: break
-    case .two: break
-    case .three: break
-    } // no error
+func test(_ value: SwiftEnum, _ exhaustiveValue: ExhaustiveEnum) {
+  switch value { // expected-warning {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  case .one: break
+  case .two: break
+  case .three: break
+  }
+
+  switch exhaustiveValue { // ok
+  case .one: break
+  case .two: break
+  case .three: break
+  }
 }
 
 let _: Int = forwardBarePointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}

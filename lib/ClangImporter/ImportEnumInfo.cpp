@@ -49,21 +49,24 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     return;
   }
 
-  // First, check for attributes that denote the classification
+  // First, check for attributes that denote the classification.
   if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
-    kind = EnumKind::Enum;
+    kind = EnumKind::NonExhaustiveEnum;
     nsErrorDomain = domainAttr->getErrorDomain()->getName();
-    return;
   }
   if (decl->hasAttr<clang::FlagEnumAttr>()) {
     kind = EnumKind::Options;
     return;
   }
-  if (decl->hasAttr<clang::EnumExtensibilityAttr>()) {
-    // FIXME: Distinguish between open and closed enums.
-    kind = EnumKind::Enum;
+  if (auto *attr = decl->getAttr<clang::EnumExtensibilityAttr>()) {
+    if (attr->getExtensibility() == clang::EnumExtensibilityAttr::Closed)
+      kind = EnumKind::ExhaustiveEnum;
+    else
+      kind = EnumKind::NonExhaustiveEnum;
     return;
   }
+  if (!nsErrorDomain.empty())
+    return;
 
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
@@ -87,7 +90,17 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
         MacroName == "OBJC_ENUM" || MacroName == "SWIFT_ENUM" ||
         MacroName == "SWIFT_ENUM_NAMED") {
-      kind = EnumKind::Enum;
+      // Note: Once the compiler starts advertising itself as Swift 5, even
+      // Swift 4 mode is supposed to treat C enums as non-exhaustive. Because
+      // it's Swift 4 mode, failing to switch over the whole enum will only
+      // produce a warning, not an error.
+      assert(version::getSwiftNumericVersion().first < 5 &&
+             "When the compiler starts advertising itself as Swift 5, even "
+             "Swift 4 mode is supposed to treat C enums as non-exhaustive.");
+      if (ctx.isSwiftVersionAtLeast(5))
+        kind = EnumKind::NonExhaustiveEnum;
+      else
+        kind = EnumKind::ExhaustiveEnum;
       return;
     }
     if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
@@ -99,7 +112,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // Hardcode a particular annoying case in the OS X headers.
   if (decl->getName() == "DYLD_BOOL") {
-    kind = EnumKind::Enum;
+    kind = EnumKind::ExhaustiveEnum;
     return;
   }
 
@@ -205,7 +218,8 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 /// within the given enum.
 void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
   switch (getKind()) {
-  case EnumKind::Enum:
+  case EnumKind::NonExhaustiveEnum:
+  case EnumKind::ExhaustiveEnum:
   case EnumKind::Options:
     // Enums are mapped to Swift enums, Options to Swift option sets, both
     // of which attempt prefix-stripping.
