@@ -43,6 +43,9 @@ public enum TriviaPiece: Codable {
     case "Newline":
       let value = try container.decode(Int.self, forKey: .value)
       self = .newlines(value)
+    case "CarriageReturn":
+      let value = try container.decode(Int.self, forKey: .value)
+      self = .carriageReturns(value)
     case "Backtick":
       let value = try container.decode(Int.self, forKey: .value)
       self = .backticks(value)
@@ -96,6 +99,9 @@ public enum TriviaPiece: Codable {
     case .newlines(let count):
       try container.encode("Newline", forKey: .kind)
       try container.encode(count, forKey: .value)
+    case .carriageReturns(let count):
+      try container.encode("CarriageReturn", forKey: .kind)
+      try container.encode(count, forKey: .value)
     case .spaces(let count):
       try container.encode("Space", forKey: .kind)
       try container.encode(count, forKey: .value)
@@ -123,6 +129,9 @@ public enum TriviaPiece: Codable {
 
   /// A newline '\n' character.
   case newlines(Int)
+
+  /// A carriage-return '\r' character.
+  case carriageReturns(Int)
 
   /// A backtick '`' character, used to escape identifiers.
   case backticks(Int)
@@ -158,6 +167,7 @@ extension TriviaPiece: TextOutputStreamable {
     case let .verticalTabs(count): printRepeated("\u{2B7F}", count: count)
     case let .formfeeds(count): printRepeated("\u{240C}", count: count)
     case let .newlines(count): printRepeated("\n", count: count)
+    case let .carriageReturns(count): printRepeated("\r", count: count)
     case let .backticks(count): printRepeated("`", count: count)
     case let .lineComment(text),
          let .blockComment(text),
@@ -183,6 +193,8 @@ extension TriviaPiece: TextOutputStreamable {
       return (lines: 0, lastColumn: n, utf8Length: n)
     case .newlines(let n):
       return (lines: n, lastColumn: 0, utf8Length: n)
+    case .carriageReturns(let n):
+      return (lines: n, lastColumn: 0, utf8Length: n)
     case .lineComment(let text),
          .docLineComment(let text):
       let length = text.utf8.count
@@ -195,7 +207,8 @@ extension TriviaPiece: TextOutputStreamable {
       var total = 0
       for char in text.utf8 {
         total += 1
-        if char == 10 /* ASCII newline */ {
+        if char == 0x0a /* ASCII newline */
+          || char == 0x0d /* ASCII carriage-return */{
           col = 0
           lines += 1
         } else {
@@ -269,6 +282,12 @@ public struct Trivia: Codable {
   /// in a row.
   public static func newlines(_ count: Int) -> Trivia {
     return [.newlines(count)]
+  }
+
+  /// Return a piece of trivia for some number of carriage-return characters
+  /// in a row.
+  public static func carriageReturns(_ count: Int) -> Trivia {
+    return [.carriageReturns(count)]
   }
 
   /// Return a piece of trivia for some number of backtick '`' characters

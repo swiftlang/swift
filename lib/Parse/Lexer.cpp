@@ -2318,10 +2318,11 @@ Restart:
       Pieces.push_back(TriviaPiece::spaces(Length));
       break;
     case '\n':
-    case '\r':
-      // FIXME: Distinguish CR and LF
       // FIXME: CR+LF shoud form one trivia piece
       Pieces.push_back(TriviaPiece::newlines(Length));
+      break;
+    case '\r':
+      Pieces.push_back(TriviaPiece::carriageReturns(Length));
       break;
     case '\t':
       Pieces.push_back(TriviaPiece::tabs(Length));

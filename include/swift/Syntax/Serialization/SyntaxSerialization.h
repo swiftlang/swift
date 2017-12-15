@@ -68,6 +68,7 @@ struct ObjectTraits<syntax::TriviaPiece> {
       case syntax::TriviaKind::VerticalTab:
       case syntax::TriviaKind::Formfeed:
       case syntax::TriviaKind::Newline:
+      case syntax::TriviaKind::CarriageReturn:
       case syntax::TriviaKind::Backtick:
         out.mapRequired("value", value.Count);
         break;
@@ -93,6 +94,7 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
     out.enumCase(value, "VerticalTab", syntax::TriviaKind::VerticalTab);
     out.enumCase(value, "Formfeed", syntax::TriviaKind::Formfeed);
     out.enumCase(value, "Newline", syntax::TriviaKind::Newline);
+    out.enumCase(value, "CarriageReturn", syntax::TriviaKind::CarriageReturn);
     out.enumCase(value, "LineComment", syntax::TriviaKind::LineComment);
     out.enumCase(value, "BlockComment", syntax::TriviaKind::BlockComment);
     out.enumCase(value, "DocLineComment", syntax::TriviaKind::DocLineComment);

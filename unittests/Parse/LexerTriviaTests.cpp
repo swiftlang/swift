@@ -123,3 +123,39 @@ TEST_F(LexerTriviaTest, TriviaConflictMarker) {
                                     TriviaPiece::garbageText(expectedTrivia),
                                     TriviaPiece::newlines(1)}}));
 }
+
+TEST_F(LexerTriviaTest, TriviaCarriageReturn) {
+  using namespace swift::syntax;
+  StringRef SourceStr = "aaa\r\rbbb\r";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
+
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
+
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+  ASSERT_EQ(LeadingTrivia, Trivia());
+  ASSERT_EQ(TrailingTrivia, Trivia());
+
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+  ASSERT_EQ(LeadingTrivia, (Trivia{{TriviaPiece::carriageReturns(2)}}));
+  ASSERT_EQ(TrailingTrivia, Trivia());
+
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+  ASSERT_EQ(LeadingTrivia, (Trivia{{TriviaPiece::carriageReturns(1)}}));
+  ASSERT_EQ(TrailingTrivia, Trivia());
+}
