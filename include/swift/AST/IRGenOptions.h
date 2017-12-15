@@ -203,8 +203,11 @@ public:
     // FIXME: dmu for batch mode
     if (OutputsForBatchMode.empty())
       return StringRef();
-    assert(OutputsForBatchMode.size() == 1);
-    return OutputsForBatchMode[0].OutputFilename;
+    if (OutputsForBatchMode.size() == 1)
+      return OutputsForBatchMode[0].OutputFilename;
+    
+    // FIXME: dmu: Investigate. All the same? All empty???
+    return OutputsForBatchMode.back().OutputFilename;
   }
 
   // Get a hash of all options which influence the llvm compilation but are not

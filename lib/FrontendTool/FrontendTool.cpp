@@ -801,18 +801,34 @@ static bool performCompile(CompilerInstance &Instance,
     if (opts.InputsAndOutputs.hasPrimaries()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
+        
+        
         for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+          unsigned xxx = 0;
+          fprintf(stderr, "testing fileUnit %d %d, %d\n", xxx++, fileUnit != nullptr,
+                  fileUnit ? isa<SerializedASTFile>(fileUnit) : 0);
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
-            if (Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(
-                    InputFile::
-                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-                            SASTF->getFilename()))) {
+            
+            fprintf(stderr, "809\n");
+            auto fn = SASTF->getFilename();
+            auto convertedFN = InputFile::
+            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(fn);
+            fprintf(stderr, "PRE ISP\n");
+            bool isP = Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(convertedFN);
+             fprintf(stderr, "POST ISP\n");
+            fprintf(stderr, "??? %s, %s, %d\n", fn.str().c_str(), convertedFN.str().c_str(), isP);
+            
+            if (isP) {
+                          fprintf(stderr, "814\n");
               assert(!PrimaryFile && "Can only handle one primary so far");
               PrimaryFile = fileUnit;
             }
           }
         }
+        
+        
       }
+      fprintf(stderr, "about to fileissib %d\n", PrimaryFile != nullptr);
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
                                 None);

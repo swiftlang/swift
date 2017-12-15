@@ -38,18 +38,34 @@ class FrontendInputsAndOutputs {
 
 public:
   FrontendInputsAndOutputs() = default;
+  
+  void printMe(StringRef s) const {
+    fprintf(stderr, "printMe %s this %p AllFiles %p, PrimaryInputs %p\n", s.str().c_str(), this, &AllFiles, &PrimaryInputs);
+    for (const auto &input: AllFiles) {
+      fprintf(stderr, "allfiles %s %d\n", input.file().str().c_str(), input.isPrimary());
+    }
+    for (const auto p: PrimaryInputs) {
+      fprintf(stderr, "PRI %s, %d\n", p.first.str().c_str(), p.second);
+    }
+  }
 
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
+    other.printMe("COPYING F BEFORE");
     for (InputFile input : other.getAllFiles())
       addInput(input);
+    other.printMe("COPYING F AFTER");
+    printMe("COPYING T");
   }
 
     FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
-    clearInputs();
-    for (InputFile input : other.getAllFiles())
-      addInput(input);
-    return *this;
-  }
+      other.printMe("ASG F B");
+      clearInputs();
+      for (InputFile input : other.getAllFiles())
+        addInput(input);
+      other.printMe("ASG F A");
+      printMe("ASG T");
+      return *this;
+    }
 
   // Readers:
 
@@ -200,9 +216,10 @@ public:
   }
 
   bool isFilePrimary(StringRef file) {
-    auto iterator = PrimaryInputs.find(file);
-    return iterator != PrimaryInputs.end() &&
-           AllFiles[iterator->second].isPrimary();
+    const bool isPrimary =  PrimaryInputs.count(file) != 0;
+    fprintf(stderr, "isFilePrim %s %d\n", file.str().c_str(), isPrimary);
+    printMe("isFP");
+    return isPrimary;
   }
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
@@ -233,11 +250,15 @@ public:
     addInput(InputFile(file, true, buffer));
   }
 
-  void addInput(const InputFile &input) {
-    if (!input.file().empty() && input.isPrimary())
+  // Argument must not be a reference, so that it does not get reclaimed!
+  void addInput(const InputFile input) {
+    printMe("PRE ADD");
+    if (input.isPrimary())
       PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
     AllFiles.push_back(input);
-  }
+    fprintf(stderr, "ADDINPUT %s, isP %d \n", input.file().str().c_str(), input.isPrimary());
+    printMe("POST ADD");
+ }
 
   void clearInputs() {
     AllFiles.clear();
