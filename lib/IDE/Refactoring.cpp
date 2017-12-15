@@ -1052,7 +1052,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   CompilerInvocation Invocation{};
 
-  Invocation.getFrontendOptions().Inputs.addInput(
+  Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
