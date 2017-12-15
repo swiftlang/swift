@@ -619,8 +619,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
     return nullptr;
   }
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
-                                              contextID, valueCount,
-                                              typeCount, conformanceCount,
+                                              contextID, typeCount,
+                                              valueCount, conformanceCount,
                                               rawIDs);
 
   ASTContext &ctx = getContext();
@@ -4898,8 +4898,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
          "registered lazy loader incorrectly");
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
-                                              contextID, valueCount,
-                                              typeCount, conformanceCount,
+                                              contextID, typeCount,
+                                              valueCount, conformanceCount,
                                               rawIDs);
 
   // Read requirement signature conformances.
@@ -4957,6 +4957,34 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   conformance->setSignatureConformances(reqConformances);
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+
+  TypeWitnessMap typeWitnesses;
+  while (typeCount--) {
+    // FIXME: We don't actually want to allocate an archetype here; we just
+    // want to get an access path within the protocol.
+    auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
+    auto second = getType(*rawIDIter++);
+    auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    if (third &&
+        isa<TypeAliasDecl>(third) &&
+        third->getModuleContext() != getAssociatedModule() &&
+        !third->getDeclaredInterfaceType()->isEqual(second)) {
+      // Conservatively drop references to typealiases in other modules
+      // that may have changed. This may also drop references to typealiases
+      // that /haven't/ changed but just happen to have generics in them, but
+      // in practice having a declaration here isn't actually required by the
+      // rest of the compiler.
+      third = nullptr;
+    }
+    typeWitnesses[first] = std::make_pair(second, third);
+  }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
+  // Set type witnesses.
+  for (auto typeWitness : typeWitnesses) {
+    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
+                                typeWitness.second.second);
+  }
 
   // An imported requirement may have changed type between Swift versions.
   // In this situation we need to do a post-pass to fill in missing
@@ -5064,35 +5092,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                           syntheticEnv, reqToSyntheticSubs));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
-
-  TypeWitnessMap typeWitnesses;
-  while (typeCount--) {
-    // FIXME: We don't actually want to allocate an archetype here; we just
-    // want to get an access path within the protocol.
-    auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = getType(*rawIDIter++);
-    auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
-    if (third &&
-        isa<TypeAliasDecl>(third) &&
-        third->getModuleContext() != getAssociatedModule() &&
-        !third->getDeclaredInterfaceType()->isEqual(second)) {
-      // Conservatively drop references to typealiases in other modules
-      // that may have changed. This may also drop references to typealiases
-      // that /haven't/ changed but just happen to have generics in them, but
-      // in practice having a declaration here isn't actually required by the
-      // rest of the compiler.
-      third = nullptr;
-    }
-    typeWitnesses[first] = std::make_pair(second, third);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
-
-  // Set type witnesses.
-  for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
-                                typeWitness.second.second);
-  }
   
   // Fill in opaque value witnesses if we need to.
   if (needToFillInOpaqueValueWitnesses) {
