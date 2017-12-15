@@ -38,20 +38,31 @@ namespace swift {
   
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
+#define LAST_STMT(ID) Last_Stmt = ID,
 #define STMT_RANGE(Id, FirstId, LastId) \
   First_##Id##Stmt = FirstId, Last_##Id##Stmt = LastId,
 #include "swift/AST/StmtNodes.def"
 };
+enum : unsigned { NumStmtKindBits =
+  countBitsUsed(static_cast<unsigned>(StmtKind::Last_Stmt)) };
 
 /// Stmt - Base class for all statements in swift.
 class alignas(8) Stmt {
   Stmt(const Stmt&) = delete;
   Stmt& operator=(const Stmt&) = delete;
 
-  /// Kind - The subclass of Stmt that this is.
-  unsigned Kind : 31;
-  /// Implicit - Whether this statement is implicit.
-  unsigned Implicit : 1;
+  SWIFT_INLINE_BITFIELD_BASE(Stmt, bitmax(NumStmtKindBits,8) + 1,
+    /// Kind - The subclass of Stmt that this is.
+    Kind : bitmax(NumStmtKindBits,8),
+
+    /// Implicit - Whether this statement is implicit.
+    Implicit : 1
+  );
+
+  union {
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(Stmt);
+  };
 
 protected:
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -61,10 +72,12 @@ protected:
   }
   
 public:
-  Stmt(StmtKind kind, bool implicit)
-    : Kind(unsigned(kind)), Implicit(unsigned(implicit)) {}
+  Stmt(StmtKind kind, bool implicit) : OpaqueBits(0) {
+    StmtBits.Kind = static_cast<unsigned>(kind);
+    StmtBits.Implicit = implicit;
+  }
 
-  StmtKind getKind() const { return StmtKind(Kind); }
+  StmtKind getKind() const { return StmtKind(StmtBits.Kind); }
 
   /// \brief Retrieve the name of the given statement kind.
   ///
@@ -84,7 +97,7 @@ public:
   
   /// isImplicit - Determines whether this statement was implicitly-generated,
   /// rather than explicitly written in the AST.
-  bool isImplicit() const { return bool(Implicit); }
+  bool isImplicit() const { return StmtBits.Implicit; }
 
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
