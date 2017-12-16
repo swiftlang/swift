@@ -5734,8 +5734,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                            overloadName, lhsType, rhsType);
       diag.highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
-      
-      tryIntegerCastFixIts(diag, CS, rhsType, lhsType, rhsExpr);
+
+      auto contextualType = CS.getContextualType();
+      if (contextualType && contextualType->isEqual(rhsType)) {
+        tryIntegerCastFixIts(diag, CS, lhsType, rhsType, lhsExpr);
+      } else {
+        tryIntegerCastFixIts(diag, CS, rhsType, lhsType, rhsExpr);
+      }
     } else {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,
                overloadName, lhsType)
