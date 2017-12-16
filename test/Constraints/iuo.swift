@@ -18,6 +18,14 @@ struct S {
   var m: Int
 
   func fn() -> Int! { return i }
+  init(i: Int!, j: Int!, k: Int, m: Int) {
+    self.i = i
+    self.j = 0
+    self.k = 0
+    self.m = 0
+  }
+
+  init!() {}
 }
 
 func takesStruct(s: S) {
@@ -114,3 +122,22 @@ let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' t
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
+
+func id<T>(_ t: T) -> T { return t }
+
+protocol P { }
+extension P {
+  func iuoResult(_ b: Bool) -> Self! { }
+  static func iuoResultStatic(_ b: Bool) -> Self! { }
+}
+
+func cast<T : P>(_ t: T) {
+  let _: (T) -> (Bool) -> T? = id(T.iuoResult as (T) -> (Bool) -> T?)
+  let _: (Bool) -> T? = id(T.iuoResult(t) as (Bool) -> T?)
+  let _: T! = id(T.iuoResult(t)(true))
+  let _: (Bool) -> T? = id(t.iuoResult as (Bool) -> T?)
+  let _: T! = id(t.iuoResult(true))
+  let _: T = id(t.iuoResult(true))
+  let _: (Bool) -> T? = id(T.iuoResultStatic as (Bool) -> T?)
+  let _: T! = id(T.iuoResultStatic(true))
+}
