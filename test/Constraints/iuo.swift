@@ -21,6 +21,10 @@ struct S {
 
   static func static_fn() -> Int! { return 0 }
 
+  subscript(i: Int) -> Int! {
+    return i
+  }
+
   init(i: Int!, j: Int!, k: Int, m: Int) {
     self.i = i
     self.j = j
@@ -53,7 +57,7 @@ _ = s.k
 s.m = 7
 s.j = 3
 
-var s2: S = S()
+let _: Int = s[0]
 
 struct T {
   let i: Float!
