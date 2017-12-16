@@ -997,7 +997,14 @@ namespace {
                                       TVO_CanBindToLValue |
                                       TVO_CanBindToInOut);
 
-      OverloadChoice choice(CS.getType(base), decl, functionRefKind);
+      OverloadChoice choice;
+      if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+            CS.getType(base), decl, functionRefKind);
+      } else {
+        choice = OverloadChoice(CS.getType(base), decl, functionRefKind);
+      }
+
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
@@ -1295,11 +1302,18 @@ namespace {
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator,
                                       TVO_CanBindToLValue);
-      CS.resolveOverload(locator, tv,
-                         OverloadChoice(Type(), E->getDecl(),
-                                        E->getFunctionRefKind()),
-                         CurDC);
-      
+
+      OverloadChoice choice;
+      if (E->getDecl()
+              ->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+            Type(), E->getDecl(), E->getFunctionRefKind());
+      } else {
+        choice = OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
+      }
+      CS.resolveOverload(locator, tv, choice, CurDC);
+
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->getInterfaceType() &&
             !VD->getInterfaceType()->is<TypeVariableType>()) {
@@ -1374,8 +1388,16 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        choices.push_back(OverloadChoice(Type(), decls[i],
-                                         expr->getFunctionRefKind()));
+        OverloadChoice choice;
+        if (decls[i]
+                ->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+              Type(), decls[i], expr->getFunctionRefKind());
+        } else {
+          choice = OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
+        }
+        choices.push_back(choice);
       }
 
       // If there are no valid overloads, give up.

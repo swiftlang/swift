@@ -131,10 +131,26 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   return false;
 }
 
+static bool sameChoiceKind(const OverloadChoice &lhs,
+                           const OverloadChoice &rhs) {
+  if (lhs.getKind() == rhs.getKind())
+    return true;
+
+  if (lhs.getKind() == OverloadChoiceKind::Decl
+      && rhs.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional)
+    return true;
+
+  if (lhs.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional
+      && rhs.getKind() == OverloadChoiceKind::Decl)
+    return true;
+
+  return false;
+}
+
 /// \brief Compare two overload choices for equality.
 static bool sameOverloadChoice(const OverloadChoice &x,
                                const OverloadChoice &y) {
-  if (x.getKind() != y.getKind())
+  if (!sameChoiceKind(x, y))
     return false;
 
   switch (x.getKind()) {
@@ -810,12 +826,13 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
     
     // If the kinds of overload choice don't match...
-    if (choice1.getKind() != choice2.getKind()) {
+    if (!sameChoiceKind(choice1, choice2)) {
       identical = false;
       
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
-      if (choice1.getKind() == OverloadChoiceKind::Decl &&
+      if ((choice1.getKind() == OverloadChoiceKind::Decl
+           || choice1.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
@@ -826,7 +843,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
-          choice2.getKind() == OverloadChoiceKind::Decl) {
+          (choice2.getKind() == OverloadChoiceKind::Decl
+           || choice2.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional)) {
         score2 += weight;
         continue;
       }
