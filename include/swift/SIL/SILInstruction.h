@@ -3647,13 +3647,13 @@ template <SILInstructionKind K>
 class StoreReferenceInstBase : public InstructionBase<K, NonValueInstruction> {
   enum { Src, Dest };
   FixedOperandList<2> Operands;
-  unsigned IsInitializationOfDest : 1; // FIXME: pack this somewhere
 protected:
   StoreReferenceInstBase(SILDebugLocation loc, SILValue src, SILValue dest,
                          IsInitialization_t isInit)
     : InstructionBase<K, NonValueInstruction>(loc),
-      Operands(this, src, dest),
-      IsInitializationOfDest(unsigned(isInit)) {
+      Operands(this, src, dest) {
+    SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest =
+      unsigned(isInit);
   }
 
 public:
@@ -3661,10 +3661,12 @@ public:
   SILValue getDest() const { return Operands[Dest].get(); }
 
   IsInitialization_t isInitializationOfDest() const {
-    return IsInitialization_t(IsInitializationOfDest);
+    return IsInitialization_t(
+      SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest);
   }
   void setIsInitializationOfDest(IsInitialization_t I) {
-    IsInitializationOfDest = (bool)I;
+    SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest =
+      (bool)I;
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }

@@ -159,6 +159,12 @@ protected:
       atomicity : 1
   );
 
+  SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
+    IsInitializationOfDest : 1;
+    template<SILInstructionKind K>
+    friend class StoreReferenceInstBase;
+  );
+
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,
     Kind : NumVOKindBits
@@ -222,6 +228,7 @@ protected:
     SWIFT_INLINE_BITS(CheckedCastValueBranchInst);
     SWIFT_INLINE_BITS(UncheckedOwnershipConversionInst);
     SWIFT_INLINE_BITS(RefCountingInst);
+    SWIFT_INLINE_BITS(StoreReferenceInstBaseT);
   } Bits;
 
 private:
