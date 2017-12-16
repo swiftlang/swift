@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 

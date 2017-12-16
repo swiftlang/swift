@@ -3244,8 +3244,12 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    const ASTContext *context,
                                    RecursiveTypeProperties properties)
   : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
+    TheDecl(theDecl), Parent(parent)
 {
+  BoundGenericTypeBits.GenericArgCount = genericArgs.size();
+  // Subtypes are required to provide storage for the generic arguments
+  std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
+                          getTrailingObjectsPointer());
 }
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
@@ -3274,7 +3278,6 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                                                      InsertPos))
     return BGT;
 
-  ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs, arena);
   bool IsCanonical = !Parent || Parent->isCanonical();
   if (IsCanonical) {
     for (Type Arg : GenericArgs) {
@@ -3287,15 +3290,22 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
   BoundGenericType *newType;
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
-    newType = new (C, arena) BoundGenericClassType(
-        theClass, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+    auto mem = C.Allocate(sizeof(BoundGenericClassType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericClassType(
+        theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    newType = new (C, arena) BoundGenericStructType(
-        theStruct, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+    auto mem = C.Allocate(sizeof(BoundGenericStructType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericStructType(
+        theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
+  } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
+    auto mem = C.Allocate(sizeof(BoundGenericEnumType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericEnumType(
+        theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else {
-    auto theEnum = cast<EnumDecl>(TheDecl);
-    newType = new (C, arena) BoundGenericEnumType(
-        theEnum, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+    llvm_unreachable("Unhandled NominalTypeDecl");
   }
   C.Impl.getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
 
@@ -3431,14 +3441,14 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
           .FindNodeOrInsertPos(ID, InsertPos))
     return compTy;
 
-  auto compTy
-    = new (C, arena)
-        ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Members),
-                                HasExplicitAnyObject,
-                                properties);
-  C.Impl.getArena(arena).ProtocolCompositionTypes
-    .InsertNode(compTy, InsertPos);
+  // Use trailing objects for member type storage
+  auto mem = C.Allocate(sizeof(ProtocolCompositionType) + sizeof(Type) *
+                        Members.size(), alignof(Type), arena);
+  auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
+                                                  Members,
+                                                  HasExplicitAnyObject,
+                                                  properties);
+  C.Impl.getArena(arena).ProtocolCompositionTypes.InsertNode(compTy, InsertPos);
   return compTy;
 }
 
@@ -3868,8 +3878,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
   SILFunctionTypeBits.ExtInfo = ext.Bits;
   // The use of both assert() and static_assert() below is intentional.
   assert(SILFunctionTypeBits.ExtInfo == ext.Bits && "Bits were dropped!");
-  static_assert(ExtInfo::NumMaskBits ==
-                SILFunctionTypeBitfields::NumExtInfoBits,
+  static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();

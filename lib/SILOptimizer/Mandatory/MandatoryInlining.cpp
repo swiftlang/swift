@@ -330,9 +330,8 @@ static SILFunction *getCalleeFunction(
     // matters here is @noescape, so just check for that.
     auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
     auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
-    auto EscapingCalleeTy = Lowering::adjustFunctionType(
-        ToCalleeTy, ToCalleeTy->getExtInfo().withNoEscape(false),
-        ToCalleeTy->getWitnessMethodConformanceOrNone());
+    auto EscapingCalleeTy =
+      ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
     if (FromCalleeTy != EscapingCalleeTy)
       return CalleeValue;
 

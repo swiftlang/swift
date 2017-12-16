@@ -3,6 +3,13 @@
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 
+import ABC
+import A.B.C
+@objc import A.B
+@objc import typealias A.B
+import struct A.B
+
+#if Blah
 class C {
   func bar(_ a: Int) {}
   func bar1(_ a: Float) -> Float { return -0.6 + 0.1 - 0.3 }
@@ -59,12 +66,24 @@ class C {
   }
 }
 
+#endif
+
+#if blah
 typealias A = Any
-typealias B = (Array<Array<Any>>.Element)
+#elseif blahblah
+typealias B = (Array<Array<Any>>.Element, x: Int)
+#else
 typealias C = [Int]
+#endif
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
+typealias G = (a x: Int, _ y: Int ... = 1) throw -> () -> ()
+typealias H = () rethrows -> ()
+typealias I = (A & B<C>) -> C & D
+
+@objc private typealias T<a,b> = Int
+@objc private typealias T<a,b>
 
 struct foo {
   struct foo {
@@ -120,3 +139,42 @@ protocol foo { func foo() }
 private protocol foo{}
 @objc
 public protocol foo where A:B {}
+
+#if blah
+func tryfoo() {
+  try foo()
+  try! foo()
+  try? foo()
+  try! foo().bar().foo().bar()
+}
+#else
+func closure() {
+  {[weak a,
+    unowned(safe) self,
+    b = 3,
+    unowned(unsafe) c = foo().bar] in
+  }
+  {[] in }
+
+  { [] a, b, _ -> Int in
+    return 2
+  }
+  { [] (a: Int, b: Int, _: Int) -> Int in
+    return 2
+  }
+  { [] a, b, _ throws -> Int in
+    return 2
+  }
+  { [] (a: Int, _ b: Int) throws -> Int in
+    return 2
+  }
+  { a, b in }
+  {}
+  { s1, s2 in s1 > s2 }
+  { $0 > $1 }
+}
+#endif
+
+#if blah
+#else
+#endif

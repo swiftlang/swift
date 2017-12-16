@@ -28,6 +28,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -74,10 +75,13 @@ namespace swift {
 
   enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
+#define LAST_TYPE(id) Last_Type = id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
+  enum : unsigned { NumTypeKindBits =
+    countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type)) };
   
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
@@ -243,10 +247,6 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
-#define NUMBITS(E, V) \
-  enum { Num##E##Bits = V }; \
-  static_assert(Num##E##Bits <= 64, "fits in a uint64_t")
-
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
@@ -259,13 +259,13 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  struct TypeBaseBitfields {
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
+                             RecursiveTypeProperties::BitWidth,
     /// Kind - The discriminator that indicates what subclass of type this is.
-    const TypeKind Kind; // Naturally sized for speed (it only needs 6 bits).
+    Kind : bitmax(NumTypeKindBits,8),
 
-    unsigned Properties : RecursiveTypeProperties::BitWidth;
-  };
-  NUMBITS(TypeBase, RecursiveTypeProperties::BitWidth + sizeof(TypeKind) * 8 );
+    Properties : RecursiveTypeProperties::BitWidth
+  );
 
   /// Returns true if the given type is a sugared type.
   ///
@@ -277,126 +277,116 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  struct ErrorTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
     /// Whether there is an original type.
-    unsigned HasOriginalType : 1;
-  };
-  NUMBITS(ErrorType, NumTypeBaseBits + 1);
+    HasOriginalType : 1
+  );
 
-  struct ParenTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  enum { NumFlagBits = 5 };
+  SWIFT_INLINE_BITFIELD(ParenType, TypeBase, NumFlagBits,
     /// Whether there is an original type.
-    enum { NumFlagBits = 5 };
-    unsigned Flags : NumFlagBits;
-  };
-  NUMBITS(ParenType, NumTypeBaseBits + ParenTypeBitfields::NumFlagBits);
+    Flags : NumFlagBits
+  );
 
-  struct AnyFunctionTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  enum { NumAFTExtInfoBits = 7 };
+  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+10,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    enum { NumExtInfoBits = 7 };
-    unsigned ExtInfo : NumExtInfoBits;
-  };
-  NUMBITS(AnyFunctionType, NumTypeBaseBits + 7);
+    ExtInfo : NumAFTExtInfoBits,
 
-  struct ArchetypeTypeBitfields {
-    unsigned : NumTypeBaseBits;
+    NumParams : 10
+  );
 
-    unsigned ExpandedNestedTypes : 1;
-    unsigned HasSuperclass : 1;
-    unsigned HasLayoutConstraint : 1;
-    unsigned NumProtocols : 16;
-  };
-  NUMBITS(ArchetypeType, NumTypeBaseBits + 19);
+  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
+    ExpandedNestedTypes : 1,
+    HasSuperclass : 1,
+    HasLayoutConstraint : 1,
+    : NumPadBits,
+    NumProtocols : 16
+  );
 
-  struct TypeVariableTypeBitfields {
-    unsigned : NumTypeBaseBits;
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
     /// \brief The unique number assigned to this type variable.
-    uint64_t ID : 32 - NumTypeBaseBits;
+    ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
-    unsigned Options : 3;
+    Options : 3,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    unsigned GraphIndex : 29;
-  };
-  NUMBITS(TypeVariableType, 64);
+    GraphIndex : 29
+  );
 
-  struct SILFunctionTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    enum { NumExtInfoBits = 6 };
-    unsigned ExtInfo : NumExtInfoBits;
-    unsigned CalleeConvention : 3;
-    unsigned HasErrorResult : 1;
-    unsigned CoroutineKind : 2;
-  };
-  NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
+  enum { NumSILExtInfoBits = 6 };
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
+    ExtInfo : NumSILExtInfoBits,
+    CalleeConvention : 3,
+    HasErrorResult : 1,
+    CoroutineKind : 2
+  );
 
-  struct SILBoxTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    unsigned : 32 - NumTypeBaseBits; // unused / padding
-    unsigned NumGenericArgs : 32;
-  };
-  NUMBITS(SILBoxType, 64);
+  SWIFT_INLINE_BITFIELD_FULL(SILBoxType, TypeBase, 32,
+    : NumPadBits,
+    NumGenericArgs : 32
+  );
 
-  struct AnyMetatypeTypeBitfields {
-    unsigned : NumTypeBaseBits;
+  SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
     /// The representation of the metatype.
     ///
     /// Zero indicates that no representation has been set; otherwise,
     /// the value is the representation + 1
-    unsigned Representation : 2;
-  };
-  NUMBITS(AnyMetatypeType, NumTypeBaseBits + 2);
+    Representation : 2
+  );
 
-  struct ProtocolCompositionTypeBitfields {
-    unsigned : NumTypeBaseBits;
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+32,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
-    unsigned HasExplicitAnyObject : 1;
-  };
-  NUMBITS(ProtocolCompositionType, NumTypeBaseBits + 1);
+    HasExplicitAnyObject : 1,
 
-  struct TupleTypeBitfields {
-    unsigned : NumTypeBaseBits;
-    
+    : NumPadBits,
+
+    /// The number of protocols being composed.
+    Count : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
     /// Whether an element of the tuple is inout.
-    unsigned HasInOutElement : 1;
+    HasInOutElement : 1,
 
-    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+    : NumPadBits,
 
     /// The number of elements of the tuple.
-    unsigned Count : 32;
-  };
-  NUMBITS(TupleType, 64);
+    Count : 32
+  );
 
-#undef NUMBITS
+  SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
+    : NumPadBits,
+
+    /// The number of generic arguments.
+    GenericArgCount : 32
+  );
+
   union {
-    TypeBaseBitfields TypeBaseBits;
-    ErrorTypeBitfields ErrorTypeBits;
-    ParenTypeBitfields ParenTypeBits;
-    AnyFunctionTypeBitfields AnyFunctionTypeBits;
-    TypeVariableTypeBitfields TypeVariableTypeBits;
-    ArchetypeTypeBitfields ArchetypeTypeBits;
-    SILFunctionTypeBitfields SILFunctionTypeBits;
-    SILBoxTypeBitfields SILBoxTypeBits;
-    AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
-    ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
-    TupleTypeBitfields TupleTypeBits;
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(TypeBase);
+    SWIFT_INLINE_BITS(ErrorType);
+    SWIFT_INLINE_BITS(ParenType);
+    SWIFT_INLINE_BITS(AnyFunctionType);
+    SWIFT_INLINE_BITS(TypeVariableType);
+    SWIFT_INLINE_BITS(ArchetypeType);
+    SWIFT_INLINE_BITS(SILFunctionType);
+    SWIFT_INLINE_BITS(SILBoxType);
+    SWIFT_INLINE_BITS(AnyMetatypeType);
+    SWIFT_INLINE_BITS(ProtocolCompositionType);
+    SWIFT_INLINE_BITS(TupleType);
+    SWIFT_INLINE_BITS(BoundGenericType);
   };
 
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr) {
-    *const_cast<TypeKind *>(&TypeBaseBits.Kind) = kind;
+    : CanonicalType((TypeBase*)nullptr), OpaqueBits(0) {
+    TypeBaseBits.Kind = static_cast<unsigned>(kind);
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
@@ -410,7 +400,7 @@ protected:
 
 public:
   /// getKind - Return what kind of type this is.
-  TypeKind getKind() const { return TypeBaseBits.Kind; }
+  TypeKind getKind() const { return static_cast<TypeKind>(TypeBaseBits.Kind); }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
@@ -1733,8 +1723,12 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
   
-  ArrayRef<Type> GenericArgs;
-  
+  /// Retrieve the intrusive pointer storage from the subtype
+  const Type *getTrailingObjectsPointer() const;
+  Type *getTrailingObjectsPointer() {
+    const BoundGenericType *temp = this;
+    return const_cast<Type *>(temp->getTrailingObjectsPointer());
+  }
 
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
@@ -1759,10 +1753,12 @@ public:
   Type getParent() const { return Parent; }
 
   /// Retrieve the set of generic arguments provided at this level.
-  ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
+  ArrayRef<Type> getGenericArgs() const {
+    return {getTrailingObjectsPointer(), BoundGenericTypeBits.GenericArgCount};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, GenericArgs);
+    Profile(ID, TheDecl, Parent, getGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -1783,7 +1779,10 @@ END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
-class BoundGenericClassType : public BoundGenericType {
+class BoundGenericClassType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericClassType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1814,7 +1813,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
 /// BoundGenericEnumType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic enum type.
-class BoundGenericEnumType : public BoundGenericType {
+class BoundGenericEnumType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericEnumType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericEnumType(EnumDecl *theDecl, Type parent,
                        ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1845,7 +1847,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
-class BoundGenericStructType : public BoundGenericType {
+class BoundGenericStructType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericStructType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -2366,7 +2371,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 class AnyFunctionType : public TypeBase {
   const Type Input;
   const Type Output;
-  const unsigned NumParams;
   
 public:
   using Representation = FunctionTypeRepresentation;
@@ -2578,13 +2582,13 @@ protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
-    NumParams(NumParams) {
+  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    AnyFunctionTypeBits.NumParams = NumParams;
+    assert(AnyFunctionTypeBits.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
-    static_assert(ExtInfo::NumMaskBits ==
-                  AnyFunctionTypeBitfields::NumExtInfoBits,
+    static_assert(ExtInfo::NumMaskBits == NumAFTExtInfoBits,
                  "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
   }
 
@@ -2607,7 +2611,7 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
-  unsigned getNumParams() const { return NumParams; }
+  unsigned getNumParams() const { return AnyFunctionTypeBits.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
   
@@ -3517,6 +3521,14 @@ public:
                                 const ASTContext &ctx,
               Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
+  /// Return a structurally-identical function type with a slightly tweaked
+  /// ExtInfo.
+  CanSILFunctionType getWithExtInfo(ExtInfo ext);
+
+  /// Return a structurally-identical function type with a slightly tweaked
+  /// representation.
+  CanSILFunctionType getWithRepresentation(Representation repr);
+
   /// Given that this function type uses a C-language convention, return its
   /// formal semantic result type.
   ///
@@ -4098,8 +4110,10 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// inheritance) protocol list. If the sorted, minimized list is a single
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
-class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  ArrayRef<Type> Members;
+class ProtocolCompositionType final : public TypeBase,
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ProtocolCompositionType, Type> {
+  friend TrailingObjects;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
@@ -4120,10 +4134,12 @@ public:
   /// Note that the list of members is not sufficient to uniquely identify
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
-  ArrayRef<Type> getMembers() const { return Members; }
+  ArrayRef<Type> getMembers() const {
+    return {getTrailingObjects<Type>(), ProtocolCompositionTypeBits.Count};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Members, hasExplicitAnyObject());
+    Profile(ID, getMembers(), hasExplicitAnyObject());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<Type> Members,
@@ -4152,10 +4168,11 @@ private:
   ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
                           bool hasExplicitAnyObject,
                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
-               properties),
-      Members(members) {
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
     ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
+    ProtocolCompositionTypeBits.Count = members.size();
+    std::uninitialized_copy(members.begin(), members.end(),
+                            getTrailingObjects<Type>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -5065,6 +5082,16 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // ParameterTypeFlags::fromParameterType entirely.
   bool inOut = paramTy->is<InOutType>();
   return {isVariadic, autoclosure, escaping, inOut, isShared};
+}
+
+inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
+  if (auto ty = dyn_cast<BoundGenericStructType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericEnumType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericClassType>(this))
+    return ty->getTrailingObjects<Type>();
+  llvm_unreachable("Unhandled BoundGenericType!");
 }
   
 /// \brief If this is a method in a type or extension thereof, compute

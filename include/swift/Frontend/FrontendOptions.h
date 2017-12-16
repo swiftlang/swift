@@ -58,8 +58,6 @@ public:
     return Filename;
   }
 
-  void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
-
   /// Return Swift-standard file name from a buffer name set by
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
@@ -83,7 +81,7 @@ public:
     for (InputFile input : other.getAllFiles())
       addInput(input);
   }
-  
+
   FrontendInputs &operator=(const FrontendInputs &other) {
     clearInputs();
     for (InputFile input : other.getAllFiles())
@@ -191,11 +189,7 @@ public:
   }
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file.str(), true, buffer));
-  }
-
-  void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
-    AllFiles[index].setBuffer(buffer);
+    addInput(InputFile(file, true, buffer));
   }
 
   void addInput(const InputFile &input) {
@@ -203,6 +197,7 @@ public:
       PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
     AllFiles.push_back(input);
   }
+
   void clearInputs() {
     AllFiles.clear();
     PrimaryInputs.clear();

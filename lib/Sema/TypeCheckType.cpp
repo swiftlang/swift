@@ -234,14 +234,6 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   return Context.getBridgedToObjC(dc, valueType);
 }
 
-void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
-  // Force any delayed members added to the nominal type declaration.
-  if (nominalDecl->hasDelayedMembers()) {
-    this->handleExternalDecl(nominalDecl);
-    nominalDecl->setHasDelayedMembers(false);
-  }
-}
-
 Type TypeChecker::resolveTypeInContext(
        TypeDecl *typeDecl,
        DeclContext *foundDC,
@@ -265,7 +257,6 @@ Type TypeChecker::resolveTypeInContext(
   if (auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
     if (!isa<ProtocolDecl>(nominalType) &&
         (!nominalType->getGenericParams() || !isSpecialized)) {
-      forceExternalDeclMembers(nominalType);
       for (auto parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
@@ -1150,11 +1141,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   for (const auto entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
-
-    // If necessary, add delayed members to the declaration.
-    if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      TC.forceExternalDeclMembers(nomDecl);
-    }
 
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 foundDC, DC,
@@ -3957,6 +3943,26 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   describeObjCReason(*this, SD, Reason);
 
   return Result;
+}
+
+bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
+  if (!Context.LangOpts.EnableObjCInterop)
+    return false;
+
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    Optional<ForeignErrorConvention> errorConvention;
+    return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
+                                 errorConvention);
+  }
+
+  if (auto var = dyn_cast<VarDecl>(decl))
+    return isRepresentableInObjC(var, ObjCReason::MemberOfObjCMembersClass);
+
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+    return isRepresentableInObjC(subscript,
+                                 ObjCReason::MemberOfObjCMembersClass);
+
+  return false;
 }
 
 void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,

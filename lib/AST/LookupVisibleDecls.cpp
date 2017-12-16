@@ -195,15 +195,8 @@ static void doGlobalExtensionLookup(Type BaseType,
     if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
                             extension))
       continue;
-    bool validatedExtension = false;
-    if (TypeResolver && extension->getAsProtocolExtensionContext()) {
-      if (!TypeResolver->isProtocolExtensionUsable(
-              const_cast<DeclContext *>(CurrDC), BaseType, extension)) {
-        continue;
-      }
-      validatedExtension = true;
-    }
 
+    bool validatedExtension = false;
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
         if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver)) {

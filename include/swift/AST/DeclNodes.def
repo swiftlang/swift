@@ -86,6 +86,10 @@
 #define DECL_RANGE(Id, First, Last)
 #endif
 
+#ifndef LAST_DECL
+#define LAST_DECL(Id)
+#endif
+
 DECL(Import, Decl)
 EXTENSION_DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
@@ -130,6 +134,7 @@ ABSTRACT_DECL(Value, Decl)
     DECL_RANGE(AbstractFunction, Constructor, Func)
   VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, GenericTypeParam, EnumElement)
+LAST_DECL(EnumElement)
 
 #undef NOMINAL_TYPE_DECL
 #undef VALUE_DECL
@@ -140,3 +145,4 @@ ABSTRACT_DECL(Value, Decl)
 #undef CONTEXT_VALUE_DECL
 #undef EXTENSION_DECL
 #undef DECL
+#undef LAST_DECL

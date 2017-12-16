@@ -130,6 +130,22 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
               return false;
             }
         },
+%       elif child.text_choices:
+        {   ${option},
+            [](const Syntax &S) {
+              // check ${child.name}.
+              if (auto Tok = S.getAs<TokenSyntax>()) {
+                auto Text = Tok->getText();
+%           tok_checks = []
+%           for choice in child.text_choices:
+%             tok_checks.append("Text == \"%s\"" % choice)
+%           end
+%           all_checks = ' || '.join(tok_checks)
+                return ${all_checks};
+              }
+              return false;
+            }
+        },
 %       else:
         {   ${option},
             [](const Syntax &S) {
@@ -200,28 +216,6 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 % end
   default:
     return None;
-  }
-}
-
-SyntaxKind
-SyntaxFactory::getUnknownKind(SyntaxKind Kind) {
-  switch(Kind) {
-% for node in SYNTAX_NODES:
-%   if node.syntax_kind.endswith('Expr'):
-%     Result = 'SyntaxKind::UnknownExpr'
-%   elif node.syntax_kind.endswith('Stmt'):
-%     Result = 'SyntaxKind::UnknownStmt'
-%   elif node.syntax_kind.endswith('Decl'):
-%     Result = 'SyntaxKind::UnknownDecl'
-%   elif node.syntax_kind.endswith('Token'):
-%     Result = 'SyntaxKind::UnknownToken'
-%   else:
-%     Result = 'SyntaxKind::Unknown'
-%   end
-  case SyntaxKind::${node.syntax_kind}: return ${Result};
-% end
-  default:
-    return SyntaxKind::Unknown;
   }
 }
 
@@ -307,17 +301,20 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
                        makeRightParenToken({}, {}));
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(
-    llvm::Optional<TokenSyntax> Label,
-    llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  auto annotation = makeTypeAnnotation(makeBlankAttributeList(), None, Type);
-  return makeTupleTypeElement(Label, Colon, annotation, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
+                                    llvm::Optional<TokenSyntax> Colon,
+                                    TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
+                              TrailingComma);
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeTupleTypeElement(None, None, Type, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, None, None, None, Type, None, None,
+                              TrailingComma);
 }
 
 GenericParameterSyntax

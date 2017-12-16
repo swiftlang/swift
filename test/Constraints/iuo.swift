@@ -18,6 +18,22 @@ struct S {
   var m: Int
 
   func fn() -> Int! { return i }
+
+  static func static_fn() -> Int! { return 0 }
+
+  init(i: Int!, j: Int!, k: Int, m: Int) {
+    self.i = i
+    self.j = j
+    self.k = k
+    self.m = m
+  }
+
+  init!() {
+    i = 0
+    j = 0
+    k = 0
+    m = 0
+  }
 }
 
 func takesStruct(s: S) {
@@ -36,6 +52,8 @@ let _: Int = s.j
 _ = s.k
 s.m = 7
 s.j = 3
+
+var s2: S = S()
 
 struct T {
   let i: Float!
@@ -93,6 +111,10 @@ func forceMemberResult(s: S) -> Int {
   return s.fn()
 }
 
+func forceStaticMemberResult() -> Int {
+  return S.static_fn()
+}
+
 func overloadedForceMemberResult() -> Int {
   return overloaded().fn()
 }
@@ -114,3 +136,22 @@ let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' t
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
+
+func id<T>(_ t: T) -> T { return t }
+
+protocol P { }
+extension P {
+  func iuoResult(_ b: Bool) -> Self! { }
+  static func iuoResultStatic(_ b: Bool) -> Self! { }
+}
+
+func cast<T : P>(_ t: T) {
+  let _: (T) -> (Bool) -> T? = id(T.iuoResult as (T) -> (Bool) -> T?)
+  let _: (Bool) -> T? = id(T.iuoResult(t) as (Bool) -> T?)
+  let _: T! = id(T.iuoResult(t)(true))
+  let _: (Bool) -> T? = id(t.iuoResult as (Bool) -> T?)
+  let _: T! = id(t.iuoResult(true))
+  let _: T = id(t.iuoResult(true))
+  let _: (Bool) -> T? = id(T.iuoResultStatic as (Bool) -> T?)
+  let _: T! = id(T.iuoResultStatic(true))
+}

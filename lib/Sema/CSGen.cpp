@@ -3510,14 +3510,15 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
 
 bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
                                const ExtensionDecl *ED) {
-  ConstraintSystemOptions Options;
-  NominalTypeDecl *Nominal = BaseTy->getNominalOrBoundGenericNominal();
-  if (!Nominal || !BaseTy->isSpecialized() ||
-      ED->getGenericRequirements().empty() ||
+  if (!ED->isConstrainedExtension() ||
       // We'll crash if we leak type variables from one constraint
       // system into the new one created below.
-      BaseTy->hasTypeVariable())
+      BaseTy->hasTypeVariable() ||
+      // We can't do anything if the base type has unbound generic
+      // parameters either.
+      BaseTy->hasUnboundGenericType())
     return true;
+
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
@@ -3525,11 +3526,10 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     CreatedTC.reset(new TypeChecker(DC.getASTContext()));
     TC = CreatedTC.get();
   }
-  if (ED->getAsProtocolExtensionContext())
-    return TC->isProtocolExtensionUsable(&DC, BaseTy, const_cast<ExtensionDecl*>(ED));
+
+  ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
-  bool Failed = false;
 
   // Prepare type substitution map.
   SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
@@ -3540,11 +3540,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     if (auto resolved = Req.subst(Substitutions)) {
       CS.addConstraint(*resolved, Loc);
     } else {
-      Failed = true;
+      return false;
     }
   }
-  if (Failed)
-    return true;
 
   // Having a solution implies the extension's requirements have been fulfilled.
   return CS.solveSingle().hasValue();

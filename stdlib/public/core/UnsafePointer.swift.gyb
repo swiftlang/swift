@@ -819,7 +819,7 @@ public struct ${Self}<Pointee>: _Pointer {
 %  if mutable:
   /// For a pointer `p`, the memory at `p + i` must be initialized when reading
   /// the value by using the subscript. When the subscript is used as the left
-  /// side of an assignment, the memory at `p + i` must be uninitialized or
+  /// side of an assignment, the memory at `p + i` must be initialized or
   /// the pointer's `Pointee` type must be a trivial type.
   ///
   /// Do not assign an instance of a nontrivial type through the subscript to

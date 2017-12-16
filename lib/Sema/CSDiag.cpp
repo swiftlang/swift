@@ -6969,108 +6969,86 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
   return diagnoseKeyPathComponents(CS, KPE, rootType);
 }
 
-static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,
-                                          SourceLoc loc) {
-  auto DLC =
-      CS.TC.getProtocol(loc, KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  if (!DLC) return false;
-  return CS.TC
-      .conformsToProtocol(ty, DLC, CS.DC, ConformanceCheckFlags::InExpression)
-      .hasValue();
-}
-
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
-  Type contextualElementType;
-  auto elementTypePurpose = CTP_Unused;
-
   // If we had a contextual type, then it either conforms to
   // ExpressibleByArrayLiteral or it is an invalid contextual type.
-  if (auto contextualType = CS.getContextualType()) {
-    // If our contextual type is an optional, look through them, because we're
-    // surely initializing whatever is inside.
-    contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+  auto contextualType = CS.getContextualType();
+  if (!contextualType) {
+    return false;
+  }
 
-    // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
-    // figure out what the contextual element type is in place.
-    auto ALC = CS.TC.getProtocol(E->getLoc(),
-                                 KnownProtocolKind::ExpressibleByArrayLiteral);
-    if (!ALC)
-      return visitExpr(E);
+  // If our contextual type is an optional, look through them, because we're
+  // surely initializing whatever is inside.
+  contextualType = contextualType->lookThroughAllAnyOptionalTypes();
 
-    // Check to see if the contextual type conforms.
-    auto Conformance = CS.TC.conformsToProtocol(
-        contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
+  // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
+  // figure out what the contextual element type is in place.
+  auto ALC = CS.TC.getProtocol(E->getLoc(),
+                               KnownProtocolKind::ExpressibleByArrayLiteral);
+  if (!ALC)
+    return visitExpr(E);
 
-    // If not, we may have an implicit conversion going on.  If the contextual
-    // type is an UnsafePointer or UnsafeMutablePointer, then that is probably
-    // what is happening.
-    if (!Conformance) {
-      // TODO: Not handling various string conversions or void conversions.
-      Type unwrappedTy = contextualType;
-      if (Type unwrapped = contextualType->getAnyOptionalObjectType())
-        unwrappedTy = unwrapped;
-      PointerTypeKind pointerKind;
-      if (Type pointeeTy = unwrappedTy->getAnyPointerElementType(pointerKind)) {
-        if (pointerKind == PTK_UnsafePointer) {
-          auto arrayTy = ArraySliceType::get(pointeeTy);
-          Conformance = CS.TC.conformsToProtocol(
-              arrayTy, ALC, CS.DC, ConformanceCheckFlags::InExpression);
-
-          if (Conformance)
-            contextualType = arrayTy;
-        }
-      }
-    }
-
-    auto numElements = E->getNumElements();
-    if (!Conformance) {
-      // If the contextual type conforms to ExpressibleByDictionaryLiteral and
-      // this is an empty array, then they meant "[:]".
-      if (numElements == 0 &&
-          isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
-        diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
-          .fixItInsert(E->getEndLoc(), ":");
-        return true;
-      }
-
-
-      diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
-        .highlight(E->getSourceRange());
-
-      // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
-      // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-      if ((numElements & 1) == 0 && numElements > 0 &&
-          isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
-        auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
-
-        // Change every other comma into a colon, only if the number
-        // of commas present matches the number of elements, because
-        // otherwise it might a structural problem with the expression
-        // e.g. ["a""b": 1].
-        const auto commaLocs = E->getCommaLocs();
-        if (commaLocs.size() == numElements - 1) {
-          for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-            diag.fixItReplace(commaLocs[i*2], ":");
-        }
-      }
-
-      return true;
-    }
-
-    contextualElementType =
+  // Check to see if the contextual type conforms.
+  if (auto Conformance
+        = CS.TC.conformsToProtocol(contextualType, ALC, CS.DC,
+                                   ConformanceCheckFlags::InExpression)) {
+    Type contextualElementType =
         ProtocolConformanceRef::getTypeWitnessByName(
             contextualType, *Conformance,
             CS.getASTContext().Id_ArrayLiteralElement, &CS.TC)
             ->getDesugaredType();
-    elementTypePurpose = CTP_ArrayElement;
+
+    // Type check each of the subexpressions in place, passing down the contextual
+    // type information if we have it.
+    for (auto elt : E->getElements()) {
+      if (typeCheckChildIndependently(elt, contextualElementType,
+                                      CTP_ArrayElement) == nullptr) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
-  // Type check each of the subexpressions in place, passing down the contextual
-  // type information if we have it.
-  for (auto elt : E->getElements()) {
-    if (typeCheckChildIndependently(elt, contextualElementType,
-                                    elementTypePurpose) == nullptr)
+  auto DLC
+    = CS.TC.getProtocol(E->getLoc(),
+                        KnownProtocolKind::ExpressibleByDictionaryLiteral);
+  if (!DLC)
+    return visitExpr(E);
+
+  if (auto Conformance
+        = CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
+                                   ConformanceCheckFlags::InExpression)) {
+    // If the contextual type conforms to ExpressibleByDictionaryLiteral and
+    // this is an empty array, then they meant "[:]".
+    auto numElements = E->getNumElements();
+    if (numElements == 0) {
+      diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
+      .fixItInsert(E->getEndLoc(), ":");
       return true;
+    }
+
+    // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
+    // they wrote "x = [1,2]" but probably meant "x = [1:2]".
+    if ((numElements & 1) == 0 && numElements > 0) {
+      bool isIniting = CS.getContextualTypePurpose() == CTP_Initialization;
+      diagnose(E->getStartLoc(), diag::should_use_dictionary_literal,
+               contextualType, isIniting);
+      auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
+
+      // Change every other comma into a colon, only if the number
+      // of commas present matches the number of elements, because
+      // otherwise it might a structural problem with the expression
+      // e.g. ["a""b": 1].
+      const auto commaLocs = E->getCommaLocs();
+      if (commaLocs.size() == numElements - 1) {
+        for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+          diag.fixItReplace(commaLocs[i*2], ":");
+      }
+      return true;
+    }
+
+    return false;
   }
 
   // If that didn't turn up an issue, then we don't know what to do.

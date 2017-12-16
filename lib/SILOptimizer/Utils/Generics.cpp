@@ -245,9 +245,6 @@ static bool growingSubstitutions(SubstitutionList Subs1,
   for (unsigned idx = 0, e = Subs1.size(); idx < e; ++idx) {
     auto Type1 = Subs1[idx].getReplacement()->getCanonicalType();
     auto Type2 = Subs2[idx].getReplacement()->getCanonicalType();
-    // Replacement types should be concrete.
-    assert(!Type1->hasArchetype());
-    assert(!Type2->hasArchetype());
     // If types are the same, the substitution type does not grow.
     if (TypeCmp.isEqual(Type2, Type1))
       continue;

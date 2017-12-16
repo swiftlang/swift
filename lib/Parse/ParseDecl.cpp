@@ -2418,6 +2418,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     // Unambiguous top level decls.
     case tok::kw_import:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
       DeclResult = parseDeclImport(Flags, Attributes);
       break;
     case tok::kw_extension:
@@ -2436,6 +2437,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       break;
     }
     case tok::kw_typealias:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::TypealiasDecl);
       DeclResult = parseDeclTypeAlias(Flags, Attributes);
       MayNeedOverrideCompletion = true;
       break;
@@ -2683,7 +2685,10 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   }
 
   std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
+  bool HasNext;
   do {
+    SyntaxParsingContext AccessCompCtx(SyntaxContext,
+                                       SyntaxKind::AccessPathComponent);
     if (Tok.is(tok::code_complete)) {
       consumeToken();
       if (CodeCompletion) {
@@ -2695,7 +2700,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     if (parseAnyIdentifier(ImportPath.back().first,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
-  } while (consumeIf(tok::period));
+    HasNext = consumeIf(tok::period);
+  } while (HasNext);
+
+  // Collect all access path components to an access path.
+  SyntaxContext->collectNodesInPlace(SyntaxKind::AccessPath);
 
   if (Tok.is(tok::code_complete)) {
     // We omit the code completion token if it immediately follows the module
@@ -3275,6 +3284,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    SyntaxParsingContext InitCtx(SyntaxContext,
+                                 SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
       // It is a common mistake to write "typealias A : Int" instead of = Int.
       // Recognize this and produce a fixit.
@@ -5622,21 +5633,37 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames);
-  if (Indices.isNull() || Indices.hasCodeCompletion())
-    return ParserStatus(Indices);
+  Status |= Indices;
+
+  SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
+  if (SignatureHasCodeCompletion && !CodeCompletion)
+    return makeParserCodeCompletionStatus();
   
   // '->'
-  if (!Tok.is(tok::arrow)) {
+  SourceLoc ArrowLoc;
+  if (!consumeIf(tok::arrow, ArrowLoc)) {
     if (!Indices.isParseError())
       diagnose(Tok, diag::expected_arrow_subscript);
-    return makeParserError();
+    Status.setIsParseError();
   }
-  SourceLoc ArrowLoc = consumeToken();
+
+  if (!ArrowLoc.isValid() && (Indices.isNull() || Indices.get()->size() == 0)) {
+    // This doesn't look much like a subscript, so let regular recovery take
+    // care of it.
+    return Status;
+  }
   
   // type
   ParserResult<TypeRepr> ElementTy = parseType(diag::expected_type_subscript);
-  if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
-    return ParserStatus(ElementTy);
+  Status |= ElementTy;
+  SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
+  if (SignatureHasCodeCompletion && !CodeCompletion) {
+    return makeParserCodeCompletionStatus();
+  }
+  if (ElementTy.isNull()) {
+    // Always set an element type.
+    ElementTy = makeParserResult(ElementTy, new (Context) ErrorTypeRepr());
+  }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
@@ -5665,8 +5692,9 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (SignatureHasCodeCompletion && CodeCompletion) {
     CodeCompletion->setParsedDecl(Subscript);
+  }
 
   Decls.push_back(Subscript);
 
@@ -5676,12 +5704,15 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (Tok.isNot(tok::l_brace)) {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
-    if (Flags.contains(PD_InProtocol))
-      diagnose(Tok, diag::expected_lbrace_subscript_protocol)
-        .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
-    else
-      diagnose(Tok, diag::expected_lbrace_subscript);
-    Status.setIsParseError();
+    if (!Status.isError()) {
+      if (Flags.contains(PD_InProtocol)) {
+        diagnose(Tok, diag::expected_lbrace_subscript_protocol)
+            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+      } else {
+        diagnose(Tok, diag::expected_lbrace_subscript);
+      }
+      Status.setIsParseError();
+    }
   } else {
     if (parseGetSet(Flags, GenericParams,
                     Indices.get(), ElementTy.get(),
@@ -5699,11 +5730,6 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()),
                    Flags, /*static*/ SourceLoc(), Attributes,
                    ElementTy.get(), Indices.get(), Decls);
-
-  if (Invalid) {
-    Subscript->setInterfaceType(ErrorType::get(Context));
-    Subscript->setInvalid();
-  }
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.

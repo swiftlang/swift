@@ -1384,8 +1384,6 @@ static void makeStructRawValued(
   var->addTrivialAccessors(varGetter, nullptr, nullptr);
   assert(var->hasStorage());
 
-  structDecl->setHasDelayedMembers();
-
   // Create constructors to initialize that value from a value of the
   // underlying type.
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
@@ -1537,7 +1535,6 @@ static void makeStructRawValuedWithBridge(
         Impl, structDecl, computedVar, storedVar,
         /*wantLabel*/ false, wantBody);
 
-  structDecl->setHasDelayedMembers();
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
   structDecl->addMember(init);
@@ -7472,25 +7469,15 @@ void ClangImporter::Implementation::finishedImportingEntity() {
 }
 
 void ClangImporter::Implementation::finishPendingActions() {
-  while (true) {
-    // The odd shape of this loop comes from previously having more than one
-    // possible kind of pending action. It's left this way to make it easy to
-    // add another one back in an `else if` clause.
-    if (!RegisteredExternalDecls.empty()) {
-      if (hasFinishedTypeChecking()) {
-        RegisteredExternalDecls.clear();
-      } else {
-        Decl *D = RegisteredExternalDecls.pop_back_val();
-        SwiftContext.addExternalDecl(D);
-        if (auto typeResolver = getTypeResolver())
-          if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-            if (!nominal->hasDelayedMembers())
-              typeResolver->resolveExternalDeclImplicitMembers(nominal);
-      }
-    } else {
-      break;
-    }
+  if (RegisteredExternalDecls.empty())
+    return;
+
+  if (!hasFinishedTypeChecking()) {
+    for (auto *D : RegisteredExternalDecls)
+      SwiftContext.addExternalDecl(D);
   }
+
+  RegisteredExternalDecls.clear();
 }
 
 /// Look up associated type requirements in the conforming type.

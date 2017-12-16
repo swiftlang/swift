@@ -2,6 +2,14 @@ from Child import Child
 from Node import Node  # noqa: I201
 
 PATTERN_NODES = [
+
+    # type-annotation -> ':' type
+    Node('TypeAnnotation', kind='Syntax',
+         children=[
+             Child('Colon', kind='ColonToken'),
+             Child('Type', kind='Type'),
+         ]),
+
     # enum-case-pattern -> type-identifier? '.' identifier tuple-pattern?
     Node('EnumCasePattern', kind='Pattern',
          children=[

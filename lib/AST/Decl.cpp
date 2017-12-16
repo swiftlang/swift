@@ -3036,12 +3036,12 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   }
   for (auto elt : getAllElements()) {
     if (elt->hasAssociatedValues()) {
-      EnumDeclBits.HasAssociatedValues
+      const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
         = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
       return false;
     }
   }
-  EnumDeclBits.HasAssociatedValues
+  const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
   return true;
 }
@@ -4558,9 +4558,15 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  if (getBracesRange().isValid())
+  if (getBracesRange().isValid()) {
     return { getSubscriptLoc(), getBracesRange().End };
-  return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+  } else if (ElementTy.getSourceRange().End.isValid()) {
+    return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+  } else if (ArrowLoc.isValid()) {
+    return { getSubscriptLoc(), ArrowLoc };
+  } else {
+    return getSubscriptLoc();
+  }
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {
