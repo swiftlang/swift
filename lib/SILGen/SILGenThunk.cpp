@@ -358,8 +358,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   // The reference to the thunk is likely @noescape, but declarations are always
   // escaping.
   auto thunkDeclType =
-      adjustFunctionType(thunkType, thunkType->getExtInfo().withNoEscape(false),
-                         thunkType->getWitnessMethodConformanceOrNone());
+      thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
 
   // Mangle the reabstraction thunk.
   // Substitute context parameters out of the "from" and "to" types.

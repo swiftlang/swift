@@ -206,6 +206,29 @@ CanSILFunctionType Lowering::adjustFunctionType(
                               witnessMethodConformance);
 }
 
+CanSILFunctionType
+SILFunctionType::getWithRepresentation(Representation repr) {
+  return getWithExtInfo(getExtInfo().withRepresentation(repr));
+}
+
+CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
+  auto oldExt = getExtInfo();
+  if (newExt == oldExt)
+    return CanSILFunctionType(this);
+
+  auto calleeConvention =
+    (newExt.hasContext()
+       ? (oldExt.hasContext()
+            ? getCalleeConvention()
+            : Lowering::DefaultThickCalleeConvention)
+       : ParameterConvention::Direct_Unowned);
+
+  return get(getGenericSignature(), newExt, getCoroutineKind(),
+             calleeConvention, getParameters(), getYields(),
+             getResults(), getOptionalErrorResult(), getASTContext(),
+             getWitnessMethodConformanceOrNone());
+}
+
 namespace {
 
 enum class ConventionsKind : uint8_t {
