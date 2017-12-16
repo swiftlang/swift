@@ -2975,6 +2975,7 @@ public:
 enum class StoreOwnershipQualifier {
   Unqualified, Init, Assign, Trivial
 };
+static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 
 /// StoreInst - Represents a store from a memory location.
 class StoreInst
@@ -2984,7 +2985,6 @@ class StoreInst
 
 private:
   FixedOperandList<2> Operands;
-  StoreOwnershipQualifier OwnershipQualifier;
 
   StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
             StoreOwnershipQualifier Qualifier);
@@ -3004,7 +3004,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   StoreOwnershipQualifier getOwnershipQualifier() const {
-    return OwnershipQualifier;
+    return StoreOwnershipQualifier(
+      SILInstruction::Bits.StoreInst.OwnershipQualifier);
   }
 };
 
