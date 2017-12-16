@@ -774,7 +774,7 @@ public:
   }
 
   unsigned getIndex() const {
-    return unsigned((getSubclassData() >> IndexBitOffset) & IndexMask);
+    return MultipleValueInstructionResultBits.Index;
   }
 
   /// Get the ownership kind assigned to this result by its parent.
@@ -802,10 +802,6 @@ protected:
 
   /// Set the index of this result.
   void setIndex(unsigned NewIndex);
-
-  static constexpr unsigned NumIndexBits = 24;
-  static constexpr uint64_t IndexMask = (uint64_t(1) << 24) - 1;
-  static constexpr uint64_t IndexBitOffset = ValueOwnershipKind::NumBits;
 };
 
 template <class Result>

@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>
 
@@ -43,11 +44,8 @@ enum class SILNodeKind {
 #include "swift/SIL/SILNodes.def"
 };
 
-enum {
-  NumSILNodeKindBits = 8
-};
-static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
-              "SILNodeKind fits in NumSILNodeKindBits bits");
+enum { NumSILNodeKindBits =
+  countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
 
 /// A SILNode is a node in the use-def graph of a SILFunction.  It is
 /// either an instruction or a defined value which can be used by an
@@ -93,51 +91,52 @@ static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode {
 public:
-  /// The assumed number of bits that a SILNode+padding will take up. Public for
-  /// static assertion purposes.
-  static constexpr unsigned NumTotalSILNodeBits = 64;
-
-private:
-  static constexpr unsigned NumKindBits = NumSILNodeKindBits;
-  static constexpr unsigned NumStorageLocBits = 1;
-  static constexpr unsigned NumIsRepresentativeBits = 1;
-
+  enum { NumVOKindBits = 3 };
 protected:
-  static constexpr unsigned NumSubclassDataBits =
-      NumTotalSILNodeBits - NumKindBits - NumStorageLocBits -
-      NumIsRepresentativeBits;
+  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
+    Kind : bitmax(NumSILNodeKindBits,8),
+    StorageLoc : 1,
+    IsRepresentativeNode : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
+
+  // No MultipleValueInstructionResult subclass needs inline bits right now,
+  // therefore let's naturally align and size the Index for speed.
+  SWIFT_INLINE_BITFIELD_FULL(MultipleValueInstructionResult, ValueBase,
+                             NumVOKindBits+32,
+      VOKind : NumVOKindBits,
+      : NumPadBits,
+      Index : 32
+  );
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
-  enum class IsRepresentative : uint8_t {
-    No = 0,
-    Yes = 1,
+  enum class IsRepresentative : bool {
+    No = false,
+    Yes = true,
+  };
+
+  union {
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(SILNode);
+    SWIFT_INLINE_BITS(MultipleValueInstructionResult);
   };
 
 private:
-  const uint64_t Kind : NumKindBits;
-  const uint64_t StorageLoc : NumStorageLocBits;
-  const uint64_t IsRepresentativeNode : NumIsRepresentativeBits;
-  uint64_t SubclassData : NumSubclassDataBits;
 
   SILNodeStorageLocation getStorageLoc() const {
-    return SILNodeStorageLocation(StorageLoc);
+    return SILNodeStorageLocation(SILNodeBits.StorageLoc);
   }
 
   const SILNode *getRepresentativeSILNodeSlowPath() const;
 
 protected:
   SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
-          IsRepresentative isRepresentative)
-      : Kind(unsigned(kind)), StorageLoc(unsigned(storageLoc)),
-        IsRepresentativeNode(unsigned(isRepresentative)), SubclassData(0) {}
-
-  uint64_t getSubclassData() const { return SubclassData; }
-
-  void setSubclassData(uint64_t NewData) {
-    assert(!(NewData & ~((uint64_t(1) << NumSubclassDataBits) - 1)) &&
-           "New subclass data is too large to fit in SubclassData");
-    SubclassData = NewData;
+          IsRepresentative isRepresentative) : OpaqueBits(0) {
+    SILNodeBits.Kind = unsigned(kind);
+    SILNodeBits.StorageLoc = unsigned(storageLoc);
+    SILNodeBits.IsRepresentativeNode = unsigned(isRepresentative);
   }
 
 public:
@@ -154,7 +153,9 @@ public:
   }
 
   /// Is this SILNode the representative SILNode subobject in this object?
-  bool isRepresentativeSILNodeInObject() const { return IsRepresentativeNode; }
+  bool isRepresentativeSILNodeInObject() const {
+    return SILNodeBits.IsRepresentativeNode;
+  }
 
   /// Return a pointer to the representative SILNode subobject in this object.
   SILNode *getRepresentativeSILNodeInObject() {
@@ -171,7 +172,7 @@ public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
-    return SILNodeKind(Kind);
+    return SILNodeKind(SILNodeBits.Kind);
   }
 
   /// Return the SILNodeKind of this node's representative SILNode.
