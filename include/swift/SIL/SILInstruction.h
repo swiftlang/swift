@@ -1300,9 +1300,7 @@ public:
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
-class AllocRefInstBase
-    : public AllocationInst,
-      public StackPromotable {
+class AllocRefInstBase : public AllocationInst {
 protected:
 
   AllocRefInstBase(SILInstructionKind Kind,
@@ -1311,11 +1309,6 @@ protected:
                    bool objc, bool canBeOnStack,
                    ArrayRef<SILType> ElementTypes,
                    ArrayRef<SILValue> AllOperands);
-
-  // Number of tail-allocated arrays.
-  unsigned short NumTailTypes;
-
-  bool ObjC;
 
   /// The first NumTailTypes operands are counts for the tail allocated
   /// elements, the remaining operands are opened archetype operands.
@@ -1329,21 +1322,33 @@ protected:
     return reinterpret_cast<const SILType*>(Operands.asArray().end());
   }
 
+  unsigned getNumTailTypes() const {
+    return SILInstruction::Bits.AllocRefInstBase.NumTailTypes;
+  }
+
 public:
+  bool canAllocOnStack() const {
+    return SILInstruction::Bits.AllocRefInstBase.OnStack;
+  }
+
+  void setStackAllocatable(bool OnStack = true) {
+    SILInstruction::Bits.AllocRefInstBase.OnStack = OnStack;
+  }
+
   ArrayRef<SILType> getTailAllocatedTypes() const {
-    return {getTypeStorage(), NumTailTypes};
+    return {getTypeStorage(), getNumTailTypes()};
   }
 
   MutableArrayRef<SILType> getTailAllocatedTypes() {
-    return {getTypeStorage(), NumTailTypes};
+    return {getTypeStorage(), getNumTailTypes()};
   }
   
   ArrayRef<Operand> getTailAllocatedCounts() const {
-    return getAllOperands().slice(0, NumTailTypes);
+    return getAllOperands().slice(0, getNumTailTypes());
   }
 
   MutableArrayRef<Operand> getTailAllocatedCounts() {
-    return getAllOperands().slice(0, NumTailTypes);
+    return getAllOperands().slice(0, getNumTailTypes());
   }
 
   ArrayRef<Operand> getAllOperands() const {
@@ -1355,7 +1360,9 @@ public:
   }
   
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
+  bool isObjC() const {
+    return SILInstruction::Bits.AllocRefInstBase.ObjC;
+  }
 };
 
 /// AllocRefInst - This represents the primitive allocation of an instance
@@ -1388,11 +1395,11 @@ class AllocRefInst final
 
 public:
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(NumTailTypes);
+    return getAllOperands().slice(getNumTailTypes());
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(NumTailTypes);
+    return getAllOperands().slice(getNumTailTypes());
   }
 };
 
@@ -1426,15 +1433,15 @@ class AllocRefDynamicInst final
 
 public:
   SILValue getMetatypeOperand() const {
-    return getAllOperands()[NumTailTypes].get();
+    return getAllOperands()[getNumTailTypes()].get();
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(NumTailTypes + 1);
+    return getAllOperands().slice(getNumTailTypes() + 1);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(NumTailTypes + 1);
+    return getAllOperands().slice(getNumTailTypes() + 1);
   }
 };
 

@@ -122,6 +122,13 @@ protected:
     NumOperands : 32-NumAllocationInstBits,
     VarInfo : 32
   );
+  SWIFT_INLINE_BITFIELD_FULL(AllocRefInstBase, AllocationInst, 1+1+32,
+    ObjC : 1,
+    OnStack : 1,
+    : NumPadBits,
+    // Number of tail-allocated arrays.
+    NumTailTypes : 32
+  );
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
@@ -136,6 +143,7 @@ protected:
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
     SWIFT_INLINE_BITS(AllocStackInst);
+    SWIFT_INLINE_BITS(AllocRefInstBase);
   } Bits;
 
 private:

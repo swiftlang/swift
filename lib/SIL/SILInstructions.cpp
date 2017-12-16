@@ -177,11 +177,10 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    bool objc, bool canBeOnStack,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> AllOperands)
-    : AllocationInst(Kind, Loc, ObjectType),
-      StackPromotable(canBeOnStack),
-      NumTailTypes(ElementTypes.size()),
-      ObjC(objc),
-      Operands(this, AllOperands) {
+    : AllocationInst(Kind, Loc, ObjectType), Operands(this, AllOperands) {
+  SILInstruction::Bits.AllocRefInstBase.ObjC = objc;
+  SILInstruction::Bits.AllocRefInstBase.OnStack = canBeOnStack;
+  SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   static_assert(IsTriviallyCopyable<SILType>::value,
                 "assuming SILType is trivially copyable");
   assert(!objc || ElementTypes.size() == 0);
