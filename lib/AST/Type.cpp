@@ -1045,17 +1045,9 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-/// getCanonicalType - Return the canonical version of this type, which has
-/// sugar from all levels stripped off.
-CanType TypeBase::getCanonicalType() {
-  // If the type is itself canonical, return it.
-  if (isCanonical())
-    return CanType(this);
-  // If the canonical type was already computed, just return what we have.
-  if (TypeBase *CT = CanonicalType.get<TypeBase*>())
-    return CanType(CT);
+void TypeBase::computeCanonicalType() {
+  assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
-  // Otherwise, compute and cache it.
   TypeBase *Result = nullptr;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
@@ -1227,12 +1219,10 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   }
-    
-  
+
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
-  return CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {

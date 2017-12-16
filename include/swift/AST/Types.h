@@ -408,10 +408,20 @@ public:
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
   bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
-  
+
+private:
+  void computeCanonicalType();
+
+public:
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  CanType getCanonicalType();
+  CanType getCanonicalType() {
+    if (isCanonical())
+      return CanType(this);
+    if (!hasCanonicalTypeComputed())
+      computeCanonicalType();
+    return CanType(CanonicalType.get<TypeBase*>());
+  }
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
