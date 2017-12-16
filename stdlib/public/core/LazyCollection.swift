@@ -1,4 +1,4 @@
-//===--- LazyCollection.swift.gyb -----------------------------*- swift -*-===//
+//===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -32,6 +32,14 @@ extension LazyCollectionProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public var lazy: LazyCollection<Elements> {
     return elements.lazy
+  }
+}
+
+extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
+  // Lazy things are already lazy
+  @_inlineable // FIXME(sil-serialize-all)
+  public var lazy: Elements {
+    return elements
   }
 }
 
