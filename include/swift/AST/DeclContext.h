@@ -29,6 +29,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   class raw_ostream;
@@ -378,6 +379,18 @@ public:
     for (const DeclContext *CurContext = this; CurContext;
          CurContext = CurContext->getParent())
       if (CurContext == Other)
+        return true;
+    return false;
+  }
+
+  /// Return true if this is a child of any of the specified other decl
+  /// contexts.
+  bool isChildContextOf(llvm::SetVector<const DeclContext *>Others) const {
+    if (Others.count(this) != 0) return false;
+
+    for (const DeclContext *CurContext = this; CurContext;
+         CurContext = CurContext->getParent())
+      if (Others.count(CurContext) != 0)
         return true;
     return false;
   }

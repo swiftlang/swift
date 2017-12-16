@@ -130,11 +130,11 @@ private:
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
 
-  /// A specific context for AST-level declarations associated with this SIL
+  /// The specific contexts for AST-level declarations associated with this SIL
   /// module.
   ///
-  /// \sa getAssociatedContext
-  const DeclContext *AssociatedDeclContext;
+  /// \sa getAssociatedContexts
+  llvm::SetVector<const DeclContext *> AssociatedDeclContexts;
 
   /// Lookup table for SIL functions. This needs to be declared before \p
   /// functions so that the destructor of \p functions is called first.
@@ -241,7 +241,8 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
+  SILModule(ModuleDecl *M, SILOptions &Options,
+            ArrayRef<DeclContext *> associatedDCs,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -317,7 +318,8 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
+  constructSIL(ModuleDecl *M, SILOptions &Options,
+               ArrayRef<FileUnit *> SourceFiles = ArrayRef<FileUnit *>(),
                Optional<unsigned> startElem = None,
                bool isWholeModule = false);
 
@@ -327,7 +329,7 @@ public:
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
                     bool WholeModule = false) {
     return std::unique_ptr<SILModule>(
-        new SILModule(M, Options, M, WholeModule));
+      new SILModule(M, Options, ArrayRef<DeclContext *>(M), WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -336,17 +338,17 @@ public:
   ASTContext &getASTContext() const { return TheSwiftModule->getASTContext(); }
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
-  /// Get the Swift DeclContext associated with this SIL module.
+  /// Get the Swift DeclContexts associated with this SIL module.
   ///
-  /// All AST declarations within this context are assumed to have been fully
+  /// All AST declarations within these contexts are assumed to have been fully
   /// processed as part of generating this module. This allows certain passes
   /// to make additional assumptions about these declarations.
   ///
-  /// If this is the same as TheSwiftModule, the entire module is being
-  /// compiled as a single unit. If this is null, no context-based assumptions
-  /// can be made.
-  const DeclContext *getAssociatedContext() const {
-    return AssociatedDeclContext;
+  /// If this set is a singleton containing only TheSwiftModule, the entire
+  /// module is being compiled as a single unit. If empty, no context-based
+  /// assumptions can be made.
+  llvm::SetVector<const DeclContext *> const& getAssociatedContexts() const {
+    return AssociatedDeclContexts;
   }
 
   /// Returns true if this SILModule really contains the whole module, i.e.

@@ -231,7 +231,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
                                ClassHierarchyAnalysis::ClassList &Subs) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
   auto *Method = CMI->getMember().getFuncDecl();
-  const DeclContext *DC = AI.getModule().getAssociatedContext();
+  auto DCs = AI.getModule().getAssociatedContexts();
 
   if (CD->isFinal())
     return true;
@@ -244,11 +244,11 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
   // Without an associated context we cannot perform any
   // access-based optimizations.
-  if (!DC)
+  if (DCs.empty())
     return false;
 
   // Only handle classes defined within the SILModule's associated context.
-  if (!CD->isChildContextOf(DC))
+  if (!CD->isChildContextOf(DCs))
     return false;
 
   if (!CD->hasAccess())

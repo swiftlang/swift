@@ -3039,15 +3039,15 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (Decl.isForeign)
     return false;
 
-  const DeclContext *AssocDC = M.getAssociatedContext();
-  if (!AssocDC)
+  auto AssocDCs = M.getAssociatedContexts();
+  if (AssocDCs.empty())
     return false;
 
   auto *AFD = Decl.getAbstractFunctionDecl();
   assert(AFD && "Expected abstract function decl!");
 
   // Only handle members defined within the SILModule's associated context.
-  if (!AFD->isChildContextOf(AssocDC))
+  if (!AFD->isChildContextOf(AssocDCs))
     return false;
 
   if (AFD->isDynamic())

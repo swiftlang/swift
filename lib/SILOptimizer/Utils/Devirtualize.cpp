@@ -90,11 +90,11 @@ static bool isEffectivelyFinalMethod(FullApplySite AI,
   if (CD && CD->isFinal())
     return true;
 
-  const DeclContext *DC = AI.getModule().getAssociatedContext();
+  auto DCs = AI.getModule().getAssociatedContexts();
 
   // Without an associated context we cannot perform any
   // access-based optimizations.
-  if (!DC)
+  if (DCs.empty())
     return false;
 
   auto *CMI = cast<MethodInst>(AI.getCallee());
@@ -152,18 +152,18 @@ static bool isEffectivelyFinalMethod(FullApplySite AI,
 ///   it is a whole-module compilation.
 static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
                               ClassHierarchyAnalysis *CHA) {
-  const DeclContext *DC = M.getAssociatedContext();
+  auto DCs = M.getAssociatedContexts();
 
   if (CD->isFinal())
     return true;
 
   // Without an associated context we cannot perform any
   // access-based optimizations.
-  if (!DC)
+  if (DCs.empty())
     return false;
 
   // Only handle classes defined within the SILModule's associated context.
-  if (!CD->isChildContextOf(DC))
+  if (!CD->isChildContextOf(DCs))
     return false;
 
   if (!CD->hasAccess())

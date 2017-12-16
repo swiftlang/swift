@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
@@ -234,18 +235,20 @@ namespace swift {
   performSILGeneration(ModuleDecl *M, SILOptions &options,
                        bool wholeModuleCompilation = false);
 
-  /// Turn a source file into SIL IR.
+  /// Turn a set of (source and/or serialized AST) files into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
-  /// SourceFile, and any optimizations should take that into account.
+  /// Files, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
+  performSILGeneration(ModuleDecl *Module,
+                       SILOptions &options,
+                       ArrayRef<FileUnit*> Files,
                        Optional<unsigned> StartElem = None);
 
-  using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
-
-  /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+  /// Serializes a module and zero or more source files to the given output file.
+  void serialize(ModuleDecl *Module,
+                 const llvm::SetVector<SourceFile*> &SourceFiles,
+                 const SerializationOptions &options,
                  const SILModule *M = nullptr);
 
   /// Get the CPU and subtarget feature options to use when emitting code.

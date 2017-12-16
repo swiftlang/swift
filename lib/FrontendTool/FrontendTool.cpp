@@ -630,8 +630,6 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
-
   // We've been told to dump the AST (either after parsing or type-checking,
   // which is already differentiated in CompilerInstance::performSema()),
   // so dump or print the main source file and return.
@@ -642,7 +640,7 @@ static bool performCompile(CompilerInstance &Instance,
       Action == FrontendOptions::ActionType::DumpScopeMaps ||
       Action == FrontendOptions::ActionType::DumpTypeRefinementContexts ||
       Action == FrontendOptions::ActionType::DumpInterfaceHash) {
-    SourceFile *SF = PrimarySourceFile;
+    SourceFile *SF = Instance.getPrimarySourceFile();
     if (!SF) {
       SourceFileKind Kind = Invocation.getSourceFileKind();
       SF = &Instance.getMainModule()->getMainSourceFile(Kind);
@@ -717,9 +715,12 @@ static bool performCompile(CompilerInstance &Instance,
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
-  if (shouldTrackReferences)
-    emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
-                              *Instance.getDependencyTracker(), opts);
+  if (shouldTrackReferences) {
+    for (auto *SF : Instance.getPrimarySourceFiles()) {
+      emitReferenceDependencies(Context.Diags, SF,
+                                *Instance.getDependencyTracker(), opts);
+    }
+  }
 
   if (!opts.LoadedModuleTracePath.empty())
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
@@ -730,7 +731,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Context.hadError()) {
     if (shouldIndex) {
       //  Emit the index store data even if there were compiler errors.
-      if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+      if (emitIndexData(Instance.getPrimarySourceFile(),
+                        Invocation, Instance))
         return true;
     }
     return true;
@@ -749,7 +751,8 @@ static bool performCompile(CompilerInstance &Instance,
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
     if (shouldIndex) {
-      if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+      if (emitIndexData(Instance.getPrimarySourceFile(),
+                        Invocation, Instance))
         return true;
     }
     return Context.hadError();
@@ -780,30 +783,37 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
+    ModuleDecl *mod = Instance.getMainModule();
+    SILOptions &SILOpts = Invocation.getSILOptions();
     if (opts.Inputs.hasPrimaryInputs()) {
-      FileUnit *PrimaryFile = PrimarySourceFile;
-      if (!PrimaryFile) {
-        for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+      llvm::SmallVector<FileUnit *, 16> PrimaryInputs;
+      std::copy(Instance.getPrimarySourceFiles().begin(),
+                Instance.getPrimarySourceFiles().end(),
+                std::back_inserter(PrimaryInputs));
+      // FIXME: This looks somewhat redundant with the fact that we're
+      // getting inputs from the primary source files list already;
+      // possibly try to eliminate this block.
+      if (PrimaryInputs.empty()) {
+        for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
             if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
                     InputFile::
                         convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
                             SASTF->getFilename()))) {
-              assert(!PrimaryFile && "Can only handle one primary so far");
-              PrimaryFile = fileUnit;
+              assert(PrimaryInputs.empty()
+                     && "Can only handle one primary so far");
+              PrimaryInputs.push_back(fileUnit);
             }
           }
         }
       }
-      astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
-      SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
-                                None);
-    } else {
-      auto mod = Instance.getMainModule();
       astGuaranteedToCorrespondToSIL =
-          llvm::none_of(mod->getFiles(), fileIsSIB);
-      SM = performSILGeneration(mod, Invocation.getSILOptions(),
-                                true);
+        llvm::none_of(PrimaryInputs, fileIsSIB);
+      SM = performSILGeneration(mod, SILOpts, PrimaryInputs, None);
+    } else {
+      astGuaranteedToCorrespondToSIL =
+        llvm::none_of(mod->getFiles(), fileIsSIB);
+      SM = performSILGeneration(mod, Invocation.getSILOptions(), true);
     }
   }
 
@@ -828,15 +838,15 @@ static bool performCompile(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
 
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(Instance.getMainModule(),
+                Instance.getPrimarySourceFiles(),
+                serializationOpts, SM.get());
     }
     return Context.hadError();
   }
@@ -885,8 +895,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   auto SerializeSILModuleAction = [&]() {
     if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-      auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
-                                  : Instance.getMainModule();
       if (!opts.ModuleOutputPath.empty()) {
         SerializationOptions serializationOpts;
         serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -908,7 +916,9 @@ static bool performCompile(CompilerInstance &Instance,
         serializationOpts.SerializeOptionsForDebugging =
             !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
 
-        serialize(DC, serializationOpts, SM.get());
+        serialize(Instance.getMainModule(),
+                  Instance.getPrimarySourceFiles(),
+                  serializationOpts, SM.get());
       }
     }
   };
@@ -957,8 +967,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Get the main source file's private discriminator and attach it to
   // the compile unit's flags.
-  if (PrimarySourceFile) {
-    Identifier PD = PrimarySourceFile->getPrivateDiscriminator();
+  if (IRGenOpts.DebugInfoKind != IRGenDebugInfoKind::None &&
+      Instance.getPrimarySourceFile()) {
+    Identifier PD = Instance.getPrimarySourceFile()->getPrivateDiscriminator();
     if (!PD.empty())
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
@@ -969,15 +980,15 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(Instance.getMainModule(),
+                Instance.getPrimarySourceFiles(),
+                serializationOpts, SM.get());
     }
     return Context.hadError();
   }
@@ -989,7 +1000,8 @@ static bool performCompile(CompilerInstance &Instance,
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
       if (shouldIndex) {
-        if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+        if (emitIndexData(Instance.getPrimarySourceFile(),
+                          Invocation, Instance))
           return true;
       }
       return Context.hadError();
@@ -1020,7 +1032,8 @@ static bool performCompile(CompilerInstance &Instance,
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
   if (Action == FrontendOptions::ActionType::Immediate) {
-    assert(!PrimarySourceFile && "-i doesn't work in -primary-file mode");
+    assert(Instance.getPrimarySourceFiles().empty() &&
+           "-i doesn't work in -primary-file mode");
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
@@ -1041,8 +1054,10 @@ static bool performCompile(CompilerInstance &Instance,
   auto &LLVMContext = getGlobalLLVMContext();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  if (PrimarySourceFile) {
-    IRModule = performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
+  if (!Instance.getPrimarySourceFiles().empty()) {
+    IRModule = performIRGeneration(IRGenOpts,
+                                   *Instance.getPrimarySourceFile(),
+                                   std::move(SM),
                                    opts.getSingleOutputFilename(), LLVMContext,
                                    0, &HashGlobal);
   } else {
@@ -1055,7 +1070,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
   if (shouldIndex) {
-    if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+    if (emitIndexData(Instance.getPrimarySourceFile(), Invocation, Instance))
       return true;
   }
 
@@ -1084,8 +1099,9 @@ static bool performCompile(CompilerInstance &Instance,
     const auto &SILOpts = Invocation.getSILOptions();
     auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
     bool error;
-    if (PrimarySourceFile)
-      error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,
+    if (!Instance.getPrimarySourceFiles().empty())
+      error = validateTBD(Instance.getPrimarySourceFile(),
+                          *IRModule, hasMultipleIRGenThreads,
                           allSymbols);
     else
       error = validateTBD(Instance.getMainModule(), *IRModule,
