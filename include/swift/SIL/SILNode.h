@@ -162,6 +162,16 @@ protected:
       atomicity : 1
   );
 
+  SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
+    /// IsTakeOfSrc - True if ownership will be taken from the value at the
+    /// source memory location.
+    IsTakeOfSrc : 1,
+
+    /// IsInitializationOfDest - True if this is the initialization of the
+    /// uninitialized destination memory location.
+    IsInitializationOfDest : 1
+  );
+
   SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
     IsTake : 1;
     template<SILInstructionKind K>
@@ -240,6 +250,7 @@ protected:
     SWIFT_INLINE_BITS(StoreReferenceInstBaseT);
     SWIFT_INLINE_BITS(LoadReferenceInstBaseT);
     SWIFT_INLINE_BITS(StrongPinInst);
+    SWIFT_INLINE_BITS(CopyAddrInst);
   } Bits;
 
 private:

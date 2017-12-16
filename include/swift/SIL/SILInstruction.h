@@ -3747,16 +3747,6 @@ public:
   };
 
 private:
-  // FIXME: compress storage
-
-  /// IsTakeOfSrc - True if ownership will be taken from the value at the source
-  /// memory location.
-  unsigned IsTakeOfSrc : 1;
-
-  /// IsInitializationOfDest - True if this is the initialization of the
-  /// uninitialized destination memory location.
-  unsigned IsInitializationOfDest : 1;
-
   FixedOperandList<2> Operands;
 
   CopyAddrInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
@@ -3769,16 +3759,19 @@ public:
   void setSrc(SILValue V) { Operands[Src].set(V); }
   void setDest(SILValue V) { Operands[Dest].set(V); }
 
-  IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
+  IsTake_t isTakeOfSrc() const {
+    return IsTake_t(SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc);
+  }
   IsInitialization_t isInitializationOfDest() const {
-    return IsInitialization_t(IsInitializationOfDest);
+    return IsInitialization_t(
+      SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest);
   }
 
   void setIsTakeOfSrc(IsTake_t T) {
-    IsTakeOfSrc = (bool)T;
+    SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc = (bool)T;
   }
   void setIsInitializationOfDest(IsInitialization_t I) {
-    IsInitializationOfDest = (bool)I;
+    SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest = (bool)I;
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }

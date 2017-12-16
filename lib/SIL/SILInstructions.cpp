@@ -849,9 +849,11 @@ StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
                            IsInitialization_t isInitializationOfDest)
-    : InstructionBase(Loc), IsTakeOfSrc(isTakeOfSrc),
-      IsInitializationOfDest(isInitializationOfDest),
-      Operands(this, SrcLValue, DestLValue) {}
+    : InstructionBase(Loc), Operands(this, SrcLValue, DestLValue) {
+    SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc = bool(isTakeOfSrc);
+    SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest =
+      bool(isInitializationOfDest);
+  }
 
 BindMemoryInst *
 BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
