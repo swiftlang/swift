@@ -3629,17 +3629,17 @@ class LoadReferenceInstBase
     return SILType::getPrimitiveObjectType(refType.getReferentType());
   }
 
-  unsigned IsTake : 1; // FIXME: pack this somewhere
-
 protected:
   LoadReferenceInstBase(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
     : UnaryInstructionBase<K, SingleValueInstruction>(loc, lvalue,
-                                             getResultType(lvalue->getType())),
-      IsTake(unsigned(isTake)) {
+                                             getResultType(lvalue->getType())) {
+    SILInstruction::Bits.LoadReferenceInstBaseT.IsTake = unsigned(isTake);
   }
 
 public:
-  IsTake_t isTake() const { return IsTake_t(IsTake); }
+  IsTake_t isTake() const {
+    return IsTake_t(SILInstruction::Bits.LoadReferenceInstBaseT.IsTake);
+  }
 };
 
 /// An abstract class representing a store to some kind of reference storage.

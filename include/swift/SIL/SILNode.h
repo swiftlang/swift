@@ -159,6 +159,12 @@ protected:
       atomicity : 1
   );
 
+  SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
+    IsTake : 1;
+    template<SILInstructionKind K>
+    friend class LoadReferenceInstBase;
+  );
+
   SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
     IsInitializationOfDest : 1;
     template<SILInstructionKind K>
@@ -229,6 +235,7 @@ protected:
     SWIFT_INLINE_BITS(UncheckedOwnershipConversionInst);
     SWIFT_INLINE_BITS(RefCountingInst);
     SWIFT_INLINE_BITS(StoreReferenceInstBaseT);
+    SWIFT_INLINE_BITS(LoadReferenceInstBaseT);
   } Bits;
 
 private:
