@@ -774,7 +774,7 @@ public:
   }
 
   unsigned getIndex() const {
-    return MultipleValueInstructionResultBits.Index;
+    return Bits.MultipleValueInstructionResult.Index;
   }
 
   /// Get the ownership kind assigned to this result by its parent.

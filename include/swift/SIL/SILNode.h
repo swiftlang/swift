@@ -126,22 +126,23 @@ protected:
     SWIFT_INLINE_BITS(SILNode);
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
-  };
+  } Bits;
 
 private:
 
   SILNodeStorageLocation getStorageLoc() const {
-    return SILNodeStorageLocation(SILNodeBits.StorageLoc);
+    return SILNodeStorageLocation(Bits.SILNode.StorageLoc);
   }
 
   const SILNode *getRepresentativeSILNodeSlowPath() const;
 
 protected:
   SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
-          IsRepresentative isRepresentative) : OpaqueBits(0) {
-    SILNodeBits.Kind = unsigned(kind);
-    SILNodeBits.StorageLoc = unsigned(storageLoc);
-    SILNodeBits.IsRepresentativeNode = unsigned(isRepresentative);
+          IsRepresentative isRepresentative) {
+    Bits.OpaqueBits = 0;
+    Bits.SILNode.Kind = unsigned(kind);
+    Bits.SILNode.StorageLoc = unsigned(storageLoc);
+    Bits.SILNode.IsRepresentativeNode = unsigned(isRepresentative);
   }
 
 public:
@@ -159,7 +160,7 @@ public:
 
   /// Is this SILNode the representative SILNode subobject in this object?
   bool isRepresentativeSILNodeInObject() const {
-    return SILNodeBits.IsRepresentativeNode;
+    return Bits.SILNode.IsRepresentativeNode;
   }
 
   /// Return a pointer to the representative SILNode subobject in this object.
@@ -177,7 +178,7 @@ public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
-    return SILNodeKind(SILNodeBits.Kind);
+    return SILNodeKind(Bits.SILNode.Kind);
   }
 
   /// Return the SILNodeKind of this node's representative SILNode.

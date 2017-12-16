@@ -132,7 +132,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     LBLoc(lbloc), RBLoc(rbloc)
 {
-  BraceStmtBits.NumElements = elts.size();
+  Bits.BraceStmt.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
 }
@@ -373,13 +373,13 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
       CaseLoc(CaseLoc), ColonLoc(ColonLoc),
       BodyAndHasBoundDecls(Body, HasBoundDecls) {
-  CaseStmtBits.NumPatterns = CaseLabelItems.size();
-  assert(CaseStmtBits.NumPatterns > 0 &&
+  Bits.CaseStmt.NumPatterns = CaseLabelItems.size();
+  assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
   MutableArrayRef<CaseLabelItem> Items{ getTrailingObjects<CaseLabelItem>(),
-                                        CaseStmtBits.NumPatterns };
+                                        Bits.CaseStmt.NumPatterns };
 
-  for (unsigned i = 0; i < CaseStmtBits.NumPatterns; ++i) {
+  for (unsigned i = 0; i < Bits.CaseStmt.NumPatterns; ++i) {
     new (&Items[i]) CaseLabelItem(CaseLabelItems[i]);
     Items[i].getPattern()->markOwnedByStatement(this);
   }

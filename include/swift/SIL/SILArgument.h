@@ -46,10 +46,10 @@ class SILArgument : public ValueBase {
 
 public:
   ValueOwnershipKind getOwnershipKind() const {
-    return static_cast<ValueOwnershipKind>(SILArgumentBits.VOKind);
+    return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);
   }
   void setOwnershipKind(ValueOwnershipKind NewKind) {
-    SILArgumentBits.VOKind = static_cast<unsigned>(NewKind);
+    Bits.SILArgument.VOKind = static_cast<unsigned>(NewKind);
   }
 
   SILBasicBlock *getParent() { return ParentBB; }
@@ -129,7 +129,7 @@ protected:
                        const ValueDecl *D = nullptr)
       : ValueBase(SubClassKind, Ty, IsRepresentative::Yes), ParentBB(nullptr),
         Decl(D) {
-    SILArgumentBits.VOKind = static_cast<unsigned>(OwnershipKind);
+    Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
   }
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 

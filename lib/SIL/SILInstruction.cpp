@@ -1388,17 +1388,17 @@ MultipleValueInstructionResult::MultipleValueInstructionResult(
 
 void MultipleValueInstructionResult::setOwnershipKind(
     ValueOwnershipKind NewKind) {
-  MultipleValueInstructionResultBits.VOKind = unsigned(NewKind);
+  Bits.MultipleValueInstructionResult.VOKind = unsigned(NewKind);
 }
 
 void MultipleValueInstructionResult::setIndex(unsigned NewIndex) {
   // We currently use 32 bits to store the Index. A previous comment wrote
   // that "500k fields is probably enough".
-  MultipleValueInstructionResultBits.Index = NewIndex;
+  Bits.MultipleValueInstructionResult.Index = NewIndex;
 }
 
 ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
-  return ValueOwnershipKind(MultipleValueInstructionResultBits.VOKind);
+  return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
 MultipleValueInstruction *MultipleValueInstructionResult::getParent() {

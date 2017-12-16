@@ -204,19 +204,19 @@ public:
   explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
     : locator(locator), ParentOrFixed(getTypeVariable()) {
-    getTypeVariable()->TypeVariableTypeBits.Options = options;
+    getTypeVariable()->Bits.TypeVariableType.Options = options;
   }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return getTypeVariable()->getID(); }
 
   unsigned getRawOptions() const {
-    return getTypeVariable()->TypeVariableTypeBits.Options;
+    return getTypeVariable()->Bits.TypeVariableType.Options;
   }
 
   void setRawOptions(unsigned bits) {
-    getTypeVariable()->TypeVariableTypeBits.Options = bits;
-    assert(getTypeVariable()->TypeVariableTypeBits.Options == bits
+    getTypeVariable()->Bits.TypeVariableType.Options = bits;
+    assert(getTypeVariable()->Bits.TypeVariableType.Options == bits
            && "Trucation");
   }
 
@@ -248,12 +248,12 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return getTypeVariable()->TypeVariableTypeBits.GraphIndex; 
+    return getTypeVariable()->Bits.TypeVariableType.GraphIndex; 
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) {
-    getTypeVariable()->TypeVariableTypeBits.GraphIndex = newIndex;
+    getTypeVariable()->Bits.TypeVariableType.GraphIndex = newIndex;
   }
   
   /// \brief Check whether this type variable either has a representative that
@@ -346,8 +346,8 @@ public:
     if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
         recordBinding(*record);
-      getTypeVariable()->TypeVariableTypeBits.Options &= ~TVO_CanBindToLValue;
-      getTypeVariable()->TypeVariableTypeBits.Options &= ~TVO_CanBindToInOut;
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
   }
 
@@ -388,9 +388,9 @@ public:
     if (!rep->getImpl().mustBeMaterializable()) {
       if (record)
         rep->getImpl().recordBinding(*record);
-      rep->getImpl().getTypeVariable()->TypeVariableTypeBits.Options
+      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
         &= ~TVO_CanBindToLValue;
-      rep->getImpl().getTypeVariable()->TypeVariableTypeBits.Options
+      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
         &= ~TVO_CanBindToInOut;
     }
   }

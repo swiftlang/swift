@@ -70,24 +70,25 @@ protected:
     SWIFT_INLINE_BITS(Pattern);
     SWIFT_INLINE_BITS(TuplePattern);
     SWIFT_INLINE_BITS(TypedPattern);
-  };
+  } Bits;
 
-  Pattern(PatternKind kind) : OpaqueBits(0) {
-    PatternBits.Kind = unsigned(kind);
-    PatternBits.isImplicit = false;
-    PatternBits.hasInterfaceType = false;
+  Pattern(PatternKind kind) {
+    Bits.OpaqueBits = 0;
+    Bits.Pattern.Kind = unsigned(kind);
+    Bits.Pattern.isImplicit = false;
+    Bits.Pattern.hasInterfaceType = false;
   }
 
 private:
   /// The checked type of the pattern.
   ///
-  /// if \c PatternBits.hasInterfaceType, this stores the interface type of the
+  /// if \c Bits.Pattern.hasInterfaceType, this stores the interface type of the
   /// pattern, which will be lazily resolved to the contextual type using
   /// the environment in \c ASTContext::DelayedPatternContexts.
   mutable Type Ty;
 
 public:
-  PatternKind getKind() const { return PatternKind(PatternBits.Kind); }
+  PatternKind getKind() const { return PatternKind(Bits.Pattern.Kind); }
 
   /// \brief Retrieve the name of the given pattern kind.
   ///
@@ -98,8 +99,8 @@ public:
 
   /// A pattern is implicit if it is compiler-generated and there
   /// exists no source code for it.
-  bool isImplicit() const { return PatternBits.isImplicit; }
-  void setImplicit() { PatternBits.isImplicit = true; }
+  bool isImplicit() const { return Bits.Pattern.isImplicit; }
+  void setImplicit() { Bits.Pattern.isImplicit = true; }
 
   /// Find the smallest subpattern which obeys the property that matching it is
   /// equivalent to matching this pattern.
@@ -125,7 +126,7 @@ public:
   ///
   /// Note: this is used for delayed deserialization logic.
   Type getDelayedInterfaceType() const {
-    if (PatternBits.hasInterfaceType) return Ty;
+    if (Bits.Pattern.hasInterfaceType) return Ty;
     return nullptr;
   }
 
@@ -279,12 +280,12 @@ class TuplePattern final : public Pattern,
     private llvm::TrailingObjects<TuplePattern, TuplePatternElt> {
   friend TrailingObjects;
   SourceLoc LPLoc, RPLoc;
-  // TuplePatternBits.NumElements
+  // Bits.TuplePattern.NumElements
 
   TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp,
                bool implicit)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
-    TuplePatternBits.NumElements = numElements;
+    Bits.TuplePattern.NumElements = numElements;
     assert(lp.isValid() == rp.isValid());
     if (implicit)
       setImplicit();
@@ -302,7 +303,7 @@ public:
                                Optional<bool> implicit = None);
 
   unsigned getNumElements() const {
-    return TuplePatternBits.NumElements;
+    return Bits.TuplePattern.NumElements;
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
@@ -380,7 +381,7 @@ public:
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
     if (implicit.hasValue() ? *implicit : !tl.hasLocation())
       setImplicit();
-    TypedPatternBits.IsPropagatedType = false;
+    Bits.TypedPattern.IsPropagatedType = false;
   }
 
   /// True if the type in this \c TypedPattern was propagated from a different
@@ -392,10 +393,10 @@ public:
   /// \endcode
   /// 'a' and 'c' will have this bit set to true.
   bool isPropagatedType() const {
-    return TypedPatternBits.IsPropagatedType;
+    return Bits.TypedPattern.IsPropagatedType;
   }
   void setPropagatedType() {
-    TypedPatternBits.IsPropagatedType = true;
+    Bits.TypedPattern.IsPropagatedType = true;
   }
 
   Pattern *getSubPattern() { return SubPattern; }

@@ -89,7 +89,7 @@ protected:
     SWIFT_INLINE_BITS(DoCatchStmt);
     SWIFT_INLINE_BITS(CaseStmt);
     SWIFT_INLINE_BITS(SwitchStmt);
-  };
+  } Bits;
 
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
@@ -98,12 +98,13 @@ protected:
   }
   
 public:
-  Stmt(StmtKind kind, bool implicit) : OpaqueBits(0) {
-    StmtBits.Kind = static_cast<unsigned>(kind);
-    StmtBits.Implicit = implicit;
+  Stmt(StmtKind kind, bool implicit) {
+    Bits.OpaqueBits = 0;
+    Bits.Stmt.Kind = static_cast<unsigned>(kind);
+    Bits.Stmt.Implicit = implicit;
   }
 
-  StmtKind getKind() const { return StmtKind(StmtBits.Kind); }
+  StmtKind getKind() const { return StmtKind(Bits.Stmt.Kind); }
 
   /// \brief Retrieve the name of the given statement kind.
   ///
@@ -123,7 +124,7 @@ public:
   
   /// isImplicit - Determines whether this statement was implicitly-generated,
   /// rather than explicitly written in the AST.
-  bool isImplicit() const { return StmtBits.Implicit; }
+  bool isImplicit() const { return Bits.Stmt.Implicit; }
 
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
@@ -168,19 +169,19 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
-  unsigned getNumElements() const { return BraceStmtBits.NumElements; }
+  unsigned getNumElements() const { return Bits.BraceStmt.NumElements; }
 
   ASTNode getElement(unsigned i) const { return getElements()[i]; }
   void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), BraceStmtBits.NumElements};
+    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), BraceStmtBits.NumElements};
+    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
@@ -549,7 +550,7 @@ class DoCatchStmt final : public LabeledStmt,
               Optional<bool> implicit)
     : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo), DoLoc(doLoc), Body(body) {
-    DoCatchStmtBits.NumCatches = catches.size();
+    Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CatchStmt *>());
   }
@@ -569,10 +570,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CatchStmt*> getCatches() const {
-    return {getTrailingObjects<CatchStmt*>(), DoCatchStmtBits.NumCatches};
+    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
   }
   MutableArrayRef<CatchStmt*> getMutableCatches() {
-    return {getTrailingObjects<CatchStmt*>(), DoCatchStmtBits.NumCatches};
+    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
   }
 
   /// Does this statement contain a syntactically exhaustive catch
@@ -885,10 +886,10 @@ public:
                           Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
-    return {getTrailingObjects<CaseLabelItem>(), CaseStmtBits.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
-    return {getTrailingObjects<CaseLabelItem>(), CaseStmtBits.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
 
   Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
@@ -926,7 +927,7 @@ class SwitchStmt final : public LabeledStmt,
                   LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
       SubjectExpr(SubjectExpr) {
-    SwitchStmtBits.CaseCount = CaseCount;
+    Bits.SwitchStmt.CaseCount = CaseCount;
   }
 
 public:
@@ -955,7 +956,7 @@ public:
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
 
   ArrayRef<ASTNode> getRawCases() const {
-    return {getTrailingObjects<ASTNode>(), SwitchStmtBits.CaseCount};
+    return {getTrailingObjects<ASTNode>(), Bits.SwitchStmt.CaseCount};
   }
 
 private:
