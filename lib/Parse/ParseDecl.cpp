@@ -2316,6 +2316,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
       consumeToken(tok::kw_class);
       // Otherwise this is the start of a class declaration.
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       break;
     }
@@ -5480,6 +5481,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   CD->setGenericParams(GenericParams);
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
