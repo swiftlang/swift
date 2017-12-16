@@ -679,6 +679,8 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   TP->setType(TL.getType());
 
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
+
   // Track whether the decl in this typed pattern should be
   // implicitly unwrapped as needed during expression type checking.
   if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
