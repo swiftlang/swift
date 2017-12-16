@@ -1249,7 +1249,8 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
+  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
+                                              ci->memberData)) {
     IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
@@ -1363,6 +1364,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
+
+  if (getBaseName().getIdentifier().str().equals("NotificationCenter") &&
+      name.getBaseName().getKind() == DeclBaseName::Kind::Normal &&
+      name.getBaseName().getIdentifier().str().equals("addObserver"))
+    fprintf(stderr, "---NotificatiobCenter.addObserver\n");
 
   // FIXME: At present, lazy member loading conflicts with a bunch of other code
   // that appears to special-case initializers (clang-imported initializer

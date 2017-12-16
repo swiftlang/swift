@@ -231,7 +231,7 @@ public:
   /// Returns None if an error occurred \em or named member-lookup
   /// was otherwise unsupported in this implementation or Decl.
   virtual Optional<TinyPtrVector<ValueDecl *>>
-  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+  loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
