@@ -2338,34 +2338,53 @@ public:
   void buildDisjunctionForImplicitlyUnwrappedOptional(
       TypeVariableType *tv, Type type, ConstraintLocator *locator) {
 
+    // Get a locator based on the anchor expression so that it's easy to
+    // regenerate the same locator for lookup when applying the results.
+    auto *disjunctionLocator = getConstraintLocator(
+        locator->getAnchor(),
+        ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+
     // Create the constraint to bind to the optional type and make it
     // the favored choice.
-    auto *bindToOptional =
-        Constraint::create(*this, ConstraintKind::Bind, tv, type, locator);
+    auto *bindToOptional = Constraint::create(*this, ConstraintKind::Bind, tv,
+                                              type, disjunctionLocator);
     bindToOptional->setFavored();
 
     Type underlyingType;
+    if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+      auto resultTy = fnTy->getResult();
+      while (resultTy->is<AnyFunctionType>())
+        resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
-    // FIXME: Support unwrapping results of function calls.
-    assert(!type->is<AnyFunctionType>());
+      assert(resultTy->getAnyOptionalObjectType());
 
-    underlyingType = type->getWithoutSpecifierType()->getAnyOptionalObjectType();
-    assert(underlyingType);
+      if (auto genericFn = type->getAs<GenericFunctionType>()) {
+        underlyingType = GenericFunctionType::get(
+            genericFn->getGenericSignature(), genericFn->getParams(),
+            resultTy->getAnyOptionalObjectType(), genericFn->getExtInfo());
+      } else {
+        underlyingType = FunctionType::get(fnTy->getParams(),
+                                           resultTy->getAnyOptionalObjectType(),
+                                           fnTy->getExtInfo());
+      }
+    } else {
+      underlyingType =
+          type->getWithoutSpecifierType()->getAnyOptionalObjectType();
+      assert(underlyingType);
 
-    if (type->is<LValueType>())
-      underlyingType = LValueType::get(underlyingType);
-    else if (type->is<InOutType>())
-      underlyingType = InOutType::get(underlyingType);
+      if (type->is<LValueType>())
+        underlyingType = LValueType::get(underlyingType);
+      assert(!type->is<InOutType>());
+    }
 
-    // Create the constraint to bind to the underlying type.
-    auto *bindToUnderlying = Constraint::create(*this, ConstraintKind::Bind, tv,
-                                                underlyingType, locator);
+    auto *bindToUnderlying = Constraint::create(
+        *this, ConstraintKind::Bind, tv, underlyingType, disjunctionLocator);
 
     llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
                                                   bindToUnderlying};
 
     // Create the disjunction
-    addDisjunctionConstraint(choices, locator, RememberChoice);
+    addDisjunctionConstraint(choices, disjunctionLocator, RememberChoice);
   }
 
 

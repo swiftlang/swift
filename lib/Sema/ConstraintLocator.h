@@ -127,9 +127,14 @@ public:
     ConditionalRequirement,
     /// A single requirement placed on the type parameters.
     TypeParameterRequirement,
-    /// \brief A coercion to an Optional type that can potentially be
-    /// force-unwrapped to the underlying type.
-    ImplicitlyUnwrappedCoercionResult,
+    /// \brief For Optional types that can be implicitly unwrapped as
+    /// needed to successfully type check.
+    ImplicitlyUnwrappedValue,
+    /// \brief For the disjunction choices that result from when we
+    /// see ImplicitlyUnwrappedValue. This is used to avoid infinite
+    /// recursion where we would split those types out again into
+    /// another disjunction.
+    ImplicitlyUnwrappedDisjunctionChoice,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -162,7 +167,8 @@ public:
     case Requirement:
     case Witness:
     case OpenedGeneric:
-    case ImplicitlyUnwrappedCoercionResult:
+    case ImplicitlyUnwrappedValue:
+    case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 
     case GenericArgument:
@@ -225,7 +231,8 @@ public:
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
-    case ImplicitlyUnwrappedCoercionResult:
+    case ImplicitlyUnwrappedValue:
+    case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 
     case FunctionArgument:

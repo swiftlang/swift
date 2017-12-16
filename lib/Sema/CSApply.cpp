@@ -3418,7 +3418,7 @@ namespace {
       auto *TR = expr->getCastTypeLoc().getTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
         auto *locator = cs.getConstraintLocator(
-            expr, ConstraintLocator::ImplicitlyUnwrappedCoercionResult);
+            expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
         return solution.getDisjunctionChoice(locator);
       }
       return false;
