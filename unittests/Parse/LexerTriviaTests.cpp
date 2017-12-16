@@ -59,3 +59,26 @@ TEST_F(LexerTriviaTest, RestoreWithTrivia) {
             (Trivia{{TriviaPiece::newlines(1), TriviaPiece::spaces(1)}}));
   ASSERT_EQ(TrailingTrivia, (Trivia{{TriviaPiece::spaces(1)}}));
 }
+
+TEST_F(LexerTriviaTest, TriviaHashbang) {
+  StringRef SourceStr = "#!/bin/swift\naaa";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
+
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+  ASSERT_EQ(LeadingTrivia,
+            (Trivia{{TriviaPiece::garbageText("#!/bin/swift"),
+                     TriviaPiece::newlines(1)}}));
+}
