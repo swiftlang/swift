@@ -2510,7 +2510,8 @@ ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,none,
       "protocol 'ExpressibleByNilLiteral' is broken", ())
-
+ERROR(array_protocol_broken,none,
+      "ExpressibleByArrayLiteral protocol definition is broken", ())
 ERROR(builtin_integer_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
@@ -2544,10 +2545,9 @@ ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 // Array literals
-ERROR(array_protocol_broken,none,
-      "ExpressibleByArrayLiteral protocol definition is broken", ())
-ERROR(type_is_not_array,none,
-      "contextual type %0 cannot be used with array literal", (Type))
+ERROR(should_use_dictionary_literal,none,
+      "dictionary of type %0 cannot be %select{used|initialized}1 "
+      "with array literal", (Type, bool))
 NOTE(meant_dictionary_lit,none,
      "did you mean to use a dictionary literal instead?", ())
 ERROR(should_use_empty_dictionary_literal,none,

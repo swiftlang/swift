@@ -3521,6 +3521,14 @@ public:
                                 const ASTContext &ctx,
               Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
+  /// Return a structurally-identical function type with a slightly tweaked
+  /// ExtInfo.
+  CanSILFunctionType getWithExtInfo(ExtInfo ext);
+
+  /// Return a structurally-identical function type with a slightly tweaked
+  /// representation.
+  CanSILFunctionType getWithRepresentation(Representation repr);
+
   /// Given that this function type uses a C-language convention, return its
   /// formal semantic result type.
   ///

@@ -2245,6 +2245,13 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+      // Don't feed to syntax token recorder.
+      ConsumeTokenReceiver DisabledRec;
+      llvm::SaveAndRestore<ConsumeTokenReceiver *> R(TokReceiver, &DisabledRec);
+      SyntaxParsingContext SContext(SyntaxContext);
+      SContext.disable();
+
       Tok.setKind(tok::unknown); // we might be at tok::eof now.
       consumeTokenWithoutFeedingReceiver();
       return parseType().getPtrOrNull();
