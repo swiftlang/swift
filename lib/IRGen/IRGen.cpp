@@ -666,10 +666,9 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
     return std::make_pair(nullptr, nullptr);
 
   // Create the IR emitter.
-  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.OutputForSingleThreadedWMO);
+                      "", Opts.getSingleOutputFilename());
 
   initLLVMModule(*IGM);
 
