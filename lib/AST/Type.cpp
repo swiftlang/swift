@@ -2006,6 +2006,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
              nullptr };
   }
 
+  // Give special dispensation to builtin types for testing purposes.
+  if (type->is<BuiltinType>())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   auto nominal = type->getAnyNominal();
   if (!nominal) return failure();
 
