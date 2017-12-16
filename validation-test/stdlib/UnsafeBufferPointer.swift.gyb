@@ -831,11 +831,15 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set
 
 UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-swapAt") {
 % if IsRaw:
-  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
+  let allocated = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 8)
+  let buffer = UnsafeMutableRawBufferPointer(start: allocated, count: 3)
+  allocated.storeBytes(of: UInt8.max, toByteOffset: 3, as: UInt8.self)
 % else:
-  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3)
+  let allocated = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  let buffer = UnsafeMutableBufferPointer(start: allocated, count: 3)
+  allocated[3] = Int.max
 % end
-  defer { buffer.deallocate() }
+  defer { allocated.deallocate() }
 
   buffer[0] = 0
   buffer[1] = 1
@@ -846,6 +850,11 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-s
 
   buffer.swapAt(0, 2)
   expectEqual(Array(buffer), [2, 1, 0])
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  buffer.swapAt(2, 3)
 }
 
 % if not IsRaw:
