@@ -930,6 +930,38 @@ let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{bin
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 
+// SR-6272: Tailored diagnostics with fixits for numerical conversions
+
+func SR_6272_a() {
+  enum Foo: Int {
+    case bar
+  }
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{22-28=}} {{29-30=}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  Foo.bar.rawValue * Float(0)
+}
+
+func SR_6272_b() {
+  let lhs = Float(3)
+  let rhs = Int(0)
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{9-9=Float(}} {{12-12=)}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  lhs * rhs
+}
+
+func SR_6272_c() {
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'String'}} {{none}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  Int(3) * "0"
+}
+
+func SR_6272_d() {
+  struct S {}
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'S'}} {{none}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  Int(10) * S()
+}
+
 // Ambiguous overload inside a trailing closure
 
 func ambiguousCall() -> Int {} // expected-note {{found this candidate}}
