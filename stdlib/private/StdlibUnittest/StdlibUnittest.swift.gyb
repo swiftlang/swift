@@ -542,10 +542,20 @@ public func expectCrashLater() {
   _seenExpectCrash = true
 }
 
-public func expectCrash(executing: () -> Void) -> Never {
+public func expectCrash(executing code: () -> Void) -> Never {
+  expectCrash(executing: code, debug: false)
+}
+
+public func expectDebugCrash(executing code: () -> Void) -> Never {
+  expectCrash(executing: code, debug: true)
+}
+
+private func expectCrash(executing code: () -> Void, debug: Bool) -> Never {
   expectCrashLater()
-  executing()
-  expectUnreachable()
+  code()
+  if debug && !_isDebugAssertConfiguration() {
+    expectUnreachable()
+  }
   fatalError()
 }
 
