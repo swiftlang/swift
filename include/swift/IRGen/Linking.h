@@ -37,12 +37,29 @@ bool useDllStorage(const llvm::Triple &triple);
 
 class UniversalLinkageInfo {
 public:
-  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule;
+  bool IsELFObject;
+  bool UseDLLStorage;
+
+  /// True iff are multiple llvm modules.
+  bool HasMultipleIGMs;
+
+  bool IsWholeModule;
 
   UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
                        bool isWholeModule);
+
+  /// In case of multiple llvm modules (in multi-threaded compilation) all
+  /// private decls must be visible from other files.
+  bool shouldAllPrivateDeclsBeVisibleFromOtherFiles() const {
+    return HasMultipleIGMs;
+  }
+  /// In case of multipe llvm modules, private lazy protocol
+  /// witness table accessors could be emitted by two different IGMs during
+  /// IRGen into different object files and the linker would complain about
+  /// duplicate symbols.
+  bool needLinkerToMergeDuplicateSymbols() const { return HasMultipleIGMs; }
 };
 
 /// Selector for type metadata symbol kinds.

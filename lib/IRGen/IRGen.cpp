@@ -1066,10 +1066,10 @@ performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash) {
-  int numThreads = SILMod->getOptions().NumThreads;
-  if (numThreads != 0) {
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod),
-                                  ModuleName, numThreads);
+  if (SILMod->getOptions().shouldPerformIRGenerationInParallel()) {
+    auto NumThreads = SILMod->getOptions().NumThreads;
+    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
+                                  NumThreads);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;

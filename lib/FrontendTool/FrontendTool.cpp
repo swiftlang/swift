@@ -757,12 +757,11 @@ static bool performCompile(CompilerInstance &Instance,
 
   const auto &SILOpts = Invocation.getSILOptions();
   if (!opts.TBDPath.empty()) {
-    auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
                            : opts.TBDInstallName;
 
-    if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
+    if (writeTBD(Instance.getMainModule(), SILOpts.hasMultipleIGMs(),
                  opts.TBDPath, installName))
       return true;
   }
@@ -1082,14 +1081,13 @@ static bool performCompile(CompilerInstance &Instance,
       break;
 
     const auto &SILOpts = Invocation.getSILOptions();
-    auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
+    const auto hasMultipleIGMs = SILOpts.hasMultipleIGMs();
     bool error;
     if (PrimarySourceFile)
-      error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,
+      error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIGMs,
                           allSymbols);
     else
-      error = validateTBD(Instance.getMainModule(), *IRModule,
-                          hasMultipleIRGenThreads,
+      error = validateTBD(Instance.getMainModule(), *IRModule, hasMultipleIGMs,
                           allSymbols);
     if (error)
       return true;

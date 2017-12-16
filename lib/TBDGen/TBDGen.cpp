@@ -327,12 +327,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
-                                           bool hasMultipleIRGenThreads,
+                                           bool hasMultipleIGMs,
                                            llvm::raw_ostream *os,
                                            StringRef installName) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, hasMultipleIRGenThreads, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, hasMultipleIGMs, isWholeModule);
 
   TBDGenVisitor visitor(symbols, target, linkInfo, M, installName);
 
@@ -369,20 +369,18 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   bool hasMultipleIRGenThreads) {
-  enumeratePublicSymbolsAndWrite(
-      file->getParentModule(), file, symbols, hasMultipleIRGenThreads,
-      nullptr, StringRef());
+                                   bool hasMultipleIGMs) {
+  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
+                                 hasMultipleIGMs, nullptr, StringRef());
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   bool hasMultipleIRGenThreads) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
-                                 nullptr, StringRef());
+                                   bool hasMultipleIGMs) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, nullptr,
+                                 StringRef());
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         bool hasMultipleIRGenThreads,
-                         StringRef installName) {
+                         bool hasMultipleIGMs, StringRef installName) {
   StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
-                                 &os, installName);
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, &os,
+                                 installName);
 }
