@@ -126,9 +126,9 @@ static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
                                                        char *buf)
-    : ArgNo(Var.ArgNo), NameLength(Var.Name.size()), Constant(Var.Constant) {
-  assert((Var.ArgNo < (2<<16)) && "too many arguments");
-  assert((NameLength < (2<<15)) && "variable name too long");
+    : ArgNo(Var.ArgNo), Constant(Var.Constant), NameLength(Var.Name.size()) {
+  assert(ArgNo == Var.ArgNo && "Truncation");
+  assert(NameLength == Var.Name.size() && "Truncation");
   memcpy(buf, Var.Name.data(), NameLength);
 }
 
