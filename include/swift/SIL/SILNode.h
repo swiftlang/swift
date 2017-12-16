@@ -47,6 +47,8 @@ enum class SILNodeKind {
 enum { NumSILNodeKindBits =
   countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
 
+enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type;
+
 /// A SILNode is a node in the use-def graph of a SILFunction.  It is
 /// either an instruction or a defined value which can be used by an
 /// instruction.  A defined value may be an instruction result, a basic
@@ -115,6 +117,25 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
+
+  // Special handling for UnaryInstructionWithTypeDependentOperandsBase
+  SWIFT_INLINE_BITFIELD(UIWTDOB, SILNode, 32,
+    // DO NOT allocate bits at the front!
+    // UIWTDOB is a template, and must allocate bits from back to front and
+    // update UIWTDOB_BITFIELD().
+
+    /*pad*/ : 32-NumSILNodeBits,
+
+    // Total number of operands of this instruction.
+    // It is number of type dependent operands + 1.
+    NumOperands : 32;
+    template<SILInstructionKind Kind, typename, typename, typename...>
+    friend class UnaryInstructionWithTypeDependentOperandsBase;
+  );
+
+#define UIWTDOB_BITFIELD(T, U, C, ...) \
+  SWIFT_INLINE_BITFIELD_FULL(T, U, (C)+32, __VA_ARGS__)
+
   SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
@@ -129,6 +150,32 @@ protected:
     // Number of tail-allocated arrays.
     NumTailTypes : 32
   );
+  UIWTDOB_BITFIELD(AllocValueBufferInst, AllocationInst, 0, : NumPadBits);
+
+  // TODO: Sort the following in SILNodes.def order
+
+  SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(PointerToThinFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UnconditionalCheckedCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UpcastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedRefCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedAddrCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedTrivialBitCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedBitwiseCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(ThinToThickFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UnconditionalCheckedCastValueInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialAddrInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialValueInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialRefInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialMetatypeInst, SingleValueInstruction, 0, : NumPadBits);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
+  UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
@@ -142,8 +189,27 @@ protected:
     SWIFT_INLINE_BITS(SILNode);
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
+    SWIFT_INLINE_BITS(UIWTDOB);
     SWIFT_INLINE_BITS(AllocStackInst);
     SWIFT_INLINE_BITS(AllocRefInstBase);
+    SWIFT_INLINE_BITS(AllocValueBufferInst);
+    SWIFT_INLINE_BITS(ConvertFunctionInst);
+    SWIFT_INLINE_BITS(PointerToThinFunctionInst);
+    SWIFT_INLINE_BITS(UpcastInst);
+    SWIFT_INLINE_BITS(UncheckedRefCastInst);
+    SWIFT_INLINE_BITS(UncheckedAddrCastInst);
+    SWIFT_INLINE_BITS(UncheckedTrivialBitCastInst);
+    SWIFT_INLINE_BITS(UncheckedBitwiseCastInst);
+    SWIFT_INLINE_BITS(ThinToThickFunctionInst);
+    SWIFT_INLINE_BITS(UnconditionalCheckedCastInst);
+    SWIFT_INLINE_BITS(UnconditionalCheckedCastValueInst);
+    SWIFT_INLINE_BITS(ObjCMethodInst);
+    SWIFT_INLINE_BITS(InitExistentialAddrInst);
+    SWIFT_INLINE_BITS(InitExistentialValueInst);
+    SWIFT_INLINE_BITS(InitExistentialRefInst);
+    SWIFT_INLINE_BITS(InitExistentialMetatypeInst);
+    SWIFT_INLINE_BITS(CheckedCastBranchInst);
+    SWIFT_INLINE_BITS(CheckedCastValueBranchInst);
   } Bits;
 
 private:

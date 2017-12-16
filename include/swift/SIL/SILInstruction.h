@@ -1074,6 +1074,10 @@ class UnaryInstructionWithTypeDependentOperandsBase
     : public InstructionBase<Kind, Base>,
       protected llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...> {
 
+  unsigned getNumOperandsStorage() const {
+    return SILInstruction::Bits.UIWTDOB.NumOperands;
+  }
+
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
@@ -1082,18 +1086,14 @@ protected:
 
   using TrailingObjects::totalSizeToAlloc;
 
-  // Total number of operands of this instruction.
-  // It is number of type dependent operands + 1.
-  unsigned NumOperands;
-
 public:
   template <typename... Args>
   UnaryInstructionWithTypeDependentOperandsBase(
       SILDebugLocation debugLoc, SILValue operand,
       ArrayRef<SILValue> typeDependentOperands,
       Args &&...args)
-        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...),
-          NumOperands(1 + typeDependentOperands.size()) {
+        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...) {
+    SILInstruction::Bits.UIWTDOB.NumOperands = 1 + typeDependentOperands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            operand, typeDependentOperands);
   }
@@ -1101,18 +1101,18 @@ public:
   // Destruct tail allocated objects.
   ~UnaryInstructionWithTypeDependentOperandsBase() {
     Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = getNumOperandsStorage(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
   size_t numTrailingObjects(
     typename TrailingObjects::template OverloadToken<Operand>) const {
-    return NumOperands;
+    return getNumOperandsStorage();
   }
 
   unsigned getNumTypeDependentOperands() const {
-    return NumOperands - 1;
+    return getNumOperandsStorage() - 1;
   }
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
@@ -1122,12 +1122,12 @@ public:
 
   ArrayRef<Operand> getAllOperands() const {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
+            static_cast<size_t>(getNumOperandsStorage())};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
+            static_cast<size_t>(getNumOperandsStorage())};
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -1462,7 +1462,6 @@ class AllocValueBufferInst final
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-
   SILType getValueType() const { return getType().getObjectType(); }
 };
 
