@@ -2331,6 +2331,36 @@ public: // FIXME: public due to statics in CSSimplify.cpp
                           ConstraintLocatorBuilder locator);
 
 public:
+  /// Given a function type where the eventual result type is an optional,
+  /// where "eventual result type" is defined as:
+  ///   1. The result type is an optional
+  ///   2. The result type is a function type with an eventual result
+  ///      type that is an optional.
+  ///
+  /// return the same function type but with the eventual result type
+  /// replaced by its underlying type.
+  ///
+  /// i.e. return (S) -> T for (S) -> T?
+  //       return (X) -> () -> Y for (X) -> () -> Y?
+  Type replaceFinalResultTypeWithUnderlying(AnyFunctionType *fnTy) {
+    auto resultTy = fnTy->getResult();
+    if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
+      resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
+    else
+      resultTy =
+          resultTy->getWithoutSpecifierType()->getAnyOptionalObjectType();
+
+    assert(resultTy);
+
+    if (auto *genericFn = fnTy->getAs<GenericFunctionType>()) {
+      return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                      genericFn->getParams(), resultTy,
+                                      genericFn->getExtInfo());
+    }
+
+    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getExtInfo());
+  }
+
   // Build a disjunction for the choices between an Optional type and
   // it's underlying type. We'll make the choice of the Optional
   // preferred, and select that if the expression type-checks
@@ -2351,31 +2381,17 @@ public:
     bindToOptional->setFavored();
 
     Type underlyingType;
-    if (auto *fnTy = type->getAs<AnyFunctionType>()) {
-      auto resultTy = fnTy->getResult();
-      while (resultTy->is<AnyFunctionType>())
-        resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-      assert(resultTy->getAnyOptionalObjectType());
-
-      if (auto genericFn = type->getAs<GenericFunctionType>()) {
-        underlyingType = GenericFunctionType::get(
-            genericFn->getGenericSignature(), genericFn->getParams(),
-            resultTy->getAnyOptionalObjectType(), genericFn->getExtInfo());
-      } else {
-        underlyingType = FunctionType::get(fnTy->getParams(),
-                                           resultTy->getAnyOptionalObjectType(),
-                                           fnTy->getExtInfo());
-      }
-    } else {
+    if (auto *fnTy = type->getAs<AnyFunctionType>())
+      underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
+    else
       underlyingType =
           type->getWithoutSpecifierType()->getAnyOptionalObjectType();
-      assert(underlyingType);
 
-      if (type->is<LValueType>())
-        underlyingType = LValueType::get(underlyingType);
-      assert(!type->is<InOutType>());
-    }
+    assert(underlyingType);
+
+    if (type->is<LValueType>())
+      underlyingType = LValueType::get(underlyingType);
+    assert(!type->is<InOutType>());
 
     auto *bindToUnderlying = Constraint::create(
         *this, ConstraintKind::Bind, tv, underlyingType, disjunctionLocator);
