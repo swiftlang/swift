@@ -216,19 +216,20 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
-void FrontendOptions::forAllOutputPaths(
+void FrontendOptions::forAllOutputPathsForMakeDependencies(
     std::function<void(const std::string &)> fn) const {
-  // Not really all!
-  // FIXME: dmu do for all? rm firstPrimary
-  InputsAndOutputs.forAllInputsNeedingOutputs( [&] (const InputFile &input) -> void {
+   InputsAndOutputs.forAllInputsNeedingOutputs( [&] (const InputFile &input) -> void {
     if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
         RequestedAction != FrontendOptions::ActionType::MergeModules &&
         !input.outputs().OutputFilename.empty()) {
       fn(input.outputs().OutputFilename);
     }
-    const std::string *outputs[] = {&input.outputs().ModuleOutputPath,
+    const std::string *outputs[] = {
+      &input.outputs().ModuleOutputPath,
       &input.outputs().ModuleDocOutputPath,
-      &input.outputs().ObjCHeaderOutputPath};
+      &input.outputs().ObjCHeaderOutputPath
+      
+    };
     for (const std::string *next : outputs) {
       if (!next->empty())
         fn(*next);

@@ -136,7 +136,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
-  opts.forAllOutputPaths([&](StringRef targetName) {
+  opts.forAllOutputPathsForMakeDependencies([&](StringRef targetName) {
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!

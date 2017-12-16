@@ -271,7 +271,7 @@ public:
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
+  void forAllOutputPathsForMakeDependencies(std::function<void(const std::string &)> fn) const;
 
   bool isOutputFilenameStdout() {
     return InputsAndOutputs.singleOutputFilename() == "-";
