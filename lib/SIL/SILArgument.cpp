@@ -27,7 +27,8 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
                          SILType Ty, ValueOwnershipKind OwnershipKind,
                          const ValueDecl *D)
     : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D), OwnershipKind(OwnershipKind) {
+      Decl(D) {
+  SILArgumentBits.VOKind = static_cast<unsigned>(OwnershipKind);
   ParentBB->insertArgument(ParentBB->args_end(), this);
 }
 
@@ -35,7 +36,8 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
                          SILBasicBlock::arg_iterator Pos, SILType Ty,
                          ValueOwnershipKind OwnershipKind, const ValueDecl *D)
     : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D), OwnershipKind(OwnershipKind) {
+      Decl(D) {
+  SILArgumentBits.VOKind = static_cast<unsigned>(OwnershipKind);
   // Function arguments need to have a decl.
   assert(
     !ParentBB->getParent()->isBare() &&

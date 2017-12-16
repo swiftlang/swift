@@ -101,6 +101,10 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
 
+  SWIFT_INLINE_BITFIELD(SILArgument, ValueBase, NumVOKindBits,
+    VOKind : NumVOKindBits
+  );
+
   // No MultipleValueInstructionResult subclass needs inline bits right now,
   // therefore let's naturally align and size the Index for speed.
   SWIFT_INLINE_BITFIELD_FULL(MultipleValueInstructionResult, ValueBase,
@@ -120,6 +124,7 @@ protected:
   union {
     uint64_t OpaqueBits;
     SWIFT_INLINE_BITS(SILNode);
+    SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
   };
 
