@@ -4,7 +4,7 @@ protocol P {
   associatedtype SomeType
 }
 
-protocol P2 {
+protocol P2 { 
   func wonka()
 }
 
@@ -16,7 +16,7 @@ extension Double : P {
   typealias SomeType = Double
 }
 
-func f0(_ x: Int,
+func f0(_ x: Int, 
         _ y: Float) { }
 
 func f1(_: @escaping (Int, Float) -> Int) { }
@@ -39,7 +39,7 @@ var d : Double
 // Tuple size mismatch.
 f1(
    f4 // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(Int, Float) -> Int'}}
-   )
+   ) 
 
 // Tuple element unused.
 f0(i, i,
@@ -256,7 +256,7 @@ class r21447318 {
 
 func test21447318(_ a : r21447318, b : () -> r21447318) {
   a.doThing.doThing()  // expected-error {{method 'doThing' was used as a property; add () to call it}} {{12-12=()}}
-
+  
   b.doThing() // expected-error {{function 'b' was used as a property; add () to call it}} {{4-4=()}}
 }
 
@@ -277,7 +277,7 @@ func r18800223(_ i : Int) {
   // 19648528
   _ = true ? [i] : i // expected-error {{result values in '? :' expression have mismatching types '[Int]' and 'Int'}}
 
-
+  
   var buttonTextColor: String?
   _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
 }
@@ -331,7 +331,7 @@ _ = f7(1)(1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
+f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}   
 
 let f8 = f7(2)
 _ = f8(1)
@@ -393,7 +393,7 @@ extension CurriedClass {
 
 extension CurriedClass {
   func m1(_ a : Int, b : Int) {}
-
+  
   func m2(_ a : Int) {}
 }
 
@@ -413,10 +413,10 @@ enum Color {
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
-
+  
   static func overload(a : Int) -> Color {}
   static func overload(b : Int) -> Color {}
-
+  
   static func frob(_ a : Int, b : inout Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
@@ -500,7 +500,7 @@ typealias MyClosure = ([Int]) -> Bool
 func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
-
+  
   let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
 }
 
@@ -510,10 +510,10 @@ func r18397777(_ d : r21447318?) {
 
   if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to nil always returns true}}
   }
-
+  
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
-
+  
   if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
 
   }
@@ -567,7 +567,7 @@ extension Array {
   func g() -> String {
     return "foo".unavail([""])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
   }
-
+  
   func h() -> String {
     return "foo".unavail([0])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
   }
@@ -645,7 +645,7 @@ func test17875634() {
   var match: [(Int, Int)] = []
   var row = 1
   var col = 2
-
+  
   match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 }
 
@@ -700,7 +700,7 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
   _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
-
+  
   // FIXME(integers): uncomment these tests once the < is no longer ambiguous
   // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
   // _ = nil < i  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
@@ -750,7 +750,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
-  var buffer : T
+  var buffer : T 
   let n = withUnsafePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
@@ -929,25 +929,6 @@ let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{bin
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
-
-// SR-6272: Tailored diagnostics with fixits for numerical conversions
-
-func SR_6272_a() {
-  enum Foo: Int {
-    case bar
-  }
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{22-28=}} {{29-30=}}
-  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
-  Foo.bar.rawValue * Float(0)
-}
-
-func SR_6272_b() {
-  let lhs = Float(3)
-  let rhs = Int(0)
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{9-9=Float(}} {{12-12=)}}
-  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
-  lhs * rhs
-}
 
 // Ambiguous overload inside a trailing closure
 
