@@ -51,7 +51,7 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK2: FooSwiftModule
 // CHECK2: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
 
-// RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr3fooAA2S1VSC10FooStruct1VF" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK3
+// RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr3fooyAA2S1VSC10FooStruct1VF" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK3
 // CHECK3: source.lang.swift.decl.function.free (9:6-9:24)
 // CHECK3: foo(x:)
 // CHECK3: (FooStruct1) -> S1
