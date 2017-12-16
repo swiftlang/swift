@@ -400,8 +400,7 @@ OptionalTests.test("unsafelyUnwrapped nil")
     reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
   let empty: Int? = nil
-  expectCrashLater()
-  _blackHole(empty.unsafelyUnwrapped)
+  expectDebugCrash { _blackHole(empty.unsafelyUnwrapped) }
 }
 
 runAllTests()
