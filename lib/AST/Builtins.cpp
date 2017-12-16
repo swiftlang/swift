@@ -1103,11 +1103,11 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
-  // (RawPointer, @convention(thin) ([Context]) -> ()[, Context]) -> ()
+  // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::Thin,
+  auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::CFunctionPointer,
                                     /*throws*/ false);
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
