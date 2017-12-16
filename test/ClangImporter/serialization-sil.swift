@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
-// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
+// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func=_T04Test16testPartialApplyyySoAA_pF -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 // @_transparent to force serialization.
 @_transparent
 public func testPartialApply(_ obj: Test) {
-  // CHECK-LABEL: @_T04Test16testPartialApplyySoAA_pF : $@convention(thin) (@owned Test) -> () {
+  // CHECK-LABEL: @_T04Test16testPartialApplyyySoAA_pF : $@convention(thin) (@owned Test) -> () {
   if let curried1 = obj.normalObject {
     // CHECK: dynamic_method_br [[CURRIED1_OBJ:%.+]] : $@opened([[CURRIED1_EXISTENTIAL:.+]]) Test, #Test.normalObject!1.foreign, [[CURRIED1_TRUE:[^,]+]], [[CURRIED1_FALSE:[^,]+]]
     // CHECK: [[CURRIED1_FALSE]]:
@@ -40,4 +40,4 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_guaranteed () -> UnsafeMutableRawPointer
     _ = prop2
   }
-} // CHECK: // end sil function '_T04Test16testPartialApplyySoAA_pF'
+} // CHECK: // end sil function '_T04Test16testPartialApplyyySoAA_pF'

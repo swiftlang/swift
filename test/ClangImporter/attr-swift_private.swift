@@ -95,13 +95,13 @@ public func testTopLevel() {
 // CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGyt8__noArgs_tcfcTO
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarC8__noArgsSQyABGyt_tcfcTO
 // CHECK: @"\01L_selector(initWithNoArgs)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V8__oneArg_tcfcTO
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarC8__oneArgSQyABGs5Int32V_tcfcTO
 // CHECK: @"\01L_selector(initWithOneArg:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V9__twoArgs_AE5othertcfcTO
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarC9__twoArgs5otherSQyABGs5Int32V_AGtcfcTO
 // CHECK: @"\01L_selector(initWithTwoArgs:other:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarCSQyABGs5Int32V2___tcfcTO
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_T0So3BarC2__SQyABGs5Int32V_tcfcTO
 // CHECK: @"\01L_selector(init:)"
 
 _ = __PrivAnonymousA
