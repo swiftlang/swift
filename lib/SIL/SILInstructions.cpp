@@ -140,9 +140,13 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
                                SILDebugVariable Var)
-    : InstructionBase(Loc, elementType.getAddressType()),
-      NumOperands(TypeDependentOperands.size()),
-      VarInfo(Var, getTrailingObjects<char>()) {
+    : InstructionBase(Loc, elementType.getAddressType()) {
+  SILInstruction::Bits.AllocStackInst.NumOperands =
+    TypeDependentOperands.size();
+  assert(SILInstruction::Bits.AllocStackInst.NumOperands ==
+         TypeDependentOperands.size() && "Truncation");
+  SILInstruction::Bits.AllocStackInst.VarInfo =
+    TailAllocatedDebugVariable(Var, getTrailingObjects<char>()).getRawValue();
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }

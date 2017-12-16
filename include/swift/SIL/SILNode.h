@@ -114,6 +114,15 @@ protected:
       Index : 32
   );
 
+  SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
+  SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
+                             64-NumAllocationInstBits,
+    NumOperands : 32-NumAllocationInstBits,
+    VarInfo : 32
+  );
+
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
   enum class IsRepresentative : bool {
@@ -126,6 +135,7 @@ protected:
     SWIFT_INLINE_BITS(SILNode);
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
+    SWIFT_INLINE_BITS(AllocStackInst);
   } Bits;
 
 private:

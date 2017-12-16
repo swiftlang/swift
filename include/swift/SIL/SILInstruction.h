@@ -1156,16 +1156,23 @@ struct SILDebugVariable {
 /// A DebugVariable where storage for the strings has been
 /// tail-allocated following the parent SILInstruction.
 class TailAllocatedDebugVariable {
-  /// The source function argument position from left to right
-  /// starting with 1 or 0 if this is a local variable.
-  unsigned ArgNo : 16;
-  /// When this is nonzero there is a tail-allocated string storing
-  /// variable name present. This typically only happens for
-  /// instructions that were created from parsing SIL assembler.
-  unsigned NameLength : 15;
-  bool Constant : 1;
+  union {
+    uint32_t RawValue;
+    struct {
+      /// The source function argument position from left to right
+      /// starting with 1 or 0 if this is a local variable.
+      unsigned ArgNo : 16;
+      bool Constant : 1;
+      /// When this is nonzero there is a tail-allocated string storing
+      /// variable name present. This typically only happens for
+      /// instructions that were created from parsing SIL assembler.
+      unsigned NameLength : 15;
+    };
+  };
 public:
   TailAllocatedDebugVariable(SILDebugVariable DbgVar, char *buf);
+  TailAllocatedDebugVariable(uint32_t RawValue) : RawValue(RawValue) {}
+  uint32_t getRawValue() const { return RawValue; }
 
   unsigned getArgNo() const { return ArgNo; }
   void setArgNo(unsigned N) { ArgNo = N; }
@@ -1182,6 +1189,8 @@ public:
       return {getName(buf), isLet(), getArgNo()};
   }
 };
+static_assert(sizeof(TailAllocatedDebugVariable) == 4,
+              "SILNode inline bitfield needs updating");
 
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
@@ -1225,9 +1234,6 @@ class AllocStackInst final
   friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned NumOperands;
-  TailAllocatedDebugVariable VarInfo;
-
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands,
                  SILFunction &F,
@@ -1239,13 +1245,14 @@ class AllocStackInst final
                                 SILDebugVariable Var);
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
+    return SILInstruction::Bits.AllocStackInst.NumOperands;
   }
 
 public:
   ~AllocStackInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    size_t end = SILInstruction::Bits.AllocStackInst.NumOperands;
+    for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
     }
   }
@@ -1256,9 +1263,16 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+    auto RawValue = SILInstruction::Bits.AllocStackInst.VarInfo;
+    auto VI = TailAllocatedDebugVariable(RawValue);
+    return VI.get(getDecl(), getTrailingObjects<char>());
   };
-  void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
+  void setArgNo(unsigned N) {
+    auto RawValue = SILInstruction::Bits.AllocStackInst.VarInfo;
+    auto VI = TailAllocatedDebugVariable(RawValue);
+    VI.setArgNo(N);
+    SILInstruction::Bits.AllocStackInst.VarInfo = VI.getRawValue();
+  }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// type of the instruction itself, which will be an address type).
@@ -1267,11 +1281,13 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(),
+             SILInstruction::Bits.AllocStackInst.NumOperands };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(),
+             SILInstruction::Bits.AllocStackInst.NumOperands };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
