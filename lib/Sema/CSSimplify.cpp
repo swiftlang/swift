@@ -3223,7 +3223,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                          functionRefKind);
     }
-    
+
+    if (cand->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+      return OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+          baseTy, cand, functionRefKind);
+    }
+
     return OverloadChoice(ovlBaseTy, cand, functionRefKind);
   };
   

@@ -8418,7 +8418,8 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
     if (resolved->Locator != locator) continue;
     
     // We only handle the simplest decl binding.
-    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
+    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl
+        && resolved->Choice.getKind() != OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional)
       return nullptr;
     return resolved->Choice.getDecl();
   }
