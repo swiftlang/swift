@@ -6010,15 +6010,16 @@ class UncheckedOwnershipConversionInst
                                   SingleValueInstruction> {
   friend SILBuilder;
 
-  ValueOwnershipKind Kind;
-
   UncheckedOwnershipConversionInst(SILDebugLocation DebugLoc, SILValue operand,
                                    ValueOwnershipKind Kind)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
-        Kind(Kind) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind = Kind;
+  }
 
 public:
-  ValueOwnershipKind getConversionOwnershipKind() const { return Kind; }
+  ValueOwnershipKind getConversionOwnershipKind() const {
+    return SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+  }
 };
 
 /// MarkDependenceInst - Marks that one value depends on another for
