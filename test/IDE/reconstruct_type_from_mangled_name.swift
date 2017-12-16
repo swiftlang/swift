@@ -64,7 +64,7 @@ class Myclass2 {
 
     arr1.append(1)
 // FIXME: missing append()
-// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyxF
+// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxF
 // CHECK: type: (@lvalue Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
@@ -204,7 +204,7 @@ func foo4(p: P1 & P2 & Myclass1) {
 }
 
 func genericFunction<T : AnyObject>(t: T) {
-// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_tRlzClF1TL_xmfp
+// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunction1tyx_tRlzClF1TL_xmfp
   genericFunction(t: t)
 }
 
