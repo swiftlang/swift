@@ -158,6 +158,9 @@ protected:
   SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
       atomicity : 1
   );
+  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
+      atomicity : 1
+  );
 
   SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
     IsTake : 1;
@@ -236,6 +239,7 @@ protected:
     SWIFT_INLINE_BITS(RefCountingInst);
     SWIFT_INLINE_BITS(StoreReferenceInstBaseT);
     SWIFT_INLINE_BITS(LoadReferenceInstBaseT);
+    SWIFT_INLINE_BITS(StrongPinInst);
   } Bits;
 
 private:
