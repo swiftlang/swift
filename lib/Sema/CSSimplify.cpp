@@ -1521,6 +1521,44 @@ ConstraintSystem::SolutionKind ConstraintSystem::matchTypesBindTypeVar(
     return SolutionKind::Solved;
   }
 
+  // If we're binding an optional type, or function type that has an
+  // optional result type, this may be the result of an IUO
+  // declaration. These are candidates for creating a disjunction.
+  bool isOptional = false;
+  if (type->getRValueType()->getAnyOptionalObjectType()) {
+    isOptional = true;
+  } else if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    auto resultTy = fnTy->getResult();
+    while (resultTy->is<AnyFunctionType>())
+      resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+    if (resultTy->getAnyOptionalObjectType()) {
+      isOptional = true;
+    }
+  }
+
+  if (isOptional) {
+    SmallVector<LocatorPathElt, 4> path;
+    locator.getLocatorParts(path);
+
+    // Find the last element that is either an indication we need to
+    // create a disjunction, or an indication that we already have.
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() == ConstraintLocator::ImplicitlyUnwrappedValue ||
+                 elt.getKind() ==
+                     ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice;
+        });
+
+    // If we need to create a disjunction for this value, do so.
+    if (last != path.rend() &&
+        last->getKind() == ConstraintLocator::ImplicitlyUnwrappedValue) {
+      buildDisjunctionForImplicitlyUnwrappedOptional(
+          typeVar, type, getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+  }
+
   assignFixedType(typeVar, type);
 
   return SolutionKind::Solved;
