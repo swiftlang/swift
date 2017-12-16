@@ -3292,7 +3292,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
-    const IterableDeclContext *IDC, DeclName N, uint64_t contextData) {
+    const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
 
   auto *D = IDC->getDecl();
   auto *DC = cast<DeclContext>(D);
@@ -3351,7 +3351,7 @@ ClangImporter::Implementation::loadNamedMembers(
   assert(isa<clang::ObjCContainerDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
-  for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
+  for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
@@ -3365,7 +3365,7 @@ ClangImporter::Implementation::loadNamedMembers(
     for (auto *TD : tmp) {
       if (auto *V = dyn_cast<ValueDecl>(TD)) {
         // Skip ValueDecls if they import under different names.
-        if (V->getFullName().matchesRef(N)) {
+        if (V->getBaseName() == N) {
           Members.push_back(V);
         }
       }
