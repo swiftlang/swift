@@ -1087,6 +1087,9 @@ ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
+NOTE(access_control_in_protocol_detail,none,
+     "protocol requirements implicitly have the same access as the "
+     "protocol itself", ())
 ERROR(access_control_setter,none,
       "'%select{private|fileprivate|internal|public|open}0(set)' modifier can only "
       "be applied to variables and subscripts",
