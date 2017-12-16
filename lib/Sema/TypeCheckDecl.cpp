@@ -4414,6 +4414,13 @@ public:
       synthesizeSetterForMutableAddressedStorage(SD, TC);
     }
 
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     TC.checkDeclAttributes(SD);
   }
 
@@ -4914,19 +4921,6 @@ public:
     return cast<VarDecl>(accessor)->getTypeLoc();
   }
 
-  static bool functionHasImplicitlyUnwrappedResult(AbstractFunctionDecl *AFD) {
-    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
-      return CD->getFailability() == OTK_ImplicitlyUnwrappedOptional;
-    }
-
-    auto *FD = cast<FuncDecl>(AFD);
-    if (FD->isAccessor() && !FD->isGetter())
-      return false;
-
-    auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
-    return TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional;
-  }
-
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
     TC.checkForForbiddenPrefix(FD);
 
@@ -4950,10 +4944,13 @@ public:
       return true;
     }
 
-    if (functionHasImplicitlyUnwrappedResult(FD)) {
-      auto &C = FD->getASTContext();
-      FD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    if (!FD->isAccessor() || FD->isGetter()) {
+      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
+      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+        auto &C = FD->getASTContext();
+        FD->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      }
     }
 
     return false;
@@ -7273,7 +7270,7 @@ public:
 
     inferDynamic(TC.Context, CD);
 
-    if (functionHasImplicitlyUnwrappedResult(CD)) {
+    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
       auto &C = CD->getASTContext();
       CD->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
