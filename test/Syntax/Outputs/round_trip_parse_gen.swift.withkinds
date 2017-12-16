@@ -83,7 +83,20 @@ typealias H <TypeInitializerClause>= <FunctionType>() rethrows -> <TupleType>()<
 typealias I <TypeInitializerClause>= <FunctionType>(<TupleTypeElement><CompositionType><CompositionTypeElement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>B<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>C</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier></CompositionTypeElement></CompositionType></TupleTypeElement>) -> <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>D</SimpleTypeIdentifier></CompositionTypeElement></CompositionType></FunctionType></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
 
 @objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>> </GenericParameterClause><TypeInitializerClause>= <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
-@objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>></GenericParameterClause></TypealiasDecl><StructDecl>
+@objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>></GenericParameterClause></TypealiasDecl><ClassDecl>
+
+class Foo <MemberDeclBlock>{
+  let bar: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>
+}</MemberDeclBlock></ClassDecl><ClassDecl>
+
+class Bar<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Foo </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{
+  var foo: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <IntegerLiteralExpr>42</IntegerLiteralExpr>
+}</MemberDeclBlock></ClassDecl><ClassDecl>
+
+class C<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>: <SimpleTypeIdentifier>Foo</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B </SimpleTypeIdentifier>== <SimpleTypeIdentifier>Bar </SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ClassDecl><ClassDecl><Attribute>
+
+@available(*, unavailable)</Attribute><DeclModifier>
+private </DeclModifier>class C <MemberDeclBlock>{}</MemberDeclBlock></ClassDecl><StructDecl>
 
 struct foo <MemberDeclBlock>{<StructDecl>
   struct foo <MemberDeclBlock>{<StructDecl>
@@ -97,12 +110,12 @@ struct foo <MemberDeclBlock>{<StructDecl>
 
 struct foo <MemberDeclBlock>{<StructDecl><Attribute>
   @available(*, unavailable)</Attribute>
-  struct foo <MemberDeclBlock>{}</MemberDeclBlock></StructDecl><DeclModifier>
-  public </DeclModifier>class foo {<FunctionDecl><Attribute>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock></StructDecl><ClassDecl><DeclModifier>
+  public </DeclModifier>class foo <MemberDeclBlock>{<FunctionDecl><Attribute>
     @available(*, unavailable)</Attribute><Attribute>
     @objc(fooObjc)</Attribute><DeclModifier>
     private </DeclModifier><DeclModifier>static </DeclModifier>func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
-  }
+  }</MemberDeclBlock></ClassDecl>
 }</MemberDeclBlock></StructDecl><StructDecl>
 
 struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B, </GenericParameter><GenericParameter>C, </GenericParameter><GenericParameter><Attribute>@objc </Attribute>D</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B</SimpleTypeIdentifier>==<SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>: <SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>B</SimpleTypeIdentifier>.C </MemberTypeIdentifier>== <MemberTypeIdentifier><SimpleTypeIdentifier>D</SimpleTypeIdentifier>.A</MemberTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.B</MemberTypeIdentifier>: <MemberTypeIdentifier><SimpleTypeIdentifier>C</SimpleTypeIdentifier>.D </MemberTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></StructDecl><StructDecl><DeclModifier>

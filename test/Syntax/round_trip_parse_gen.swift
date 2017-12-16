@@ -85,6 +85,19 @@ typealias I = (A & B<C>) -> C & D
 @objc private typealias T<a,b> = Int
 @objc private typealias T<a,b>
 
+class Foo {
+  let bar: Int
+}
+
+class Bar: Foo {
+  var foo: Int = 42
+}
+
+class C<A, B> where A: Foo, B == Bar {}
+
+@available(*, unavailable)
+private class C {}
+
 struct foo {
   struct foo {
     struct foo {
