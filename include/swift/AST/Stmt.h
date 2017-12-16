@@ -61,7 +61,7 @@ class alignas(8) Stmt {
 
   SWIFT_INLINE_BITFIELD_FULL(BraceStmt, Stmt, 32,
     : NumPadBits,
-    NumElements : 32;
+    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 32,
