@@ -2942,6 +2942,7 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
 enum class LoadOwnershipQualifier {
   Unqualified, Take, Copy, Trivial
 };
+static_assert(2 == SILNode::NumLoadOwnershipQualifierBits, "Size mismatch");
 
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
@@ -2949,8 +2950,6 @@ class LoadInst
                                 SingleValueInstruction>
 {
   friend SILBuilder;
-
-  LoadOwnershipQualifier OwnershipQualifier;
 
   /// Constructs a LoadInst.
   ///
@@ -2961,12 +2960,14 @@ class LoadInst
   LoadInst(SILDebugLocation DebugLoc, SILValue LValue,
            LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()),
-        OwnershipQualifier(Q) {}
+                             LValue->getType().getObjectType()) {
+    SILInstruction::Bits.LoadInst.OwnershipQualifier = unsigned(Q);
+  }
 
 public:
   LoadOwnershipQualifier getOwnershipQualifier() const {
-    return OwnershipQualifier;
+    return LoadOwnershipQualifier(
+      SILInstruction::Bits.LoadInst.OwnershipQualifier);
   }
 };
 

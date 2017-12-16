@@ -95,6 +95,7 @@ class alignas(8) SILNode {
 public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
+  enum { NumLoadOwnershipQualifierBits = 2 };
 protected:
   SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
     Kind : bitmax(NumSILNodeKindBits,8),
@@ -189,6 +190,10 @@ protected:
                         NumStoreOwnershipQualifierBits,
     OwnershipQualifier : NumStoreOwnershipQualifierBits
   );
+  SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
+                        NumLoadOwnershipQualifierBits,
+    OwnershipQualifier : NumLoadOwnershipQualifierBits
+  );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,
@@ -258,6 +263,7 @@ protected:
     SWIFT_INLINE_BITS(StrongPinInst);
     SWIFT_INLINE_BITS(CopyAddrInst);
     SWIFT_INLINE_BITS(StoreInst);
+    SWIFT_INLINE_BITS(LoadInst);
   } Bits;
 
 private:
