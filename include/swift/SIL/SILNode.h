@@ -154,6 +154,11 @@ protected:
 
   // TODO: Sort the following in SILNodes.def order
 
+  SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
+      atomicity : 1
+  );
+
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,
     Kind : NumVOKindBits
@@ -216,6 +221,7 @@ protected:
     SWIFT_INLINE_BITS(CheckedCastBranchInst);
     SWIFT_INLINE_BITS(CheckedCastValueBranchInst);
     SWIFT_INLINE_BITS(UncheckedOwnershipConversionInst);
+    SWIFT_INLINE_BITS(RefCountingInst);
   } Bits;
 
 private:

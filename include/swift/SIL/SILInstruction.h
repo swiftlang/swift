@@ -4504,18 +4504,26 @@ public:
     NonAtomic,
   };
 protected:
-  Atomicity atomicity;
-protected:
   RefCountingInst(SILInstructionKind Kind, SILDebugLocation DebugLoc)
-      : NonValueInstruction(Kind, DebugLoc), atomicity(Atomicity::Atomic) {}
+      : NonValueInstruction(Kind, DebugLoc) {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::Atomic);
+  }
 
 public:
-  void setAtomicity(Atomicity flag) { atomicity = flag; }
-  void setNonAtomic() { atomicity = Atomicity::NonAtomic; }
-  void setAtomic() { atomicity = Atomicity::Atomic; }
-  Atomicity getAtomicity() const { return atomicity; }
-  bool isNonAtomic() const { return atomicity == Atomicity::NonAtomic; }
-  bool isAtomic() const { return atomicity == Atomicity::Atomic; }
+  void setAtomicity(Atomicity flag) {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(flag);
+  }
+  void setNonAtomic() {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::NonAtomic);
+  }
+  void setAtomic() {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::Atomic);
+  }
+  Atomicity getAtomicity() const {
+    return Atomicity(SILInstruction::Bits.RefCountingInst.atomicity);
+  }
+  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
+  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(RefCountingInst)
 };
