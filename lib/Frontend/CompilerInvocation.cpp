@@ -1728,6 +1728,24 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
   }
 }
 
+static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
+                                  IRGenOptions &opts) {
+  if (io.hasPrimaries()) {
+    // FIXME: dmu indices matching
+    io.forEachPrimaryInput([&](const InputFile &input) -> void {
+      opts.OutputsForBatchMode.push_back(input.outputs());
+    });
+    return;
+  }
+  auto fn = io.singleOutputFilenameFIXME();
+  if (!fn.empty())
+    opts.OutputForSingleThreadedWMO = fn;
+  else
+    io.forEachInput([&](const InputFile &input) -> void {
+      opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
+    });
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
@@ -1822,24 +1840,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
 
-  {
-    const FrontendInputsAndOutputs &io = FrontendOpts.InputsAndOutputs;
-    if (io.hasPrimaries()) {
-      // FIXME: dmu indices matching
-      io.forEachPrimaryInput([&](const InputFile &input) -> void {
-        Opts.OutputsForBatchMode.push_back(input.outputs());
-      });
-    } else {
-      auto fn = io.singleOutputFilenameFIXME();
-      if (!fn.empty())
-        Opts.OutputForSingleThreadedWMO = fn;
-      else
-        io.forEachInput([&](const InputFile &input) -> void {
-          Opts.OutputFilesForThreadedWMO.push_back(
-              input.outputs().OutputFilename);
-        });
-    }
-  }
+  ParseIRGenOutputFiles(FrontendOpts.InputsAndOutputs, Opts);
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
