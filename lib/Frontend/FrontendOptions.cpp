@@ -60,7 +60,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const std::pair<StringRef, unsigned> &elem) -> bool {
-        StringRef filename = getAllFiles()[elem.second].file();
+        StringRef filename = getAllInputs()[elem.second].file();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
@@ -98,7 +98,7 @@ bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
 }
 
 bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
-  for (const InputFile &input : getAllFiles()) {
+  for (const InputFile &input : getAllInputs()) {
     if (input.isPrimary())
       continue;
     if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
@@ -109,27 +109,27 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
 }
 
 StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
-  if (getAllFiles().empty())
+  if (getAllInputs().empty())
     return StringRef();
-  for (auto i : indices(getAllFiles())) {
-    if (!getAllFiles()[i].outputs().OutputFilename.empty()) {
+  for (auto i : indices(getAllInputs())) {
+    if (!getAllInputs()[i].outputs().OutputFilename.empty()) {
       assert(i == 0);
-      return getAllFiles()[i].outputs().OutputFilename;
+      return getAllInputs()[i].outputs().OutputFilename;
     }
   }
   return StringRef();
 }
 
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
-  if (getAllFiles().empty())
+  if (getAllInputs().empty())
     return StringRef();
   // FIXME: dmu use reverse iterator?
-  for (auto i = getAllFiles().size() - 1;; --i) {
-    if (!getAllFiles()[i].outputs().OutputFilename.empty()) {
+  for (auto i = getAllInputs().size() - 1;; --i) {
+    if (!getAllInputs()[i].outputs().OutputFilename.empty()) {
       // FIXME: dmu try uncommenting and seeing what breaks:
-      //      assert(getAllFiles()[i].outputs().OutputFilename ==
-      //      getAllFiles()[0].outputs().OutputFilename);
-      return getAllFiles()[i].outputs().OutputFilename;
+      //      assert(getAllInputs()[i].outputs().OutputFilename ==
+      //      getAllInputs()[0].outputs().OutputFilename);
+      return getAllInputs()[i].outputs().OutputFilename;
     }
     if (i == 0)
       break;

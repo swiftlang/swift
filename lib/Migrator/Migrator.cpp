@@ -146,7 +146,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
 
   assert(OrigFrontendOpts.InputsAndOutputs.hasPrimaries() &&
          "Migration must have a primary");
-  for (const auto &input : OrigFrontendOpts.InputsAndOutputs.getAllFiles()) {
+  for (const auto &input : OrigFrontendOpts.InputsAndOutputs.getAllInputs()) {
     Invocation.getFrontendOptions().InputsAndOutputs.addInput(
         InputFile(input.file(), input.isPrimary(),
                   input.isPrimary() ? InputBuffer.get() : input.buffer()));

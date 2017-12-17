@@ -430,7 +430,7 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputs,
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputs;
-  for (const InputFile &input : inputs.getAllFiles()) {
+  for (const InputFile &input : inputs.getAllInputs()) {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.file());
     bool newIsPrimary = input.isPrimary() ||
@@ -713,7 +713,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   InputStamps.reserve(
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
-       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllFiles()) {
+       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     StringRef File = input.file();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
@@ -900,7 +900,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
     SmallVectorImpl<FileContent> &Contents, std::string &Error) const {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
-       Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllFiles()) {
+       Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     StringRef File = input.file();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;

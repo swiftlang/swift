@@ -40,24 +40,24 @@ public:
   FrontendInputsAndOutputs() = default;
 
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
-    for (InputFile input : other.getAllFiles())
+    for (InputFile input : other.getAllInputs())
       addInput(input);
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
-    for (InputFile input : other.getAllFiles())
+    for (InputFile input : other.getAllInputs())
       addInput(input);
     return *this;
   }
 
   // Readers:
 
-  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-  std::vector<InputFile> &getAllFiles() { return AllFiles; }
+  ArrayRef<InputFile> getAllInputs() const { return AllFiles; }
+  std::vector<InputFile> &getAllInputs() { return AllFiles; }
   std::vector<InputFile *> getPointersToAllFiles() {
     std::vector<InputFile *> pointers;
-    for (InputFile &input : getAllFiles()) {
+    for (InputFile &input : getAllInputs()) {
       pointers.push_back(&input);
     }
     return pointers;
@@ -73,16 +73,16 @@ public:
 
   const InputFile &firstPrimary() const {
     assert(!PrimaryInputs.empty());
-    return getAllFiles()[PrimaryInputs.front().second];
+    return getAllInputs()[PrimaryInputs.front().second];
   }
 
   // FIXME: dmu check all uses
   const OutputPaths &pathsForAtMostOnePrimary() const {
     static OutputPaths empty;
     return hasPrimaries()
-               ? getAllFiles()[PrimaryInputs.front().second].outputs()
-               : getAllFiles().empty() ? empty
-                                       : getAllFiles().front().outputs();
+               ? getAllInputs()[PrimaryInputs.front().second].outputs()
+               : getAllInputs().empty() ? empty
+                                       : getAllInputs().front().outputs();
   }
 
   // FIXME: dmu  Why the *last* one?
@@ -96,21 +96,21 @@ public:
   // FIXME: dmu iterator?
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
-    for (auto &input : getAllFiles()) {
+    for (auto &input : getAllInputs()) {
       filenames.push_back(input.file());
     }
     return filenames;
   }
 
-  unsigned inputCount() const { return getAllFiles().size(); }
+  unsigned inputCount() const { return getAllInputs().size(); }
 
-  bool hasInputs() const { return !getAllFiles().empty(); }
+  bool hasInputs() const { return !getAllInputs().empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
   StringRef getFilenameOfFirstInput() const {
     assert(hasInputs());
-    const InputFile &inp = getAllFiles()[0];
+    const InputFile &inp = getAllInputs()[0];
     StringRef f = inp.file();
     assert(!f.empty());
     return f;
@@ -147,7 +147,7 @@ public:
   }
 
   void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const {
-    for (const auto file: getAllFiles()) {
+    for (const auto file: getAllInputs()) {
       fn(file);
     }
   }
@@ -156,13 +156,13 @@ public:
   // (maybe) and reify count of same
   void forEachPrimaryInput(llvm::function_ref<void(InputFile &input)> fn) {
     for (auto p : PrimaryInputs)
-      fn(getAllFiles()[p.second]);
+      fn(getAllInputs()[p.second]);
   }
 
   void
   forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const {
     for (const auto p: PrimaryInputs) {
-      fn(getAllFiles()[p.second]);
+      fn(getAllInputs()[p.second]);
     }
   }
   
@@ -183,7 +183,7 @@ public:
   const InputFile *getUniquePrimaryInput() const {
     assertMustNotBeMoreThanOnePrimaryInput();
     const auto b = PrimaryInputs.begin();
-    return b == PrimaryInputs.end() ? nullptr : &getAllFiles()[b->second];
+    return b == PrimaryInputs.end() ? nullptr : &getAllInputs()[b->second];
   }
 
   const InputFile &getRequiredUniquePrimaryInput() const {
@@ -210,7 +210,7 @@ public:
   // FIXME: dmu used for index generation, may be wrong
   std::vector<std::string> outputFilenamesForEachInput() const {
     std::vector<std::string> result;
-    for (const InputFile &input : getAllFiles())
+    for (const InputFile &input : getAllInputs())
       result.push_back(input.outputs().OutputFilename);
     return result;
   }
@@ -234,12 +234,12 @@ public:
   }
 
   void addInput(const InputFile &input) {
-    getAllFiles().push_back(input);
+    getAllInputs().push_back(input);
     if (input.isPrimary()) {
       // Take care to push a reference to the string in the InputFile stored in
       // AllFiles, NOT in the input parameter.
-      PrimaryInputs.insert(std::make_pair(getAllFiles().back().file(),
-                                          getAllFiles().size() - 1));
+      PrimaryInputs.insert(std::make_pair(getAllInputs().back().file(),
+                                          getAllInputs().size() - 1));
     }
   }
 
