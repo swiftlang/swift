@@ -774,7 +774,7 @@ public:
   }
 
   unsigned getIndex() const {
-    return unsigned((getSubclassData() >> IndexBitOffset) & IndexMask);
+    return Bits.MultipleValueInstructionResult.Index;
   }
 
   /// Get the ownership kind assigned to this result by its parent.
@@ -802,10 +802,6 @@ protected:
 
   /// Set the index of this result.
   void setIndex(unsigned NewIndex);
-
-  static constexpr unsigned NumIndexBits = 24;
-  static constexpr uint64_t IndexMask = (uint64_t(1) << 24) - 1;
-  static constexpr uint64_t IndexBitOffset = ValueOwnershipKind::NumBits;
 };
 
 template <class Result>
@@ -1078,6 +1074,10 @@ class UnaryInstructionWithTypeDependentOperandsBase
     : public InstructionBase<Kind, Base>,
       protected llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...> {
 
+  unsigned getNumOperandsStorage() const {
+    return SILInstruction::Bits.UIWTDOB.NumOperands;
+  }
+
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
@@ -1086,18 +1086,14 @@ protected:
 
   using TrailingObjects::totalSizeToAlloc;
 
-  // Total number of operands of this instruction.
-  // It is number of type dependent operands + 1.
-  unsigned NumOperands;
-
 public:
   template <typename... Args>
   UnaryInstructionWithTypeDependentOperandsBase(
       SILDebugLocation debugLoc, SILValue operand,
       ArrayRef<SILValue> typeDependentOperands,
       Args &&...args)
-        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...),
-          NumOperands(1 + typeDependentOperands.size()) {
+        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...) {
+    SILInstruction::Bits.UIWTDOB.NumOperands = 1 + typeDependentOperands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            operand, typeDependentOperands);
   }
@@ -1105,18 +1101,18 @@ public:
   // Destruct tail allocated objects.
   ~UnaryInstructionWithTypeDependentOperandsBase() {
     Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = getNumOperandsStorage(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
   size_t numTrailingObjects(
     typename TrailingObjects::template OverloadToken<Operand>) const {
-    return NumOperands;
+    return getNumOperandsStorage();
   }
 
   unsigned getNumTypeDependentOperands() const {
-    return NumOperands - 1;
+    return getNumOperandsStorage() - 1;
   }
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
@@ -1126,12 +1122,12 @@ public:
 
   ArrayRef<Operand> getAllOperands() const {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
+            static_cast<size_t>(getNumOperandsStorage())};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
+            static_cast<size_t>(getNumOperandsStorage())};
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -1160,16 +1156,23 @@ struct SILDebugVariable {
 /// A DebugVariable where storage for the strings has been
 /// tail-allocated following the parent SILInstruction.
 class TailAllocatedDebugVariable {
-  /// The source function argument position from left to right
-  /// starting with 1 or 0 if this is a local variable.
-  unsigned ArgNo : 16;
-  /// When this is nonzero there is a tail-allocated string storing
-  /// variable name present. This typically only happens for
-  /// instructions that were created from parsing SIL assembler.
-  unsigned NameLength : 15;
-  bool Constant : 1;
+  union {
+    uint32_t RawValue;
+    struct {
+      /// The source function argument position from left to right
+      /// starting with 1 or 0 if this is a local variable.
+      unsigned ArgNo : 16;
+      bool Constant : 1;
+      /// When this is nonzero there is a tail-allocated string storing
+      /// variable name present. This typically only happens for
+      /// instructions that were created from parsing SIL assembler.
+      unsigned NameLength : 15;
+    };
+  };
 public:
   TailAllocatedDebugVariable(SILDebugVariable DbgVar, char *buf);
+  TailAllocatedDebugVariable(uint32_t RawValue) : RawValue(RawValue) {}
+  uint32_t getRawValue() const { return RawValue; }
 
   unsigned getArgNo() const { return ArgNo; }
   void setArgNo(unsigned N) { ArgNo = N; }
@@ -1186,6 +1189,8 @@ public:
       return {getName(buf), isLet(), getArgNo()};
   }
 };
+static_assert(sizeof(TailAllocatedDebugVariable) == 4,
+              "SILNode inline bitfield needs updating");
 
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
@@ -1202,24 +1207,6 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
 };
 
-/// Base class for allocation/deallocation instructions where the allocation
-/// can be promoted to the stack.
-/// Note that IRGen can still decide to _not_ promote the allocation on the
-/// stack.
-class StackPromotable {
-
-  /// If true, the allocation can be done on the stack (the final decision is
-  /// in IRGen).
-  bool OnStack = false;
-
-public:
-  StackPromotable(bool OnStack) : OnStack(OnStack) { }
-
-  bool canAllocOnStack() const { return OnStack; }
-
-  void setStackAllocatable() { OnStack = true; }
-};
-
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1228,9 +1215,6 @@ class AllocStackInst final
       private llvm::TrailingObjects<AllocStackInst, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
-
-  unsigned NumOperands;
-  TailAllocatedDebugVariable VarInfo;
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands,
@@ -1243,13 +1227,14 @@ class AllocStackInst final
                                 SILDebugVariable Var);
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
+    return SILInstruction::Bits.AllocStackInst.NumOperands;
   }
 
 public:
   ~AllocStackInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    size_t end = SILInstruction::Bits.AllocStackInst.NumOperands;
+    for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
     }
   }
@@ -1260,9 +1245,16 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+    auto RawValue = SILInstruction::Bits.AllocStackInst.VarInfo;
+    auto VI = TailAllocatedDebugVariable(RawValue);
+    return VI.get(getDecl(), getTrailingObjects<char>());
   };
-  void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
+  void setArgNo(unsigned N) {
+    auto RawValue = SILInstruction::Bits.AllocStackInst.VarInfo;
+    auto VI = TailAllocatedDebugVariable(RawValue);
+    VI.setArgNo(N);
+    SILInstruction::Bits.AllocStackInst.VarInfo = VI.getRawValue();
+  }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// type of the instruction itself, which will be an address type).
@@ -1271,11 +1263,13 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(),
+             SILInstruction::Bits.AllocStackInst.NumOperands };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(),
+             SILInstruction::Bits.AllocStackInst.NumOperands };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -1288,9 +1282,7 @@ public:
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
-class AllocRefInstBase
-    : public AllocationInst,
-      public StackPromotable {
+class AllocRefInstBase : public AllocationInst {
 protected:
 
   AllocRefInstBase(SILInstructionKind Kind,
@@ -1299,11 +1291,6 @@ protected:
                    bool objc, bool canBeOnStack,
                    ArrayRef<SILType> ElementTypes,
                    ArrayRef<SILValue> AllOperands);
-
-  // Number of tail-allocated arrays.
-  unsigned short NumTailTypes;
-
-  bool ObjC;
 
   /// The first NumTailTypes operands are counts for the tail allocated
   /// elements, the remaining operands are opened archetype operands.
@@ -1317,21 +1304,33 @@ protected:
     return reinterpret_cast<const SILType*>(Operands.asArray().end());
   }
 
+  unsigned getNumTailTypes() const {
+    return SILInstruction::Bits.AllocRefInstBase.NumTailTypes;
+  }
+
 public:
+  bool canAllocOnStack() const {
+    return SILInstruction::Bits.AllocRefInstBase.OnStack;
+  }
+
+  void setStackAllocatable(bool OnStack = true) {
+    SILInstruction::Bits.AllocRefInstBase.OnStack = OnStack;
+  }
+
   ArrayRef<SILType> getTailAllocatedTypes() const {
-    return {getTypeStorage(), NumTailTypes};
+    return {getTypeStorage(), getNumTailTypes()};
   }
 
   MutableArrayRef<SILType> getTailAllocatedTypes() {
-    return {getTypeStorage(), NumTailTypes};
+    return {getTypeStorage(), getNumTailTypes()};
   }
   
   ArrayRef<Operand> getTailAllocatedCounts() const {
-    return getAllOperands().slice(0, NumTailTypes);
+    return getAllOperands().slice(0, getNumTailTypes());
   }
 
   MutableArrayRef<Operand> getTailAllocatedCounts() {
-    return getAllOperands().slice(0, NumTailTypes);
+    return getAllOperands().slice(0, getNumTailTypes());
   }
 
   ArrayRef<Operand> getAllOperands() const {
@@ -1343,7 +1342,9 @@ public:
   }
   
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
+  bool isObjC() const {
+    return SILInstruction::Bits.AllocRefInstBase.ObjC;
+  }
 };
 
 /// AllocRefInst - This represents the primitive allocation of an instance
@@ -1376,11 +1377,11 @@ class AllocRefInst final
 
 public:
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(NumTailTypes);
+    return getAllOperands().slice(getNumTailTypes());
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(NumTailTypes);
+    return getAllOperands().slice(getNumTailTypes());
   }
 };
 
@@ -1414,15 +1415,15 @@ class AllocRefDynamicInst final
 
 public:
   SILValue getMetatypeOperand() const {
-    return getAllOperands()[NumTailTypes].get();
+    return getAllOperands()[getNumTailTypes()].get();
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(NumTailTypes + 1);
+    return getAllOperands().slice(getNumTailTypes() + 1);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(NumTailTypes + 1);
+    return getAllOperands().slice(getNumTailTypes() + 1);
   }
 };
 
@@ -1443,7 +1444,6 @@ class AllocValueBufferInst final
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-
   SILType getValueType() const { return getType().getObjectType(); }
 };
 
@@ -2774,8 +2774,6 @@ class IntegerLiteralInst final
   friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned numBits;
-
   IntegerLiteralInst(SILDebugLocation Loc, SILType Ty, const APInt &Value);
 
   static IntegerLiteralInst *create(IntegerLiteralExpr *E,
@@ -2801,8 +2799,6 @@ class FloatLiteralInst final
       private llvm::TrailingObjects<FloatLiteralInst, llvm::APInt::WordType> {
   friend TrailingObjects;
   friend SILBuilder;
-
-  unsigned numBits;
 
   FloatLiteralInst(SILDebugLocation Loc, SILType Ty, const APInt &Bits);
 
@@ -2924,6 +2920,7 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
 enum class LoadOwnershipQualifier {
   Unqualified, Take, Copy, Trivial
 };
+static_assert(2 == SILNode::NumLoadOwnershipQualifierBits, "Size mismatch");
 
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
@@ -2931,8 +2928,6 @@ class LoadInst
                                 SingleValueInstruction>
 {
   friend SILBuilder;
-
-  LoadOwnershipQualifier OwnershipQualifier;
 
   /// Constructs a LoadInst.
   ///
@@ -2943,12 +2938,14 @@ class LoadInst
   LoadInst(SILDebugLocation DebugLoc, SILValue LValue,
            LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()),
-        OwnershipQualifier(Q) {}
+                             LValue->getType().getObjectType()) {
+    SILInstruction::Bits.LoadInst.OwnershipQualifier = unsigned(Q);
+  }
 
 public:
   LoadOwnershipQualifier getOwnershipQualifier() const {
-    return OwnershipQualifier;
+    return LoadOwnershipQualifier(
+      SILInstruction::Bits.LoadInst.OwnershipQualifier);
   }
 };
 
@@ -2957,6 +2954,7 @@ public:
 enum class StoreOwnershipQualifier {
   Unqualified, Init, Assign, Trivial
 };
+static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 
 /// StoreInst - Represents a store from a memory location.
 class StoreInst
@@ -2966,7 +2964,6 @@ class StoreInst
 
 private:
   FixedOperandList<2> Operands;
-  StoreOwnershipQualifier OwnershipQualifier;
 
   StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
             StoreOwnershipQualifier Qualifier);
@@ -2986,7 +2983,8 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   StoreOwnershipQualifier getOwnershipQualifier() const {
-    return OwnershipQualifier;
+    return StoreOwnershipQualifier(
+      SILInstruction::Bits.StoreInst.OwnershipQualifier);
   }
 };
 
@@ -3611,17 +3609,17 @@ class LoadReferenceInstBase
     return SILType::getPrimitiveObjectType(refType.getReferentType());
   }
 
-  unsigned IsTake : 1; // FIXME: pack this somewhere
-
 protected:
   LoadReferenceInstBase(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
     : UnaryInstructionBase<K, SingleValueInstruction>(loc, lvalue,
-                                             getResultType(lvalue->getType())),
-      IsTake(unsigned(isTake)) {
+                                             getResultType(lvalue->getType())) {
+    SILInstruction::Bits.LoadReferenceInstBaseT.IsTake = unsigned(isTake);
   }
 
 public:
-  IsTake_t isTake() const { return IsTake_t(IsTake); }
+  IsTake_t isTake() const {
+    return IsTake_t(SILInstruction::Bits.LoadReferenceInstBaseT.IsTake);
+  }
 };
 
 /// An abstract class representing a store to some kind of reference storage.
@@ -3629,13 +3627,13 @@ template <SILInstructionKind K>
 class StoreReferenceInstBase : public InstructionBase<K, NonValueInstruction> {
   enum { Src, Dest };
   FixedOperandList<2> Operands;
-  unsigned IsInitializationOfDest : 1; // FIXME: pack this somewhere
 protected:
   StoreReferenceInstBase(SILDebugLocation loc, SILValue src, SILValue dest,
                          IsInitialization_t isInit)
     : InstructionBase<K, NonValueInstruction>(loc),
-      Operands(this, src, dest),
-      IsInitializationOfDest(unsigned(isInit)) {
+      Operands(this, src, dest) {
+    SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest =
+      unsigned(isInit);
   }
 
 public:
@@ -3643,10 +3641,12 @@ public:
   SILValue getDest() const { return Operands[Dest].get(); }
 
   IsInitialization_t isInitializationOfDest() const {
-    return IsInitialization_t(IsInitializationOfDest);
+    return IsInitialization_t(
+      SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest);
   }
   void setIsInitializationOfDest(IsInitialization_t I) {
-    IsInitializationOfDest = (bool)I;
+    SILInstruction::Bits.StoreReferenceInstBaseT.IsInitializationOfDest =
+      (bool)I;
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
@@ -3727,16 +3727,6 @@ public:
   };
 
 private:
-  // FIXME: compress storage
-
-  /// IsTakeOfSrc - True if ownership will be taken from the value at the source
-  /// memory location.
-  unsigned IsTakeOfSrc : 1;
-
-  /// IsInitializationOfDest - True if this is the initialization of the
-  /// uninitialized destination memory location.
-  unsigned IsInitializationOfDest : 1;
-
   FixedOperandList<2> Operands;
 
   CopyAddrInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
@@ -3749,16 +3739,19 @@ public:
   void setSrc(SILValue V) { Operands[Src].set(V); }
   void setDest(SILValue V) { Operands[Dest].set(V); }
 
-  IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
+  IsTake_t isTakeOfSrc() const {
+    return IsTake_t(SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc);
+  }
   IsInitialization_t isInitializationOfDest() const {
-    return IsInitialization_t(IsInitializationOfDest);
+    return IsInitialization_t(
+      SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest);
   }
 
   void setIsTakeOfSrc(IsTake_t T) {
-    IsTakeOfSrc = (bool)T;
+    SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc = (bool)T;
   }
   void setIsInitializationOfDest(IsInitialization_t I) {
-    IsInitializationOfDest = (bool)I;
+    SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest = (bool)I;
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
@@ -4486,18 +4479,26 @@ public:
     NonAtomic,
   };
 protected:
-  Atomicity atomicity;
-protected:
   RefCountingInst(SILInstructionKind Kind, SILDebugLocation DebugLoc)
-      : NonValueInstruction(Kind, DebugLoc), atomicity(Atomicity::Atomic) {}
+      : NonValueInstruction(Kind, DebugLoc) {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::Atomic);
+  }
 
 public:
-  void setAtomicity(Atomicity flag) { atomicity = flag; }
-  void setNonAtomic() { atomicity = Atomicity::NonAtomic; }
-  void setAtomic() { atomicity = Atomicity::Atomic; }
-  Atomicity getAtomicity() const { return atomicity; }
-  bool isNonAtomic() const { return atomicity == Atomicity::NonAtomic; }
-  bool isAtomic() const { return atomicity == Atomicity::Atomic; }
+  void setAtomicity(Atomicity flag) {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(flag);
+  }
+  void setNonAtomic() {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::NonAtomic);
+  }
+  void setAtomic() {
+    SILInstruction::Bits.RefCountingInst.atomicity = bool(Atomicity::Atomic);
+  }
+  Atomicity getAtomicity() const {
+    return Atomicity(SILInstruction::Bits.RefCountingInst.atomicity);
+  }
+  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
+  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(RefCountingInst)
 };
@@ -4645,18 +4646,25 @@ public:
 
 private:
   friend SILBuilder;
-  Atomicity atomicity;
 
   StrongPinInst(SILDebugLocation DebugLoc, SILValue operand,
                 Atomicity atomicity);
 
 public:
-  void setAtomicity(Atomicity flag) { atomicity = flag; }
-  void setNonAtomic() { atomicity = Atomicity::NonAtomic; }
-  void setAtomic() { atomicity = Atomicity::Atomic; }
-  Atomicity getAtomicity() const { return atomicity; }
-  bool isNonAtomic() const { return atomicity == Atomicity::NonAtomic; }
-  bool isAtomic() const { return atomicity == Atomicity::Atomic; }
+  void setAtomicity(Atomicity flag) {
+    SILInstruction::Bits.StrongPinInst.atomicity = bool(flag);
+  }
+  void setNonAtomic() {
+    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::NonAtomic);
+  }
+  void setAtomic() {
+    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::Atomic);
+  }
+  Atomicity getAtomicity() const {
+    return Atomicity(SILInstruction::Bits.StrongPinInst.atomicity);
+  }
+  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
+  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
 };
 
 /// StrongUnpinInst - Given that the operand is the result of a
@@ -5992,15 +6000,16 @@ class UncheckedOwnershipConversionInst
                                   SingleValueInstruction> {
   friend SILBuilder;
 
-  ValueOwnershipKind Kind;
-
   UncheckedOwnershipConversionInst(SILDebugLocation DebugLoc, SILValue operand,
                                    ValueOwnershipKind Kind)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
-        Kind(Kind) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind = Kind;
+  }
 
 public:
-  ValueOwnershipKind getConversionOwnershipKind() const { return Kind; }
+  ValueOwnershipKind getConversionOwnershipKind() const {
+    return SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+  }
 };
 
 /// MarkDependenceInst - Marks that one value depends on another for
@@ -6125,14 +6134,23 @@ class DeallocStackInst :
 /// most derived type of the allocated instance.
 class DeallocRefInst :
   public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
-                              DeallocationInst>,
-  public StackPromotable {
+                              DeallocationInst> {
   friend SILBuilder;
 
 private:
   DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand,
                  bool canBeOnStack = false)
-      : UnaryInstructionBase(DebugLoc, Operand), StackPromotable(canBeOnStack) {
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    SILInstruction::Bits.DeallocRefInst.OnStack = canBeOnStack;
+  }
+
+public:
+  bool canAllocOnStack() const {
+    return SILInstruction::Bits.DeallocRefInst.OnStack;
+  }
+
+  void setStackAllocatable(bool OnStack) {
+    SILInstruction::Bits.DeallocRefInst.OnStack = OnStack;
   }
 };
 

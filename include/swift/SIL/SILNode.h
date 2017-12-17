@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>
 
@@ -43,11 +44,10 @@ enum class SILNodeKind {
 #include "swift/SIL/SILNodes.def"
 };
 
-enum {
-  NumSILNodeKindBits = 8
-};
-static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
-              "SILNodeKind fits in NumSILNodeKindBits bits");
+enum { NumSILNodeKindBits =
+  countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
+
+enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type;
 
 /// A SILNode is a node in the use-def graph of a SILFunction.  It is
 /// either an instruction or a defined value which can be used by an
@@ -93,51 +93,214 @@ static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode {
 public:
-  /// The assumed number of bits that a SILNode+padding will take up. Public for
-  /// static assertion purposes.
-  static constexpr unsigned NumTotalSILNodeBits = 64;
-
-private:
-  static constexpr unsigned NumKindBits = NumSILNodeKindBits;
-  static constexpr unsigned NumStorageLocBits = 1;
-  static constexpr unsigned NumIsRepresentativeBits = 1;
-
+  enum { NumVOKindBits = 3 };
+  enum { NumStoreOwnershipQualifierBits = 2 };
+  enum { NumLoadOwnershipQualifierBits = 2 };
 protected:
-  static constexpr unsigned NumSubclassDataBits =
-      NumTotalSILNodeBits - NumKindBits - NumStorageLocBits -
-      NumIsRepresentativeBits;
+  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
+    Kind : bitmax(NumSILNodeKindBits,8),
+    StorageLoc : 1,
+    IsRepresentativeNode : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
+
+  SWIFT_INLINE_BITFIELD(SILArgument, ValueBase, NumVOKindBits,
+    VOKind : NumVOKindBits
+  );
+
+  // No MultipleValueInstructionResult subclass needs inline bits right now,
+  // therefore let's naturally align and size the Index for speed.
+  SWIFT_INLINE_BITFIELD_FULL(MultipleValueInstructionResult, ValueBase,
+                             NumVOKindBits+32,
+      VOKind : NumVOKindBits,
+      : NumPadBits,
+      Index : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
+
+  // Special handling for UnaryInstructionWithTypeDependentOperandsBase
+  SWIFT_INLINE_BITFIELD(UIWTDOB, SILNode, 32,
+    // DO NOT allocate bits at the front!
+    // UIWTDOB is a template, and must allocate bits from back to front and
+    // update UIWTDOB_BITFIELD().
+
+    /*pad*/ : 32-NumSILNodeBits,
+
+    // Total number of operands of this instruction.
+    // It is number of type dependent operands + 1.
+    NumOperands : 32;
+    template<SILInstructionKind Kind, typename, typename, typename...>
+    friend class UnaryInstructionWithTypeDependentOperandsBase;
+  );
+
+#define UIWTDOB_BITFIELD(T, U, C, ...) \
+  SWIFT_INLINE_BITFIELD_FULL(T, U, (C)+32, __VA_ARGS__)
+
+  SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
+
+  SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
+    : NumPadBits,
+    numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(FloatLiteralInst, LiteralInst, 32,
+    : NumPadBits,
+    numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
+    OnStack : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
+                             64-NumAllocationInstBits,
+    NumOperands : 32-NumAllocationInstBits,
+    VarInfo : 32
+  );
+  SWIFT_INLINE_BITFIELD_FULL(AllocRefInstBase, AllocationInst, 1+1+32,
+    ObjC : 1,
+    OnStack : 1,
+    : NumPadBits,
+    // Number of tail-allocated arrays.
+    NumTailTypes : 32
+  );
+  UIWTDOB_BITFIELD(AllocValueBufferInst, AllocationInst, 0, : NumPadBits);
+
+  // TODO: Sort the following in SILNodes.def order
+
+  SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
+      atomicity : 1
+  );
+  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
+      atomicity : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
+    /// IsTakeOfSrc - True if ownership will be taken from the value at the
+    /// source memory location.
+    IsTakeOfSrc : 1,
+
+    /// IsInitializationOfDest - True if this is the initialization of the
+    /// uninitialized destination memory location.
+    IsInitializationOfDest : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
+    IsTake : 1;
+    template<SILInstructionKind K>
+    friend class LoadReferenceInstBase;
+  );
+
+  SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
+    IsInitializationOfDest : 1;
+    template<SILInstructionKind K>
+    friend class StoreReferenceInstBase;
+  );
+
+  SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
+                        NumStoreOwnershipQualifierBits,
+    OwnershipQualifier : NumStoreOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
+                        NumLoadOwnershipQualifierBits,
+    OwnershipQualifier : NumLoadOwnershipQualifierBits
+  );
+
+  SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
+                        NumVOKindBits,
+    Kind : NumVOKindBits
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(PointerToThinFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UnconditionalCheckedCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UpcastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedRefCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedAddrCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedTrivialBitCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UncheckedBitwiseCastInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(ThinToThickFunctionInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(UnconditionalCheckedCastValueInst, ConversionInst, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialAddrInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialValueInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialRefInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(InitExistentialMetatypeInst, SingleValueInstruction, 0, : NumPadBits);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
+  UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
+  UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
-  enum class IsRepresentative : uint8_t {
-    No = 0,
-    Yes = 1,
+  enum class IsRepresentative : bool {
+    No = false,
+    Yes = true,
   };
 
+  union {
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(SILNode);
+    SWIFT_INLINE_BITS(SILArgument);
+    SWIFT_INLINE_BITS(MultipleValueInstructionResult);
+    SWIFT_INLINE_BITS(UIWTDOB);
+    SWIFT_INLINE_BITS(AllocStackInst);
+    SWIFT_INLINE_BITS(AllocRefInstBase);
+    SWIFT_INLINE_BITS(AllocValueBufferInst);
+    SWIFT_INLINE_BITS(ConvertFunctionInst);
+    SWIFT_INLINE_BITS(PointerToThinFunctionInst);
+    SWIFT_INLINE_BITS(UpcastInst);
+    SWIFT_INLINE_BITS(UncheckedRefCastInst);
+    SWIFT_INLINE_BITS(UncheckedAddrCastInst);
+    SWIFT_INLINE_BITS(UncheckedTrivialBitCastInst);
+    SWIFT_INLINE_BITS(UncheckedBitwiseCastInst);
+    SWIFT_INLINE_BITS(ThinToThickFunctionInst);
+    SWIFT_INLINE_BITS(UnconditionalCheckedCastInst);
+    SWIFT_INLINE_BITS(UnconditionalCheckedCastValueInst);
+    SWIFT_INLINE_BITS(ObjCMethodInst);
+    SWIFT_INLINE_BITS(InitExistentialAddrInst);
+    SWIFT_INLINE_BITS(InitExistentialValueInst);
+    SWIFT_INLINE_BITS(InitExistentialRefInst);
+    SWIFT_INLINE_BITS(InitExistentialMetatypeInst);
+    SWIFT_INLINE_BITS(CheckedCastBranchInst);
+    SWIFT_INLINE_BITS(CheckedCastValueBranchInst);
+    SWIFT_INLINE_BITS(UncheckedOwnershipConversionInst);
+    SWIFT_INLINE_BITS(RefCountingInst);
+    SWIFT_INLINE_BITS(StoreReferenceInstBaseT);
+    SWIFT_INLINE_BITS(LoadReferenceInstBaseT);
+    SWIFT_INLINE_BITS(StrongPinInst);
+    SWIFT_INLINE_BITS(CopyAddrInst);
+    SWIFT_INLINE_BITS(StoreInst);
+    SWIFT_INLINE_BITS(LoadInst);
+    SWIFT_INLINE_BITS(IntegerLiteralInst);
+    SWIFT_INLINE_BITS(FloatLiteralInst);
+    SWIFT_INLINE_BITS(DeallocRefInst);
+  } Bits;
+
 private:
-  const uint64_t Kind : NumKindBits;
-  const uint64_t StorageLoc : NumStorageLocBits;
-  const uint64_t IsRepresentativeNode : NumIsRepresentativeBits;
-  uint64_t SubclassData : NumSubclassDataBits;
 
   SILNodeStorageLocation getStorageLoc() const {
-    return SILNodeStorageLocation(StorageLoc);
+    return SILNodeStorageLocation(Bits.SILNode.StorageLoc);
   }
 
   const SILNode *getRepresentativeSILNodeSlowPath() const;
 
 protected:
   SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
-          IsRepresentative isRepresentative)
-      : Kind(unsigned(kind)), StorageLoc(unsigned(storageLoc)),
-        IsRepresentativeNode(unsigned(isRepresentative)), SubclassData(0) {}
-
-  uint64_t getSubclassData() const { return SubclassData; }
-
-  void setSubclassData(uint64_t NewData) {
-    assert(!(NewData & ~((uint64_t(1) << NumSubclassDataBits) - 1)) &&
-           "New subclass data is too large to fit in SubclassData");
-    SubclassData = NewData;
+          IsRepresentative isRepresentative) {
+    Bits.OpaqueBits = 0;
+    Bits.SILNode.Kind = unsigned(kind);
+    Bits.SILNode.StorageLoc = unsigned(storageLoc);
+    Bits.SILNode.IsRepresentativeNode = unsigned(isRepresentative);
   }
 
 public:
@@ -154,7 +317,9 @@ public:
   }
 
   /// Is this SILNode the representative SILNode subobject in this object?
-  bool isRepresentativeSILNodeInObject() const { return IsRepresentativeNode; }
+  bool isRepresentativeSILNodeInObject() const {
+    return Bits.SILNode.IsRepresentativeNode;
+  }
 
   /// Return a pointer to the representative SILNode subobject in this object.
   SILNode *getRepresentativeSILNodeInObject() {
@@ -171,7 +336,7 @@ public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
-    return SILNodeKind(Kind);
+    return SILNodeKind(Bits.SILNode.Kind);
   }
 
   /// Return the SILNodeKind of this node's representative SILNode.

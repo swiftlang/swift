@@ -76,12 +76,13 @@ protected:
     uint64_t OpaqueBits;
     SWIFT_INLINE_BITS(TypeRepr);
     SWIFT_INLINE_BITS(TupleTypeRepr);
-  };
+  } Bits;
 
-  TypeRepr(TypeReprKind K) : OpaqueBits(0) {
-    TypeReprBits.Kind = static_cast<unsigned>(K);
-    TypeReprBits.Invalid = false;
-    TypeReprBits.Warned = false;
+  TypeRepr(TypeReprKind K) {
+    Bits.OpaqueBits = 0;
+    Bits.TypeRepr.Kind = static_cast<unsigned>(K);
+    Bits.TypeRepr.Invalid = false;
+    Bits.TypeRepr.Warned = false;
   }
 
 private:
@@ -89,19 +90,19 @@ private:
 
 public:
   TypeReprKind getKind() const {
-    return static_cast<TypeReprKind>(TypeReprBits.Kind);
+    return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }
 
   /// Is this type representation known to be invalid?
-  bool isInvalid() const { return TypeReprBits.Invalid; }
+  bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
   /// Note that this type representation describes an invalid type.
-  void setInvalid() { TypeReprBits.Invalid = true; }
+  void setInvalid() { Bits.TypeRepr.Invalid = true; }
 
   /// If a warning is produced about this type repr, keep track of that so we
   /// don't emit another one upon further reanalysis.
-  bool isWarnedAbout() const { return TypeReprBits.Warned; }
-  void setWarned() { TypeReprBits.Warned = true; }
+  bool isWarnedAbout() const { return Bits.TypeRepr.Warned; }
+  void setWarned() { Bits.TypeRepr.Warned = true; }
   
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
@@ -617,14 +618,14 @@ class TupleTypeRepr final : public TypeRepr,
   SourceRange Parens;
   
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
-    return TupleTypeReprBits.NumElements;
+    return Bits.TupleTypeRepr.NumElements;
   }
 
   TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                 SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
 
 public:
-  unsigned getNumElements() const { return TupleTypeReprBits.NumElements; }
+  unsigned getNumElements() const { return Bits.TupleTypeRepr.NumElements; }
   bool hasElementNames() const {
     for (auto &Element : getElements()) {
       if (Element.NameLoc.isValid()) {
@@ -636,7 +637,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             TupleTypeReprBits.NumElements };
+             Bits.TupleTypeRepr.NumElements };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -678,7 +679,7 @@ public:
   SourceRange getParens() const { return Parens; }
 
   bool hasEllipsis() const {
-    return TupleTypeReprBits.HasEllipsis;
+    return Bits.TupleTypeRepr.HasEllipsis;
   }
 
   SourceLoc getEllipsisLoc() const {
@@ -689,12 +690,12 @@ public:
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
       getTrailingObjects<SourceLocAndIdx>()[0].second :
-        TupleTypeReprBits.NumElements;
+        Bits.TupleTypeRepr.NumElements;
   }
 
   void removeEllipsis() {
     if (hasEllipsis()) {
-      TupleTypeReprBits.HasEllipsis = false;
+      Bits.TupleTypeRepr.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {
         SourceLoc(),
         getNumElements()
@@ -703,7 +704,7 @@ public:
   }
 
   bool isParenType() const {
-    return TupleTypeReprBits.NumElements == 1 &&
+    return Bits.TupleTypeRepr.NumElements == 1 &&
            getElementNameLoc(0).isInvalid() &&
            !hasEllipsis();
   }

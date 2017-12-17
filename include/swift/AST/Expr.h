@@ -337,26 +337,26 @@ protected:
     SWIFT_INLINE_BITS(ArrayToPointerExpr);
     SWIFT_INLINE_BITS(ObjCSelectorExpr);
     SWIFT_INLINE_BITS(KeyPathExpr);
-  };
+  } Bits;
 
 private:
   /// Ty - This is the type of the expression.
   Type Ty;
 
   void setLValueAccessKind(AccessKind accessKind) {
-    ExprBits.LValueAccessKind = unsigned(accessKind) + 1;
+    Bits.Expr.LValueAccessKind = unsigned(accessKind) + 1;
   }
  
 protected:
   Expr(ExprKind Kind, bool Implicit, Type Ty = Type()) : Ty(Ty) {
-    ExprBits.Kind = unsigned(Kind);
-    ExprBits.Implicit = Implicit;
-    ExprBits.LValueAccessKind = 0;
+    Bits.Expr.Kind = unsigned(Kind);
+    Bits.Expr.Implicit = Implicit;
+    Bits.Expr.LValueAccessKind = 0;
   }
 
 public:
   /// Return the kind of this expression.
-  ExprKind getKind() const { return ExprKind(ExprBits.Kind); }
+  ExprKind getKind() const { return ExprKind(Bits.Expr.Kind); }
 
   /// \brief Retrieve the name of the given expression kind.
   ///
@@ -453,22 +453,22 @@ public:
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
   bool isImplicit() const {
-    return ExprBits.Implicit;
+    return Bits.Expr.Implicit;
   }
   void setImplicit(bool Implicit = true) {
-    ExprBits.Implicit = Implicit;
+    Bits.Expr.Implicit = Implicit;
   }
 
   /// getLValueAccessKind - Determines how this l-value expression is used.
   AccessKind getLValueAccessKind() const {
     assert(hasLValueAccessKind());
-    return AccessKind(ExprBits.LValueAccessKind - 1);
+    return AccessKind(Bits.Expr.LValueAccessKind - 1);
   }
   bool hasLValueAccessKind() const {
-    return ExprBits.LValueAccessKind != 0;
+    return Bits.Expr.LValueAccessKind != 0;
   }
   void clearLValueAccessKind() {
-    ExprBits.LValueAccessKind = 0;
+    Bits.Expr.LValueAccessKind = 0;
   }
 
   /// Set that this l-value expression is used in the given way.
@@ -731,13 +731,13 @@ public:
                      StringRef Val, SourceLoc DigitsLoc, bool Implicit)
        : LiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc)
    {
-     NumberLiteralExprBits.IsNegative = false;
+     Bits.NumberLiteralExpr.IsNegative = false;
    }
   
-  bool isNegative() const { return NumberLiteralExprBits.IsNegative; }
+  bool isNegative() const { return Bits.NumberLiteralExpr.IsNegative; }
   void setNegative(SourceLoc Loc) {
     MinusLoc = Loc;
-    NumberLiteralExprBits.IsNegative = true;
+    Bits.NumberLiteralExpr.IsNegative = true;
   }
 
   StringRef getDigitsText() const { return Val; }
@@ -809,11 +809,11 @@ class BooleanLiteralExpr : public LiteralExpr {
 public:
   BooleanLiteralExpr(bool Value, SourceLoc Loc, bool Implicit = false)
     : LiteralExpr(ExprKind::BooleanLiteral, Implicit), Loc(Loc) {
-    BooleanLiteralExprBits.Value = Value;
+    Bits.BooleanLiteralExpr.Value = Value;
   }
 
   /// Retrieve the Boolean value of this literal.
-  bool getValue() const { return BooleanLiteralExprBits.Value; }
+  bool getValue() const { return Bits.BooleanLiteralExpr.Value; }
 
   SourceRange getSourceRange() const {
     return Loc;
@@ -857,20 +857,20 @@ public:
 
   /// Determine the encoding that should be used for this string literal.
   Encoding getEncoding() const {
-    return static_cast<Encoding>(StringLiteralExprBits.Encoding);
+    return static_cast<Encoding>(Bits.StringLiteralExpr.Encoding);
   }
 
   /// Set the encoding that should be used for this string literal.
   void setEncoding(Encoding encoding) {
-    StringLiteralExprBits.Encoding = static_cast<unsigned>(encoding);
+    Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(encoding);
   }
 
   bool isSingleUnicodeScalar() const {
-    return StringLiteralExprBits.IsSingleUnicodeScalar;
+    return Bits.StringLiteralExpr.IsSingleUnicodeScalar;
   }
 
   bool isSingleExtendedGraphemeCluster() const {
-    return StringLiteralExprBits.IsSingleExtendedGraphemeCluster;
+    return Bits.StringLiteralExpr.IsSingleExtendedGraphemeCluster;
   }
 
   /// Retrieve the builtin initializer that will be used to construct the string
@@ -960,13 +960,13 @@ private:
 public:
   MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit = false)
     : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc) {
-    MagicIdentifierLiteralExprBits.Kind = static_cast<unsigned>(kind);
-    MagicIdentifierLiteralExprBits.StringEncoding
+    Bits.MagicIdentifierLiteralExpr.Kind = static_cast<unsigned>(kind);
+    Bits.MagicIdentifierLiteralExpr.StringEncoding
       = static_cast<unsigned>(StringLiteralExpr::UTF8);
   }
   
   Kind getKind() const {
-    return static_cast<Kind>(MagicIdentifierLiteralExprBits.Kind);
+    return static_cast<Kind>(Bits.MagicIdentifierLiteralExpr.Kind);
   }
 
   bool isFile() const { return getKind() == File; }
@@ -994,14 +994,14 @@ public:
   StringLiteralExpr::Encoding getStringEncoding() const {
     assert(isString() && "Magic identifier literal has non-string encoding");
     return static_cast<StringLiteralExpr::Encoding>(
-             MagicIdentifierLiteralExprBits.StringEncoding);
+             Bits.MagicIdentifierLiteralExpr.StringEncoding);
   }
 
   // For a magic identifier that produces a string literal, set the encoding
   // for the string literal.
   void setStringEncoding(StringLiteralExpr::Encoding encoding) {
     assert(isString() && "Magic identifier literal has non-string encoding");
-    MagicIdentifierLiteralExprBits.StringEncoding
+    Bits.MagicIdentifierLiteralExpr.StringEncoding
       = static_cast<unsigned>(encoding);
   }
 
@@ -1091,22 +1091,22 @@ public:
                                    bool implicit);
 
   LiteralKind getLiteralKind() const {
-    return static_cast<LiteralKind>(ObjectLiteralExprBits.LitKind);
+    return static_cast<LiteralKind>(Bits.ObjectLiteralExpr.LitKind);
   }
 
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
   unsigned getNumArguments() const {
-    return ObjectLiteralExprBits.NumArgLabels;
+    return Bits.ObjectLiteralExpr.NumArgLabels;
   }
   bool hasArgumentLabelLocs() const {
-    return ObjectLiteralExprBits.HasArgLabelLocs;
+    return Bits.ObjectLiteralExpr.HasArgLabelLocs;
   }
 
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
-    return ObjectLiteralExprBits.HasTrailingClosure;
+    return Bits.ObjectLiteralExpr.HasTrailingClosure;
   }
 
   Expr *getSemanticExpr() const { return SemanticExpr; }
@@ -1155,8 +1155,8 @@ public:
               AccessSemantics semantics = AccessSemantics::Ordinary,
               Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc) {
-    DeclRefExprBits.Semantics = (unsigned) semantics;
-    DeclRefExprBits.FunctionRefKind =
+    Bits.DeclRefExpr.Semantics = (unsigned) semantics;
+    Bits.DeclRefExpr.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
   }
@@ -1169,7 +1169,7 @@ public:
   /// Return true if this access is direct, meaning that it does not call the
   /// getter or setter.
   AccessSemantics getAccessSemantics() const {
-    return (AccessSemantics) DeclRefExprBits.Semantics;
+    return (AccessSemantics) Bits.DeclRefExpr.Semantics;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1183,12 +1183,12 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(DeclRefExprBits.FunctionRefKind);
+    return static_cast<FunctionRefKind>(Bits.DeclRefExpr.FunctionRefKind);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefKind(FunctionRefKind refKind) {
-    DeclRefExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+    Bits.DeclRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
 
   static bool classof(const Expr *E) {
@@ -1329,7 +1329,7 @@ protected:
   OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls,
                      FunctionRefKind functionRefKind, bool Implicit, Type Ty)
       : Expr(Kind, Implicit, Ty), Decls(decls) {
-    OverloadSetRefExprBits.FunctionRefKind =
+    Bits.OverloadSetRefExpr.FunctionRefKind =
       static_cast<unsigned>(functionRefKind);
   }
 
@@ -1352,12 +1352,12 @@ public:
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
     return static_cast<FunctionRefKind>(
-             OverloadSetRefExprBits.FunctionRefKind);
+             Bits.OverloadSetRefExpr.FunctionRefKind);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefKind(FunctionRefKind refKind) {
-    OverloadSetRefExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+    Bits.OverloadSetRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
 
   static bool classof(const Expr *E) {
@@ -1402,8 +1402,8 @@ public:
   UnresolvedDeclRefExpr(DeclName name, DeclRefKind refKind, DeclNameLoc loc)
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
-    UnresolvedDeclRefExprBits.DeclRefKind = static_cast<unsigned>(refKind);
-    UnresolvedDeclRefExprBits.FunctionRefKind =
+    Bits.UnresolvedDeclRefExpr.DeclRefKind = static_cast<unsigned>(refKind);
+    Bits.UnresolvedDeclRefExpr.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
   }
@@ -1412,18 +1412,18 @@ public:
   DeclName getName() const { return Name; }
 
   DeclRefKind getRefKind() const {
-    return static_cast<DeclRefKind>(UnresolvedDeclRefExprBits.DeclRefKind);
+    return static_cast<DeclRefKind>(Bits.UnresolvedDeclRefExpr.DeclRefKind);
   }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
     return static_cast<FunctionRefKind>(
-             UnresolvedDeclRefExprBits.FunctionRefKind);
+             Bits.UnresolvedDeclRefExpr.FunctionRefKind);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefKind(FunctionRefKind refKind) {
-    UnresolvedDeclRefExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+    Bits.UnresolvedDeclRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
 
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1461,16 +1461,16 @@ public:
   /// Return true if this member access is direct, meaning that it
   /// does not call the getter or setter.
   AccessSemantics getAccessSemantics() const {
-    return (AccessSemantics) MemberRefExprBits.Semantics;
+    return (AccessSemantics) Bits.MemberRefExpr.Semantics;
   }
 
   /// Determine whether this member reference refers to the
   /// superclass's property.
-  bool isSuper() const { return MemberRefExprBits.IsSuper; }
+  bool isSuper() const { return Bits.MemberRefExpr.IsSuper; }
 
   /// Set whether this member reference refers to the superclass's
   /// property.
-  void setIsSuper(bool isSuper) { MemberRefExprBits.IsSuper = isSuper; }
+  void setIsSuper(bool isSuper) { Bits.MemberRefExpr.IsSuper = isSuper; }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
@@ -1633,16 +1633,16 @@ public:
   void setIndex(Expr *E) { Index = E; }
 
   unsigned getNumArguments() const {
-    return DynamicSubscriptExprBits.NumArgLabels;
+    return Bits.DynamicSubscriptExpr.NumArgLabels;
   }
 
   bool hasArgumentLabelLocs() const {
-    return DynamicSubscriptExprBits.HasArgLabelLocs;
+    return Bits.DynamicSubscriptExpr.HasArgLabelLocs;
   }
 
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
-    return DynamicSubscriptExprBits.HasTrailingClosure;
+    return Bits.DynamicSubscriptExpr.HasTrailingClosure;
   }
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
@@ -1698,20 +1698,20 @@ public:
 
   /// Whether this reference has arguments.
   bool hasArguments() const {
-    return UnresolvedMemberExprBits.HasArguments;
+    return Bits.UnresolvedMemberExpr.HasArguments;
   }
 
   unsigned getNumArguments() const {
-    return UnresolvedMemberExprBits.NumArgLabels;
+    return Bits.UnresolvedMemberExpr.NumArgLabels;
   }
 
   bool hasArgumentLabelLocs() const {
-    return UnresolvedMemberExprBits.HasArgLabelLocs;
+    return Bits.UnresolvedMemberExpr.HasArgLabelLocs;
   }
 
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
-    return UnresolvedMemberExprBits.HasTrailingClosure;
+    return Bits.UnresolvedMemberExpr.HasTrailingClosure;
   }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
@@ -1969,7 +1969,7 @@ public:
   SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
+  bool hasTrailingClosure() const { return Bits.TupleExpr.HasTrailingClosure; }
 
   /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
@@ -1992,7 +1992,7 @@ public:
 
   /// Whether this tuple has element names.
   bool hasElementNames() const { 
-    return TupleExprBits.HasElementNames;
+    return Bits.TupleExpr.HasElementNames;
   }
 
   /// Retrieve the element names for a tuple.
@@ -2007,7 +2007,7 @@ public:
   
   /// Whether this tuple has element name locations.
   bool hasElementNameLocs() const { 
-    return TupleExprBits.HasElementNameLocations;
+    return Bits.TupleExpr.HasElementNameLocations;
   }
 
   /// Retrieve the locations of the element names for a tuple.
@@ -2183,31 +2183,31 @@ public:
   void setIndex(Expr *E) { Index = E; }
 
   unsigned getNumArguments() const {
-    return SubscriptExprBits.NumArgLabels;
+    return Bits.SubscriptExpr.NumArgLabels;
   }
 
   bool hasArgumentLabelLocs() const {
-    return SubscriptExprBits.HasArgLabelLocs;
+    return Bits.SubscriptExpr.HasArgLabelLocs;
   }
 
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
-    return SubscriptExprBits.HasTrailingClosure;
+    return Bits.SubscriptExpr.HasTrailingClosure;
   }
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
   AccessSemantics getAccessSemantics() const {
-    return (AccessSemantics) SubscriptExprBits.Semantics;
+    return (AccessSemantics) Bits.SubscriptExpr.Semantics;
   }
   
   /// Determine whether this member reference refers to the
   /// superclass's property.
-  bool isSuper() const { return SubscriptExprBits.IsSuper; }
+  bool isSuper() const { return Bits.SubscriptExpr.IsSuper; }
 
   /// Set whether this member reference refers to the superclass's
   /// property.
-  void setIsSuper(bool isSuper) { SubscriptExprBits.IsSuper = isSuper; }
+  void setIsSuper(bool isSuper) { Bits.SubscriptExpr.IsSuper = isSuper; }
 
   /// Determine whether subscript operation has a known underlying
   /// subscript declaration or not.
@@ -2270,7 +2270,7 @@ public:
                     DeclNameLoc nameloc, bool Implicit)
     : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
       NameLoc(nameloc), Name(name) {
-    UnresolvedDotExprBits.FunctionRefKind =
+    Bits.UnresolvedDotExpr.FunctionRefKind =
       static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
                                                  : FunctionRefKind::Unapplied);
   }
@@ -2294,12 +2294,12 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(UnresolvedDotExprBits.FunctionRefKind);
+    return static_cast<FunctionRefKind>(Bits.UnresolvedDotExpr.FunctionRefKind);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefKind(FunctionRefKind refKind) {
-    UnresolvedDotExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+    Bits.UnresolvedDotExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
 
   static bool classof(const Expr *E) {
@@ -2360,8 +2360,8 @@ public:
                    unsigned depth, Type ty = Type())
     : Expr(ExprKind::BindOptional, /*Implicit=*/ questionLoc.isInvalid(), ty),
       SubExpr(subExpr), QuestionLoc(questionLoc) {
-    BindOptionalExprBits.Depth = depth;
-    assert(BindOptionalExprBits.Depth == depth && "bitfield truncation");
+    Bits.BindOptionalExpr.Depth = depth;
+    assert(Bits.BindOptionalExpr.Depth == depth && "bitfield truncation");
   }
 
   SourceRange getSourceRange() const {
@@ -2383,9 +2383,9 @@ public:
   }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
-  unsigned getDepth() const { return BindOptionalExprBits.Depth; }
+  unsigned getDepth() const { return Bits.BindOptionalExpr.Depth; }
   void setDepth(unsigned depth) {
-    BindOptionalExprBits.Depth = depth;
+    Bits.BindOptionalExpr.Depth = depth;
   }
 
   Expr *getSubExpr() const { return SubExpr; }
@@ -2660,16 +2660,16 @@ class InOutToPointerExpr : public ImplicitConversionExpr {
 public:
   InOutToPointerExpr(Expr *subExpr, Type ty)
       : ImplicitConversionExpr(ExprKind::InOutToPointer, subExpr, ty) {
-    InOutToPointerExprBits.IsNonAccessing = false;
+    Bits.InOutToPointerExpr.IsNonAccessing = false;
   }
 
   /// Is this conversion "non-accessing"?  That is, is it only using the
   /// pointer for its identity, as opposed to actually accessing the memory?
   bool isNonAccessing() const {
-    return InOutToPointerExprBits.IsNonAccessing;
+    return Bits.InOutToPointerExpr.IsNonAccessing;
   }
   void setNonAccessing(bool nonAccessing = true) {
-    InOutToPointerExprBits.IsNonAccessing = nonAccessing;
+    Bits.InOutToPointerExpr.IsNonAccessing = nonAccessing;
   }
 
   static bool classof(const Expr *E) {
@@ -2682,16 +2682,16 @@ class ArrayToPointerExpr : public ImplicitConversionExpr {
 public:
   ArrayToPointerExpr(Expr *subExpr, Type ty)
       : ImplicitConversionExpr(ExprKind::ArrayToPointer, subExpr, ty) {
-    ArrayToPointerExprBits.IsNonAccessing = false;
+    Bits.ArrayToPointerExpr.IsNonAccessing = false;
   }
   
   /// Is this conversion "non-accessing"?  That is, is it only using the
   /// pointer for its identity, as opposed to actually accessing the memory?
   bool isNonAccessing() const {
-    return ArrayToPointerExprBits.IsNonAccessing;
+    return Bits.ArrayToPointerExpr.IsNonAccessing;
   }
   void setNonAccessing(bool nonAccessing = true) {
-    ArrayToPointerExprBits.IsNonAccessing = nonAccessing;
+    Bits.ArrayToPointerExpr.IsNonAccessing = nonAccessing;
   }
 
   static bool classof(const Expr *E) {
@@ -2815,14 +2815,14 @@ public:
       DefaultArgsOwner(defaultArgsOwner), VariadicArgs(VariadicArgs),
       CallerDefaultArgs(CallerDefaultArgs)
   {
-    TupleShuffleExprBits.TypeImpact = typeImpact;
+    Bits.TupleShuffleExpr.TypeImpact = typeImpact;
   }
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
 
   /// What is the type impact of this shuffle?
   TypeImpact getTypeImpact() const {
-    return TypeImpact(TupleShuffleExprBits.TypeImpact);
+    return TypeImpact(Bits.TupleShuffleExpr.TypeImpact);
   }
 
   bool isSourceScalar() const {
@@ -3260,7 +3260,7 @@ public:
       : Expr(Kind, Implicit, FnType),
         DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         parameterList(nullptr) {
-    AbstractClosureExprBits.Discriminator = Discriminator;
+    Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
   CaptureInfo &getCaptureInfo() { return Captures; }
@@ -3290,12 +3290,12 @@ public:
   /// Having their symbol names be stable across minor code changes is
   /// therefore pretty useful for debugging.)
   unsigned getDiscriminator() const {
-    return AbstractClosureExprBits.Discriminator;
+    return Bits.AbstractClosureExpr.Discriminator;
   }
   void setDiscriminator(unsigned discriminator) {
     assert(getDiscriminator() == InvalidDiscriminator);
     assert(discriminator != InvalidDiscriminator);
-    AbstractClosureExprBits.Discriminator = discriminator;
+    Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
@@ -3406,7 +3406,7 @@ public:
       ExplicitResultType(explicitResultType),
       Body(nullptr) {
     setParameterList(params);
-    ClosureExprBits.HasAnonymousClosureVars = false;
+    Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3423,13 +3423,13 @@ public:
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
   bool hasAnonymousClosureVars() const {
-    return ClosureExprBits.HasAnonymousClosureVars;
+    return Bits.ClosureExpr.HasAnonymousClosureVars;
   }
 
   /// \brief Set the parameters of this closure along with a flag indicating
   /// whether these parameters are actually anonymous closure variables.
   void setHasAnonymousClosureVars() {
-    ClosureExprBits.HasAnonymousClosureVars = true;
+    Bits.ClosureExpr.HasAnonymousClosureVars = true;
   }
   
   /// \brief Determine whether this closure expression has an
@@ -3669,7 +3669,7 @@ protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
     : Expr(Kind, Implicit, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
-    ApplyExprBits.ThrowsIsSet = false;
+    Bits.ApplyExpr.ThrowsIsSet = false;
   }
 
 public:
@@ -3692,7 +3692,7 @@ public:
   /// Has the type-checker set the 'throws' bit yet?
   ///
   /// In general, this should only be used for debugging purposes.
-  bool isThrowsSet() const { return ApplyExprBits.ThrowsIsSet; }
+  bool isThrowsSet() const { return Bits.ApplyExpr.ThrowsIsSet; }
 
   /// Does this application throw?  This is only meaningful after
   /// complete type-checking.
@@ -3700,13 +3700,13 @@ public:
   /// If true, the function expression must have a throwing function
   /// type.  The converse is not true because of 'rethrows' functions.
   bool throws() const {
-    assert(ApplyExprBits.ThrowsIsSet);
-    return ApplyExprBits.Throws;
+    assert(Bits.ApplyExpr.ThrowsIsSet);
+    return Bits.ApplyExpr.Throws;
   }
   void setThrows(bool throws) {
-    assert(!ApplyExprBits.ThrowsIsSet);
-    ApplyExprBits.ThrowsIsSet = true;
-    ApplyExprBits.Throws = throws;
+    assert(!Bits.ApplyExpr.ThrowsIsSet);
+    Bits.ApplyExpr.ThrowsIsSet = true;
+    Bits.ApplyExpr.Throws = throws;
   }
 
   ValueDecl *getCalledValue() const;
@@ -3797,11 +3797,11 @@ public:
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
 
-  unsigned getNumArguments() const { return CallExprBits.NumArgLabels; }
-  bool hasArgumentLabelLocs() const { return CallExprBits.HasArgLabelLocs; }
+  unsigned getNumArguments() const { return Bits.CallExpr.NumArgLabels; }
+  bool hasArgumentLabelLocs() const { return Bits.CallExpr.HasArgLabelLocs; }
 
   /// Whether this call with written with a trailing closure.
-  bool hasTrailingClosure() const { return CallExprBits.HasTrailingClosure; }
+  bool hasTrailingClosure() const { return Bits.CallExpr.HasTrailingClosure; }
 
   using TrailingCallArguments::getArgumentLabels;
 
@@ -4041,15 +4041,15 @@ public:
                   Expr *sub, SourceLoc asLoc, TypeLoc castTy, Type resultTy)
     : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy)
   {
-    CheckedCastExprBits.CastKind = unsigned(CheckedCastKind::Unresolved);
+    Bits.CheckedCastExpr.CastKind = unsigned(CheckedCastKind::Unresolved);
   }
   
   /// Return the semantic kind of cast performed.
   CheckedCastKind getCastKind() const {
-    return CheckedCastKind(CheckedCastExprBits.CastKind);
+    return CheckedCastKind(Bits.CheckedCastExpr.CastKind);
   }
   void setCastKind(CheckedCastKind kind) {
-    CheckedCastExprBits.CastKind = unsigned(kind);
+    Bits.CheckedCastExpr.CastKind = unsigned(kind);
   }
   
   /// True if the cast has been type-checked and its kind has been set.
@@ -4440,7 +4440,7 @@ public:
     : Expr(ExprKind::ObjCSelector, /*Implicit=*/false),
       KeywordLoc(keywordLoc), LParenLoc(lParenLoc),
       ModifierLoc(modifierLoc), SubExpr(subExpr), RParenLoc(rParenLoc) {
-    ObjCSelectorExprBits.SelectorKind = static_cast<unsigned>(kind);
+    Bits.ObjCSelectorExpr.SelectorKind = static_cast<unsigned>(kind);
   }
 
   Expr *getSubExpr() const { return SubExpr; }
@@ -4492,7 +4492,7 @@ public:
 
   /// Retrieve the kind of the selector (method, getter, setter)
   ObjCSelectorKind getSelectorKind() const {
-    return static_cast<ObjCSelectorKind>(ObjCSelectorExprBits.SelectorKind);
+    return static_cast<ObjCSelectorKind>(Bits.ObjCSelectorExpr.SelectorKind);
   }
 
   /// Override the selector kind.
@@ -4501,7 +4501,7 @@ public:
   /// expressions.
   void overrideObjCSelectorKind(ObjCSelectorKind newKind,
                                 SourceLoc modifierLoc) {
-    ObjCSelectorExprBits.SelectorKind = static_cast<unsigned>(newKind);
+    Bits.ObjCSelectorExpr.SelectorKind = static_cast<unsigned>(newKind);
     ModifierLoc = modifierLoc;
   }
 
@@ -4830,7 +4830,7 @@ public:
         ParsedRoot(parsedRoot), ParsedPath(parsedPath) {
     assert((parsedRoot || parsedPath) &&
            "keypath must have either root or path");
-    KeyPathExprBits.IsObjC = false;
+    Bits.KeyPathExpr.IsObjC = false;
   }
 
   SourceLoc getLoc() const { return StartLoc; }
@@ -4889,7 +4889,7 @@ public:
   }
 
   /// True if this is an ObjC key path expression.
-  bool isObjC() const { return KeyPathExprBits.IsObjC; }
+  bool isObjC() const { return Bits.KeyPathExpr.IsObjC; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;
