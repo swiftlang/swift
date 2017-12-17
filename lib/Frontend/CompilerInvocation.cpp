@@ -935,7 +935,8 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
           return;
 
         if (useMainOutput) {
-          auto fn = Opts.InputsAndOutputs.singleOutputFilename();
+          auto fn =
+              Opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
           if (!fn.empty()) {
             output = fn;
             return;
@@ -1638,7 +1639,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.InputsAndOutputs.singleOutputFilename();
+    StringRef BaseName =
+        FEOpts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1704,16 +1706,9 @@ static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
         io.SingleThreadedWMOOutputs.OutputFilename;
     return;
   }
-  if (io.hasPrimaries()) {
-    // FIXME: dmu indices matching
-    io.forEachPrimaryInput([&](const InputFile &input) -> bool {
-      opts.OutputsForBatchMode.push_back(input.outputs());
-      return false;
-    });
-    return;
-  }
-  io.forEachInput([&](const InputFile &input) -> bool {
-    opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
+  io.forEachPrimaryInput([&](const InputFile &input) -> bool {
+    opts.OutputsForBatchModeOrThreadedWMO.push_back(
+        input.outputs().OutputFilename);
     return false;
   });
 }

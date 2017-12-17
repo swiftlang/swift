@@ -37,6 +37,8 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
 
 public:
+  // FIXME: dmu, some refs to this may be just looking for any old output
+  // filename (last?)
   OutputPaths SingleThreadedWMOOutputs;
   bool isSingleThreadedWMO() const {
     return !SingleThreadedWMOOutputs.OutputFilename.empty();
@@ -83,11 +85,6 @@ public:
                                         : getAllInputs().front().outputs();
   }
 
-  // FIXME: dmu  Why the *last* one?
-  // FIXME: dmu Also someday elim all uses of singleOutputFilename
-  StringRef singleOutputFilename() const;
-  StringRef firstOutputFilename() const;
-  StringRef lastOutputFilename() const;
   // FIXME: dmu eliminate primaryOrEmpty by getting file, then asking?
   StringRef outputFilenameForPrimary() const;
 
@@ -261,19 +258,6 @@ public:
     return getAllInputs()[0];
   }
 
-  // Returns the single OutputFilename if there is one
-  const StringRef singleOutputFilenameFIXME() const {
-    StringRef result;
-    for (const auto &input : AllFiles) {
-      auto fn = input.outputs().OutputFilename;
-      if (fn.empty())
-        continue;
-      if (!result.empty())
-        return "";
-      result = fn;
-    }
-    return result;
-  }
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -287,10 +271,6 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPathsForMakeDependencies(std::function<void(const std::string &)> fn) const;
-
-  bool isOutputFilenameStdout() {
-    return InputsAndOutputs.singleOutputFilename() == "-";
-  }
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;

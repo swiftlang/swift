@@ -668,7 +668,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
   // Create the IR emitter.
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.getSingleOutputFilename());
+                      "", Opts.OutputForSingleThreadedWMO);
 
   initLLVMModule(*IGM);
 
@@ -721,7 +721,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, Opts.getSingleOutputFilename());
+                  ModuleName, Opts.OutputForSingleThreadedWMO);
 
   initLLVMModule(IGM);
 
@@ -875,7 +875,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   } _igmDeleter(irgen);
 
-  auto OutputIter = Opts.OutputFilesForThreadedWMO.begin();
+  auto OutputIter = Opts.OutputsForBatchModeOrThreadedWMO.begin();
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
@@ -888,7 +888,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
-    if (OutputIter == Opts.OutputFilesForThreadedWMO.end()) {
+    if (OutputIter == Opts.OutputsForBatchModeOrThreadedWMO.end()) {
       // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;

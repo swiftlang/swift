@@ -108,40 +108,6 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   return true;
 }
 
-StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
-  if (getAllInputs().empty())
-    return StringRef();
-  for (auto i : indices(getAllInputs())) {
-    if (!getAllInputs()[i].outputs().OutputFilename.empty()) {
-      assert(i == 0);
-      return getAllInputs()[i].outputs().OutputFilename;
-    }
-  }
-  return StringRef();
-}
-
-StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
-  if (getAllInputs().empty())
-    return StringRef();
-  // FIXME: dmu use reverse iterator?
-  for (auto i = getAllInputs().size() - 1;; --i) {
-    if (!getAllInputs()[i].outputs().OutputFilename.empty()) {
-      // FIXME: dmu try uncommenting and seeing what breaks:
-      //      assert(getAllInputs()[i].outputs().OutputFilename ==
-      //      getAllInputs()[0].outputs().OutputFilename);
-      return getAllInputs()[i].outputs().OutputFilename;
-    }
-    if (i == 0)
-      break;
-  }
-  return StringRef();
-}
-
-StringRef FrontendInputsAndOutputs::singleOutputFilename() const {
-  return lastOutputFilename();
-  // FIXME: dmu Someday, try firstOutputFilename and see what breaks;
-}
-
 /// Do something better when >1 primary
 StringRef FrontendInputsAndOutputs::outputFilenameForPrimary() const {
   assertMustNotBeMoreThanOnePrimaryInput();
