@@ -1055,15 +1055,19 @@ bool FrontendArgsToOptionsConverter::checkUnusedOutputPaths(
   return false;
 }
 
+static bool shouldSerializeBridgingHeader(
+    const FrontendInputsAndOutputs &inputsAndOutputs) {
+  return isWholeModule() && inputsAndOutputs.hasInputs() &&
+         !inputsAndOutputs.getFirstInput().outputs().ModuleOutputPath.empty()
+}
+
 void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaries() &&
-                                    Opts.InputsAndOutputs.inputCount() != 0 &&
-                                    !Opts.InputsAndOutputs.getAllFiles()[0]
-                                         .outputs()
-                                         .ModuleOutputPath.empty();
+    // FIXME: dmu reify
+    Opts.SerializeBridgingHeader |=
+        shouldSerializeBridgingHeader(Opts.InputsAndOutputs);
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
