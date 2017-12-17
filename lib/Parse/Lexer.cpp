@@ -350,9 +350,9 @@ void Lexer::skipToEndOfLine(bool EatNewline) {
   }
 }
 
-void Lexer::skipSlashSlashComment() {
+void Lexer::skipSlashSlashComment(bool EatNewline) {
   assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
-  skipToEndOfLine(/*EatNewline=*/true);
+  skipToEndOfLine(EatNewline);
 }
 
 void Lexer::skipHashbang() {
@@ -2183,7 +2183,7 @@ Restart:
       // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
-      skipSlashSlashComment();
+      skipSlashSlashComment(/*EatNewline=*/true);
       SeenComment = true;
       if (isKeepingComments())
         return formToken(tok::comment, TokStart);
@@ -2346,11 +2346,7 @@ Restart:
       // '// ...' comment.
       SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
-      
-      // NOTE: Don't use skipSlashSlashComment() here
-      // because it consumes trailing newline.
-      skipToEndOfLine(/*EatNewline=*/false);
-      
+      skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(isDocComment
                            ? TriviaPiece::docLineComment({TriviaStart, Length})

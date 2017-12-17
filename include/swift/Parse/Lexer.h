@@ -491,7 +491,7 @@ private:
   void skipToEndOfLine(bool EatNewline);
 
   /// Skip to the end of the line of a // comment.
-  void skipSlashSlashComment();
+  void skipSlashSlashComment(bool EatNewline);
 
   /// Skip a #! hashbang line.
   void skipHashbang();
