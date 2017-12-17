@@ -2792,8 +2792,6 @@ class IntegerLiteralInst final
   friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned numBits;
-
   IntegerLiteralInst(SILDebugLocation Loc, SILType Ty, const APInt &Value);
 
   static IntegerLiteralInst *create(IntegerLiteralExpr *E,
@@ -2819,8 +2817,6 @@ class FloatLiteralInst final
       private llvm::TrailingObjects<FloatLiteralInst, llvm::APInt::WordType> {
   friend TrailingObjects;
   friend SILBuilder;
-
-  unsigned numBits;
 
   FloatLiteralInst(SILDebugLocation Loc, SILType Ty, const APInt &Bits);
 

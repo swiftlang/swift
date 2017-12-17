@@ -643,8 +643,8 @@ static void *allocateLiteralInstWithBitSize(SILModule &M, unsigned bits) {
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
                                        const llvm::APInt &Value)
-    : InstructionBase(Loc, Ty),
-      numBits(Value.getBitWidth()) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.IntegerLiteralInst.numBits = Value.getBitWidth();
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
                             getTrailingObjects<llvm::APInt::WordType>());
 }
@@ -682,16 +682,17 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
+  auto numBits = SILInstruction::Bits.IntegerLiteralInst.numBits;
   return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
 FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
                                    const APInt &Bits)
-    : InstructionBase(Loc, Ty),
-      numBits(Bits.getBitWidth()) {
-        std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                                  getTrailingObjects<llvm::APInt::WordType>());
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.FloatLiteralInst.numBits = Bits.getBitWidth();
+  std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
+                            getTrailingObjects<llvm::APInt::WordType>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -721,6 +722,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 }
 
 APInt FloatLiteralInst::getBits() const {
+  auto numBits = SILInstruction::Bits.FloatLiteralInst.numBits;
   return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
