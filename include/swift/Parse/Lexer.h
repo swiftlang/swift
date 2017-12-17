@@ -494,7 +494,7 @@ private:
   void skipSlashSlashComment(bool EatNewline);
 
   /// Skip a #! hashbang line.
-  void skipHashbang();
+  void skipHashbang(bool EatNewline);
 
   void skipSlashStarComment();
   void lexHash();

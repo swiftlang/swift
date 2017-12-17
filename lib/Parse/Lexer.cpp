@@ -355,10 +355,10 @@ void Lexer::skipSlashSlashComment(bool EatNewline) {
   skipToEndOfLine(EatNewline);
 }
 
-void Lexer::skipHashbang() {
+void Lexer::skipHashbang(bool EatNewline) {
   assert(CurPtr == ContentStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
          "Not a hashbang");
-  skipToEndOfLine(/*EatNewline=*/true);
+  skipToEndOfLine(/*EatNewline=*/EatNewline);
 }
 
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
@@ -607,7 +607,7 @@ void Lexer::lexHash() {
     CurPtr--;
     if (BufferID != SourceMgr.getHashbangBufferID())
       diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-    skipHashbang();
+    skipHashbang(/*EatNewline=*/true);
     return lexImpl();
   }
 
@@ -2367,13 +2367,10 @@ Restart:
   case '#':
     if (TriviaStart == BufferStart && *CurPtr == '!') {
       // Hashbang '#!/path/to/swift'.
+      --CurPtr;
       if (BufferID != SourceMgr.getHashbangBufferID())
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
-      
-      // NOTE: Don't use skipHashbang() here because it
-      // consumes trailing newline.
-      skipToEndOfLine(/*EatNewline=*/false);
-      
+      skipHashbang(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
       goto Restart;
