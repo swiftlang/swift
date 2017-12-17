@@ -82,7 +82,7 @@ public:
     return hasPrimaries()
                ? getAllInputs()[PrimaryInputs.front().second].outputs()
                : getAllInputs().empty() ? empty
-                                       : getAllInputs().front().outputs();
+                                        : getAllInputs().front().outputs();
   }
 
   // FIXME: dmu  Why the *last* one?
@@ -138,6 +138,7 @@ public:
   unsigned countOfFilesNeededOutput() const {
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
+
   void forEachInputNeedingOutputs(
       llvm::function_ref<void(const InputFile &)> fn) const {
     if (hasPrimaries())
@@ -147,16 +148,9 @@ public:
   }
 
   void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const {
-    for (const auto file: getAllInputs()) {
+    for (const auto &file : getAllInputs()) {
       fn(file);
     }
-  }
-
-  // FIXME: dmu reify forEachInputNeedingOutputs to elim these
-  // (maybe) and reify count of same
-  void forEachPrimaryInput(llvm::function_ref<void(InputFile &input)> fn) {
-    for (auto p : PrimaryInputs)
-      fn(getAllInputs()[p.second]);
   }
 
   void
@@ -165,7 +159,25 @@ public:
       fn(getAllInputs()[p.second]);
     }
   }
-  
+
+  void forEachInputNeedingOutputs(llvm::function_ref<void(InputFile &)> fn) {
+    if (hasPrimaries())
+      forEachPrimaryInput(fn);
+    else
+      forEachInput(fn);
+  }
+
+  void forEachInput(llvm::function_ref<void(InputFile &)> fn) {
+    for (auto &file : getAllInputs()) {
+      fn(file);
+    }
+  }
+
+  void forEachPrimaryInput(llvm::function_ref<void(InputFile &input)> fn) {
+    for (auto p : PrimaryInputs)
+      fn(getAllInputs()[p.second]);
+  }
+
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:

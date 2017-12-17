@@ -1056,8 +1056,8 @@ bool FrontendArgsToOptionsConverter::checkUnusedOutputPaths(
 
 static bool shouldSerializeBridgingHeader(
     const FrontendInputsAndOutputs &inputsAndOutputs) {
-  return isWholeModule() && inputsAndOutputs.hasInputs() &&
-         !inputsAndOutputs.getFirstInput().outputs().ModuleOutputPath.empty()
+  return inputsAndOutputs.isWholeModule() && inputsAndOutputs.hasInputs() &&
+         !inputsAndOutputs.getFirstInput().outputs().ModuleOutputPath.empty();
 }
 
 void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
