@@ -200,7 +200,7 @@ public:
   StringRef getSingleOutputFilename() const {
     if (!OutputForSingleThreadedWMO.empty())
       return OutputForSingleThreadedWMO;
-    // FIXME: dmu for batch mode
+    // FIXME: dmu getSingleOutputFilename for batch mode
     if (OutputsForBatchMode.empty())
       return StringRef();
     if (OutputsForBatchMode.size() == 1)

@@ -725,14 +725,12 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     return false;
   }
-  const std::vector<InputFile *> filesWithOutputs =
-      Opts.InputsAndOutputs.filesWithOutputs();
-
   ArrayRef<std::string> outputFileArguments =
       getOutputFilenamesFromCommandLineOrFilelist();
 
-  if (checkNumberOfOutputArguments(outputFileArguments.size(),
-                                   filesWithOutputs.size()))
+  if (checkNumberOfOutputArguments(
+          outputFileArguments.size(),
+          Opts.InputsAndOutputs.countOfFilesNeededOutput()))
     return true;
   // FIXME: dmu can I just use function pointers without the lambdas?
   // WMO threaded or batch mode or WMO one input
@@ -757,15 +755,18 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
           ? deriveForDirectory
           : outputFileArguments.empty() ? deriveFromInput : assignUnaltered;
 
-  for (auto i : indices(filesWithOutputs))
-    if (fn(outputFileArguments.empty()
-               ? StringRef()
-               : outputFileArguments.size() == 1
-                     ? StringRef(outputFileArguments[0])
-                     : StringRef(outputFileArguments[i]),
-           *filesWithOutputs[i]))
-      return true;
-  return false;
+  unsigned i = 0;
+  bool hadError = false;
+  Opts.InputsAndOutputs.forEachInputNeedingOutputs(
+      [&](InputFile &input) -> void {
+        auto output = outputFileArguments.empty()
+                          ? StringRef()
+                          : outputFileArguments.size() == 1
+                                ? StringRef(outputFileArguments[0])
+                                : StringRef(outputFileArguments[i++]);
+        hadError = fn(output, input) || hadError;
+      });
+  return hadError;
 }
 
 bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(
@@ -927,15 +928,13 @@ bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
 
-  std::vector<InputFile *> filesWithOutputs =
-      Opts.InputsAndOutputs.filesWithOutputs();
-
-  for (auto i : indices(filesWithOutputs)) {
-    determineSupplementaryOutputFilenames(suppFilelistArgs[i],
-                                          *filesWithOutputs[i]);
-    if (checkUnusedOutputPaths(*filesWithOutputs[i]))
-      return true;
-  }
+  bool hadError = false;
+  unsigned i = 0;
+  Opts.InputsAndOutputs.forEachInputNeedingOutputs(
+      [&](InputFile &input) -> void {
+        determineSupplementaryOutputFilenames(suppFilelistArgs[i++], input);
+        hadError = checkUnusedOutputPaths(input) || hadError;
+      });
   return false;
 }
 
@@ -1822,15 +1821,24 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.MainInputFilename =
         FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
-  if (FrontendOpts.InputsAndOutputs.isWholeModule() && SILOpts.NumThreads > 1) {
-    for (const InputFile &input : FrontendOpts.InputsAndOutputs.getAllFiles())
-      Opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
-  } else if (FrontendOpts.InputsAndOutputs.hasPrimaries()) {
-    for (const InputFile &input : FrontendOpts.InputsAndOutputs.getAllFiles())
-      Opts.OutputsForBatchMode.push_back(input.outputs());
-  } else {
-    Opts.OutputForSingleThreadedWMO =
-        FrontendOpts.InputsAndOutputs.singleOutputFilename();
+
+  {
+    const FrontendInputsAndOutputs &io = FrontendOpts.InputsAndOutputs;
+    if (io.hasPrimaries()) {
+      // FIXME: dmu indices matching
+      io.forEachPrimaryInput([&](const InputFile &input) -> void {
+        Opts.OutputsForBatchMode.push_back(input.outputs());
+      });
+    } else {
+      auto fn = io.singleOutputFilenameFIXME();
+      if (!fn.empty())
+        Opts.OutputForSingleThreadedWMO = fn;
+      else
+        io.forEachInput([&](const InputFile &input) -> void {
+          Opts.OutputFilesForThreadedWMO.push_back(
+              input.outputs().OutputFilename);
+        });
+    }
   }
 
   Opts.ModuleName = FrontendOpts.ModuleName;

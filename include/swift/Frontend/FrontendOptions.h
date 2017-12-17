@@ -66,7 +66,7 @@ public:
 
   std::vector<InputFile *> getPointersToAllPrimaries() {
     std::vector<InputFile *> primaries;
-    forEachPrimary(
+    forEachPrimaryInput(
         [&](InputFile &input) -> void { primaries.push_back(&input); });
     return primaries;
   }
@@ -74,18 +74,6 @@ public:
   const InputFile &firstPrimary() const {
     assert(!PrimaryInputs.empty());
     return getAllFiles()[PrimaryInputs.front().second];
-  }
-
-  // FIXME: dmu reify forAllInputsNeedingOutputs to elim these
-  // (maybe) and reify count of same
-  void forEachPrimary(llvm::function_ref<void(InputFile &input)> fn) {
-    for (auto p : PrimaryInputs)
-      fn(getAllFiles()[p.second]);
-  }
-
-  std::vector<InputFile *> filesWithOutputs() {
-    return hasPrimaries() ? getPointersToAllPrimaries()
-                          : getPointersToAllFiles();
   }
 
   // FIXME: dmu check all uses
@@ -150,20 +138,29 @@ public:
   unsigned countOfFilesNeededOutput() const {
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
-  void forAllInputsNeedingOutputs(llvm::function_ref<void(const InputFile &)> fn) const {
+  void forEachInputNeedingOutputs(
+      llvm::function_ref<void(const InputFile &)> fn) const {
     if (hasPrimaries())
-      forAllPrimaryFiles(fn);
+      forEachPrimaryInput(fn);
     else
-      forAllFiles(fn);
+      forEachInput(fn);
   }
-  
-  void forAllFiles(llvm::function_ref<void(const InputFile &)> fn) const {
+
+  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const {
     for (const auto file: getAllFiles()) {
       fn(file);
     }
   }
-  
-  void forAllPrimaryFiles(llvm::function_ref<void(const InputFile &)> fn) const {
+
+  // FIXME: dmu reify forEachInputNeedingOutputs to elim these
+  // (maybe) and reify count of same
+  void forEachPrimaryInput(llvm::function_ref<void(InputFile &input)> fn) {
+    for (auto p : PrimaryInputs)
+      fn(getAllFiles()[p.second]);
+  }
+
+  void
+  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const {
     for (const auto p: PrimaryInputs) {
       fn(getAllFiles()[p.second]);
     }
@@ -179,15 +176,6 @@ public:
 
   bool isWholeModule() const { return !hasPrimaries(); }
 
-  bool forEachPrimaryOrEmptyWithErrors(
-      llvm::function_ref<bool(StringRef)> fn) const {
-    if (!hasPrimaries())
-      return fn("");
-    for (const auto &p : PrimaryInputs)
-      if (fn(p.first))
-        return true;
-    return false;
-  }
 
   // Count-dependend readers:
 
@@ -258,6 +246,26 @@ public:
   void clearInputs() {
     AllFiles.clear();
     PrimaryInputs.clear();
+  }
+
+  // FIXME: dmu move? redo??
+  const InputFile &getFirstInput() const {
+    assert(hasInputs());
+    return getAllInputs()[0];
+  }
+
+  // Returns the single OutputFilename if there is one
+  const StringRef singleOutputFilenameFIXME() const {
+    StringRef result;
+    for (const auto &input : AllFiles) {
+      auto fn = input.outputs().OutputFilename;
+      if (fn.empty())
+        continue;
+      if (!result.empty())
+        return "";
+      result = fn;
+    }
+    return result;
   }
 };
 

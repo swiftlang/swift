@@ -218,7 +218,8 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 
 void FrontendOptions::forAllOutputPathsForMakeDependencies(
     std::function<void(const std::string &)> fn) const {
-   InputsAndOutputs.forAllInputsNeedingOutputs( [&] (const InputFile &input) -> void {
+  InputsAndOutputs.forEachInputNeedingOutputs([&](const InputFile &input)
+                                                  -> void {
     if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
         RequestedAction != FrontendOptions::ActionType::MergeModules &&
         !input.outputs().OutputFilename.empty()) {
