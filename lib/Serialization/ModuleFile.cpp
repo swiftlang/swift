@@ -1793,7 +1793,7 @@ void ModuleFile::loadObjCMethods(
 }
 
 Optional<TinyPtrVector<ValueDecl *>>
-ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
 
@@ -1801,7 +1801,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
   assert(DeclMemberNames);
 
   TinyPtrVector<ValueDecl *> results;
-  auto i = DeclMemberNames->find(N.getBaseName());
+  auto i = DeclMemberNames->find(N);
   if (i == DeclMemberNames->end())
     return results;
 
