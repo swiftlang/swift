@@ -1207,24 +1207,6 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
 };
 
-/// Base class for allocation/deallocation instructions where the allocation
-/// can be promoted to the stack.
-/// Note that IRGen can still decide to _not_ promote the allocation on the
-/// stack.
-class StackPromotable {
-
-  /// If true, the allocation can be done on the stack (the final decision is
-  /// in IRGen).
-  bool OnStack = false;
-
-public:
-  StackPromotable(bool OnStack) : OnStack(OnStack) { }
-
-  bool canAllocOnStack() const { return OnStack; }
-
-  void setStackAllocatable() { OnStack = true; }
-};
-
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -6152,14 +6134,23 @@ class DeallocStackInst :
 /// most derived type of the allocated instance.
 class DeallocRefInst :
   public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
-                              DeallocationInst>,
-  public StackPromotable {
+                              DeallocationInst> {
   friend SILBuilder;
 
 private:
   DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand,
                  bool canBeOnStack = false)
-      : UnaryInstructionBase(DebugLoc, Operand), StackPromotable(canBeOnStack) {
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    SILInstruction::Bits.DeallocRefInst.OnStack = canBeOnStack;
+  }
+
+public:
+  bool canAllocOnStack() const {
+    return SILInstruction::Bits.DeallocRefInst.OnStack;
+  }
+
+  void setStackAllocatable(bool OnStack) {
+    SILInstruction::Bits.DeallocRefInst.OnStack = OnStack;
   }
 };
 

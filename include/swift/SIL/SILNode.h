@@ -139,6 +139,7 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(T, U, (C)+32, __VA_ARGS__)
 
   SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
 
@@ -146,9 +147,14 @@ protected:
     : NumPadBits,
     numBits : 32
   );
+
   SWIFT_INLINE_BITFIELD_FULL(FloatLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
+    OnStack : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
@@ -277,6 +283,7 @@ protected:
     SWIFT_INLINE_BITS(LoadInst);
     SWIFT_INLINE_BITS(IntegerLiteralInst);
     SWIFT_INLINE_BITS(FloatLiteralInst);
+    SWIFT_INLINE_BITS(DeallocRefInst);
   } Bits;
 
 private:
