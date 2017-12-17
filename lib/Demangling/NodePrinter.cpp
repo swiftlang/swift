@@ -544,12 +544,11 @@ private:
   }
 
   NodePointer getChildIf(NodePointer Node, Node::Kind Kind) {
-    const auto &iter = *Node;
     auto result =
-        std::find_if(iter.begin(), iter.end(), [&](NodePointer child) {
+        std::find_if(Node->begin(), Node->end(), [&](NodePointer child) {
           return child->getKind() == Kind;
         });
-    return result == iter.end() ? nullptr : *result;
+    return result != Node->end() ? *result : nullptr;
   }
 
   void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
@@ -588,10 +587,15 @@ private:
                [&](NodePointer Param) {
                  assert(Param->getKind() == Node::Kind::TupleElement);
 
-                 if (hasLabels)
+                 if (hasLabels) {
                    Printer << getLabelFor(Param, ParamIndex) << ':';
-                 else if (!showTypes)
-                   Printer << "_:";
+                 } else if (!showTypes) {
+                   if (auto Label = getChildIf(Param,
+                                               Node::Kind::TupleElementName))
+                     Printer << Label->getText() << ":";
+                   else
+                     Printer << "_:";
+                 }
 
                  if (hasLabels && showTypes)
                    Printer << ' ';
@@ -1904,7 +1908,12 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
     if (!OverwriteName.empty()) {
       Printer << OverwriteName;
     } else {
-      print(Entity->getChild(1));
+      auto Name = Entity->getChild(1);
+      if (Name->getKind() != Node::Kind::PrivateDeclName)
+        print(Name);
+
+      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
+        print(PrivateName);
     }
     if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
       Printer << '.';
