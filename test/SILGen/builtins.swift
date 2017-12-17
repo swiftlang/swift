@@ -909,3 +909,16 @@ func retain(ptr: Builtin.NativeObject) {
 func release(ptr: Builtin.NativeObject) {
   Builtin.release(ptr)
 }
+
+//===----------------------------------------------------------------------===//
+// Other Operations
+//===----------------------------------------------------------------------===//
+
+func once_helper() {}
+
+// CHECK-LABEL: sil hidden @_T08builtins4onceyBp7control_tF
+// CHECK:      [[T0:%.*]] = function_ref @_T08builtins11once_helperyyFTo : $@convention(c) () -> ()
+// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) () -> ())
+func once(control: Builtin.RawPointer) {
+  Builtin.once(control, once_helper)
+}
