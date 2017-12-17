@@ -134,6 +134,9 @@ public:
   BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
   ~BBEnumTagDataflowState() = default;
 
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
   bool init(SILBasicBlock *NewBB) {
     assert(NewBB && "NewBB should not be null");
     BB = NewBB;
@@ -731,6 +734,27 @@ bool BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(
   }
 
   return Changed;
+}
+
+void BBEnumTagDataflowState::dump() const {
+#ifndef NDEBUG
+  llvm::dbgs() << "Dumping state for BB" << BB.get()->getDebugID() << "\n";
+  // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
+  for (auto &P : EnumToEnumBBCaseListMap) {
+    if (!P.hasValue()) {
+      llvm::dbgs() << "  NULL enum value... skipping!\n";
+      continue;
+    }
+    llvm::dbgs() << "  Found value: " << P->first << "\n";
+    llvm::dbgs() << "  Case List:\n";
+    for (auto &P2 : P->second) {
+      llvm::dbgs() << "    BB" << P2.first->getDebugID() << ": ";
+      P2.second->dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    llvm::dbgs() << "  End Case List.\n";
+  }
+#endif
 }
 
 //===----------------------------------------------------------------------===//
