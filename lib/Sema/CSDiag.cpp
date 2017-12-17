@@ -5735,11 +5735,18 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       diag.highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
 
-      auto contextualType = CS.getContextualType();
-      if (contextualType && contextualType->isEqual(rhsType)) {
-        tryIntegerCastFixIts(diag, CS, lhsType, rhsType, lhsExpr);
-      } else {
-        tryIntegerCastFixIts(diag, CS, rhsType, lhsType, rhsExpr);
+      for (auto &candidate : calleeInfo.candidates) {
+        auto tupleType = dyn_cast<TupleType>(candidate.getArgumentType().getPointer());
+        if (!tupleType || tupleType->getNumElements() != 2)
+          continue;
+
+        if (!rhsType->isEqual(tupleType->getElementType(1)) &&
+            tryIntegerCastFixIts(diag, CS, rhsType, tupleType->getElementType(1), rhsExpr))
+          break;
+
+        if (!lhsType->isEqual(tupleType->getElementType(0)) &&
+            tryIntegerCastFixIts(diag, CS, lhsType, tupleType->getElementType(0), lhsExpr))
+          break;
       }
     } else {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,

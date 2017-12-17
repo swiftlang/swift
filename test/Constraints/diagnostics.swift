@@ -936,7 +936,7 @@ func SR_6272_a() {
   enum Foo: Int {
     case bar
   }
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{22-28=}} {{29-30=}}
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{3-3=Float(}} {{19-19=)}}
   // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
   Foo.bar.rawValue * Float(0)
 
@@ -969,13 +969,33 @@ func SR_6272_c() {
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'String'}} {{none}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
   Int(3) * "0"
-}
 
-func SR_6272_d() {
   struct S {}
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'S'}} {{none}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
   Int(10) * S()
+}
+
+struct SR_6272_D: ExpressibleByIntegerLiteral {
+  typealias IntegerLiteralType = Int
+  init(integerLiteral: Int) {}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
+}
+
+func SR_6272_d() {
+  let x: Float = 1.0
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{50-50=Int(}} {{51-51=)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + x
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Double'}} {{50-50=Int(}} {{54-54=)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Double, Double)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + 42.0
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{50-50=Int(}} {{51-51=)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + x + 1.0
 }
 
 // Ambiguous overload inside a trailing closure
