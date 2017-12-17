@@ -37,6 +37,12 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
 
 public:
+  OutputPaths SingleThreadedWMOOutputs;
+  bool isSingleThreadedWMO() const {
+    return !SingleThreadedWMOOutputs.OutputFilename.empty();
+  }
+
+public:
   FrontendInputsAndOutputs() = default;
 
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
@@ -61,14 +67,6 @@ public:
       pointers.push_back(&input);
     }
     return pointers;
-  }
-  // FIXME: dmu Can I use an iterator instead of making a new collection?
-
-  std::vector<InputFile *> getPointersToAllPrimaries() {
-    std::vector<InputFile *> primaries;
-    forEachPrimaryInput(
-        [&](InputFile &input) -> void { primaries.push_back(&input); });
-    return primaries;
   }
 
   const InputFile &firstPrimary() const {
@@ -134,48 +132,46 @@ public:
   bool areAllNonPrimariesSIB() const;
 
 public:
-  // FIXME: dmu what about nonthreaded WMO? Should be 1.
-  unsigned countOfFilesNeededOutput() const {
+  unsigned countOfFilesProducingOutput() const {
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
 
-  void forEachInputNeedingOutputs(
-      llvm::function_ref<void(const InputFile &)> fn) const {
-    if (hasPrimaries())
-      forEachPrimaryInput(fn);
-    else
-      forEachInput(fn);
+  bool forEachInputProducingOutput(
+      llvm::function_ref<bool(const InputFile &)> fn) const {
+    return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
   }
 
-  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const {
-    for (const auto &file : getAllInputs()) {
-      fn(file);
-    }
+  bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const {
+    for (const auto &file : getAllInputs())
+      if (fn(file))
+        return true;
+    return false;
   }
 
-  void
-  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const {
-    for (const auto p: PrimaryInputs) {
-      fn(getAllInputs()[p.second]);
-    }
+  bool
+  forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const {
+    for (const auto p : PrimaryInputs)
+      if (fn(getAllInputs()[p.second]))
+        return true;
+    return false;
   }
 
-  void forEachInputNeedingOutputs(llvm::function_ref<void(InputFile &)> fn) {
-    if (hasPrimaries())
-      forEachPrimaryInput(fn);
-    else
-      forEachInput(fn);
+  bool forEachInputProducingOutput(llvm::function_ref<bool(InputFile &)> fn) {
+    return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
   }
 
-  void forEachInput(llvm::function_ref<void(InputFile &)> fn) {
-    for (auto &file : getAllInputs()) {
-      fn(file);
-    }
+  bool forEachInput(llvm::function_ref<bool(InputFile &)> fn) {
+    for (auto &file : getAllInputs())
+      if (fn(file))
+        return true;
+    return false;
   }
 
-  void forEachPrimaryInput(llvm::function_ref<void(InputFile &input)> fn) {
+  bool forEachPrimaryInput(llvm::function_ref<bool(InputFile &input)> fn) {
     for (auto p : PrimaryInputs)
-      fn(getAllInputs()[p.second]);
+      if (fn(getAllInputs()[p.second]))
+        return true;
+    return false;
   }
 
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
@@ -187,7 +183,6 @@ public:
   bool hasPrimaries() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() const { return !hasPrimaries(); }
-
 
   // Count-dependend readers:
 

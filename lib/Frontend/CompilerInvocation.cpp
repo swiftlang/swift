@@ -262,8 +262,6 @@ private:
   bool computeModuleName();
 
   bool computeOutputFilenames();
-  bool checkNumberOfOutputArguments(unsigned outputArgumentCount,
-                                    unsigned filesNeedingOutputCount) const;
   bool computeOutputFilenamesForPrimary(StringRef primaryOrEmpty,
                                         StringRef correspondingOutputFile);
 
@@ -714,72 +712,45 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   return false;
 }
 
-// Frontend is called with one directory output for testing
-static bool areOutputArgumentsUniqueDirectory(
-    llvm::ArrayRef<std::string> outputFileArguments) {
-  return outputFileArguments.size() == 1 &&
-         llvm::sys::fs::is_directory(outputFileArguments[0]);
-}
-
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
-  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
+  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction))
     return false;
-  }
+
   ArrayRef<std::string> outputFileArguments =
       getOutputFilenamesFromCommandLineOrFilelist();
 
-  if (checkNumberOfOutputArguments(
-          outputFileArguments.size(),
-          Opts.InputsAndOutputs.countOfFilesNeededOutput()))
-    return true;
-  // FIXME: dmu can I just use function pointers without the lambdas?
-  // WMO threaded or batch mode or WMO one input
-  llvm::function_ref<bool(StringRef, InputFile &)> assignUnaltered =
-      [&](StringRef s, InputFile &input) -> bool {
-    input.malleableOutputs().OutputFilename = s;
-    return false;
-  };
-  // For testing: supply a directory that gets used for each primary or threaded
-  // WMO input
-  llvm::function_ref<bool(StringRef, InputFile &)> deriveForDirectory =
-      [&](StringRef dir, InputFile &input) -> bool {
-    return deriveOutputFileForDirectory(dir, input);
-  };
-  // For testing: derive output name from input name.
-  llvm::function_ref<bool(StringRef, InputFile &)> deriveFromInput =
-      [&](StringRef, InputFile &input) -> bool {
-    return deriveOutputFileFromInput(input);
-  };
-  llvm::function_ref<bool(StringRef, InputFile &)> fn =
-      areOutputArgumentsUniqueDirectory(outputFileArguments)
-          ? deriveForDirectory
-          : outputFileArguments.empty() ? deriveFromInput : assignUnaltered;
+  if (outputFileArguments.empty())
+    return Opts.InputsAndOutputs.forEachInputProducingOutput(
+        [&](InputFile &input) -> bool {
+          return deriveOutputFileFromInput(input);
+        });
 
-  unsigned i = 0;
-  bool hadError = false;
-  Opts.InputsAndOutputs.forEachInputNeedingOutputs(
-      [&](InputFile &input) -> void {
-        auto output = outputFileArguments.empty()
-                          ? StringRef()
-                          : outputFileArguments.size() == 1
-                                ? StringRef(outputFileArguments[0])
-                                : StringRef(outputFileArguments[i++]);
-        hadError = fn(output, input) || hadError;
-      });
-  return hadError;
-}
-
-bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(
-    unsigned outputArgumentCount, unsigned filesNeedingOutputCount) const {
-  if (outputArgumentCount > 1 &&
-      outputArgumentCount != filesNeedingOutputCount) {
-    Diags.diagnose(SourceLoc(),
-                   Opts.InputsAndOutputs.hasPrimaries()
-                       ? diag::error_output_files_must_correspond_to_primaries
-                       : diag::error_output_files_must_correspond_to_inputs);
-    return true;
+  if (outputFileArguments.size() == 1 &&
+      llvm::sys::fs::is_directory(outputFileArguments[0]))
+    return Opts.InputsAndOutputs.forEachInputProducingOutput(
+        [&](InputFile &input) -> bool {
+          return deriveOutputFileForDirectory(outputFileArguments[0], input);
+        });
+  if (outputFileArguments.size() ==
+      Opts.InputsAndOutputs.countOfFilesProducingOutput()) {
+    unsigned i = 0;
+    return Opts.InputsAndOutputs.forEachInputProducingOutput(
+        [&](InputFile &input) -> bool {
+          input.malleableOutputs().OutputFilename = outputFileArguments[i++];
+          return false;
+        });
   }
-  return false;
+  if (outputFileArguments.size() == 1 && Opts.InputsAndOutputs.hasInputs() &&
+      !Opts.InputsAndOutputs.hasPrimaries()) {
+    Opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename =
+        outputFileArguments[0];
+    return false;
+  }
+  Diags.diagnose(SourceLoc(),
+                 Opts.InputsAndOutputs.hasPrimaries()
+                     ? diag::error_output_files_must_correspond_to_primaries
+                     : diag::error_output_files_must_correspond_to_inputs);
+  return true;
 }
 
 bool FrontendArgsToOptionsConverter::deriveOutputFileFromInput(
@@ -868,7 +839,7 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
 // FIXME: dmu assumes same indices as... what?
 std::vector<OutputPaths>
 FrontendArgsToOptionsConverter::getSupplementaryFilenamesFromFilelists() {
-  const unsigned N = Opts.InputsAndOutputs.countOfFilesNeededOutput();
+  const unsigned N = Opts.InputsAndOutputs.countOfFilesProducingOutput();
 
   auto objCHeaderOutput = readSupplementaryOutputFileList(
       options::OPT_objCHeaderOutput_filelist, N);
@@ -928,14 +899,12 @@ bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
 
-  bool hadError = false;
   unsigned i = 0;
-  Opts.InputsAndOutputs.forEachInputNeedingOutputs(
-      [&](InputFile &input) -> void {
+  return Opts.InputsAndOutputs.forEachInputProducingOutput(
+      [&](InputFile &input) -> bool {
         determineSupplementaryOutputFilenames(suppFilelistArgs[i++], input);
-        hadError = checkUnusedOutputPaths(input) || hadError;
+        return checkUnusedOutputPaths(input);
       });
-  return false;
 }
 
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
@@ -1730,20 +1699,23 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 
 static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
                                   IRGenOptions &opts) {
+  if (io.isSingleThreadedWMO()) {
+    opts.OutputForSingleThreadedWMO =
+        io.SingleThreadedWMOOutputs.OutputFilename;
+    return;
+  }
   if (io.hasPrimaries()) {
     // FIXME: dmu indices matching
-    io.forEachPrimaryInput([&](const InputFile &input) -> void {
+    io.forEachPrimaryInput([&](const InputFile &input) -> bool {
       opts.OutputsForBatchMode.push_back(input.outputs());
+      return false;
     });
     return;
   }
-  auto fn = io.singleOutputFilenameFIXME();
-  if (!fn.empty())
-    opts.OutputForSingleThreadedWMO = fn;
-  else
-    io.forEachInput([&](const InputFile &input) -> void {
-      opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
-    });
+  io.forEachInput([&](const InputFile &input) -> bool {
+    opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
+    return false;
+  });
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
