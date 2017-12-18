@@ -312,6 +312,44 @@ func testReabstractionThunk(p1: inout ParameterizedStruct<Int>,
   }
 }
 
+
+func takesNoEscapeBlockClosure
+(
+  _ p: inout Int, _ c: @convention(block) () -> ()
+) { }
+
+func takesEscapingBlockClosure
+(
+  _ p: inout Int, _ c: @escaping @convention(block) () -> ()
+) { }
+
+func testCallNoEscapeBlockClosure() {
+  var i = 7
+  takesNoEscapeBlockClosure(&i) {
+    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    i = 7
+    // expected-note@-1 {{conflicting access is here}}
+  }
+}
+
+func testCallEscapingBlockClosure() {
+  var i = 7
+  takesEscapingBlockClosure(&i) { // no-warning
+    i = 7
+  }
+}
+
+
+
+func testCallNonEscapingWithEscapedBlock() {
+  var i = 7
+  let someBlock : @convention(block) () -> () = {
+    i = 8
+  }
+
+  takesNoEscapeBlockClosure(&i, someBlock) // no-warning
+}
+
 func takesInoutAndClosureWithGenericArg<T>(_ p: inout Int, _ c: (T) -> Int) { }
 
 func callsTakesInoutAndClosureWithGenericArg() {
