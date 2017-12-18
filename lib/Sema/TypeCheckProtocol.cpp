@@ -1898,6 +1898,32 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // Record the type witness.
   Conformance->setTypeWitness(assocType, type, typeDecl);
+
+  // Record type witnesses for any "overridden" associated types.
+  llvm::SetVector<AssociatedTypeDecl *> overriddenAssocTypes;
+  overriddenAssocTypes.insert(assocType->getOverriddenDecls().begin(),
+                              assocType->getOverriddenDecls().end());
+  for (unsigned idx = 0; idx < overriddenAssocTypes.size(); ++idx) {
+    auto overridden = overriddenAssocTypes[idx];
+
+    // Note all of the newly-discovered overridden associated types.
+    overriddenAssocTypes.insert(overridden->getOverriddenDecls().begin(),
+                                overridden->getOverriddenDecls().end());
+
+    // Find the conformance for this overridden protocol.
+    auto overriddenConformance =
+      DC->getParentModule()->lookupConformance(Adoptee,
+                                               overridden->getProtocol());
+    if (!overriddenConformance ||
+        !overriddenConformance->isConcrete())
+      continue;
+
+    auto overriddenRootConformance =
+      overriddenConformance->getConcrete()->getRootNormalConformance();
+    ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
+      .recordTypeWitness(overridden, type, typeDecl,
+                         /*performRedeclarationCheck=*/true);
+  }
 }
 
 bool swift::
