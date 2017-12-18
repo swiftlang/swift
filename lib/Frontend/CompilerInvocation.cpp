@@ -358,7 +358,8 @@ bool FrontendArgsToOptionsConverter::convert() {
   }
 
   computeDumpScopeMapLocations();
-  Opts.RequestedAction = FrontendOptions::determineRequestedAction(Args);
+  Opts.RequestedAction =
+      FrontendArgsToOptionsConverter::determineRequestedAction(Args);
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
       Opts.InputsAndOutputs.hasPrimaries()) {
@@ -859,7 +860,7 @@ static void deriveModuleParameters(const ArgList &args,
       requestedAction == FrontendOptions::ActionType::MergeModules ||
       requestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
 
-  auto moduleExtension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
 
   mainOutputIfUsable = canUseMainOutputForModule ? singleOutputFilename : "";
 }
@@ -962,7 +963,7 @@ static Optional<OutputPaths> computeOutputsForOneInput(
       deriveSupplementaryOutputFromInputOrModule(*outputFilename, input.file(),
                                                  input.isPrimary(), moduleName);
 
-  Optional<OutputPaths> outputPaths = determineSupplementaryOutputFilenames(
+  return determineSupplementaryOutputFilenames(
       args, *outputFilename, singleInputFilename, suppFileListArg,
       supplementaryNameFromInputOrModule, diags);
 }
@@ -978,8 +979,8 @@ static bool computeAllOutputs(
   StringRef singleInputFilename =
       io.hasSingleInput() ? io.getFilenameOfFirstInput() : StringRef();
 
-  // const bool oneSetOfOutputPathsForWMO
-  if (isSingleThreadedWMO) {
+  const bool oneSetOfOutputPathsForWMO = false;
+  if (isSingleThreadedWMO && oneSetOfOutputPathsForWMO) {
     Optional<OutputPaths> outputPaths = computeOutputsForOneInput(
         args, outputFileArguments, outputFileArguments.front(),
         isOutputFilenameArgumentOneDirectory,
@@ -987,7 +988,8 @@ static bool computeAllOutputs(
         io.getFirstInput(), moduleName, suppFileListArgs.front(), diags);
     if (!outputPaths)
       return true;
-    input.setSingleThreadedWMOOutputs(*outputPaths);
+    io.setSingleThreadedWMOOutputs(*outputPaths);
+    return false;
   }
 
   unsigned i = 0;
@@ -1008,7 +1010,10 @@ static bool computeAllOutputs(
 
         if (!outputPaths)
           return true;
+        if (isSingleThreadedWMO && i == 0 && !oneSetOfOutputPathsForWMO)
+          io.setSingleThreadedWMOOutputs(*outputPaths);
         input.setOutputs(*outputPaths);
+        ++i;
         return false;
       });
 }
@@ -1768,7 +1773,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
     StringRef BaseName =
-        FEOpts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
+        FEOpts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename;
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1831,7 +1836,7 @@ static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
                                   IRGenOptions &opts) {
   if (io.isSingleThreadedWMO()) {
     opts.OutputForSingleThreadedWMO =
-        io.SingleThreadedWMOOutputs.OutputFilename;
+        io.getSingleThreadedWMOOutputs()->OutputFilename;
     return;
   }
   io.forEachPrimaryInput([&](const InputFile &input) -> bool {

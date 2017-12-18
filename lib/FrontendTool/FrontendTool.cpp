@@ -543,7 +543,7 @@ static bool performCompile(CompilerInstance &Instance,
     return clangImporter->emitBridgingPCH(
         Invocation.getFrontendOptions()
             .InputsAndOutputs.getFilenameOfFirstInput(),
-        opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename);
+        opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename);
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
@@ -711,8 +711,9 @@ static bool performCompile(CompilerInstance &Instance,
     else if (Action == FrontendOptions::ActionType::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
     else if (Action == FrontendOptions::ActionType::EmitSyntax) {
-      emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
-                 opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename);
+      emitSyntax(
+          SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
+          opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename);
     } else
       SF->dump();
     return Context.hadError();
@@ -838,7 +839,7 @@ static bool performCompile(CompilerInstance &Instance,
       performSILLinking(SM.get(), true);
     return writeSIL(
         *SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-        opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename,
+        opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename,
         opts.EmitSortedSIL);
   }
 
@@ -1041,7 +1042,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitSIL) {
     return writeSIL(
         *SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-        opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename,
+        opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename,
         opts.EmitSortedSIL);
   }
 
@@ -1089,7 +1090,7 @@ static bool performCompile(CompilerInstance &Instance,
   } else {
     IRModule = performIRGeneration(
         IRGenOpts, Instance.getMainModule(), std::move(SM),
-        opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename,
+        opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename,
         LLVMContext, &HashGlobal);
   }
 
@@ -1147,11 +1148,12 @@ static bool performCompile(CompilerInstance &Instance,
   Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(
-             IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
-             IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
-             opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename,
-             Stats) ||
+  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
+                     IRModule.get(), TargetMachine.get(),
+                     EffectiveLanguageVersion,
+                     opts.InputsAndOutputs.getSingleThreadedWMOOutputs()
+                         ->OutputFilename,
+                     Stats) ||
          HadError;
 }
 
@@ -1178,7 +1180,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
   if (PrimarySourceFile) {
     if (index::indexAndRecord(
             PrimarySourceFile,
-            opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename,
+            opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename,
             opts.IndexStorePath, opts.IndexSystemModules, isDebugCompilation,
             Invocation.getTargetTriple(), *Instance.getDependencyTracker())) {
       return true;
@@ -1188,7 +1190,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
         opts.InputsAndOutputs.pathsForAtMostOnePrimary().ModuleOutputPath;
     if (moduleToken.empty())
       moduleToken =
-          opts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
+          opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename;
 
     if (index::indexAndRecord(
             Instance.getMainModule(),
@@ -1436,7 +1438,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
         FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile =
-        FEOpts.InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
+        FEOpts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename;
     StringRef OutputType = llvm::sys::path::extension(OutFile);
     std::string TripleName = LangOpts.Target.normalize();
     auto &SM = Instance->getSourceMgr();

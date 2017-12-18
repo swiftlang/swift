@@ -35,13 +35,17 @@ class FrontendInputsAndOutputs {
   std::vector<InputFile> AllFiles;
   typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
+  Optional<OutputPaths> SingleThreadedWMOOutputs;
 
 public:
-  // FIXME: dmu, some refs to this may be just looking for any old output
-  // filename (last?)
-  OutputPaths SingleThreadedWMOOutputs;
+  Optional<OutputPaths> getSingleThreadedWMOOutputs() const {
+    return SingleThreadedWMOOutputs;
+  }
+  void setSingleThreadedWMOOutputs(const OutputPaths &outputs) {
+    SingleThreadedWMOOutputs = outputs;
+  }
   bool isSingleThreadedWMO() const {
-    return !SingleThreadedWMOOutputs.OutputFilename.empty();
+    return SingleThreadedWMOOutputs.hasValue();
   }
 
 public:

@@ -372,9 +372,9 @@ static void setModuleName(CompilerInvocation &Invocation) {
   if (!Invocation.getModuleName().empty())
     return;
 
-  StringRef Filename =
-      Invocation.getFrontendOptions()
-          .InputsAndOutputs.SingleThreadedWMOOutputs.OutputFilename;
+  StringRef Filename = Invocation.getFrontendOptions()
+                           .InputsAndOutputs.getSingleThreadedWMOOutputs()
+                           ->OutputFilename;
   if (Filename.empty()) {
     if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
       Invocation.setModuleName("__main__");
