@@ -737,6 +737,8 @@ namespace {
 
     bool isAddress() const { return Value->getType().isAddress(); }
 
+    SILType getSILType() const { return Value->getType(); }
+
     Source() = default;
     Source(SILValue value, CanType formalType)
       : Value(value), FormalType(formalType) {}
@@ -757,6 +759,12 @@ namespace {
       assert(!isAddress());
       assert(!value->getType().isAddress());
       return { value, FormalType };
+    }
+    SILType getSILType() const {
+      if (isAddress())
+        return Address->getType();
+      else
+        return LoweredType;
     }
 
     Target() = default;
@@ -813,7 +821,8 @@ namespace {
     }
 
     Source emitSameType(Source source, Target target) {
-      assert(source.FormalType == target.FormalType);
+      assert(source.FormalType == target.FormalType ||
+             source.getSILType() == target.getSILType());
 
       auto &srcTL = getTypeLowering(source.Value->getType());
 
@@ -845,7 +854,8 @@ namespace {
     }
 
     Source emit(Source source, Target target) {
-      if (source.FormalType == target.FormalType)
+      if (source.FormalType == target.FormalType ||
+          source.getSILType() == target.getSILType())
         return emitSameType(source, target);
 
       // Handle subtype conversions involving optionals.
