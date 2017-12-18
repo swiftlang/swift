@@ -73,12 +73,12 @@ bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
                                 OptRemark::Emitter *ORE = nullptr);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
                                   MethodInst *MI);
-DevirtualizationResult
-devirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
-                        OptRemark::Emitter *ORE = nullptr);
+DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
+                                               SILValue ClassInstance,
+                                               OptRemark::Emitter *ORE);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance,
-                                                  OptRemark::Emitter *ORE = nullptr);
+                                                  OptRemark::Emitter *ORE);
 DevirtualizationResult
 tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
 }
