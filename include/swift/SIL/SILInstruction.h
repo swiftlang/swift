@@ -5246,14 +5246,16 @@ class TupleElementAddrInst
 {
   friend SILBuilder;
 
-  unsigned FieldNo;
-
   TupleElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                        unsigned FieldNo, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), FieldNo(FieldNo) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    SILInstruction::Bits.TupleElementAddrInst.FieldNo = FieldNo;
+  }
 
 public:
-  unsigned getFieldNo() const { return FieldNo; }
+  unsigned getFieldNo() const {
+    return SILInstruction::Bits.TupleElementAddrInst.FieldNo;
+  }
 
 
   TupleType *getTupleType() const {

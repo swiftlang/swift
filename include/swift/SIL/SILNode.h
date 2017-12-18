@@ -221,6 +221,10 @@ protected:
     : NumPadBits,
     FieldNo : 32
   );
+  SWIFT_INLINE_BITFIELD_FULL(TupleElementAddrInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_FULL(WitnessMethodInst, MethodInst, 32,
@@ -295,6 +299,7 @@ protected:
     SWIFT_INLINE_BITS(DeallocRefInst);
     SWIFT_INLINE_BITS(WitnessMethodInst);
     SWIFT_INLINE_BITS(TupleExtractInst);
+    SWIFT_INLINE_BITS(TupleElementAddrInst);
   } Bits;
 
 private:
