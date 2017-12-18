@@ -5740,12 +5740,20 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (!tupleType || tupleType->getNumElements() != 2)
           continue;
 
-        if (!rhsType->isEqual(tupleType->getElementType(1)) &&
-            tryIntegerCastFixIts(diag, CS, rhsType, tupleType->getElementType(1), rhsExpr))
+        auto lhsCandidate = tupleType->getElementType(0);
+        auto rhsCandidate = tupleType->getElementType(1);
+        auto lhsIsCandidate = lhsType->isEqual(lhsCandidate);
+        auto rhsIsCandidate = rhsType->isEqual(rhsCandidate);
+
+        if (!lhsIsCandidate && !rhsIsCandidate)
+          continue;
+
+        if (!lhsIsCandidate &&
+            tryIntegerCastFixIts(diag, CS, lhsType, lhsCandidate, lhsExpr))
           break;
 
-        if (!lhsType->isEqual(tupleType->getElementType(0)) &&
-            tryIntegerCastFixIts(diag, CS, lhsType, tupleType->getElementType(0), lhsExpr))
+        if (!rhsIsCandidate &&
+            tryIntegerCastFixIts(diag, CS, rhsType, rhsCandidate, rhsExpr))
           break;
       }
     } else {
