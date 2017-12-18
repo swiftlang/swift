@@ -10,56 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An iterator that produces the elements contained in each segment
-/// produced by some `Base` Iterator.
-///
-/// The elements traversed are the concatenation of those in each
-/// segment produced by the base iterator.
-///
-/// - Note: This is the `IteratorProtocol` used by `FlattenSequence`,
-///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Sequence
-  where Base.Element : Sequence {
-
-  /// Construct around a `base` iterator.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(_base: Base) {
-    self._base = _base
-  }
-
-  /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.
-  ///
-  /// Once `nil` has been returned, all subsequent calls return `nil`.
-  ///
-  /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func next() -> Base.Element.Element? {
-    repeat {
-      if _fastPath(_inner != nil) {
-        let ret = _inner!.next()
-        if _fastPath(ret != nil) {
-          return ret
-        }
-      }
-      let s = _base.next()
-      if _slowPath(s == nil) {
-        return nil
-      }
-      _inner = s!.makeIterator()
-    }
-    while true
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _base: Base
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _inner: Base.Element.Iterator?
-}
-
 /// A sequence consisting of all the elements contained in each segment
 /// contained in some `Base` sequence.
 ///
@@ -76,8 +26,10 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
 ///
 /// - See also: `FlattenCollection`
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct FlattenSequence<Base : Sequence> : Sequence
-  where Base.Element : Sequence {
+public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _base: Base
 
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
@@ -87,17 +39,62 @@ public struct FlattenSequence<Base : Sequence> : Sequence
   internal init(_base: Base) {
     self._base = _base
   }
+}
 
+extension FlattenSequence {
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Iterator {
+    @_versioned // FIXME(sil-serialize-all)
+    internal var _base: Base.Iterator
+    @_versioned // FIXME(sil-serialize-all)
+    internal var _inner: Base.Element.Iterator?
+
+    /// Construct around a `base` iterator.
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_base: Base.Iterator) {
+      self._base = _base
+    }
+  }
+}
+
+extension FlattenSequence.Iterator: IteratorProtocol {
+  public typealias Element = Base.Element.Element
+  
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  ///
+  /// - Precondition: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made.
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func next() -> Element? {
+    repeat {
+      if _fastPath(_inner != nil) {
+        let ret = _inner!.next()
+        if _fastPath(ret != nil) {
+          return ret
+        }
+      }
+      let s = _base.next()
+      if _slowPath(s == nil) {
+        return nil
+      }
+      _inner = s!.makeIterator()
+    }
+    while true
+  }
+}
+
+extension FlattenSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base: _base.makeIterator())
+  public func makeIterator() -> Iterator {
+    return Iterator(_base: _base.makeIterator())
   }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _base: Base
 }
 
 extension Sequence where Element : Sequence {
@@ -131,85 +128,11 @@ extension Sequence where Element : Sequence {
 }
 
 extension LazySequenceProtocol where Element : Sequence {
-
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
   @_inlineable // FIXME(sil-serialize-all)
-  public func joined() -> LazySequence<
-    FlattenSequence<Elements>
-  > {
+  public func joined() -> LazySequence<FlattenSequence<Elements>> {
     return FlattenSequence(_base: elements).lazy
-  }
-}
-
-/// A position in a FlattenCollection
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct FlattenCollectionIndex<BaseElements>
-  where
-  BaseElements : Collection,
-  BaseElements.Element : Collection {
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(
-    _ _outer: BaseElements.Index,
-    _ inner: BaseElements.Element.Index?) {
-    self._outer = _outer
-    self._inner = inner
-  }
-
-  /// The position in the outer collection of collections.
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _outer: BaseElements.Index
-
-  /// The position in the inner collection at `base[_outer]`, or `nil` if
-  /// `_outer == base.endIndex`.
-  ///
-  /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
-  /// when `_inner == nil`, `_outer == base.endIndex` and this index is
-  /// `endIndex` of the `FlattenCollection`.
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _inner: BaseElements.Element.Index?
-}
-
-extension FlattenCollectionIndex : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func == (
-    lhs: FlattenCollectionIndex<BaseElements>,
-    rhs: FlattenCollectionIndex<BaseElements>
-  ) -> Bool {
-    return lhs._outer == rhs._outer && lhs._inner == rhs._inner
-  }
-}
-
-extension FlattenCollectionIndex : Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func < (
-    lhs: FlattenCollectionIndex<BaseElements>,
-    rhs: FlattenCollectionIndex<BaseElements>
-  ) -> Bool {
-    // FIXME: swift-3-indexing-model: tests.
-    if lhs._outer != rhs._outer {
-      return lhs._outer < rhs._outer
-    }
-
-    if let lhsInner = lhs._inner, let rhsInner = rhs._inner {
-      return lhsInner < rhsInner
-    }
-
-    // When combined, the two conditions above guarantee that both
-    // `_outer` indices are `_base.endIndex` and both `_inner` indices
-    // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
-    _precondition(lhs._inner == nil && rhs._inner == nil)
-
-    return false
-  }
-}
-
-extension FlattenCollectionIndex : Hashable
-  where BaseElements.Index : Hashable, BaseElements.Element.Index : Hashable {
-  public var hashValue: Int {
-    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
   }
 }
 
@@ -227,7 +150,7 @@ extension FlattenCollectionIndex : Hashable
 /// * `c.lazy.joined().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
-///   that depend on `startIndex`, or of advancing a `FlattenCollectionIndex`
+///   that depend on `startIndex`, or of advancing an `Index`
 ///   depends on how many empty subcollections are found in the base
 ///   collection, and may not offer the usual performance given by `Collection`
 ///   or `Index`. Be aware, therefore, that general operation on
@@ -249,14 +172,83 @@ public struct FlattenCollection<Base>
   }
 }
 
+extension FlattenCollection {
+  /// A position in a FlattenCollection
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Index {
+    /// The position in the outer collection of collections.
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _outer: Base.Index
+
+    /// The position in the inner collection at `base[_outer]`, or `nil` if
+    /// `_outer == base.endIndex`.
+    ///
+    /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
+    /// when `_inner == nil`, `_outer == base.endIndex` and this index is
+    /// `endIndex` of the `FlattenCollection`.
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _inner: Base.Element.Index?
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_ _outer: Base.Index, _ inner: Base.Element.Index?) {
+      self._outer = _outer
+      self._inner = inner
+    }
+  }
+}
+
+extension FlattenCollection.Index : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (
+    lhs: FlattenCollection<Base>.Index,
+    rhs: FlattenCollection<Base>.Index
+  ) -> Bool {
+    return lhs._outer == rhs._outer && lhs._inner == rhs._inner
+  }
+}
+
+extension FlattenCollection.Index : Comparable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (
+    lhs: FlattenCollection<Base>.Index,
+    rhs: FlattenCollection<Base>.Index
+  ) -> Bool {
+    // FIXME: swift-3-indexing-model: tests.
+    if lhs._outer != rhs._outer {
+      return lhs._outer < rhs._outer
+    }
+
+    if let lhsInner = lhs._inner, let rhsInner = rhs._inner {
+      return lhsInner < rhsInner
+    }
+
+    // When combined, the two conditions above guarantee that both
+    // `_outer` indices are `_base.endIndex` and both `_inner` indices
+    // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
+    _precondition(lhs._inner == nil && rhs._inner == nil)
+
+    return false
+  }
+}
+
+extension FlattenCollection.Index : Hashable
+  where Base.Index : Hashable, Base.Element.Index : Hashable {
+  public var hashValue: Int {
+    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
+  }
+}
+
 extension FlattenCollection : Sequence {
+  public typealias Iterator = FlattenSequence<Base>.Iterator
   public typealias SubSequence = Slice<FlattenCollection>
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base: _base.makeIterator())
+  public func makeIterator() -> Iterator {
+    return Iterator(_base: _base.makeIterator())
   }
 
   // To return any estimate of the number of elements, we have to start
@@ -265,9 +257,7 @@ extension FlattenCollection : Sequence {
   public var underestimatedCount: Int { return 0 }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _copyToContiguousArray()
-    -> ContiguousArray<Base.Element.Element> {
-
+  public func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only
@@ -288,12 +278,6 @@ extension FlattenCollection : Sequence {
 }
 
 extension FlattenCollection : Collection {
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = FlattenCollectionIndex<Base>
-
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -304,7 +288,7 @@ extension FlattenCollection : Collection {
     while outer != end {
       let innerCollection = _base[outer]
       if !innerCollection.isEmpty {
-        return FlattenCollectionIndex(outer, innerCollection.startIndex)
+        return Index(outer, innerCollection.startIndex)
       }
       _base.formIndex(after: &outer)
     }
@@ -319,7 +303,7 @@ extension FlattenCollection : Collection {
   /// `index(after:)`.
   @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index {
-    return FlattenCollectionIndex(_base.endIndex, nil)
+    return Index(_base.endIndex, nil)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -328,15 +312,14 @@ extension FlattenCollection : Collection {
     let innerCollection = _base[i._outer]
     let nextInner = innerCollection.index(after: i._inner!)
     if _fastPath(nextInner != innerCollection.endIndex) {
-      return FlattenCollectionIndex(i._outer, nextInner)
+      return Index(i._outer, nextInner)
     }
 
     var nextOuter = _base.index(after: i._outer)
     while nextOuter != _base.endIndex {
       let nextInnerCollection = _base[nextOuter]
       if !nextInnerCollection.isEmpty {
-        return FlattenCollectionIndex(
-          nextOuter, nextInnerCollection.startIndex)
+        return Index(nextOuter, nextInnerCollection.startIndex)
       }
       _base.formIndex(after: &nextOuter)
     }
@@ -360,8 +343,7 @@ extension FlattenCollection : Collection {
       prevInner = prevInnerCollection.endIndex
     }
 
-    return FlattenCollectionIndex(
-      prevOuter, prevInnerCollection.index(prevInner, offsetBy: -1))
+    return Index(prevOuter, prevInnerCollection.index(prevInner, offsetBy: -1))
   }
 
   // TODO: swift-3-indexing-model - add docs
@@ -582,7 +564,9 @@ extension LazyCollectionProtocol
   }
 }
 
-@available(*, deprecated, renamed: "FlattenCollectionIndex")
-public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollectionIndex<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection
+// @available(*, deprecated, renamed: "FlattenCollection.Index")
+public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
+@available(*, deprecated, renamed: "FlattenCollection.Index")
+public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
 @available(*, deprecated, renamed: "FlattenCollection")
 public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection

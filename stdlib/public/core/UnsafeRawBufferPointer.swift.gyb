@@ -98,28 +98,11 @@ public struct Unsafe${Mutable}RawBufferPointer {
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 }
 
-extension Unsafe${Mutable}RawBufferPointer: Sequence {
-  public typealias SubSequence = Slice<${Self}>
-
+%if not mutable:
+extension UnsafeRawBufferPointer {
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
-  public struct Iterator : IteratorProtocol, Sequence {
-    /// Advances to the next byte and returns it, or `nil` if no next byte
-    /// exists.
-    ///
-    /// Once `nil` has been returned, all subsequent calls return `nil`.
-    ///
-    /// - Returns: The next sequential byte in the raw buffer if another byte
-    ///   exists; otherwise, `nil`.
-    @_inlineable
-    public mutating func next() -> UInt8? {
-      if _position == _end { return nil }
-
-      let result = _position!.load(as: UInt8.self)
-      _position! += 1
-      return result
-    }
-
+  public struct Iterator {
     @_versioned
     internal var _position, _end: UnsafeRawPointer?
 
@@ -130,6 +113,33 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
       self._end = _end
     }
   }
+}
+
+extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
+  /// Advances to the next byte and returns it, or `nil` if no next byte
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  ///
+  /// - Returns: The next sequential byte in the raw buffer if another byte
+  ///   exists; otherwise, `nil`.
+  @_inlineable
+  public mutating func next() -> UInt8? {
+    if _position == _end { return nil }
+
+    let result = _position!.load(as: UInt8.self)
+    _position! += 1
+    return result
+  }
+}
+%else:
+extension UnsafeMutableRawBufferPointer {
+  public typealias Iterator = UnsafeRawBufferPointer.Iterator
+}
+%end
+
+extension Unsafe${Mutable}RawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<${Self}>
 
   /// Returns an iterator over the bytes of this sequence.
   @_inlineable
@@ -666,8 +676,8 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
 
 extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
-  @available(*, unavailable, message:
-    "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  @available(*, unavailable, 
+    message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> ${Self} {
     get { return ${Self}(start: nil, count: 0) }
 %  if mutable:
@@ -676,8 +686,8 @@ extension ${Self} {
   }
 
 %  if mutable:
-  @available(*, unavailable, message:
-    "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  @available(*, unavailable, 
+    message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
     get { return UnsafeRawBufferPointer(start: nil, count: 0) }
     nonmutating set {}
@@ -740,3 +750,9 @@ public func withUnsafeBytes<T, Result>(
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
 }
+
+// @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")
+public typealias UnsafeRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
+
+// @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")
+public typealias UnsafeMutableRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator

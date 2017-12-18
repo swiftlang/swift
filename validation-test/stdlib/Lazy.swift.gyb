@@ -437,7 +437,7 @@ LazyTestSuite.test("LazySequence<${TraversalCollection}>/underestimatedCount") {
     underestimatedCount: .value(42))
   var lazySeq = s.lazy
   expectType(
-    Lazy${TraversalCollection}<
+    LazyCollection<
       Minimal${TraversalCollection}<OpaqueValue<Int>>
     >.self,
     &lazySeq)
@@ -555,7 +555,7 @@ LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
     underestimatedCount: .value(42))
   var reversed = base.lazy.reversed()
   expectType(
-    Lazy${TraversalCollection}<
+    LazyCollection<
       ${ReversedType}<Minimal${TraversalCollection}<OpaqueValue<Int>>>
     >.self, &reversed)
 
@@ -564,7 +564,7 @@ LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
 
   var reversedTwice = reversed.reversed()
   expectType(
-    Lazy${TraversalCollection}<
+    LazyCollection<
       ${ReversedType}<${ReversedType}<
         Minimal${TraversalCollection}<OpaqueValue<Int>>
       >>>.self, &reversedTwice)
@@ -594,7 +594,7 @@ extension ReversedCollection where Base : TestProtocol1 {
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension ReversedIndex where Base : TestProtocol1 {
+extension ReversedCollection.Index where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -617,7 +617,7 @@ extension ReversedCollection
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension ReversedIndex
+extension ReversedCollection.Index
     where Base : TestProtocol1, Base : RandomAccessCollection {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
@@ -699,13 +699,13 @@ tests.test("Lazy${TraversalCollection}/Collection") {
   let base = Minimal${TraversalCollection}(elements: expected)
   var actual = base.lazy
 
-  expectType(Lazy${TraversalCollection}<
+  expectType(LazyCollection<
     Minimal${TraversalCollection}<OpaqueValue<Int>>
   >.self, &actual)
 
   // Asking for .lazy again doesn't re-wrap the type
   var again = actual.lazy
-  expectType(Lazy${TraversalCollection}<
+  expectType(LazyCollection<
     Minimal${TraversalCollection}<OpaqueValue<Int>>
   >.self, &again)
 
@@ -863,7 +863,7 @@ tests.test("LazyMapSequence/AssociatedTypes") {
   typealias Subject = LazyMapSequence<Base, OpaqueValue<Int32>>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    iteratorType: LazyMapSequence<Base, OpaqueValue<Int32>>.Iterator.self,
     subSequenceType: AnySequence<OpaqueValue<Int32>>.self)
 }
 
@@ -872,7 +872,7 @@ tests.test("LazyMapCollection/AssociatedTypes") {
   typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    iteratorType: LazyMapCollection<Base, OpaqueValue<Int32>>.Iterator.self,
     subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
@@ -883,7 +883,7 @@ tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
   typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    iteratorType: LazyMapCollection<Base, OpaqueValue<Int32>>.Iterator.self,
     subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
@@ -894,7 +894,7 @@ tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
   typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    iteratorType: LazyMapCollection<Base, OpaqueValue<Int32>>.Iterator.self,
     subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
@@ -1022,7 +1022,7 @@ tests.test("ReversedCollection/Lazy") {
 // the first selects even numbers and the second selects odd numbers,
 // both from an underlying sequence of whole numbers.
 func checkFilterIteratorBase<  S : Sequence, I>(_ s1: S, _ s2: S)
-where S.Iterator == LazyFilterIterator<I>, I.Element == OpaqueValue<Int> {
+where S.Iterator == LazyFilterSequence<I>.Iterator, I.Element == OpaqueValue<Int> {
   var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
   expectEqual(2, iter1.next()!.value)
@@ -1143,7 +1143,7 @@ tests.test("LazyFilterSequence/AssociatedTypes") {
   typealias Subject = LazyFilterSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    iteratorType: LazyFilterSequence<Base>.Iterator.self,
     subSequenceType: AnySequence<OpaqueValue<Int>>.self)
 }
 
@@ -1152,7 +1152,7 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
   typealias Subject = LazyFilterCollection<Base>
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    iteratorType: LazyFilterCollection<Base>.Iterator.self,
     subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
     indexType: Base.Index.self,
     indicesType: DefaultIndices<Subject>.self)
@@ -1163,10 +1163,10 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
   typealias Subject = LazyFilterCollection<Base>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    iteratorType: LazyFilterCollection<Base>.Iterator.self,
     subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
     indexType: Base.Index.self,
-    indicesType: DefaultBidirectionalIndices<Subject>.self)
+    indicesType: DefaultIndices<Subject>.self)
 }
 
 tests.test("lazy.filter/TypeInference") {
@@ -1360,7 +1360,7 @@ tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
     // FIXME(ABI)#82 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: LazyPrefixWhileIndex<Base>.self,
-    indicesType: DefaultBidirectionalIndices<Subject>.self)
+    indicesType: DefaultIndices<Subject>.self)
 }
 
 //===--- LazyDropWhile ----------------------------------------------------===//
@@ -1418,7 +1418,7 @@ tests.test("LazyDropWhileBidirectionalCollection/AssociatedTypes") {
     // FIXME(ABI)#83 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: LazyDropWhileIndex<Base>.self,
-    indicesType: DefaultBidirectionalIndices<Subject>.self)
+    indicesType: DefaultIndices<Subject>.self)
 }
 
 runAllTests()
