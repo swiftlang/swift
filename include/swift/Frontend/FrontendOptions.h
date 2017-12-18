@@ -493,8 +493,6 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath(const InputFile &) const;
-
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
@@ -503,8 +501,6 @@ public:
   }
 
 private:
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
-
   bool hasUnusedDependenciesFilePath(const InputFile &input) const;
   static bool canActionEmitDependencies(ActionType);
   bool hasUnusedObjCHeaderOutputPath(const InputFile &input) const;
@@ -517,8 +513,11 @@ private:
   static bool canActionEmitModuleDoc(ActionType);
 
   static bool doesActionProduceOutput(ActionType);
-  static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
+
+public:
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+  static bool doesActionProduceTextualOutput(ActionType);
 };
 
 }

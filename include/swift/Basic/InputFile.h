@@ -43,6 +43,21 @@ struct OutputPaths {
   /// The path to which we should output a TBD file.
   std::string TBDPath;
 
+  OutputPaths(std::string outputFilename, std::string objCHeaderOutputPath,
+              std::string moduleOutputPath, std::string moduleDocOutputPath,
+              std::string dependenciesFilePath,
+              std::string referenceDependenciesFilePath,
+              std::string serializedDiagnosticsPath,
+              std::string loadedModuleTracePath, std::string tbdPath)
+      : OutputFilename(outputFilename),
+        ObjCHeaderOutputPath(objCHeaderOutputPath),
+        ModuleOutputPath(moduleOutputPath),
+        ModuleDocOutputPath(moduleDocOutputPath),
+        DependenciesFilePath(dependenciesFilePath),
+        ReferenceDependenciesFilePath(referenceDependenciesFilePath),
+        SerializedDiagnosticsPath(serializedDiagnosticsPath),
+        LoadedModuleTracePath(loadedModuleTracePath), TBDPath(tbdPath) {}
+
   OutputPaths(unsigned i, Optional<std::vector<std::string>> &objCHeaderOutputs,
               Optional<std::vector<std::string>> &moduleOutput,
               Optional<std::vector<std::string>> &moduleDocOutputs,
@@ -102,8 +117,6 @@ public:
   llvm::MemoryBuffer *buffer() const { return Buffer; }
   StringRef file() const { return Filename; }
   const OutputPaths &outputs() const { return Outputs; }
-  // FIXME: dmu can drop malleable?
-  OutputPaths &malleableOutputs() { return Outputs; }
 
   /// Return Swift-standard file name from a buffer name set by
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
@@ -111,6 +124,8 @@ public:
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
   }
+
+  void setOutputs(const OutputPaths &outputs) { Outputs = outputs; }
 };
 } // namespace swift
 

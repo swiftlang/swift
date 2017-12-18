@@ -205,20 +205,6 @@ void FrontendOptions::forAllOutputPathsForMakeDependencies(
   });
 }
 
-StringRef FrontendOptions::originalPath(const InputFile &input) const {
-  if (!input.outputs().OutputFilename.empty() &&
-      input.outputs().OutputFilename != "-")
-    // Put the serialized diagnostics file next to the output file.
-    return input.outputs().OutputFilename;
-
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  if (input.isPrimary() && input.file() != "-")
-    return llvm::sys::path::filename(input.file());
-
-  return ModuleName;
-}
 
 const char *
 FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
