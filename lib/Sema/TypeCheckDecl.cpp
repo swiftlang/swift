@@ -7918,6 +7918,14 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
   return false;
 }
 
+void TypeChecker::requestMemberLayout(ValueDecl *member) {
+  auto *dc = member->getDeclContext();
+  if (auto *classDecl = dyn_cast<ClassDecl>(dc))
+    requestNominalLayout(classDecl);
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
+    requestNominalLayout(protocolDecl);
+}
+
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
   if (nominalDecl->hasValidatedLayout())
     return;
