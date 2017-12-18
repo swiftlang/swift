@@ -6885,8 +6885,6 @@ public:
 /// switch_enum_addr instructions.
 class SwitchEnumInstBase : public TermInst {
   FixedOperandList<1> Operands;
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
 
   // Tail-allocated after the SwitchEnumInst record are:
   // - an array of `NumCases` EnumElementDecl* pointers, referencing the case
@@ -6907,10 +6905,10 @@ class SwitchEnumInstBase : public TermInst {
   }
 
   SILSuccessor *getSuccessorBuf() {
-    return reinterpret_cast<SILSuccessor*>(getCaseBuf() + NumCases);
+    return reinterpret_cast<SILSuccessor*>(getCaseBuf() + getNumCases());
   }
   const SILSuccessor *getSuccessorBuf() const {
-    return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + NumCases);
+    return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + getNumCases());
   }
 
 protected:
@@ -6938,17 +6936,19 @@ public:
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
-                           static_cast<size_t>(NumCases + HasDefault)};
+                           static_cast<size_t>(getNumCases() + hasDefault())};
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return SILInstruction::Bits.SwitchEnumInstBase.NumCases;
+  }
   std::pair<EnumElementDecl*, SILBasicBlock*>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
   ProfileCounter getCaseCount(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return getSuccessorBuf()[i].getCount();
   }
 
@@ -6974,14 +6974,16 @@ public:
   /// return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDestination(SILBasicBlock *BB);
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return SILInstruction::Bits.SwitchEnumInstBase.HasDefault;
+  }
   SILBasicBlock *getDefaultBB() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases];
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()];
   }
   ProfileCounter getDefaultCount() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases].getCount();
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()].getCount();
   }
 
   static bool classof(const SILInstruction *I) {

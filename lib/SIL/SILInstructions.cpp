@@ -1494,8 +1494,9 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
     Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
-    : TermInst(Kind, Loc), Operands(this, Operand), NumCases(CaseBBs.size()),
-      HasDefault(bool(DefaultBB)) {
+    : TermInst(Kind, Loc), Operands(this, Operand) {
+  SILInstruction::Bits.SwitchEnumInstBase.HasDefault = bool(DefaultBB);
+  SILInstruction::Bits.SwitchEnumInstBase.NumCases = CaseBBs.size();
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();
   auto *succs = getSuccessorBuf();
@@ -1509,8 +1510,8 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     }
   }
 
-  if (HasDefault) {
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB, DefaultCount);
+  if (hasDefault()) {
+    ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB, DefaultCount);
   }
 }
 
@@ -1600,7 +1601,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
 SwitchEnumInstBase::~SwitchEnumInstBase() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
+  for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
     succs[i].~SILSuccessor();
   }
 }
