@@ -291,6 +291,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   if (CD->hasFixedLayout())
     return;
 
+  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
     TBDGenVisitor &TBD;
