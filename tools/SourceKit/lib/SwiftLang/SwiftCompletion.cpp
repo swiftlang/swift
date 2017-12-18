@@ -247,12 +247,10 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
         break;
     }
   });
-  std::vector<const char *> extendedArgs(Args.begin(), Args.end());
-  extendedArgs.push_back("-code-complete-call-pattern-heuristics");
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             extendedArgs, Error)) {
+                             Args, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -817,6 +815,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
+  static UIdent KeyCallPatternHeuristics("key.codecomplete.callpatternheuristics");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
@@ -838,6 +837,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
+  from.valueForOption(KeyCallPatternHeuristics, to.callPatternHeuristics);
   from.valueForOption(KeyFuzzyMatching, to.fuzzyMatching);
   from.valueForOption(KeyContextWeight, to.semanticContextWeight);
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
@@ -1196,8 +1196,8 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<const char *> extendedArgs(args.begin(), args.end());
   if (CCOpts.addInitsToTopLevel)
     extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
-
-  extendedArgs.push_back("-code-complete-call-pattern-heuristics");
+  if (CCOpts.callPatternHeuristics)
+    extendedArgs.push_back("-code-complete-call-pattern-heuristics");
 
   // Invoke completion.
   std::string error;
