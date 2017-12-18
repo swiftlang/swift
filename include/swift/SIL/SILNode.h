@@ -96,6 +96,8 @@ public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumSILAccessKindBits = 2 };
+  enum { NumSILAccessEnforcementBits = 2 };
 protected:
   SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
     Kind : bitmax(NumSILNodeKindBits,8),
@@ -201,6 +203,12 @@ protected:
     IsInitializationOfDest : 1;
     template<SILInstructionKind K>
     friend class StoreReferenceInstBase;
+  );
+
+  SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits,
+    AccessKind : NumSILAccessKindBits,
+    Enforcement : NumSILAccessEnforcementBits
   );
 
   SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
@@ -323,6 +331,7 @@ protected:
     SWIFT_INLINE_BITS(SwitchValueInst);
     SWIFT_INLINE_BITS(SwitchEnumInstBase);
     SWIFT_INLINE_BITS(PointerToAddressInst);
+    SWIFT_INLINE_BITS(BeginAccessInst);
     SWIFT_INLINE_BITS(EndAccessInst);
   } Bits;
 

@@ -3137,33 +3137,39 @@ class BeginAccessInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
-  SILAccessKind AccessKind;
-  SILAccessEnforcement Enforcement;
-
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
                   SILAccessKind accessKind, SILAccessEnforcement enforcement)
-      : UnaryInstructionBase(loc, lvalue, lvalue->getType()),
-        AccessKind(accessKind), Enforcement(enforcement) {
+      : UnaryInstructionBase(loc, lvalue, lvalue->getType()) {
+    SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(accessKind);
+    SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
 
     static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
     static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
+
+    static_assert(unsigned(SILAccessKind::Last) <
+                  (1 << SILNode::NumSILAccessKindBits),
+                  "SILNode needs updating");
+    static_assert(unsigned(SILAccessEnforcement::Last) <
+                  (1 << SILNode::NumSILAccessEnforcementBits),
+                  "SILNode needs updating");
   }
 
 public:
   SILAccessKind getAccessKind() const {
-    return AccessKind;
+    return SILAccessKind(SILInstruction::Bits.BeginAccessInst.AccessKind);
   }
   void setAccessKind(SILAccessKind kind) {
-    AccessKind = kind;
+    SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(kind);
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return
+      SILAccessEnforcement(SILInstruction::Bits.BeginAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
   }
 
   SILValue getSource() const {
