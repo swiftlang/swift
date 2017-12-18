@@ -999,6 +999,7 @@ static bool computeAllOutputs(
         StringRef ithOutputFilenameArg =
             doOutputFilenameArgumentsCorrespondToInputs
                 ? StringRef(outputFileArguments[i])
+        : isSingleThreadedWMO && !outputFileArguments.empty() ? StringRef(outputFileArguments[0])
                 : StringRef();
         const OutputPaths &ithSuppFileListArg = suppFileListArgs[i];
 

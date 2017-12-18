@@ -1151,8 +1151,7 @@ static bool performCompile(CompilerInstance &Instance,
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
                      IRModule.get(), TargetMachine.get(),
                      EffectiveLanguageVersion,
-                     opts.InputsAndOutputs.getSingleThreadedWMOOutputs()
-                         ->OutputFilename,
+                     opts.InputsAndOutputs.pathsForAtMostOnePrimary().OutputFilename,
                      Stats) ||
          HadError;
 }

@@ -54,12 +54,14 @@ public:
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
     for (InputFile input : other.getAllInputs())
       addInput(input);
+    SingleThreadedWMOOutputs = other.SingleThreadedWMOOutputs;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
     for (InputFile input : other.getAllInputs())
       addInput(input);
+     SingleThreadedWMOOutputs = other.SingleThreadedWMOOutputs;
     return *this;
   }
 
@@ -85,7 +87,8 @@ public:
     static OutputPaths empty;
     return hasPrimaries()
                ? getAllInputs()[PrimaryInputs.front().second].outputs()
-               : getAllInputs().empty() ? empty
+    : isSingleThreadedWMO() ? *SingleThreadedWMOOutputs
+    : getAllInputs().empty() ? empty
                                         : getAllInputs().front().outputs();
   }
 
