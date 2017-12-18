@@ -381,6 +381,10 @@ option(SWIFT_ENABLE_SOURCEKIT_TESTS
     "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS FALSE)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
 #
 # Assume a new enough ar to generate the index at construction time. This avoids
 # having to invoke ranlib as a secondary command.
