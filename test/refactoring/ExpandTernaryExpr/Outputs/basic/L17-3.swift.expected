@@ -20,7 +20,7 @@ func testExpandAssignOnlyTernaryExpr() {
     x = b
   }
 }
-func testExpandAssignOnlyTernaryExpr() {
+func testExpandAssignOnlyTupleTernaryExpr() {
   let a = 3
   let b = 5
   let x: Int

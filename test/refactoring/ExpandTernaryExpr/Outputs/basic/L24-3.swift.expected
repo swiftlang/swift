@@ -16,7 +16,7 @@ func testExpandAssignOnlyTernaryExpr() {
   let x: Int
   x = a < 5 ? a : b
 }
-func testExpandAssignOnlyTernaryExpr() {
+func testExpandAssignOnlyTupleTernaryExpr() {
   let a = 3
   let b = 5
   let x: Int
