@@ -5482,14 +5482,18 @@ class WitnessMethodInst final
 
   CanType LookupType;
   ProtocolConformanceRef Conformance;
-  unsigned NumOperands;
+
+  unsigned getNumOperands() const {
+    return SILInstruction::Bits.WitnessMethodInst.NumOperands;
+  }
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
       : InstructionBase(DebugLoc, Ty, Member),
-        LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()) {
+        LookupType(LookupType), Conformance(Conformance) {
+    SILInstruction::Bits.WitnessMethodInst.NumOperands =
+      TypeDependentOperands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
@@ -5514,7 +5518,7 @@ class WitnessMethodInst final
 public:
   ~WitnessMethodInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = getNumOperands(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
@@ -5528,19 +5532,19 @@ public:
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 };
 

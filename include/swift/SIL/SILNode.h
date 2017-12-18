@@ -218,6 +218,10 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD_FULL(WitnessMethodInst, MethodInst, 32,
+    : NumPadBits,
+    NumOperands : 32
+  );
   UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
@@ -284,6 +288,7 @@ protected:
     SWIFT_INLINE_BITS(IntegerLiteralInst);
     SWIFT_INLINE_BITS(FloatLiteralInst);
     SWIFT_INLINE_BITS(DeallocRefInst);
+    SWIFT_INLINE_BITS(WitnessMethodInst);
   } Bits;
 
 private:
