@@ -125,15 +125,17 @@ static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
-                                                       char *buf)
-    : ArgNo(Var.ArgNo), Constant(Var.Constant), NameLength(Var.Name.size()) {
-  assert(ArgNo == Var.ArgNo && "Truncation");
-  assert(NameLength == Var.Name.size() && "Truncation");
-  memcpy(buf, Var.Name.data(), NameLength);
+                                                       char *buf) {
+  Data.ArgNo = Var.ArgNo;
+  Data.Constant = Var.Constant;
+  Data.NameLength = Var.Name.size();
+  assert(Data.ArgNo == Var.ArgNo && "Truncation");
+  assert(Data.NameLength == Var.Name.size() && "Truncation");
+  memcpy(buf, Var.Name.data(), Var.Name.size());
 }
 
 StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
-  return NameLength ? StringRef(buf, NameLength) : StringRef();
+  return Data.NameLength ? StringRef(buf, Data.NameLength) : StringRef();
 }
 
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,

@@ -134,7 +134,7 @@ protected:
     // It is number of type dependent operands + 1.
     NumOperands : 32;
     template<SILInstructionKind Kind, typename, typename, typename...>
-    friend class UnaryInstructionWithTypeDependentOperandsBase;
+    friend class UnaryInstructionWithTypeDependentOperandsBase
   );
 
 #define UIWTDOB_BITFIELD(T, U, C, ...) \
@@ -201,13 +201,13 @@ protected:
   SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
     IsTake : 1;
     template<SILInstructionKind K>
-    friend class LoadReferenceInstBase;
+    friend class LoadReferenceInstBase
   );
 
   SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
     IsInitializationOfDest : 1;
     template<SILInstructionKind K>
-    friend class StoreReferenceInstBase;
+    friend class StoreReferenceInstBase
   );
 
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
