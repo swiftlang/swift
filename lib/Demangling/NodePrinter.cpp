@@ -579,11 +579,10 @@ private:
     };
 
     unsigned ParamIndex = 0;
-    const auto &ParamIter = *Parameters;
     bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
 
     Printer << '(';
-    interleave(ParamIter.begin(), ParamIter.end(),
+    interleave(Parameters->begin(), Parameters->end(),
                [&](NodePointer Param) {
                  assert(Param->getKind() == Node::Kind::TupleElement);
 
