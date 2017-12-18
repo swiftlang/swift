@@ -489,6 +489,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (tyR)
       tyR->walk(walker);
   }
+  if (specifierLoc.isValid() || !attrs.empty())
+    SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
   return makeParserResult(applyAttributeToType(tyR, attrs, specifier,
                                                specifierLoc));

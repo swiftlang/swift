@@ -81,6 +81,8 @@ typealias F = [Int]!.Type
 typealias G = (a x: Int, _ y: Int ... = 1) throw -> () -> ()
 typealias H = () rethrows -> ()
 typealias I = (A & B<C>) -> C & D
+typealias J = inout @autoclosure () -> Int
+typealias K = (@invalidAttr Int, inout Int, __shared Int, __owned Int) -> ()
 
 @objc private typealias T<a,b> = Int
 @objc private typealias T<a,b>
