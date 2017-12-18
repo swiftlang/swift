@@ -192,4 +192,21 @@ func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
 
 #if <IdentifierExpr>blah</IdentifierExpr><ElseDirectiveClause>
 #else</ElseDirectiveClause>
-#endif</IfConfigDecl>
+#endif</IfConfigDecl><ClassDecl>
+
+class C <MemberDeclBlock>{
+  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{<AccessorDecl><Attribute>
+    @objc </Attribute><DeclModifier>mutating </DeclModifier>set<AccessorParameter>(value) </AccessorParameter><CodeBlock>{}</CodeBlock></AccessorDecl><AccessorDecl><DeclModifier>
+    mutating </DeclModifier>get <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></AccessorDecl><AccessorDecl><Attribute>
+    @objc </Attribute>didSet <CodeBlock>{}</CodeBlock></AccessorDecl><AccessorDecl>
+    willSet<AccessorParameter>(newValue)</AccessorParameter><CodeBlock>{ }</CodeBlock></AccessorDecl>
+  }</AccessorBlock>
+  var a : <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{<ReturnStmt>
+    return <IntegerLiteralExpr>3</IntegerLiteralExpr></ReturnStmt>
+  }</AccessorBlock>
+}</MemberDeclBlock></ClassDecl><ProtocolDecl>
+
+protocol P <MemberDeclBlock>{
+  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{ <AccessorDecl>get </AccessorDecl><AccessorDecl>set </AccessorDecl>}</AccessorBlock>
+  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{}</AccessorBlock>
+}</MemberDeclBlock></ProtocolDecl>

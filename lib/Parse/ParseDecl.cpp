@@ -3591,6 +3591,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   // If the SpecifierLoc is invalid, then the caller just wants us to synthesize
   // the default, not actually try to parse something.
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
+    SyntaxParsingContext ParamCtx(P.SyntaxContext, SyntaxKind::AccessorParameter);
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
@@ -3755,6 +3756,23 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
              getAccessorNameForDiagnostic(accessorKind, addressorKind));
 }
 
+void Parser::parseAccessorAttributes(DeclAttributes &Attributes) {
+  bool FoundCCToken;
+  parseDeclAttributeList(Attributes, FoundCCToken);
+  SyntaxParsingContext ModifierCtx(SyntaxContext, SyntaxKind::DeclModifier);
+  // Parse the contextual keywords for 'mutating' and 'nonmutating' before
+  // get and set.
+  if (Tok.isContextualKeyword("mutating")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
+  } else if (Tok.isContextualKeyword("nonmutating")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+  } else if (Tok.isContextualKeyword("__consuming")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
+  } else {
+    ModifierCtx.setTransparent();
+  }
+}
+
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
@@ -3765,7 +3783,6 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
-
   // Properties in protocols use sufficiently limited syntax that we have a
   // special parsing loop for them.  SIL mode uses the same syntax.
   if (Flags.contains(PD_InProtocol) || isInSILMode()) {
@@ -3773,21 +3790,10 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       if (Tok.is(tok::eof))
         return true;
 
+      SyntaxParsingContext AccessorCtx(SyntaxContext, SyntaxKind::AccessorDecl);
       // Parse any leading attributes.
       DeclAttributes Attributes;
-      bool FoundCCToken;
-      parseDeclAttributeList(Attributes, FoundCCToken);
-
-      // Parse the contextual keywords for 'mutating' and 'nonmutating' before
-      // get and set.
-      if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
-      } else if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
-      } else if (Tok.isContextualKeyword("__consuming")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
-      }
-
+      parseAccessorAttributes(Attributes);
       AccessorKind Kind;
       AddressorKind addressorKind = AddressorKind::NotAddressor;
       FuncDecl **TheDeclPtr;
@@ -3809,6 +3815,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         Kind = AccessorKind::IsMutableAddressor;
         TheDeclPtr = &accessors.MutableAddressor;
       } else {
+        AccessorCtx.setTransparent();
         AccessorKeywordLoc = SourceLoc();
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
@@ -3868,7 +3875,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof))
       return true;
-
+    SyntaxParsingContext AccessorCtx(SyntaxContext, SyntaxKind::AccessorDecl);
     // If there are any attributes, we are going to parse them.  Because these
     // attributes might not be appertaining to the accessor, but to the first
     // declaration inside the implicit getter, we need to save the parser
@@ -3879,19 +3886,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
-    bool FoundCCToken;
-    parseDeclAttributeList(Attributes, FoundCCToken);
-
-    // Parse the contextual keywords for 'mutating' and 'nonmutating' before
-    // get and set.
-    if (Tok.isContextualKeyword("mutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
-    } else if (Tok.isContextualKeyword("nonmutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
-    } else if (Tok.isContextualKeyword("__consuming")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
-    }
-    
+    parseAccessorAttributes(Attributes);
     bool isImplicitGet = false;
     AccessorKind Kind;
     AddressorKind addressorKind = AddressorKind::NotAddressor;
@@ -3966,6 +3961,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, *this, Kind);
 
+    SyntaxParsingContext BlockCtx(SyntaxContext, SyntaxKind::CodeBlock);
+    if (AccessorKeywordLoc.isInvalid()) {
+      // If the keyword is absent, we shouldn't make these sub-nodes.
+      BlockCtx.setTransparent();
+      AccessorCtx.setTransparent();
+    }
+
     SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
     // FIXME: Use outer '{' loc if isImplicitGet.
     bool ExternalAsmName = false;
@@ -4038,12 +4040,15 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
                          TypeLoc ElementTy, ParsedAccessors &accessors,
                          SourceLoc StaticLoc,
                          SmallVectorImpl<Decl *> &Decls) {
+  SyntaxParsingContext AccessorsCtx(SyntaxContext, SyntaxKind::AccessorBlock);
   accessors.LBLoc = consumeToken(tok::l_brace);
   SourceLoc LastValidLoc = accessors.LBLoc;
   bool Invalid = parseGetSetImpl(Flags, GenericParams, Indices, ElementTy,
                                  accessors, LastValidLoc, StaticLoc,
                                  accessors.LBLoc, Decls);
 
+  // Collect all explicit accessors to a list.
+  AccessorsCtx.collectNodesInPlace(SyntaxKind::AccessorList);
   // Parse the final '}'.
   if (Invalid)
     skipUntil(tok::r_brace);

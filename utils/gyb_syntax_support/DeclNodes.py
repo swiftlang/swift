@@ -93,7 +93,7 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating',
                    ]),
-             Child('Detail', kind='TokenList'),
+             Child('Detail', kind='TokenList', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -331,5 +331,36 @@ DECL_NODES = [
                       'FuncToken',
                    ]),
              Child('Path', kind='AccessPath'),
+         ]),
+
+    # (value)
+    Node('AccessorParameter', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Name', kind='IdentifierToken'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    Node('AccessorDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifier', kind='DeclModifier', is_optional=True),
+             Child('AccessorKind', kind='Token',
+                   text_choices=[
+                      'get', 'set', 'didSet', 'willSet',
+                   ]),
+             Child('Parameter', kind='AccessorParameter', is_optional=True),
+             Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
+
+    Node('AccessorBlock', kind="Syntax",
+         children=[
+             Child('LeftBrace', kind='LeftBraceToken'),
+             # one of the following children should be required.
+             Child('Accessors', kind='AccessorList', is_optional=True),
+             Child('Statements', kind='StmtList', is_optional=True),
+             Child('RightBrace', kind='RightBraceToken'),
          ]),
 ]
