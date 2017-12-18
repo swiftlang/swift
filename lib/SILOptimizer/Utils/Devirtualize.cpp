@@ -18,6 +18,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -494,7 +495,8 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
 ///    devirtualizing for.
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(FullApplySite AI,
-                                       SILType ClassOrMetatypeType) {
+                                       SILType ClassOrMetatypeType,
+                                       OptRemark::Emitter *ORE) {
 
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
@@ -545,7 +547,8 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 ///    self argument of the apply we will devirtualize.
 /// return the result value of the new ApplyInst if created one or null.
 DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
-                                                     SILValue ClassOrMetatype) {
+                                                      SILValue ClassOrMetatype,
+                                                      OptRemark::Emitter *ORE) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
@@ -669,6 +672,12 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                              ResultTy, AI.getType());
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+  if (ORE)
+    ORE->emit([&]() {
+        using namespace OptRemark;
+        return RemarkPassed("ClassMethodDevirtualized", *AI.getInstruction())
+               << "Devirtualized call to class method " << NV("Method", F);
+      });
   NumClassDevirt++;
 
   if (NormalBB) {
@@ -693,10 +702,11 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 }
 
 DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
-                                                   SILValue ClassInstance) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType()))
+                                                         SILValue ClassInstance,
+                                                         OptRemark::Emitter *ORE) {
+  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE))
     return std::make_pair(nullptr, FullApplySite());
-  return devirtualizeClassMethod(AI, ClassInstance);
+  return devirtualizeClassMethod(AI, ClassInstance, ORE);
 }
 
 
@@ -841,7 +851,7 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
 /// up calling.
 static DevirtualizationResult
 devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
-                          ProtocolConformanceRef C) {
+                          ProtocolConformanceRef C, OptRemark::Emitter *ORE) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI.getModule();
@@ -912,6 +922,12 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
     SAI = NewPAI;
   }
 
+  if (ORE)
+    ORE->emit([&]() {
+        using namespace OptRemark;
+        return RemarkPassed("WitnessMethodDevirtualized", *AI.getInstruction())
+               << "Devirtualized call to " << NV("Method", F);
+      });
   NumWitnessDevirt++;
   return std::make_pair(ResultValue, SAI);
 }
@@ -942,7 +958,8 @@ static bool canDevirtualizeWitnessMethod(ApplySite AI) {
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
+DevirtualizationResult
+swift::tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE) {
   if (!canDevirtualizeWitnessMethod(AI))
     return std::make_pair(nullptr, FullApplySite());
 
@@ -955,7 +972,7 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
     AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                 WMI->getMember());
 
-  return devirtualizeWitnessMethod(AI, F, WMI->getConformance());
+  return devirtualizeWitnessMethod(AI, F, WMI->getConformance(), ORE);
 }
 
 //===----------------------------------------------------------------------===//
@@ -964,8 +981,9 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
-DevirtualizationResult
-swift::tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA) {
+DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
+                                                   ClassHierarchyAnalysis *CHA,
+                                                   OptRemark::Emitter *ORE) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
@@ -974,7 +992,7 @@ swift::tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA) {
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (isa<WitnessMethodInst>(AI.getCallee()))
-    return tryDevirtualizeWitnessMethod(AI);
+    return tryDevirtualizeWitnessMethod(AI, ORE);
 
   // TODO: check if we can also de-virtualize partial applies of class methods.
   FullApplySite FAS = FullApplySite::isa(AI.getInstruction());
@@ -1007,30 +1025,30 @@ swift::tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA) {
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance);
+      return tryDevirtualizeClassMethod(FAS, Instance, ORE);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
     if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
                                                         CMI->getModule(),
                                                         CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance);
+      return tryDevirtualizeClassMethod(FAS, Instance, ORE);
 
     if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
                                            CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
-        return tryDevirtualizeClassMethod(FAS, CMI->getOperand());
+        return tryDevirtualizeClassMethod(FAS, CMI->getOperand(), ORE);
     }
   }
 
   if (isa<SuperMethodInst>(FAS.getCallee())) {
     if (FAS.hasSelfArgument()) {
-      return tryDevirtualizeClassMethod(FAS, FAS.getSelfArgument());
+      return tryDevirtualizeClassMethod(FAS, FAS.getSelfArgument(), ORE);
     }
 
     // It is an invocation of a class method.
     // Last operand is the metatype that should be used for dispatching.
-    return tryDevirtualizeClassMethod(FAS, FAS.getArguments().back());
+    return tryDevirtualizeClassMethod(FAS, FAS.getArguments().back(), ORE);
   }
 
   return std::make_pair(nullptr, ApplySite());
