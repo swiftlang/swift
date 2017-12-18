@@ -3137,33 +3137,39 @@ class BeginAccessInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
-  SILAccessKind AccessKind;
-  SILAccessEnforcement Enforcement;
-
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
                   SILAccessKind accessKind, SILAccessEnforcement enforcement)
-      : UnaryInstructionBase(loc, lvalue, lvalue->getType()),
-        AccessKind(accessKind), Enforcement(enforcement) {
+      : UnaryInstructionBase(loc, lvalue, lvalue->getType()) {
+    SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(accessKind);
+    SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
 
     static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
     static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
+
+    static_assert(unsigned(SILAccessKind::Last) <
+                  (1 << SILNode::NumSILAccessKindBits),
+                  "SILNode needs updating");
+    static_assert(unsigned(SILAccessEnforcement::Last) <
+                  (1 << SILNode::NumSILAccessEnforcementBits),
+                  "SILNode needs updating");
   }
 
 public:
   SILAccessKind getAccessKind() const {
-    return AccessKind;
+    return SILAccessKind(SILInstruction::Bits.BeginAccessInst.AccessKind);
   }
   void setAccessKind(SILAccessKind kind) {
-    AccessKind = kind;
+    SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(kind);
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return
+      SILAccessEnforcement(SILInstruction::Bits.BeginAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
   }
 
   SILValue getSource() const {
@@ -3188,12 +3194,10 @@ class EndAccessInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  bool Aborting;
-
 private:
-  EndAccessInst(SILDebugLocation loc, SILValue access,
-                bool aborting = false)
-    : UnaryInstructionBase(loc, access), Aborting(aborting) {
+  EndAccessInst(SILDebugLocation loc, SILValue access, bool aborting = false)
+      : UnaryInstructionBase(loc, access) {
+    SILInstruction::Bits.EndAccessInst.Aborting = aborting;
   }
 
 public:
@@ -3204,10 +3208,10 @@ public:
   /// Only AccessKind::Init and AccessKind::Deinit accesses can be
   /// aborted.
   bool isAborting() const {
-    return Aborting;
+    return SILInstruction::Bits.EndAccessInst.Aborting;
   }
-  void setAborting(bool aborting) {
-    Aborting = aborting;
+  void setAborting(bool aborting = true) {
+    SILInstruction::Bits.EndAccessInst.Aborting = aborting;
   }
 
   BeginAccessInst *getBeginAccess() const {
@@ -3938,22 +3942,26 @@ class PointerToAddressInst
 {
   friend SILBuilder;
 
-  bool IsStrict, IsInvariant;
-
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
                        bool IsStrict, bool IsInvariant)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty),
-      IsStrict(IsStrict), IsInvariant(IsInvariant) {}
+    : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+    SILInstruction::Bits.PointerToAddressInst.IsStrict = IsStrict;
+    SILInstruction::Bits.PointerToAddressInst.IsInvariant = IsInvariant;
+  }
 
 public:
   /// Whether the returned address adheres to strict aliasing.
   /// If true, then the type of each memory access dependent on
   /// this address must be consistent with the memory's bound type.
-  bool isStrict() const { return IsStrict; }
+  bool isStrict() const {
+    return SILInstruction::Bits.PointerToAddressInst.IsStrict;
+  }
   /// Whether the returned address is invariant.
   /// If true, then loading from an address derived from this pointer always
   /// produces the same value.
-  bool isInvariant() const { return IsInvariant; }
+  bool isInvariant() const {
+    return SILInstruction::Bits.PointerToAddressInst.IsInvariant;
+  }
 };
 
 /// Convert a heap object reference to a different type without any runtime
@@ -5148,7 +5156,9 @@ class MetatypeInst final
   friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned NumOperands;
+  unsigned _getNumOperands() const {
+    return SILInstruction::Bits.MetatypeInst.NumOperands;
+  };
 
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
@@ -5161,25 +5171,25 @@ class MetatypeInst final
 public:
   ~MetatypeInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = _getNumOperands(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 };
 
@@ -5214,14 +5224,16 @@ class TupleExtractInst
 {
   friend SILBuilder;
 
-  unsigned FieldNo;
-
   TupleExtractInst(SILDebugLocation DebugLoc, SILValue Operand,
                    unsigned FieldNo, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), FieldNo(FieldNo) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    SILInstruction::Bits.TupleExtractInst.FieldNo = FieldNo;
+  }
 
 public:
-  unsigned getFieldNo() const { return FieldNo; }
+  unsigned getFieldNo() const {
+    return SILInstruction::Bits.TupleExtractInst.FieldNo;
+  }
 
   TupleType *getTupleType() const {
     return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
@@ -5244,14 +5256,16 @@ class TupleElementAddrInst
 {
   friend SILBuilder;
 
-  unsigned FieldNo;
-
   TupleElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                        unsigned FieldNo, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), FieldNo(FieldNo) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    SILInstruction::Bits.TupleElementAddrInst.FieldNo = FieldNo;
+  }
 
 public:
-  unsigned getFieldNo() const { return FieldNo; }
+  unsigned getFieldNo() const {
+    return SILInstruction::Bits.TupleElementAddrInst.FieldNo;
+  }
 
 
   TupleType *getTupleType() const {
@@ -5482,14 +5496,18 @@ class WitnessMethodInst final
 
   CanType LookupType;
   ProtocolConformanceRef Conformance;
-  unsigned NumOperands;
+
+  unsigned getNumOperands() const {
+    return SILInstruction::Bits.WitnessMethodInst.NumOperands;
+  }
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
       : InstructionBase(DebugLoc, Ty, Member),
-        LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()) {
+        LookupType(LookupType), Conformance(Conformance) {
+    SILInstruction::Bits.WitnessMethodInst.NumOperands =
+      TypeDependentOperands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
@@ -5514,7 +5532,7 @@ class WitnessMethodInst final
 public:
   ~WitnessMethodInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = getNumOperands(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
@@ -5528,19 +5546,19 @@ public:
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), getNumOperands() };
   }
 };
 
@@ -6813,8 +6831,6 @@ class SwitchValueInst
                              TermInst> {
   friend SILBuilder;
 
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
   TailAllocatedOperandList<1> Operands;
 
   SwitchValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -6856,20 +6872,24 @@ public:
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
-                           static_cast<size_t>(NumCases + HasDefault)};
+                           static_cast<size_t>(getNumCases() + hasDefault())};
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return SILInstruction::Bits.SwitchValueInst.NumCases;
+  }
   std::pair<SILValue, SILBasicBlock*>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i]};
   }
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return SILInstruction::Bits.SwitchValueInst.HasDefault;
+  }
   SILBasicBlock *getDefaultBB() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases];
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()];
   }
 };
 
@@ -6877,8 +6897,6 @@ public:
 /// switch_enum_addr instructions.
 class SwitchEnumInstBase : public TermInst {
   FixedOperandList<1> Operands;
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
 
   // Tail-allocated after the SwitchEnumInst record are:
   // - an array of `NumCases` EnumElementDecl* pointers, referencing the case
@@ -6899,10 +6917,10 @@ class SwitchEnumInstBase : public TermInst {
   }
 
   SILSuccessor *getSuccessorBuf() {
-    return reinterpret_cast<SILSuccessor*>(getCaseBuf() + NumCases);
+    return reinterpret_cast<SILSuccessor*>(getCaseBuf() + getNumCases());
   }
   const SILSuccessor *getSuccessorBuf() const {
-    return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + NumCases);
+    return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + getNumCases());
   }
 
 protected:
@@ -6930,17 +6948,19 @@ public:
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
-                           static_cast<size_t>(NumCases + HasDefault)};
+                           static_cast<size_t>(getNumCases() + hasDefault())};
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return SILInstruction::Bits.SwitchEnumInstBase.NumCases;
+  }
   std::pair<EnumElementDecl*, SILBasicBlock*>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
   ProfileCounter getCaseCount(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return getSuccessorBuf()[i].getCount();
   }
 
@@ -6966,14 +6986,16 @@ public:
   /// return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDestination(SILBasicBlock *BB);
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return SILInstruction::Bits.SwitchEnumInstBase.HasDefault;
+  }
   SILBasicBlock *getDefaultBB() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases];
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()];
   }
   ProfileCounter getDefaultCount() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases].getCount();
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()].getCount();
   }
 
   static bool classof(const SILInstruction *I) {

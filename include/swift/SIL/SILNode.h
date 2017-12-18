@@ -96,6 +96,8 @@ public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumSILAccessKindBits = 2 };
+  enum { NumSILAccessEnforcementBits = 2 };
 protected:
   SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
     Kind : bitmax(NumSILNodeKindBits,8),
@@ -181,6 +183,11 @@ protected:
       atomicity : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(MetatypeInst, SingleValueInstruction, 32,
+      : NumPadBits,
+      NumOperands : 32
+  );
+
   SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
     /// IsTakeOfSrc - True if ownership will be taken from the value at the
     /// source memory location.
@@ -203,6 +210,16 @@ protected:
     friend class StoreReferenceInstBase;
   );
 
+  SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits,
+    AccessKind : NumSILAccessKindBits,
+    Enforcement : NumSILAccessEnforcementBits
+  );
+
+  SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
+    Aborting : 1
+  );
+
   SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
                         NumStoreOwnershipQualifierBits,
     OwnershipQualifier : NumStoreOwnershipQualifierBits
@@ -217,10 +234,28 @@ protected:
     Kind : NumVOKindBits
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(TupleExtractInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+  SWIFT_INLINE_BITFIELD_FULL(TupleElementAddrInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD_FULL(WitnessMethodInst, MethodInst, 32,
+    : NumPadBits,
+    NumOperands : 32
+  );
   UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 1+1,
+    IsStrict : 1,
+    IsInvariant : 1
+  );
+
   UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(PointerToThinFunctionInst, ConversionInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(UnconditionalCheckedCastInst, ConversionInst, 0, : NumPadBits);
@@ -239,6 +274,17 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
   UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
   UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
+
+  SWIFT_INLINE_BITFIELD_FULL(SwitchValueInst, TermInst, 1+32,
+    HasDefault : 1,
+    : NumPadBits,
+    NumCases : 32
+  );
+  SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
+    HasDefault : 1,
+    : NumPadBits,
+    NumCases : 32
+  );
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
@@ -284,6 +330,15 @@ protected:
     SWIFT_INLINE_BITS(IntegerLiteralInst);
     SWIFT_INLINE_BITS(FloatLiteralInst);
     SWIFT_INLINE_BITS(DeallocRefInst);
+    SWIFT_INLINE_BITS(WitnessMethodInst);
+    SWIFT_INLINE_BITS(TupleExtractInst);
+    SWIFT_INLINE_BITS(TupleElementAddrInst);
+    SWIFT_INLINE_BITS(SwitchValueInst);
+    SWIFT_INLINE_BITS(SwitchEnumInstBase);
+    SWIFT_INLINE_BITS(PointerToAddressInst);
+    SWIFT_INLINE_BITS(BeginAccessInst);
+    SWIFT_INLINE_BITS(EndAccessInst);
+    SWIFT_INLINE_BITS(MetatypeInst);
   } Bits;
 
 private:
