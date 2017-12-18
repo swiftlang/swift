@@ -1774,7 +1774,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
     StringRef BaseName =
-        FEOpts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
+        FEOpts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())

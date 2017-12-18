@@ -372,7 +372,8 @@ static void setModuleName(CompilerInvocation &Invocation) {
   if (!Invocation.getModuleName().empty())
     return;
 
-  StringRef Filename = Invocation.getFrontendOptions().usedToBeGetSingleOutputFilename();
+  StringRef Filename =
+      Invocation.getFrontendOptions().preBatchModeGetSingleOutputFilename();
   if (Filename.empty()) {
     if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
       Invocation.setModuleName("__main__");

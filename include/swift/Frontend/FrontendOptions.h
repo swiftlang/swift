@@ -256,7 +256,7 @@ public:
   }
   
   // FIXME: dmu temp
-  const StringRef usedToBeGetSingleOutputFilename() const {
+  const StringRef preBatchModeGetSingleOutputFilename() const {
     return pathsForAtMostOnePrimary().OutputFilename;
   }
   // FIXME: dmu check all uses
@@ -268,8 +268,8 @@ public:
     : getAllInputs().empty() ? empty
     : getAllInputs().front().outputs();
   }
-  
-  const StringRef usedToBeOutputFilename() {
+
+  const StringRef preBatchModeOutputFilename() {
     return pathsForAtMostOnePrimary().OutputFilename;
   }
   

@@ -192,7 +192,7 @@ public:
 
   // Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef usedToBeGetIRGSingleOutputFilename() const {
+  StringRef preBatchModeGetIRGSingleOutputFilename() const {
     if (IRGOutputFilenames.size() >= 1)
       return IRGOutputFilenames.back();
     return StringRef();

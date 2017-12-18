@@ -46,8 +46,7 @@ static void findAllClangImports(const clang::Module *module,
 bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
                                 const FrontendOptions &opts) {
 
-  auto path =
-      opts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
+  auto path = opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
 

@@ -668,7 +668,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
   // Create the IR emitter.
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.usedToBeGetIRGSingleOutputFilename());
+                      "", Opts.preBatchModeGetIRGSingleOutputFilename());
 
   initLLVMModule(*IGM);
 
@@ -721,7 +721,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, Opts.usedToBeGetIRGSingleOutputFilename());
+                  ModuleName, Opts.preBatchModeGetIRGSingleOutputFilename());
 
   initLLVMModule(IGM);
 
@@ -1105,7 +1105,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, Opts.usedToBeGetIRGSingleOutputFilename());
+                  OutputPath, Opts.preBatchModeGetIRGSingleOutputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -1150,7 +1150,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.usedToBeGetIRGSingleOutputFilename(), Stats))
+                    Opts.preBatchModeGetIRGSingleOutputFilename(), Stats))
     return true;
   return false;
 }

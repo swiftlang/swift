@@ -543,7 +543,7 @@ static bool performCompile(CompilerInstance &Instance,
     return clangImporter->emitBridgingPCH(
         Invocation.getFrontendOptions()
             .InputsAndOutputs.getFilenameOfFirstInput(),
-        opts.InputsAndOutputs.usedToBeGetSingleOutputFilename());
+        opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename());
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
@@ -711,9 +711,8 @@ static bool performCompile(CompilerInstance &Instance,
     else if (Action == FrontendOptions::ActionType::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
     else if (Action == FrontendOptions::ActionType::EmitSyntax) {
-      emitSyntax(
-          SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
-          opts.InputsAndOutputs.usedToBeGetSingleOutputFilename());
+      emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
+                 opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename());
     } else
       SF->dump();
     return Context.hadError();
@@ -837,10 +836,9 @@ static bool performCompile(CompilerInstance &Instance,
     // If we are asked to link all, link all.
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
-    return writeSIL(
-        *SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-        opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(),
-        opts.EmitSortedSIL);
+    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                    opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
+                    opts.EmitSortedSIL);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
@@ -1040,10 +1038,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL) {
-    return writeSIL(
-        *SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-        opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(),
-        opts.EmitSortedSIL);
+    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                    opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
+                    opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
@@ -1083,14 +1080,14 @@ static bool performCompile(CompilerInstance &Instance,
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
   if (PrimarySourceFile) {
-    IRModule =
-        performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
-                            opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(),
-                            LLVMContext, 0, &HashGlobal);
+    IRModule = performIRGeneration(
+        IRGenOpts, *PrimarySourceFile, std::move(SM),
+        opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
+        LLVMContext, 0, &HashGlobal);
   } else {
     IRModule = performIRGeneration(
         IRGenOpts, Instance.getMainModule(), std::move(SM),
-        opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(),
+        opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
         LLVMContext, &HashGlobal);
   }
 
@@ -1151,7 +1148,8 @@ static bool performCompile(CompilerInstance &Instance,
   return performLLVM(
              IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
              IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
-             opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(), Stats) ||
+             opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
+             Stats) ||
          HadError;
 }
 
@@ -1178,7 +1176,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
   if (PrimarySourceFile) {
     if (index::indexAndRecord(
             PrimarySourceFile,
-            opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(),
+            opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
             opts.IndexStorePath, opts.IndexSystemModules, isDebugCompilation,
             Invocation.getTargetTriple(), *Instance.getDependencyTracker())) {
       return true;
@@ -1187,8 +1185,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
     StringRef moduleToken =
         opts.InputsAndOutputs.pathsForAtMostOnePrimary().ModuleOutputPath;
     if (moduleToken.empty())
-      moduleToken =
-          opts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
+      moduleToken = opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();
 
     if (index::indexAndRecord(
             Instance.getMainModule(),
@@ -1436,7 +1433,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
         FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile =
-        FEOpts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
+        FEOpts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
     std::string TripleName = LangOpts.Target.normalize();
     auto &SM = Instance->getSourceMgr();
