@@ -1353,17 +1353,12 @@ namespace {
                                      ConstraintLocatorBuilder locator);
 
   private:
-    /// \brief Build a new subscript.
-    ///
-    /// \param base The base of the subscript.
-    /// \param index The index of the subscript.
-    /// \param locator The locator used to refer to the subscript.
-    /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
                          ArrayRef<Identifier> argLabels,
                          bool hasTrailingClosure,
-                         ConstraintLocatorBuilder locator,
-                         bool isImplicit, AccessSemantics semantics) {
+                         ConstraintLocatorBuilder locator, bool isImplicit,
+                         AccessSemantics semantics) {
+
       // Determine the declaration selected for this subscript operation.
       auto selected = getOverloadChoiceIfAvailable(
                         cs.getConstraintLocator(
@@ -1390,13 +1385,52 @@ namespace {
         return nullptr;
       }
 
+      // Build the new subscript.
+      auto newSubscript = buildSubscriptHelper(base, index, argLabels,
+                                               *selected, hasTrailingClosure,
+                                               locator, isImplicit, semantics);
+
       auto choice = selected->choice;
-      
+
+      if (choice.getKind() ==
+          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+
+        if (choice.getDecl()
+                ->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          auto *disjunctionLocator =
+              cs.getConstraintLocator(locator.withPathElement(
+                  ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
+          if (solution.getDisjunctionChoice(disjunctionLocator)) {
+            return coerceImplicitlyUnwrappedOptionalToValue(
+                newSubscript,
+                cs.getType(newSubscript)->getOptionalObjectType());
+          }
+        }
+      }
+
+      return newSubscript;
+    }
+
+    /// \brief Build a new subscript.
+    ///
+    /// \param base The base of the subscript.
+    /// \param index The index of the subscript.
+    /// \param locator The locator used to refer to the subscript.
+    /// \param isImplicit Whether this is an implicit subscript.
+    Expr *buildSubscriptHelper(Expr *base, Expr *index,
+                               ArrayRef<Identifier> argLabels,
+                               SelectedOverload &selected,
+                               bool hasTrailingClosure,
+                               ConstraintLocatorBuilder locator,
+                               bool isImplicit, AccessSemantics semantics) {
+      auto choice = selected.choice;
+
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
-        auto applicationTy = simplifyType(selected->openedType)
-          ->castTo<FunctionType>();
-                
+        auto applicationTy =
+            simplifyType(selected.openedType)->castTo<FunctionType>();
+
         index = cs.coerceToRValue(index);
         // The index argument should be (keyPath: KeyPath<Root, Value>).
         // Dig the key path expression out of the argument tuple.
@@ -1499,7 +1533,7 @@ namespace {
       }
 
       // Figure out the index and result types.
-      auto subscriptTy = simplifyType(selected->openedType);
+      auto subscriptTy = simplifyType(selected.openedType);
       auto subscriptFnTy = subscriptTy->castTo<AnyFunctionType>();
       auto resultTy = subscriptFnTy->getResult();
 
@@ -1555,7 +1589,7 @@ namespace {
       }
 
       // Convert the base.
-      auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
+      auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
       auto openedBaseType = openedFullFnType->getInput();
       auto containerTy = solution.simplifyType(openedBaseType);
       base = coerceObjectArgumentToType(
@@ -2366,6 +2400,29 @@ namespace {
       return expr;
     }
 
+    Expr *forceOptionalIfExpected(Expr *newExpr, Expr *oldExpr,
+                                  SelectedOverload &selected) {
+      auto choiceLocator = cs.getConstraintLocator(
+          oldExpr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+
+      // If the selection that type-checked was the one that did not
+      // involve forcing, just return the new expression.
+      if (!solution.getDisjunctionChoice(choiceLocator))
+        return newExpr;
+
+      if (auto *fnTy = selected.openedType->getAs<AnyFunctionType>()) {
+        auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
+
+        auto &ctx = cs.getTypeChecker().Context;
+        return cs.cacheType(new (ctx) ImplicitlyUnwrappedFunctionConversionExpr(
+            newExpr, underlyingType));
+      } else {
+        return coerceImplicitlyUnwrappedOptionalToValue(
+            newExpr, selected.openedType->getWithoutSpecifierType()
+                         ->getOptionalObjectType());
+      }
+    }
+
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
 
@@ -2382,13 +2439,17 @@ namespace {
       auto choice = selected->choice;
       auto decl = choice.getDecl();
 
-      // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
-      // new one?
-      return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
-                          locator,
-                          expr->isImplicit(),
-                          expr->getFunctionRefKind(),
-                          expr->getAccessSemantics());
+      auto *newDeclRef =
+          buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
+                       locator, expr->isImplicit(), expr->getFunctionRefKind(),
+                       expr->getAccessSemantics());
+
+      if (choice.getKind() ==
+          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+        return forceOptionalIfExpected(newDeclRef, expr, *selected);
+      }
+
+      return newDeclRef;
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2420,10 +2481,17 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
-                          locator, expr->isImplicit(),
-                          choice.getFunctionRefKind(),
-                          AccessSemantics::Ordinary);
+      auto *newDeclRef =
+          buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
+                       locator, expr->isImplicit(), choice.getFunctionRefKind(),
+                       AccessSemantics::Ordinary);
+
+      if (choice.getKind() ==
+          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+        return forceOptionalIfExpected(newDeclRef, expr, selected);
+      }
+
+      return newDeclRef;
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -2443,17 +2511,21 @@ namespace {
       auto selected = getOverloadChoice(memberLocator);
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-      return buildMemberRef(expr->getBase(),
-                            selected.openedFullType,
-                            expr->getDotLoc(),
-                            selected.choice.getDecl(), expr->getNameLoc(),
-                            selected.openedType,
-                            cs.getConstraintLocator(expr),
-                            memberLocator,
-                            expr->isImplicit(),
-                            selected.choice.getFunctionRefKind(),
-                            expr->getAccessSemantics(),
-                            isDynamic);
+      auto newMemberRef = buildMemberRef(
+          expr->getBase(), selected.openedFullType, expr->getDotLoc(),
+          selected.choice.getDecl(), expr->getNameLoc(), selected.openedType,
+          cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
+          selected.choice.getFunctionRefKind(), expr->getAccessSemantics(),
+          isDynamic);
+
+      auto choice = selected.choice;
+
+      if (choice.getKind() ==
+          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+        return forceOptionalIfExpected(newMemberRef, expr, selected);
+      }
+
+      return newMemberRef;
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2522,6 +2594,12 @@ namespace {
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/false, Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+      }
+
+      auto choice = selected.choice;
+      if (choice.getKind() ==
+          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+        result = forceOptionalIfExpected(result, expr, selected);
       }
 
       result = coerceToType(result, resultTy, cs.getConstraintLocator(expr));
@@ -2695,6 +2773,13 @@ namespace {
                                      selected.choice.getFunctionRefKind(),
                                      AccessSemantics::Ordinary,
                                      isDynamic);
+
+        auto choice = selected.choice;
+
+        if (choice.getKind() ==
+            OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+          return forceOptionalIfExpected(member, expr, selected);
+        }
 
         return member;
       }
@@ -7105,6 +7190,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))
     fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy);
 
+  bool unwrapResult = false;
+  if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {
+    unwrapResult = true;
+    fn = IUOFnTy->getSubExpr();
+  }
+
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
   // FIXME: It would be nicer if we could build the ASTs properly in the
@@ -7209,6 +7300,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           }
       }
     }
+
+    if (unwrapResult) {
+      return coerceImplicitlyUnwrappedOptionalToValue(
+          result, cs.getType(result)->getOptionalObjectType());
+    }
+
     return result;
   }
 
