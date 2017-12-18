@@ -2366,7 +2366,7 @@ Restart:
     }
     break;
   case '#':
-    if (TriviaStart == BufferStart && *CurPtr == '!') {
+    if (TriviaStart == ContentStart && *CurPtr == '!') {
       // Hashbang '#!/path/to/swift'.
       --CurPtr;
       if (BufferID != SourceMgr.getHashbangBufferID())

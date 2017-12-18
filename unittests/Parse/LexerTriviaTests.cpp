@@ -83,6 +83,31 @@ TEST_F(LexerTriviaTest, TriviaHashbang) {
                      TriviaPiece::newlines(1)}}));
 }
 
+TEST_F(LexerTriviaTest, TriviaHashbangAfterBOM) {
+  StringRef SourceStr = "\xEF\xBB\xBF" "#!/bin/swift\naaa";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
+
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
+  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+
+  // FIXME: This should include UTF8-BOM as a GarbargeText trivia.
+  ASSERT_EQ(LeadingTrivia,
+            (Trivia{{TriviaPiece::garbageText("#!/bin/swift"),
+                     TriviaPiece::newlines(1)}}));
+}
+
 TEST_F(LexerTriviaTest, TriviaConflictMarker) {
   using namespace swift::syntax;
   StringRef SourceStr =
