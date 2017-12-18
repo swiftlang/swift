@@ -132,6 +132,4 @@
   * CompositionType
   * TupleType
   * FunctionType
-
-### In-progress:
   * AttributedType
