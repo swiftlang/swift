@@ -39,7 +39,7 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
-  public func filterMap<ElementOfResult>(
+  public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
     LazyFilterSequence<
@@ -60,7 +60,7 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   @inline(__always)
-  @available(*, deprecated, renamed: "filterMap(_:)")
+  @available(*, deprecated, renamed: "compactMap(_:)")
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
@@ -68,7 +68,7 @@ extension LazySequenceProtocol {
       LazyMapSequence<Elements, ElementOfResult?>>,
     ElementOfResult
   > {
-    return self.filterMap(transform)
+    return self.compactMap(transform)
   }
 }
 
@@ -103,7 +103,7 @@ extension LazyCollectionProtocol {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
-  public func filterMap<ElementOfResult>(
+  public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
     LazyFilterCollection<
@@ -123,7 +123,7 @@ extension LazyCollectionProtocol {
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @available(*, deprecated, renamed: "filterMap(_:)")
+  @available(*, deprecated, renamed: "compactMap(_:)")
   @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?

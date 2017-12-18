@@ -438,18 +438,18 @@ extension Sequence {
 
 extension Collection {
   @_inlineable // FIXME(sil-serialize-all)
-  public func filterMap(
+  public func compactMap(
     _ transform: (Element) throws -> String?
   ) rethrows -> [String] {
-    return try _filterMap(transform)
+    return try _compactMap(transform)
   }
 
-  @available(*, deprecated, renamed: "filterMap(_:)")
+  @available(*, deprecated, renamed: "compactMap(_:)")
   @inline(__always)
   public func flatMap(
     _ transform: (Element) throws -> String?
   ) rethrows -> [String] {
-    return try _filterMap(transform)
+    return try _compactMap(transform)
   }
 }
 //===----------------------------------------------------------------------===//

@@ -1571,9 +1571,9 @@ func itsFalse(_: Int) -> Bool? {
 }
 
 func rdar33159366(s: AnySequence<Int>) {
-  _ = s.filterMap(itsFalse)
+  _ = s.compactMap(itsFalse)
   let a = Array(s)
-  _ = a.filterMap(itsFalse)
+  _ = a.compactMap(itsFalse)
 }
 
 func sr5429<T>(t: T) {

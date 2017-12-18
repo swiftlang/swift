@@ -179,7 +179,7 @@ internal func readUInt() -> UInt {
 /// process.
 internal func sendReflectionInfos() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let infos = (0..<_dyld_image_count()).filterMap(getReflectionInfoForImage)
+  let infos = (0..<_dyld_image_count()).compactMap(getReflectionInfoForImage)
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")
