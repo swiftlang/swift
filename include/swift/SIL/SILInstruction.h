@@ -1167,19 +1167,19 @@ class TailAllocatedDebugVariable {
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
       unsigned NameLength : 15;
-    };
+    } Data;
   };
 public:
   TailAllocatedDebugVariable(SILDebugVariable DbgVar, char *buf);
   TailAllocatedDebugVariable(uint32_t RawValue) : RawValue(RawValue) {}
   uint32_t getRawValue() const { return RawValue; }
 
-  unsigned getArgNo() const { return ArgNo; }
-  void setArgNo(unsigned N) { ArgNo = N; }
+  unsigned getArgNo() const { return Data.ArgNo; }
+  void setArgNo(unsigned N) { Data.ArgNo = N; }
   /// Returns the name of the source variable, if it is stored in the
   /// instruction.
   StringRef getName(const char *buf) const;
-  bool isLet() const  { return Constant; }
+  bool isLet() const  { return Data.Constant; }
 
   SILDebugVariable get(VarDecl *VD, const char *buf) const {
     if (VD)
