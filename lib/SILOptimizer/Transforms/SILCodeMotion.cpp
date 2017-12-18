@@ -118,6 +118,7 @@ using EnumBBCaseList =
 /// Class that performs enum tag state dataflow on the given BB.
 class BBEnumTagDataflowState
     : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
+  EnumCaseDataflowContext *Context;
   NullablePtr<SILBasicBlock> BB;
 
   using ValueToCaseSmallBlotMapVectorTy =
@@ -137,11 +138,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
-  bool init(SILBasicBlock *NewBB) {
-    assert(NewBB && "NewBB should not be null");
-    BB = NewBB;
-    return true;
-  }
+  bool init(EnumCaseDataflowContext &Context, SILBasicBlock *NewBB);
 
   SILBasicBlock *getBB() { return BB.get(); }
 
@@ -200,7 +197,7 @@ public:
     BBToStateVec.resize(PO->size());
     unsigned RPOIdx = 0;
     for (SILBasicBlock *BB : PO->getReversePostOrder()) {
-      BBToStateVec[RPOIdx].init(BB);
+      BBToStateVec[RPOIdx].init(*this, BB);
       ++RPOIdx;
     }
   }
@@ -755,6 +752,14 @@ void BBEnumTagDataflowState::dump() const {
     llvm::dbgs() << "  End Case List.\n";
   }
 #endif
+}
+
+bool BBEnumTagDataflowState::init(EnumCaseDataflowContext &NewContext,
+                                  SILBasicBlock *NewBB) {
+  assert(NewBB && "NewBB should not be null");
+  Context = &NewContext;
+  BB = NewBB;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
