@@ -80,7 +80,7 @@ namespace swift {
 #define SWIFT_INLINE_BITFIELD_EMPTY(T, U) \
   enum { Num##T##Bits = Num##U##Bits }
 
-#define SWIFT_INLINE_BITS(T) T##Bitfield T##Bits
+#define SWIFT_INLINE_BITS(T) T##Bitfield T
 
 // XXX/HACK: templated max() doesn't seem to work in a bitfield size context.
 constexpr unsigned bitmax(unsigned a, unsigned b) {

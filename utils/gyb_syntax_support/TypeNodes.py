@@ -157,6 +157,18 @@ TYPE_NODES = [
              Child('ReturnType', kind='Type'),
          ]),
 
+    # attributed-type -> type-specifier? attribute-list? type
+    # type-specifiyer -> 'inout' | '__owned' | '__unowned'
+    Node('AttributedType', kind='Type',
+         children=[
+             Child('Specifier', kind='Token',
+                   text_choices=['inout', '__shared', '__owned'],
+                   is_optional=True),
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('BaseType', kind='Type'),
+         ]),
+
     # generic-argument-list -> generic-argument generic-argument-list?
     Node('GenericArgumentList', kind='SyntaxCollection',
          element='GenericArgument'),

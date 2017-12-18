@@ -386,7 +386,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
 
-func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(thin) () -> ()) {
+func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
   Builtin.once(p, f)
 }
 
@@ -402,7 +402,7 @@ func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(thin) () -> ()) 
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
-func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(thin) (Builtin.RawPointer) -> (), k: Builtin.RawPointer) {
+func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (Builtin.RawPointer) -> (), k: Builtin.RawPointer) {
   Builtin.onceWithContext(p, f, k)
 }
 

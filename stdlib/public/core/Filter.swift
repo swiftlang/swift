@@ -245,9 +245,9 @@ extension LazyFilterCollection : LazyCollectionProtocol, Collection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
-      repeat {
-        _base.formIndex(&i, offsetBy: step)
-      } while i != _base.endIndex && !_predicate(_base[i])
+    repeat {
+      _base.formIndex(&i, offsetBy: step)
+    } while i != _base.endIndex && !_predicate(_base[i])
   }
 
   @inline(__always)

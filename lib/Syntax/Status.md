@@ -61,6 +61,7 @@
 
 ### Done:
   * TopLevelCodeDecl
+  * ClassDecl
   * StructDecl
   * FuncDecl
   * ProtocolDecl
@@ -71,7 +72,6 @@
 ### In-progress (UnknownDecl):
   * PatternBindingDecl
   * VarDecl
-  * ClassDecl (SR-6571)
   * ExtensionDecl (SR-6572)
 
 ### Not-started (UnknownDecl):
@@ -132,6 +132,4 @@
   * CompositionType
   * TupleType
   * FunctionType
-
-### In-progress:
   * AttributedType

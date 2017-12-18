@@ -1618,6 +1618,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     
     // Recover by eating @foo(...) when foo is not known.
     consumeToken();
+    SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
     if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
       ParserPosition LParenPosition = getParserPosition();
       skipSingle();
@@ -1633,6 +1635,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
+  
+  // Accumulate attribute argument '( ... )' as a token list.
+  SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
 
   bool isAutoclosureEscaping = false;
   SourceRange autoclosureEscapingParenRange;
@@ -1916,9 +1921,11 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
     SpecifierLoc = consumeToken();
   }
 
+  SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   while (Tok.is(tok::at_sign)) {
     if (Attributes.AtLoc.isInvalid())
       Attributes.AtLoc = Tok.getLoc();
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     consumeToken();
     if (parseTypeAttribute(Attributes))
       return true;
@@ -2316,6 +2323,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
       consumeToken(tok::kw_class);
       // Otherwise this is the start of a class declaration.
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       break;
     }
@@ -5480,6 +5488,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   CD->setGenericParams(GenericParams);
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;

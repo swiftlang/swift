@@ -114,7 +114,7 @@ struct ValueOwnershipKind {
   } Value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
-  static constexpr unsigned NumBits = 3;
+  static constexpr unsigned NumBits = SILNode::NumVOKindBits;
   static constexpr UnderlyingType MaxValue = (UnderlyingType(1) << NumBits);
   static constexpr uint64_t Mask = MaxValue - 1;
   static_assert(unsigned(ValueOwnershipKind::LastValueOwnershipKind) < MaxValue,

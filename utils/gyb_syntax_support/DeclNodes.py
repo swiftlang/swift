@@ -112,6 +112,30 @@ DECL_NODES = [
              Child('InheritedTypeCollection', kind='InheritedTypeList'),
          ]),
 
+    # class-declaration -> attributes? access-level-modifier?
+    #                      'class' class-name
+    #                      generic-parameter-clause?
+    #                      type-inheritance-clause?
+    #                      generic-where-clause?
+    #                     '{' class-members ''
+    # class-name -> identifier
+    Node('ClassDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ClassKeyword', kind='ClassToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
     # struct-declaration -> attributes? access-level-modifier?
     #                         'struct' struct-name
     #                         generic-parameter-clause?

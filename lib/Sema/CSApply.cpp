@@ -920,12 +920,7 @@ namespace {
           memberLocator, substitutions);
       auto memberRef = ConcreteDeclRef(context, member, substitutions);
 
-      // Class members might be virtually dispatched, so we need to know
-      // the full layout of the class.
-      if (auto *classDecl = dyn_cast<ClassDecl>(member->getDeclContext()))
-        tc.requestNominalLayout(classDecl);
-      if (auto *protocolDecl = dyn_cast<ProtocolDecl>(member->getDeclContext()))
-        tc.requestNominalLayout(protocolDecl);
+      cs.TC.requestMemberLayout(member);
 
       auto refTy = solution.simplifyType(openedFullType);
 
@@ -4125,8 +4120,11 @@ namespace {
             resolvedComponents.push_back(
                  KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
           }
-          
+
+          cs.TC.requestMemberLayout(property);
+
           auto dc = property->getInnermostDeclContext();
+
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
@@ -4170,7 +4168,9 @@ namespace {
             resolvedComponents.push_back(
                  KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
           }
-          
+
+          cs.TC.requestMemberLayout(subscript);
+
           auto dc = subscript->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
           SubstitutionMap subMap;

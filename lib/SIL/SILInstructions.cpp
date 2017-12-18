@@ -126,9 +126,9 @@ static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
                                                        char *buf)
-    : ArgNo(Var.ArgNo), NameLength(Var.Name.size()), Constant(Var.Constant) {
-  assert((Var.ArgNo < (2<<16)) && "too many arguments");
-  assert((NameLength < (2<<15)) && "variable name too long");
+    : ArgNo(Var.ArgNo), Constant(Var.Constant), NameLength(Var.Name.size()) {
+  assert(ArgNo == Var.ArgNo && "Truncation");
+  assert(NameLength == Var.Name.size() && "Truncation");
   memcpy(buf, Var.Name.data(), NameLength);
 }
 
@@ -140,9 +140,13 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
                                SILDebugVariable Var)
-    : InstructionBase(Loc, elementType.getAddressType()),
-      NumOperands(TypeDependentOperands.size()),
-      VarInfo(Var, getTrailingObjects<char>()) {
+    : InstructionBase(Loc, elementType.getAddressType()) {
+  SILInstruction::Bits.AllocStackInst.NumOperands =
+    TypeDependentOperands.size();
+  assert(SILInstruction::Bits.AllocStackInst.NumOperands ==
+         TypeDependentOperands.size() && "Truncation");
+  SILInstruction::Bits.AllocStackInst.VarInfo =
+    TailAllocatedDebugVariable(Var, getTrailingObjects<char>()).getRawValue();
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
@@ -173,11 +177,10 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    bool objc, bool canBeOnStack,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> AllOperands)
-    : AllocationInst(Kind, Loc, ObjectType),
-      StackPromotable(canBeOnStack),
-      NumTailTypes(ElementTypes.size()),
-      ObjC(objc),
-      Operands(this, AllOperands) {
+    : AllocationInst(Kind, Loc, ObjectType), Operands(this, AllOperands) {
+  SILInstruction::Bits.AllocRefInstBase.ObjC = objc;
+  SILInstruction::Bits.AllocRefInstBase.OnStack = canBeOnStack;
+  SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   static_assert(IsTriviallyCopyable<SILType>::value,
                 "assuming SILType is trivially copyable");
   assert(!objc || ElementTypes.size() == 0);
@@ -640,8 +643,8 @@ static void *allocateLiteralInstWithBitSize(SILModule &M, unsigned bits) {
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
                                        const llvm::APInt &Value)
-    : InstructionBase(Loc, Ty),
-      numBits(Value.getBitWidth()) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.IntegerLiteralInst.numBits = Value.getBitWidth();
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
                             getTrailingObjects<llvm::APInt::WordType>());
 }
@@ -679,16 +682,17 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
+  auto numBits = SILInstruction::Bits.IntegerLiteralInst.numBits;
   return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
 FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
                                    const APInt &Bits)
-    : InstructionBase(Loc, Ty),
-      numBits(Bits.getBitWidth()) {
-        std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                                  getTrailingObjects<llvm::APInt::WordType>());
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.FloatLiteralInst.numBits = Bits.getBitWidth();
+  std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
+                            getTrailingObjects<llvm::APInt::WordType>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -718,6 +722,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 }
 
 APInt FloatLiteralInst::getBits() const {
+  auto numBits = SILInstruction::Bits.FloatLiteralInst.numBits;
   return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
@@ -778,8 +783,9 @@ uint64_t ConstStringLiteralInst::getCodeUnitCount() {
 StoreInst::StoreInst(
     SILDebugLocation Loc, SILValue Src, SILValue Dest,
     StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
-    : InstructionBase(Loc), Operands(this, Src, Dest),
-      OwnershipQualifier(Qualifier) {}
+    : InstructionBase(Loc), Operands(this, Src, Dest) {
+  SILInstruction::Bits.StoreInst.OwnershipQualifier = unsigned(Qualifier);
+}
 
 StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
                                  SILValue Dest)
@@ -846,9 +852,11 @@ StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
                            IsInitialization_t isInitializationOfDest)
-    : InstructionBase(Loc), IsTakeOfSrc(isTakeOfSrc),
-      IsInitializationOfDest(isInitializationOfDest),
-      Operands(this, SrcLValue, DestLValue) {}
+    : InstructionBase(Loc), Operands(this, SrcLValue, DestLValue) {
+    SILInstruction::Bits.CopyAddrInst.IsTakeOfSrc = bool(isTakeOfSrc);
+    SILInstruction::Bits.CopyAddrInst.IsInitializationOfDest =
+      bool(isInitializationOfDest);
+  }
 
 BindMemoryInst *
 BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
@@ -932,8 +940,8 @@ TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
 
 MetatypeInst::MetatypeInst(SILDebugLocation Loc, SILType Metatype,
                            ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBase(Loc, Metatype),
-      NumOperands(TypeDependentOperands.size()) {
+    : InstructionBase(Loc, Metatype) {
+  SILInstruction::Bits.MetatypeInst.NumOperands = TypeDependentOperands.size();
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
@@ -1304,9 +1312,9 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,
                                  SILBasicBlock *DefaultBB,
                                  ArrayRef<SILValue> Cases,
                                  ArrayRef<SILBasicBlock *> BBs)
-    : InstructionBase(Loc), NumCases(Cases.size()),
-      HasDefault(bool(DefaultBB)), Operands(this, Cases, Operand) {
-
+    : InstructionBase(Loc), Operands(this, Cases, Operand) {
+  SILInstruction::Bits.SwitchValueInst.HasDefault = bool(DefaultBB);
+  SILInstruction::Bits.SwitchValueInst.NumCases = Cases.size();
   // Initialize the successor array.
   auto *succs = getSuccessorBuf();
   unsigned OperandBitWidth = 0;
@@ -1340,14 +1348,14 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,
     ::new (succs + i) SILSuccessor(this, BBs[i]);
   }
 
-  if (HasDefault)
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+  if (hasDefault())
+    ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB);
 }
 
 SwitchValueInst::~SwitchValueInst() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
+  for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
     succs[i].~SILSuccessor();
   }
 }
@@ -1486,8 +1494,9 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
     Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
-    : TermInst(Kind, Loc), Operands(this, Operand), NumCases(CaseBBs.size()),
-      HasDefault(bool(DefaultBB)) {
+    : TermInst(Kind, Loc), Operands(this, Operand) {
+  SILInstruction::Bits.SwitchEnumInstBase.HasDefault = bool(DefaultBB);
+  SILInstruction::Bits.SwitchEnumInstBase.NumCases = CaseBBs.size();
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();
   auto *succs = getSuccessorBuf();
@@ -1501,8 +1510,8 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     }
   }
 
-  if (HasDefault) {
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB, DefaultCount);
+  if (hasDefault()) {
+    ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB, DefaultCount);
   }
 }
 
@@ -1592,7 +1601,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
 SwitchEnumInstBase::~SwitchEnumInstBase() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
+  for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
     succs[i].~SILSuccessor();
   }
 }

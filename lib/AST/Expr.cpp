@@ -1052,10 +1052,10 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
                                      bool Implicit)
     : LiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
       Range(Range) {
-  StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
-  StringLiteralExprBits.IsSingleUnicodeScalar =
+  Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(UTF8);
+  Bits.StringLiteralExpr.IsSingleUnicodeScalar =
       unicode::isSingleUnicodeScalar(Val);
-  StringLiteralExprBits.IsSingleExtendedGraphemeCluster =
+  Bits.StringLiteralExpr.IsSingleExtendedGraphemeCluster =
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
@@ -1256,11 +1256,11 @@ ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                                      bool implicit)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
       Arg(Arg), SemanticExpr(nullptr), PoundLoc(PoundLoc) {
-  ObjectLiteralExprBits.LitKind = static_cast<unsigned>(LitKind);
+  Bits.ObjectLiteralExpr.LitKind = static_cast<unsigned>(LitKind);
   assert(getLiteralKind() == LitKind);
-  ObjectLiteralExprBits.NumArgLabels = argLabels.size();
-  ObjectLiteralExprBits.HasArgLabelLocs = !argLabelLocs.empty();
-  ObjectLiteralExprBits.HasTrailingClosure = hasTrailingClosure;
+  Bits.ObjectLiteralExpr.NumArgLabels = argLabels.size();
+  Bits.ObjectLiteralExpr.HasArgLabelLocs = !argLabelLocs.empty();
+  Bits.ObjectLiteralExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);  
 }
 
@@ -1337,8 +1337,8 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
     Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
    
-  MemberRefExprBits.Semantics = (unsigned) semantics;
-  MemberRefExprBits.IsSuper = false;
+  Bits.MemberRefExpr.Semantics = (unsigned) semantics;
+  Bits.MemberRefExpr.IsSuper = false;
   assert(Member);
 }
 
@@ -1419,9 +1419,9 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
     LParenLoc(LParenLoc), RParenLoc(RParenLoc),
     NumElements(SubExprs.size())
 {
-  TupleExprBits.HasTrailingClosure = HasTrailingClosure;
-  TupleExprBits.HasElementNames = !ElementNames.empty();
-  TupleExprBits.HasElementNameLocations = !ElementNameLocs.empty();
+  Bits.TupleExpr.HasTrailingClosure = HasTrailingClosure;
+  Bits.TupleExpr.HasElementNames = !ElementNames.empty();
+  Bits.TupleExpr.HasElementNameLocations = !ElementNameLocs.empty();
   
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
@@ -1517,11 +1517,11 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
                              bool implicit, AccessSemantics semantics)
     : Expr(ExprKind::Subscript, implicit, Type()),
       TheDecl(decl), Base(base), Index(index) {
-  SubscriptExprBits.Semantics = (unsigned) semantics;
-  SubscriptExprBits.IsSuper = false;
-  SubscriptExprBits.NumArgLabels = argLabels.size();
-  SubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
-  SubscriptExprBits.HasTrailingClosure = hasTrailingClosure;
+  Bits.SubscriptExpr.Semantics = (unsigned) semantics;
+  Bits.SubscriptExpr.IsSuper = false;
+  Bits.SubscriptExpr.NumArgLabels = argLabels.size();
+  Bits.SubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
+  Bits.SubscriptExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
 }
 
@@ -1584,9 +1584,9 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
                                            bool implicit)
     : DynamicLookupExpr(ExprKind::DynamicSubscript, member, base),
       Index(index) {
-  DynamicSubscriptExprBits.NumArgLabels = argLabels.size();
-  DynamicSubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
-  DynamicSubscriptExprBits.HasTrailingClosure = hasTrailingClosure;
+  Bits.DynamicSubscriptExpr.NumArgLabels = argLabels.size();
+  Bits.DynamicSubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
+  Bits.DynamicSubscriptExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
   if (implicit) setImplicit(implicit);
 }
@@ -1648,10 +1648,10 @@ UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
                                            bool implicit)
   : Expr(ExprKind::UnresolvedMember, implicit),
     DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
-  UnresolvedMemberExprBits.HasArguments = (argument != nullptr);
-  UnresolvedMemberExprBits.NumArgLabels = argLabels.size();
-  UnresolvedMemberExprBits.HasArgLabelLocs = !argLabelLocs.empty();
-  UnresolvedMemberExprBits.HasTrailingClosure = hasTrailingClosure;
+  Bits.UnresolvedMemberExpr.HasArguments = (argument != nullptr);
+  Bits.UnresolvedMemberExpr.NumArgLabels = argLabels.size();
+  Bits.UnresolvedMemberExpr.HasArgLabelLocs = !argLabelLocs.empty();
+  Bits.UnresolvedMemberExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
 }
 
@@ -1735,9 +1735,9 @@ CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
                    Type ty)
     : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty)
 {
-  CallExprBits.NumArgLabels = argLabels.size();
-  CallExprBits.HasArgLabelLocs = !argLabelLocs.empty();
-  CallExprBits.HasTrailingClosure = hasTrailingClosure;
+  Bits.CallExpr.NumArgLabels = argLabels.size();
+  Bits.CallExpr.HasArgLabelLocs = !argLabelLocs.empty();
+  Bits.CallExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
 }
 
@@ -2109,7 +2109,7 @@ KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,
   std::uninitialized_copy(components.begin(), components.end(),
                           Components.begin());
 
-  KeyPathExprBits.IsObjC = true;
+  Bits.KeyPathExpr.IsObjC = true;
 }
 
 void
