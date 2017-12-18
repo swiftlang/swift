@@ -1073,6 +1073,11 @@ public:
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
 
+  /// Request that type containing the given member needs to have all
+  /// members validated after everythign in the translation unit has
+  /// been processed.
+  void requestMemberLayout(ValueDecl *member);
+
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
   void requestNominalLayout(NominalTypeDecl *nominalDecl);
