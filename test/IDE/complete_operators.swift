@@ -278,7 +278,7 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 1 items
-// INFIX_16-NEXT: Pattern/ExprSpecific:               ({#(self): T#})[#() -> S2#]; name=(self: T)
+// INFIX_16-NEXT: Pattern/CurrModule:               ({#(self): T#})[#() -> S2#]; name=(self: T)
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {
@@ -321,7 +321,7 @@ func testInfix22() {
   E.B#^INFIX_22^#
 }
 // INFIX_22: Begin completions, 1 items
-// INFIX_22-NEXT: Pattern/ExprSpecific:               ({#S2#})[#E#]; name=(S2)
+// INFIX_22-NEXT: Pattern/CurrModule:               ({#S2#})[#E#]; name=(S2)
 // INFIX_22: End completions
 
 func testSpace(x: S2) {

@@ -352,7 +352,7 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
-// FIRST_ARG_NAME_4: Pattern/ExprSpecific: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
+// FIRST_ARG_NAME_4: Pattern/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
