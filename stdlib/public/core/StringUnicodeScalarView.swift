@@ -257,9 +257,9 @@ extension String {
       @_versioned // FIXME(sil-serialize-all)
       internal let _ascii: Bool
       @_versioned // FIXME(sil-serialize-all)
-      internal var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
+      internal var _asciiBase: UnsafeBufferPointer<UInt8>.Iterator!
       @_versioned // FIXME(sil-serialize-all)
-      internal var _base: UnsafeBufferPointerIterator<UInt16>!
+      internal var _base: UnsafeBufferPointer<UInt16>.Iterator!
       @_versioned // FIXME(sil-serialize-all)
       internal var _iterator: IndexingIterator<_StringCore>
     }

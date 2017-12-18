@@ -1022,8 +1022,8 @@ SequenceTypeTests.test("Sequence/split/dispatch") {
 //===----------------------------------------------------------------------===//
 
 // Check generic parameter names.
-extension Zip2Iterator
-  where Iterator1 : TestProtocol1, Iterator2 : TestProtocol1 {
+extension Zip2Sequence.Iterator
+  where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
 
   var _generator1IsTestProtocol1: Bool {
     fatalError("not implemented")
