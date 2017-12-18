@@ -111,6 +111,155 @@ TEST_F(LexerTest, StringLiteralWithNUL1) {
   EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
+TEST_F(LexerTest, ContentStartHashbangSkip) {
+  const char *Source = "#!/usr/bin/swift\naaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 17), Tok.getLoc());
+}
+
+TEST_F(LexerTest, ContentStartHashbangSkipUTF8BOM) {
+  const char *Source = "\xEF\xBB\xBF" "#!/usr/bin/swift\naaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 20), Tok.getLoc());
+}
+
+TEST_F(LexerTest, ContentStartOperatorLeftBound) {
+  const char *Source = "+a";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::oper_prefix, Tok.getKind());
+  ASSERT_EQ("+", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 0), Tok.getLoc());
+}
+
+TEST_F(LexerTest, ContentStartOperatorLeftBoundUTF8BOM) {
+  const char *Source = "\xEF\xBB\xBF" "+a";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::oper_prefix, Tok.getKind());
+  ASSERT_EQ("+", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
+}
+
+TEST_F(LexerTest, ContentStartConflictMarker) {
+  const char *Source =
+    "<<<<<<< HEAD\n"
+    "xxx\n"
+    "=======\n"
+    "yyy\n"
+    ">>>>>>> 12345670\n"
+    "aaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+}
+
+TEST_F(LexerTest, ContentStartConflictMarkerUTF8BOM) {
+  const char *Source =
+  "\xEF\xBB\xBF"
+  "<<<<<<< HEAD\n"
+  "xxx\n"
+  "=======\n"
+  "yyy\n"
+  ">>>>>>> 12345670\n"
+  "aaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+}
+
+TEST_F(LexerTest, ContentStartTokenIsStartOfLine) {
+  const char *Source = "aaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 0), Tok.getLoc());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+}
+
+TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
+  const char *Source = "\xEF\xBB\xBF" "aaa";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("aaa", Tok.getText());
+  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
+  ASSERT_TRUE(Tok.isAtStartOfLine());
+}
+
 TEST_F(LexerTest, RestoreBasic) {
   const char *Source = "aaa \t\0 bbb ccc";
 

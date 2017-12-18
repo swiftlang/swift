@@ -191,6 +191,7 @@ Lexer::Lexer(const LangOptions &Options,
   // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
   // on byte order), throw it away.
   CurPtr = BufferStart + BOMLength;
+  ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
   if (BufferID == SM.getCodeCompletionBufferID()) {
@@ -274,7 +275,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   const char *Ptr = getBufferPtrForSourceLoc(Loc);
   // Skip whitespace backwards until we hit a newline.  This is needed to
   // correctly lex the token if it is at the beginning of the line.
-  while (Ptr >= BufferStart + 1) {
+  while (Ptr >= ContentStart + 1) {
     char C = Ptr[-1];
     if (C == ' ' || C == '\t') {
       Ptr--;
@@ -382,7 +383,7 @@ void Lexer::skipSlashSlashComment() {
 }
 
 void Lexer::skipHashbang() {
-  assert(CurPtr == BufferStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
+  assert(CurPtr == ContentStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
          "Not a hashbang");
   skipToEndOfLine();
 }
@@ -629,7 +630,7 @@ void Lexer::lexHash() {
   }
   
   // Allow a hashbang #! line at the beginning of the file.
-  if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
+  if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
     CurPtr--;
     if (BufferID != SourceMgr.getHashbangBufferID())
       diagnose(CurPtr, diag::lex_hashbang_not_allowed);
@@ -773,7 +774,7 @@ void Lexer::lexOperatorIdentifier() {
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
-  bool leftBound = isLeftBound(TokStart, BufferStart);
+  bool leftBound = isLeftBound(TokStart, ContentStart);
   bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
 
   // Match various reserved words.
@@ -1843,7 +1844,7 @@ bool Lexer::tryLexConflictMarker() {
   const char *Ptr = CurPtr - 1;
 
   // Only a conflict marker if it starts at the beginning of a line.
-  if (Ptr != BufferStart && Ptr[-1] != '\n' && Ptr[-1] != '\r')
+  if (Ptr != ContentStart && Ptr[-1] != '\n' && Ptr[-1] != '\r')
     return false;
   
   // Check to see if we have <<<<<<< or >>>>.
@@ -2062,7 +2063,7 @@ void Lexer::lexImpl() {
     LeadingTrivia.clear();
     TrailingTrivia.clear();
   }
-  NextToken.setAtStartOfLine(CurPtr == BufferStart);
+  NextToken.setAtStartOfLine(CurPtr == ContentStart);
 
   // Remember where we started so that we can find the comment range.
   LastCommentBlockStart = CurPtr;
@@ -2237,12 +2238,12 @@ Restart:
   case '!':
     if (InSILBody)
       return formToken(tok::sil_exclamation, TokStart);
-    if (isLeftBound(TokStart, BufferStart))
+    if (isLeftBound(TokStart, ContentStart))
       return formToken(tok::exclaim_postfix, TokStart);
     return lexOperatorIdentifier();
   
   case '?':
-    if (isLeftBound(TokStart, BufferStart))
+    if (isLeftBound(TokStart, ContentStart))
       return formToken(tok::question_postfix, TokStart);
     return lexOperatorIdentifier();
 

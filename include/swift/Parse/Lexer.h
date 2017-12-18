@@ -86,6 +86,9 @@ class Lexer {
   /// produce a code completion token.
   const char *CodeCompletionPtr = nullptr;
 
+  /// Points to BufferStart or past the end of UTF-8 BOM sequence if it exists.
+  const char *ContentStart;
+
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
