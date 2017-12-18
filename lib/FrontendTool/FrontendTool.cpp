@@ -102,14 +102,13 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  const FrontendOptions &opts) {
   std::error_code EC;
   llvm::raw_fd_ostream out(
-      opts.InputsAndOutputs.pathsForAtMostOnePrimary().DependenciesFilePath, EC,
+      opts.InputsAndOutputs.preBatchModeDependenciesFilePath(), EC,
       llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(
-        SourceLoc(), diag::error_opening_output,
-        opts.InputsAndOutputs.pathsForAtMostOnePrimary().DependenciesFilePath,
-        EC.message());
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   opts.InputsAndOutputs.preBatchModeDependenciesFilePath(),
+                   EC.message());
     out.clear_error();
     return true;
   }
@@ -178,13 +177,13 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   const FrontendOptions &opts) {
   std::error_code EC;
   llvm::raw_fd_ostream out(
-      opts.InputsAndOutputs.pathsForAtMostOnePrimary().LoadedModuleTracePath,
-      EC, llvm::sys::fs::F_Append);
+      opts.InputsAndOutputs.preBatchModeLoadedModuleTracePath(), EC,
+      llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(
         SourceLoc(), diag::error_opening_output,
-        opts.InputsAndOutputs.pathsForAtMostOnePrimary().LoadedModuleTracePath,
+        opts.InputsAndOutputs.preBatchModeLoadedModuleTracePath(),
         EC.message());
     out.clear_error();
     return true;
@@ -591,8 +590,9 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences = !opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-                                    .ReferenceDependenciesFilePath.empty();
+  bool shouldTrackReferences =
+      !opts.InputsAndOutputs.preBatchModeReferenceDependenciesFilePath()
+           .empty();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -725,8 +725,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-           .DependenciesFilePath.empty())
+  if (!opts.InputsAndOutputs.preBatchModeDependenciesFilePath().empty())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
@@ -734,8 +733,7 @@ static bool performCompile(CompilerInstance &Instance,
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
                               *Instance.getDependencyTracker(), opts);
 
-  if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-           .LoadedModuleTracePath.empty())
+  if (!opts.InputsAndOutputs.preBatchModeLoadedModuleTracePath().empty())
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
                                 opts);
 
@@ -759,10 +757,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-             .ObjCHeaderOutputPath.empty())
+    if (!opts.InputsAndOutputs.preBatchModeObjCHeaderOutputPath().empty())
       return printAsObjC(
-          opts.InputsAndOutputs.pathsForAtMostOnePrimary().ObjCHeaderOutputPath,
+          opts.InputsAndOutputs.preBatchModeObjCHeaderOutputPath(),
           Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
           moduleIsPublic);
     if (shouldIndex) {
@@ -773,14 +770,13 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   const auto &SILOpts = Invocation.getSILOptions();
-  if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary().TBDPath.empty()) {
+  if (!opts.InputsAndOutputs.preBatchModeTBDPath().empty()) {
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
                            : opts.TBDInstallName;
 
     if (writeTBD(Instance.getMainModule(), SILOpts.hasMultipleIGMs(),
-                 opts.InputsAndOutputs.pathsForAtMostOnePrimary().TBDPath,
-                 installName))
+                 opts.InputsAndOutputs.preBatchModeTBDPath(), installName))
       return true;
   }
 
@@ -848,12 +844,10 @@ static bool performCompile(CompilerInstance &Instance,
 
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-             .ModuleOutputPath.empty()) {
+    if (!opts.InputsAndOutputs.preBatchModeModuleOutputPath().empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath =
-          opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-              .ModuleOutputPath.c_str();
+          opts.InputsAndOutputs.preBatchModeModuleOutputPath().c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
@@ -905,21 +899,16 @@ static bool performCompile(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-             .ModuleOutputPath.empty() ||
-        !opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-             .ModuleDocOutputPath.empty()) {
+    if (!opts.InputsAndOutputs.preBatchModeModuleOutputPath().empty() ||
+        !opts.InputsAndOutputs.preBatchModeModuleDocOutputPath().empty()) {
       auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
                                   : Instance.getMainModule();
-      if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-               .ModuleOutputPath.empty()) {
+      if (!opts.InputsAndOutputs.preBatchModeModuleOutputPath().empty()) {
         SerializationOptions serializationOpts;
         serializationOpts.OutputPath =
-            opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-                .ModuleOutputPath.c_str();
+            opts.InputsAndOutputs.preBatchModeModuleOutputPath().c_str();
         serializationOpts.DocOutputPath =
-            opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-                .ModuleDocOutputPath.c_str();
+            opts.InputsAndOutputs.preBatchModeModuleDocOutputPath().c_str();
         serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
         if (opts.SerializeBridgingHeader)
           serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -992,22 +981,19 @@ static bool performCompile(CompilerInstance &Instance,
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
 
-  if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-           .ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(
-        opts.InputsAndOutputs.pathsForAtMostOnePrimary().ObjCHeaderOutputPath,
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  if (!opts.InputsAndOutputs.preBatchModeObjCHeaderOutputPath().empty()) {
+    (void)printAsObjC(opts.InputsAndOutputs.preBatchModeObjCHeaderOutputPath(),
+                      Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+                      moduleIsPublic);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-             .ModuleOutputPath.empty()) {
+    if (!opts.InputsAndOutputs.preBatchModeModuleOutputPath().empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath =
-          opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-              .ModuleOutputPath.c_str();
+          opts.InputsAndOutputs.preBatchModeModuleOutputPath().c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
@@ -1016,10 +1002,8 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  if (!opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-           .ModuleOutputPath.empty() ||
-      !opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-           .ModuleDocOutputPath.empty()) {
+  if (!opts.InputsAndOutputs.preBatchModeModuleOutputPath().empty() ||
+      !opts.InputsAndOutputs.preBatchModeModuleDocOutputPath().empty()) {
     // Serialize the SILModule if it was not serialized yet.
     if (!SM.get()->isSerialized())
       SM.get()->serialize();
@@ -1183,7 +1167,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
     }
   } else {
     StringRef moduleToken =
-        opts.InputsAndOutputs.pathsForAtMostOnePrimary().ModuleOutputPath;
+        opts.InputsAndOutputs.preBatchModeModuleOutputPath();
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();
 
@@ -1392,8 +1376,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   {
     const std::string &SerializedDiagnosticsPath =
         Invocation.getFrontendOptions()
-            .InputsAndOutputs.pathsForAtMostOnePrimary()
-            .SerializedDiagnosticsPath;
+            .InputsAndOutputs.preBatchModeSerializedDiagnosticsPath();
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1456,15 +1439,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   DependencyTracker depTracker;
   if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.pathsForAtMostOnePrimary()
-           .DependenciesFilePath.empty() ||
+           .InputsAndOutputs.preBatchModeDependenciesFilePath()
+           .empty() ||
       !Invocation.getFrontendOptions()
-           .InputsAndOutputs.pathsForAtMostOnePrimary()
-           .ReferenceDependenciesFilePath.empty() ||
+           .InputsAndOutputs.preBatchModeReferenceDependenciesFilePath()
+           .empty() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty() ||
       !Invocation.getFrontendOptions()
-           .InputsAndOutputs.pathsForAtMostOnePrimary()
-           .LoadedModuleTracePath.empty()) {
+           .InputsAndOutputs.preBatchModeLoadedModuleTracePath()
+           .empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 

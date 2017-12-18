@@ -1835,7 +1835,7 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 
 static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
                                   IRGenOptions &opts) {
-  opts.IRGOutputFilenames = io.outputFilenamesForIRGenOptions();
+  opts.IRGOutputFilenames = io.preBatchModeOutputFilenames();
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,

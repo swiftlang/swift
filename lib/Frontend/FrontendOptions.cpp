@@ -108,14 +108,8 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   return true;
 }
 
-/// Do something better when >1 primary
-StringRef FrontendInputsAndOutputs::outputFilenameForPrimary() const {
-  assertMustNotBeMoreThanOnePrimaryInput();
-  assert(hasPrimaries());
-  return pathsForAtMostOnePrimary().OutputFilename;
-}
-
-std::vector<std::string> FrontendInputsAndOutputs::outputFilenamesForIRGenOptions() const {
+std::vector<std::string>
+FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
   std::vector<std::string> outputs;
   if (isSingleThreadedWMO())
     outputs.push_back(getSingleThreadedWMOOutputs()->OutputFilename);

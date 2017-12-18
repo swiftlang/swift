@@ -80,8 +80,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
   if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.pathsForAtMostOnePrimary()
-           .ModuleDocOutputPath.empty())
+           .InputsAndOutputs.preBatchModeModuleDocOutputPath()
+           .empty())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   // If we are doing index-while-building, configure lexing and parsing to

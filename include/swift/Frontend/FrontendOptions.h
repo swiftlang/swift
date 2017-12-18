@@ -257,10 +257,10 @@ public:
   
   // FIXME: dmu temp
   const StringRef preBatchModeGetSingleOutputFilename() const {
-    return pathsForAtMostOnePrimary().OutputFilename;
+    return preBatchModePathsForAtMostOnePrimary().OutputFilename;
   }
   // FIXME: dmu check all uses
-  const OutputPaths &pathsForAtMostOnePrimary() const {
+  const OutputPaths &preBatchModePathsForAtMostOnePrimary() const {
     static OutputPaths empty;
     return hasPrimaries()
     ? getAllInputs()[PrimaryInputs.front().second].outputs()
@@ -269,14 +269,39 @@ public:
     : getAllInputs().front().outputs();
   }
 
-  const StringRef preBatchModeOutputFilename() {
-    return pathsForAtMostOnePrimary().OutputFilename;
+  std::vector<std::string> preBatchModeOutputFilenames() const;
+
+  std::string preBatchModeObjCHeaderOutputPath() const {
+    return preBatchModePathsForAtMostOnePrimary().ObjCHeaderOutputPath;
   }
-  
-  // FIXME: dmu eliminate primaryOrEmpty by getting file, then asking?
-  StringRef outputFilenameForPrimary() const;
-  
-  std::vector<std::string> outputFilenamesForIRGenOptions() const;
+
+  std::string preBatchModeModuleOutputPath() const {
+    return preBatchModePathsForAtMostOnePrimary().ModuleOutputPath;
+  }
+
+  std::string preBatchModeModuleDocOutputPath() const {
+    return preBatchModePathsForAtMostOnePrimary().ModuleDocOutputPath;
+  }
+
+  std::string preBatchModeDependenciesFilePath() const {
+    return preBatchModePathsForAtMostOnePrimary().DependenciesFilePath;
+  }
+
+  std::string preBatchModeReferenceDependenciesFilePath() const {
+    return preBatchModePathsForAtMostOnePrimary().ReferenceDependenciesFilePath;
+  }
+
+  std::string preBatchModeSerializedDiagnosticsPath() const {
+    return preBatchModePathsForAtMostOnePrimary().SerializedDiagnosticsPath;
+  }
+
+  std::string preBatchModeLoadedModuleTracePath() const {
+    return preBatchModePathsForAtMostOnePrimary().LoadedModuleTracePath;
+  }
+
+  std::string preBatchModeTBDPath() const {
+    return preBatchModePathsForAtMostOnePrimary().TBDPath;
+  }
 };
 
 /// Options for controlling the behavior of the frontend.
