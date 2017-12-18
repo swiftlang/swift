@@ -234,6 +234,11 @@ protected:
   UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 1+1,
+    IsStrict : 1,
+    IsInvariant : 1
+  );
+
   UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(PointerToThinFunctionInst, ConversionInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(UnconditionalCheckedCastInst, ConversionInst, 0, : NumPadBits);
@@ -313,6 +318,7 @@ protected:
     SWIFT_INLINE_BITS(TupleElementAddrInst);
     SWIFT_INLINE_BITS(SwitchValueInst);
     SWIFT_INLINE_BITS(SwitchEnumInstBase);
+    SWIFT_INLINE_BITS(PointerToAddressInst);
   } Bits;
 
 private:
