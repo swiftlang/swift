@@ -164,10 +164,7 @@ int main(int argc, char **argv) {
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.MainInputFilename = InputFilename;
-  assert(Invocation.getSILOptions().NumThreads == 1);
-  // FIXME: dmu Does this come from FrontendInputsAndOutputs? Where??? Should
-  // there be a special OutputPaths for this case???
-  Opts.OutputForSingleThreadedWMO = OutputFilename;
+  Opts.IRGOutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;

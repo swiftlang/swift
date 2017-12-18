@@ -67,8 +67,7 @@ class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
-  std::vector<std::string> OutputsForBatchModeOrThreadedWMO;
-  std::string OutputForSingleThreadedWMO;
+  std::vector<std::string> IRGOutputFilenames;
 
   std::string ModuleName;
 
@@ -191,6 +190,13 @@ public:
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
+  // Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef usedToBeGetIRGSingleOutputFilename() const {
+    if (IRGOutputFilenames.size() >= 1)
+      return IRGOutputFilenames.back();
+    return StringRef();
+  }
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

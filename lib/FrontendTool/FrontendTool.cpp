@@ -1148,11 +1148,10 @@ static bool performCompile(CompilerInstance &Instance,
   Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
-                     IRModule.get(), TargetMachine.get(),
-                     EffectiveLanguageVersion,
-                     opts.InputsAndOutputs.pathsForAtMostOnePrimary().OutputFilename,
-                     Stats) ||
+  return performLLVM(
+             IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
+             IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
+             opts.InputsAndOutputs.usedToBeGetSingleOutputFilename(), Stats) ||
          HadError;
 }
 

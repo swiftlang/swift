@@ -1835,14 +1835,7 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 
 static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
                                   IRGenOptions &opts) {
-  // usedToBeOutputFilename
-  if (io.isSingleThreadedWMO()) {
-    opts.OutputForSingleThreadedWMO =
-        io.getSingleThreadedWMOOutputs()->OutputFilename;
-    return;
-  }
-  // FIXME dmu need OutputForSingleThreadedWMO???
-  opts.OutputsForBatchModeOrThreadedWMO = io.outputFilenamesForIRGenOptions();
+  opts.IRGOutputFilenames = io.outputFilenamesForIRGenOptions();
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
