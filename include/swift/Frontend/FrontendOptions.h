@@ -269,35 +269,35 @@ public:
 
   std::vector<std::string> preBatchModeOutputFilenames() const;
 
-  std::string preBatchModeObjCHeaderOutputPath() const {
+  const std::string &preBatchModeObjCHeaderOutputPath() const {
     return preBatchModePathsForAtMostOnePrimary().ObjCHeaderOutputPath;
   }
 
-  std::string preBatchModeModuleOutputPath() const {
+  const std::string &preBatchModeModuleOutputPath() const {
     return preBatchModePathsForAtMostOnePrimary().ModuleOutputPath;
   }
 
-  std::string preBatchModeModuleDocOutputPath() const {
+  const std::string &preBatchModeModuleDocOutputPath() const {
     return preBatchModePathsForAtMostOnePrimary().ModuleDocOutputPath;
   }
 
-  std::string preBatchModeDependenciesFilePath() const {
+  const std::string &preBatchModeDependenciesFilePath() const {
     return preBatchModePathsForAtMostOnePrimary().DependenciesFilePath;
   }
 
-  std::string preBatchModeReferenceDependenciesFilePath() const {
+  const std::string &preBatchModeReferenceDependenciesFilePath() const {
     return preBatchModePathsForAtMostOnePrimary().ReferenceDependenciesFilePath;
   }
 
-  std::string preBatchModeSerializedDiagnosticsPath() const {
+  const std::string &preBatchModeSerializedDiagnosticsPath() const {
     return preBatchModePathsForAtMostOnePrimary().SerializedDiagnosticsPath;
   }
 
-  std::string preBatchModeLoadedModuleTracePath() const {
+  const std::string &preBatchModeLoadedModuleTracePath() const {
     return preBatchModePathsForAtMostOnePrimary().LoadedModuleTracePath;
   }
 
-  std::string preBatchModeTBDPath() const {
+  const std::string &preBatchModeTBDPath() const {
     return preBatchModePathsForAtMostOnePrimary().TBDPath;
   }
 };
