@@ -394,7 +394,6 @@ NodePointer Demangler::demangleTypeMangling() {
   addChild(TypeMangling, LabelList);
   addChild(TypeMangling, Type);
   return TypeMangling;
-//  return createWithChild(Node::Kind::TypeMangling, popNode(Node::Kind::Type));
 }
 
 NodePointer Demangler::demangleOperator() {
