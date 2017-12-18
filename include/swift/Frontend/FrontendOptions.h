@@ -255,11 +255,9 @@ public:
     return getAllInputs()[0];
   }
   
-  // FIXME: dmu temp
   const StringRef preBatchModeGetSingleOutputFilename() const {
     return preBatchModePathsForAtMostOnePrimary().OutputFilename;
   }
-  // FIXME: dmu check all uses
   const OutputPaths &preBatchModePathsForAtMostOnePrimary() const {
     static OutputPaths empty;
     return hasPrimaries()
