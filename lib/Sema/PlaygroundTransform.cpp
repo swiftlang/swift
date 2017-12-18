@@ -705,7 +705,7 @@ public:
                          PatternBindingDecl *&ArgPattern,
                          VarDecl *&ArgVariable) {
     const char *LoggerName =
-        isDebugPrint ? "$builtin_debugPrint" : "$builtin_print";
+        isDebugPrint ? "__builtin_debugPrint" : "__builtin_print";
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName), DeclRefKind::Ordinary,
@@ -724,7 +724,7 @@ public:
   }
 
   Added<Stmt *> logPostPrint(SourceRange SR) {
-    return buildLoggerCallWithArgs("$builtin_postPrint",
+    return buildLoggerCallWithArgs("__builtin_postPrint",
                                    MutableArrayRef<Expr *>(), SR);
   }
 
@@ -775,7 +775,7 @@ public:
 
     Expr *LoggerArgExprs[] = {*E, NameExpr, IDExpr};
 
-    return buildLoggerCallWithArgs("$builtin_log_with_id",
+    return buildLoggerCallWithArgs("__builtin_log_with_id",
                                    MutableArrayRef<Expr *>(LoggerArgExprs), SR);
   }
 
@@ -789,7 +789,7 @@ public:
 
   Added<Stmt *> buildScopeCall(SourceRange SR, bool IsExit) {
     const char *LoggerName =
-        IsExit ? "$builtin_log_scope_exit" : "$builtin_log_scope_entry";
+        IsExit ? "__builtin_log_scope_exit" : "__builtin_log_scope_entry";
 
     return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
   }
@@ -849,7 +849,7 @@ public:
                                   AccessSemantics::Ordinary, Apply->getType());
 
     UnresolvedDeclRefExpr *SendDataRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("$builtin_send_data"),
+        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_send_data"),
                               DeclRefKind::Ordinary, DeclNameLoc());
 
     SendDataRef->setImplicit(true);
