@@ -1774,7 +1774,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
     StringRef BaseName =
-        FEOpts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename;
+        FEOpts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1835,16 +1835,14 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 
 static void ParseIRGenOutputFiles(const FrontendInputsAndOutputs &io,
                                   IRGenOptions &opts) {
+  // usedToBeOutputFilename
   if (io.isSingleThreadedWMO()) {
     opts.OutputForSingleThreadedWMO =
         io.getSingleThreadedWMOOutputs()->OutputFilename;
     return;
   }
-  io.forEachPrimaryInput([&](const InputFile &input) -> bool {
-    opts.OutputsForBatchModeOrThreadedWMO.push_back(
-        input.outputs().OutputFilename);
-    return false;
-  });
+  // FIXME dmu need OutputForSingleThreadedWMO???
+  opts.OutputsForBatchModeOrThreadedWMO = io.outputFilenamesForIRGenOptions();
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,

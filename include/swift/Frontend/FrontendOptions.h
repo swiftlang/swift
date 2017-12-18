@@ -82,18 +82,7 @@ public:
     return getAllInputs()[PrimaryInputs.front().second];
   }
 
-  // FIXME: dmu check all uses
-  const OutputPaths &pathsForAtMostOnePrimary() const {
-    static OutputPaths empty;
-    return hasPrimaries()
-               ? getAllInputs()[PrimaryInputs.front().second].outputs()
-    : isSingleThreadedWMO() ? *SingleThreadedWMOOutputs
-    : getAllInputs().empty() ? empty
-                                        : getAllInputs().front().outputs();
-  }
-
-  // FIXME: dmu eliminate primaryOrEmpty by getting file, then asking?
-  StringRef outputFilenameForPrimary() const;
+  
 
   // FIXME: dmu iterator?
   std::vector<std::string> getInputFilenames() const {
@@ -140,6 +129,7 @@ public:
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
 
+  // FIXME dmu what about WMO??
   bool forEachInputProducingOutput(
       llvm::function_ref<bool(const InputFile &)> fn) const {
     return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
@@ -264,7 +254,29 @@ public:
     assert(hasInputs());
     return getAllInputs()[0];
   }
-
+  
+  // FIXME: dmu temp
+  const StringRef usedToBeGetSingleOutputFilename() const {
+    return pathsForAtMostOnePrimary().OutputFilename;
+  }
+  // FIXME: dmu check all uses
+  const OutputPaths &pathsForAtMostOnePrimary() const {
+    static OutputPaths empty;
+    return hasPrimaries()
+    ? getAllInputs()[PrimaryInputs.front().second].outputs()
+    : isSingleThreadedWMO() ? *SingleThreadedWMOOutputs
+    : getAllInputs().empty() ? empty
+    : getAllInputs().front().outputs();
+  }
+  
+  const StringRef usedToBeOutputFilename() {
+    return pathsForAtMostOnePrimary().OutputFilename;
+  }
+  
+  // FIXME: dmu eliminate primaryOrEmpty by getting file, then asking?
+  StringRef outputFilenameForPrimary() const;
+  
+  std::vector<std::string> outputFilenamesForIRGenOptions() const;
 };
 
 /// Options for controlling the behavior of the frontend.

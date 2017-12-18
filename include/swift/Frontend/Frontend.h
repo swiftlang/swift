@@ -287,7 +287,7 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
-};
+ };
 
 /// A class which manages the state and execution of the compiler.
 /// This owns the primary compiler singletons, such as the ASTContext,

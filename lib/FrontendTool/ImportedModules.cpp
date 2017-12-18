@@ -47,7 +47,7 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
                                 const FrontendOptions &opts) {
 
   auto path =
-      opts.InputsAndOutputs.getSingleThreadedWMOOutputs()->OutputFilename;
+      opts.InputsAndOutputs.usedToBeGetSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
 

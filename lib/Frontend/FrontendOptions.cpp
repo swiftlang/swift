@@ -115,6 +115,18 @@ StringRef FrontendInputsAndOutputs::outputFilenameForPrimary() const {
   return pathsForAtMostOnePrimary().OutputFilename;
 }
 
+std::vector<std::string> FrontendInputsAndOutputs::outputFilenamesForIRGenOptions() const {
+  std::vector<std::string> outputs;
+  if (isSingleThreadedWMO())
+    outputs.push_back(getSingleThreadedWMOOutputs()->OutputFilename);
+  else {
+    forEachInputProducingOutput([&] (const InputFile &input) -> bool {
+      outputs.push_back(input.outputs().OutputFilename);
+      return false;
+    });
+  }
+  return outputs;
+}
 bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
