@@ -3188,12 +3188,10 @@ class EndAccessInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  bool Aborting;
-
 private:
-  EndAccessInst(SILDebugLocation loc, SILValue access,
-                bool aborting = false)
-    : UnaryInstructionBase(loc, access), Aborting(aborting) {
+  EndAccessInst(SILDebugLocation loc, SILValue access, bool aborting = false)
+      : UnaryInstructionBase(loc, access) {
+    SILInstruction::Bits.EndAccessInst.Aborting = aborting;
   }
 
 public:
@@ -3204,10 +3202,10 @@ public:
   /// Only AccessKind::Init and AccessKind::Deinit accesses can be
   /// aborted.
   bool isAborting() const {
-    return Aborting;
+    return SILInstruction::Bits.EndAccessInst.Aborting;
   }
-  void setAborting(bool aborting) {
-    Aborting = aborting;
+  void setAborting(bool aborting = true) {
+    SILInstruction::Bits.EndAccessInst.Aborting = aborting;
   }
 
   BeginAccessInst *getBeginAccess() const {

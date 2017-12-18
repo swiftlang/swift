@@ -203,6 +203,10 @@ protected:
     friend class StoreReferenceInstBase;
   );
 
+  SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
+    Aborting : 1
+  );
+
   SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
                         NumStoreOwnershipQualifierBits,
     OwnershipQualifier : NumStoreOwnershipQualifierBits
@@ -319,6 +323,7 @@ protected:
     SWIFT_INLINE_BITS(SwitchValueInst);
     SWIFT_INLINE_BITS(SwitchEnumInstBase);
     SWIFT_INLINE_BITS(PointerToAddressInst);
+    SWIFT_INLINE_BITS(EndAccessInst);
   } Bits;
 
 private:
