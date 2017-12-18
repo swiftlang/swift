@@ -2338,9 +2338,12 @@ public:
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](bool includeDefaultArgs = true) {
+      // FIXME: to get the corect semantic context we need to know how lookup
+      // would have found the declaration AFD. For now, just choose a reasonable
+      // default, it's most likely to be CurrentModule or CurrentNominal.
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::ExpressionSpecific, ExpectedTypes);
+          SemanticContextKind::CurrentModule, ExpectedTypes);
       if (!HaveLParen)
         Builder.addLeftParen();
       else

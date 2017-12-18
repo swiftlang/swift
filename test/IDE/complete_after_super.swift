@@ -229,7 +229,7 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Pattern/ExprSpecific: ()[#SuperBaseA#];
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Pattern/CurrModule: ()[#SuperBaseA#];
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {

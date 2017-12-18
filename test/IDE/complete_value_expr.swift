@@ -500,32 +500,32 @@ func testMetatypeExprWithoutDot() {
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
-// IMPLICITLY_CURRIED_FUNC_0-NEXT: Pattern/ExprSpecific: ()[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_0-NEXT: Pattern/CurrModule: ()[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_FUNC_0-NEXT: End completions
 
   FooStruct.instanceFunc1(&fs)#^IMPLICITLY_CURRIED_FUNC_1^#
 // IMPLICITLY_CURRIED_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: Pattern/ExprSpecific: ({#(a): Int#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_1-NEXT: Pattern/CurrModule: ({#(a): Int#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_FUNC_1-NEXT: End completions
 
   FooStruct.instanceFunc2(&fs)#^IMPLICITLY_CURRIED_FUNC_2^#
 // IMPLICITLY_CURRIED_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: Pattern/ExprSpecific: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_2-NEXT: Pattern/CurrModule: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_FUNC_2-NEXT: End completions
 
   FooStruct.varargInstanceFunc0(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_0^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_0: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Pattern/ExprSpecific: ({#(v): Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Pattern/CurrModule: ({#(v): Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: End completions
 
   FooStruct.varargInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_1^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Pattern/ExprSpecific: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Pattern/CurrModule: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: End completions
 
   FooStruct.varargInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_2^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Pattern/ExprSpecific: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Pattern/CurrModule: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: End completions
 
   // This call is ambiguous, and the expression is invalid.
@@ -672,7 +672,7 @@ func testInsideFunctionCall2() {
   a.instanceFunc1(#^INSIDE_FUNCTION_CALL_2^#
 // INSIDE_FUNCTION_CALL_2: Begin completions
 // FIXME: we should print the non-API param name rdar://20962472
-// INSIDE_FUNCTION_CALL_2-DAG: Pattern/ExprSpecific:       ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_2-DAG: Pattern/CurrModule:       ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_2-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_2: End completions
 }
@@ -691,7 +691,7 @@ func testInsideFunctionCall4() {
   a.instanceFunc2(#^INSIDE_FUNCTION_CALL_4^#
 // INSIDE_FUNCTION_CALL_4: Begin completions
 // FIXME: we should print the non-API param name rdar://20962472
-// INSIDE_FUNCTION_CALL_4-DAG: Pattern/ExprSpecific:       ['(']{#Int#}, {#b: &Double#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_4-DAG: Pattern/CurrModule:       ['(']{#Int#}, {#b: &Double#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_4-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_4: End completions
 }
@@ -707,7 +707,7 @@ func testInsideFunctionCall6() {
   var a = FooStruct()
   a.instanceFunc7(#^INSIDE_FUNCTION_CALL_6^#
 // INSIDE_FUNCTION_CALL_6: Begin completions
-// INSIDE_FUNCTION_CALL_6-NEXT: Pattern/ExprSpecific: ['(']{#a: Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_6-NEXT: Pattern/CurrModule: ['(']{#a: Int#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_6-NEXT: End completions
 }
 
@@ -716,7 +716,7 @@ func testInsideFunctionCall7() {
   a.instanceFunc8(#^INSIDE_FUNCTION_CALL_7^#
 // INSIDE_FUNCTION_CALL_7: Begin completions
 // FIXME: we should print the non-API param name rdar://20962472
-// INSIDE_FUNCTION_CALL_7: Pattern/ExprSpecific: ['(']{#(Int, Int)#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_7: Pattern/CurrModule: ['(']{#(Int, Int)#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_7: End completions
 }
 
@@ -729,7 +729,7 @@ func testInsideFunctionCall9(_ x: inout FooStruct) {
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_9: Begin completions
-// INSIDE_FUNCTION_CALL_9-DAG: Pattern/ExprSpecific: ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_9-DAG: Pattern/CurrModule: ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_9-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_9: End completions
 }
@@ -737,14 +737,14 @@ func testInsideFunctionCall10(_ x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_10^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_10: Begin completions
-// INSIDE_FUNCTION_CALL_10-DAG: Pattern/ExprSpecific: ['(']{#Int#}, {#b: &Double#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_10-DAG: Pattern/CurrModule: ['(']{#Int#}, {#b: &Double#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_10-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_10: End completions
 }
 func testInsideFunctionCall11(_ x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_11^#,
 // INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
-// INSIDE_FUNCTION_CALL_11B: Pattern/ExprSpecific: ['(']{#Int#}, {#b: &Double#}[')'][#Void#];
+// INSIDE_FUNCTION_CALL_11B: Pattern/CurrModule: ['(']{#Int#}, {#b: &Double#}[')'][#Void#];
 }
 func testInsideFunctionCall12(_ x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
@@ -756,7 +756,7 @@ func testInsideVarargFunctionCall1() {
   a.varargInstanceFunc0(#^INSIDE_VARARG_FUNCTION_CALL_1^#
 // INSIDE_VARARG_FUNCTION_CALL_1: Begin completions
 // FIXME: we should print the non-API param name rdar://20962472
-// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific:       ['(']{#Int...#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/CurrModule:       ['(']{#Int...#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_VARARG_FUNCTION_CALL_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_VARARG_FUNCTION_CALL_1: End completions
 }
@@ -788,7 +788,7 @@ func testInsideFunctionCallOnClassInstance1(_ a: FooClass) {
   a.fooClassInstanceFunc1(#^INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1^#
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: Begin completions
 // FIXME: we should print the non-API param name rdar://20962472
-// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/ExprSpecific:       ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/CurrModule:       ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: End completions
 }
@@ -804,13 +804,13 @@ var funcTypeVarsObject: FuncTypeVars
 func testFuncTypeVars() {
   funcTypeVarsObject.funcVar1#^VF1^#
 // VF1: Begin completions
-// VF1-NEXT: Pattern/ExprSpecific: ()[#Double#]{{; name=.+$}}
+// VF1-NEXT: Pattern/CurrModule: ()[#Double#]{{; name=.+$}}
 // VF1-NEXT: BuiltinOperator/None:         = {#() -> Double##() -> Double#}[#Void#]
 // VF1-NEXT: End completions
 
   funcTypeVarsObject.funcVar2#^VF2^#
 // VF2: Begin completions
-// VF2-NEXT: Pattern/ExprSpecific: ({#Int#})[#Double#]{{; name=.+$}}
+// VF2-NEXT: Pattern/CurrModule: ({#Int#})[#Double#]{{; name=.+$}}
 // VF2-NEXT: BuiltinOperator/None:         = {#(Int) -> Double##(Int) -> Double#}[#Void#]
 // VF2-NEXT: End completions
 }
@@ -1070,7 +1070,7 @@ func testFuncParenPattern2(_ fpp: FuncParenPattern) {
 func testFuncParenPattern3(_ fpp: inout FuncParenPattern) {
   fpp.instanceFunc#^FUNC_PAREN_PATTERN_3^#
 // FUNC_PAREN_PATTERN_3: Begin completions
-// FUNC_PAREN_PATTERN_3-NEXT: Pattern/ExprSpecific: ({#Int#})[#Void#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_3-NEXT: Pattern/CurrModule: ({#Int#})[#Void#]{{; name=.+$}}
 // FUNC_PAREN_PATTERN_3-NEXT: End completions
 }
 
@@ -1689,14 +1689,14 @@ func testThrows001() {
   globalFuncThrows#^THROWS1^#
 
 // THROWS1: Begin completions
-// THROWS1: Pattern/ExprSpecific:               ()[' throws'][#Void#]; name=() throws
+// THROWS1: Pattern/CurrModule:               ()[' throws'][#Void#]; name=() throws
 // THROWS1: End completions
 }
 func testThrows002() {
   globalFuncRethrows#^THROWS2^#
 
 // THROWS2: Begin completions
-// THROWS2: Pattern/ExprSpecific:               ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
+// THROWS2: Pattern/CurrModule:               ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
 // THROWS2: End completions
 }
 func testThrows003(_ x: HasThrowingMembers) {
@@ -1709,13 +1709,13 @@ func testThrows003(_ x: HasThrowingMembers) {
 func testThrows004(_ x: HasThrowingMembers) {
   x.memberThrows#^MEMBER_THROWS2^#
 // MEMBER_THROWS2: Begin completions
-// MEMBER_THROWS2: Pattern/ExprSpecific:               ()[' throws'][#Void#]; name=() throws
+// MEMBER_THROWS2: Pattern/CurrModule:               ()[' throws'][#Void#]; name=() throws
 // MEMBER_THROWS2: End completions
 }
 func testThrows005(_ x: HasThrowingMembers) {
   x.memberRethrows#^MEMBER_THROWS3^#
 // MEMBER_THROWS3: Begin completions
-// MEMBER_THROWS3: Pattern/ExprSpecific: ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
+// MEMBER_THROWS3: Pattern/CurrModule: ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
 // MEMBER_THROWS3: End completions
 }
 func testThrows006() {
