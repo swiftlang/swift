@@ -110,7 +110,7 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
 namespace {
 
-class BBToDataflowStateMap;
+class EnumCaseDataflowContext;
 
 using EnumBBCaseList =
     llvm::SmallVector<std::pair<SILBasicBlock *, EnumElementDecl *>, 2>;
@@ -179,24 +179,24 @@ public:
   /// first predecessor BB.
   ///
   /// We will be performing an intersection in a later step of the merging.
-  bool initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
+  bool initWithFirstPred(EnumCaseDataflowContext &BBToStateMap,
                          SILBasicBlock *FirstPredBB);
 
   /// Top level merging function for predecessors.
-  void mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
+  void mergePredecessorStates(EnumCaseDataflowContext &BBToStateMap);
 
   ///
-  void mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
+  void mergeSinglePredTermInfoIntoState(EnumCaseDataflowContext &BBToStateMap,
                                         SILBasicBlock *Pred);
 };
 
 /// Map all blocks to BBEnumTagDataflowState in RPO order.
-class BBToDataflowStateMap {
+class EnumCaseDataflowContext {
   PostOrderFunctionInfo *PO;
   std::vector<BBEnumTagDataflowState> BBToStateVec;
 
 public:
-  BBToDataflowStateMap(PostOrderFunctionInfo *PO) : PO(PO), BBToStateVec() {
+  EnumCaseDataflowContext(PostOrderFunctionInfo *PO) : PO(PO), BBToStateVec() {
     BBToStateVec.resize(PO->size());
     unsigned RPOIdx = 0;
     for (SILBasicBlock *BB : PO->getReversePostOrder()) {
@@ -303,7 +303,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 }
 
 bool BBEnumTagDataflowState::initWithFirstPred(
-    BBToDataflowStateMap &BBToStateMap, SILBasicBlock *FirstPredBB) {
+    EnumCaseDataflowContext &BBToStateMap, SILBasicBlock *FirstPredBB) {
   // Try to look up the state for the first pred BB.
   BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(FirstPredBB);
 
@@ -333,7 +333,7 @@ bool BBEnumTagDataflowState::initWithFirstPred(
 }
 
 void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
-    BBToDataflowStateMap &BBToStateMap, SILBasicBlock *Pred) {
+    EnumCaseDataflowContext &BBToStateMap, SILBasicBlock *Pred) {
   // Grab the terminator of our one predecessor and if it is a switch enum, mix
   // it into this state.
   TermInst *PredTerm = Pred->getTerminator();
@@ -350,7 +350,7 @@ void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
 }
 
 void BBEnumTagDataflowState::mergePredecessorStates(
-    BBToDataflowStateMap &BBToStateMap) {
+    EnumCaseDataflowContext &BBToStateMap) {
 
   // If we have no predecessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
@@ -1595,7 +1595,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
 
   bool Changed = false;
 
-  BBToDataflowStateMap BBToStateMap(PO);
+  EnumCaseDataflowContext BBToStateMap(PO);
   for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
        ++RPOIdx) {
 
