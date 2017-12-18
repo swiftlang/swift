@@ -5156,7 +5156,9 @@ class MetatypeInst final
   friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned NumOperands;
+  unsigned _getNumOperands() const {
+    return SILInstruction::Bits.MetatypeInst.NumOperands;
+  };
 
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
@@ -5169,25 +5171,25 @@ class MetatypeInst final
 public:
   ~MetatypeInst() {
     Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+    for (unsigned i = 0, end = _getNumOperands(); i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return { getTrailingObjects<Operand>(), _getNumOperands() };
   }
 };
 

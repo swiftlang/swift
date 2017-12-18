@@ -940,8 +940,8 @@ TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
 
 MetatypeInst::MetatypeInst(SILDebugLocation Loc, SILType Metatype,
                            ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBase(Loc, Metatype),
-      NumOperands(TypeDependentOperands.size()) {
+    : InstructionBase(Loc, Metatype) {
+  SILInstruction::Bits.MetatypeInst.NumOperands = TypeDependentOperands.size();
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
