@@ -176,15 +176,18 @@ public:
   /// first predecessor BB.
   ///
   /// We will be performing an intersection in a later step of the merging.
-  bool initWithFirstPred(EnumCaseDataflowContext &BBToStateMap,
-                         SILBasicBlock *FirstPredBB);
+  bool initWithFirstPred(SILBasicBlock *FirstPredBB);
 
   /// Top level merging function for predecessors.
-  void mergePredecessorStates(EnumCaseDataflowContext &BBToStateMap);
+  void mergePredecessorStates();
 
-  ///
-  void mergeSinglePredTermInfoIntoState(EnumCaseDataflowContext &BBToStateMap,
-                                        SILBasicBlock *Pred);
+  /// If we have a single predecessor, see if the predecessor's terminator was a
+  /// switch_enum or a (cond_br + select_enum). If so, track in this block the
+  /// enum state of the operand.
+  void mergeSinglePredTermInfoIntoState(SILBasicBlock *Pred);
+
+private:
+  EnumCaseDataflowContext &getContext() const;
 };
 
 /// Map all blocks to BBEnumTagDataflowState in RPO order.
@@ -215,6 +218,12 @@ public:
 };
 
 } // end anonymous namespace
+
+EnumCaseDataflowContext &BBEnumTagDataflowState::getContext() const {
+  // Context and BB are initialized together, so we only need to check one.
+  assert(BB.isNonNull() && "Uninitialized state?!");
+  return *Context;
+}
 
 void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
 
@@ -299,10 +308,9 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   }
 }
 
-bool BBEnumTagDataflowState::initWithFirstPred(
-    EnumCaseDataflowContext &BBToStateMap, SILBasicBlock *FirstPredBB) {
+bool BBEnumTagDataflowState::initWithFirstPred(SILBasicBlock *FirstPredBB) {
   // Try to look up the state for the first pred BB.
-  BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(FirstPredBB);
+  BBEnumTagDataflowState *FirstPredState = getContext().getBBState(FirstPredBB);
 
   // If we fail, we found an unreachable block, bail.
   if (FirstPredState == nullptr) {
@@ -330,7 +338,7 @@ bool BBEnumTagDataflowState::initWithFirstPred(
 }
 
 void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
-    EnumCaseDataflowContext &BBToStateMap, SILBasicBlock *Pred) {
+    SILBasicBlock *Pred) {
   // Grab the terminator of our one predecessor and if it is a switch enum, mix
   // it into this state.
   TermInst *PredTerm = Pred->getTerminator();
@@ -346,8 +354,7 @@ void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
   handlePredCondSelectEnum(CondBr);
 }
 
-void BBEnumTagDataflowState::mergePredecessorStates(
-    EnumCaseDataflowContext &BBToStateMap) {
+void BBEnumTagDataflowState::mergePredecessorStates() {
 
   // If we have no predecessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
@@ -367,7 +374,7 @@ void BBEnumTagDataflowState::mergePredecessorStates(
 
   // Attempt to initialize our state with our first predecessor's state by just
   // copying. We will be doing an intersection with all of the other BB.
-  if (!initWithFirstPred(BBToStateMap, FirstPred))
+  if (!initWithFirstPred(FirstPred))
     return;
 
   // If we only have one predecessor see if we can gain any information and or
@@ -378,7 +385,7 @@ void BBEnumTagDataflowState::mergePredecessorStates(
   // the value that an enum can take in our block. This is a common case that
   // comes up.
   if (PI == PE) {
-    mergeSinglePredTermInfoIntoState(BBToStateMap, FirstPred);
+    mergeSinglePredTermInfoIntoState(FirstPred);
     return;
   }
 
@@ -405,7 +412,7 @@ void BBEnumTagDataflowState::mergePredecessorStates(
     // Grab the predecessors state...
     SILBasicBlock *PredBB = *PI;
 
-    BBEnumTagDataflowState *PredBBState = BBToStateMap.getBBState(PredBB);
+    BBEnumTagDataflowState *PredBBState = getContext().getBBState(PredBB);
     if (PredBBState == nullptr) {
       DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
       return;
@@ -1619,7 +1626,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // predecessors to avoid memory invalidation issues due to copying in the
     // dense map.
     DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
-    State.mergePredecessorStates(BBToStateMap);
+    State.mergePredecessorStates();
 
     // If our predecessors cover any of our enum values, attempt to hoist
     // releases up the CFG onto enum payloads or sink retains out of switch
