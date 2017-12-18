@@ -5214,14 +5214,16 @@ class TupleExtractInst
 {
   friend SILBuilder;
 
-  unsigned FieldNo;
-
   TupleExtractInst(SILDebugLocation DebugLoc, SILValue Operand,
                    unsigned FieldNo, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), FieldNo(FieldNo) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    SILInstruction::Bits.TupleExtractInst.FieldNo = FieldNo;
+  }
 
 public:
-  unsigned getFieldNo() const { return FieldNo; }
+  unsigned getFieldNo() const {
+    return SILInstruction::Bits.TupleExtractInst.FieldNo;
+  }
 
   TupleType *getTupleType() const {
     return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
