@@ -190,12 +190,17 @@ public:
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
-  // Gets the name of the specified output filename.
+  /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef preBatchModeGetIRGSingleOutputFilename() const {
     if (IRGOutputFilenames.size() >= 1)
       return IRGOutputFilenames.back();
     return StringRef();
+  }
+  
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  StringRef getSingleOutputFilename() const {
+    return preBatchModeGetIRGSingleOutputFilename();
   }
 
   // Get a hash of all options which influence the llvm compilation but are not
