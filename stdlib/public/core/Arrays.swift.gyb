@@ -528,7 +528,7 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Indices = Range<Int>
 
   /// The type that allows iteration over an array's elements.
-  public typealias Iterator = ${Self}IndexingIterator<Element>
+  public typealias Iterator = ${Self}Iterator<Element>
 
 %if Self == 'ArraySlice':
   /// The position of the first element in a nonempty array.
