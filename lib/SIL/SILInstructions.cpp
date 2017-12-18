@@ -1312,9 +1312,9 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,
                                  SILBasicBlock *DefaultBB,
                                  ArrayRef<SILValue> Cases,
                                  ArrayRef<SILBasicBlock *> BBs)
-    : InstructionBase(Loc), NumCases(Cases.size()),
-      HasDefault(bool(DefaultBB)), Operands(this, Cases, Operand) {
-
+    : InstructionBase(Loc), Operands(this, Cases, Operand) {
+  SILInstruction::Bits.SwitchValueInst.HasDefault = bool(DefaultBB);
+  SILInstruction::Bits.SwitchValueInst.NumCases = Cases.size();
   // Initialize the successor array.
   auto *succs = getSuccessorBuf();
   unsigned OperandBitWidth = 0;
@@ -1348,14 +1348,14 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,
     ::new (succs + i) SILSuccessor(this, BBs[i]);
   }
 
-  if (HasDefault)
-    ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+  if (hasDefault())
+    ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB);
 }
 
 SwitchValueInst::~SwitchValueInst() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
+  for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
     succs[i].~SILSuccessor();
   }
 }

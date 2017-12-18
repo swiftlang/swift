@@ -6821,8 +6821,6 @@ class SwitchValueInst
                              TermInst> {
   friend SILBuilder;
 
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
   TailAllocatedOperandList<1> Operands;
 
   SwitchValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -6864,20 +6862,24 @@ public:
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
-                           static_cast<size_t>(NumCases + HasDefault)};
+                           static_cast<size_t>(getNumCases() + hasDefault())};
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return SILInstruction::Bits.SwitchValueInst.NumCases;
+  }
   std::pair<SILValue, SILBasicBlock*>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
+    assert(i < getNumCases() && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i]};
   }
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return SILInstruction::Bits.SwitchValueInst.HasDefault;
+  }
   SILBasicBlock *getDefaultBB() const {
-    assert(HasDefault && "doesn't have a default");
-    return getSuccessorBuf()[NumCases];
+    assert(hasDefault() && "doesn't have a default");
+    return getSuccessorBuf()[getNumCases()];
   }
 };
 

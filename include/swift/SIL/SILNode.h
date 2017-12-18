@@ -253,6 +253,11 @@ protected:
   UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
   UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
 
+  SWIFT_INLINE_BITFIELD_FULL(SwitchValueInst, TermInst, 1+32,
+    HasDefault : 1,
+    : NumPadBits,
+    NumCases : 32
+  );
   SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
     HasDefault : 1,
     : NumPadBits,
@@ -306,6 +311,7 @@ protected:
     SWIFT_INLINE_BITS(WitnessMethodInst);
     SWIFT_INLINE_BITS(TupleExtractInst);
     SWIFT_INLINE_BITS(TupleElementAddrInst);
+    SWIFT_INLINE_BITS(SwitchValueInst);
     SWIFT_INLINE_BITS(SwitchEnumInstBase);
   } Bits;
 
