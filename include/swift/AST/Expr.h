@@ -167,6 +167,11 @@ class alignas(8) Expr {
     IsSuper : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(TupleElementExpr, Expr, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+1+32,
     /// Whether this tuple has a trailing closure.
     HasTrailingClosure : 1,
@@ -320,6 +325,7 @@ protected:
     SWIFT_INLINE_BITS(DeclRefExpr);
     SWIFT_INLINE_BITS(UnresolvedDeclRefExpr);
     SWIFT_INLINE_BITS(TupleExpr);
+    SWIFT_INLINE_BITS(TupleElementExpr);
     SWIFT_INLINE_BITS(MemberRefExpr);
     SWIFT_INLINE_BITS(UnresolvedDotExpr);
     SWIFT_INLINE_BITS(SubscriptExpr);
@@ -2314,20 +2320,21 @@ public:
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc NameLoc;
-  unsigned FieldNo;
   SourceLoc DotLoc;
 
 public:
   TupleElementExpr(Expr *SubExpr, SourceLoc DotLoc, unsigned FieldNo,
                    SourceLoc NameLoc, Type Ty)
     : Expr(ExprKind::TupleElement, /*Implicit=*/false, Ty), SubExpr(SubExpr),
-      NameLoc(NameLoc), FieldNo(FieldNo), DotLoc(DotLoc) {}
+      NameLoc(NameLoc) {
+    Bits.TupleElementExpr.FieldNo = FieldNo;
+  }
 
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
-  unsigned getFieldNumber() const { return FieldNo; }
+  unsigned getFieldNumber() const { return Bits.TupleElementExpr.FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
   SourceLoc getDotLoc() const { return DotLoc; }
   
