@@ -323,6 +323,11 @@ class alignas(8) Expr {
     IsObjC : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
+
 protected:
   union {
     SWIFT_INLINE_BITS(Expr);
@@ -353,6 +358,7 @@ protected:
     SWIFT_INLINE_BITS(ObjCSelectorExpr);
     SWIFT_INLINE_BITS(KeyPathExpr);
     SWIFT_INLINE_BITS(ParenExpr);
+    SWIFT_INLINE_BITS(SequenceExpr);
   } Bits;
 
 private:
@@ -3215,12 +3221,10 @@ class SequenceExpr final : public Expr,
     private llvm::TrailingObjects<SequenceExpr, Expr *> {
   friend TrailingObjects;
 
-  unsigned NumElements;
-
   SequenceExpr(ArrayRef<Expr*> elements)
-    : Expr(ExprKind::Sequence, /*Implicit=*/false),
-      NumElements(elements.size()) {
-    assert(NumElements > 0 && "zero-length sequence!");
+    : Expr(ExprKind::Sequence, /*Implicit=*/false) {
+    Bits.SequenceExpr.NumElements = elements.size();
+    assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
                             getTrailingObjects<Expr*>());
   }
@@ -3235,14 +3239,14 @@ public:
     return getElement(getNumElements() - 1)->getEndLoc();
   }
   
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), NumElements};
+    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), NumElements};
+    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
   }
 
   Expr *getElement(unsigned i) const {
