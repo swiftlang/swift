@@ -1218,7 +1218,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1281,7 +1281,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
       ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
       if (CursorInfo.isInvalid()) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
       CompilerInvocation CompInvok;
@@ -1313,7 +1313,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                           Receiver);
           } else {
-            Receiver({});
+            Receiver(CursorInfoData());
           }
         }
         return;
@@ -1343,7 +1343,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
           }
         }
 
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
       case CursorInfoKind::Invalid: {
@@ -1360,7 +1360,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("cursor info failed: " << Error);
-      Receiver({});
+      Receiver(CursorInfoData());
     }
   };
 
@@ -1595,7 +1595,7 @@ void SwiftLangSupport::getCursorInfo(
               {}, *this, Invok, {}, Receiver);
         }
       } else {
-        Receiver({});
+        Receiver(CursorInfoData());
       }
     });
     return;
@@ -1606,7 +1606,7 @@ void SwiftLangSupport::getCursorInfo(
   if (!Invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver({});
+    Receiver(CursorInfoData());
     return;
   }
 
@@ -1752,7 +1752,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1761,7 +1761,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       Decl *D = ide::getDeclFromUSR(context, USR, error);
 
       if (!D) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1790,7 +1790,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                                  /*TryExistingAST=*/false,
                                  CancelOnSubsequentRequest, Receiver);
           } else {
-            Receiver({});
+            Receiver(CursorInfoData());
           }
         }
       }
@@ -1804,7 +1804,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("cursor info failed: " << Error);
-      Receiver({});
+      Receiver(CursorInfoData());
     }
   };
 
@@ -1824,7 +1824,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
     std::function<void(const CursorInfoData &)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
-    receiver({});
+    receiver(CursorInfoData());
     return;
   }
 
@@ -1833,7 +1833,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   if (!invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << error);
-    receiver({});
+    receiver(CursorInfoData());
     return;
   }
 
