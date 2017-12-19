@@ -2847,7 +2847,8 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
   addUsedConformances(conformance, visited);
 }
 
-void ConformanceChecker::ensureRequirementsAreSatisfied() {
+void ConformanceChecker::ensureRequirementsAreSatisfied(
+                                                     bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
   // Some other problem stopped the signature being computed.
   if (!proto->isRequirementSignatureComputed()) {
@@ -2874,13 +2875,14 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   class GatherConformancesListener : public GenericRequirementsCheckListener {
     TypeChecker &tc;
-    DeclContext *dc;
+    NormalProtocolConformance *conformance;
     std::function<void(ProtocolConformanceRef)> &writer;
   public:
     GatherConformancesListener(
-                         TypeChecker &tc, DeclContext *dc,
+                         TypeChecker &tc,
+                        NormalProtocolConformance *conformance,
                          std::function<void(ProtocolConformanceRef)> &writer)
-      : tc(tc), dc(dc), writer(writer) { }
+      : tc(tc), conformance(conformance), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
@@ -2912,7 +2914,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
         conformance = *tc.conformsToProtocol(
                          interfaceType,
                          conformance.getRequirement(),
-                         dc,
+                         this->conformance->getDeclContext(),
                          (ConformanceCheckFlags::SuppressDependencyTracking|
                           ConformanceCheckFlags::SkipConditionalRequirements));
 
@@ -2927,7 +2929,18 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
       writer(conformance);
     }
-  } listener(TC, DC, writer);
+
+    bool diagnoseUnsatisfiedRequirement(
+                      const Requirement &req, Type first, Type second,
+                      ArrayRef<ParentConditionalConformance> parents) override {
+      // Invalidate the conformance to suppress further diagnostics.
+      if (conformance->getLoc().isValid()) {
+        conformance->setInvalid();
+      }
+
+      return false;
+    }
+  } listener(TC, Conformance, writer);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -2940,9 +2953,33 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       nullptr,
       ConformanceCheckFlags::Used, &listener);
 
-  // If there were errors, mark the conformance as invalid.
-  if (result != RequirementCheckResult::Success) {
+  switch (result) {
+  case RequirementCheckResult::Success:
+    return;
+
+  case RequirementCheckResult::Failure:
     Conformance->setInvalid();
+    return;
+
+  case RequirementCheckResult::UnsatisfiedDependency:
+    llvm_unreachable("Cannot handle unsatisfied dependencies here");
+
+  case RequirementCheckResult::SubstitutionFailure:
+    // If we're not allowed to fail, record this as a partially-checked
+    // conformance.
+    if (!failUnsubstituted) {
+      TC.PartiallyCheckedConformances.insert(Conformance);
+      return;
+    }
+
+    // Diagnose the failure generically.
+    // FIXME: Would be nice to give some more context here!
+    if (!Conformance->isInvalid()) {
+      TC.diagnose(Loc, diag::type_does_not_conform,
+                  Adoptee, Proto->getDeclaredType());
+      Conformance->setInvalid();
+    }
+    return;
   }
 }
 
@@ -3658,6 +3695,19 @@ void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
+}
+
+void TypeChecker::checkConformanceRequirements(
+                                     NormalProtocolConformance *conformance) {
+  // If the conformance is already invalid, there's nothing to do here.
+  if (conformance->isInvalid())
+    return;
+
+  conformance->setSignatureConformances({ });
+
+  llvm::SetVector<ValueDecl *> globalMissingWitnesses;
+  ConformanceChecker checker(*this, conformance, globalMissingWitnesses);
+  checker.ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
 }
 
 /// Determine the score when trying to match two identifiers together.
