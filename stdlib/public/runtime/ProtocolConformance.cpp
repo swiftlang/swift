@@ -142,10 +142,41 @@ const {
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type, nullptr, 0);
 
-  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor: {
     // FIXME: this needs to query the conditional requirements to form the
     // array of witness tables to pass along to the accessor.
+    const char *typeName = "<unknown type>";
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::UniqueDirectType:
+      if (const auto *ntd = getDirectType()->getNominalTypeDescriptor())
+        typeName = ntd->Name.get();
+      break;
+
+    case TypeMetadataRecordKind::UniqueDirectClass:
+      typeName = class_getName(getDirectClass());
+      break;
+
+    case TypeMetadataRecordKind::UniqueIndirectClass:
+      typeName = class_getName(*getIndirectClass());
+      break;
+
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor: {
+      SymbolInfo info;
+      if (lookupSymbol(getNominalTypeDescriptor(), &info))
+        typeName = info.symbolName;
+      break;
+    }
+
+    case TypeMetadataRecordKind::Universal:
+      break;
+    }
+    warning(/*flag=*/0,
+            "warning: Swift runtime does not yet support dynamically "
+            "querying conditional conformance ('%s': '%s')\n",
+            typeName, getProtocol()->Name);
     return nullptr;
+  }
   }
 
   swift_runtime_unreachable(
