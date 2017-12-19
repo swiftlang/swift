@@ -669,6 +669,13 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
         return cs.getTypeMatchFailure(locator);
       }
     }
+
+    // Disallow assignment of noescape function to parameter of type
+    // Any. Allowing this would allow these functions to escape.
+    if (auto *fnTy = argType->getAs<AnyFunctionType>())
+      if (fnTy->isNoEscape())
+        return cs.getTypeMatchFailure(locator);
+
     return cs.getTypeMatchSuccess();
   }
 
@@ -1301,9 +1308,17 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (type1->is<InOutType>())
     return getTypeMatchFailure(locator);
 
+  // FIXME; Feels like a hack...nothing actually "conforms" here, and
+  // we need to disallow conversions from @noescape functions to Any.
+
   // Conformance to 'Any' always holds.
-  if (type2->isAny())
-    return getTypeMatchSuccess();
+  if (type2->isAny()) {
+    auto *fnTy = type1->getAs<AnyFunctionType>();
+    if (!fnTy || !fnTy->isNoEscape())
+      return getTypeMatchSuccess();
+
+    return getTypeMatchFailure(locator);
+  }
 
   // If the first type is a type variable or member thereof, there's nothing
   // we can do now.
@@ -1472,7 +1487,13 @@ ConstraintSystem::matchTypesBindTypeVar(
   if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType())
     return getTypeMatchFailure(locator);
 
-  // Okay. Bind below.
+  // Disallow bindings of noescape functions to type variables that
+  // represent an opened archetype. If we allowed this it would allow
+  // the noescape function to potentially escape.
+  if (auto *fnTy = type->getAs<AnyFunctionType>())
+    if (fnTy->isNoEscape())
+      if (typeVar->getImpl().getArchetype())
+        return getTypeMatchFailure(locator);
 
   // Check whether the type variable must be bound to a materializable
   // type.
@@ -1482,6 +1503,8 @@ ConstraintSystem::matchTypesBindTypeVar(
 
     setMustBeMaterializableRecursive(type);
   }
+
+  // Okay. Bind below.
 
   // A constraint that binds any pointer to a void pointer is
   // ineffective, since any pointer can be converted to a void pointer.
@@ -1985,9 +2008,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() &&
         type2->isExistentialType()) {
 
-      // Penalize conversions to Any.
-      if (kind >= ConstraintKind::Conversion && type2->isAny())
+      // Penalize conversions to Any, and disallow conversions of
+      // noescape functions to Any.
+      if (kind >= ConstraintKind::Conversion && type2->isAny()) {
+        if (auto *fnTy = type1->getAs<AnyFunctionType>())
+          if (fnTy->isNoEscape())
+            return getTypeMatchFailure(locator);
+
         increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+      }
 
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
     }
