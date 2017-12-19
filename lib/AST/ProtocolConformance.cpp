@@ -387,6 +387,11 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
 
 void NormalProtocolConformance::setSignatureConformances(
                                ArrayRef<ProtocolConformanceRef> conformances) {
+  if (conformances.empty()) {
+    SignatureConformances = { };
+    return;
+  }
+
   auto &ctx = getProtocol()->getASTContext();
   SignatureConformances = ctx.AllocateCopy(conformances);
 
@@ -458,11 +463,6 @@ NormalProtocolConformance::populateSignatureConformances() {
         requirementSignature(other.requirementSignature),
         buffer(other.buffer) {
       other.owning = false;
-    }
-
-    ~Writer() {
-      assert((!owning || self->isInvalid() || requirementSignature.empty()) &&
-             "signature conformances were not fully populated");
     }
 
     void operator()(ProtocolConformanceRef conformance){

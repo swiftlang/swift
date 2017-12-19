@@ -1648,7 +1648,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   SWIFT_DEFER {
     // Resolution attempts to have the witnesses be correct by construction, but
     // this isn't guaranteed, so let's double check.
-    ensureRequirementsAreSatisfied();
+    ensureRequirementsAreSatisfied(/*failUnsubstituted=*/false);
   };
 
   // Attempt to infer associated type witnesses.
@@ -1657,10 +1657,10 @@ void ConformanceChecker::resolveTypeWitnesses() {
     for (const auto &inferredWitness : *inferred) {
       recordTypeWitness(inferredWitness.first, inferredWitness.second,
                         /*typeDecl=*/nullptr,
-      /*performRedeclarationCheck=*/true);
+                        /*performRedeclarationCheck=*/true);
     }
 
-    ensureRequirementsAreSatisfied();
+    ensureRequirementsAreSatisfied(/*failUnsubstituted=*/false);
     return;
   }
 
@@ -1676,11 +1676,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, true);
   }
-
-  return;
-
-  // Multiple solutions. Diagnose the ambiguity.
-
 }
 
 void ConformanceChecker::resolveSingleTypeWitness(
