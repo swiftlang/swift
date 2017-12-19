@@ -2464,14 +2464,15 @@ static Lazy<ForeignTypeState> ForeignTypes;
 const ForeignTypeMetadata *
 swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // Fast path: check the invasive cache.
-  if (auto unique = nonUnique->getCachedUniqueMetadata()) {
-    return unique;
+  auto cache = nonUnique->getCacheValue();
+  if (cache.isInitialized()) {
+    return cache.getCachedUniqueMetadata();
   }
 
   // Okay, check the global map.
   auto &foreignTypes = ForeignTypes.get();
   GlobalString key(nonUnique->getName());
-  bool hasInit = nonUnique->hasInitializationFunction();
+  bool hasInit = cache.hasInitializationFunction();
 
   const ForeignTypeMetadata *uniqueMetadata;
   bool inserted;
