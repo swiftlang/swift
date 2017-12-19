@@ -2142,18 +2142,6 @@ static bool checkASTTypeForABIDifferences(CanType type1,
                          /*resolver*/nullptr);
 }
 
-SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
-  SILDeclRef cur = method, next = method;
-  do {
-    cur = next;
-    if (cur.requiresNewVTableEntry())
-      return cur;
-    next = cur.getNextOverriddenVTableEntry();
-  } while (next);
-
-  return cur;
-}
-
 // FIXME: This makes me very upset. Can we do without this?
 static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType derived,

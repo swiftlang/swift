@@ -904,7 +904,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           idKind = KeyPathComponentHeader::VTableOffset;
           auto dc = declRef.getDecl()->getDeclContext();
           if (isa<ClassDecl>(dc)) {
-            auto overridden = getSILTypes().getOverriddenVTableEntry(declRef);
+            auto overridden = declRef.getOverriddenVTableEntry();
             auto declaringClass =
               cast<ClassDecl>(overridden.getDecl()->getDeclContext());
             auto &metadataLayout = getMetadataLayout(declaringClass);

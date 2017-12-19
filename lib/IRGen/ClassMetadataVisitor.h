@@ -45,7 +45,7 @@ protected:
   ClassDecl *const Target;
 
   ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
-    : super(IGM), SILVTableVisitor<Impl>(IGM.getSILTypes()), Target(target) {}
+    : super(IGM), Target(target) {}
 
 public:
   void layout() {
