@@ -82,9 +82,6 @@ public:
     return getAllInputs()[PrimaryInputs.front().second];
   }
 
-  
-
-  // FIXME: dmu iterator?
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getAllInputs()) {
@@ -117,11 +114,6 @@ public:
 
   // Primary input readers
 
-  // FIXME: dmu remove these as batch mode works
-  void assertMustNotBeMoreThanOnePrimaryInput() const {
-    assert(primaryInputCount() < 2 &&
-           "have not implemented >1 primary input yet");
-  }
   bool areAllNonPrimariesSIB() const;
 
 public:
@@ -129,7 +121,7 @@ public:
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
 
-  // FIXME dmu what about WMO??
+  // FIXME dmu forEachInputProducingOutput what about WMO??
   bool forEachInputProducingOutput(
       llvm::function_ref<bool(const InputFile &)> fn) const {
     return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
@@ -195,7 +187,7 @@ public:
 
   /// Return the name of the unique primary input, or an empty StringRef if
   /// there isn't one.
-  // FIXME: dmu probably wrong
+  // FIXME: dmu getNameOfUniquePrimaryInputFile probably wrong
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->file();
@@ -208,7 +200,8 @@ public:
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
-  // FIXME: dmu used for index generation, may be wrong
+  // FIXME: dmu outputFilenamesForEachInput used for index generation, may be
+  // wrong
   std::vector<std::string> outputFilenamesForEachInput() const {
     std::vector<std::string> result;
     for (const InputFile &input : getAllInputs())
@@ -249,16 +242,17 @@ public:
     PrimaryInputs.clear();
   }
 
-  // FIXME: dmu move? redo??
-  const InputFile &getFirstInput() const {
-    assert(hasInputs());
-    return getAllInputs()[0];
+  // FIXME: dmu fix uses / remove these when batch mode works
+  void assertMustNotBeMoreThanOnePrimaryInput() const {
+    assert(primaryInputCount() < 2 &&
+           "have not implemented >1 primary input yet");
   }
   
   const StringRef preBatchModeGetSingleOutputFilename() const {
     return preBatchModePathsForAtMostOnePrimary().OutputFilename;
   }
   const OutputPaths &preBatchModePathsForAtMostOnePrimary() const {
+    assertMustNotBeMoreThanOnePrimaryInput();
     static OutputPaths empty;
     return hasPrimaries()
     ? getAllInputs()[PrimaryInputs.front().second].outputs()

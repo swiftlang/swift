@@ -283,7 +283,6 @@ private:
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
-  /// FIXME: dmu merge output filename handling with supplementaries
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
   /// Read any filelists for suppliementary outputs that may be present on the
@@ -819,7 +818,7 @@ static Optional<std::string> determineSupplementaryOutputFilename(
       // FIXME: dmu write out arg name and file list name
       diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_filelist_and_argument);
-      return None; // FIXME: dmu bail?
+      return None; // FIXME: dmu bail on supp filelist and argument?
     }
     if (!pathFromSupplementaryFilelist.empty())
       return pathFromSupplementaryFilelist.str();
@@ -1027,7 +1026,7 @@ bool FrontendArgsToOptionsConverter::
   const ArrayRef<std::string> outputFileArguments =
       getOutputFilenamesFromCommandLineOrFilelist();
 
-  // FIXME: dmu Should be const, but std::vector...
+  // FIXME: dmu suppFilelistArgs should be const, but std::vector...
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
 
@@ -1069,7 +1068,8 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
-// FIXME: dmu assumes same indices as... what?
+// FIXME: dmu getSupplementaryFilenamesFromFilelists assumes same indices as
+// inputs
 std::vector<OutputPaths>
 FrontendArgsToOptionsConverter::getSupplementaryFilenamesFromFilelists() {
   const unsigned N = Opts.InputsAndOutputs.countOfFilesProducingOutput();
@@ -1161,14 +1161,13 @@ bool FrontendArgsToOptionsConverter::checkUnusedOutputPaths(
 static bool shouldSerializeBridgingHeader(
     const FrontendInputsAndOutputs &inputsAndOutputs) {
   return inputsAndOutputs.isWholeModule() && inputsAndOutputs.hasInputs() &&
-         !inputsAndOutputs.getFirstInput().outputs().ModuleOutputPath.empty();
+         !inputsAndOutputs.preBatchModeModuleOutputPath().empty();
 }
 
 void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    // FIXME: dmu reify
     Opts.SerializeBridgingHeader |=
         shouldSerializeBridgingHeader(Opts.InputsAndOutputs);
   }
