@@ -399,8 +399,8 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
-
-/// Erase any ErrorType types on the given expression, allowing later
+/// Prepare the given expression for type-checking again, prinicipally by
+/// erasing any ErrorType types on the given expression, allowing later
 /// type-checking to make progress.
 ///
 /// FIXME: this is fundamentally a workaround for the fact that we may end up
@@ -408,12 +408,15 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
 /// the context, and later for checking more-specific things like unresolved
 /// members.  We should restructure code-completion type-checking so that we
 /// never typecheck more than once (or find a more principled way to do it).
-static void eraseErrorTypes(Expr *E) {
+static void prepareForRetypechecking(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (expr && expr->getType() && expr->getType()->hasError())
         expr->setType(Type());
+      if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
+        return { true, ACE->getSingleExpressionBody() };
+      }
       return { true, expr };
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
@@ -1388,7 +1391,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(),
                             ParsedExpr->getReferencedDecl());
 
-    eraseErrorTypes(ParsedExpr);
+    prepareForRetypechecking(ParsedExpr);
 
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
@@ -3335,7 +3338,7 @@ public:
       // Reset sequence.
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);
-      eraseErrorTypes(SE);
+      prepareForRetypechecking(SE);
 
       // Reset any references to operators in types, so they are properly
       // handled as operators by sequence folding.
@@ -3394,7 +3397,7 @@ public:
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    eraseErrorTypes(expr);
+    prepareForRetypechecking(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
@@ -3432,7 +3435,7 @@ public:
     sequence.push_back(nullptr); // operator
     sequence.push_back(nullptr); // RHS
     auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    eraseErrorTypes(SE);
+    prepareForRetypechecking(SE);
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -5337,7 +5340,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if (auto PE = Walker.ParentFarthest.get<Expr *>()) {
-      eraseErrorTypes(PE);
+      prepareForRetypechecking(PE);
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(PossibleTypes);
