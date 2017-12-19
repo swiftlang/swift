@@ -2424,9 +2424,7 @@ namespace {
   public:
     ClassNominalTypeDescriptorBuilder(IRGenModule &IGM,
                                        ClassDecl *c)
-      : super(IGM),
-        SILVTableVisitor<ClassNominalTypeDescriptorBuilder>(IGM.getSILTypes()),
-        Target(c)
+      : super(IGM), Target(c)
     {
       auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
@@ -4411,7 +4409,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the vtable entry for this method.
-  SILDeclRef overridden = IGF.IGM.getSILTypes().getOverriddenVTableEntry(method);
+  SILDeclRef overridden = method.getOverriddenVTableEntry();
 
   // Find the metadata.
   llvm::Value *metadata;
