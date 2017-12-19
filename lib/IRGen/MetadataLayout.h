@@ -150,6 +150,8 @@ public:
   };
 
 private:
+  StoredOffset MetadataSize;
+
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
 
@@ -187,6 +189,8 @@ private:
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 public:
+  Size getMetadataSizeOffset() const;
+
   Size getInstanceSizeOffset() const;
 
   Size getInstanceAlignMaskOffset() const;
