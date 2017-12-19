@@ -829,10 +829,9 @@ static Optional<std::string> determineSupplementaryOutputFilename(
   if (!hasArgWithoutPath)
     return std::string();
 
+  // ISOLATEMODULEPATH
   if (!mainOutputIfUsable.empty()) {
-    llvm::SmallString<128> path(*mainOutputIfUsable);
-    llvm::sys::path::replace_extension(path, extension);
-    output = path.str();
+    return mainOutputIfUsable.str();
   }
 
   llvm::SmallString<128> path(supplementaryNameFromInputOrModule);
@@ -840,10 +839,11 @@ static Optional<std::string> determineSupplementaryOutputFilename(
   return path.str().str();
 };
 
-static void deriveModuleOutputParameters(
-    const ArgList &args, StringRef singleOutputFilename,
-    StringRef uniquePrimaryInput, StringRef moduleName, options::ID &emitOption,
-    std::string &extension, std::string &mainOutputIfUsable) {
+static void deriveModuleParameters(const ArgList &args,
+                                   StringRef singleOutputFilename,
+                                   options::ID &emitOption,
+                                   std::string &extension,
+                                   std::string &mainOutputIfUsable) {
   FrontendOptions::ActionType requestedAction =
       FrontendArgsToOptionsConverter::determineRequestedAction(args);
 
@@ -861,24 +861,12 @@ static void deriveModuleOutputParameters(
 
   extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
 
-  if (!canUseMainOutputForModule)
-    mainOutputIfUsable = "";
-  else if (!singleOutputFilename.empty())
-    // Put the serialized diagnostics file next to the output file.
-    mainOutputIfUsable = singleOutputFilename;
-  else if (!uniquePrimaryInput.empty())
-    // If we have a primary input, so use that as the basis for the name of the
-    // serialized diagnostics file, otherwise fall back on the
-    // module name.
-    mainOutputIfUsable = llvm::sys::path::filename(uniquePrimaryInput);
-  else
-    mainOutputIfUsable = moduleName;
+  mainOutputIfUsable = canUseMainOutputForModule ? singleOutputFilename : "";
 }
 
 static Optional<OutputPaths> determineSupplementaryOutputFilenames(
     const ArgList &args, StringRef outputFilename,
-    StringRef singleOutputFilename, StringRef uniquePrimaryInput,
-    StringRef moduleName, const OutputPaths &suppOutArg,
+    StringRef singleOutputFilename, const OutputPaths &suppOutArg,
     StringRef supplementaryNameFromInputOrModule, DiagnosticEngine &diags) {
   using namespace options;
 
@@ -938,9 +926,8 @@ static Optional<OutputPaths> determineSupplementaryOutputFilenames(
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
-  deriveModuleOutputParameters(args, singleOutputFilename, uniquePrimaryInput,
-                               moduleName, emitModuleOption, moduleExtension,
-                               mainOutputIfUsableForModule);
+  deriveModuleParameters(args, singleOutputFilename, emitModuleOption,
+                         moduleExtension, mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
       args.getLastArg(OPT_emit_module_path), args.hasArg(emitModuleOption),
@@ -976,8 +963,7 @@ static Optional<OutputPaths> computeOutputsForOneInput(
                                                  input.isPrimary(), moduleName);
 
   return determineSupplementaryOutputFilenames(
-      args, *outputFilename, singleInputFilename,
-      input.isPrimary() ? input.file() : "", moduleName, suppFileListArg,
+      args, *outputFilename, singleInputFilename, suppFileListArg,
       supplementaryNameFromInputOrModule, diags);
 }
 
