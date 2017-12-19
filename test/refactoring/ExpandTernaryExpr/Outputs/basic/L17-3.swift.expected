@@ -15,10 +15,10 @@ func testExpandAssignOnlyTernaryExpr() {
   let b = 5
   let x: Int
   if a < 5 {
-    x = a
-  } else {
-    x = b
-  }
+x = a
+} else {
+x = b
+}
 }
 func testExpandAssignOnlyTupleTernaryExpr() {
   let a = 3

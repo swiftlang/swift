@@ -22,10 +22,10 @@ func testExpandAssignOnlyTupleTernaryExpr() {
   let x: Int
   let y: Int
   if a < 5 {
-    (x, y) = (a, b)
-  } else {
-    (x, y) = (b, a)
-  }
+(x, y) = (a, b)
+} else {
+(x, y) = (b, a)
+}
 }
 
 
