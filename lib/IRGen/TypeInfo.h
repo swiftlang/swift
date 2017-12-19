@@ -261,7 +261,6 @@ public:
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                     bool isInEntryBlock,
                                      const llvm::Twine &name) const = 0;
 
   /// Deallocate a variable of this type.
