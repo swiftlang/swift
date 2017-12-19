@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
-// RUN: %target-build-swift -swift-version 4 -enable-experimental-conditional-conformances %s -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_WARNINGS
 protocol P {
   func foo()
