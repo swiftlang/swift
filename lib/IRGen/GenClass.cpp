@@ -253,6 +253,9 @@ namespace {
       if (theClass->isGenericContext())
         ClassMetadataRequiresDynamicInitialization = true;
 
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
+        ClassMetadataRequiresDynamicInitialization = true;
+
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
