@@ -286,7 +286,7 @@ struct CursorInfoData {
   StringRef ModuleInterfaceName;
   /// This is an (offset,length) pair.
   /// It is set only if the declaration has a source location.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
+  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
   /// Set only if the declaration has a source location.
   StringRef Filename;
   /// For methods this lists the USRs of the overrides in the class hierarchy.
