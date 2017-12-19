@@ -299,6 +299,11 @@ class alignas(8) Expr {
     IsNonAccessing : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+    : NumPadBits,
+    NumConformances : 32
+  );
+
   SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1,
     ThrowsIsSet : 1,
     Throws : 1
@@ -371,6 +376,7 @@ protected:
     SWIFT_INLINE_BITS(ParenExpr);
     SWIFT_INLINE_BITS(SequenceExpr);
     SWIFT_INLINE_BITS(CollectionExpr);
+    SWIFT_INLINE_BITS(ErasureExpr);
   } Bits;
 
 private:
@@ -3090,14 +3096,21 @@ public:
 ///
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
-class ErasureExpr : public ImplicitConversionExpr {
-  ArrayRef<ProtocolConformanceRef> Conformances;
+class ErasureExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+  friend TrailingObjects;
 
-public:
   ErasureExpr(Expr *subExpr, Type type,
               ArrayRef<ProtocolConformanceRef> conformances)
-    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
-      Conformances(conformances) {}
+    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
+    Bits.ErasureExpr.NumConformances = conformances.size();
+    std::uninitialized_copy(conformances.begin(), conformances.end(),
+                            getTrailingObjects<ProtocolConformanceRef>());
+  }
+
+public:
+  static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
+                             ArrayRef<ProtocolConformanceRef> conformances);
 
   /// \brief Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3110,7 +3123,8 @@ public:
   /// type is either an archetype or an existential type that conforms to
   /// that corresponding protocol).
   ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return Conformances;
+    return {getTrailingObjects<ProtocolConformanceRef>(),
+            Bits.ErasureExpr.NumConformances };
   }
 
   static bool classof(const Expr *E) {
