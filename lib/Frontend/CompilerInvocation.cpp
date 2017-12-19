@@ -979,14 +979,14 @@ static bool computeAllOutputs(
       io.hasSingleInput() ? io.getFilenameOfFirstInput() : StringRef();
 
   unsigned i = 0;
+  io.setIsSingleThreadedWMO(isSingleThreadedWMO);
   return io.forEachInputProducingOutput(
       [&](InputFile &input) -> bool { // ONLY ONCE IF WMONON??
 
         StringRef ithOutputFilenameArg =
-            doOutputFilenameArgumentsCorrespondToInputs
-                ? StringRef(outputFileArguments[i])
-        : isSingleThreadedWMO && !outputFileArguments.empty() ? StringRef(outputFileArguments[0])
-                : StringRef();
+            outputFileArguments.empty() ? StringRef()
+                                        : StringRef(outputFileArguments[i]);
+
         const OutputPaths &ithSuppFileListArg = suppFileListArgs[i];
 
         Optional<OutputPaths> outputPaths = computeOutputsForOneInput(
@@ -998,8 +998,6 @@ static bool computeAllOutputs(
         if (!outputPaths)
           return true;
         input.setOutputs(*outputPaths);
-        if (isSingleThreadedWMO && i == 0)
-          io.beSingleThreadedWMO();
         ++i;
         return false;
       });

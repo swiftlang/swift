@@ -35,7 +35,6 @@ class FrontendInputsAndOutputs {
   std::vector<InputFile> AllFiles;
   typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
-  Optional<OutputPaths> SingleThreadedWMOOutputs;
   bool IsSingleThreadedWMO = false;
 
 public:
@@ -44,14 +43,14 @@ public:
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
     for (InputFile input : other.getAllInputs())
       addInput(input);
-    SingleThreadedWMOOutputs = other.SingleThreadedWMOOutputs;
+    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
     for (InputFile input : other.getAllInputs())
       addInput(input);
-     SingleThreadedWMOOutputs = other.SingleThreadedWMOOutputs;
+    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     return *this;
   }
 
@@ -70,10 +69,13 @@ public:
   const InputFile *getSingleThreadedWMOInput() const {
     return isSingleThreadedWMO() ? &AllFiles[0] : nullptr;
   }
+  InputFile *getSingleThreadedWMOInput() {
+    return isSingleThreadedWMO() ? &AllFiles[0] : nullptr;
+  }
   const OutputPaths *getSingleThreadedWMOOutputs() const {
     return isSingleThreadedWMO() ? &AllFiles[0].outputs() : nullptr;
   }
-  void beSingleThreadedWMO() { IsSingleThreadedWMO = true; }
+  void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
 
   // Readers:
@@ -132,10 +134,11 @@ public:
     return hasPrimaries() ? primaryInputCount() : inputCount();
   }
 
-  // FIXME dmu forEachInputProducingOutput what about WMO??
   bool forEachInputProducingOutput(
       llvm::function_ref<bool(const InputFile &)> fn) const {
-    return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
+    return isSingleThreadedWMO()
+               ? fn(*getSingleThreadedWMOInput())
+               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
   }
 
   bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const {
@@ -154,7 +157,9 @@ public:
   }
 
   bool forEachInputProducingOutput(llvm::function_ref<bool(InputFile &)> fn) {
-    return hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
+    return isSingleThreadedWMO()
+               ? fn(*getSingleThreadedWMOInput())
+               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
   }
 
   bool forEachInput(llvm::function_ref<bool(InputFile &)> fn) {
@@ -256,10 +261,11 @@ public:
     assertMustNotBeMoreThanOnePrimaryInput();
     static OutputPaths empty;
     return hasPrimaries()
-    ? getAllInputs()[PrimaryInputs.front().second].outputs()
-    : isSingleThreadedWMO() ? *SingleThreadedWMOOutputs
-    : getAllInputs().empty() ? empty
-    : getAllInputs().front().outputs();
+               ? getAllInputs()[PrimaryInputs.front().second].outputs()
+               : isSingleThreadedWMO() ? *getSingleThreadedWMOOutputs()
+                                       : getAllInputs().empty()
+                                             ? empty
+                                             : getAllInputs().front().outputs();
   }
 
   std::vector<std::string> preBatchModeOutputFilenames() const;

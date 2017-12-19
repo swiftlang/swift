@@ -111,14 +111,10 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
 std::vector<std::string>
 FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
   std::vector<std::string> outputs;
-  if (isSingleThreadedWMO())
-    outputs.push_back(getSingleThreadedWMOOutputs()->OutputFilename);
-  else {
-    forEachInputProducingOutput([&] (const InputFile &input) -> bool {
-      outputs.push_back(input.outputs().OutputFilename);
-      return false;
-    });
-  }
+  forEachInputProducingOutput([&](const InputFile &input) -> bool {
+    outputs.push_back(input.outputs().OutputFilename);
+    return false;
+  });
   return outputs;
 }
 bool FrontendOptions::needsProperModuleName(ActionType action) {
@@ -201,7 +197,6 @@ void FrontendOptions::forAllOutputPathsForMakeDependencies(
       &input.outputs().ModuleOutputPath,
       &input.outputs().ModuleDocOutputPath,
       &input.outputs().ObjCHeaderOutputPath
-      
     };
     for (const std::string *next : outputs) {
       if (!next->empty())
