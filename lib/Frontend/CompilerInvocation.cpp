@@ -962,7 +962,13 @@ static Optional<OutputPaths> computeOutputsForOneInput(
                                                  input.isPrimary(), moduleName);
 
   return determineSupplementaryOutputFilenames(
-      args, *outputFilename, singleOutputFilename, suppFileListArg,
+      args, *outputFilename,
+                                               
+                                          //xxx XXXXX     singleOutputFilename,
+                                               "",
+                                               
+                                               
+                                               suppFileListArg,
       supplementaryNameFromInputOrModule, diags);
 }
 
