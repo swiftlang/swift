@@ -5215,8 +5215,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
           new (ctx) OpaqueValueExpr(expr->getLoc(),
                                     fromType));
     
-    auto *result =
-      cs.cacheType(new (ctx) ErasureExpr(archetypeVal, toType, conformances));
+    auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
+                                                    conformances));
     return cs.cacheType(
         new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
                                       cs.getType(result)));
@@ -5238,7 +5238,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     }
   }
 
-  return cs.cacheType(new (ctx) ErasureExpr(expr, toType, conformances));
+  return cs.cacheType(ErasureExpr::create(ctx, expr, toType, conformances));
 }
 
 /// Given that the given expression is an implicit conversion added
