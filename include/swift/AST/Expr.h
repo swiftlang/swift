@@ -167,7 +167,7 @@ class alignas(8) Expr {
     IsSuper : 1
   );
 
-  SWIFT_INLINE_BITFIELD(TupleExpr, Expr, 1+1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+1+32,
     /// Whether this tuple has a trailing closure.
     HasTrailingClosure : 1,
 
@@ -175,7 +175,10 @@ class alignas(8) Expr {
     HasElementNames : 1,
 
     /// Whether this tuple has label locations.
-    HasElementNameLocations : 1
+    HasElementNameLocations : 1,
+
+    : NumPadBits,
+    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 2,
@@ -1911,7 +1914,6 @@ class TupleExpr final : public Expr,
 
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
-  unsigned NumElements;
 
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
@@ -1981,7 +1983,7 @@ public:
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
   
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return Bits.TupleExpr.NumElements; }
   
   Expr *getElement(unsigned i) const {
     return getElements()[i];

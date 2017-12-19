@@ -1416,12 +1416,11 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
                      SourceLoc RParenLoc, bool HasTrailingClosure, 
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
-    LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-    NumElements(SubExprs.size())
-{
+    LParenLoc(LParenLoc), RParenLoc(RParenLoc) {
   Bits.TupleExpr.HasTrailingClosure = HasTrailingClosure;
   Bits.TupleExpr.HasElementNames = !ElementNames.empty();
   Bits.TupleExpr.HasElementNameLocations = !ElementNameLocs.empty();
+  Bits.TupleExpr.NumElements = SubExprs.size();
   
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
