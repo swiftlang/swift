@@ -10,7 +10,7 @@
 @inline(never) func id<T>(_ t: T) -> T {
   return t
 }
-// CHECK-LABEL: define hidden swiftcc void @_T021dynamic_self_metadata2idxxlF
+// CHECK-LABEL: define hidden swiftcc void @_T021dynamic_self_metadata2idyxxlF
 
 class C {
   class func fromMetatype() -> Self? { return nil }
@@ -38,5 +38,5 @@ class C {
   // CHECK: [[CAST1:%.+]] = bitcast %T21dynamic_self_metadata1CC* %0 to [[METATYPE:%.+]]
   // CHECK: [[TYPE1:%.+]] = call %swift.type* @swift_getObjectType([[METATYPE]] [[CAST1]])
   // CHECK: [[TYPE2:%.+]] = call %swift.type* @_T0SqMa(%swift.type* [[TYPE1]])
-  // CHECK: call swiftcc void @_T021dynamic_self_metadata2idxxlF({{.*}}, %swift.type* [[TYPE2]])
+  // CHECK: call swiftcc void @_T021dynamic_self_metadata2idyxxlF({{.*}}, %swift.type* [[TYPE2]])
 }

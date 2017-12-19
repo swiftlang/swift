@@ -14,7 +14,7 @@ class Sub : Base {
 
 // CHECK-LABEL: sil hidden @_T021accessibility_vtables3SubCACycfc : $@convention(method) (@owned Sub) -> @owned Sub
 // CHECK:       bb0(%0 : $Sub):
-// CHECK:         function_ref @_T0s25_unimplementedInitializers5NeverOs12StaticStringV9className_AE04initG0AE4fileSu4lineSu6columntF
+// CHECK:         function_ref @_T0s25_unimplementedInitializer9className04initD04file4line6columns5NeverOs12StaticStringV_A2JS2utF
 
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:  #Base.internalMethod!1: {{.*}} : _T028accessibility_vtables_helper4BaseC14internalMethodyyF [inherited]

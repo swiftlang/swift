@@ -145,7 +145,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_butTakesAParam(param:)",
-          key.usr: "s:23index_is_test_candidate7MyClassC0C30_startsWithTest_butTakesAParamySi5param_tF",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C30_startsWithTest_butTakesAParam5paramySi_tF",
           key.line: 22,
           key.column: 8,
           key.is_dynamic: 1,

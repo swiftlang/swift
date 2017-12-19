@@ -365,7 +365,7 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
   // CHECK:   return [[A2P]]
   return Builtin.projectTailElems(h, ty)
 }
-// CHECK: } // end sil function '_T08builtins16projectTailElemsBpAA6HeaderC1h_xm2tytlF'
+// CHECK: } // end sil function '_T08builtins16projectTailElems1h2tyBpAA6HeaderC_xmtlF'
 
 // CHECK-LABEL: sil hidden @_T08builtins11getTailAddr{{[_0-9a-zA-Z]*}}F
 func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Type, ty2: T2.Type) -> Builtin.RawPointer {
@@ -446,7 +446,7 @@ func canBeClassMetatype<T>(_: T) {
   Builtin.canBeClass(TT.self)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins11fixLifetimeyAA1CCF : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil hidden @_T08builtins11fixLifetimeyyAA1CCF : $@convention(thin) (@owned C) -> () {
 func fixLifetime(_ c: C) {
   // CHECK: bb0([[ARG:%.*]] : @owned $C):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -457,7 +457,7 @@ func fixLifetime(_ c: C) {
   // CHECK:   destroy_value [[ARG]]
   Builtin.fixLifetime(c)
 }
-// CHECK: } // end sil function '_T08builtins11fixLifetimeyAA1CCF'
+// CHECK: } // end sil function '_T08builtins11fixLifetimeyyAA1CCF'
 
 // CHECK-LABEL: sil hidden @_T08builtins20assert_configuration{{[_0-9a-zA-Z]*}}F
 func assert_configuration() -> Builtin.Int32 {
@@ -466,14 +466,14 @@ func assert_configuration() -> Builtin.Int32 {
   // CHECK: return [[APPLY]] : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins17assumeNonNegativeBwBwF
+// CHECK-LABEL: sil hidden @_T08builtins17assumeNonNegativeyBwBwF
 func assumeNonNegative(_ x: Builtin.Word) -> Builtin.Word {
   return Builtin.assumeNonNegative_Word(x)
   // CHECK: [[APPLY:%.*]] = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
   // CHECK: return [[APPLY]] : $Builtin.Word
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins11autoreleaseyAA1OCF : $@convention(thin) (@owned O) -> () {
+// CHECK-LABEL: sil hidden @_T08builtins11autoreleaseyyAA1OCF : $@convention(thin) (@owned O) -> () {
 // ==> SEMANTIC ARC TODO: This will be unbalanced... should we allow it?
 // CHECK: bb0([[ARG:%.*]] : @owned $O):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -482,7 +482,7 @@ func assumeNonNegative(_ x: Builtin.Word) -> Builtin.Word {
 // CHECK:   destroy_value [[ARG_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK: } // end sil function '_T08builtins11autoreleaseyAA1OCF'
+// CHECK: } // end sil function '_T08builtins11autoreleaseyyAA1OCF'
 func autorelease(_ o: O) {
   Builtin.autorelease(o)
 }
@@ -498,7 +498,7 @@ func unreachable() {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins15reinterpretCastBw_AA1DCAA1CCSgAFtAF_Bw1xtF : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
+// CHECK-LABEL: sil hidden @_T08builtins15reinterpretCast_1xBw_AA1DCAA1CCSgAGtAG_BwtF : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
 // CHECK:       bb0([[ARG1:%.*]] : @owned $C, [[ARG2:%.*]] : @trivial $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
@@ -728,7 +728,7 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins17refcast_class_anyyXlAA1ACF :
+// CHECK-LABEL: sil hidden @_T08builtins17refcast_class_anyyyXlAA1ACF :
 // CHECK: bb0([[ARG:%.*]] : @owned $A):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -736,7 +736,7 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CASTED]]
-// CHECK: } // end sil function '_T08builtins17refcast_class_anyyXlAA1ACF'
+// CHECK: } // end sil function '_T08builtins17refcast_class_anyyyXlAA1ACF'
 func refcast_class_any(_ o: A) -> AnyObject {
   return Builtin.castReference(o)
 }
@@ -747,7 +747,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins18refcast_pclass_anyyXlAA6PClass_pF :
+// CHECK-LABEL: sil hidden @_T08builtins18refcast_pclass_anyyyXlAA6PClass_pF :
 // CHECK: bb0([[ARG:%.*]] : @owned $PClass):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -755,7 +755,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CAST]]
-// CHECK: } // end sil function '_T08builtins18refcast_pclass_anyyXlAA6PClass_pF'
+// CHECK: } // end sil function '_T08builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
   return Builtin.castReference(o)
 }
@@ -916,7 +916,7 @@ func release(ptr: Builtin.NativeObject) {
 
 func once_helper() {}
 
-// CHECK-LABEL: sil hidden @_T08builtins4onceyBp7control_tF
+// CHECK-LABEL: sil hidden @_T08builtins4once7controlyBp_tF
 // CHECK:      [[T0:%.*]] = function_ref @_T08builtins11once_helperyyFTo : $@convention(c) () -> ()
 // CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) () -> ())
 func once(control: Builtin.RawPointer) {

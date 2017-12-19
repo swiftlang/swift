@@ -14,7 +14,7 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypes010resilient_A04SizeVAE_A2Ec1ftF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
 
 public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
@@ -54,7 +54,7 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypesy010resilient_A09RectangleVF(%T16resilient_struct9RectangleV* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypesyy010resilient_A09RectangleVF(%T16resilient_struct9RectangleV* noalias nocapture)
 public func functionWithResilientTypes(_ r: Rectangle) {
 
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct9RectangleVMa()
@@ -83,7 +83,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience28functionWithMyResilientTypesAA0E4SizeVAD_A2Dc1ftF(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
@@ -150,14 +150,14 @@ public struct ResilientStructWithMethod {
 
 // Corner case -- type is address-only in SIL, but empty in IRGen
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethodyAA0f10StructWithG0V1r_tF(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture)
 public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
   _ = r.method
 }
 
 // Type is address-only in SIL, and resilient in IRGen
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethody010resilient_A04SizeV1s_tF(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF(%swift.opaque* noalias nocapture)
 public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }

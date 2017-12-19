@@ -340,17 +340,17 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
 }
 
 // internal func _getErrorDomainNSString<T : Error>
-//   (x: UnsafePointer<T>) -> AnyObject
+//   (_ x: UnsafePointer<T>) -> AnyObject
 #define getErrorDomainNSString \
-  MANGLE_SYM(s23_getErrorDomainNSStringyXlSPyxGs0B0RzlF)
+  MANGLE_SYM(s23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 NSString *getErrorDomainNSString(const OpaqueValue *error,
                                  const Metadata *T,
                                  const WitnessTable *Error);
 
-// internal func _getErrorCode<T : Error>(x: UnsafePointer<T>) -> Int
+// internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int
 #define getErrorCode \
-  MANGLE_SYM(s13_getErrorCodeSiSPyxGs0B0RzlF)
+  MANGLE_SYM(s13_getErrorCodeySiSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 NSInteger getErrorCode(const OpaqueValue *error,
                        const Metadata *T,
@@ -358,7 +358,7 @@ NSInteger getErrorCode(const OpaqueValue *error,
 
 // internal func _getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
 #define getErrorUserInfoNSDictionary \
-  MANGLE_SYM(s29_getErrorUserInfoNSDictionaryyXlSgSPyxGs0B0RzlF)
+  MANGLE_SYM(s29_getErrorUserInfoNSDictionaryyyXlSgSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 NSDictionary *getErrorUserInfoNSDictionary(
                 const OpaqueValue *error,
@@ -380,7 +380,7 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
   //   -> AnyObject?
   auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<GetDefaultFn*> (dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyXlSgxs0C0RzlF)))));
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)))));
   if (!foundationGetDefaultUserInfo) {
     T->vw_destroy(error);
     return nullptr;
@@ -468,7 +468,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                   const WitnessTable *);
   auto bridgeNSErrorToError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<BridgeFn*>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation21_bridgeNSErrorToErrorSbSo0C0C_SpyxG3outtAA021_ObjectiveCBridgeableE0RzlF)))));
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF)))));
   // protocol _ObjectiveCBridgeableError
   auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B0ySiSgz_SitF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
@@ -10,7 +10,7 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
 }
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B0ySQySiGz_SitF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B0yySQySiGz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
@@ -29,7 +29,7 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B9_implicitySQyAA1SVGz_SitF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B9_implicityySQyAA1SVGz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<S>
 // CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr [[WRITE]]
 // CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
@@ -41,7 +41,7 @@ struct Struct<T> {
   var value: T?
 }
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B13_reabstractedyAA6StructVyS2icGz_S2ictF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B13_reabstractedyyAA6StructVyS2icGz_S2ictF
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_T0S2iIegyd_S2iIegir_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_guaranteed (@in Int) -> @out Int
@@ -50,7 +50,7 @@ func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
   x.value! = y
 }
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B9_computedSiAA1SVSgz_SitF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B9_computedySiAA1SVSgz_SitF
 // CHECK:         function_ref @_T015optional_lvalue1SV8computedSivs
 // CHECK:         function_ref @_T015optional_lvalue1SV8computedSivg
 func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
@@ -60,7 +60,7 @@ func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
 
 func generate_int() -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_T015optional_lvalue013assign_bound_a1_B0ySiSgzF
+// CHECK-LABEL: sil hidden @_T015optional_lvalue013assign_bound_a1_B0yySiSgzF
 // CHECK:         select_enum_addr
 // CHECK:         cond_br {{%.*}}, [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
 // CHECK:       [[SOME]]:

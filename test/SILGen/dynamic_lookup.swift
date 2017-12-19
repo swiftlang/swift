@@ -345,7 +345,7 @@ func downcast(_ obj: AnyObject) -> X {
   @objc optional var juice: Juice { get }
 }
 
-// CHECK-LABEL: sil hidden @_T014dynamic_lookup7consumeyAA5Fruit_pF
+// CHECK-LABEL: sil hidden @_T014dynamic_lookup7consumeyyAA5Fruit_pF
 // CHECK: bb0(%0 : $Fruit):
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
 // CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2

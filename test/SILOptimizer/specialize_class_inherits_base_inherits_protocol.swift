@@ -12,7 +12,7 @@ class Bar<T>: Foo<T> {}
 
 // CHECK-LABEL: sil @_T0031specialize_class_inherits_base_C9_protocol3fooyyF
 public func foo() {
-  // CHECK: function_ref @_T0031specialize_class_inherits_base_C9_protocol4sinkyxlFypXp_Tg5Tf4d_n
+  // CHECK: function_ref @_T0031specialize_class_inherits_base_C9_protocol4sinkyyxlFypXp_Tg5Tf4d_n
   p(Bar<Int>())
 }
 

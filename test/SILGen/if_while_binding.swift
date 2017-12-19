@@ -279,7 +279,7 @@ func if_multi_where() {
 
 
 // <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviors. They could be unified.
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A16_leading_booleanySiF
+// CHECK-LABEL: sil hidden @_T016if_while_binding0A16_leading_booleanyySiF
 func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
   
@@ -318,7 +318,7 @@ func if_leading_boolean(_ a : Int) {
 class BaseClass {}
 class DerivedClass : BaseClass {}
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding20testAsPatternInIfLetyAA9BaseClassCSgF
+// CHECK-LABEL: sil hidden @_T016if_while_binding20testAsPatternInIfLetyyAA9BaseClassCSgF
 func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: bb0([[ARG:%.*]] : @owned $Optional<BaseClass>):
   // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
@@ -362,7 +362,7 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
 }
 
 // <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
-// CHECK-LABEL: sil hidden @_T016if_while_binding12testCaseBoolySbSgF
+// CHECK-LABEL: sil hidden @_T016if_while_binding12testCaseBoolyySbSgF
 func testCaseBool(_ value : Bool?) {
   // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Bool>):
   // CHECK: switch_enum [[ARG]] : $Optional<Bool>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]

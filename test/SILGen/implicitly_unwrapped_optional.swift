@@ -46,7 +46,7 @@ func wrap_then_unwrap<T>(x x: T) -> T {
   return wrap(x: x)!
 }
 
-// CHECK-LABEL: sil hidden @_T029implicitly_unwrapped_optional10tuple_bindSSSgSQySi_SStG1x_tF : $@convention(thin) (@owned Optional<(Int, String)>) -> @owned Optional<String> {
+// CHECK-LABEL: sil hidden @_T029implicitly_unwrapped_optional10tuple_bind1xSSSgSQySi_SStG_tF : $@convention(thin) (@owned Optional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
@@ -55,7 +55,7 @@ func tuple_bind(x x: (Int, String)!) -> String? {
   // CHECK-NOT: destroy_value [[STRING]]
 }
 
-// CHECK-LABEL: sil hidden @_T029implicitly_unwrapped_optional011tuple_bind_a1_B0SSSQySi_SStG1x_tF
+// CHECK-LABEL: sil hidden @_T029implicitly_unwrapped_optional011tuple_bind_a1_B01xSSSQySi_SStG_tF
 func tuple_bind_implicitly_unwrapped(x x: (Int, String)!) -> String {
   return x.1
 }

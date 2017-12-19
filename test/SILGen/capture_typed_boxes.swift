@@ -4,7 +4,7 @@ func foo(_ x: Int) -> () -> Int {
   var x = x
   return { x }
 }
-// CHECK-LABEL: sil private @_T019capture_typed_boxes3fooSiycSiFSiycfU_ : $@convention(thin) (@guaranteed { var Int }) -> Int {
+// CHECK-LABEL: sil private @_T019capture_typed_boxes3fooySiycSiFSiycfU_ : $@convention(thin) (@guaranteed { var Int }) -> Int {
 // CHECK:       bb0(%0 : @guaranteed ${ var Int }):
 
 func closure(_ f: @escaping (Int) -> Int) -> Int {
@@ -15,7 +15,7 @@ func closure(_ f: @escaping (Int) -> Int) -> Int {
 
   return bar(0)
 }
-// CHECK-LABEL: sil private @_T019capture_typed_boxes7closureS3icF3barL_S2iF : $@convention(thin) (Int, @guaranteed { var @callee_guaranteed (Int) -> Int }) -> Int {
+// CHECK-LABEL: sil private @_T019capture_typed_boxes7closureyS3icF3barL_yS2iF : $@convention(thin) (Int, @guaranteed { var @callee_guaranteed (Int) -> Int }) -> Int {
 // CHECK:       bb0(%0 : @trivial $Int, %1 : @guaranteed ${ var @callee_guaranteed (Int) -> Int }):
 
 func closure_generic<T>(_ f: @escaping (T) -> T, x: T) -> T {

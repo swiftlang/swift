@@ -33,7 +33,7 @@ public struct PatternStruct {
 }
 
 public func singleDefaultArgument(i: Int = {
-  // CHECK-DAG: @_T011local_types21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE6StructL_VWV = internal constant
+  // CHECK-DAG: @_T011local_types21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_VWV = internal constant
   struct SingleDefaultArgumentStruct {
     let i: Int
   }

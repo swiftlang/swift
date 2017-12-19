@@ -152,7 +152,7 @@ NSString *swift::convertStringToNSString(String *swiftString) {
   typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
   auto convertStringToNSString = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<ConversionFn*>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringSo0E0CSSF)))));
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringySo0E0CSSF)))));
 
   // If Foundation hasn't loaded yet, fall back to returning the static string
   // "SwiftObject". The likelihood of someone invoking -description without

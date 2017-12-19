@@ -106,7 +106,7 @@ func testExistentialDispatchClass(cp: CP) {
   @objc func method() -> Self { return self }
 }
 
-// CHECK-LABEL: sil hidden @_T012dynamic_self21testAnyObjectDispatchyyXl1o_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil hidden @_T012dynamic_self21testAnyObjectDispatch1oyyXl_tF : $@convention(thin) (@owned AnyObject) -> () {
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
@@ -115,7 +115,7 @@ func testAnyObjectDispatch(o: AnyObject) {
   // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
   var _ = o.method
 }
-// CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatchyyXl1o_tF'
+// CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatch1oyyXl_tF'
 
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
@@ -155,7 +155,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
 
-// CHECK-LABEL: sil hidden @_T012dynamic_self18testOptionalResultyAA0dE9InheritorC1v_tF : $@convention(thin) (@owned OptionalResultInheritor) -> () {
+// CHECK-LABEL: sil hidden @_T012dynamic_self18testOptionalResult1vyAA0dE9InheritorC_tF : $@convention(thin) (@owned OptionalResultInheritor) -> () {
 // CHECK: bb0([[ARG:%.*]] : $OptionalResultInheritor):
 // CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:      [[CAST_BORROWED_ARG:%.*]] = upcast [[BORROWED_ARG]]
@@ -170,13 +170,13 @@ class Z {
 
   required init() {}
 
-  // CHECK-LABEL: sil hidden @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tF : $@convention(method) (Int, @guaranteed Z) -> @owned Z {
+  // CHECK-LABEL: sil hidden @_T012dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tF : $@convention(method) (Int, @guaranteed Z) -> @owned Z {
   func testDynamicSelfCaptures(x: Int) -> Self {
     // CHECK: bb0({{.*}}, [[SELF:%.*]] : $Z):
 
     // Single capture of 'self' type
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU_ : $@convention(thin) (@guaranteed Z) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU_ : $@convention(thin) (@guaranteed Z) -> ()
     // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
     // CHECK-NEXT: partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]])
     let fn1 = { _ = self }
@@ -185,7 +185,7 @@ class Z {
     // Capturing 'self', but it's not the last capture. Make sure it ends
     // up at the end of the list anyway
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU0_ : $@convention(thin) (Int, @guaranteed Z) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU0_ : $@convention(thin) (Int, @guaranteed Z) -> ()
     // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
     // CHECK-NEXT: partial_apply [callee_guaranteed] [[FN]]({{.*}}, [[SELF_COPY]])
     let fn2 = {
@@ -198,7 +198,7 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
@@ -210,7 +210,7 @@ class Z {
 
     // Capturing a value with a complex type involving self
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU2_ : $@convention(thin) (@guaranteed (Z, Z), @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU2_ : $@convention(thin) (@guaranteed (Z, Z), @thick @dynamic_self Z.Type) -> ()
     let xx = (self, self)
     let fn4 = {
       _ = xx
@@ -259,7 +259,7 @@ class Factory {
   static func staticNewInstance() -> Self { return self.init() }
 }
 
-// CHECK-LABEL: sil hidden @_T012dynamic_self22partialApplySelfReturnyAA7FactoryC1c_ADm1ttF : $@convention(thin) (@owned Factory, @thick Factory.Type) -> ()
+// CHECK-LABEL: sil hidden @_T012dynamic_self22partialApplySelfReturn1c1tyAA7FactoryC_AFmtF : $@convention(thin) (@owned Factory, @thick Factory.Type) -> ()
 func partialApplySelfReturn(c: Factory, t: Factory.Type) {
   // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = c.newInstance

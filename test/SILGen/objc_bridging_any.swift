@@ -138,7 +138,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK:   [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
-  // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF
+  // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK:   [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
   // CHECK:   dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   destroy_value [[ERROR_COPY]] : $Error
@@ -225,7 +225,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 // _bridgeAnythingToObjectiveC call.  That's not true anymore.
 func zim() {}
 struct Zang {}
-// CHECK-LABEL: sil hidden @_T017objc_bridging_any27typesWithNontrivialLoweringySo9NSIdLoverC8receiver_tF
+// CHECK-LABEL: sil hidden @_T017objc_bridging_any27typesWithNontrivialLowering8receiverySo9NSIdLoverC_tF
 func typesWithNontrivialLowering(receiver: NSIdLover) {
   // CHECK: apply {{.*}}<() -> ()>
   receiver.takesId(zim)
@@ -385,7 +385,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
-  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF
+  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
   // CHECK-NEXT: [[BRIDGED_ERROR_OPT:%[0-9]+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[BRIDGED_ERROR]] : $AnyObject
   // CHECK-NEXT: dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
@@ -518,7 +518,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:       function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
 
   @objc func methodTakingAny(a: Any) {}
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAnyyyp1a_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
   // CHECK:     bb0([[ARG:%.*]] : @unowned $AnyObject, [[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -528,7 +528,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  store [[OPENED_SELF]] to [init] [[INIT]]
   // CHECK-NEXT:  [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAnyyyp1a_tF
+  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tF
   // CHECK-NEXT:  apply [[METHOD]]([[RESULT]], [[BORROWED_SELF_COPY]])
   // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
@@ -536,13 +536,13 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  return
 
   func methodTakingOptionalAny(a: Any?) {}
-  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAnyyypSg1a_tF
+  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tF
 
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAnyyypSg1a_tFTo
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tFTo
 
-  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyypcF : $@convention(method) (@owned @noescape @callee_guaranteed (@in Any) -> (), @guaranteed SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypcF : $@convention(method) (@owned @noescape @callee_guaranteed (@in Any) -> (), @guaranteed SwiftIdLover) -> ()
 
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyypcFTo : $@convention(objc_method) (@convention(block) @noescape (AnyObject) -> (), SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypcFTo : $@convention(objc_method) (@convention(block) @noescape (AnyObject) -> (), SwiftIdLover) -> ()
   // CHECK:    bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (AnyObject) -> (), [[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -551,7 +551,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_function [[THUNK]]
   // CHECK:       [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyypcF
+  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypcF
   // CHECK-NEXT:  [[RESULT:%.*]] = apply [[METHOD]]([[THUNK_CVT]], [[BORROWED_SELF_COPY]])
   // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK-NEXT:  destroy_value [[SELF_COPY]]
@@ -616,9 +616,9 @@ class SwiftIdLover : NSObject, Anyable {
 
   @objc func methodReturningBlockTakingAny() -> ((Any) -> ()) {}
 
-  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyypycF : $@convention(method) (@owned @noescape @callee_guaranteed () -> @out Any, @guaranteed SwiftIdLover) -> () {
+  // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypycF : $@convention(method) (@owned @noescape @callee_guaranteed () -> @out Any, @guaranteed SwiftIdLover) -> () {
 
-  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyypycFTo : $@convention(objc_method) (@convention(block) @noescape () -> @autoreleased AnyObject, SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypycFTo : $@convention(objc_method) (@convention(block) @noescape () -> @autoreleased AnyObject, SwiftIdLover) -> ()
   // CHECK:     bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape () -> @autoreleased AnyObject, [[ANY:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK-NEXT:  [[ANY_COPY:%.*]] = copy_value [[ANY]]
@@ -628,7 +628,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_function [[THUNK]]
   // CHECK-NEXT:  [[BORROWED_ANY_COPY:%.*]] = begin_borrow [[ANY_COPY]]
   // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyypycF
+  // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypycF
   // CHECK-NEXT:  [[RESULT:%.*]] = apply [[METHOD]]([[THUNK_CVT]], [[BORROWED_ANY_COPY]])
   // CHECK-NEXT:  end_borrow [[BORROWED_ANY_COPY]] from [[ANY_COPY]]
   // CHECK-NEXT:  destroy_value [[ANY_COPY]]
@@ -717,7 +717,7 @@ func dynamicLookup(x: AnyObject) {
 }
 
 extension GenericClass {
-  // CHECK-LABEL: sil hidden @_T0So12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasureypx1x_tF :
+  // CHECK-LABEL: sil hidden @_T0So12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasure1xypx_tF :
   func pseudogenericAnyErasure(x: T) -> Any {
     // CHECK: bb0([[ANY_OUT:%.*]] : @trivial $*Any, [[ARG:%.*]] : @owned $T, [[SELF:%.*]] : @guaranteed $GenericClass<T>
     // CHECK:   [[ANY_BUF:%.*]] = init_existential_addr [[ANY_OUT]] : $*Any, $AnyObject
@@ -729,20 +729,20 @@ extension GenericClass {
     // CHECK:   destroy_value [[ARG]]
     return x
   }
-  // CHECK: } // end sil function '_T0So12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasureypx1x_tF'
+  // CHECK: } // end sil function '_T0So12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasure1xypx_tF'
 }
 
 // Make sure AnyHashable erasure marks Hashable conformance as used
 class AnyHashableClass : NSObject {
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any16AnyHashableClassC07returnsdE0s0dE0VyF
-  // CHECK: [[FN:%.*]] = function_ref @_T0s21_convertToAnyHashables0cD0Vxs0D0RzlF
+  // CHECK: [[FN:%.*]] = function_ref @_T0s21_convertToAnyHashableys0cD0Vxs0D0RzlF
   // CHECK: apply [[FN]]<GenericOption>({{.*}})
   func returnsAnyHashable() -> AnyHashable {
     return GenericOption.multithreaded
   }
 }
 
-// CHECK-LABEL: sil hidden @_T017objc_bridging_any33bridgeOptionalFunctionToAnyObjectyXlyycSg2fn_tF : $@convention(thin) (@owned Optional<@callee_guaranteed () -> ()>) -> @owned AnyObject
+// CHECK-LABEL: sil hidden @_T017objc_bridging_any33bridgeOptionalFunctionToAnyObject2fnyXlyycSg_tF : $@convention(thin) (@owned Optional<@callee_guaranteed () -> ()>) -> @owned AnyObject
 // CHECK: [[BRIDGE:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
 // CHECK: [[FN:%.*]] = function_ref @_T0Ieg_ytytIegir_TR
 // CHECK: partial_apply [callee_guaranteed] [[FN]]

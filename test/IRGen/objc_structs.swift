@@ -61,7 +61,7 @@ func convertRectFromBase(_ v: NSView, r: NSRect) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsSC0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
+// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsySC0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
 // CHECK:   call void @useStructOfNSStringsInObjC(%struct.StructOfNSStrings* noalias nocapture sret {{%.*}}, %struct.StructOfNSStrings* byval align 8 {{%.*}})
 func useStructOfNSStrings(_ s: StructOfNSStrings) -> StructOfNSStrings {
   return useStructOfNSStringsInObjC(s)

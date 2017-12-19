@@ -44,7 +44,7 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK: bb0([[ARG:%.*]] : @owned $T):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -67,7 +67,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   _ = T.mince
   // CHECK:   destroy_value [[ARG]]
 }
-// CHECK: } // end sil function '_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF'
+// CHECK: } // end sil function '_T014objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : @owned $Self):
@@ -119,7 +119,7 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF : $@convention(thin) (@owned NSRuncing) -> () {
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@owned NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
   // CHECK: bb0([[ARG:%.*]] : @owned $NSRuncing):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -135,7 +135,7 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
   // FIXME: rdar://21289579
   // _ = NSRuncing.runce
 }
-// CHECK : } // end sil function '_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF'
+// CHECK : } // end sil function '_T014objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
@@ -258,7 +258,7 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden @_T014objc_protocols28testInitializableExistentialAA0D0_pAaC_pXp_Si1itF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
+// CHECK-LABEL: sil hidden @_T014objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
@@ -277,7 +277,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   var i2 = im.init(int: i)
   return i2
 }
-// CHECK: } // end sil function '_T014objc_protocols28testInitializableExistentialAA0D0_pAaC_pXp_Si1itF'
+// CHECK: } // end sil function '_T014objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF'
 
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}

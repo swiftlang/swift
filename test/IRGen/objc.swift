@@ -124,7 +124,7 @@ func test10(_ g: Gizmo, r: Rect) {
 // Force the emission of the Rect metadata.
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
-// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySC4RectVF
+// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11yySC4RectVF
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0SC4RectVN
 func test11(_ r: Rect) { test11_helper(r) }
 

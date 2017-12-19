@@ -10,7 +10,7 @@ public func ifelseexpr() -> Int64 {
   var x = X(i:0)
   // CHECK: [[ALLOCA:%.*]] = alloca %T6return1XC*
   // CHECK: [[META:%.*]] = call %swift.type* @_T06return1XCMa()
-  // CHECK: [[X:%.*]] = call {{.*}}%T6return1XC* @_T06return1XCACs5Int64V1i_tcfC(
+  // CHECK: [[X:%.*]] = call {{.*}}%T6return1XC* @_T06return1XC1iACs5Int64V_tcfC(
   // CHECK-SAME:                                  i64 0, %swift.type* swiftself [[META]])
   // CHECK:  store %T6return1XC* [[X]], %T6return1XC** [[ALLOCA]]
   // CHECK:  @swift_rt_swift_release to void (%T6return1XC*)*)(%T6return1XC* [[X]])
