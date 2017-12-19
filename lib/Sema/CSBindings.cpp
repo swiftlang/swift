@@ -268,6 +268,18 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   }
   hasNonDependentMemberRelationalConstraints = true;
 
+  // If our binding choice is a function type and we're attempting
+  // to bind to a type variable that is the result of opening a
+  // generic parameter, strip the noescape bit so that we only allow
+  // bindings of escaping functions in this position. We do this
+  // because within the generic function we have no indication of
+  // whether the parameter is a function type and if so whether it
+  // should be allowed to escape. As a result we allow anything
+  // passed in to escape.
+  if (auto *fnTy = type->getAs<AnyFunctionType>())
+    if (typeVar->getImpl().getArchetype())
+      type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
+
   // Check whether we can perform this binding.
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
   bool isNilLiteral = false;
