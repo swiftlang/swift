@@ -460,3 +460,12 @@ protocol P16b : P16a {
 }
 
 struct X16b : P16b { }
+
+// Refined protocols that tie associated types to a fixed type.
+protocol P17 {
+  associatedtype T
+}
+
+protocol Q17 : P17 where T == Int { }
+
+struct S17 : Q17 { }
