@@ -663,6 +663,35 @@ static AssociatedTypeDecl *findDefaultedAssociatedType(
   return results.size() == 1 ? results.front() : nullptr;
 }
 
+Type AssociatedTypeInference::computeFixedTypeWitness(
+                                            AssociatedTypeDecl *assocType) {
+  // Look at all of the inherited protocols to determine whether they
+  // require a fixed type for this associated type.
+  Type dependentType = assocType->getDeclaredInterfaceType();
+  Type resultType;
+  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
+    if (!conformedProto->inheritsFrom(assocType->getProtocol()))
+      continue;
+
+    auto genericSig = conformedProto->getGenericSignature();
+    if (!genericSig) return Type();
+
+    Type concreteType = genericSig->getConcreteType(dependentType);
+    if (!concreteType) continue;
+
+    if (!resultType) {
+      resultType = concreteType;
+      continue;
+    }
+
+    // FIXME: Bailing out on ambiguity.
+    if (!resultType->isEqual(concreteType))
+      return Type();
+  }
+
+  return resultType;
+}
+
 Type AssociatedTypeInference::computeDefaultTypeWitness(
                                               AssociatedTypeDecl *assocType) {
   // Go find a default definition.
@@ -979,7 +1008,17 @@ void AssociatedTypeInference::findSolutionsRec(
         continue;
       }
 
-      // We don't have a type witness for this associated type.
+      // We don't have a type witness for this associated type, so go
+      // looking for more options.
+      if (Type concreteType = computeFixedTypeWitness(assocType)) {
+        if (concreteType->hasError()) {
+          recordMissing();
+          return;
+        }
+
+        typeWitnesses.insert(assocType, {concreteType, reqDepth});
+        continue;
+      }
 
       // If we can form a default type, do so.
       if (Type defaultType = computeDefaultTypeWitness(assocType)) {
