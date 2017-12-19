@@ -169,6 +169,7 @@ namespace {
         }
         }
       }
+
       
     public:
       explicit Space(Type T, Identifier NameForPrinting)
@@ -199,6 +200,29 @@ namespace {
       size_t getSize(TypeChecker &TC) const {
         SmallPtrSet<TypeBase *, 4> cache;
         return computeSize(TC, cache);
+      }
+
+      // Walk one level deep into the space to return whether it is
+      // composed entirely of irrefutable patterns - these are quick to check
+      // regardless of the size of the total type space.
+      bool isAllIrrefutable() const {
+        switch (getKind()) {
+        case SpaceKind::Empty:
+        case SpaceKind::Type:
+          return true;
+        case SpaceKind::BooleanConstant:
+          return false;
+        case SpaceKind::Constructor:
+          return llvm::all_of(getSpaces(), [](const Space &sp) {
+            return sp.getKind() == SpaceKind::Type
+                || sp.getKind() == SpaceKind::Empty;
+          });
+        case SpaceKind::Disjunct: {
+          return llvm::all_of(getSpaces(), [](const Space &sp) {
+            return sp.isAllIrrefutable();
+          });
+        }
+        }
       }
 
       static size_t getMaximumSize() {
@@ -1011,14 +1035,16 @@ namespace {
       if (subjectType && subjectType->isStructurallyUninhabited()) {
         return;
       }
-      
+
+      // Reject switch statements with empty blocks.
+      if (limitedChecking && Switch->getCases().empty()) {
+        SpaceEngine::diagnoseMissingCases(TC, Switch,
+                                          RequiresDefault::EmptySwitchBody,
+                                          SpaceEngine::Space());
+      }
+
+      // If the switch body fails to typecheck, end analysis here.
       if (limitedChecking) {
-        // Reject switch statements with empty blocks.
-        if (Switch->getCases().empty()) {
-          SpaceEngine::diagnoseMissingCases(TC, Switch,
-                                            /*justNeedsDefault*/true,
-                                            SpaceEngine::Space());
-        }
         return;
       }
 
@@ -1063,23 +1089,18 @@ namespace {
       
       Space totalSpace(subjectType, Identifier());
       Space coveredSpace(spaces);
-      size_t totalSpaceSize = totalSpace.getSize(TC);
-      if (totalSpaceSize > Space::getMaximumSize()) {
-        // Because the space is large, we have to extend the size
-        // heuristic to compensate for actually exhaustively pattern matching
-        // over enormous spaces.  In this case, if the covered space covers
-        // as much as the total space, and there were no duplicates, then we
-        // can assume the user did the right thing and that they don't need
-        // a 'default' to be inserted.
-        if (!sawRedundantPattern
-            && coveredSpace.getSize(TC) >= totalSpaceSize) {
-          return;
-        }
 
-        diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/true, Space());
+      size_t totalSpaceSize = totalSpace.getSize(TC);
+      if (totalSpaceSize > Space::getMaximumSize() && !coveredSpace.isAllIrrefutable()) {
+        // Because the space is large, fall back to requiring 'default'.
+        //
+        // FIXME: Explore ways of reducing runtime of this analysis or doing
+        // partial analysis to recover this case.
+        diagnoseMissingCases(TC, Switch,
+                             RequiresDefault::SpaceTooLarge, Space());
         return;
       }
-      
+
       auto uncovered = totalSpace.minus(coveredSpace, TC).simplify(TC);
       if (uncovered.isEmpty()) {
         return;
@@ -1092,11 +1113,12 @@ namespace {
         if (Space::canDecompose(uncovered.getType())) {
           SmallVector<Space, 4> spaces;
           Space::decompose(TC, uncovered.getType(), spaces);
-          diagnoseMissingCases(TC, Switch,
-                               /*justNeedsDefault*/ false, Space(spaces));
+          diagnoseMissingCases(TC, Switch, RequiresDefault::No, Space(spaces));
         } else {
-          diagnoseMissingCases(TC, Switch,
-                               /*justNeedsDefault*/ true, Space());
+          diagnoseMissingCases(TC, Switch, Switch->getCases().empty()
+                                            ? RequiresDefault::EmptySwitchBody
+                                            : RequiresDefault::UncoveredSwitch,
+                               Space());
         }
         return;
       }
@@ -1107,7 +1129,7 @@ namespace {
         uncovered = Space(spaces);
       }
 
-      diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/ false, uncovered,
+      diagnoseMissingCases(TC, Switch, RequiresDefault::No, uncovered,
                            sawDowngradablePattern);
     }
     
@@ -1139,8 +1161,15 @@ namespace {
       }
     }
 
+    enum class RequiresDefault {
+      No,
+      EmptySwitchBody,
+      UncoveredSwitch,
+      SpaceTooLarge,
+    };
+
     static void diagnoseMissingCases(TypeChecker &TC, const SwitchStmt *SS,
-                                     bool justNeedsDefault,
+                                     RequiresDefault defaultReason,
                                      Space uncovered,
                                      bool sawDowngradablePattern = false) {
       SourceLoc startLoc = SS->getStartLoc();
@@ -1149,20 +1178,30 @@ namespace {
       llvm::SmallString<128> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
-      bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
-
-      if (justNeedsDefault) {
+      switch (defaultReason) {
+      case RequiresDefault::EmptySwitchBody: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        if (SS->getCases().empty()) {
-          TC.Context.Diags.diagnose(startLoc, diag::empty_switch_stmt)
-             .fixItInsert(endLoc, buffer.str());
-        } else {
-          TC.Context.Diags.diagnose(startLoc, diag::non_exhaustive_switch);
-          TC.Context.Diags.diagnose(startLoc, diag::missing_several_cases,
-                                    uncovered.isEmpty()).fixItInsert(endLoc,
-                                                              buffer.str());
-        }
+        TC.diagnose(startLoc, diag::empty_switch_stmt)
+          .fixItInsert(endLoc, buffer.str());
+      }
         return;
+      case RequiresDefault::UncoveredSwitch: {
+        OS << tok::kw_default << ":\n" << placeholder << "\n";
+        TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        TC.diagnose(startLoc, diag::missing_several_cases, uncovered.isEmpty())
+          .fixItInsert(endLoc, buffer.str());
+      }
+        return;
+      case RequiresDefault::SpaceTooLarge: {
+        OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
+        TC.diagnose(startLoc,  diag::cannot_prove_exhaustive_switch);
+        TC.diagnose(startLoc, diag::missing_several_cases, uncovered.isEmpty())
+          .fixItInsert(endLoc, buffer.str());
+      }
+        return;
+      case RequiresDefault::No:
+        // Break out to diagnose below.
+        break;
       }
 
       // If there's nothing else to diagnose, bail.
@@ -1189,7 +1228,7 @@ namespace {
       //
       // missing case '(.none, .some(_))'
       // missing case '(.some(_), .none)'
-      if (InEditor) {
+      if (TC.Context.LangOpts.DiagnosticsEditorMode) {
         buffer.clear();
         SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
@@ -1212,7 +1251,7 @@ namespace {
         TC.diagnose(startLoc, diag::missing_several_cases, false)
           .fixItInsert(endLoc, buffer.str());
       } else {
-        TC.Context.Diags.diagnose(startLoc, mainDiagType);
+        TC.diagnose(startLoc, mainDiagType);
 
         SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {

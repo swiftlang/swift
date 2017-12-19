@@ -1031,7 +1031,8 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
         }
-        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        if (!isDefault)
+          SGF.SGM.diagnose(Loc, diag::unreachable_case);
       }
     }
   }
