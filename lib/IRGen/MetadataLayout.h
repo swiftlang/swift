@@ -119,11 +119,17 @@ public:
 /// Base class for nominal type metadata layouts.
 class NominalMetadataLayout : public MetadataLayout {
 protected:
+  NominalTypeDecl *Nominal;
   StoredOffset GenericRequirements;
 
-  NominalMetadataLayout(Kind kind) : MetadataLayout(kind) {}
+  NominalMetadataLayout(Kind kind, NominalTypeDecl *nominal)
+      : MetadataLayout(kind), Nominal(nominal) {}
 
 public:
+  NominalTypeDecl *getDecl() const {
+    return Nominal;
+  }
+
   bool hasGenericRequirements() const {
     return GenericRequirements.isValid();
   }
@@ -150,6 +156,8 @@ public:
   };
 
 private:
+  StoredOffset MetadataSize;
+
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
 
@@ -187,6 +195,12 @@ private:
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 public:
+  ClassDecl *getDecl() const {
+    return cast<ClassDecl>(Nominal);
+  }
+
+  Size getMetadataSizeOffset() const;
+
   Size getInstanceSizeOffset() const;
 
   Size getInstanceAlignMaskOffset() const;
@@ -249,6 +263,10 @@ class EnumMetadataLayout : public NominalMetadataLayout {
   EnumMetadataLayout(IRGenModule &IGM, EnumDecl *theEnum);
 
 public:
+  EnumDecl *getDecl() const {
+    return cast<EnumDecl>(Nominal);
+  }
+
   bool hasPayloadSizeOffset() const {
     return PayloadSizeOffset.isValid();
   }
@@ -277,6 +295,9 @@ class StructMetadataLayout : public NominalMetadataLayout {
   StructMetadataLayout(IRGenModule &IGM, StructDecl *theStruct);
 
 public:
+  StructDecl *getDecl() const {
+    return cast<StructDecl>(Nominal);
+  }
 
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 
