@@ -4735,7 +4735,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
     break;
 
   case DefaultArgumentKind::EmptyDictionary:
-    init = DictionaryExpr::create(tc.Context, loc, {}, loc);
+    init = DictionaryExpr::create(tc.Context, loc, {}, {}, loc);
     init->setImplicit();
     break;
   }

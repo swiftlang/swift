@@ -140,11 +140,12 @@ class alignas(8) Expr {
     Implicit : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 1+32,
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumExprBits,
     /// True if the type of this collection expr was inferred by the collection
     /// fallback type, like [Any].
     IsTypeDefaulted : 1,
-    : NumPadBits,
+    /// Number of comma source locations.
+    NumCommas : 32 - 1 - NumExprBits,
     /// Number of entries in the collection. If this is a DictionaryLiteral,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
@@ -2072,16 +2073,27 @@ class CollectionExpr : public Expr {
     return const_cast<Expr**>(temp->getTrailingObjectsPointer());
   }
 
+  /// Retrieve the intrusive pointer storage from the subtype
+  const SourceLoc *getTrailingSourceLocs() const;
+  SourceLoc *getTrailingSourceLocs() {
+    const CollectionExpr *temp = this;
+    return const_cast<SourceLoc*>(temp->getTrailingSourceLocs());
+  }
+
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
-                 ArrayRef<Expr*> Elements,
+                 ArrayRef<Expr*> Elements, ArrayRef<SourceLoc> CommaLocs,
                  SourceLoc RBracketLoc, Type Ty)
     : Expr(Kind, /*Implicit=*/false, Ty),
       LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc) {
     Bits.CollectionExpr.IsTypeDefaulted = false;
     Bits.CollectionExpr.NumSubExprs = Elements.size();
+    Bits.CollectionExpr.NumCommas = CommaLocs.size();
+    assert(Bits.CollectionExpr.NumCommas == CommaLocs.size() && "Truncation");
     std::uninitialized_copy(Elements.begin(), Elements.end(),
                             getTrailingObjectsPointer());
+    std::uninitialized_copy(CommaLocs.begin(), CommaLocs.end(),
+                            getTrailingSourceLocs());
   }
 
 public:
@@ -2096,6 +2108,17 @@ public:
   Expr *getElement(unsigned i) const { return getElements()[i]; }
   void setElement(unsigned i, Expr *E) { getElements()[i] = E; }
   unsigned getNumElements() const { return Bits.CollectionExpr.NumSubExprs; }
+
+  /// Retrieve the comma source locations stored in the collection. Please note
+  /// that trailing commas are currently allowed, and that invalid code may have
+  /// stray or missing commas.
+  MutableArrayRef<SourceLoc> getCommaLocs() {
+    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+  }
+  ArrayRef<SourceLoc> getCommaLocs() const {
+    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+  }
+  unsigned getNumCommas() const { return Bits.CollectionExpr.NumCommas; }
 
   bool isTypeDefaulted() const { return Bits.CollectionExpr.IsTypeDefaulted; }
   void setIsTypeDefaulted(bool value = true) {
@@ -2120,30 +2143,28 @@ public:
  
 /// \brief An array literal expression [a, b, c].
 class ArrayExpr final : public CollectionExpr,
-    private llvm::TrailingObjects<ArrayExpr, Expr*> {
+    private llvm::TrailingObjects<ArrayExpr, Expr*, SourceLoc> {
   friend TrailingObjects;
   friend CollectionExpr;
 
-  /// ASTContext allocated list of comma locations, there is one less entry here
-  /// than the number of elements.
-  MutableArrayRef<SourceLoc> CommaLocs;
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumElements();
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return getNumCommas();
+  }
 
   ArrayExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
-            MutableArrayRef<SourceLoc> CommaLocs,
+            ArrayRef<SourceLoc> CommaLocs,
             SourceLoc RBracketLoc, Type Ty)
-  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty),
-    CommaLocs(CommaLocs) {}
+  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, CommaLocs,
+                   RBracketLoc, Ty) { }
 public:
   static ArrayExpr *create(ASTContext &C, SourceLoc LBracketLoc,
                            ArrayRef<Expr*> Elements,
                            ArrayRef<SourceLoc> CommaLocs,
                            SourceLoc RBracketLoc,
                            Type Ty = Type());
-
-  /// ASTContext allocated list of comma locations, there is one less entry here
-  /// than the number of elements.
-  MutableArrayRef<SourceLoc> getCommaLocs() { return CommaLocs; }
-  ArrayRef<SourceLoc> getCommaLocs() const { return CommaLocs; }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
@@ -2152,20 +2173,29 @@ public:
 
 /// \brief A dictionary literal expression [a : x, b : y, c : z].
 class DictionaryExpr final : public CollectionExpr,
-    private llvm::TrailingObjects<DictionaryExpr, Expr*> {
+    private llvm::TrailingObjects<DictionaryExpr, Expr*, SourceLoc> {
   friend TrailingObjects;
   friend CollectionExpr;
 
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumElements();
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return getNumCommas();
+  }
+
   DictionaryExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
+                 ArrayRef<SourceLoc> CommaLocs,
                  SourceLoc RBracketLoc, Type Ty)
-    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, RBracketLoc,
-                     Ty) { }
+    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, CommaLocs,
+                     RBracketLoc, Ty) { }
 public:
 
   static DictionaryExpr *create(ASTContext &C, SourceLoc LBracketLoc,
-                                ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                                ArrayRef<Expr*> Elements,
+                                ArrayRef<SourceLoc> CommaLocs,
+                                SourceLoc RBracketLoc,
                                 Type Ty = Type());
-
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
@@ -4966,6 +4996,14 @@ inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {
     return ty->getTrailingObjects<Expr*>();
   if (auto ty = dyn_cast<DictionaryExpr>(this))
     return ty->getTrailingObjects<Expr*>();
+  llvm_unreachable("Unhandled CollectionExpr!");
+}
+
+inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
+  if (auto ty = dyn_cast<ArrayExpr>(this))
+    return ty->getTrailingObjects<SourceLoc>();
+  if (auto ty = dyn_cast<DictionaryExpr>(this))
+    return ty->getTrailingObjects<SourceLoc>();
   llvm_unreachable("Unhandled CollectionExpr!");
 }
 
