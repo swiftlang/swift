@@ -2410,7 +2410,8 @@ namespace {
       if (!solution.getDisjunctionChoice(choiceLocator))
         return newExpr;
 
-      if (auto *fnTy = selected.openedType->getAs<AnyFunctionType>()) {
+      auto optionalTy = simplifyType(selected.openedType);
+      if (auto *fnTy = optionalTy->getAs<AnyFunctionType>()) {
         auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
 
         auto &ctx = cs.getTypeChecker().Context;
@@ -2418,7 +2419,7 @@ namespace {
             newExpr, underlyingType));
       } else {
         return coerceImplicitlyUnwrappedOptionalToValue(
-            newExpr, selected.openedType->getWithoutSpecifierType()
+            newExpr, optionalTy->getWithoutSpecifierType()
                          ->getOptionalObjectType());
       }
     }
