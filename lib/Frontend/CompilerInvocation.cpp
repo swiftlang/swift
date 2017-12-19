@@ -978,19 +978,6 @@ static bool computeAllOutputs(
   StringRef singleInputFilename =
       io.hasSingleInput() ? io.getFilenameOfFirstInput() : StringRef();
 
-  const bool oneSetOfOutputPathsForWMO = false;
-  if (isSingleThreadedWMO && oneSetOfOutputPathsForWMO) {
-    Optional<OutputPaths> outputPaths = computeOutputsForOneInput(
-        args, outputFileArguments, outputFileArguments.front(),
-        isOutputFilenameArgumentOneDirectory,
-        doOutputFilenameArgumentsCorrespondToInputs, singleInputFilename,
-        io.getFirstInput(), moduleName, suppFileListArgs.front(), diags);
-    if (!outputPaths)
-      return true;
-    io.setSingleThreadedWMOOutputs(*outputPaths);
-    return false;
-  }
-
   unsigned i = 0;
   return io.forEachInputProducingOutput(
       [&](InputFile &input) -> bool { // ONLY ONCE IF WMONON??
@@ -1010,9 +997,9 @@ static bool computeAllOutputs(
 
         if (!outputPaths)
           return true;
-        if (isSingleThreadedWMO && i == 0 && !oneSetOfOutputPathsForWMO)
-          io.setSingleThreadedWMOOutputs(*outputPaths);
         input.setOutputs(*outputPaths);
+        if (isSingleThreadedWMO && i == 0)
+          io.beSingleThreadedWMO();
         ++i;
         return false;
       });

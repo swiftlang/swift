@@ -36,17 +36,7 @@ class FrontendInputsAndOutputs {
   typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
   Optional<OutputPaths> SingleThreadedWMOOutputs;
-
-public:
-  Optional<OutputPaths> getSingleThreadedWMOOutputs() const {
-    return SingleThreadedWMOOutputs;
-  }
-  void setSingleThreadedWMOOutputs(const OutputPaths &outputs) {
-    SingleThreadedWMOOutputs = outputs;
-  }
-  bool isSingleThreadedWMO() const {
-    return SingleThreadedWMOOutputs.hasValue();
-  }
+  bool IsSingleThreadedWMO = false;
 
 public:
   FrontendInputsAndOutputs() = default;
@@ -64,6 +54,27 @@ public:
      SingleThreadedWMOOutputs = other.SingleThreadedWMOOutputs;
     return *this;
   }
+
+  // Single-threaded WMO routines:
+
+  //  SingleThreadedWMO mode needs only one of each output file for the entire
+  //  invocation. WMO can get away with that because it doesn't even attempt to
+  //  be incremental, and so it doesn't need per-file intermediates that
+  //  wouldn't be generated otherwise.
+  //
+  //    (A few of the outputs might make more sense to be generated for every
+  //    input—.d files in particular—but it wasn't natural when passing them on
+  //    the command line, and it hasn't been critical. So right now there's only
+  //    one of everything in WMO, always, except for the actual object files in
+  //    threaded mode.)
+  const InputFile *getSingleThreadedWMOInput() const {
+    return isSingleThreadedWMO() ? &AllFiles[0] : nullptr;
+  }
+  const OutputPaths *getSingleThreadedWMOOutputs() const {
+    return isSingleThreadedWMO() ? &AllFiles[0].outputs() : nullptr;
+  }
+  void beSingleThreadedWMO() { IsSingleThreadedWMO = true; }
+  bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
 
   // Readers:
 
