@@ -14,6 +14,11 @@
 #ifndef ArgsToFrontendInputsConverter_h
 #define ArgsToFrontendInputsConverter_h
 
+#include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/Frontend/FrontendOptions.h"
+#include "llvm/Option/ArgList.h"
+
 using namespace swift;
 using namespace llvm::opt;
 
@@ -52,11 +57,7 @@ class ArgsToFrontendInputsConverter {
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags, const ArgList &args,
-                                FrontendInputsAndOutputs &inputsAndOutputs)
-      : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
-        FilelistPathArg(args.getLastArg(options::OPT_filelist)),
-        PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {
-  }
+                                FrontendInputsAndOutputs &inputsAndOutputs);
 
   bool convert();
 
