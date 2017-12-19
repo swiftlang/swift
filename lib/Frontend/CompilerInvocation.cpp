@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/Frontend.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -93,159 +94,6 @@ static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
 namespace swift {
 
-/// Implement argument semantics in a way that will make it easier to have
-/// >1 primary file (or even a primary file list) in the future without
-/// breaking anything today.
-///
-/// Semantics today:
-/// If input files are on command line, primary files on command line are also
-/// input files; they are not repeated without -primary-file. If input files are
-/// in a file list, the primary files on the command line are repeated in the
-/// file list. Thus, if there are any primary files, it is illegal to have both
-/// (non-primary) input files and a file list. Finally, the order of input files
-/// must match the order given on the command line or the file list.
-///
-/// Side note:
-/// since each input file will cause a lot of work for the compiler, this code
-/// is biased towards clarity and not optimized.
-/// In the near future, it will be possible to put primary files in the
-/// filelist, or to have a separate filelist for primaries. The organization
-/// here anticipates that evolution.
-
-class ArgsToFrontendInputsConverter {
-  DiagnosticEngine &Diags;
-  const ArgList &Args;
-  FrontendInputsAndOutputs &InputsAndOutputs;
-
-  Arg const *const FilelistPathArg;
-  Arg const *const PrimaryFilelistPathArg;
-
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
-
-  llvm::SetVector<StringRef> Files;
-
-public:
-  ArgsToFrontendInputsConverter(DiagnosticEngine &diags, const ArgList &args,
-                                FrontendInputsAndOutputs &inputsAndOutputs)
-      : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
-        FilelistPathArg(args.getLastArg(options::OPT_filelist)),
-        PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {
-  }
-
-  bool convert() {
-    if (enforceFilelistExclusion())
-      return true;
-    if (FilelistPathArg ? readInputFilesFromFilelist()
-                        : readInputFilesFromCommandLine())
-      return true;
-    Optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
-    if (!primaryFiles)
-      return true;
-    std::set<StringRef> unusedPrimaryFiles =
-        createInputFilesConsumingPrimaries(*primaryFiles);
-    return checkForMissingPrimaryFiles(unusedPrimaryFiles);
-  }
-
-private:
-  bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_cannot_have_input_files_with_file_list);
-      return true;
-    }
-    // The following is not strictly necessary, but the restriction makes
-    // it easier to understand a given command line:
-    if (Args.hasArg(options::OPT_primary_file) && PrimaryFilelistPathArg) {
-      Diags.diagnose(
-          SourceLoc(),
-          diag::error_cannot_have_primary_files_with_primary_file_list);
-      return true;
-    }
-    return false;
-  }
-
-  bool readInputFilesFromCommandLine() {
-    bool hadDuplicates = false;
-    for (const Arg *A :
-         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-      hadDuplicates = addFile(A->getValue()) || hadDuplicates;
-    }
-    return false; // FIXME: dmu Don't bail out for duplicates, too many tests
-                  // depend on it.
-  }
-
-  bool readInputFilesFromFilelist() {
-    bool hadDuplicates = false;
-    bool hadError =
-        forAllFilesInFilelist(FilelistPathArg, [&](StringRef file) -> void {
-          hadDuplicates = addFile(file) || hadDuplicates;
-        });
-    if (hadError)
-      return true;
-    return false; // FIXME: dmu Don't bail out for duplicates, too many tests
-                  // depend on it.
-  }
-
-  bool forAllFilesInFilelist(Arg const *const pathArg,
-                             llvm::function_ref<void(StringRef)> fn) {
-    if (!pathArg)
-      return false;
-    StringRef path = pathArg->getValue();
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
-        llvm::MemoryBuffer::getFile(path);
-    if (!filelistBufferOrError) {
-      Diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
-                     filelistBufferOrError.getError().message());
-      return true;
-    }
-    for (auto file :
-         llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
-                          llvm::line_iterator()))
-      fn(file);
-    BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
-    return false;
-  }
-
-  bool addFile(StringRef file) {
-    if (Files.insert(file))
-      return false;
-    Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file, file);
-    return true;
-  }
-
-  Optional<std::set<StringRef>> readPrimaryFiles() {
-    std::set<StringRef> primaryFiles;
-    for (const Arg *A : Args.filtered(options::OPT_primary_file))
-      primaryFiles.insert(A->getValue());
-    if (forAllFilesInFilelist(
-            PrimaryFilelistPathArg,
-            [&](StringRef file) -> void { primaryFiles.insert(file); }))
-      return None;
-    return primaryFiles;
-  }
-
-  std::set<StringRef>
-  createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles) {
-    for (auto &file : Files) {
-      bool isPrimary = primaryFiles.count(file) > 0;
-      InputsAndOutputs.addInput(InputFile(file, isPrimary));
-      if (isPrimary)
-        primaryFiles.erase(file);
-    }
-    return primaryFiles;
-  }
-
-  bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles) {
-    for (auto &file : primaryFiles) {
-      // Catch "swiftc -frontend -c -filelist foo -primary-file
-      // some-file-not-in-foo".
-      assert(FilelistPathArg && "Missing primary with no filelist");
-      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                     FilelistPathArg->getValue());
-    }
-    return !primaryFiles.empty();
-  }
-};
 class FrontendArgsToOptionsConverter {
 private:
   DiagnosticEngine &Diags;
