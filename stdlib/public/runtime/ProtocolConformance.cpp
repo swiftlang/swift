@@ -149,9 +149,10 @@ const {
     // array of witness tables to pass along to the accessor.
 
     // Pretty-print the type name.
-    auto typeNamePair = swift_getTypeName(type, /*qualified=*/true);
-    std::string typeName(typeNamePair.data,
-                         typeNamePair.data + typeNamePair.length);
+    TwoWordPair<const char *, uintptr_t> typeNamePair =
+      swift_getTypeName(type, /*qualified=*/true);
+    std::string typeName(typeNamePair.first,
+                         typeNamePair.first + typeNamePair.second);
 
     // Demangle the protocol name.
     DemangleOptions options;
