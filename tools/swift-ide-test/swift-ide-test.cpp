@@ -333,6 +333,11 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
+static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
+    "code-complete-call-pattern-heuristics",
+    llvm::cl::desc(
+        "Use heuristics to guess whether we want call pattern completions"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 ObjCForwardDeclarations("enable-objc-forward-declarations",
@@ -3045,6 +3050,8 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
+  InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
+      options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =

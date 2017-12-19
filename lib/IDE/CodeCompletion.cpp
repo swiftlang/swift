@@ -399,8 +399,8 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
-
-/// Erase any ErrorType types on the given expression, allowing later
+/// Prepare the given expression for type-checking again, prinicipally by
+/// erasing any ErrorType types on the given expression, allowing later
 /// type-checking to make progress.
 ///
 /// FIXME: this is fundamentally a workaround for the fact that we may end up
@@ -408,12 +408,15 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
 /// the context, and later for checking more-specific things like unresolved
 /// members.  We should restructure code-completion type-checking so that we
 /// never typecheck more than once (or find a more principled way to do it).
-static void eraseErrorTypes(Expr *E) {
+static void prepareForRetypechecking(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (expr && expr->getType() && expr->getType()->hasError())
         expr->setType(Type());
+      if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
+        return { true, ACE->getSingleExpressionBody() };
+      }
       return { true, expr };
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
@@ -1294,7 +1297,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   int AttrParamIndex;
   bool IsInSil;
   bool HasSpace = false;
-  bool HasRParen = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
@@ -1389,7 +1391,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(),
                             ParsedExpr->getReferencedDecl());
 
-    eraseErrorTypes(ParsedExpr);
+    prepareForRetypechecking(ParsedExpr);
 
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
@@ -1592,7 +1594,6 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
 
   bool HaveLParen = false;
-  bool HaveRParen = false;
   bool IsSuperRefExpr = false;
   bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
@@ -1745,10 +1746,6 @@ public:
 
   void setHaveLParen(bool Value) {
     HaveLParen = Value;
-  }
-
-  void setHaveRParen(bool Value) {
-    HaveRParen = Value;
   }
 
   void setIsSuperRefExpr() {
@@ -2344,9 +2341,12 @@ public:
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](bool includeDefaultArgs = true) {
+      // FIXME: to get the corect semantic context we need to know how lookup
+      // would have found the declaration AFD. For now, just choose a reasonable
+      // default, it's most likely to be CurrentModule or CurrentNominal.
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::ExpressionSpecific, ExpectedTypes);
+          SemanticContextKind::CurrentModule, ExpectedTypes);
       if (!HaveLParen)
         Builder.addLeftParen();
       else
@@ -2354,13 +2354,14 @@ public:
 
       bool anyParam = addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
 
-      if (HaveLParen && HaveRParen && !anyParam) {
+      if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
         Builder.cancel();
         return;
       }
 
-      if (!HaveRParen)
+      // The rparen matches the lparen here so that we insert both or neither.
+      if (!HaveLParen)
         Builder.addRightParen();
       else
         Builder.addAnnotatedRightParen();
@@ -2562,13 +2563,14 @@ public:
       bool anyParam = addParamPatternFromFunction(Builder, ConstructorType, CD,
                                   includeDefaultArgs);
 
-      if (HaveLParen && HaveRParen && !anyParam) {
+      if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
         Builder.cancel();
         return;
       }
 
-      if (!HaveRParen)
+      // The rparen matches the lparen here so that we insert both or neither.
+      if (!HaveLParen)
         Builder.addRightParen();
       else
         Builder.addAnnotatedRightParen();
@@ -3336,7 +3338,7 @@ public:
       // Reset sequence.
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);
-      eraseErrorTypes(SE);
+      prepareForRetypechecking(SE);
 
       // Reset any references to operators in types, so they are properly
       // handled as operators by sequence folding.
@@ -3395,7 +3397,7 @@ public:
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    eraseErrorTypes(expr);
+    prepareForRetypechecking(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
@@ -3433,7 +3435,7 @@ public:
     sequence.push_back(nullptr); // operator
     sequence.push_back(nullptr); // RHS
     auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    eraseErrorTypes(SE);
+    prepareForRetypechecking(SE);
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -4491,18 +4493,16 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
 
-  // Lookahead one token to decide what kind of call completions to provide.
-  // When it appears that there is already code for the call present, just
-  // complete values and/or argument labels.  Otherwise give the entire call
-  // pattern.
-  Token next = P.peekToken();
-  if (next.isAtStartOfLine() || next.is(tok::eof)) {
-    ShouldCompleteCallPatternAfterParen = true;
-  } else if (next.is(tok::r_paren)) {
-    HasRParen = true;
-    ShouldCompleteCallPatternAfterParen = true;
-  } else {
-    ShouldCompleteCallPatternAfterParen = false;
+  ShouldCompleteCallPatternAfterParen = true;
+  if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+    // Lookahead one token to decide what kind of call completions to provide.
+    // When it appears that there is already code for the call present, just
+    // complete values and/or argument labels.  Otherwise give the entire call
+    // pattern.
+    Token next = P.peekToken();
+    if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
+      ShouldCompleteCallPatternAfterParen = false;
+    }
   }
 }
 
@@ -5223,7 +5223,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (ExprType) {
       if (ShouldCompleteCallPatternAfterParen) {
-        Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
         // Add argument labels, then fallthrough to get values.
@@ -5341,7 +5340,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if (auto PE = Walker.ParentFarthest.get<Expr *>()) {
-      eraseErrorTypes(PE);
+      prepareForRetypechecking(PE);
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(PossibleTypes);
