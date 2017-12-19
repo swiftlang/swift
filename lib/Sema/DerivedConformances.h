@@ -22,11 +22,14 @@
 
 namespace swift {
   class Decl;
+  class DeclRefExpr;
   class FuncDecl;
   class NominalTypeDecl;
+  class PatternBindingDecl;
   class Type;
   class TypeChecker;
   class ValueDecl;
+  class VarDecl;
   
 namespace DerivedConformance {
 
