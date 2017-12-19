@@ -35,12 +35,10 @@ PATTERN_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
-    # identifier-pattern -> identifier type-annotation?
+    # identifier-pattern -> identifier
     Node('IdentifierPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation',
-                   is_optional=True),
+             Child('Identifier', kind='IdentifierToken')
          ]),
 
     # as-pattern -> pattern 'as' type

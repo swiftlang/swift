@@ -68,10 +68,10 @@
   * ImportDecl
   * TypeAliasDecl
   * IfConfigDecl
-
-### In-progress (UnknownDecl):
   * PatternBindingDecl
   * VarDecl
+
+### In-progress (UnknownDecl):
   * ExtensionDecl (SR-6572)
 
 ### Not-started (UnknownDecl):
@@ -118,7 +118,6 @@
   * AnyPattern
   * TypedPattern
   * VarPattern
-
 
 ## TypeRepr
 ### Done:

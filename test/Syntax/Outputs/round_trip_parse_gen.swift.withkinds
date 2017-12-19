@@ -16,15 +16,15 @@ class C <MemberDeclBlock>{<FunctionDecl>
   func bar2<FunctionSignature><ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>c:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl>
   func bar3<FunctionSignature><ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl>
   func bar4<FunctionSignature><ParameterClause>(<FunctionParameter>_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl>
-  func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{
-    var a = <StringLiteralExpr>/*comment*/"ab\(x)c"</StringLiteralExpr>/*comment*/
-    var b = <PrefixOperatorExpr>/*comment*/+<IntegerLiteralExpr>2</IntegerLiteralExpr></PrefixOperatorExpr><IdentifierExpr>/*comment*/
+  func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>
+    var <PatternBinding><IdentifierPattern>a </IdentifierPattern><InitializerClause>= <StringLiteralExpr>/*comment*/"ab\(x)c"</StringLiteralExpr></InitializerClause></PatternBinding></VariableDecl><VariableDecl>/*comment*/
+    var <PatternBinding><IdentifierPattern>b </IdentifierPattern><InitializerClause>= <PrefixOperatorExpr>/*comment*/+<IntegerLiteralExpr>2</IntegerLiteralExpr></PrefixOperatorExpr></InitializerClause></PatternBinding></VariableDecl><IdentifierExpr>/*comment*/
     bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
     bar</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>+<IntegerLiteralExpr>10</IntegerLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
     bar</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<IntegerLiteralExpr>10</IntegerLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<FloatLiteralExpr>1.1</FloatLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
-    bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)
-    var f = <PrefixOperatorExpr>/*comments*/+<FloatLiteralExpr>0.1</FloatLiteralExpr></PrefixOperatorExpr><IdentifierExpr>/*comments*/
+    bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)<VariableDecl>
+    var <PatternBinding><IdentifierPattern>f </IdentifierPattern><InitializerClause>= <PrefixOperatorExpr>/*comments*/+<FloatLiteralExpr>0.1</FloatLiteralExpr></PrefixOperatorExpr></InitializerClause></PatternBinding></VariableDecl><IdentifierExpr>/*comments*/
     foo</IdentifierExpr>()
   }</CodeBlock></FunctionDecl><FunctionDecl>
 
@@ -87,12 +87,12 @@ typealias K <TypeInitializerClause>= <FunctionType>(<TupleTypeElement><Attribute
 @objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>> </GenericParameterClause><TypeInitializerClause>= <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
 @objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>></GenericParameterClause></TypealiasDecl><ClassDecl>
 
-class Foo <MemberDeclBlock>{
-  let bar: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>
+class Foo <MemberDeclBlock>{<VariableDecl>
+  let <PatternBinding><IdentifierPattern>bar</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl>
 }</MemberDeclBlock></ClassDecl><ClassDecl>
 
-class Bar<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Foo </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{
-  var foo: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <IntegerLiteralExpr>42</IntegerLiteralExpr>
+class Bar<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Foo </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{<VariableDecl>
+  var <PatternBinding><IdentifierPattern>foo</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IntegerLiteralExpr>42</IntegerLiteralExpr></InitializerClause></PatternBinding></VariableDecl>
 }</MemberDeclBlock></ClassDecl><ClassDecl>
 
 class C<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>: <SimpleTypeIdentifier>Foo</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B </SimpleTypeIdentifier>== <SimpleTypeIdentifier>Bar </SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ClassDecl><ClassDecl><Attribute>
@@ -194,19 +194,25 @@ func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
 #else</ElseDirectiveClause>
 #endif</IfConfigDecl><ClassDecl>
 
-class C <MemberDeclBlock>{
-  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{<AccessorDecl><Attribute>
+class C <MemberDeclBlock>{<VariableDecl>
+  var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<AccessorDecl><Attribute>
     @objc </Attribute><DeclModifier>mutating </DeclModifier>set<AccessorParameter>(value) </AccessorParameter><CodeBlock>{}</CodeBlock></AccessorDecl><AccessorDecl><DeclModifier>
     mutating </DeclModifier>get <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></AccessorDecl><AccessorDecl><Attribute>
     @objc </Attribute>didSet <CodeBlock>{}</CodeBlock></AccessorDecl><AccessorDecl>
     willSet<AccessorParameter>(newValue)</AccessorParameter><CodeBlock>{ }</CodeBlock></AccessorDecl>
-  }</AccessorBlock>
-  var a : <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{<ReturnStmt>
+  }</AccessorBlock></PatternBinding></VariableDecl><VariableDecl>
+  var <PatternBinding><IdentifierPattern>a </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<ReturnStmt>
     return <IntegerLiteralExpr>3</IntegerLiteralExpr></ReturnStmt>
-  }</AccessorBlock>
+  }</AccessorBlock></PatternBinding></VariableDecl>
 }</MemberDeclBlock></ClassDecl><ProtocolDecl>
 
-protocol P <MemberDeclBlock>{
-  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{ <AccessorDecl>get </AccessorDecl><AccessorDecl>set </AccessorDecl>}</AccessorBlock>
-  var a: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><AccessorBlock>{}</AccessorBlock>
-}</MemberDeclBlock></ProtocolDecl>
+protocol P <MemberDeclBlock>{<VariableDecl>
+  var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get </AccessorDecl><AccessorDecl>set </AccessorDecl>}</AccessorBlock></PatternBinding></VariableDecl><VariableDecl>
+  var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{}</AccessorBlock></PatternBinding></VariableDecl>
+}</MemberDeclBlock></ProtocolDecl><ClassDecl>
+
+class C <MemberDeclBlock>{<VariableDecl><Attribute>
+  @objc</Attribute><DeclModifier>
+  static </DeclModifier><DeclModifier>private </DeclModifier>var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IntegerLiteralExpr>3 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock>, </PatternBinding><PatternBinding><IdentifierPattern>b</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeAnnotation>, </PatternBinding><PatternBinding><IdentifierPattern>c </IdentifierPattern><InitializerClause>= <IntegerLiteralExpr>4</IntegerLiteralExpr></InitializerClause>, </PatternBinding><PatternBinding><IdentifierPattern>d </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>get <CodeBlock>{}</CodeBlock></AccessorDecl>}</AccessorBlock>, </PatternBinding><PatternBinding>(<IdentifierPattern>a</IdentifierPattern>, <IdentifierPattern>b</IdentifierPattern>)<TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeAnnotation></PatternBinding></VariableDecl><VariableDecl>
+  let <PatternBinding>(<IdentifierPattern>a</IdentifierPattern>, <IdentifierPattern>b</IdentifierPattern>) <InitializerClause>= <TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr>,</TupleElement><TupleElement><IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></InitializerClause>, </PatternBinding><PatternBinding>_ <InitializerClause>= <IntegerLiteralExpr>4 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{}</AccessorBlock></PatternBinding></VariableDecl>
+}</MemberDeclBlock></ClassDecl>
