@@ -2347,7 +2347,7 @@ public:
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
     else
-      resultTy->getWithoutSpecifierType()->getAnyOptionalObjectType();
+      resultTy = resultTy->getWithoutSpecifierType()->getAnyOptionalObjectType();
 
     assert(resultTy);
 
