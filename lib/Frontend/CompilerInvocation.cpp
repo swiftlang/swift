@@ -829,7 +829,6 @@ static Optional<std::string> determineSupplementaryOutputFilename(
   if (!hasArgWithoutPath)
     return std::string();
 
-  // ISOLATEMODULEPATH
   if (!mainOutputIfUsable.empty()) {
     return mainOutputIfUsable.str();
   }
@@ -963,7 +962,7 @@ static Optional<OutputPaths> computeOutputsForOneInput(
                                                  input.isPrimary(), moduleName);
 
   return determineSupplementaryOutputFilenames(
-      args, *outputFilename, singleInputFilename, suppFileListArg,
+      args, *outputFilename, singleOutputFilename, suppFileListArg,
       supplementaryNameFromInputOrModule, diags);
 }
 
