@@ -2392,7 +2392,7 @@ public:
   TupleElementExpr(Expr *SubExpr, SourceLoc DotLoc, unsigned FieldNo,
                    SourceLoc NameLoc, Type Ty)
     : Expr(ExprKind::TupleElement, /*Implicit=*/false, Ty), SubExpr(SubExpr),
-      NameLoc(NameLoc) {
+      NameLoc(NameLoc), DotLoc(DotLoc) {
     Bits.TupleElementExpr.FieldNo = FieldNo;
   }
 
