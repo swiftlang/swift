@@ -930,7 +930,7 @@ static Optional<OutputPaths> determineSupplementaryOutputFilenames(
                          moduleExtension, mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_module_path), emitModuleOption,
+      args.getLastArg(OPT_emit_module_path), args.hasArg(emitModuleOption),
       suppOutArg.ModuleOutputPath, moduleExtension, mainOutputIfUsableForModule,
       supplementaryNameFromInputOrModule, diags);
   if (!moduleOutputPath)
