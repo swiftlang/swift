@@ -45,9 +45,9 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
     SyntaxFactory::makeTokenList({LParen, Set, RParen}));
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
-  ASSERT_EQ(LParen.getRaw(), Mod.getDetail()[0].getRaw());
-  ASSERT_EQ(Set.getRaw(), Mod.getDetail()[1].getRaw());
-  ASSERT_EQ(RParen.getRaw(), Mod.getDetail()[2].getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getDetail().getValue()[0].getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getDetail().getValue()[1].getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getDetail().getValue()[2].getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {

@@ -4166,8 +4166,8 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
-/// Return true if this stored property needs to be accessed with getters and
-/// setters for Objective-C.
+/// Return true if this stored property has a getter and
+/// setter that are accessible from Objective-C.
 bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
   if (auto override = getOverriddenDecl())
     return override->hasForeignGetterAndSetter();
@@ -4188,9 +4188,11 @@ bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
   // Imported accessors are foreign and only have objc entry points.
   if (hasClangNode())
     return true;
-  // Otherwise, we only dispatch by @objc if the declaration is dynamic or
-  // NSManaged.
-  return isDynamic() || getAttrs().hasAttribute<NSManagedAttr>();
+  // Otherwise, we only dispatch by @objc if the declaration is dynamic,
+  // NSManaged, or dispatched through an ObjC protocol.
+  return isDynamic()
+    || getAttrs().hasAttribute<NSManagedAttr>()
+    || (isa<ProtocolDecl>(getDeclContext()) && isProtocolRequirement());
 }
 
 

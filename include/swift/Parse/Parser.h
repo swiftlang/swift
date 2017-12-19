@@ -850,6 +850,8 @@ public:
                 SmallVectorImpl<Decl *> &decls);
   };
 
+  void parseAccessorAttributes(DeclAttributes &Attributes);
+
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
                        ParameterList *Indices,

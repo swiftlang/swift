@@ -193,3 +193,20 @@ func closure() {
 #if blah
 #else
 #endif
+
+class C {
+  var a: Int {
+    @objc mutating set(value) {}
+    mutating get { return 3 }
+    @objc didSet {}
+    willSet(newValue){ }
+  }
+  var a : Int {
+    return 3
+  }
+}
+
+protocol P {
+  var a: Int { get set }
+  var a: Int {}
+}
