@@ -233,7 +233,7 @@ decl-attributes ::=
       return ScalarTraits<std::string>::input(Scalar, Context,                 \
                                               Val.STRING_MEMBER_NAME);         \
     }                                                                          \
-    static bool mustQuote(StringRef S) {                                       \
+    static QuotingType mustQuote(StringRef S) {                                \
       return ScalarTraits<std::string>::mustQuote(S);                          \
     }                                                                          \
   };                                                                           \
