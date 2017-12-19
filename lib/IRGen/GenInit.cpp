@@ -57,7 +57,6 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
 }
 
 StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                          bool isEntryBlock,
                                           const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {

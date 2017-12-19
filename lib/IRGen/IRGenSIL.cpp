@@ -3756,9 +3756,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 
   (void) Decl;
 
-  bool isEntryBlock = (i->getParent() == i->getFunction()->getEntryBlock());
-  auto addr =
-      type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
+  auto addr = type.allocateStack(*this, i->getElementType(), dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
   
@@ -4661,6 +4659,7 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
+  Optional<StackAddress> dynamicArgsBuf;
   llvm::Value *args;
   if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();
@@ -4702,11 +4701,9 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       argsBufAlign = Builder.CreateOr(argsBufAlign, alignMask);
     }
 
-    auto argsBufInst = Builder.CreateAlloca(IGM.Int8Ty, argsBufSize);
-    // TODO: over-alignment?
-    argsBufInst->setAlignment(16);
+    dynamicArgsBuf = emitDynamicAlloca(IGM.Int8Ty, argsBufSize, Alignment(16));
     
-    Address argsBuf(argsBufInst, Alignment(16));
+    Address argsBuf = dynamicArgsBuf->getAddress();
     
     if (!I->getSubstitutions().empty()) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
@@ -4720,7 +4717,8 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     for (unsigned i : indices(I->getAllOperands())) {
       auto operand = I->getAllOperands()[i].get();
       auto &ti = getTypeInfo(operand->getType());
-      auto ptr = Builder.CreateInBoundsGEP(argsBufInst, operandOffsets[i]);
+      auto ptr = Builder.CreateInBoundsGEP(argsBuf.getAddress(),
+                                           operandOffsets[i]);
       auto addr = ti.getAddressForPointer(
         Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
       if (operand->getType().isAddress()) {
@@ -4731,7 +4729,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
         cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr, false);
       }
     }
-    args = argsBufInst;
+    args = argsBuf.getAddress();
   } else {
     // No arguments necessary, so the argument ought to be ignored by any
     // callbacks in the pattern.
@@ -4741,6 +4739,10 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto patternPtr = llvm::ConstantExpr::getBitCast(pattern, IGM.Int8PtrTy);
   auto call = Builder.CreateCall(IGM.getGetKeyPathFn(), {patternPtr, args});
   call->setDoesNotThrow();
+
+  if (dynamicArgsBuf) {
+    emitDeallocateDynamicAlloca(*dynamicArgsBuf);
+  }
 
   auto resultStorageTy = IGM.getTypeInfo(I->getType()).getStorageType();
 

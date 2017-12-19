@@ -203,8 +203,8 @@ class Foo {
   // x86_64-macosx:      call void @llvm.lifetime.start
   // x86_64-macosx:      store i32 {{.*}}
   // x86_64-macosx:      store i32 {{.*}}
-  // x86_64-macosx:      getelementptr inbounds { i64 }, { i64 }
-  // x86_64-macosx:      load i64, i64* %12, align 8
+  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds { i64 }, { i64 }
+  // x86_64-macosx:      load i64, i64* [[T0]], align 8
   // x86_64-macosx:      bitcast
   // x86_64-macosx:      call void @llvm.lifetime.end
   // x86_64-macosx:      ret i64
