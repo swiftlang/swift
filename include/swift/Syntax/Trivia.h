@@ -245,6 +245,10 @@ public:
   }
 
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
+  
+  /// Try to compose this and Next to one TriviaPiece.
+  /// It returns true if it is succeeded.
+  bool trySquash(const TriviaPiece &Next);
 
   /// Print a debug representation of this trivia piece to the provided output
   /// stream and indentation level.
@@ -336,6 +340,10 @@ struct Trivia {
       Len += P.getTextLength();
     return Len;
   }
+  
+  /// Append Next TriviaPiece or compose last TriviaPiece and
+  /// Next TriviaPiece to one last TriviaPiece if it can.
+  void appendOrSquash(const TriviaPiece &Next);
 
   /// Dump a debug representation of this Trivia collection to standard error.
   void dump() const;

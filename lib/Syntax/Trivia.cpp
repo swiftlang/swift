@@ -113,6 +113,28 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   }
 }
 
+bool TriviaPiece::trySquash(const TriviaPiece &Next) {
+  if (Kind != Next.Kind) { return false; }
+  
+  switch (Kind) {
+    case TriviaKind::Space:
+    case TriviaKind::Tab:
+    case TriviaKind::VerticalTab:
+    case TriviaKind::Formfeed:
+    case TriviaKind::Newline:
+    case TriviaKind::CarriageReturn:
+      Count += Next.Count;
+      return true;
+    case TriviaKind::LineComment:
+    case TriviaKind::BlockComment:
+    case TriviaKind::DocLineComment:
+    case TriviaKind::DocBlockComment:
+    case TriviaKind::GarbageText:
+    case TriviaKind::Backtick:
+      return false;
+  }
+}
+
 void TriviaPiece::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case TriviaKind::Space:
@@ -147,6 +169,17 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
 }
 
 #pragma mark - Trivia collection
+
+void Trivia::appendOrSquash(const TriviaPiece &Next) {
+  if (Pieces.size() > 0) {
+    TriviaPiece &last = Pieces.back();
+    if (last.trySquash(Next)) {
+      return;
+    }
+  }
+  
+  push_back(Next);
+}
 
 Trivia Trivia::appending(const Trivia &Other) const {
   auto NewPieces = Pieces;
