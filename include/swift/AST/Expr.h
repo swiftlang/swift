@@ -140,6 +140,12 @@ class alignas(8) Expr {
     Implicit : 1
   );
 
+  SWIFT_INLINE_BITFIELD(CollectionExpr, Expr, 1,
+    /// True if the type of this collection expr was inferred by the collection
+    /// fallback type, like [Any].
+    IsTypeDefaulted : 1
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
 
@@ -359,6 +365,7 @@ protected:
     SWIFT_INLINE_BITS(KeyPathExpr);
     SWIFT_INLINE_BITS(ParenExpr);
     SWIFT_INLINE_BITS(SequenceExpr);
+    SWIFT_INLINE_BITS(CollectionExpr);
   } Bits;
 
 private:
@@ -2059,17 +2066,14 @@ class CollectionExpr : public Expr {
 
   Expr *SemanticExpr = nullptr;
 
-  /// True if the type of this collection expr was inferred by the collection
-  /// fallback type, like [Any].
-  bool IsTypeDefaulted = false;
-
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
                  MutableArrayRef<Expr*> Elements,
                  SourceLoc RBracketLoc, Type Ty)
     : Expr(Kind, /*Implicit=*/false, Ty),
-      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc),
-      Elements(Elements) { }
+      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc), Elements(Elements) {
+    Bits.CollectionExpr.IsTypeDefaulted = false;
+  }
 
 public:
 
@@ -2080,8 +2084,10 @@ public:
   void setElement(unsigned i, Expr *E) { Elements[i] = E; }
   unsigned getNumElements() const { return Elements.size(); }
 
-  bool isTypeDefaulted() const { return IsTypeDefaulted; }
-  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = value; }
+  bool isTypeDefaulted() const { return Bits.CollectionExpr.IsTypeDefaulted; }
+  void setIsTypeDefaulted(bool value = true) {
+    Bits.CollectionExpr.IsTypeDefaulted = value;
+  }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
