@@ -636,12 +636,18 @@ public:
 
   /// Check all of the protocols requirements are actually satisfied by a
   /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
+  ///
+  /// \param failUnsubstituted Whether to fail when the requirements of the
+  /// protocol could not be substituted (e.g., due to missing information).
+  /// When true, emits a diagnostic in such cases; when false, enqueues the
+  /// conformance for later checking.
+  void ensureRequirementsAreSatisfied(bool failUnsubstituted);
 
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
 };
+
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.
