@@ -18,9 +18,9 @@ extension Foo {
 
   // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV3zimyyF
   func zim() { }
-  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zangyqd__lF
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zangyyqd__lF
   func zang<U>(_: U) { }
-  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zungyqd__AA8RuncibleRd__3HatQyd__Rs_lF
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zungyyqd__AA8RuncibleRd__3HatQyd__Rs_lF
   func zung<U: Runcible>(_: U) where U.Hat == T { }
 }
 
@@ -61,9 +61,9 @@ extension Runcible where Self.Spoon == Self.Hat {
 struct Bar<T: Runcible, U: Runcible> { }
 
 extension Bar {
-  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yqd__AA8RuncibleRd__AaE5SpoonRpzAFQy_AGRSlF
+  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yyqd__AA8RuncibleRd__AaE5SpoonRpzAFQy_AGRSlF
   func bar1<V: Runcible>(_: V) where U.Spoon: Runcible, T.Spoon == U.Spoon { }
 
-  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yqd__AA8RuncibleRd__AaE5SpoonRp_lF
+  // CHECK-LABEL: _T027mangling_generic_extensions3BarV4bar1yyqd__AA8RuncibleRd__AaE5SpoonRp_lF
   func bar1<V: Runcible>(_: V) where U.Spoon: Runcible { }
 }

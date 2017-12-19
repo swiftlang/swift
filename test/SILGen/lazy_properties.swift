@@ -8,7 +8,7 @@
 
 // CHECK-LABEL: sil hidden [transparent] @_T015lazy_properties19StructWithLazyFieldV4onceSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout StructWithLazyField) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 
-// CHECK-LABEL: sil hidden @_T015lazy_properties19StructWithLazyFieldVACSiSg4once_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField
+// CHECK-LABEL: sil hidden @_T015lazy_properties19StructWithLazyFieldV4onceACSiSg_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField
 
 struct StructWithLazyField {
   lazy var once : Int = 42

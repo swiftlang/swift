@@ -22,7 +22,7 @@ public struct PublicStruct {
   // CHECK-LABEL: sil private @_T016mangling_private12PublicStructV0B6Method33_A3CCBB841DB59E79A4AD4EE458655068LLyyFZ
   private static func privateMethod() {}
 
-  // CHECK-LABEL: sil private @_T016mangling_private12PublicStructVACSi1x_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
+  // CHECK-LABEL: sil private @_T016mangling_private12PublicStructV1xACSi_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
   private init(x: Int) {}
 }
 
@@ -30,7 +30,7 @@ public struct InternalStruct {
   // CHECK-LABEL: sil private @_T016mangling_private14InternalStructV0B6Method33_A3CCBB841DB59E79A4AD4EE458655068LLyyFZ
   private static func privateMethod() {}
 
-  // CHECK-LABEL: sil private @_T016mangling_private14InternalStructVACSi1x_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
+  // CHECK-LABEL: sil private @_T016mangling_private14InternalStructV1xACSi_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
   private init(x: Int) {}
 }
 
@@ -38,14 +38,14 @@ private struct PrivateStruct {
   // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV0B6MethodyyFZ
   private static func privateMethod() {}
 
-  // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLVADSi1x_tcfC
+  // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV1xADSi_tcfC
   private init(x: Int) {}
 
   struct Inner {
     // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV5InnerV0B6MethodyyFZ
     private static func privateMethod() {}
 
-    // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV5InnerVAFSi1x_tcfC
+    // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV5InnerV1xAFSi_tcfC
     private init(x: Int) {}
   }
 }
@@ -60,14 +60,14 @@ extension PublicStruct {
   // CHECK-LABEL: sil private @_T016mangling_private12PublicStructV16extPrivateMethod33_A3CCBB841DB59E79A4AD4EE458655068LLyyF
   private func extPrivateMethod() {}
 
-  // CHECK-LABEL: sil private @_T016mangling_private12PublicStructVACSi3ext_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
+  // CHECK-LABEL: sil private @_T016mangling_private12PublicStructV3extACSi_tc33_A3CCBB841DB59E79A4AD4EE458655068LlfC
   private init(ext: Int) {}
 }
 extension PrivateStruct {
   // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV03extC6MethodyyF
   private func extPrivateMethod() {}
 
-  // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLVADSi3ext_tcfC
+  // CHECK-LABEL: sil private @_T016mangling_private13PrivateStruct33_A3CCBB841DB59E79A4AD4EE458655068LLV3extADSi_tcfC
   private init(ext: Int) {}
 }
 

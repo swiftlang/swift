@@ -23,12 +23,12 @@ _ = Holder(value: C())
 // CHECK-NEXT:   destroy_value [[T0]] : $C
 // CHECK-NEXT:   [[T2:%.*]] = struct $Holder ([[T1]] : $@sil_unmanaged C)
 // CHECK-NEXT:   return [[T2]] : $Holder
-// CHECK-NEXT: } // end sil function '_T0s6HolderVABs1CC5value_tcfC'
+// CHECK-NEXT: } // end sil function '_T0s6HolderV5valueABs1CC_tcfC'
 func set(holder holder: inout Holder) {
   holder.value = C()
 }
 
-// CHECK-LABEL: sil hidden @_T0s3setys6HolderVz6holder_tF : $@convention(thin) (@inout Holder) -> () {
+// CHECK-LABEL: sil hidden @_T0s3set6holderys6HolderVz_tF : $@convention(thin) (@inout Holder) -> () {
 // CHECK: bb0([[ADDR:%.*]] : @trivial $*Holder):
 // CHECK:        [[T0:%.*]] = function_ref @_T0s1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
@@ -38,12 +38,12 @@ func set(holder holder: inout Holder) {
 // CHECK-NEXT:   assign [[T1]] to [[T0]]
 // CHECK-NEXT:   destroy_value [[C]]
 // CHECK-NEXT:   end_access [[WRITE]] : $*Holder
-// CHECK: } // end sil function '_T0s3setys6HolderVz6holder_tF'
+// CHECK: } // end sil function '_T0s3set6holderys6HolderVz_tF'
 
 func get(holder holder: inout Holder) -> C {
   return holder.value
 }
-// CHECK-LABEL: sil hidden @_T0s3gets1CCs6HolderVz6holder_tF : $@convention(thin) (@inout Holder) -> @owned C {
+// CHECK-LABEL: sil hidden @_T0s3get6holders1CCs6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C {
 // CHECK: bb0([[ADDR:%.*]] : @trivial $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*Holder
@@ -57,7 +57,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL: sil hidden @_T0s7projects1CCs6HolderVyc2fn_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C {
+// CHECK-LABEL: sil hidden @_T0s7project2fns1CCs6HolderVyc_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C {
 // CHECK: bb0([[FN:%.*]] : @owned $@noescape @callee_guaranteed () -> Holder):
 // CHECK:      [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
 // CHECK-NEXT: [[BORROWED_FN_COPY:%.*]] = copy_value [[BORROWED_FN]]

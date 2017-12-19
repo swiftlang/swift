@@ -317,8 +317,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       kind = Node::Kind::ThinFunctionType;
       break;
     }
-    
-    std::vector<NodePointer> inputs;
+
+    std::vector<std::pair<NodePointer, bool>> inputs;
     for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
       auto param = func->getParameter(i);
       auto flags = func->getParameterFlags(i);
@@ -333,27 +333,58 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         shared->addChild(input, Dem);
         input = shared;
       }
-      inputs.push_back(input);
+
+      inputs.push_back({input, flags.isVariadic()});
     }
 
     NodePointer totalInput = nullptr;
     switch (inputs.size()) {
-    case 1:
-      totalInput = inputs.front();
-      break;
+    case 1: {
+      auto &singleParam = inputs.front();
+      if (!singleParam.second) {
+        totalInput = singleParam.first;
+        break;
+      }
+
+      // If single parameter has a variadic marker it
+      // requires a tuple wrapper.
+      LLVM_FALLTHROUGH;
+    }
 
     // This covers both none and multiple parameters.
     default:
       auto tuple = Dem.createNode(Node::Kind::Tuple);
-      for (auto &input : inputs)
-        tuple->addChild(input, Dem);
+      for (auto &input : inputs) {
+        NodePointer eltType;
+        bool isVariadic;
+        std::tie(eltType, isVariadic) = input;
+
+        // Tuple element := variadic-marker label? type
+        auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
+
+        if (isVariadic)
+          tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
+
+        if (eltType->getKind() == Node::Kind::Type) {
+          tupleElt->addChild(eltType, Dem);
+        } else {
+          auto type = Dem.createNode(Node::Kind::Type);
+          type->addChild(eltType, Dem);
+          tupleElt->addChild(type, Dem);
+        }
+
+        tuple->addChild(tupleElt, Dem);
+      }
       totalInput = tuple;
       break;
     }
 
-    NodePointer args = Dem.createNode(Node::Kind::ArgumentTuple);
-    args->addChild(totalInput, Dem);
-    
+    NodePointer parameters = Dem.createNode(Node::Kind::ArgumentTuple);
+    NodePointer paramType = Dem.createNode(Node::Kind::Type);
+
+    paramType->addChild(totalInput, Dem);
+    parameters->addChild(paramType, Dem);
+
     NodePointer resultTy = _swift_buildDemanglingForMetadata(func->ResultType,
                                                              Dem);
     NodePointer result = Dem.createNode(Node::Kind::ReturnType);
@@ -362,7 +393,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto funcNode = Dem.createNode(kind);
     if (func->throws())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
-    funcNode->addChild(args, Dem);
+    funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;
   }
@@ -403,7 +434,14 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       // Add the element type child.
       auto eltType =
         _swift_buildDemanglingForMetadata(tuple->getElement(i).Type, Dem);
-      elt->addChild(eltType, Dem);
+
+      if (eltType->getKind() == Node::Kind::Type) {
+        elt->addChild(eltType, Dem);
+      } else {
+        auto type = Dem.createNode(Node::Kind::Type);
+        type->addChild(eltType, Dem);
+        elt->addChild(type, Dem);
+      }
 
       // Add the completed element to the tuple.
       tupleNode->addChild(elt, Dem);

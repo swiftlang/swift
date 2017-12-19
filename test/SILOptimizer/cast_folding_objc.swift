@@ -52,7 +52,7 @@ func test0() -> Bool {
 // the compiler does not statically know if this object
 // is NSNumber can be converted into Int.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftSiyXlF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftySiyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -64,7 +64,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(_ o: AnyObject) -> Int {
 // the compiler does not statically know if this object
 // is NSString can be converted into String.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftSSSgyXlF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftySSSgyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -77,7 +77,7 @@ public func castObjCToSwift<T>(_ t: T) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftSiSo8NSStringCF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -87,7 +87,7 @@ public func testFailingBridgedCastFromObjCtoSwift(_ ns: NSString) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc37testFailingBridgedCastFromSwiftToObjCSiSSF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -297,7 +297,7 @@ public func testBridgedCastFromObjCtoSwift(_ ns: NSString) -> String {
 
 // Check that compiler understands that this cast always succeeds
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc30testBridgedCastFromSwiftToObjCSo8NSStringCSSF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc30testBridgedCastFromSwiftToObjCySo8NSStringCSSF
 // CHECK-NOT: {{ cast}}
 // CHECK: function_ref @_T0SS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK: apply

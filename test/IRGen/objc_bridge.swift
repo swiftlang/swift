@@ -63,7 +63,7 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]*}} x i8], [{{[0-9]*}} x i8]* @"\01L_selector_data(strArgWithS:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC6strArgySS1s_tFTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC6strArg1sySS_tFTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(nsstrResult)", i64 0, i64 0),
@@ -73,7 +73,7 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(nsstrArgWithS:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC8nsstrArgySo8NSStringC1s_tFTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
@@ -88,7 +88,7 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
-// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_T011objc_bridge3BasC9acceptSetys0E0VyACGFTo to i8*)
+// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_T011objc_bridge3BasC9acceptSetyys0E0VyACGFTo to i8*)
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
@@ -142,7 +142,7 @@ extension NSString {
   // CHECK: define internal [[OPAQUE:.*]]* @_T0So8NSStringC11objc_bridgeE11nsstrResultAByFTo([[OPAQUE:.*]]*, i8*) unnamed_addr
   func nsstrResult() -> NSString { return NSS }
 
-  // CHECK: define internal void @_T0So8NSStringC11objc_bridgeE8nsstrArgyAB1s_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
+  // CHECK: define internal void @_T0So8NSStringC11objc_bridgeE8nsstrArg1syAB_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
   func nsstrArg(s s: NSString) { }
 }
 
@@ -175,12 +175,12 @@ class Bas : NSObject {
 
   // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC9strResultSSyFTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   func strResult() -> String { return "" }
-  // CHECK: define internal void @_T011objc_bridge3BasC6strArgySS1s_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC6strArg1sySS_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   func strArg(s s: String) { }
 
   // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC11nsstrResultSo8NSStringCyFTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   func nsstrResult() -> NSString { return NSS }
-  // CHECK: define internal void @_T011objc_bridge3BasC8nsstrArgySo8NSStringC1s_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   func nsstrArg(s s: NSString) { }
 
   override init() { 

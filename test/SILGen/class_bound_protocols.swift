@@ -104,7 +104,7 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
   // CHECK: return [[PROTO]]
 }
 
-// CHECK-LABEL: sil hidden @_T0s30class_bound_existential_upcasts10ClassBound_psAB_s0E6Bound2p1x_tF :
+// CHECK-LABEL: sil hidden @_T0s30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF :
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
@@ -117,9 +117,9 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
   // CHECK:   destroy_value [[ARG]]
   // CHECK:   return [[PROTO]]
 }
-// CHECK: } // end sil function '_T0s30class_bound_existential_upcasts10ClassBound_psAB_s0E6Bound2p1x_tF'
+// CHECK: } // end sil function '_T0s30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
 
-// CHECK-LABEL: sil hidden @_T0s41class_bound_to_unbound_existential_upcasts13NotClassBound_ps0hI0_sABp1x_tF :
+// CHECK-LABEL: sil hidden @_T0s41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
 // CHECK: bb0([[ARG0:%.*]] : $*NotClassBound, [[ARG1:%.*]] : $ClassBound & NotClassBound):
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[X_OPENED:%.*]] = open_existential_ref [[BORROWED_ARG1]] : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
@@ -133,7 +133,7 @@ func class_bound_to_unbound_existential_upcast
   return x
 }
 
-// CHECK-LABEL: sil hidden @_T0s18class_bound_methodys10ClassBound_p1x_tF :
+// CHECK-LABEL: sil hidden @_T0s18class_bound_method1xys10ClassBound_p_tF :
 // CHECK: bb0([[ARG:%.*]] : $ClassBound):
 func class_bound_method(x: ClassBound) {
   var x = x
@@ -153,7 +153,7 @@ func class_bound_method(x: ClassBound) {
   // CHECK: destroy_value [[XBOX]]
   // CHECK: destroy_value [[ARG]]
 }
-// CHECK: } // end sil function '_T0s18class_bound_methodys10ClassBound_p1x_tF'
+// CHECK: } // end sil function '_T0s18class_bound_method1xys10ClassBound_p_tF'
 
 // rdar://problem/31858378
 struct Value {}
@@ -168,7 +168,7 @@ protocol InheritsMutatingMethod : class, HasMutatingMethod {}
 
 func takesInOut<T>(_: inout T) {}
 
-// CHECK-LABEL: sil hidden @_T0s27takesInheritsMutatingMethodys0bcD0_pz1x_s5ValueV1ytF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
+// CHECK-LABEL: sil hidden @_T0s27takesInheritsMutatingMethod1x1yys0bcD0_pz_s5ValueVtF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
 func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
                                  y: Value) {
   // CHECK:      [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*InheritsMutatingMethod

@@ -15,7 +15,7 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_foreach.guessForEach1
-// SIL-LABEL: sil @_T011pgo_foreach13guessForEach1s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
+// SIL-LABEL: sil @_T011pgo_foreach13guessForEach11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
 // IR-LABEL: define swiftcc i32 @_T09pgo_foreach10guessWhiles5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T09pgo_foreach10guessWhiles5Int32VAD1x_tF
 
@@ -30,7 +30,7 @@ public func guessForEach1(x: Int32) -> Int32 {
 }
 
 // SIL-LABEL: // pgo_foreach.guessForEach2
-// SIL-LABEL: sil @_T011pgo_foreach13guessForEach2s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
+// SIL-LABEL: sil @_T011pgo_foreach13guessForEach21xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
 // IR-LABEL: define swiftcc i32 @_T09pgo_foreach10guessWhiles5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @_T09pgo_foreach10guessWhiles5Int32VAD1x_tF
 

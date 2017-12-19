@@ -317,7 +317,7 @@ func logical_local_get(_ x: Int) -> Int {
       return x
     }
   }
-  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_T010properties17logical_local_getS2iF4propL_Sivg]]
+  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_T010properties17logical_local_getyS2iF4propL_Sivg]]
   // CHECK: apply [[GET_REF]](%0)
   return prop
 }
@@ -355,7 +355,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   }
 
   return get_prop()
-  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_T010properties26logical_local_captured_getS2iF0E5_propL_SiyF
+  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_T010properties26logical_local_captured_getyS2iF0E5_propL_SiyF
   // CHECK: apply [[FUNC_REF]](%0)
 }
 // CHECK: sil private @_T010properties26logical_local_captured_get{{.*}}vg
@@ -930,7 +930,7 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
+// CHECK-LABEL: sil hidden @_T010properties12genericPropsyyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -1177,7 +1177,7 @@ protocol NonmutatingProtocol {
   var x: Int { get nonmutating set }
 }
 
-// sil hidden @_T010properties19overlappingLoadExpryAA13ReferenceTypeCz1c_tF : $@convention(thin) (@inout ReferenceType) -> () {
+// sil hidden @_T010properties19overlappingLoadExpr1cyAA13ReferenceTypeCz_tF : $@convention(thin) (@inout ReferenceType) -> () {
 // CHECK:        [[RESULT:%.*]] = alloc_stack $Int
 // CHECK-NEXT:   [[UNINIT:%.*]] = mark_uninitialized [var] [[RESULT]] : $*Int
 // CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType

@@ -7,7 +7,7 @@ public struct S {
   var o: AnyObject?
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
+// CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSyAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
 // CHECK: bb0(%0 : @owned $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
@@ -26,7 +26,7 @@ public struct S {
 // CHECK: [[RET:%.*]] = load [copy] [[ACCESS3]] : $*S
 // CHECK: end_access [[ACCESS3]] : $*S
 // CHECK: return [[RET]] : $S
-// CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSAA1SVyXlSgF'
+// CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSyAA1SVyXlSgF'
 @inline(never)
 func initS(_ o: AnyObject?) -> S {
   var s: S
@@ -102,7 +102,7 @@ func testClassInstanceProperties(c: C) {
   let y = c.x
   c.x = y
 }
-// CHECK-LABEL: sil hidden @_T017access_marker_gen27testClassInstancePropertiesyAA1CC1c_tF :
+// CHECK-LABEL: sil hidden @_T017access_marker_gen27testClassInstanceProperties1cyAA1CC_tF :
 // CHECK:       [[C:%.*]] = begin_borrow %0 : $C
 // CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [read] [dynamic] [[CX]] : $*Int
@@ -129,7 +129,7 @@ class D {
 func testDispatchedClassInstanceProperty(d: D) {
   modify(&d.x)
 }
-// CHECK-LABEL: sil hidden @_T017access_marker_gen35testDispatchedClassInstancePropertyyAA1DC1d_tF
+// CHECK-LABEL: sil hidden @_T017access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
 // CHECK:       [[D:%.*]] = begin_borrow %0 : $D
 // CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
 // CHECK:       apply [[METHOD]]({{.*}}, [[D]])

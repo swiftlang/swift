@@ -14,7 +14,7 @@ public struct MySt {
     return 5
   }
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStVS2icig : $@convention(method) (Int, MySt) -> Int
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute4MyStVyS2icig : $@convention(method) (Int, MySt) -> Int
   @_inlineable public subscript(x: Int) -> Int {
     return x
   }
@@ -26,12 +26,12 @@ public class MyCls {
 
   // Allocating entry point is [serialized]
 
-  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute5MyClsCACyt14designatedInit_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public init(designatedInit: ()) {}
 
   // Note -- convenience init is intentionally not [serialized]
 
-  // CHECK-LABEL: sil @_T020inlineable_attribute5MyClsCACyt15convenienceInit_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  // CHECK-LABEL: sil @_T020inlineable_attribute5MyClsC15convenienceInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public convenience init(convenienceInit: ()) {
     self.init(designatedInit: ())
   }
@@ -43,7 +43,7 @@ public class MyCls {
   case c(MySt)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T020inlineable_attribute6MyEnumO1cAcA0C2StVcACmFTc : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_guaranteed (MySt) -> MyEnum
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T020inlineable_attribute6MyEnumO1cyAcA0C2StVcACmFTc : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_guaranteed (MySt) -> MyEnum
 
 @_inlineable public func referencesMyEnum() {
   _ = MyEnum.c
@@ -61,7 +61,7 @@ public class Horse {
   public func gallop() {}
 }
 
-// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute15talkAboutAHorseyAA5HorseC1h_tF : $@convention(thin) (@owned Horse) -> () {
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute15talkAboutAHorse1hyAA5HorseC_tF : $@convention(thin) (@owned Horse) -> () {
 // CHECK: function_ref @_T020inlineable_attribute5HorseC6gallopyyFTc
 // CHECK: return
 // CHECK: }
@@ -86,7 +86,7 @@ public class Horse {
 
 // Make sure the synthesized delegating initializer is inlineable also
 
-// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedCAcA5HorseC5horse_tcfc : $@convention(method) (@owned Horse, @owned Derived) -> @owned Derived
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute7DerivedC5horseAcA5HorseC_tcfc : $@convention(method) (@owned Horse, @owned Derived) -> @owned Derived
 @_versioned class Derived : Base {
   // Allow @_inlineable deinits
   @_inlineable deinit {}

@@ -3,7 +3,7 @@
 struct Bool {}
 var false_ = Bool()
 
-// CHECK-LABEL: sil hidden @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Bool) -> Bool
+// CHECK-LABEL: sil hidden @_T013auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
   // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
@@ -49,7 +49,7 @@ public class Sub : Base {
   // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [callee_guaranteed] [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
   // CHECK: [[CVT:%.*]] = convert_function [[AUTOCLOSURE]]
-  // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin)
+  // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_T013auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin)
   // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[CVT]])
   // CHECK: return [[RET]] : $Bool
   // CHECK: }
@@ -61,11 +61,11 @@ public class Sub : Base {
   override var x: Bool { return call_auto_closure(super.x) }
 }
 
-// CHECK-LABEL: sil hidden @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtF : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil hidden @_T013auto_closures20closureInAutoclosureyAA4BoolVAD_ADtF : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private [transparent] @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private [transparent] @_T013auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private @_T013auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

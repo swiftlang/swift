@@ -65,8 +65,8 @@ func ifexpr_rval() -> Int {
 // --- Test function calls.
 func simpleDirectCallTest(_ i: Int) -> Int {
   return simpleDirectCallTest(i)
-  // CHECK-LABEL: sil hidden @_T013sil_locations20simpleDirectCallTestS2iF
-  // CHECK: function_ref @_T013sil_locations20simpleDirectCallTestS2iF : {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
+  // CHECK-LABEL: sil hidden @_T013sil_locations20simpleDirectCallTestyS2iF
+  // CHECK: function_ref @_T013sil_locations20simpleDirectCallTestyS2iF : {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: {{%.*}} apply {{%.*}} line:[[@LINE-3]]:10
 }
 
@@ -76,7 +76,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @_T013sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":77
+  // CHECK: function_ref @_T0Si2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":77
 }
 
 func foo(_ x: Int) -> Int {

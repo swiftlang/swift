@@ -94,10 +94,10 @@ func literals() {
 // CHECK: string_literal utf8 "foo"
 // CHECK: [[CONST_STRING_LIT:%.*]] = const_string_literal utf8 "foobar"
 // CHECK: [[METATYPE:%.*]] = metatype $@thin SillyConstUTF16String.Type
-// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringV08_builtincE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: apply [[FUN]]([[CONST_STRING_LIT]], [[METATYPE]]) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: [[CONST_UTF16STRING_LIT:%.*]] = const_string_literal utf16 "foobarö"
-// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincdE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringV08_builtincdE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: apply [[FUN]]([[CONST_UTF16STRING_LIT]], {{.*}}) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 
 func bar(_ x: Int) {}
@@ -583,7 +583,7 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
-// CHECK-LABEL: sil hidden @_T011expressions21implodeRecursiveTupleySi_Sit_SitSgF
+// CHECK-LABEL: sil hidden @_T011expressions21implodeRecursiveTupleyySi_Sit_SitSgF
 // CHECK: bb0(%0 : @trivial $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 

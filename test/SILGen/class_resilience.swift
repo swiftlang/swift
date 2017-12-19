@@ -8,7 +8,7 @@ import resilient_class
 // Accessing final property of resilient class from different resilience domain
 // through accessor
 
-// CHECK-LABEL: sil @_T016class_resilience20finalPropertyOfOthery010resilient_A022ResilientOutsideParentCF
+// CHECK-LABEL: sil @_T016class_resilience20finalPropertyOfOtheryy010resilient_A022ResilientOutsideParentCF
 // CHECK: function_ref @_T015resilient_class22ResilientOutsideParentC13finalPropertySSvg
 
 public func finalPropertyOfOther(_ other: ResilientOutsideParent) {
@@ -23,7 +23,7 @@ public class MyResilientClass {
   // CHECK:   return
   public func publicMethodFirst() -> Int? { return nil }
 
-  // CHECK-LABEL: sil [thunk] @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+  // CHECK-LABEL: sil [thunk] @_T016class_resilience16MyResilientClassC18publicMethodSecondyyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
   // CHECK:   class_method %1 : $MyResilientClass, #MyResilientClass.publicMethodSecond!1 : (MyResilientClass) -> (AnyObject) -> (), $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
   // CHECK:   return
   public func publicMethodSecond(_ a: AnyObject) {}
@@ -42,7 +42,7 @@ public class MyResilientSubclass : MyResilientClass {
 // Accessing final property of resilient class from my resilience domain
 // directly
 
-// CHECK-LABEL: sil @_T016class_resilience19finalPropertyOfMineyAA16MyResilientClassCF
+// CHECK-LABEL: sil @_T016class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF
 // CHECK: bb0([[ARG:%.*]] : @owned $MyResilientClass):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   ref_element_addr [[BORROWED_ARG]] : $MyResilientClass, #MyResilientClass.finalProperty
@@ -58,7 +58,7 @@ class SubclassOfOutsideChild : ResilientOutsideChild {
   func newMethod() {}
 }
 
-// CHECK-LABEL: sil @_T016class_resilience19callResilientMethodyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
+// CHECK-LABEL: sil @_T016class_resilience19callResilientMethodyyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
 public func callResilientMethod(_ s: MyResilientSubclass) {
 // CHECK:   class_method {{.*}} : $MyResilientSubclass, #MyResilientSubclass.publicMethodFirst!1
   _ = s.publicMethodFirst()
@@ -67,18 +67,18 @@ public func callResilientMethod(_ s: MyResilientSubclass) {
 // CHECK:   return
 }
 
-// CHECK-LABEL: sil [serialized] @_T016class_resilience29callResilientMethodInlineableyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
+// CHECK-LABEL: sil [serialized] @_T016class_resilience29callResilientMethodInlineableyyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
 @_inlineable public func callResilientMethodInlineable(_ s: MyResilientSubclass) {
 // CHECK:   [[FN:%.*]] = function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj : $@convention(method) (@guaranteed MyResilientSubclass) -> Int
   _ = s.publicMethodFirst()
-  // CHECK:   [[FN:%.*]] = function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+  // CHECK:   [[FN:%.*]] = function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
   // CHECK:   [[CONVERTED:%.*]] = convert_function [[FN]] : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> () to $@convention(method) (@owned Optional<AnyObject>, @guaranteed MyResilientSubclass) -> ()
   s.publicMethodSecond(nil)
 
   // CHECK:   function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTc
   _ = s.publicMethodFirst
 
-  // CHECK:   function_ref @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc
+  // CHECK:   function_ref @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyyXlSgFTc
   _ = s.publicMethodSecond
 // CHECK:   return
 }
@@ -87,8 +87,8 @@ public func callResilientMethod(_ s: MyResilientSubclass) {
 // CHECK:     function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj
 // CHECK:     return
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed (@owned Optional<AnyObject>) -> ()
-// CHECK:     function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyyXlSgFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed (@owned Optional<AnyObject>) -> ()
+// CHECK:     function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
 // CHECK:     return
 
 // Note: no entries for [inherited] methods

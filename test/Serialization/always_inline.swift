@@ -9,17 +9,17 @@ import def_always_inline
 
 // SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = global_addr @_T013always_inline3rawSbvp : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @_T017def_always_inline16testAlwaysInlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL: [[FUNC:%.+]] = function_ref @_T017def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testAlwaysInline(x: false)
 
-// SIL: [[FUNC2:%.+]] = function_ref @_T017def_always_inline22AlwaysInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
+// SIL: [[FUNC2:%.+]] = function_ref @_T017def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
 // SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
 
 var a = AlwaysInlineInitStruct(x: false)
 
-// SIL-LABEL: [always_inline] @_T017def_always_inline16testAlwaysInlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [always_inline] @_T017def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] @_T017def_always_inline22AlwaysInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [always_inline] @_T017def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 

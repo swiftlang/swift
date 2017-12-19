@@ -98,7 +98,7 @@ func objc_enum_inject() -> ExportedToObjC {
   return .Foo
 }
 
-// CHECK-LABEL: define hidden swiftcc i64 @_T012objc_ns_enum0a1_C7_switchSiAA14ExportedToObjCOF(i64)
+// CHECK-LABEL: define hidden swiftcc i64 @_T012objc_ns_enum0a1_C7_switchySiAA14ExportedToObjCOF(i64)
 // CHECK:         switch i64 %0, label {{%.*}} [
 // CHECK:           i64 -1, label {{%.*}}
 // CHECK:           i64  0, label {{%.*}}
@@ -115,7 +115,7 @@ func objc_enum_switch(_ x: ExportedToObjC) -> Int {
 }
 
 @objc class ObjCEnumMethods : NSObject {
-  // CHECK: define internal void @_T012objc_ns_enum15ObjCEnumMethodsC0C2InyAA010ExportedToD1COFTo([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
+  // CHECK: define internal void @_T012objc_ns_enum15ObjCEnumMethodsC0C2InyyAA010ExportedToD1COFTo([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
   dynamic func enumIn(_ x: ExportedToObjC) {}
   // CHECK: define internal i64 @_T012objc_ns_enum15ObjCEnumMethodsC0C3OutAA010ExportedToD1COyFTo([[OBJC_ENUM_METHODS]]*, i8*)
   dynamic func enumOut() -> ExportedToObjC { return .Foo }
@@ -125,7 +125,7 @@ func objc_enum_switch(_ x: ExportedToObjC) -> Int {
   dynamic var prop: ExportedToObjC = .Foo
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T012objc_ns_enum0a1_C13_method_callsyAA15ObjCEnumMethodsCF(%T12objc_ns_enum15ObjCEnumMethodsC*)
+// CHECK-LABEL: define hidden swiftcc void @_T012objc_ns_enum0a1_C13_method_callsyyAA15ObjCEnumMethodsCF(%T12objc_ns_enum15ObjCEnumMethodsC*)
 func objc_enum_method_calls(_ x: ObjCEnumMethods) {
   
   // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)

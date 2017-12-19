@@ -13,7 +13,7 @@ final class Foo {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSivsTo
 }
 
-// CHECK-LABEL: sil hidden @_T010objc_final7callFooyAA0D0CF
+// CHECK-LABEL: sil hidden @_T010objc_final7callFooyyAA0D0CF
 func callFoo(_ x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.
