@@ -1173,7 +1173,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
 
     if (index::indexAndRecord(
             Instance.getMainModule(),
-            opts.InputsAndOutputs.outputFilenamesForEachInput(), moduleToken,
+            opts.InputsAndOutputs.preBatchModeOutputFilenames(), moduleToken,
             opts.IndexStorePath, opts.IndexSystemModules, isDebugCompilation,
             Invocation.getTargetTriple(), *Instance.getDependencyTracker())) {
       return true;
@@ -1413,7 +1413,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
     StringRef InputName =
-        FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
+        FEOpts.InputsAndOutputs.preBatchGetNameOfUniquePrimaryInputFile();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile =
         FEOpts.InputsAndOutputs.preBatchModeGetSingleOutputFilename();

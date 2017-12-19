@@ -198,8 +198,7 @@ public:
 
   /// Return the name of the unique primary input, or an empty StringRef if
   /// there isn't one.
-  // FIXME: dmu getNameOfUniquePrimaryInputFile probably wrong
-  StringRef getNameOfUniquePrimaryInputFile() const {
+  StringRef preBatchGetNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->file();
   }
@@ -210,15 +209,6 @@ public:
   }
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
-
-  // FIXME: dmu outputFilenamesForEachInput used for index generation, may be
-  // wrong
-  std::vector<std::string> outputFilenamesForEachInput() const {
-    std::vector<std::string> result;
-    for (const InputFile &input : getAllInputs())
-      result.push_back(input.outputs().OutputFilename);
-    return result;
-  }
 
   // Multi-facet readers
 
