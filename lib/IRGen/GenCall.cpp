@@ -1315,6 +1315,12 @@ llvm::CallSite CallEmission::emitCallSite() {
 
   Args.clear();
 
+  // Deallocate all the temporaries.
+  for (auto &temporary : Temporaries) {
+    auto &ti = IGF.getTypeInfo(temporary.Type);
+    ti.deallocateStack(IGF, temporary.Temp, temporary.Type);
+  }
+
   // Return.
   return call;
 }
@@ -1386,7 +1392,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   // explode that temporary.
   if (LastArgWritten == 1) {
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
-                                                     false, "call.aggresult");
+                                                     "call.aggresult");
     Address temp = ctemp.getAddress();
     emitToMemory(temp, substResultTI, isOutlined);
 
@@ -1623,8 +1629,9 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
   }
 
   // Otherwise, materialize to a temporary.
-  Address temporary =
-    paramTI.allocateStack(IGF, paramTy, false, "coerce-and-expand.temp").getAddress();
+  auto temporaryAlloc =
+    paramTI.allocateStack(IGF, paramTy, "coerce-and-expand.temp");
+  Address temporary = temporaryAlloc.getAddress();
 
   auto coercionTyLayout = IGF.IGM.DataLayout.getStructLayout(coercionTy);
 
@@ -1683,7 +1690,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
     paramTI.loadAsTake(IGF, temporary, out);
   }
 
-  paramTI.deallocateStack(IGF, StackAddress(temporary), paramTy);
+  paramTI.deallocateStack(IGF, temporaryAlloc, paramTy);
 }
 
 static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
@@ -1794,12 +1801,14 @@ emitClangExpandedArgument(IRGenFunction &IGF, Explosion &in, Explosion &out,
   }
 
   // Otherwise, materialize to a temporary.
-  Address temp = swiftTI.allocateStack(IGF, swiftType, false,
-                                       "clang-expand-arg.temp").getAddress();
+  auto ctemp = swiftTI.allocateStack(IGF, swiftType, "clang-expand-arg.temp");
+  Address temp = ctemp.getAddress();
   swiftTI.initialize(IGF, in, temp, isOutlined);
 
   Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
   ClangExpandLoadEmitter(IGF, out).visit(clangType, castTemp);
+
+  swiftTI.deallocateStack(IGF, ctemp, swiftType);
 }
 
 /// Given a Clang-expanded (according to ABIArgInfo::Expand) parameter
@@ -1816,17 +1825,21 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
   }
 
   // Otherwise, materialize to a temporary.
-  Address temp = swiftTI.allocateStack(IGF, swiftType, false,
-                                       "clang-expand-param.temp").getAddress();
+  auto tempAlloc = swiftTI.allocateStack(IGF, swiftType,
+                                         "clang-expand-param.temp");
+  Address temp = tempAlloc.getAddress();
   Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
   ClangExpandStoreEmitter(IGF, in).visit(clangType, castTemp);
 
   // Then load out.
   swiftTI.loadAsTake(IGF, temp, out);
+
+  swiftTI.deallocateStack(IGF, tempAlloc, swiftType);
 }
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
+                 SmallVectorImpl<CallEmission::TypedTemporary> &temporaries,
                                  bool isOutlined) {
   auto silConv = IGF.IGM.silConv;
   auto fnType = callee.getOrigFunctionType();
@@ -1894,8 +1907,11 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
-      Address addr = ti.allocateStack(IGF, paramType, false,
-                                      "indirect-temporary").getAddress();
+
+      auto temp = ti.allocateStack(IGF, paramType, "indirect-temporary");
+      temporaries.push_back({temp, paramType});
+
+      Address addr = temp.getAddress();
       // Set at least the alignment the ABI expects.
       if (AI.getIndirectByVal()) {
         auto ABIAlign = AI.getIndirectAlign();
@@ -2121,7 +2137,8 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
   case SILFunctionTypeRepresentation::ObjCMethod:
     adjusted.add(getCallee().getObjCMethodReceiver());
     adjusted.add(getCallee().getObjCMethodSelector());
-    externalizeArguments(IGF, getCallee(), original, adjusted, isOutlined);
+    externalizeArguments(IGF, getCallee(), original, adjusted,
+                         Temporaries, isOutlined);
     break;
 
   case SILFunctionTypeRepresentation::Block:
@@ -2129,7 +2146,8 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
     LLVM_FALLTHROUGH;
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
-    externalizeArguments(IGF, getCallee(), original, adjusted, isOutlined);
+    externalizeArguments(IGF, getCallee(), original, adjusted,
+                         Temporaries, isOutlined);
     break;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -2204,23 +2222,23 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
 
     // Create the alloca.  We don't use allocateStack because we're
     // not allocating this in stack order.
-    auto addr = builder.CreateAlloca(errorTI.getStorageType(), nullptr,
-                                     "swifterror");
-    addr->setAlignment(errorTI.getFixedAlignment().getValue());
+    auto addr = createAlloca(errorTI.getStorageType(),
+                             errorTI.getFixedAlignment(),
+                             "swifterror");
 
     // Only add the swifterror attribute on ABIs that pass it in a register.
     // We create a shadow stack location of the swifterror parameter for the
     // debugger on platforms that pass swifterror by reference and so we can't
     // mark the parameter with a swifterror attribute for these.
     if (IGM.IsSwiftErrorInRegister)
-      addr->setSwiftError(true);
+      cast<llvm::AllocaInst>(addr.getAddress())->setSwiftError(true);
 
     // Initialize at the alloca point.
     auto nullError = llvm::ConstantPointerNull::get(
                             cast<llvm::PointerType>(errorTI.getStorageType()));
-    builder.CreateStore(nullError, addr, errorTI.getFixedAlignment());
+    builder.CreateStore(nullError, addr);
 
-    ErrorResultSlot = addr;
+    ErrorResultSlot = addr.getAddress();
   }
   return Address(ErrorResultSlot, IGM.getPointerAlignment());
 }
@@ -2256,8 +2274,9 @@ void IRGenFunction::emitPrologue() {
   Builder.SetInsertPoint(EntryBB);
 
   // Set up the alloca insertion point.
-  AllocaIP = Builder.CreateAlloca(IGM.Int1Ty, /*array size*/ nullptr,
-                                  "alloca point");
+  AllocaIP = Builder.IRBuilderBase::CreateAlloca(IGM.Int1Ty,
+                                                 /*array size*/ nullptr,
+                                                 "alloca point");
 }
 
 /// Emit a branch to the return block and set the insert point there.
@@ -2572,6 +2591,8 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   Address storageAddr = Builder.CreateBitCast(
       temporary, loadableTI.getStorageType()->getPointerTo());
   loadableTI.loadAsTake(IGF, storageAddr, nonNativeExplosion);
+
+  Builder.CreateLifetimeEnd(temporary, tempSize);
 
   return nonNativeExplosion;
 }

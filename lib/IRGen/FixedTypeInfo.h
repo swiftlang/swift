@@ -76,7 +76,7 @@ public:
     return (isFixedSize(expansion) && StorageSize.isZero());
   }
 
-  StackAddress allocateStack(IRGenFunction &IGF, SILType T, bool isEntryBlock,
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                              const llvm::Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
