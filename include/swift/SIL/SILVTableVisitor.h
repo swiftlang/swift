@@ -71,7 +71,7 @@ template <class T> class SILVTableVisitor {
     // Update any existing entries that it overrides.
     auto nextRef = declRef;
     while ((nextRef = nextRef.getNextOverriddenVTableEntry())) {
-      auto baseRef = Types.getOverriddenVTableEntry(nextRef);
+      auto baseRef = nextRef.getOverriddenVTableEntry();
       asDerived().addMethodOverride(baseRef, declRef);
       nextRef = baseRef;
     }

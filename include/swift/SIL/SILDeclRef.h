@@ -361,6 +361,11 @@ struct SILDeclRef {
   /// declarations do not always have vtable entries.
   SILDeclRef getNextOverriddenVTableEntry() const;
 
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry() const;
+
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
 
