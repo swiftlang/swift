@@ -504,10 +504,17 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
   return File;
 }
 
+struct PostSILGenInputs {
+  std::unique_ptr<SILModule> TheSILModule;
+  bool astGuaranteedToCorrespondToSIL;
+  ModuleOrSourceFile ModuleOrPrimarySourceFile;
+};
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
+                                          ModuleOrSourceFile MSF,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
@@ -783,16 +790,13 @@ static bool performCompile(CompilerInstance &Instance,
   assert(Action >= FrontendOptions::ActionType::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
 
-  // The second boolean in each std::pair<> in this std::deque<> indicates
-  // whether the SIL is guaranteed to correspond to the the AST. This might be
-  // false if we loaded SIL from an SIB.
-  std::deque<std::pair<std::unique_ptr<SILModule>, bool>> SMs;
+  auto mod = Instance.getMainModule();
+  std::deque<PostSILGenInputs> PSGIs;
   if (auto SM = Instance.takeSILModule()) {
-    SMs.push_back(std::make_pair(std::move(SM), false));
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
   }
 
-  if (SMs.empty()) {
-    auto mod = Instance.getMainModule();
+  if (PSGIs.empty()) {
     auto fileIsSIB = [](const FileUnit *File) -> bool {
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
@@ -807,9 +811,10 @@ static bool performCompile(CompilerInstance &Instance,
                   InputFile::
                     convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
                       SASTF->getFilename()))) {
-              assert(SMs.empty() && "Can only handle one primary AST input");
+              assert(PSGIs.empty() && "Can only handle one primary AST input");
               auto SM = performSILGeneration(*SASTF, SILOpts, None);
-              SMs.push_back(std::make_pair(std::move(SM), !fileIsSIB(SASTF)));
+              PSGIs.push_back(
+                  PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
             }
           }
         }
@@ -819,25 +824,26 @@ static bool performCompile(CompilerInstance &Instance,
         // once for each such input.
         for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
           auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
-          SMs.push_back(std::make_pair(std::move(SM), !fileIsSIB(PrimaryFile)));
+          PSGIs.push_back(PostSILGenInputs{
+              std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
         }
       }
     } else {
       // If we have no primary inputs we are in WMO mode and need to build a
       // SILModule for the entire module.
       auto SM = performSILGeneration(mod, SILOpts, true);
-      SMs.push_back(std::make_pair(std::move(SM),
-                                   llvm::none_of(mod->getFiles(),
-                                                 fileIsSIB)));
+      PSGIs.push_back(PostSILGenInputs{
+          std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
     }
   }
 
-  while (!SMs.empty()) {
-    auto pair = std::move(SMs.front());
-    SMs.pop_front();
+  while (!PSGIs.empty()) {
+    auto PSGI = std::move(PSGIs.front());
+    PSGIs.pop_front();
     if (performCompileStepsPostSILGen(Instance, Invocation,
-                                      std::move(pair.first),
-                                      pair.second,
+                                      std::move(PSGI.TheSILModule),
+                                      PSGI.astGuaranteedToCorrespondToSIL,
+                                      PSGI.ModuleOrPrimarySourceFile,
                                       moduleIsPublic,
                                       ReturnValue, observer, Stats))
       return true;
@@ -850,6 +856,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
                                           bool astGuaranteedToCorrespondToSIL,
+                                          ModuleOrSourceFile MSF,
                                           bool moduleIsPublic,
                                           int &ReturnValue,
                                           FrontendObserver *observer,
@@ -883,14 +890,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
 
-    auto DC = Instance.getPrimarySourceFileOrMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(MSF, serializationOpts, SM.get());
     }
     return Context.hadError();
   }
@@ -939,7 +945,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   auto SerializeSILModuleAction = [&]() {
     if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-      auto DC = Instance.getPrimarySourceFileOrMainModule();
       if (!opts.ModuleOutputPath.empty()) {
         SerializationOptions serializationOpts;
         serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -961,7 +966,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
         serializationOpts.SerializeOptionsForDebugging =
             !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
 
-        serialize(DC, serializationOpts, SM.get());
+        serialize(MSF, serializationOpts, SM.get());
       }
     }
   };
@@ -1011,8 +1016,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // Get the main source file's private discriminator and attach it to
   // the compile unit's flags.
   if (IRGenOpts.DebugInfoKind != IRGenDebugInfoKind::None &&
-      Instance.getPrimarySourceFile()) {
-    Identifier PD = Instance.getPrimarySourceFile()->getPrivateDiscriminator();
+      MSF.is<SourceFile*>()) {
+    Identifier PD = MSF.get<SourceFile*>()->getPrivateDiscriminator();
     if (!PD.empty())
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
@@ -1023,14 +1028,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
-    auto DC = Instance.getPrimarySourceFileOrMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(MSF, serializationOpts, SM.get());
     }
     return Context.hadError();
   }
@@ -1042,7 +1046,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
       if (shouldIndex) {
-        if (emitIndexData(Instance.getPrimarySourceFile(),
+        if (emitIndexData(MSF.dyn_cast<SourceFile*>(),
                           Invocation, Instance))
           return true;
       }
@@ -1074,7 +1078,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
   if (Action == FrontendOptions::ActionType::Immediate) {
-    assert(Instance.getPrimarySourceFiles().empty() &&
+    assert(!MSF.is<SourceFile*>() &&
            "-i doesn't work in -primary-file mode");
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
@@ -1096,14 +1100,14 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   auto &LLVMContext = getGlobalLLVMContext();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  if (!Instance.getPrimarySourceFiles().empty()) {
+  if (MSF.is<SourceFile*>()) {
     IRModule = performIRGeneration(IRGenOpts,
-                                   *Instance.getPrimarySourceFile(),
+                                   *MSF.get<SourceFile*>(),
                                    std::move(SM),
                                    opts.getSingleOutputFilename(), LLVMContext,
                                    0, &HashGlobal);
   } else {
-    IRModule = performIRGeneration(IRGenOpts, Instance.getMainModule(),
+    IRModule = performIRGeneration(IRGenOpts, MSF.get<ModuleDecl*>(),
                                    std::move(SM),
                                    opts.getSingleOutputFilename(), LLVMContext,
                                    &HashGlobal);
@@ -1112,7 +1116,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
   if (shouldIndex) {
-    if (emitIndexData(Instance.getPrimarySourceFile(), Invocation, Instance))
+    if (emitIndexData(MSF.dyn_cast<SourceFile*>(), Invocation, Instance))
       return true;
   }
 
@@ -1141,12 +1145,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     const auto &SILOpts = Invocation.getSILOptions();
     const auto hasMultipleIGMs = SILOpts.hasMultipleIGMs();
     bool error;
-    if (!Instance.getPrimarySourceFiles().empty())
-      error = validateTBD(Instance.getPrimarySourceFile(),
+    if (MSF.is<SourceFile*>())
+      error = validateTBD(MSF.get<SourceFile*>(),
                           *IRModule, hasMultipleIGMs,
                           allSymbols);
     else
-      error = validateTBD(Instance.getMainModule(), *IRModule, hasMultipleIGMs,
+      error = validateTBD(MSF.get<ModuleDecl*>(),
+                          *IRModule, hasMultipleIGMs,
                           allSymbols);
     if (error)
       return true;
