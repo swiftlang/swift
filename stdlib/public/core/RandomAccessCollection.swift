@@ -48,10 +48,10 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   associatedtype Index
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence = Slice<Self>
+  associatedtype SubSequence
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices = DefaultIndices<Self>
+  associatedtype Indices
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.

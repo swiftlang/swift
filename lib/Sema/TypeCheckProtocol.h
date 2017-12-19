@@ -715,6 +715,11 @@ private:
     ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
+  /// Compute a "fixed" type witness for an associated type, e.g.,
+  /// if the refined protocol requires it to be equivalent to some other
+  /// concrete type.
+  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
+
   /// Compute the default type witness from an associated type default,
   /// if there is one.
   Type computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
