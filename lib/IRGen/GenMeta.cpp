@@ -2424,9 +2424,7 @@ namespace {
   public:
     ClassNominalTypeDescriptorBuilder(IRGenModule &IGM,
                                        ClassDecl *c)
-      : super(IGM),
-        SILVTableVisitor<ClassNominalTypeDescriptorBuilder>(IGM.getSILTypes()),
-        Target(c)
+      : super(IGM), Target(c)
     {
       auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
