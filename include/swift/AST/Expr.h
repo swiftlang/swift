@@ -141,6 +141,12 @@ class alignas(8) Expr {
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
+
+  SWIFT_INLINE_BITFIELD(ParenExpr, IdentityExpr, 1,
+    /// \brief Whether we're wrapping a trailing closure expression.
+    HasTrailingClosure : 1
+  );
 
   SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1,
     IsNegative : 1
@@ -346,6 +352,7 @@ protected:
     SWIFT_INLINE_BITS(ArrayToPointerExpr);
     SWIFT_INLINE_BITS(ObjCSelectorExpr);
     SWIFT_INLINE_BITS(KeyPathExpr);
+    SWIFT_INLINE_BITS(ParenExpr);
   } Bits;
 
 private:
@@ -1872,17 +1879,13 @@ public:
 class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
   
-  /// \brief Whether we're wrapping a trailing closure expression.
-  /// FIXME: Pack bit into superclass.
-  bool HasTrailingClosure;
-
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
             Type ty = Type())
     : IdentityExpr(ExprKind::Paren, subExpr, ty),
-      LParenLoc(lploc), RParenLoc(rploc),
-      HasTrailingClosure(hasTrailingClosure) {
+      LParenLoc(lploc), RParenLoc(rploc) {
+    Bits.ParenExpr.HasTrailingClosure = hasTrailingClosure;
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
   }
@@ -1900,13 +1903,13 @@ public:
   SourceLoc getEndLoc() const {
     // If we have a trailing closure, our end point is the end of the
     // trailing closure.
-    if (RParenLoc.isInvalid() || HasTrailingClosure)
+    if (RParenLoc.isInvalid() || Bits.ParenExpr.HasTrailingClosure)
       return getSubExpr()->getEndLoc();
     return RParenLoc;
   }
 
   /// \brief Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return HasTrailingClosure; }
+  bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
