@@ -315,43 +315,16 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
       .fixItRemoveChars(NulLoc, NulEndLoc);
 }
 
-void Lexer::skipUpToEndOfLine() {
-  while (1) {
-    switch (*CurPtr) {
-      case '\n':
-      case '\r':
-        return;
-      default:
-        // If this is a "high" UTF-8 character, validate it.
-        if (*reinterpret_cast<const signed char *>(CurPtr) < 0) {
-          const char *CharStart = CurPtr;
-          if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-            diagnose(CharStart, diag::lex_invalid_utf8);
-          else
-            continue;
-        }
-        break;   // Otherwise, eat other characters.
-      case 0:
-        // If this is a random nul character in the middle of a buffer, skip it as
-        // whitespace.
-        if (CurPtr != BufferEnd) {
-          diagnoseEmbeddedNul(Diags, CurPtr);
-          break;
-        }
-
-        // Otherwise, the last line of the file does not have a newline.
-        return;
-    }
-    ++CurPtr;
-  }
-}
-
-void Lexer::skipToEndOfLine() {
+void Lexer::skipToEndOfLine(bool EatNewline) {
   while (1) {
     switch (*CurPtr++) {
     case '\n':
     case '\r':
-      NextToken.setAtStartOfLine(true);
+      if (EatNewline) {
+        NextToken.setAtStartOfLine(true);
+      } else {
+        --CurPtr;
+      }
       return;  // If we found the end of the line, return.
     default:
       // If this is a "high" UTF-8 character, validate it.
@@ -377,15 +350,15 @@ void Lexer::skipToEndOfLine() {
   }
 }
 
-void Lexer::skipSlashSlashComment() {
+void Lexer::skipSlashSlashComment(bool EatNewline) {
   assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
-  skipToEndOfLine();
+  skipToEndOfLine(EatNewline);
 }
 
-void Lexer::skipHashbang() {
+void Lexer::skipHashbang(bool EatNewline) {
   assert(CurPtr == ContentStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
          "Not a hashbang");
-  skipToEndOfLine();
+  skipToEndOfLine(/*EatNewline=*/EatNewline);
 }
 
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
@@ -634,7 +607,7 @@ void Lexer::lexHash() {
     CurPtr--;
     if (BufferID != SourceMgr.getHashbangBufferID())
       diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-    skipHashbang();
+    skipHashbang(/*EatNewline=*/true);
     return lexImpl();
   }
 
@@ -1861,7 +1834,7 @@ bool Lexer::tryLexConflictMarker() {
     
     // Skip ahead to the end of the marker.
     if (CurPtr != BufferEnd)
-      skipToEndOfLine();
+      skipToEndOfLine(/*EatNewline=*/true);
     
     return true;
   }
@@ -2210,7 +2183,7 @@ Restart:
       // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
-      skipSlashSlashComment();
+      skipSlashSlashComment(/*EatNewline=*/true);
       SeenComment = true;
       if (isKeepingComments())
         return formToken(tok::comment, TokStart);
@@ -2373,8 +2346,7 @@ Restart:
       // '// ...' comment.
       SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
-      skipUpToEndOfLine(); // NOTE: Don't use skipSlashSlashComment() here
-                           // because it consumes trailing newline.
+      skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(isDocComment
                            ? TriviaPiece::docLineComment({TriviaStart, Length})
@@ -2395,10 +2367,10 @@ Restart:
   case '#':
     if (TriviaStart == BufferStart && *CurPtr == '!') {
       // Hashbang '#!/path/to/swift'.
+      --CurPtr;
       if (BufferID != SourceMgr.getHashbangBufferID())
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
-      skipUpToEndOfLine(); // NOTE: Don't use skipHashbang() here because it
-                           // consumes trailing newline.
+      skipHashbang(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
       Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
       goto Restart;
@@ -2557,7 +2529,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
-  L.skipToEndOfLine();
+  L.skipToEndOfLine(/*EatNewline=*/true);
   return getSourceLoc(L.CurPtr);
 }
 

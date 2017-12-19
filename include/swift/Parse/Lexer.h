@@ -485,18 +485,16 @@ private:
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
 
-  /// Advance to the end of the line but leave the current buffer pointer
-  /// at that newline character.
-  void skipUpToEndOfLine();
-
-  /// Advance past the next newline character.
-  void skipToEndOfLine();
+  /// Advance to the end of the line.
+  /// If EatNewLine is true, CurPtr will be at end of newline character.
+  /// Otherwise, CurPtr will be at newline character.
+  void skipToEndOfLine(bool EatNewline);
 
   /// Skip to the end of the line of a // comment.
-  void skipSlashSlashComment();
+  void skipSlashSlashComment(bool EatNewline);
 
   /// Skip a #! hashbang line.
-  void skipHashbang();
+  void skipHashbang(bool EatNewline);
 
   void skipSlashStarComment();
   void lexHash();
