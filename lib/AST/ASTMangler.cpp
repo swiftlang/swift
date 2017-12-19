@@ -2018,10 +2018,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
 void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
   GenericSignature *contextSig = nullptr;
-  Mod = conformance->getDeclContext()->getParentModule();
-  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
-    auto topLevelContext =
+  auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
+  Mod = topLevelContext->getParentModule();
+
+  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
     appendContextOf(behaviorStorage);
     FileUnit *fileUnit = cast<FileUnit>(topLevelContext);
     appendIdentifier(
@@ -2032,7 +2033,19 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     auto conformingType = conformance->getType();
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
-    appendModule(conformance->getDeclContext()->getParentModule());
+
+    bool needsModule = true;
+    if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+      if (file->getKind() == FileUnitKind::ClangModule) {
+        if (conformance->getProtocol()->hasClangNode())
+          appendOperator("So");
+        else
+          appendOperator("SC");
+        needsModule = false;
+      }
+    }
+    if (needsModule)
+      appendModule(Mod);
 
     contextSig =
       conformingType->getAnyNominal()->getGenericSignatureOfContext();

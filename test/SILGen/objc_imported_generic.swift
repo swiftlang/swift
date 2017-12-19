@@ -141,5 +141,5 @@ func configureWithoutOptions() {
 // Make sure we emitted the witness table for the above conformance
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
-// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @$SSo13GenericOptionas8Hashable13objc_genericssACP9hashValueSivgTW
+// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
 // CHECK: }

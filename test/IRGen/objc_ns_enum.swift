@@ -11,7 +11,7 @@ import gizmo
 // CHECK: @"$SSo16NSRuncingOptionsVWV" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden global
-// CHECK: @"$SSo28NeverActuallyMentionedByNameVs9Equatable5gizmoWP" = linkonce_odr hidden constant
+// CHECK: @"$SSo28NeverActuallyMentionedByNameVs9EquatableSCWP" = linkonce_odr hidden constant
 
 // CHECK-LABEL: define{{( protected)?}} i32 @main
 // CHECK:         call %swift.type* @"$SSo16NSRuncingOptionsVMa"()

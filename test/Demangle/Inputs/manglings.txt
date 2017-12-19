@@ -303,3 +303,5 @@ _T0iW ---> _T0iW
 _S$iW ---> _S$iW
 _T0s5print_9separator10terminatoryypfC ---> _T0s5print_9separator10terminatoryypfC
 _S$s5print_9separator10terminatoryypfC ---> _S$s5print_9separator10terminatoryypfC
+_T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness for Swift.Hashable.hashValue.getter : Swift.Int in conformance __C.GenericOption : Swift.Hashable in __C_Synthesized
+_T0So11CrappyColorVs16RawRepresentableSCMA --> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
