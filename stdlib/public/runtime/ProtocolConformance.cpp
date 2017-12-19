@@ -16,8 +16,10 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
@@ -142,10 +144,28 @@ const {
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type, nullptr, 0);
 
-  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor: {
     // FIXME: this needs to query the conditional requirements to form the
     // array of witness tables to pass along to the accessor.
+
+    // Pretty-print the type name.
+    TwoWordPair<const char *, uintptr_t> typeNamePair =
+      swift_getTypeName(type, /*qualified=*/true);
+    std::string typeName(typeNamePair.first,
+                         typeNamePair.first + typeNamePair.second);
+
+    // Demangle the protocol name.
+    DemangleOptions options;
+    options.DisplayEntityTypes = false;
+    std::string demangledProtocolName =
+      demangleSymbolAsString(StringRef(getProtocol()->Name), options);
+
+    warning(/*flag=*/0,
+            "warning: Swift runtime does not yet support dynamically "
+            "querying conditional conformance ('%s': '%s')\n",
+            typeName.c_str(), demangledProtocolName.c_str());
     return nullptr;
+  }
   }
 
   swift_runtime_unreachable(

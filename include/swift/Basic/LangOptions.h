@@ -138,9 +138,6 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
-    /// Whether SE-0143: Conditional Conformances are enabled.
-    bool EnableConditionalConformances = false;
-
     ///
     /// Flags for developers
     ///
