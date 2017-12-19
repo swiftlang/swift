@@ -2,6 +2,7 @@ add_swift_library(swiftFrontend STATIC
   CompilerInvocation.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
+  FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp

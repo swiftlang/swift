@@ -762,7 +762,7 @@ Optional<std::string> deriveOutputFileForDirectory(
 }
 
 static Optional<std::string> computeOutputFilename(
-    const ArgList &args, ArrayRef<std::string> outputFileArguments,
+    const ArgList &args, ArrayRef<std::string> outputFileArgumentsForEveryInput,
     StringRef ithOutputFilenameArg,
     const bool isOutputFilenameArgumentOneDirectory,
     const bool doOutputFilenameArgumentsCorrespondToInputs,
@@ -777,15 +777,15 @@ static Optional<std::string> computeOutputFilename(
   const bool hasTextualOutput =
       FrontendOptions::doesActionProduceTextualOutput(requestedAction);
 
-  return outputFileArguments.empty()
+  return outputFileArgumentsForEveryInput.empty()
              ? deriveOutputFileFromInput(
                    moduleNameArg, filenameOfSingleInput, inputFilename,
                    isPrimary, outputFileSuffix, hasTextualOutput, diags)
              : isOutputFilenameArgumentOneDirectory
                    ? deriveOutputFileForDirectory(
-                         outputFileArguments.front(), moduleNameArg,
-                         filenameOfSingleInput, inputFilename, isPrimary,
-                         outputFileSuffix, diags)
+                         outputFileArgumentsForEveryInput.front(),
+                         moduleNameArg, filenameOfSingleInput, inputFilename,
+                         isPrimary, outputFileSuffix, diags)
                    : ithOutputFilenameArg.str();
 }
 
@@ -830,6 +830,7 @@ static Optional<std::string> determineSupplementaryOutputFilename(
     return std::string();
 
   if (!mainOutputIfUsable.empty()) {
+    assert(false && "Using fake_outputFilenameOfFirstInput");
     return mainOutputIfUsable.str();
   }
 
@@ -839,7 +840,7 @@ static Optional<std::string> determineSupplementaryOutputFilename(
 };
 
 static void deriveModuleParameters(const ArgList &args,
-                                   StringRef singleOutputFilename,
+                                   StringRef outputFilenameOfFirstInput,
                                    options::ID &emitOption,
                                    std::string &extension,
                                    std::string &mainOutputIfUsable) {
@@ -860,12 +861,13 @@ static void deriveModuleParameters(const ArgList &args,
 
   extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
 
-  mainOutputIfUsable = canUseMainOutputForModule ? singleOutputFilename : "";
+  mainOutputIfUsable =
+      canUseMainOutputForModule ? outputFilenameOfFirstInput : "";
 }
 
 static Optional<OutputPaths> determineSupplementaryOutputFilenames(
     const ArgList &args, StringRef outputFilename,
-    StringRef singleOutputFilename, const OutputPaths &suppOutArg,
+    StringRef outputFilenameOfFirstInput, const OutputPaths &suppOutArg,
     StringRef supplementaryNameFromInputOrModule, DiagnosticEngine &diags) {
   using namespace options;
 
@@ -925,7 +927,7 @@ static Optional<OutputPaths> determineSupplementaryOutputFilenames(
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
-  deriveModuleParameters(args, singleOutputFilename, emitModuleOption,
+  deriveModuleParameters(args, outputFilenameOfFirstInput, emitModuleOption,
                          moduleExtension, mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
@@ -942,17 +944,18 @@ static Optional<OutputPaths> determineSupplementaryOutputFilenames(
 }
 
 static Optional<OutputPaths> computeOutputsForOneInput(
-    const ArgList &args, ArrayRef<std::string> allOutputFileArguments,
+    const ArgList &args, ArrayRef<std::string> outputFileArgumentsForEveryInput,
     StringRef outputFilenameArg,
     const bool isOutputFilenameArgumentOneDirectory,
     const bool doOutputFilenameArgumentsCorrespondToInputs,
-    StringRef singleInputFilename, const InputFile &input, StringRef moduleName,
+    StringRef filenameOfFirstInput, StringRef outputFilenameOfFirstInput,
+    const InputFile &input, StringRef moduleName,
     const OutputPaths &suppFileListArg, DiagnosticEngine &diags) {
 
   Optional<std::string> outputFilename = computeOutputFilename(
-      args, allOutputFileArguments, outputFilenameArg,
+      args, outputFileArgumentsForEveryInput, outputFilenameArg,
       isOutputFilenameArgumentOneDirectory,
-      doOutputFilenameArgumentsCorrespondToInputs, singleInputFilename,
+      doOutputFilenameArgumentsCorrespondToInputs, filenameOfFirstInput,
       input.file(), input.isPrimary(), diags);
   if (!outputFilename)
     return None;
@@ -962,26 +965,27 @@ static Optional<OutputPaths> computeOutputsForOneInput(
                                                  input.isPrimary(), moduleName);
 
   return determineSupplementaryOutputFilenames(
-      args, *outputFilename,
-                                               
-                                          //xxx XXXXX     singleOutputFilename,
-                                               "",
-                                               
-                                               
-                                               suppFileListArg,
+      args, *outputFilename, outputFilenameOfFirstInput, suppFileListArg,
       supplementaryNameFromInputOrModule, diags);
 }
 
 static bool computeAllOutputs(
-    const ArgList &args, ArrayRef<std::string> outputFileArguments,
+    const ArgList &args, ArrayRef<std::string> outputFileArgumentsForEveryInput,
     ArrayRef<OutputPaths> suppFileListArgs, const bool isSingleThreadedWMO,
     const bool isOutputFilenameArgumentOneDirectory,
     const bool doOutputFilenameArgumentsCorrespondToInputs,
     StringRef moduleName, DiagnosticEngine &diags,
     FrontendInputsAndOutputs &io) {
 
-  StringRef singleInputFilename =
+  StringRef filenameOfFirstInput =
       io.hasSingleInput() ? io.getFilenameOfFirstInput() : StringRef();
+
+  // FIXME: dmu Get rid of this someday.
+  StringRef outputFilenameOfFirstInput = computeOutputFilename(
+      args, outputFileArgumentsForEveryInput, outputFilenameArg,
+      isOutputFilenameArgumentOneDirectory,
+      doOutputFilenameArgumentsCorrespondToInputs, filenameOfFirstInput,
+      input.file(), input.isPrimary(), diags);
 
   unsigned i = 0;
   io.setIsSingleThreadedWMO(isSingleThreadedWMO);
@@ -989,16 +993,18 @@ static bool computeAllOutputs(
       [&](InputFile &input) -> bool { // ONLY ONCE IF WMONON??
 
         StringRef ithOutputFilenameArg =
-            outputFileArguments.empty() ? StringRef()
-                                        : StringRef(outputFileArguments[i]);
+            outputFileArgumentsForEveryInput.empty()
+                ? StringRef()
+                : StringRef(outputFileArgumentsForEveryInput[i]);
 
         const OutputPaths &ithSuppFileListArg = suppFileListArgs[i];
 
         Optional<OutputPaths> outputPaths = computeOutputsForOneInput(
-            args, outputFileArguments, ithOutputFilenameArg,
+            args, outputFileArgumentsForEveryInput, ithOutputFilenameArg,
             isOutputFilenameArgumentOneDirectory,
-            doOutputFilenameArgumentsCorrespondToInputs, singleInputFilename,
-            input, moduleName, ithSuppFileListArg, diags);
+            doOutputFilenameArgumentsCorrespondToInputs, filenameOfFirstInput,
+            outputFilenameOfFirstInput, input, moduleName, ithSuppFileListArg,
+            diags);
 
         if (!outputPaths)
           return true;
@@ -1013,28 +1019,29 @@ bool FrontendArgsToOptionsConverter::
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction))
     return false;
 
-  const ArrayRef<std::string> outputFileArguments =
+  const ArrayRef<std::string> outputFileArgumentsForEveryInput =
       getOutputFilenamesFromCommandLineOrFilelist();
 
   // FIXME: dmu suppFilelistArgs should be const, but std::vector...
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
 
-  const bool isSingleThreadedWMO = outputFileArguments.size() == 1 &&
-                                   Opts.InputsAndOutputs.hasInputs() &&
-                                   !Opts.InputsAndOutputs.hasPrimaries();
+  const bool isSingleThreadedWMO =
+      outputFileArgumentsForEveryInput.size() == 1 &&
+      Opts.InputsAndOutputs.hasInputs() &&
+      !Opts.InputsAndOutputs.hasPrimaries();
 
   const bool isOutputFilenameArgumentOneDirectory =
-      outputFileArguments.size() == 1 &&
-      llvm::sys::fs::is_directory(outputFileArguments.front());
+      outputFileArgumentsForEveryInput.size() == 1 &&
+      llvm::sys::fs::is_directory(outputFileArgumentsForEveryInput.front());
 
   const bool doOutputFilenameArgumentsCorrespondToInputs =
       !isOutputFilenameArgumentOneDirectory &&
-      outputFileArguments.size() ==
+      outputFileArgumentsForEveryInput.size() ==
           Opts.InputsAndOutputs.countOfFilesProducingOutput();
 
-  return computeAllOutputs(Args, outputFileArguments, suppFilelistArgs,
-                           isSingleThreadedWMO,
+  return computeAllOutputs(Args, outputFileArgumentsForEveryInput,
+                           suppFilelistArgs, isSingleThreadedWMO,
                            isOutputFilenameArgumentOneDirectory,
                            doOutputFilenameArgumentsCorrespondToInputs,
                            Opts.ModuleName, Diags, Opts.InputsAndOutputs);
