@@ -3217,7 +3217,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
     return makeParserResult(
-                  DictionaryExpr::create(Context, LSquareLoc, {}, RSquareLoc));
+               DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
   }
 
   bool ParseDict;
@@ -3311,6 +3311,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
   // Each subexpression is a (key, value) tuple.
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
   SourceLoc RSquareLoc;
 
   // Function that adds a new key/value pair.
@@ -3349,12 +3350,17 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
+
+    if (Tok.is(tok::comma))
+      CommaLocs.push_back(Tok.getLoc());
+
     return ParserStatus(Key) | ParserStatus(Value);
   });
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status, DictionaryExpr::create(Context, LSquareLoc,
-                                                         SubExprs, RSquareLoc));
+                                                         SubExprs, CommaLocs,
+                                                         RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
