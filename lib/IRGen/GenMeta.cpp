@@ -3224,6 +3224,8 @@ namespace {
     using super::Target;
     using super::asImpl;
 
+    bool HasResilientSuperclass = false;
+
     ConstantStructBuilder &B;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
@@ -3239,6 +3241,45 @@ namespace {
         Members(IGM, theClass, builder, layout, fieldLayout) {}
 
   public:
+    void noteResilientSuperclass() {
+      // FIXME: Perform sliding
+      HasResilientSuperclass = true;
+    }
+
+    void noteStartOfImmediateMembers(ClassDecl *theClass) {
+      // Only classes defined in resilient modules, or those that have
+      // a resilient superclass need this.
+      if (!HasResilientSuperclass &&
+          !IGM.isResilient(theClass, ResilienceExpansion::Minimal)) {
+        return;
+      }
+
+      if (theClass == Target) {
+        auto *offsetAddr =
+          IGM.getAddrOfClassMetadataBaseOffset(theClass,
+                                               ForDefinition);
+        auto *offsetVar = cast<llvm::GlobalVariable>(offsetAddr);
+
+        if (HasResilientSuperclass) {
+          // If the superclass is resilient to us, we have to compute and
+          // initialize the global when we initialize the metadata.
+          auto *init = llvm::ConstantInt::get(IGM.SizeTy, 0);
+
+          offsetVar->setInitializer(init);
+          offsetVar->setConstant(false);
+          return;
+        }
+
+        // Otherwise, we know the offset at compile time, even if our
+        // clients do not, so just emit a constant.
+        auto value = asImpl().getNextOffsetFromAddressPoint().getValue();
+        auto *init = llvm::ConstantInt::get(IGM.SizeTy, value);
+
+        offsetVar->setInitializer(init);
+        offsetVar->setConstant(true);
+      }
+    }
+
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
     ///
@@ -3456,20 +3497,11 @@ namespace {
 
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
                                                          llvm::Value *metadata) {
-      // We assume that we've already filled in the class's generic arguments.
-      // We need to:
-      //   - fill out the subclass's field offset vector, if its layout
-      //     wasn't fixed;
-      //   - copy field offsets and generic arguments from higher in the
-      //     class hierarchy, if 
-      //   - copy the superclass data, if there are generic arguments
-      //     or field offset vectors there that weren't filled in;
-      //   - populate the field offset vector, if layout isn't fixed, and
-      //   - register the class with the ObjC runtime, if ObjC interop is
-      //     enabled.
-      //
-      // emitInitializeFieldOffsetVector will do everything in the full case.
       if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
+        // We need to:
+        //   - fill out the subclass's field offset vector
+        //   - copy field offsets and generic arguments from higher in the
+        //     class hierarchy
         auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
         auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
         emitInitializeFieldOffsetVector(IGF, loweredClassTy,
@@ -3482,9 +3514,8 @@ namespace {
         // correctly in the first place.
         if (!IGF.IGM.ObjCInterop)
           emitInitializeFieldOffsets(IGF, metadata);
-
-      // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
+        // Otherwise, all we need to do is register with the ObjC runtime.
         metadata = emitFinishIdempotentInitialization(IGF, metadata);
       }
 
@@ -3493,6 +3524,43 @@ namespace {
       emitInitializeMethodOverrides(IGF, metadata);
 
       return metadata;
+    }
+
+    // Store the runtime-computed metadata size of our superclass into the
+    // target class's metadata base offset global variable.
+    //
+    // Note that this code will run for each generic instantiation of the
+    // class, if the class is generic. This should be OK because the
+    // metadata size does not change between generic instantiations, so
+    // all stores after the first should be idempotent.
+    void emitInitializeClassMetadataBaseOffset(IRGenFunction &IGF,
+                                               llvm::Value *superMetadata) {
+      if (!HasResilientSuperclass)
+        return;
+
+      auto &layout = IGM.getMetadataLayout(Target);
+
+      // Load the size of the superclass metadata.
+      Address metadataAsBytes(
+          IGF.Builder.CreateBitCast(superMetadata, IGF.IGM.Int8PtrTy),
+          IGM.getPointerAlignment());
+
+      Address slot = IGF.Builder.CreateConstByteArrayGEP(
+          metadataAsBytes,
+          layout.getMetadataSizeOffset());
+      slot = IGF.Builder.CreateBitCast(slot, IGM.Int32Ty->getPointerTo());
+      llvm::Value *size = IGF.Builder.CreateLoad(slot);
+      if (IGM.SizeTy != IGM.Int32Ty)
+        size = IGF.Builder.CreateZExt(size, IGM.SizeTy);
+
+      Address offsetAddr(
+          IGM.getAddrOfClassMetadataBaseOffset(Target,
+                                               NotForDefinition),
+          IGM.getPointerAlignment());
+
+      // FIXME: Do we need to worry about memory barriers here, and when we
+      // load from the global?
+      IGF.Builder.CreateStore(size, offsetAddr);
     }
 
     // Update vtable entries for method overrides. The runtime copies in
@@ -3600,6 +3668,7 @@ namespace {
     using super::Target;
     using super::B;
     using super::addReferenceToHeapMetadata;
+    using super::emitInitializeClassMetadataBaseOffset;
     using super::emitFinishInitializationOfClassMetadata;
     using super::emitFinishIdempotentInitialization;
     using super::emitFieldOffsetGlobals;
@@ -3695,15 +3764,18 @@ namespace {
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
         auto superclass = type->getSuperclass()->getCanonicalType();
-        llvm::Value *superclassMetadata =
+        llvm::Value *superMetadata =
           emitClassHeapMetadataRef(IGF, superclass,
                                    MetadataValueType::TypeMetadata,
                                    /*allowUninit*/ false);
+
+        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
+
         Address superField =
           emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
         superField = IGF.Builder.CreateElementBitCast(superField,
                                                      IGM.TypeMetadataPtrTy);
-        IGF.Builder.CreateStore(superclassMetadata, superField);
+        IGF.Builder.CreateStore(superMetadata, superField);
       }
 
       // Relocate the metadata if it has a superclass that is resilient
@@ -3792,12 +3864,13 @@ namespace {
         superMetadata =
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);
+
+        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
       } else if (IGM.ObjCInterop) {
         superMetadata = emitObjCHeapMetadataRef(IGF,
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target));
       } else {
-        superMetadata
-          = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+        superMetadata = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       }
 
       auto numImmediateMembers =

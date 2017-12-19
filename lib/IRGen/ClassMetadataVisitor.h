@@ -90,20 +90,30 @@ public:
 private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass, Type type) {
-    // Add any fields associated with the superclass.
-    // NB: We don't apply superclass substitutions to members because we want
-    // consistent metadata layout between generic superclasses and concrete
-    // subclasses.
+    // Visit the superclass first.
     if (Type superclass = type->getSuperclass()) {
-      ClassDecl *superclassDecl = superclass->getClassOrBoundGenericClass();
-      // Skip superclass fields if superclass is resilient.
-      // FIXME: Needs runtime support to ensure the field offset vector is
-      // populated correctly.
-      if (!IGM.Context.LangOpts.EnableClassResilience ||
-          !IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      if (IGM.Context.LangOpts.EnableClassResilience &&
+          IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+        // Just note that we have a resilient superclass and move on.
+        //
+        // Runtime metadata instantiation needs to slide our entries down
+        // and copy in the superclass metadata.
+        //
+        // Metadata access needs to access our fields relative to a
+        // global variable.
+        asImpl().noteResilientSuperclass();
+      } else {
+        // NB: We don't apply superclass substitutions to members because we want
+        // consistent metadata layout between generic superclasses and concrete
+        // subclasses.
         addClassMembers(superclassDecl, superclass);
       }
     }
+
+    // Note that we have to emit a global variable storing the metadata
+    // start offset, or access remaining fields relative to one.
+    asImpl().noteStartOfImmediateMembers(theClass);
 
     // Add space for the generic parameters, if applicable.
     // Note that we only add references for the immediate parameters;

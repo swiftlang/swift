@@ -16,11 +16,21 @@
 // CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvpWvd = {{(protected )?}}global [[INT]] {{8|16}}
 // CHECK: @_T016class_resilience21ResilientGenericChildC5fields5Int32VvpWvi = {{(protected )?}}global [[INT]] {{56|88}}
 
+// CHECK: @_T016class_resilience26ClassWithResilientPropertyCMo = {{(protected )?}}constant [[INT]] {{52|80}}
+
 // CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd = {{(protected )?}}constant [[INT]] {{8|16}}
 // CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd = {{(protected )?}}constant [[INT]] {{12|20}}
 
 // CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd = {{(protected )?}}constant [[INT]] {{8|16}}
 // CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd = {{(protected )?}}constant [[INT]] {{12|24}}
+
+// CHECK: @_T016class_resilience14ResilientChildCMo = {{(protected )?}}global [[INT]] 0
+
+// CHECK: @_T016class_resilience21ResilientGenericChildCMo = {{(protected )?}}global [[INT]] 0
+
+// CHECK: @_T016class_resilience17MyResilientParentCMo = {{(protected )?}}constant [[INT]] {{52|80}}
+
+// CHECK: @_T016class_resilience16MyResilientChildCMo = {{(protected )?}}constant [[INT]] {{60|96}}
 
 import resilient_class
 import resilient_struct
@@ -240,7 +250,7 @@ public class MyResilientChild : MyResilientParent {
 // ClassWithResilientProperty metadata initialization function
 
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_ClassWithResilientProperty
+// CHECK-LABEL: define private void @initialize_metadata_ClassWithResilientProperty
 // CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
 // CHECK:             [[SIZE_METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
 // CHECK:             call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], [[INT]] 3, {{.*}})
@@ -257,7 +267,7 @@ public class MyResilientChild : MyResilientParent {
 
 // ClassWithResilientlySizedProperty metadata initialization function
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_ClassWithResilientlySizedProperty
+// CHECK-LABEL: define private void @initialize_metadata_ClassWithResilientlySizedProperty
 // CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 3)
 // CHECK:             [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_T016resilient_struct9RectangleVMa()
 // CHECK:             call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], [[INT]] 2, {{.*}})
@@ -271,3 +281,41 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:             store atomic %swift.type* [[METADATA]], %swift.type** @_T016class_resilience33ClassWithResilientlySizedPropertyCML release,
 // CHECK:             ret void
 
+
+// CHECK-LABEL: define private void @initialize_metadata_ResilientChild(i8*)
+
+// Get the superclass...
+
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
+// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
+
+// Initialize class metadata base offset...
+// CHECK:              store [[INT]] {{.*}}, [[INT]]* @_T016class_resilience14ResilientChildCMo
+
+// Initialize the superclass field...
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
+
+// Relocate metadata if necessary...
+// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 1)
+
+// CHECK:              ret void
+
+// CHECK-LABEL: define private %swift.type* @create_generic_metadata_ResilientGenericChild(%swift.type_pattern*, i8**)
+
+// Get the superclass...
+
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @_T015resilient_class29ResilientGenericOutsideParentCMa(%swift.type* %T)
+// CHECK:              [[SUPER_TMP:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
+// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %objc_class* [[SUPER_TMP]] to i8*
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
+
+// Initialize class metadata base offset...
+// CHECK:              store [[INT]] {{.*}}, [[INT]]* @_T016class_resilience21ResilientGenericChildCMo
+
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 2)
+// CHECK:              ret %swift.type* [[METADATA]]

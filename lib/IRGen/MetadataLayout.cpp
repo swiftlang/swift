@@ -212,6 +212,10 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void noteResilientSuperclass() {}
+
+    void noteStartOfImmediateMembers(ClassDecl *theClass) {}
+
     void addClassSize() {
       Layout.MetadataSize = getNextOffset();
       super::addClassSize();
