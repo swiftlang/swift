@@ -862,8 +862,7 @@ namespace {
       OptionalTypeKind sourceOptKind;
       if (auto sourceObjectType =
             source.FormalType.getAnyOptionalObjectType(sourceOptKind)) {
-        return emitOptionalToOptional(source, sourceOptKind, sourceObjectType,
-                                      target);
+        return emitOptionalToOptional(source, sourceObjectType, target);
       }
       assert(!target.FormalType.getAnyOptionalObjectType());
 
@@ -903,7 +902,6 @@ namespace {
     }
 
     Source emitOptionalToOptional(Source source,
-                                  OptionalTypeKind sourceOptKind,
                                   CanType sourceObjectType,
                                   Target target) {
       // Switch on the incoming value.
@@ -913,8 +911,8 @@ namespace {
 
       // Emit the switch.
       std::pair<EnumElementDecl*, SILBasicBlock*> cases[] = {
-        { Ctx.getOptionalSomeDecl(sourceOptKind), someBB },
-        { Ctx.getOptionalNoneDecl(sourceOptKind), noneBB },
+        { Ctx.getOptionalSomeDecl(), someBB },
+        { Ctx.getOptionalNoneDecl(), noneBB },
       };
       if (source.isAddress()) {
         B.createSwitchEnumAddr(Loc, source.Value, /*default*/ nullptr, cases);
@@ -925,7 +923,7 @@ namespace {
       // Create the Some block, which recurses.
       B.setInsertionPoint(someBB);
       {
-        auto sourceSomeDecl = Ctx.getOptionalSomeDecl(sourceOptKind);
+        auto sourceSomeDecl = Ctx.getOptionalSomeDecl();
 
         SILType loweredSourceObjectType =
           source.Value->getType().getEnumElementType(sourceSomeDecl, M);
