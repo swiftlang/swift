@@ -18,10 +18,8 @@
 #ifndef SWIFT_SIL_SILVTABLEVISITOR_H
 #define SWIFT_SIL_SILVTABLEVISITOR_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/SIL/TypeLowering.h"
 
 namespace swift {
 
