@@ -140,10 +140,14 @@ class alignas(8) Expr {
     Implicit : 1
   );
 
-  SWIFT_INLINE_BITFIELD(CollectionExpr, Expr, 1,
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 1+32,
     /// True if the type of this collection expr was inferred by the collection
     /// fallback type, like [Any].
-    IsTypeDefaulted : 1
+    IsTypeDefaulted : 1,
+    : NumPadBits,
+    /// Number of entries in the collection. If this is a DictionaryLiteral,
+    /// each entry is a Tuple with the key and value pair.
+    NumSubExprs : 32
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
@@ -2059,30 +2063,39 @@ class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
 
-  /// ASTContext allocated element lists.  Each entry is one entry of the
-  /// collection.  If this is a DictionaryLiteral, each entry is a Tuple with
-  /// the key and value pair.
-  MutableArrayRef<Expr*> Elements;
-
   Expr *SemanticExpr = nullptr;
+
+  /// Retrieve the intrusive pointer storage from the subtype
+  Expr *const *getTrailingObjectsPointer() const;
+  Expr **getTrailingObjectsPointer() {
+    const CollectionExpr *temp = this;
+    return const_cast<Expr**>(temp->getTrailingObjectsPointer());
+  }
 
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
-                 MutableArrayRef<Expr*> Elements,
+                 ArrayRef<Expr*> Elements,
                  SourceLoc RBracketLoc, Type Ty)
     : Expr(Kind, /*Implicit=*/false, Ty),
-      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc), Elements(Elements) {
+      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc) {
     Bits.CollectionExpr.IsTypeDefaulted = false;
+    Bits.CollectionExpr.NumSubExprs = Elements.size();
+    std::uninitialized_copy(Elements.begin(), Elements.end(),
+                            getTrailingObjectsPointer());
   }
 
 public:
 
   /// Retrieve the elements stored in the collection.
-  ArrayRef<Expr *> getElements() const { return Elements; }
-  MutableArrayRef<Expr *> getElements() { return Elements; }
-  Expr *getElement(unsigned i) const { return Elements[i]; }
-  void setElement(unsigned i, Expr *E) { Elements[i] = E; }
-  unsigned getNumElements() const { return Elements.size(); }
+  ArrayRef<Expr *> getElements() const {
+    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+  }
+  MutableArrayRef<Expr *> getElements() {
+    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+  }
+  Expr *getElement(unsigned i) const { return getElements()[i]; }
+  void setElement(unsigned i, Expr *E) { getElements()[i] = E; }
+  unsigned getNumElements() const { return Bits.CollectionExpr.NumSubExprs; }
 
   bool isTypeDefaulted() const { return Bits.CollectionExpr.IsTypeDefaulted; }
   void setIsTypeDefaulted(bool value = true) {
@@ -2106,12 +2119,16 @@ public:
 };
  
 /// \brief An array literal expression [a, b, c].
-class ArrayExpr : public CollectionExpr {
+class ArrayExpr final : public CollectionExpr,
+    private llvm::TrailingObjects<ArrayExpr, Expr*> {
+  friend TrailingObjects;
+  friend CollectionExpr;
+
   /// ASTContext allocated list of comma locations, there is one less entry here
   /// than the number of elements.
   MutableArrayRef<SourceLoc> CommaLocs;
 
-  ArrayExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+  ArrayExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
             MutableArrayRef<SourceLoc> CommaLocs,
             SourceLoc RBracketLoc, Type Ty)
   : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty),
@@ -2134,8 +2151,12 @@ public:
 };
 
 /// \brief A dictionary literal expression [a : x, b : y, c : z].
-class DictionaryExpr : public CollectionExpr {
-  DictionaryExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+class DictionaryExpr final : public CollectionExpr,
+    private llvm::TrailingObjects<DictionaryExpr, Expr*> {
+  friend TrailingObjects;
+  friend CollectionExpr;
+
+  DictionaryExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
                  SourceLoc RBracketLoc, Type Ty)
     : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, RBracketLoc,
                      Ty) { }
@@ -4938,6 +4959,14 @@ public:
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
+}
+
+inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {
+  if (auto ty = dyn_cast<ArrayExpr>(this))
+    return ty->getTrailingObjects<Expr*>();
+  if (auto ty = dyn_cast<DictionaryExpr>(this))
+    return ty->getTrailingObjects<Expr*>();
+  llvm_unreachable("Unhandled CollectionExpr!");
 }
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO

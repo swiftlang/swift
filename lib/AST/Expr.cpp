@@ -1481,18 +1481,19 @@ ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                              ArrayRef<Expr*> Elements,
                              ArrayRef<SourceLoc> CommaLocs,
                              SourceLoc RBracketLoc, Type Ty) {
-  // Copy the element list into the ASTContext.
-  auto NewElements = C.AllocateCopy(Elements);
+  // Copy the comma list into the ASTContext.
   auto NewCommas = C.AllocateCopy(CommaLocs);
-  return new (C) ArrayExpr(LBracketLoc, NewElements, NewCommas, RBracketLoc,Ty);
+  auto Size = totalSizeToAlloc<Expr *>(Elements.size());
+  auto Mem = C.Allocate(Size, alignof(ArrayExpr));
+  return new (Mem) ArrayExpr(LBracketLoc, Elements, NewCommas, RBracketLoc,Ty);
 }
 
 DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                              ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
                              Type Ty) {
-  // Copy the element list into the ASTContext.
-  auto NewElements = C.AllocateCopy(Elements);
-  return new (C) DictionaryExpr(LBracketLoc, NewElements, RBracketLoc, Ty);
+  auto Size = totalSizeToAlloc<Expr *>(Elements.size());
+  auto Mem = C.Allocate(Size, alignof(DictionaryExpr));
+  return new (Mem) DictionaryExpr(LBracketLoc, Elements, RBracketLoc, Ty);
 }
 
 static ValueDecl *getCalledValue(Expr *E) {
