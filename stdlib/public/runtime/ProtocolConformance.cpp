@@ -16,8 +16,10 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
@@ -145,36 +147,22 @@ const {
   case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor: {
     // FIXME: this needs to query the conditional requirements to form the
     // array of witness tables to pass along to the accessor.
-    const char *typeName = "<unknown type>";
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectType:
-      if (const auto *ntd = getDirectType()->getNominalTypeDescriptor())
-        typeName = ntd->Name.get();
-      break;
 
-    case TypeMetadataRecordKind::UniqueDirectClass:
-      typeName = class_getName(getDirectClass());
-      break;
+    // Pretty-print the type name.
+    auto typeNamePair = swift_getTypeName(type, /*qualified=*/true);
+    std::string typeName(typeNamePair.data,
+                         typeNamePair.data + typeNamePair.length);
 
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      typeName = class_getName(*getIndirectClass());
-      break;
+    // Demangle the protocol name.
+    DemangleOptions options;
+    options.DisplayEntityTypes = false;
+    std::string demangledProtocolName =
+      demangleSymbolAsString(StringRef(getProtocol()->Name), options);
 
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor: {
-      SymbolInfo info;
-      if (lookupSymbol(getNominalTypeDescriptor(), &info))
-        typeName = info.symbolName;
-      break;
-    }
-
-    case TypeMetadataRecordKind::Universal:
-      break;
-    }
     warning(/*flag=*/0,
             "warning: Swift runtime does not yet support dynamically "
             "querying conditional conformance ('%s': '%s')\n",
-            typeName, getProtocol()->Name);
+            typeName.c_str(), demangledProtocolName.c_str());
     return nullptr;
   }
   }

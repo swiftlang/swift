@@ -30,5 +30,5 @@ extension Dictionary: P where Value == (Key) -> Bool {
 
 let yx = Y(wrapped: X())
 
-// CHECK_WARNINGS: warning: Swift runtime does not yet support dynamically querying conditional conformance ('_T01a1YVMn': '_T01a1P_pD')
+// CHECK_WARNINGS: warning: Swift runtime does not yet support dynamically querying conditional conformance ('a.Y<a.X>': 'a.P')
 tryAsP(yx)
