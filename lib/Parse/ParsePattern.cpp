@@ -777,6 +777,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   
   // Now parse an optional type annotation.
   if (Tok.is(tok::colon)) {
+    SyntaxParsingContext TypeAnnoCtx(SyntaxContext, SyntaxKind::TypeAnnotation);
     SourceLoc colonLoc = consumeToken(tok::colon);
     
     if (result.isNull())  // Recover by creating AnyPattern.
@@ -841,6 +842,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///   pattern ::= 'let' pattern
 ///
 ParserResult<Pattern> Parser::parsePattern() {
+  SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
@@ -849,6 +851,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
   case tok::identifier: {
+    PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     bool isLet = (InVarOrLetPattern != IVOLP_InVar);
