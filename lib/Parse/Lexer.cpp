@@ -2287,7 +2287,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   return L.peekNextToken();
 }
 
-void Lexer::lexTrivia(syntax::TriviaList &Pieces, bool IsForTrailingTrivia) {
+void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
   if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
     return;
 
