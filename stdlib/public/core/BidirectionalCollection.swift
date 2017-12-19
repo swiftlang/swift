@@ -53,10 +53,10 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   associatedtype Index
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence = Slice<Self>
+  associatedtype SubSequence
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices = DefaultIndices<Self>
+  associatedtype Indices
 
   /// Returns the position immediately before the given index.
   ///

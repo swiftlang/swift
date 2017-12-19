@@ -73,7 +73,7 @@ public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence = Slice<Self>
+  associatedtype SubSequence
 
   //===--- Fundamental Requirements ---------------------------------------===//
 

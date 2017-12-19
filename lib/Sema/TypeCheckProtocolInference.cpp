@@ -632,12 +632,73 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   return inferred;
 }
 
+/// Find an associated type declarations that provides a default definition.
+static AssociatedTypeDecl *findDefaultedAssociatedType(
+                                             TypeChecker &tc,
+                                             AssociatedTypeDecl *assocType) {
+  // If this associated type has a default, we're done.
+  tc.validateDecl(assocType);
+  if (!assocType->getDefaultDefinitionLoc().isNull())
+    return assocType;
+
+  // Look at overridden associated types.
+  SmallPtrSet<CanType, 4> canonicalTypes;
+  SmallVector<AssociatedTypeDecl *, 2> results;
+  for (auto overridden : assocType->getOverriddenDecls()) {
+    auto overriddenDefault = findDefaultedAssociatedType(tc, overridden);
+    if (!overriddenDefault) continue;
+
+    Type overriddenType =
+      overriddenDefault->getDefaultDefinitionLoc().getType();
+    assert(overriddenType);
+    if (!overriddenType) continue;
+
+    CanType key = overriddenType->mapTypeOutOfContext()->getCanonicalType();
+    if (canonicalTypes.insert(key).second)
+      results.push_back(overriddenDefault);
+  }
+
+  // If there was a single result, return it.
+  // FIXME: We could find *all* of the non-covered, defaulted associated types.
+  return results.size() == 1 ? results.front() : nullptr;
+}
+
+Type AssociatedTypeInference::computeFixedTypeWitness(
+                                            AssociatedTypeDecl *assocType) {
+  // Look at all of the inherited protocols to determine whether they
+  // require a fixed type for this associated type.
+  Type dependentType = assocType->getDeclaredInterfaceType();
+  Type resultType;
+  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
+    if (!conformedProto->inheritsFrom(assocType->getProtocol()))
+      continue;
+
+    auto genericSig = conformedProto->getGenericSignature();
+    if (!genericSig) return Type();
+
+    Type concreteType = genericSig->getConcreteType(dependentType);
+    if (!concreteType) continue;
+
+    if (!resultType) {
+      resultType = concreteType;
+      continue;
+    }
+
+    // FIXME: Bailing out on ambiguity.
+    if (!resultType->isEqual(concreteType))
+      return Type();
+  }
+
+  return resultType;
+}
+
 Type AssociatedTypeInference::computeDefaultTypeWitness(
                                               AssociatedTypeDecl *assocType) {
-  // If we don't have a default definition, we're done.
-  if (assocType->getDefaultDefinitionLoc().isNull())
-    return Type();
+  // Go find a default definition.
+  auto defaultedAssocType = findDefaultedAssociatedType(tc, assocType);
+  if (!defaultedAssocType) return Type();
 
+  // If we don't have a default definition, we're done.
   auto selfType = proto->getSelfInterfaceType();
 
   // Create a set of type substitutions for all known associated type.
@@ -664,12 +725,19 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
     }
   }
 
-  tc.validateDecl(assocType);
-  Type defaultType = assocType->getDefaultDefinitionLoc().getType();
+  Type defaultType = defaultedAssocType->getDefaultDefinitionLoc().getType();
 
   // FIXME: Circularity
   if (!defaultType)
     return Type();
+
+  // If the associated type came from a different protocol, map it into our
+  // protocol's context.
+  if (defaultedAssocType->getDeclContext() != proto) {
+    defaultType = defaultType->mapTypeOutOfContext();
+    defaultType = proto->mapTypeIntoContext(defaultType);
+    if (!defaultType) return Type();
+  }
 
   defaultType = defaultType.subst(
                           QueryTypeSubstitutionMap{substitutions},
@@ -681,7 +749,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
     // Record the failure, if we haven't seen one already.
     if (!failedDefaultedAssocType) {
-      failedDefaultedAssocType = assocType;
+      failedDefaultedAssocType = defaultedAssocType;
       failedDefaultedWitness = defaultType;
       failedDefaultedResult = failed;
     }
@@ -940,7 +1008,17 @@ void AssociatedTypeInference::findSolutionsRec(
         continue;
       }
 
-      // We don't have a type witness for this associated type.
+      // We don't have a type witness for this associated type, so go
+      // looking for more options.
+      if (Type concreteType = computeFixedTypeWitness(assocType)) {
+        if (concreteType->hasError()) {
+          recordMissing();
+          return;
+        }
+
+        typeWitnesses.insert(assocType, {concreteType, reqDepth});
+        continue;
+      }
 
       // If we can form a default type, do so.
       if (Type defaultType = computeDefaultTypeWitness(assocType)) {
