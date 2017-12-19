@@ -4904,7 +4904,14 @@ namespace {
   };
   
   /// An adapter that turns a metadata layout class into a foreign metadata
-  /// layout class. Foreign metadata has an additional header that
+  /// layout class.
+  ///
+  /// Foreign metadata is generated for declarations that are
+  /// synthesized by the Clang importer from C declarations, meaning they don't
+  /// have a single Swift binary that is responsible for their emission.
+  /// In this case, we emit the record into every binary that needs it, with
+  /// a header with a unique identifier string that the runtime can use to pick
+  /// the first-used instance as the canonical instance for a process.
   template<typename Impl, typename Base>
   class ForeignMetadataBuilderBase : public Base {
     typedef Base super;
