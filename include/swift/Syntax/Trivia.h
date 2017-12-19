@@ -111,6 +111,9 @@ enum class TriviaKind {
   /// A newline '\n' character.
   Newline,
 
+  /// A newline '\r' character.
+  CarriageReturn,
+
   /// A developer line comment, starting with '//'
   LineComment,
 
@@ -175,10 +178,16 @@ public:
     return {TriviaKind::Formfeed, Count};
   }
 
-  /// Return a piece of trivia for some number of newline characters
+  /// Return a piece of trivia for some number of newline (LF) characters
   /// in a row.
   static TriviaPiece newlines(unsigned Count) {
     return {TriviaKind::Newline, Count};
+  }
+
+  /// Return a piece of trivia for some number of carriage-return (CR)
+  /// characters in a row.
+  static TriviaPiece carriageReturns(unsigned Count) {
+    return {TriviaKind::CarriageReturn, Count};
   }
 
   /// Return a piece of trivia for a single line of ('//') developer comment.
@@ -225,6 +234,7 @@ public:
       case TriviaKind::GarbageText:
         return Text.size();
       case TriviaKind::Newline:
+      case TriviaKind::CarriageReturn:
       case TriviaKind::Space:
       case TriviaKind::Backtick:
       case TriviaKind::Tab:
@@ -385,7 +395,7 @@ struct Trivia {
   }
 
   /// Return a collection of trivia of some number of newline characters
-  // in a row.
+  /// in a row.
   static Trivia newlines(unsigned Count) {
     if (Count == 0) {
       return {};
@@ -393,8 +403,17 @@ struct Trivia {
     return {{TriviaPiece::newlines(Count)}};
   }
 
+  /// Return a collection of trivia of some number of carriage-return characters
+  /// in a row.
+  static Trivia carriageReturns(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
+    return {{TriviaPiece::carriageReturns(Count)}};
+  }
+
   /// Return a collection of trivia with a single line of ('//')
-  // developer comment.
+  /// developer comment.
   static Trivia lineComment(const OwnedString Text) {
     assert(Text.str().startswith("//"));
     return {{TriviaPiece::lineComment(Text)}};
@@ -414,7 +433,7 @@ struct Trivia {
   }
 
   /// Return a collection of trivia with a documentation block
-  // comment ('/** ... */')
+  /// comment ('/** ... */')
   static Trivia docBlockComment(const OwnedString Text) {
     assert(Text.str().startswith("/**"));
     assert(Text.str().endswith("*/"));
