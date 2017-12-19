@@ -79,6 +79,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include <deque>
 #include <memory>
 #include <unordered_set>
 
@@ -503,6 +504,15 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
   return File;
 }
 
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          bool astGuaranteedToCorrespondToSIL,
+                                          bool moduleIsPublic,
+                                          int &ReturnValue,
+                                          FrontendObserver *observer,
+                                          UnifiedStatsReporter *Stats);
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -759,7 +769,7 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  const auto &SILOpts = Invocation.getSILOptions();
+  auto &SILOpts = Invocation.getSILOptions();
   if (!opts.TBDPath.empty()) {
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
@@ -773,42 +783,84 @@ static bool performCompile(CompilerInstance &Instance,
   assert(Action >= FrontendOptions::ActionType::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
 
-  std::unique_ptr<SILModule> SM = Instance.takeSILModule();
-  // Records whether the SIL is directly computed from the AST we have, meaning
-  // that it will exactly match the source. It might not if, for instance, some
-  // of the inputs are SIB with extra explicit SIL.
-  auto astGuaranteedToCorrespondToSIL = false;
-  if (!SM) {
+  // The second boolean in each std::pair<> in this std::deque<> indicates
+  // whether the SIL is guaranteed to correspond to the the AST. This might be
+  // false if we loaded SIL from an SIB.
+  std::deque<std::pair<std::unique_ptr<SILModule>, bool>> SMs;
+  if (auto SM = Instance.takeSILModule()) {
+    SMs.push_back(std::make_pair(std::move(SM), false));
+  }
+
+  if (SMs.empty()) {
+    auto mod = Instance.getMainModule();
     auto fileIsSIB = [](const FileUnit *File) -> bool {
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
     if (opts.Inputs.hasPrimaryInputs()) {
-      FileUnit *PrimaryFile = Instance.getPrimarySourceFile();
-      if (!PrimaryFile) {
-        for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+      if (Instance.getPrimarySourceFiles().empty()) {
+        // If we have primary inputs but no primary _source files_, we might
+        // have a primary serialized input.
+        for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
             if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
-                    InputFile::
-                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-                            SASTF->getFilename()))) {
-              assert(!PrimaryFile && "Can only handle one primary so far");
-              PrimaryFile = fileUnit;
+                  InputFile::
+                    convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                      SASTF->getFilename()))) {
+              assert(SMs.empty() && "Can only handle one primary AST input");
+              auto SM = performSILGeneration(*SASTF, SILOpts, None);
+              SMs.push_back(std::make_pair(std::move(SM), !fileIsSIB(SASTF)));
             }
           }
         }
+      } else {
+        // If we have multiple primary inputs, build a separate SILModule for
+        // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
+        // once for each such input.
+        for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+          auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
+          SMs.push_back(std::make_pair(std::move(SM), !fileIsSIB(PrimaryFile)));
+        }
       }
-      astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
-      SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
-                                None);
     } else {
-      auto mod = Instance.getMainModule();
-      astGuaranteedToCorrespondToSIL =
-          llvm::none_of(mod->getFiles(), fileIsSIB);
-      SM = performSILGeneration(mod, Invocation.getSILOptions(),
-                                true);
+      // If we have no primary inputs we are in WMO mode and need to build a
+      // SILModule for the entire module.
+      auto SM = performSILGeneration(mod, SILOpts, true);
+      SMs.push_back(std::make_pair(std::move(SM),
+                                   llvm::none_of(mod->getFiles(),
+                                                 fileIsSIB)));
     }
   }
+
+  while (!SMs.empty()) {
+    auto pair = std::move(SMs.front());
+    SMs.pop_front();
+    if (performCompileStepsPostSILGen(Instance, Invocation,
+                                      std::move(pair.first),
+                                      pair.second,
+                                      moduleIsPublic,
+                                      ReturnValue, observer, Stats))
+      return true;
+  }
+  return false;
+}
+
+
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          bool astGuaranteedToCorrespondToSIL,
+                                          bool moduleIsPublic,
+                                          int &ReturnValue,
+                                          FrontendObserver *observer,
+                                          UnifiedStatsReporter *Stats) {
+
+  FrontendOptions opts = Invocation.getFrontendOptions();
+  FrontendOptions::ActionType Action = opts.RequestedAction;
+  ASTContext &Context = Instance.getASTContext();
+  SILOptions &SILOpts = Invocation.getSILOptions();
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  bool shouldIndex = !opts.IndexStorePath.empty();
 
   if (observer) {
     observer->performedSILGeneration(*SM);
