@@ -473,13 +473,13 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   }
   unsigned DescEnd = SS.size();
 
-  if (Result->getName().empty() || DescBegin == DescEnd) {
+  if (DescBegin == DescEnd) {
     LOG_FUNC_SECTION_WARN {
       llvm::SmallString<64> LogMessage;
       llvm::raw_svector_ostream LogMessageOs(LogMessage);
 
-      LogMessageOs << "Code completion result with empty name and/or "
-                      "description was ignored: \n";
+      LogMessageOs << "Code completion result with empty description "
+                      "was ignored: \n";
       Result->print(LogMessageOs);
 
       *Log << LogMessage;
@@ -815,6 +815,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
+  static UIdent KeyCallPatternHeuristics("key.codecomplete.callpatternheuristics");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
@@ -836,6 +837,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
+  from.valueForOption(KeyCallPatternHeuristics, to.callPatternHeuristics);
   from.valueForOption(KeyFuzzyMatching, to.fuzzyMatching);
   from.valueForOption(KeyContextWeight, to.semanticContextWeight);
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
@@ -1194,6 +1196,8 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<const char *> extendedArgs(args.begin(), args.end());
   if (CCOpts.addInitsToTopLevel)
     extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
+  if (CCOpts.callPatternHeuristics)
+    extendedArgs.push_back("-code-complete-call-pattern-heuristics");
 
   // Invoke completion.
   std::string error;

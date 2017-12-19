@@ -12,7 +12,7 @@ struct S {
 func test01() {
   S(#^INIT_NAME^#)
 }
-// INIT_NAME: key.name: "a:b::)"
+// INIT_NAME: key.name: "a:b::"
 
 func test02(_ x: S) {
   x.#^METHOD_NAME^#
