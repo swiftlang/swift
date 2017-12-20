@@ -356,6 +356,7 @@ Optional<std::string> OutputPathsComputer::determineSupplementaryOutputFilename(
 
   {
     const Arg *argWithPath = Args.getLastArg(pathOpt);
+    if (argWithPath) Args.ClaimAllArgs(pathOpt);
     if (argWithPath && !pathFromFilelists.empty()) {
       // FIXME: dmu write out arg name and file list name
       Diags.diagnose(SourceLoc(),
