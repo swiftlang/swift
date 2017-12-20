@@ -956,6 +956,8 @@ Parser::parsePatternTupleElement() {
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern> Parser::parsePatternTuple() {
+  SyntaxParsingContext TuplePatternCtxt(SyntaxContext,
+                                        SyntaxKind::TuplePattern);
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
@@ -966,7 +968,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
     parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
-              SyntaxKind::Unknown,
+              SyntaxKind::TuplePatternElementList,
               [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
@@ -1148,4 +1150,3 @@ bool Parser::canParseTypedPattern() {
     return canParseType();
   return true;
 }
-

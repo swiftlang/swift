@@ -845,6 +845,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::FunctionParameter;
   case SyntaxKind::TupleTypeElementList:
     return SyntaxKind::TupleTypeElement;
+  case SyntaxKind::TuplePatternElementList:
+    return SyntaxKind::TuplePatternElement;
   default:
     return SyntaxKind::Unknown;
   }

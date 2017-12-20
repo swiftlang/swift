@@ -111,10 +111,12 @@
   * ThrowStmt
 
 ## Pattern
+### Done:
+  * IdentifierPattern
+  * TuplePattern
+
 ### Not-started:
   * ParenPattern
-  * TuplePattern
-  * NamedPattern
   * AnyPattern
   * TypedPattern
   * VarPattern
