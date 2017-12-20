@@ -26,6 +26,8 @@
 
 // CHECK: @_T016class_resilience14ResilientChildCMo = {{(protected )?}}global [[INT]] 0
 
+// CHECK: @_T016class_resilience16FixedLayoutChildCMo = {{(protected )?}}global [[INT]] 0
+
 // CHECK: @_T016class_resilience21ResilientGenericChildCMo = {{(protected )?}}global [[INT]] 0
 
 // CHECK: @_T016class_resilience17MyResilientParentCMo = {{(protected )?}}constant [[INT]] {{52|80}}
@@ -103,6 +105,14 @@ public class ResilientChild : ResilientOutsideParent {
   public let field: Int32 = 0
 }
 
+// Superclass is resilient, but the class is fixed-layout.
+// This simulates a user app subclassing a class in a resilient
+// framework. In this case, we still want to emit a base offset
+// global.
+
+@_fixed_layout public class FixedLayoutChild : ResilientOutsideParent {
+  public let field: Int32 = 0
+}
 
 // Superclass is resilient, so the number of fields and their
 // offsets is not known at compile time
@@ -294,6 +304,27 @@ public class MyResilientChild : MyResilientParent {
 
 // Initialize class metadata base offset...
 // CHECK:              store [[INT]] {{.*}}, [[INT]]* @_T016class_resilience14ResilientChildCMo
+
+// Initialize the superclass field...
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
+
+// Relocate metadata if necessary...
+// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 1)
+
+// CHECK:              ret void
+
+// CHECK-LABEL: define private void @initialize_metadata_FixedLayoutChild(i8*)
+
+// Get the superclass...
+
+// CHECK:              [[SUPER:%.*]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
+// CHECK:              [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER]] to i8*
+// CHECK:              [[SIZE_TMP:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], i32 {{36|56}}
+// CHECK:              [[SIZE_ADDR:%.*]] = bitcast i8* [[SIZE_TMP]] to i32*
+// CHECK:              [[SIZE:%.*]] = load i32, i32* [[SIZE_ADDR]]
+
+// Initialize class metadata base offset...
+// CHECK:              store [[INT]] {{.*}}, [[INT]]* @_T016class_resilience16FixedLayoutChildCMo
 
 // Initialize the superclass field...
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
