@@ -28,10 +28,10 @@ PATTERN_NODES = [
              Child('Type', kind='Type'),
          ]),
 
-    # optional-pattern -> identifier '?'
+    # optional-pattern -> pattern '?'
     Node('OptionalPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
+             Child('SubPattern', kind='Pattern'),
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
@@ -49,14 +49,12 @@ PATTERN_NODES = [
              Child('Type', kind='Type'),
          ]),
 
-    # tuple-pattern -> '(' tuple-pattern-element-list ')' type-annotation?
+    # tuple-pattern -> '(' tuple-pattern-element-list ')'
     Node('TuplePattern', kind='Pattern',
          children=[
              Child('OpenParen', kind='LeftParenToken'),
              Child('Elements', kind='TuplePatternElementList'),
              Child('CloseParen', kind='RightParenToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation',
-                   is_optional=True),
          ]),
 
     # wildcard-pattern -> '_' type-annotation?
@@ -72,7 +70,7 @@ PATTERN_NODES = [
          children=[
              Child('LabelName', kind='IdentifierToken',
                    is_optional=True),
-             Child('LabelColon', kind='ColonToken',
+             Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('Pattern', kind='Pattern'),
              Child('Comma', kind='CommaToken',
