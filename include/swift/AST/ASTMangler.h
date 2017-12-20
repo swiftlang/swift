@@ -187,7 +187,8 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false);
+  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false,
+                      bool captureLabels = true);
   void appendFunctionType(AnyFunctionType *fn);
 
   void appendFunctionSignature(AnyFunctionType *fn);

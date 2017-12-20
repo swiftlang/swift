@@ -221,11 +221,11 @@ extension ReabstractSelfBase {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@owned τ_0_0) -> @owned τ_0_0
+// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@owned τ_0_0) -> @owned τ_0_0
 // CHECK: [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value %0 : $τ_0_0
 // CHECK-NEXT: store [[SELF_COPY]] to [init] [[SELF_BOX]] : $*τ_0_0
-// CHECK: [[WITNESS:%.*]] = function_ref @_T019protocol_resilience18ReabstractSelfBasePAAE8callbackyxxcvg
+// CHECK: [[WITNESS:%.*]] = function_ref @_T019protocol_resilience18ReabstractSelfBasePAAE8callbackxxcvg
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]<τ_0_0>([[SELF_BOX]])
 // CHECK: [[THUNK_FN:%.*]] = function_ref @_T0xxIegir_xxIegxo_19protocol_resilience21ReabstractSelfRefinedRzlTR
 // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[RESULT]])
@@ -311,7 +311,7 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 
 // CHECK-LABEL: sil_default_witness_table ReabstractSelfRefined {
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvm
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvg
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvs
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvm
 // CHECK-NEXT: }

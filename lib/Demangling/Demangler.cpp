@@ -2013,9 +2013,10 @@ NodePointer Demangler::demangleFunctionEntity() {
   return Entity;
 }
 
-NodePointer Demangler::demangleEntity(Node::Kind Kind) {
+NodePointer Demangler::demangleEntity(Node::Kind Kind, bool MayHaveLabels) {
   NodePointer Type = popNode(Node::Kind::Type);
-  NodePointer LabelList = popFunctionParamLabels(Type);
+  NodePointer LabelList =
+      MayHaveLabels ? popFunctionParamLabels(Type) : nullptr;
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
   return LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
@@ -2023,7 +2024,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
 }
 
 NodePointer Demangler::demangleVariable() {
-  NodePointer Variable = demangleEntity(Node::Kind::Variable);
+  NodePointer Variable = demangleEntity(Node::Kind::Variable, false);
   return demangleAccessor(Variable);
 }
 

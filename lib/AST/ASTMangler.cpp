@@ -1451,23 +1451,26 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   addSubstitution(key.getPointer());
 }
 
-void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
+void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling,
+                                bool captureLabels) {
   // Append parameter labels right before the signature/type.
-  auto parameters = fn->getParams();
-  auto firstLabel = std::find_if(
-                  parameters.begin(), parameters.end(),
-                  [&](AnyFunctionType::Param param) { return param.hasLabel(); });
+  if (captureLabels) {
+    auto parameters = fn->getParams();
+    auto firstLabel = std::find_if(
+        parameters.begin(), parameters.end(),
+        [&](AnyFunctionType::Param param) { return param.hasLabel(); });
 
-  if (firstLabel != parameters.end()) {
-    for (auto param : parameters) {
-      auto label = param.getLabel();
-      if (!label.empty())
-        appendIdentifier(label.str());
-      else
-        appendOperator("_");
+    if (firstLabel != parameters.end()) {
+      for (auto param : parameters) {
+        auto label = param.getLabel();
+        if (!label.empty())
+          appendIdentifier(label.str());
+        else
+          appendOperator("_");
+      }
+    } else if (parameters.size() > 0) {
+      appendOperator("y");
     }
-  } else if (parameters.size() > 0) {
-    appendOperator("y");
   }
 
   if (isFunctionMangling) {
@@ -1880,7 +1883,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    appendFunction(FuncTy, isFunctionMangling);
+    appendFunction(FuncTy, isFunctionMangling, !isa<VarDecl>(decl));
   } else {
     appendType(type);
   }
