@@ -544,6 +544,10 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, ValueToBridgeObject)
 
+// SWIFT_ENABLE_TENSORFLOW
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TensorFlowSend)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TensorFlowReceive)
+
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Check all of these...

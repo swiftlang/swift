@@ -517,6 +517,17 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 // Swift3ImplicitObjCEntrypoint has type () -> ()
 BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
 
+
+// SWIFT_ENABLE_TENSORFLOW
+/// tensorflowSend_X has type <T> (T) -> ().  The X in the name is an integer
+/// ID number that allows matching sends and receives.
+BUILTIN_MISC_OPERATION(TensorFlowSend, "tensorflowSend", "", Special)
+
+/// tensorflowReceive_X has type <T> () -> T.  The X in the name is an integer
+/// ID number that allows matching sends and receives.
+BUILTIN_MISC_OPERATION(TensorFlowReceive, "tensorflowReceive", "", Special)
+
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
