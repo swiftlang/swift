@@ -221,3 +221,12 @@ class C {
     for var x: Int in foo {}
   }
 }
+
+do {
+  switch foo {
+    case let a: break
+    case let a as Int: break
+    case let (a, b): break
+    case (let a, var b): break
+  }
+}
