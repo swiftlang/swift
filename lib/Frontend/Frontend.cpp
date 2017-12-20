@@ -196,12 +196,6 @@ bool CompilerInstance::setUpInputs() {
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
-  // Remove this check when batch mode is (starting to) work.
-  if (PrimaryBufferID != NO_SUCH_BUFFER)
-    Invocation.getFrontendOptions()
-        .InputsAndOutputs
-        .assertMustNotBeMoreThanOnePrimaryInput(); // not impl yet
-
   if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
       InputSourceCodeBufferIDs.size() == 1)
     MainBufferID = InputSourceCodeBufferIDs.front();

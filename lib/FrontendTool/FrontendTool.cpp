@@ -1124,11 +1124,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
   if (MSF.is<SourceFile*>()) {
-    IRModule = performIRGeneration(IRGenOpts,
-                                   *MSF.get<SourceFile*>(),
-                                   std::move(SM),
-                                   opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename()(), LLVMContext,
-                                   0, &HashGlobal);
+    IRModule = performIRGeneration(
+        IRGenOpts, *MSF.get<SourceFile *>(), std::move(SM),
+        opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
+        LLVMContext, 0, &HashGlobal);
   } else {
     IRModule = performIRGeneration(IRGenOpts, MSF.get<ModuleDecl*>(),
                                    std::move(SM),
