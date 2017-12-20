@@ -229,5 +229,9 @@ do {
     case let (a, b): break
     case (let a, var b): break
     case is Int: break
+    case let .bar(x): break
+    case MyEnum.foo: break
+    case let a as Int: break
+    case let a?: break
   }
 }

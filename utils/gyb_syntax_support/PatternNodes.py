@@ -28,10 +28,10 @@ PATTERN_NODES = [
              Child('Type', kind='Type'),
          ]),
 
-    # optional-pattern -> identifier '?'
+    # optional-pattern -> pattern '?'
     Node('OptionalPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
+             Child('SubPattern', kind='Pattern'),
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
