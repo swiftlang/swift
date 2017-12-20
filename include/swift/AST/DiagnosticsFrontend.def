@@ -152,6 +152,9 @@ ERROR(error_output_files_must_correspond_to_primaries,none,
 ERROR(error_output_files_must_correspond_to_inputs,none,
 "the number of output filenames must equal the number of inputs in threaded WMO mode", ())
 
+ERROR(error_only_one_more_output,none,
+"there may only be one more output than input", ())
+
 
 ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "

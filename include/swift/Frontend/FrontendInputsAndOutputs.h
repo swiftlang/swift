@@ -39,6 +39,9 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
+  /// Sometimes there may be one more output file than input.
+  std::string ExcessOutputFile;
+
 public:
   FrontendInputsAndOutputs() = default;
 
@@ -111,6 +114,10 @@ public:
 
   bool areAllNonPrimariesSIB() const;
 
+  StringRef excessOutputFile() const { return ExcessOutputFile; }
+
+  void setExcessOutputFile(std::string f) { ExcessOutputFile = f; }
+
 public:
   unsigned countOfFilesProducingOutput() const;
 
@@ -176,7 +183,7 @@ public:
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
 
-  const StringRef preBatchModeGetSingleOutputFilename() const;
+  StringRef preBatchModeGetSingleOutputFilename() const;
   const OutputPaths &preBatchModePathsForAtMostOnePrimary() const;
 
   std::vector<std::string> preBatchModeOutputFilenames() const;

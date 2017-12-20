@@ -58,7 +58,6 @@ class OutputFilesComputer {
 
   const std::vector<std::string> OutputFileArguments;
   const StringRef OutputDirectoryArgument;
-  const bool DoOutputFileArgumentsMatchInputs;
   const StringRef FirstInput;
   const FrontendOptions::ActionType RequestedAction;
   const Arg *const ModuleNameArg;
@@ -77,6 +76,10 @@ public:
                                               DiagnosticEngine &diags);
 
   Optional<std::vector<std::string>> computeOutputFiles() const;
+
+  /// The Frontend can be invoked with one more output file than inputs.
+  /// This value is used, for instance, for the ModuleOutputPath.
+  Optional<std::string> computeExcessOutputFile() const;
 
 private:
 
@@ -109,6 +112,7 @@ class OutputPathsComputer {
   DiagnosticEngine &Diags;
   const FrontendInputsAndOutputs &InputsAndOutputs;
   ArrayRef<std::string> OutputFiles;
+  std::string ExcessOutputFile;
   StringRef ModuleName;
 
   std::vector<OutputPaths> SupplementaryFilenamesFromCommandLineOrFilelists;
@@ -117,7 +121,8 @@ class OutputPathsComputer {
 public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
-                      ArrayRef<std::string> outputFiles, StringRef moduleName);
+                      ArrayRef<std::string> outputFiles,
+                      std::string excessOutputFile, StringRef moduleName);
   Optional<std::vector<OutputPaths>> computeOutputPaths() const;
 
 private:

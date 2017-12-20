@@ -192,6 +192,8 @@ FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
     outputs.push_back(input.outputs().OutputFilename);
     return false;
   });
+  if (!excessOutputFile().empty())
+    outputs.push_back(excessOutputFile());
   return outputs;
 }
 
@@ -200,9 +202,10 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
          "have not implemented >1 primary input yet");
 }
 
-const StringRef
+StringRef
 FrontendInputsAndOutputs::preBatchModeGetSingleOutputFilename() const {
-  return preBatchModePathsForAtMostOnePrimary().OutputFilename;
+  const auto &fns = preBatchModeOutputFilenames();
+  return fns.empty() ? StringRef() : StringRef(fns.back());
 }
 const OutputPaths &
 FrontendInputsAndOutputs::preBatchModePathsForAtMostOnePrimary() const {

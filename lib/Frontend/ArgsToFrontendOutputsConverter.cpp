@@ -35,21 +35,30 @@ bool ArgsToFrontendOutputsConverter::convert() {
   if (!FrontendOptions::doesActionProduceOutput(requestedAction))
     return false;
 
+  OutputFilesComputer outputFilesComputer(Args, Diags, InputsAndOutputs);
   Optional<std::vector<std::string>> outputFiles =
-      OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
+      outputFilesComputer.computeOutputFiles();
   if (!outputFiles)
     return true;
+  Optional<std::string> excessOutputFile =
+      outputFilesComputer.computeExcessOutputFile();
+  if (!excessOutputFile)
+    return true;
+
   Optional<std::vector<OutputPaths>> outputPaths =
       OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
-                          ModuleName)
+                          *excessOutputFile, ModuleName)
           .computeOutputPaths();
   if (!outputPaths)
     return true;
-  return InputsAndOutputs.forEachInputProducingOutput(
+
+  InputsAndOutputs.setExcessOutputFile(*excessOutputFile);
+  InputsAndOutputs.forEachInputProducingOutput(
       [&](InputFile &input, unsigned i) -> bool {
         input.setOutputs((*outputPaths)[i]);
         return false;
       });
+  return false;
 }
 
 /// Try to read an output file list file.
@@ -98,10 +107,6 @@ OutputFilesComputer::OutputFilesComputer(
                   llvm::sys::fs::is_directory(OutputFileArguments.front())
               ? StringRef(OutputFileArguments.front())
               : StringRef()),
-      DoOutputFileArgumentsMatchInputs(
-          OutputDirectoryArgument.empty() &&
-          OutputFileArguments.size() ==
-              InputsAndOutputs.countOfFilesProducingOutput()),
       FirstInput(InputsAndOutputs.hasSingleInput()
                      ? InputsAndOutputs.getFilenameOfFirstInput()
                      : StringRef()),
@@ -141,6 +146,17 @@ OutputFilesComputer::computeOutputFile(StringRef outputArg,
                            : !OutputDirectoryArgument.empty()
                                  ? deriveOutputFileForDirectory(input)
                                  : outputArg.str();
+}
+
+Optional<std::string> OutputFilesComputer::computeExcessOutputFile() const {
+  if (OutputFileArguments.size() <=
+      InputsAndOutputs.countOfFilesProducingOutput())
+    return std::string();
+  if (OutputFileArguments.size() ==
+      InputsAndOutputs.countOfFilesProducingOutput() + 1)
+    return OutputFileArguments.back();
+  Diags.diagnose(SourceLoc(), diag::error_only_one_more_output);
+  return None;
 }
 
 Optional<std::string>
@@ -190,9 +206,11 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
 OutputPathsComputer::OutputPathsComputer(
     const ArgList &args, DiagnosticEngine &diags,
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    ArrayRef<std::string> outputFiles, StringRef moduleName)
+    ArrayRef<std::string> outputFiles, std::string excessOutputFile,
+    StringRef moduleName)
     : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
-      OutputFiles(outputFiles), ModuleName(moduleName),
+      OutputFiles(outputFiles), ExcessOutputFile(excessOutputFile),
+      ModuleName(moduleName),
       SupplementaryFilenamesFromCommandLineOrFilelists(
           getSupplementaryFilenamesFromCommandLineOrFilelists(
               Args, Diags, InputsAndOutputs.countOfFilesProducingOutput())),
@@ -400,5 +418,9 @@ void OutputPathsComputer::deriveModulePathParameters(
   extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
 
   mainOutputIfUsable =
-      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+      !canUseMainOutputForModule
+          ? ""
+          : !ExcessOutputFile.empty()
+                ? ExcessOutputFile
+                : !OutputFiles.empty() ? OutputFiles.back() : "";
 }
