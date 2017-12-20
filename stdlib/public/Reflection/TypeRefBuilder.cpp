@@ -43,13 +43,12 @@ lookupTypeWitness(const std::string &MangledTypeName,
   // Cache missed - we need to look through all of the assocty sections
   // for all images that we've been notified about.
   for (auto &Info : ReflectionInfos) {
-    uintptr_t Offset = Info.AssociatedType.SectionOffset;
-    for (const auto &AssocTyDescriptor : Info.AssociatedType.Metadata) {
-      std::string ConformingTypeName(AssocTyDescriptor.ConformingTypeName + Offset);
+    for (const auto &AssocTyDescriptor : Info.assocty) {
+      std::string ConformingTypeName(AssocTyDescriptor.ConformingTypeName);
       if (ConformingTypeName.compare(MangledTypeName) != 0)
         continue;
 
-      std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName + Offset);
+      std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
       auto DemangledProto = Dem.demangleType(ProtocolMangledName);
       auto TR = swift::remote::decodeMangledType(*this, DemangledProto);
 
@@ -57,11 +56,10 @@ lookupTypeWitness(const std::string &MangledTypeName,
         continue;
 
       for (auto &AssocTy : AssocTyDescriptor) {
-        if (Member.compare(AssocTy.getName(Offset)) != 0)
+        if (Member.compare(AssocTy.getName()) != 0)
           continue;
 
-        auto SubstitutedTypeName =
-            AssocTy.getMangledSubstitutedTypeName(Offset);
+        auto SubstitutedTypeName = AssocTy.getMangledSubstitutedTypeName();
         auto Demangled = Dem.demangleType(SubstitutedTypeName);
         auto *TypeWitness = swift::remote::decodeMangledType(*this, Demangled);
 
@@ -75,11 +73,11 @@ lookupTypeWitness(const std::string &MangledTypeName,
 
 const TypeRef * TypeRefBuilder::
 lookupSuperclass(const TypeRef *TR) {
-  const auto &FD = getFieldTypeInfo(TR);
-  if (FD.first == nullptr)
+  auto *FD = getFieldTypeInfo(TR);
+  if (FD == nullptr)
     return nullptr;
 
-  auto Demangled = Dem.demangleType(FD.first->getSuperclass(FD.second));
+  auto Demangled = Dem.demangleType(FD->getSuperclass());
   auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
   if (!Unsubstituted)
     return nullptr;
@@ -87,7 +85,7 @@ lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, TR->getSubstMap());
 }
 
-std::pair<const FieldDescriptor *, uintptr_t>
+const FieldDescriptor *
 TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   std::string MangledName;
   if (auto N = dyn_cast<NominalTypeRef>(TR))
@@ -101,45 +99,45 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
 
   std::vector<std::pair<std::string, const TypeRef *>> Fields;
   for (auto Info : ReflectionInfos) {
-    uintptr_t Offset = Info.Field.SectionOffset;
-    for (auto &FD : Info.Field.Metadata) {
+    for (auto &FD : Info.fieldmd) {
       if (!FD.hasMangledTypeName())
         continue;
-      auto CandidateMangledName = FD.getMangledTypeName(Offset);
+      auto CandidateMangledName = FD.getMangledTypeName();
       if (MangledName.compare(CandidateMangledName) != 0)
         continue;
-      return {&FD, Offset};
+      return &FD;
     }
   }
 
-  return {nullptr, 0};
+  return nullptr;
 }
 
-bool TypeRefBuilder::getFieldTypeRefs(
-    const TypeRef *TR, const std::pair<const FieldDescriptor *, uintptr_t> &FD,
-    std::vector<FieldTypeInfo> &Fields) {
-  if (FD.first == nullptr)
+
+bool TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR,
+                                      const FieldDescriptor *FD,
+                                      std::vector<FieldTypeInfo> &Fields) {
+  if (FD == nullptr)
     return false;
 
   auto Subs = TR->getSubstMap();
 
-  for (auto &Field : *FD.first) {
-    auto FieldName = Field.getFieldName(FD.second);
+  for (auto &Field : *FD) {
+    auto FieldName = Field.getFieldName();
 
     // Empty cases of enums do not have a type
-    if (FD.first->isEnum() && !Field.hasMangledTypeName()) {
+    if (FD->isEnum() && !Field.hasMangledTypeName()) {
       Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName));
       continue;
     }
 
-    auto Demangled = Dem.demangleType(Field.getMangledTypeName(FD.second));
+    auto Demangled = Dem.demangleType(Field.getMangledTypeName());
     auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
     if (!Unsubstituted)
       return false;
 
     auto Substituted = Unsubstituted->subst(*this, Subs);
 
-    if (FD.first->isEnum() && Field.isIndirectCase()) {
+    if (FD->isEnum() && Field.isIndirectCase()) {
       Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));
       continue;
     }
@@ -162,15 +160,13 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
     return nullptr;
 
   for (auto Info : ReflectionInfos) {
-    uintptr_t Offset = Info.Builtin.SectionOffset;
-    for (auto &BuiltinTypeDescriptor : Info.Builtin.Metadata) {
+    for (auto &BuiltinTypeDescriptor : Info.builtin) {
       assert(BuiltinTypeDescriptor.Size > 0);
       assert(BuiltinTypeDescriptor.Alignment > 0);
       assert(BuiltinTypeDescriptor.Stride > 0);
       if (!BuiltinTypeDescriptor.hasMangledTypeName())
         continue;
-      auto CandidateMangledName =
-          BuiltinTypeDescriptor.getMangledTypeName(Offset);
+      auto CandidateMangledName = BuiltinTypeDescriptor.getMangledTypeName();
       if (MangledName.compare(CandidateMangledName) != 0)
         continue;
       return &BuiltinTypeDescriptor;
@@ -183,9 +179,10 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
 const CaptureDescriptor *
 TypeRefBuilder::getCaptureDescriptor(uintptr_t RemoteAddress) {
   for (auto Info : ReflectionInfos) {
-    for (auto &CD : Info.Capture.Metadata) {
-      auto OtherAddr = (reinterpret_cast<uintptr_t>(&CD) -
-                        Info.LocalStartAddress + Info.RemoteStartAddress);
+    for (auto &CD : Info.capture) {
+      auto OtherAddr = ((uintptr_t) &CD -
+                        Info.LocalStartAddress +
+                        Info.RemoteStartAddress);
       if (OtherAddr == RemoteAddress)
         return &CD;
     }
@@ -196,14 +193,13 @@ TypeRefBuilder::getCaptureDescriptor(uintptr_t RemoteAddress) {
 
 /// Get the unsubstituted capture types for a closure context.
 ClosureContextInfo
-TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD,
-                                      uintptr_t Offset) {
+TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD) {
   ClosureContextInfo Info;
 
   for (auto i = CD.capture_begin(), e = CD.capture_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     if (i->hasMangledTypeName()) {
-      auto MangledName = i->getMangledTypeName(Offset);
+      auto MangledName = i->getMangledTypeName();
       auto DemangleTree = Dem.demangleType(MangledName);
       TR = swift::remote::decodeMangledType(*this, DemangleTree);
     }
@@ -213,14 +209,14 @@ TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD,
   for (auto i = CD.source_begin(), e = CD.source_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     if (i->hasMangledTypeName()) {
-      auto MangledName = i->getMangledTypeName(Offset);
+      auto MangledName = i->getMangledTypeName();
       auto DemangleTree = Dem.demangleType(MangledName);
       TR = swift::remote::decodeMangledType(*this, DemangleTree);
     }
 
     const MetadataSource *MS = nullptr;
     if (i->hasMangledMetadataSource()) {
-      auto MangledMetadataSource = i->getMangledMetadataSource(Offset);
+      auto MangledMetadataSource = i->getMangledMetadataSource();
       MS = MetadataSource::decode(MSB, MangledMetadataSource);
     }
 
@@ -254,19 +250,18 @@ TypeRefBuilder::dumpTypeRef(const std::string &MangledName,
 
 void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
-    uintptr_t Offset = sections.Field.SectionOffset;
-    for (const auto &descriptor : sections.Field.Metadata) {
-      auto TypeName =
-          Demangle::demangleTypeAsString(descriptor.getMangledTypeName(Offset));
+    for (const auto &descriptor : sections.fieldmd) {
+      auto TypeName
+        = Demangle::demangleTypeAsString(descriptor.getMangledTypeName());
       OS << TypeName << '\n';
       for (size_t i = 0; i < TypeName.size(); ++i)
         OS << '-';
       OS << '\n';
       for (auto &field : descriptor) {
-        OS << field.getFieldName(Offset);
+        OS << field.getFieldName();
         if (field.hasMangledTypeName()) {
           OS << ": ";
-          dumpTypeRef(field.getMangledTypeName(Offset), OS);
+          dumpTypeRef(field.getMangledTypeName(), OS);
         } else {
           OS << "\n\n";
         }
@@ -277,19 +272,18 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
 
 void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
-    uintptr_t Offset = sections.AssociatedType.SectionOffset;
-    for (const auto &descriptor : sections.AssociatedType.Metadata) {
+    for (const auto &descriptor : sections.assocty) {
       auto conformingTypeName = Demangle::demangleTypeAsString(
-          descriptor.getMangledConformingTypeName(Offset));
+        descriptor.getMangledConformingTypeName());
       auto protocolName = Demangle::demangleTypeAsString(
-          descriptor.getMangledProtocolTypeName(Offset));
+        descriptor.getMangledProtocolTypeName());
 
       OS << "- " << conformingTypeName << " : " << protocolName;
       OS << '\n';
 
       for (const auto &associatedType : descriptor) {
-        OS << "typealias " << associatedType.getName(Offset) << " = ";
-        dumpTypeRef(associatedType.getMangledSubstitutedTypeName(Offset), OS);
+        OS << "typealias " << associatedType.getName() << " = ";
+        dumpTypeRef(associatedType.getMangledSubstitutedTypeName(), OS);
       }
     }
   }
@@ -297,10 +291,9 @@ void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
 
 void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
-    uintptr_t Offset = sections.Builtin.SectionOffset;
-    for (const auto &descriptor : sections.Builtin.Metadata) {
-      auto typeName =
-          Demangle::demangleTypeAsString(descriptor.getMangledTypeName(Offset));
+    for (const auto &descriptor : sections.builtin) {
+      auto typeName = Demangle::demangleTypeAsString(
+        descriptor.getMangledTypeName());
 
       OS << "\n- " << typeName << ":\n";
       OS << "Size: " << descriptor.Size << "\n";
@@ -339,9 +332,8 @@ void ClosureContextInfo::dump(std::ostream &OS) const {
 
 void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {
   for (const auto &sections : ReflectionInfos) {
-    uintptr_t Offset = sections.Capture.SectionOffset;
-    for (const auto &descriptor : sections.Capture.Metadata) {
-      auto info = getClosureContextInfo(descriptor, Offset);
+    for (const auto &descriptor : sections.capture) {
+      auto info = getClosureContextInfo(descriptor);
       info.dump(OS);
     }
   }
