@@ -109,6 +109,82 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   return true;
 }
 
+std::vector<InputFile *> FrontendInputsAndOutputs::getPointersToAllFiles() {
+  std::vector<InputFile *> pointers;
+  for (InputFile &input : getAllInputs()) {
+    pointers.push_back(&input);
+  }
+  return pointers;
+}
+
+const InputFile &FrontendInputsAndOutputs::firstPrimary() const {
+  assert(!PrimaryInputs.empty());
+  return getAllInputs()[PrimaryInputs.front().second];
+}
+
+std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
+  std::vector<std::string> filenames;
+  for (auto &input : getAllInputs()) {
+    filenames.push_back(input.file());
+  }
+  return filenames;
+}
+
+StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
+  assert(hasInputs());
+  const InputFile &inp = getAllInputs()[0];
+  StringRef f = inp.file();
+  assert(!f.empty());
+  return f;
+}
+
+const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
+  assertMustNotBeMoreThanOnePrimaryInput();
+  const auto b = PrimaryInputs.begin();
+  return b == PrimaryInputs.end() ? nullptr : &getAllInputs()[b->second];
+}
+
+const InputFile &
+FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
+  if (const auto *input = getUniquePrimaryInput())
+    return *input;
+  llvm_unreachable("No primary when one is required");
+}
+
+StringRef
+FrontendInputsAndOutputs::preBatchGetNameOfUniquePrimaryInputFile() const {
+  const auto *input = getUniquePrimaryInput();
+  return input == nullptr ? StringRef() : input->file();
+}
+
+bool FrontendInputsAndOutputs::isFilePrimary(StringRef file) {
+  return PrimaryInputs.count(file) != 0;
+}
+
+void FrontendInputsAndOutputs::addInputFile(StringRef file,
+                                            llvm::MemoryBuffer *buffer) {
+  addInput(InputFile(file, false, buffer));
+}
+void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
+                                                   llvm::MemoryBuffer *buffer) {
+  addInput(InputFile(file, true, buffer));
+}
+
+void FrontendInputsAndOutputs::addInput(const InputFile &input) {
+  getAllInputs().push_back(input);
+  if (input.isPrimary()) {
+    // Take care to push a reference to the string in the InputFile stored in
+    // AllFiles, NOT in the input parameter.
+    PrimaryInputs.insert(std::make_pair(getAllInputs().back().file(),
+                                        getAllInputs().size() - 1));
+  }
+}
+
+void FrontendInputsAndOutputs::clearInputs() {
+  AllFiles.clear();
+  PrimaryInputs.clear();
+}
+
 std::vector<std::string>
 FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
   std::vector<std::string> outputs;
@@ -117,4 +193,116 @@ FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
     return false;
   });
   return outputs;
+}
+
+void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
+  assert(primaryInputCount() < 2 &&
+         "have not implemented >1 primary input yet");
+}
+
+const StringRef
+FrontendInputsAndOutputs::preBatchModeGetSingleOutputFilename() const {
+  return preBatchModePathsForAtMostOnePrimary().OutputFilename;
+}
+const OutputPaths &
+FrontendInputsAndOutputs::preBatchModePathsForAtMostOnePrimary() const {
+  assertMustNotBeMoreThanOnePrimaryInput();
+  static OutputPaths empty;
+  return hasPrimaries()
+             ? getAllInputs()[PrimaryInputs.front().second].outputs()
+             : isSingleThreadedWMO()
+                   ? *getSingleThreadedWMOOutputs()
+                   : getAllInputs().empty() ? empty
+                                            : getAllInputs().front().outputs();
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeObjCHeaderOutputPath() const {
+  return preBatchModePathsForAtMostOnePrimary().ObjCHeaderOutputPath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeModuleOutputPath() const {
+  return preBatchModePathsForAtMostOnePrimary().ModuleOutputPath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeModuleDocOutputPath() const {
+  return preBatchModePathsForAtMostOnePrimary().ModuleDocOutputPath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeDependenciesFilePath() const {
+  return preBatchModePathsForAtMostOnePrimary().DependenciesFilePath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeReferenceDependenciesFilePath() const {
+  return preBatchModePathsForAtMostOnePrimary().ReferenceDependenciesFilePath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeSerializedDiagnosticsPath() const {
+  return preBatchModePathsForAtMostOnePrimary().SerializedDiagnosticsPath;
+}
+
+const std::string &
+FrontendInputsAndOutputs::preBatchModeLoadedModuleTracePath() const {
+  return preBatchModePathsForAtMostOnePrimary().LoadedModuleTracePath;
+}
+
+const std::string &FrontendInputsAndOutputs::preBatchModeTBDPath() const {
+  return preBatchModePathsForAtMostOnePrimary().TBDPath;
+}
+
+unsigned FrontendInputsAndOutputs::countOfFilesProducingOutput() const {
+  return hasPrimaries() ? primaryInputCount() : inputCount();
+}
+
+bool FrontendInputsAndOutputs::forEachInputProducingOutput(
+    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
+  return isSingleThreadedWMO()
+             ? fn(*getSingleThreadedWMOInput(), 0)
+             : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
+}
+
+bool FrontendInputsAndOutputs::forEachInput(
+    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
+  for (auto i : indices(getAllInputs()))
+    if (fn(getAllInputs()[i], i))
+      return true;
+  return false;
+}
+
+bool FrontendInputsAndOutputs::forEachPrimaryInput(
+    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
+  unsigned i = 0;
+  for (const auto p : PrimaryInputs)
+    if (fn(getAllInputs()[p.second], i++))
+      return true;
+  return false;
+}
+
+bool FrontendInputsAndOutputs::forEachInputProducingOutput(
+    llvm::function_ref<bool(InputFile &, unsigned)> fn) {
+  return isSingleThreadedWMO()
+             ? fn(*getSingleThreadedWMOInput(), 0)
+             : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
+}
+
+bool FrontendInputsAndOutputs::forEachInput(
+    llvm::function_ref<bool(InputFile &, unsigned)> fn) {
+  for (auto i : indices(getAllInputs()))
+    if (fn(getAllInputs()[i], i))
+      return true;
+  return false;
+}
+
+bool FrontendInputsAndOutputs::forEachPrimaryInput(
+    llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
+  unsigned i = 0;
+  for (auto p : PrimaryInputs)
+    if (fn(getAllInputs()[p.second], ++i))
+      return true;
+  return false;
 }

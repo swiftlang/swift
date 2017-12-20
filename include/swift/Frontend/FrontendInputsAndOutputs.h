@@ -84,26 +84,12 @@ public:
 
   ArrayRef<InputFile> getAllInputs() const { return AllFiles; }
   std::vector<InputFile> &getAllInputs() { return AllFiles; }
-  std::vector<InputFile *> getPointersToAllFiles() {
-    std::vector<InputFile *> pointers;
-    for (InputFile &input : getAllInputs()) {
-      pointers.push_back(&input);
-    }
-    return pointers;
-  }
 
-  const InputFile &firstPrimary() const {
-    assert(!PrimaryInputs.empty());
-    return getAllInputs()[PrimaryInputs.front().second];
-  }
+  std::vector<InputFile *> getPointersToAllFiles();
 
-  std::vector<std::string> getInputFilenames() const {
-    std::vector<std::string> filenames;
-    for (auto &input : getAllInputs()) {
-      filenames.push_back(input.file());
-    }
-    return filenames;
-  }
+  const InputFile &firstPrimary() const;
+
+  std::vector<std::string> getInputFilenames() const;
 
   unsigned inputCount() const { return getAllInputs().size(); }
 
@@ -111,13 +97,7 @@ public:
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
-  StringRef getFilenameOfFirstInput() const {
-    assert(hasInputs());
-    const InputFile &inp = getAllInputs()[0];
-    StringRef f = inp.file();
-    assert(!f.empty());
-    return f;
-  }
+  StringRef getFilenameOfFirstInput() const;
 
   bool isReadingFromStdin() const {
     return hasSingleInput() && getFilenameOfFirstInput() == "-";
@@ -132,56 +112,23 @@ public:
   bool areAllNonPrimariesSIB() const;
 
 public:
-  unsigned countOfFilesProducingOutput() const {
-    return hasPrimaries() ? primaryInputCount() : inputCount();
-  }
+  unsigned countOfFilesProducingOutput() const;
 
   bool forEachInputProducingOutput(
-      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-    return isSingleThreadedWMO()
-               ? fn(*getSingleThreadedWMOInput(), 0)
-               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
-  }
+      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
 
   bool
-  forEachInput(llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-    for (auto i : indices(getAllInputs()))
-      if (fn(getAllInputs()[i], i))
-        return true;
-    return false;
-  }
+  forEachInput(llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
 
   bool forEachPrimaryInput(
-      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-    unsigned i = 0;
-    for (const auto p : PrimaryInputs)
-      if (fn(getAllInputs()[p.second], i++))
-        return true;
-    return false;
-  }
+      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
 
   bool forEachInputProducingOutput(
-      llvm::function_ref<bool(InputFile &, unsigned)> fn) {
-    return isSingleThreadedWMO()
-               ? fn(*getSingleThreadedWMOInput(), 0)
-               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
-  }
-
-  bool forEachInput(llvm::function_ref<bool(InputFile &, unsigned)> fn) {
-    for (auto i : indices(getAllInputs()))
-      if (fn(getAllInputs()[i], i))
-        return true;
-    return false;
-  }
+      llvm::function_ref<bool(InputFile &, unsigned)> fn);
+  bool forEachInput(llvm::function_ref<bool(InputFile &, unsigned)> fn);
 
   bool
-  forEachPrimaryInput(llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
-    unsigned i = 0;
-    for (auto p : PrimaryInputs)
-      if (fn(getAllInputs()[p.second], ++i))
-        return true;
-    return false;
-  }
+  forEachPrimaryInput(llvm::function_ref<bool(InputFile &input, unsigned)> fn);
 
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
@@ -196,29 +143,15 @@ public:
   // Count-dependend readers:
 
   /// Return the unique primary input, if one exists.
-  const InputFile *getUniquePrimaryInput() const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    const auto b = PrimaryInputs.begin();
-    return b == PrimaryInputs.end() ? nullptr : &getAllInputs()[b->second];
-  }
+  const InputFile *getUniquePrimaryInput() const;
 
-  const InputFile &getRequiredUniquePrimaryInput() const {
-    if (const auto *input = getUniquePrimaryInput())
-      return *input;
-    llvm_unreachable("No primary when one is required");
-  }
+  const InputFile &getRequiredUniquePrimaryInput() const;
 
   /// Return the name of the unique primary input, or an empty StringRef if
   /// there isn't one.
-  StringRef preBatchGetNameOfUniquePrimaryInputFile() const {
-    const auto *input = getUniquePrimaryInput();
-    return input == nullptr ? StringRef() : input->file();
-  }
+  StringRef preBatchGetNameOfUniquePrimaryInputFile() const;
 
-  bool isFilePrimary(StringRef file) {
-    const bool isPrimary = PrimaryInputs.count(file) != 0;
-    return isPrimary;
-  }
+  bool isFilePrimary(StringRef file);
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
@@ -232,82 +165,30 @@ public:
 
   // Writers
 
-  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, false, buffer));
-  }
+  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
   void addPrimaryInputFile(StringRef file,
-                           llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, true, buffer));
-  }
+                           llvm::MemoryBuffer *buffer = nullptr);
 
-  void addInput(const InputFile &input) {
-    getAllInputs().push_back(input);
-    if (input.isPrimary()) {
-      // Take care to push a reference to the string in the InputFile stored in
-      // AllFiles, NOT in the input parameter.
-      PrimaryInputs.insert(std::make_pair(getAllInputs().back().file(),
-                                          getAllInputs().size() - 1));
-    }
-  }
+  void addInput(const InputFile &input);
 
-  void clearInputs() {
-    AllFiles.clear();
-    PrimaryInputs.clear();
-  }
+  void clearInputs();
 
   // FIXME: dmu fix uses / remove these when batch mode works
-  void assertMustNotBeMoreThanOnePrimaryInput() const {
-    assert(primaryInputCount() < 2 &&
-           "have not implemented >1 primary input yet");
-  }
+  void assertMustNotBeMoreThanOnePrimaryInput() const;
 
-  const StringRef preBatchModeGetSingleOutputFilename() const {
-    return preBatchModePathsForAtMostOnePrimary().OutputFilename;
-  }
-  const OutputPaths &preBatchModePathsForAtMostOnePrimary() const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    static OutputPaths empty;
-    return hasPrimaries()
-               ? getAllInputs()[PrimaryInputs.front().second].outputs()
-               : isSingleThreadedWMO() ? *getSingleThreadedWMOOutputs()
-                                       : getAllInputs().empty()
-                                             ? empty
-                                             : getAllInputs().front().outputs();
-  }
+  const StringRef preBatchModeGetSingleOutputFilename() const;
+  const OutputPaths &preBatchModePathsForAtMostOnePrimary() const;
 
   std::vector<std::string> preBatchModeOutputFilenames() const;
 
-  const std::string &preBatchModeObjCHeaderOutputPath() const {
-    return preBatchModePathsForAtMostOnePrimary().ObjCHeaderOutputPath;
-  }
-
-  const std::string &preBatchModeModuleOutputPath() const {
-    return preBatchModePathsForAtMostOnePrimary().ModuleOutputPath;
-  }
-
-  const std::string &preBatchModeModuleDocOutputPath() const {
-    return preBatchModePathsForAtMostOnePrimary().ModuleDocOutputPath;
-  }
-
-  const std::string &preBatchModeDependenciesFilePath() const {
-    return preBatchModePathsForAtMostOnePrimary().DependenciesFilePath;
-  }
-
-  const std::string &preBatchModeReferenceDependenciesFilePath() const {
-    return preBatchModePathsForAtMostOnePrimary().ReferenceDependenciesFilePath;
-  }
-
-  const std::string &preBatchModeSerializedDiagnosticsPath() const {
-    return preBatchModePathsForAtMostOnePrimary().SerializedDiagnosticsPath;
-  }
-
-  const std::string &preBatchModeLoadedModuleTracePath() const {
-    return preBatchModePathsForAtMostOnePrimary().LoadedModuleTracePath;
-  }
-
-  const std::string &preBatchModeTBDPath() const {
-    return preBatchModePathsForAtMostOnePrimary().TBDPath;
-  }
+  const std::string &preBatchModeObjCHeaderOutputPath() const;
+  const std::string &preBatchModeModuleOutputPath() const;
+  const std::string &preBatchModeModuleDocOutputPath() const;
+  const std::string &preBatchModeDependenciesFilePath() const;
+  const std::string &preBatchModeReferenceDependenciesFilePath() const;
+  const std::string &preBatchModeSerializedDiagnosticsPath() const;
+  const std::string &preBatchModeLoadedModuleTracePath() const;
+  const std::string &preBatchModeTBDPath() const;
 };
 
 } // namespace swift
