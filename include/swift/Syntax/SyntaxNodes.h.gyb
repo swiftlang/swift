@@ -100,6 +100,7 @@ public:
 %   end
 % end
 
+bool checkAccessorListOrStmtList(const Syntax &S);
 }
 }
 
