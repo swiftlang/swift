@@ -153,6 +153,7 @@ EXPECTED_DEFAULTS = {
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
+    'swift_profile_instr_use': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
@@ -491,6 +492,7 @@ EXPECTED_OPTIONS = [
     PathOption('--android-ndk'),
     PathOption('--build-subdir'),
     PathOption('--clang-profile-instr-use'),
+    PathOption('--swift-profile-instr-use'),
     PathOption('--cmake'),
     PathOption('--coverage-db'),
     PathOption('--host-cc'),

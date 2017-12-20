@@ -301,6 +301,27 @@ option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   FALSE)
 
 #
+# User-configurable Profile Guided Optimization (PGO) options
+#
+
+option(SWIFT_ENABLE_PROFILE_GENERATION
+  "Build Swift with profile generation instrumentation enabled"
+  OFF)
+
+option(SWIFT_ENABLE_IR_PROFILE_GENERATION
+  "Build Swift with IR profile generation instrumentation enabled"
+  OFF)
+
+option(SWIFT_PROFDATA_FILE
+  "Profile data file to use when compiling Swift with PGO"
+  NONE)
+
+mark_as_advanced(
+  SWIFT_ENABLE_PROFILE_GENERATION
+  SWIFT_ENABLE_IR_PROFILE_GENERATION
+  SWIFT_PROFDATA_FILE)
+
+#
 # End of user-configurable options.
 #
 
@@ -868,7 +889,73 @@ if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
 
+#
+# Configure Swift to build with profile generation
+#
+
+if(SWIFT_ENABLE_PROFILE_GENERATION OR SWIFT_ENABLE_IR_PROFILE_GENERATION)
+  if(NOT SWIFT_PROFILE_MERGE_POOL_SIZE)
+    # A pool size of 1-2 is probably sufficient on a SSD. 3-4 should be fine
+    # for spining disks. Anything higher may only help on slower mediums.
+    set(SWIFT_PROFILE_MERGE_POOL_SIZE "4")
+  endif()
+
+  if(NOT SWIFT_PROFILE_FILE_PATTERN)
+    set(SWIFT_PROFILE_FILE_PATTERN
+      "%${SWIFT_PROFILE_MERGE_POOL_SIZE}m-%p.profraw")
+  endif()
+
+  if(NOT SWIFT_PROFILE_OUTPUT_DIR)
+    file(TO_NATIVE_PATH
+      "${SWIFT_BINARY_DIR}/profiles"
+      SWIFT_PROFILE_DATA_DIR)
+  endif()
+
+  file(TO_NATIVE_PATH
+    "${SWIFT_PROFILE_OUTPUT_DIR}/${SWIFT_PROFILE_FILE_PATTERN}"
+    SWIFT_PROFILE_FILE_PATTERN)
+  endif()
+endif()
+
+# Enables profile generation for the current diretory and all subsequent
+# subdirectories.
+function(enable_profile_generation)
+  if(NOT SWIFT_ENABLE_PROFILE_GENERATION)
+    return()
+  endif()
+
+  set(profile_flag "-fprofile-generate='${SWIFT_PROFILE_DATA_DIR}'")
+  if(SWIFT_ENABLE_IR_PROFILE_GENERATION)
+    set(profile_flag "-fprofile-instr-generate='${SWIFT_PROFILE_FILE_PATTERN}'")
+  endif()
+
+  set(cmake_flag_vars
+    CMAKE_C_FLAGS
+    CMAKE_CXX_FLAGS
+    CMAKE_EXE_LINKER_FLAGS
+    CMAKE_SHARED_LINKER_FLAGS)
+
+  foreach(var ${cmake_flag_vars})
+    set(${var} "${${var}} ${profile_flag}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
+#
+# Configure Swift to build with PGO
+#
+
+if(SWIFT_PROFDATA_FILE AND EXISTS "${SWIFT_PROFDATA_FILE}")
+  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+  else()
+    message(FATAL_ERROR
+      "SWIFT_PROFDATA_FILE can only be specified when compiling with Clang")
+  endif()
+endif()
+
+#
 # Add all of the subdirectories, where we actually do work.
+#
 
 ###############
 # PLEASE READ #
@@ -890,6 +977,9 @@ endif()
 #
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
+
+# Enable profile generation after stdlib
+enable_profile_generation()
 
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)

@@ -419,7 +419,10 @@ def create_argument_parser():
                 'chosen by default')
 
     option('--clang-profile-instr-use', store_path,
-           help='profile file to use for clang PGO')
+           help='profile file to use for Clang PGO')
+
+    option('--swift-profile-instr-use', store_path,
+           help='profile file to use for Swift PGO')
 
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     option('--llvm-max-parallel-lto-link-jobs', store_int,

@@ -750,6 +750,12 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.clang_profile_instr_use)
             ]
 
+        if args.swift_profile_instr_use:
+            path = os.path.abspath(args.swift_profile_instr_use)
+            impl_args += [
+                '--swift-profile-instr-use={}'.format(path)
+            ]
+
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
