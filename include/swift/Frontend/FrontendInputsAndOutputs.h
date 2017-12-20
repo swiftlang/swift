@@ -137,43 +137,48 @@ public:
   }
 
   bool forEachInputProducingOutput(
-      llvm::function_ref<bool(const InputFile &)> fn) const {
+      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
     return isSingleThreadedWMO()
-               ? fn(*getSingleThreadedWMOInput())
+               ? fn(*getSingleThreadedWMOInput(), 0)
                : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
   }
 
-  bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const {
-    for (const auto &file : getAllInputs())
-      if (fn(file))
+  bool
+  forEachInput(llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
+    for (auto i : indices(getAllInputs()))
+      if (fn(getAllInputs()[i], i))
+        return true;
+    return false;
+  }
+
+  bool forEachPrimaryInput(
+      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
+    unsigned i = 0;
+    for (const auto p : PrimaryInputs)
+      if (fn(getAllInputs()[p.second], i++))
+        return true;
+    return false;
+  }
+
+  bool forEachInputProducingOutput(
+      llvm::function_ref<bool(InputFile &, unsigned)> fn) {
+    return isSingleThreadedWMO()
+               ? fn(*getSingleThreadedWMOInput(), 0)
+               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
+  }
+
+  bool forEachInput(llvm::function_ref<bool(InputFile &, unsigned)> fn) {
+    for (auto i : indices(getAllInputs()))
+      if (fn(getAllInputs()[i], i))
         return true;
     return false;
   }
 
   bool
-  forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const {
-    for (const auto p : PrimaryInputs)
-      if (fn(getAllInputs()[p.second]))
-        return true;
-    return false;
-  }
-
-  bool forEachInputProducingOutput(llvm::function_ref<bool(InputFile &)> fn) {
-    return isSingleThreadedWMO()
-               ? fn(*getSingleThreadedWMOInput())
-               : hasPrimaries() ? forEachPrimaryInput(fn) : forEachInput(fn);
-  }
-
-  bool forEachInput(llvm::function_ref<bool(InputFile &)> fn) {
-    for (auto &file : getAllInputs())
-      if (fn(file))
-        return true;
-    return false;
-  }
-
-  bool forEachPrimaryInput(llvm::function_ref<bool(InputFile &input)> fn) {
+  forEachPrimaryInput(llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
+    unsigned i = 0;
     for (auto p : PrimaryInputs)
-      if (fn(getAllInputs()[p.second]))
+      if (fn(getAllInputs()[p.second], ++i))
         return true;
     return false;
   }

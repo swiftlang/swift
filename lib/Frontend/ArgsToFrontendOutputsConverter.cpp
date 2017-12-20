@@ -45,10 +45,9 @@ bool ArgsToFrontendOutputsConverter::convert() {
           .computeOutputPaths();
   if (!outputPaths)
     return true;
-  unsigned i = 0;
   return InputsAndOutputs.forEachInputProducingOutput(
-      [&](InputFile &input) -> bool {
-        input.setOutputs((*outputPaths)[i++]);
+      [&](InputFile &input, unsigned i) -> bool {
+        input.setOutputs((*outputPaths)[i]);
         return false;
       });
 }
@@ -118,13 +117,12 @@ Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
 
-  unsigned i = 0;
   bool hadError = InputsAndOutputs.forEachInputProducingOutput(
-      [&](const InputFile &input) -> bool {
+      [&](const InputFile &input, unsigned i) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
-                                  : StringRef(OutputFileArguments[i++]);
+                                  : StringRef(OutputFileArguments[i]);
 
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
         if (!outputFile)
@@ -203,14 +201,12 @@ OutputPathsComputer::OutputPathsComputer(
 
 Optional<std::vector<OutputPaths>>
 OutputPathsComputer::computeOutputPaths() const {
-  unsigned i = 0;
   std::vector<OutputPaths> outputs;
   bool hadError = InputsAndOutputs.forEachInputProducingOutput(
-      [&](const InputFile &input) -> bool {
+      [&](const InputFile &input, unsigned i) -> bool {
         Optional<OutputPaths> outputPaths = computeOutputPathsForOneInput(
             OutputFiles[i], SupplementaryFilenamesFromCommandLineOrFilelists[i],
             input);
-        ++i;
         if (outputPaths)
           outputs.push_back(*outputPaths);
         return !outputPaths;

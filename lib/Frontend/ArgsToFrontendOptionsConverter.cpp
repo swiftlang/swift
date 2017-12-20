@@ -116,7 +116,7 @@ bool ArgsToFrontendOptionsConverter::convert() {
     return true;
 
   if (Opts.InputsAndOutputs.forEachInputProducingOutput(
-          [&](const InputFile &input) -> bool {
+          [&](const InputFile &input, unsigned) -> bool {
             return checkUnusedOutputPaths(input);
           }))
     return true;

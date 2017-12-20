@@ -112,7 +112,7 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
 std::vector<std::string>
 FrontendInputsAndOutputs::preBatchModeOutputFilenames() const {
   std::vector<std::string> outputs;
-  forEachInputProducingOutput([&](const InputFile &input) -> bool {
+  forEachInputProducingOutput([&](const InputFile &input, unsigned) -> bool {
     outputs.push_back(input.outputs().OutputFilename);
     return false;
   });

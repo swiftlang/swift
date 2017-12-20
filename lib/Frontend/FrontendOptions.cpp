@@ -97,8 +97,8 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 
 void FrontendOptions::forAllOutputPathsForMakeDependencies(
     std::function<void(const std::string &)> fn) const {
-  InputsAndOutputs.forEachInputProducingOutput([&](const InputFile &input)
-                                                   -> bool {
+  InputsAndOutputs.forEachInputProducingOutput([&](const InputFile &input,
+                                                   unsigned) -> bool {
     if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
         RequestedAction != FrontendOptions::ActionType::MergeModules &&
         !input.outputs().OutputFilename.empty()) {
