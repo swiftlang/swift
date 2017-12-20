@@ -597,7 +597,6 @@ void CompilerInstance::parseLibraryFile(
 
   auto *DelayedCB = SecondaryDelayedCB;
   if (BufferID == PrimaryBufferID) {
-    setPrimarySourceFile(NextInput);
     DelayedCB = PrimaryDelayedCB;
   }
   if (isWholeModuleCompilation())
