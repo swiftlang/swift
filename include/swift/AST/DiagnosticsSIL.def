@@ -244,7 +244,7 @@ WARNING(unreachable_code_after_stmt,none,
         "code after '%select{return|break|continue|throw}0' will never "
         "be executed", (unsigned))
 WARNING(unreachable_case,none,
-        "case will never be executed", ())
+        "%select{case|default}0 will never be executed", (bool))
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())

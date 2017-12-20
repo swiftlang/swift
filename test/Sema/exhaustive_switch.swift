@@ -444,7 +444,7 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
@@ -460,7 +460,8 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}}
+  // No diagnostic
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, _): return true
   case (.case1, _): return true
@@ -476,9 +477,8 @@ func quiteBigEnough() -> Bool {
   }
 
 
-  // expected-error@+1 {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}}
+  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
-  // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -493,9 +493,8 @@ func quiteBigEnough() -> Bool {
   case (.case11, _): return true
   }
 
-  // expected-error@+1 {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}}
+  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
-  // expected-note@-1 {{do you want to add a default clause?}}
   case (_, .case0): return true
   case (_, .case1): return true
   case (_, .case2): return true
@@ -510,14 +509,13 @@ func quiteBigEnough() -> Bool {
   case (_, .case11): return true
   }
 
-  // No diagnostic 
+  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
   case (_, _): return true
   }
 
-  // expected-error@+1 {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}} 
+  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
-  // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -525,7 +523,7 @@ func quiteBigEnough() -> Bool {
   case _: return true
   }
   
-  // No diagnostic 
+  // No diagnostic
   switch ContainsOverlyLargeEnum.one(.case0) {
   case .one: return true
   case .two: return true
@@ -558,28 +556,6 @@ func infinitelySized() -> Bool {
   // expected-note@-1 10 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
-  }
-}
-
-// SR-6316: Size heuristic is insufficient to catch space covering when the
-// covered space size is greater than or equal to the master space size.
-func largeSpaceMatch(_ x: Bool) {
-  switch (x, (x, x, x, x), (x, x, x, x)) { // expected-error {{analysis of uncovered switch statement is too complex to perform in a reasonable amount of time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
-  case (true, (_, _, _, _), (_, true, true, _)):
-    break
-  case (true, (_, _, _, _), (_, _, false, _)):
-    break
-  case (_, (_, true, true, _), (_, _, false, _)):
-    break
-  case (_, (_, _, false, _), (_, true, true, _)):
-    break
-  case (_, (_, true, true, _), (_, true, true, _)):
-    break
-  case (_, (_, _, false, _), (_, _, false, _)):
-    break
-  case (_, (false, false, false, false), (_, _, _, _)):
-    break
   }
 }
 
