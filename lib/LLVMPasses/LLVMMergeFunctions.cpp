@@ -75,7 +75,7 @@ static cl::opt<unsigned> FunctionMergeThreshold(
     "swiftmergefunc-threshold",
     cl::desc("Functions larger than the threshold are considered for merging."
              "'0' disables function merging at all."),
-    cl::init(30), cl::Hidden);
+    cl::init(15), cl::Hidden);
 
 namespace {
 
