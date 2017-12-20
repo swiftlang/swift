@@ -566,7 +566,7 @@ extension Panda {
 
 struct TuxedoPanda : Panda { }
 
-// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
   // FIXME: Useless re-abstractions
 
@@ -574,15 +574,15 @@ struct TuxedoPanda : Panda { }
 
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIegyd_A2CIegir_TR : $@convention(thin) (@in TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xyxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK: }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmTW
 
 // Call the getter:
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xyxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0
 
 // Result of calling the getter is re-abstracted to the maximally substituted type
 // by SILGenFunction::emitApply():
@@ -597,7 +597,7 @@ struct TuxedoPanda : Panda { }
 
 // The callback:
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
 // CHECK: }
 
