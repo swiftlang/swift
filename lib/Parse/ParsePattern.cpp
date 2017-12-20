@@ -1050,6 +1050,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
+    PatternCtx.setCreateSyntax(SyntaxKind::IsTypePattern);
     SourceLoc isLoc = consumeToken(tok::kw_is);
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
