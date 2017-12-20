@@ -40,7 +40,8 @@ bool ArgsToFrontendOutputsConverter::convert() {
   if (!outputFiles)
     return true;
   Optional<std::vector<OutputPaths>> outputPaths =
-      OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles)
+      OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
+                          ModuleName)
           .computeOutputPaths();
   if (!outputPaths)
     return true;
@@ -119,7 +120,7 @@ OutputFilesComputer::computeOutputFiles() const {
 
   unsigned i = 0;
   bool hadError = InputsAndOutputs.forEachInputProducingOutput(
-      [&](InputFile &input) -> bool {
+      [&](const InputFile &input) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
@@ -131,9 +132,7 @@ OutputFilesComputer::computeOutputFiles() const {
         outputFiles.push_back(*outputFile);
         return false;
       });
-  if (hadError)
-    return None;
-  return outputFiles;
+  return hadError ? None : Optional<std::vector<std::string>>(outputFiles);
 }
 
 Optional<std::string>
@@ -190,129 +189,218 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   return path.str();
 }
 
-//      // FIXME: dmu suppFilelistArgs should be const, but std::vector...
-//      std::vector<OutputPaths> suppFilelistArgs =
-//      getSupplementaryFilenamesFromFilelists();
-//
+OutputPathsComputer::OutputPathsComputer(
+    const ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    ArrayRef<std::string> outputFiles, StringRef moduleName)
+    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+      OutputFiles(outputFiles), ModuleName(moduleName),
+      SupplementaryFilenamesFromCommandLineOrFilelists(
+          getSupplementaryFilenamesFromCommandLineOrFilelists(
+              Args, Diags, InputsAndOutputs.countOfFilesProducingOutput())),
+      RequestedAction(
+          ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
-//
+Optional<std::vector<OutputPaths>>
+OutputPathsComputer::computeOutputPaths() const {
+  unsigned i = 0;
+  std::vector<OutputPaths> outputs;
+  bool hadError = InputsAndOutputs.forEachInputProducingOutput(
+      [&](const InputFile &input) -> bool {
+        Optional<OutputPaths> outputPaths = computeOutputPathsForOneInput(
+            OutputFiles[i], SupplementaryFilenamesFromCommandLineOrFilelists[i],
+            input);
+        if (outputPaths)
+          outputs.push_back(*outputPaths);
+        return !outputPaths;
+      });
+  return hadError ? None : Optional<std::vector<OutputPaths>>(outputs);
+}
 
-//
-//      return computeAllOutputs(Args, outputFileArgumentsForEveryInput,
-//                               suppFilelistArgs, isSingleThreadedWMO,
-//                               isOutputFilenameArgumentOneDirectory,
-//                               doOutputFilenameArgumentsCorrespondToInputs,
-//                               Opts.ModuleName, Diags, Opts.InputsAndOutputs);
+std::vector<OutputPaths>
+OutputPathsComputer::getSupplementaryFilenamesFromCommandLineOrFilelists(
+    const ArgList &args, DiagnosticEngine &diags, const unsigned inputCount) {
 
-// FIXME: dmu getSupplementaryFilenamesFromFilelists assumes same indices as
-// inputs
-//      std::vector<OutputPaths>
-//      ArgsToFrontendOutputsConverter::getSupplementaryFilenamesFromFilelists()
-//      {
-//        const unsigned N = InputsAndOutputs.countOfFilesProducingOutput();
-//
-//        auto objCHeaderOutput = readSupplementaryOutputFileList(
-//                                                                options::OPT_objCHeaderOutput_filelist,
-//                                                                N);
-//        auto moduleOutput =
-//        readSupplementaryOutputFileList(options::OPT_moduleOutput_filelist,
-//        N); auto moduleDocOutput =
-//        readSupplementaryOutputFileList(options::OPT_moduleDocOutput_filelist,
-//        N); auto dependenciesFile = readSupplementaryOutputFileList(
-//                                                                options::OPT_dependenciesFile_filelist,
-//                                                                N);
-//        auto referenceDependenciesFile = readSupplementaryOutputFileList(
-//                                                                         options::OPT_referenceDependenciesFile_filelist,
-//                                                                         N);
-//        auto serializedDiagnostics = readSupplementaryOutputFileList(
-//                                                                     options::OPT_serializedDiagnostics_filelist,
-//                                                                     N);
-//        auto loadedModuleTrace = readSupplementaryOutputFileList(
-//                                                                 options::OPT_loadedModuleTrace_filelist,
-//                                                                 N);
-//        auto TBD = readSupplementaryOutputFileList(options::OPT_TBD_filelist,
-//        N);
-//
-//        std::vector<OutputPaths> result;
-//
-//        for (unsigned i = 0; i < N; ++i) {
-//          result.push_back(
-//                           OutputPaths(i, objCHeaderOutput, moduleOutput,
-//                           moduleDocOutput,
-//                                       dependenciesFile,
-//                                       referenceDependenciesFile,
-//                                       serializedDiagnostics,
-//                                       loadedModuleTrace, TBD));
-//        }
-//        return result;
-//      }
+  auto objCHeaderOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_objCHeaderOutput_filelist, inputCount);
+  auto moduleOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_moduleOutput_filelist, inputCount);
+  auto moduleDocOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_moduleDocOutput_filelist, inputCount);
+  auto dependenciesFile = readSupplementaryOutputFileList(
+      args, diags, options::OPT_dependenciesFile_filelist, inputCount);
+  auto referenceDependenciesFile = readSupplementaryOutputFileList(
+      args, diags, options::OPT_referenceDependenciesFile_filelist, inputCount);
+  auto serializedDiagnostics = readSupplementaryOutputFileList(
+      args, diags, options::OPT_serializedDiagnostics_filelist, inputCount);
+  auto loadedModuleTrace = readSupplementaryOutputFileList(
+      args, diags, options::OPT_loadedModuleTrace_filelist, inputCount);
+  auto TBD = readSupplementaryOutputFileList(
+      args, diags, options::OPT_TBD_filelist, inputCount);
 
-//      static bool computeAllOutputs(
-//                                    const ArgList &args, ArrayRef<std::string>
-//                                    outputFileArgumentsForEveryInput,
-//                                    ArrayRef<OutputPaths> suppFileListArgs,
-//                                    const bool isSingleThreadedWMO, const bool
-//                                    isOutputFilenameArgumentOneDirectory,
-//                                    const bool
-//                                    doOutputFilenameArgumentsCorrespondToInputs,
-//                                    StringRef moduleName, DiagnosticEngine
-//                                    &diags, FrontendInputsAndOutputs &io) {
-//
-//        StringRef filenameOfFirstInput =
-//        io.hasSingleInput() ? io.getFilenameOfFirstInput() : StringRef();
-//
-//        // FIXME: dmu Get rid of this someday.
-//        StringRef outputFilenameOfFirstInput = computeOutputFilename(
-//                                                                     args,
-//                                                                     outputFileArgumentsForEveryInput,
-//                                                                     outputFilenameArg,
-//                                                                     isOutputFilenameArgumentOneDirectory,
-//                                                                     doOutputFilenameArgumentsCorrespondToInputs,
-//                                                                     filenameOfFirstInput,
-//                                                                     input.file(),
-//                                                                     input.isPrimary(),
-//                                                                     diags);
-//
-//        unsigned i = 0;
-//        io.setIsSingleThreadedWMO(isSingleThreadedWMO);
-//        return io.forEachInputProducingOutput(
-//                                              [&](InputFile &input) -> bool {
-//                                              // ONLY ONCE IF WMONON??
-//
-//                                                StringRef ithOutputFilenameArg
-//                                                =
-//                                                outputFileArgumentsForEveryInput.empty()
-//                                                ? StringRef()
-//                                                :
-//                                                StringRef(outputFileArgumentsForEveryInput[i]);
-//
-//                                                const OutputPaths
-//                                                &ithSuppFileListArg =
-//                                                suppFileListArgs[i];
-//
-//                                                Optional<OutputPaths>
-//                                                outputPaths =
-//                                                computeOutputsForOneInput(
-//                                                                                                              args, outputFileArgumentsForEveryInput, ithOutputFilenameArg,
-//                                                                                                              isOutputFilenameArgumentOneDirectory,
-//                                                                                                              doOutputFilenameArgumentsCorrespondToInputs, filenameOfFirstInput,
-//                                                                                                              outputFilenameOfFirstInput, input, moduleName, ithSuppFileListArg,
-//                                                                                                              diags);
-//
-//                                                if (!outputPaths)
-//                                                  return true;
-//                                                input.setOutputs(*outputPaths);
-//                                                ++i;
-//                                                return false;
-//                                              });
-//      }
-//      Optional<std::vector<std::string>>
-//      FrontendArgsToOutputsConverter::readSupplementaryOutputFileList(swift::options::ID
-//      id, unsigned N) {
-//        Arg *A = Args.getLastArg(id);
-//        if (!A)
-//          return None;
-//        auto r = readOutputFilelist(A->getValue(), Diags);
-//        assert(r.size() == N);
-//        return r;
-//      }
+  std::vector<OutputPaths> result;
+
+  for (unsigned i = 0; i < inputCount; ++i) {
+    result.push_back(
+        OutputPaths(i, objCHeaderOutput, moduleOutput, moduleDocOutput,
+                    dependenciesFile, referenceDependenciesFile,
+                    serializedDiagnostics, loadedModuleTrace, TBD));
+  }
+  return result;
+}
+
+Optional<std::vector<std::string>>
+OutputPathsComputer::readSupplementaryOutputFileList(const ArgList &args,
+                                                     DiagnosticEngine &diags,
+                                                     swift::options::ID id,
+                                                     unsigned requiredCount) {
+  Arg *A = args.getLastArg(id);
+  if (!A)
+    return None;
+  auto r =
+      ArgsToFrontendOutputsConverter::readOutputFileList(A->getValue(), diags);
+  assert(r.size() == requiredCount);
+  return r;
+}
+
+Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
+    StringRef outputFile, const OutputPaths &pathsFromFilelists,
+    const InputFile &input) const {
+  StringRef implicitBasis = deriveImplicitBasis(outputFile, input);
+
+  using namespace options;
+
+  auto dependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_dependencies_path, OPT_emit_dependencies,
+      pathsFromFilelists.DependenciesFilePath, "d", "", implicitBasis);
+  if (!dependenciesFilePath)
+    return None;
+
+  auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_reference_dependencies_path, OPT_emit_reference_dependencies,
+      pathsFromFilelists.ReferenceDependenciesFilePath, "swiftdeps", "",
+      implicitBasis);
+  if (!referenceDependenciesFilePath)
+    return None;
+
+  auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
+      OPT_serialize_diagnostics_path, OPT_serialize_diagnostics,
+      pathsFromFilelists.SerializedDiagnosticsPath, "dia", "", implicitBasis);
+
+  if (!serializedDiagnosticsPath)
+    return None;
+
+  auto objCHeaderOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_objc_header_path, OPT_emit_objc_header,
+      pathsFromFilelists.ObjCHeaderOutputPath, "h", "", implicitBasis);
+  if (!objCHeaderOutputPath)
+    return None;
+
+  auto loadedModuleTracePath = determineSupplementaryOutputFilename(
+      OPT_emit_loaded_module_trace_path, OPT_emit_loaded_module_trace,
+      pathsFromFilelists.LoadedModuleTracePath, "trace.json", "",
+      implicitBasis);
+  if (!loadedModuleTracePath)
+    return None;
+
+  auto tbdPath = determineSupplementaryOutputFilename(
+      OPT_emit_tbd_path, OPT_emit_tbd, pathsFromFilelists.TBDPath, "tbd", "",
+      implicitBasis);
+  if (!tbdPath)
+    return None;
+
+  auto moduleDocOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_doc_path, OPT_emit_module_doc,
+      pathsFromFilelists.ModuleDocOutputPath, SERIALIZED_MODULE_DOC_EXTENSION,
+      "", implicitBasis);
+  if (!moduleDocOutputPath)
+    return None;
+
+  ID emitModuleOption;
+  std::string moduleExtension;
+  std::string mainOutputIfUsableForModule;
+  deriveModulePathParameters(emitModuleOption, moduleExtension,
+                             mainOutputIfUsableForModule);
+
+  auto moduleOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_path, emitModuleOption,
+      pathsFromFilelists.ModuleOutputPath, moduleExtension,
+      mainOutputIfUsableForModule, implicitBasis);
+  if (!moduleOutputPath)
+    return None;
+
+  return OutputPaths(outputFile, *objCHeaderOutputPath, *moduleOutputPath,
+                     *moduleDocOutputPath, *dependenciesFilePath,
+                     *referenceDependenciesFilePath, *serializedDiagnosticsPath,
+                     *loadedModuleTracePath, *tbdPath);
+}
+
+StringRef
+OutputPathsComputer::deriveImplicitBasis(StringRef outputFilename,
+                                         const InputFile &input) const {
+  if (!outputFilename.empty() && outputFilename != "-")
+    // Put the serialized diagnostics file next to the output file.
+    return outputFilename;
+
+  // If we have a primary input, so use that as the basis for the name of the
+  // serialized diagnostics file, otherwise fall back on the
+  // module name.
+  if (input.isPrimary() && input.file() != "-")
+    return llvm::sys::path::filename(input.file());
+
+  return ModuleName;
+}
+
+Optional<std::string> OutputPathsComputer::determineSupplementaryOutputFilename(
+    options::ID pathOpt, options::ID emitOpt, StringRef pathFromFilelists,
+    StringRef extension, StringRef mainOutputIfUsable,
+    StringRef implicitBasis) const {
+  using namespace options;
+
+  {
+    const Arg *argWithPath = Args.getLastArg(pathOpt);
+    if (argWithPath && !pathFromFilelists.empty()) {
+      // FIXME: dmu write out arg name and file list name
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_filelist_and_argument);
+      return None; // FIXME: dmu bail on supp filelist and argument?
+    }
+    if (!pathFromFilelists.empty())
+      return pathFromFilelists.str();
+    if (argWithPath)
+      return std::string(argWithPath->getValue());
+  }
+
+  if (!Args.hasArg(emitOpt))
+    return std::string();
+
+  if (!mainOutputIfUsable.empty()) {
+    return mainOutputIfUsable.str();
+  }
+
+  llvm::SmallString<128> path(implicitBasis);
+  llvm::sys::path::replace_extension(path, extension);
+  return path.str().str();
+};
+
+void OutputPathsComputer::deriveModulePathParameters(
+    options::ID &emitOption, std::string &extension,
+    std::string &mainOutputIfUsable) const {
+
+  bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
+               RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
+
+  emitOption = !isSIB ? options::OPT_emit_module
+                      : RequestedAction == FrontendOptions::ActionType::EmitSIB
+                            ? options::OPT_emit_sib
+                            : options::OPT_emit_sibgen;
+
+  bool canUseMainOutputForModule =
+      RequestedAction == FrontendOptions::ActionType::MergeModules ||
+      RequestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
+
+  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+
+  mainOutputIfUsable =
+      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+}

@@ -115,6 +115,12 @@ bool ArgsToFrontendOptionsConverter::convert() {
   if (computeOutputFilenamesAndSupplementaryFilenames())
     return true;
 
+  if (Opts.InputsAndOutputs.forEachInputProducingOutput(
+          [&](const InputFile &input) -> bool {
+            return checkUnusedOutputPaths(input);
+          }))
+    return true;
+
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
   }
@@ -422,192 +428,41 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
                                                                        Diags);
 
-  auto nameToStem =
-      outputFilenames &&
-              ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
-                  outputFilenames)
-          ? outputFilenames.front()
-          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+  auto nameToStem = ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
+                        outputFilenames)
+                        ? outputFilenames.front()
+                        : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }
 
-static StringRef deriveSupplementaryOutputFromInputOrModule(
-    StringRef outputFilename, StringRef inputFilename, const bool isPrimary,
-    StringRef moduleName) {
-  if (!outputFilename.empty() && outputFilename != "-")
-    // Put the serialized diagnostics file next to the output file.
-    return outputFilename;
-
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  if (isPrimary && inputFilename != "-")
-    return llvm::sys::path::filename(inputFilename);
-
-  return moduleName;
+static bool shouldSerializeBridgingHeader(
+    const FrontendInputsAndOutputs &inputsAndOutputs) {
+  return inputsAndOutputs.isWholeModule() && inputsAndOutputs.hasInputs() &&
+         !inputsAndOutputs.preBatchModeModuleOutputPath().empty();
 }
 
-// ISOLATEMODULEPATH
-static Optional<std::string> determineSupplementaryOutputFilename(
-    const Arg *const argWithPath, const bool hasArgWithoutPath,
-    StringRef pathFromSupplementaryFilelist, StringRef extension,
-    StringRef mainOutputIfUsable, StringRef supplementaryNameFromInputOrModule,
-    DiagnosticEngine &diags) {
+void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-
-  {
-    if (argWithPath && !pathFromSupplementaryFilelist.empty()) {
-      // FIXME: dmu write out arg name and file list name
-      diags.diagnose(SourceLoc(),
-                     diag::error_cannot_have_filelist_and_argument);
-      return None; // FIXME: dmu bail on supp filelist and argument?
-    }
-    if (!pathFromSupplementaryFilelist.empty())
-      return pathFromSupplementaryFilelist.str();
-    if (argWithPath)
-      return std::string(argWithPath->getValue());
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
+    Opts.ImplicitObjCHeaderPath = A->getValue();
+    Opts.SerializeBridgingHeader |=
+        shouldSerializeBridgingHeader(Opts.InputsAndOutputs);
   }
-
-  if (!hasArgWithoutPath)
-    return std::string();
-
-  if (!mainOutputIfUsable.empty()) {
-    assert(false && "Using fake_outputFilenameOfFirstInput");
-    return mainOutputIfUsable.str();
-  }
-
-  llvm::SmallString<128> path(supplementaryNameFromInputOrModule);
-  llvm::sys::path::replace_extension(path, extension);
-  return path.str().str();
-};
-
-static void deriveModuleParameters(const ArgList &args,
-                                   StringRef outputFilenameOfFirstInput,
-                                   options::ID &emitOption,
-                                   std::string &extension,
-                                   std::string &mainOutputIfUsable) {
-  FrontendOptions::ActionType requestedAction =
-      ArgsToFrontendOptionsConverter::determineRequestedAction(args);
-
-  bool isSIB = requestedAction == FrontendOptions::ActionType::EmitSIB ||
-               requestedAction == FrontendOptions::ActionType::EmitSIBGen;
-
-  emitOption = !isSIB ? options::OPT_emit_module
-                      : requestedAction == FrontendOptions::ActionType::EmitSIB
-                            ? options::OPT_emit_sib
-                            : options::OPT_emit_sibgen;
-
-  bool canUseMainOutputForModule =
-      requestedAction == FrontendOptions::ActionType::MergeModules ||
-      requestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
-
-  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
-
-  mainOutputIfUsable =
-      canUseMainOutputForModule ? outputFilenameOfFirstInput : "";
 }
-
-static Optional<OutputPaths> determineSupplementaryOutputFilenames(
-    const ArgList &args, StringRef outputFilename,
-    StringRef outputFilenameOfFirstInput, const OutputPaths &suppOutArg,
-    StringRef supplementaryNameFromInputOrModule, DiagnosticEngine &diags) {
+void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
   using namespace options;
-
-  auto dependenciesFilePath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_dependencies_path),
-      args.hasArg(OPT_emit_dependencies), suppOutArg.DependenciesFilePath, "d",
-      "", supplementaryNameFromInputOrModule, diags);
-  if (!dependenciesFilePath)
-    return None;
-
-  auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_reference_dependencies_path),
-      args.hasArg(OPT_emit_reference_dependencies),
-      suppOutArg.ReferenceDependenciesFilePath, "swiftdeps", "",
-      supplementaryNameFromInputOrModule, diags);
-  if (!referenceDependenciesFilePath)
-    return None;
-
-  auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_serialize_diagnostics_path),
-      args.hasArg(OPT_serialize_diagnostics),
-      suppOutArg.SerializedDiagnosticsPath, "dia", "",
-      supplementaryNameFromInputOrModule, diags);
-
-  if (!serializedDiagnosticsPath)
-    return None;
-
-  auto objCHeaderOutputPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_objc_header_path),
-      args.hasArg(OPT_emit_objc_header), suppOutArg.ObjCHeaderOutputPath, "h",
-      "", supplementaryNameFromInputOrModule, diags);
-  if (!objCHeaderOutputPath)
-    return None;
-
-  auto loadedModuleTracePath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_loaded_module_trace_path),
-      args.hasArg(OPT_emit_loaded_module_trace),
-      suppOutArg.LoadedModuleTracePath, "trace.json", "",
-      supplementaryNameFromInputOrModule, diags);
-  if (!loadedModuleTracePath)
-    return None;
-
-  auto tbdPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_tbd_path), args.hasArg(OPT_emit_tbd),
-      suppOutArg.TBDPath, "tbd", "", supplementaryNameFromInputOrModule, diags);
-  if (!tbdPath)
-    return None;
-
-  auto moduleDocOutputPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_module_doc_path),
-      args.hasArg(OPT_emit_module_doc), suppOutArg.ModuleDocOutputPath,
-      SERIALIZED_MODULE_DOC_EXTENSION, "", supplementaryNameFromInputOrModule,
-      diags);
-  if (!moduleDocOutputPath)
-    return None;
-
-  ID emitModuleOption;
-  std::string moduleExtension;
-  std::string mainOutputIfUsableForModule;
-  deriveModuleParameters(args, outputFilenameOfFirstInput, emitModuleOption,
-                         moduleExtension, mainOutputIfUsableForModule);
-
-  auto moduleOutputPath = determineSupplementaryOutputFilename(
-      args.getLastArg(OPT_emit_module_path), args.hasArg(emitModuleOption),
-      suppOutArg.ModuleOutputPath, moduleExtension, mainOutputIfUsableForModule,
-      supplementaryNameFromInputOrModule, diags);
-  if (!moduleOutputPath)
-    return None;
-
-  return OutputPaths(outputFilename, *objCHeaderOutputPath, *moduleOutputPath,
-                     *moduleDocOutputPath, *dependenciesFilePath,
-                     *referenceDependenciesFilePath, *serializedDiagnosticsPath,
-                     *loadedModuleTracePath, *tbdPath);
+  for (const Arg *A : Args.filtered(OPT_import_module)) {
+    Opts.ImplicitImportModuleNames.push_back(A->getValue());
+  }
 }
-
-static Optional<OutputPaths> computeOutputsForOneInput(
-    const ArgList &args, ArrayRef<std::string> outputFileArgumentsForEveryInput,
-    StringRef outputFilenameArg,
-    const bool isOutputFilenameArgumentOneDirectory,
-    const bool doOutputFilenameArgumentsCorrespondToInputs,
-    StringRef filenameOfFirstInput, StringRef outputFilenameOfFirstInput,
-    const InputFile &input, StringRef moduleName,
-    const OutputPaths &suppFileListArg, DiagnosticEngine &diags) {
-
-  if (!outputFilename)
-    return None;
-
-  StringRef supplementaryNameFromInputOrModule =
-      deriveSupplementaryOutputFromInputOrModule(*outputFilename, input.file(),
-                                                 input.isPrimary(), moduleName);
-
-  return determineSupplementaryOutputFilenames(
-      args, *outputFilename, outputFilenameOfFirstInput, suppFileListArg,
-      supplementaryNameFromInputOrModule, diags);
+void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
+  using namespace options;
+  for (const Arg *A : Args.filtered(OPT_Xllvm)) {
+    Opts.LLVMArgs.push_back(A->getValue());
+  }
 }
-
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
   return ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
@@ -639,31 +494,4 @@ bool ArgsToFrontendOptionsConverter::checkUnusedOutputPaths(
     return true;
   }
   return false;
-}
-
-static bool shouldSerializeBridgingHeader(
-    const FrontendInputsAndOutputs &inputsAndOutputs) {
-  return inputsAndOutputs.isWholeModule() && inputsAndOutputs.hasInputs() &&
-         !inputsAndOutputs.preBatchModeModuleOutputPath().empty();
-}
-
-void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
-  using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        shouldSerializeBridgingHeader(Opts.InputsAndOutputs);
-  }
-}
-void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
-  using namespace options;
-  for (const Arg *A : Args.filtered(OPT_import_module)) {
-    Opts.ImplicitImportModuleNames.push_back(A->getValue());
-  }
-}
-void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
-  using namespace options;
-  for (const Arg *A : Args.filtered(OPT_Xllvm)) {
-    Opts.LLVMArgs.push_back(A->getValue());
-  }
 }
