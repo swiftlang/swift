@@ -1283,8 +1283,10 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
+  SILFunctionConventions FnConv(CurCallee.getSubstFunctionType(),
+                                IGF.getSILModule());
   addIndirectResultAttributes(IGF.IGM, CurCallee.getMutableAttributes(),
-                              0, true);
+                              0, FnConv.getNumIndirectSILResults() <= 1);
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
 #endif
