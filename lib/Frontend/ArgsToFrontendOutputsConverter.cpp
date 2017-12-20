@@ -210,6 +210,7 @@ OutputPathsComputer::computeOutputPaths() const {
         Optional<OutputPaths> outputPaths = computeOutputPathsForOneInput(
             OutputFiles[i], SupplementaryFilenamesFromCommandLineOrFilelists[i],
             input);
+        ++i;
         if (outputPaths)
           outputs.push_back(*outputPaths);
         return !outputPaths;
