@@ -79,6 +79,8 @@ private:
   createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles);
 
   bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles);
+
+  bool isSingleThreadedWMO() const;
 };
 } // namespace swift
 

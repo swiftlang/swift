@@ -79,10 +79,6 @@ public:
   Optional<std::vector<std::string>> computeOutputFiles() const;
 
 private:
-  bool isSingleThreadedWMO() const {
-    return OutputFileArguments.size() == 1 && InputsAndOutputs.hasInputs() &&
-           !InputsAndOutputs.hasPrimaries();
-  }
 
   Optional<std::string> computeOutputFile(StringRef outputArg,
                                           const InputFile &input) const;

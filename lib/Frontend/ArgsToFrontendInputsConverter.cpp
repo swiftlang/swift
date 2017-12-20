@@ -15,6 +15,7 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
+#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -47,7 +48,13 @@ bool ArgsToFrontendInputsConverter::convert() {
     return true;
   std::set<StringRef> unusedPrimaryFiles =
       createInputFilesConsumingPrimaries(*primaryFiles);
-  return checkForMissingPrimaryFiles(unusedPrimaryFiles);
+  if (checkForMissingPrimaryFiles(unusedPrimaryFiles))
+    return true;
+
+  // Must be set before we iterate over inputs needing outputs.
+  InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
+
+  return false;
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -150,4 +157,11 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
                    FilelistPathArg->getValue());
   }
   return !primaryFiles.empty();
+}
+
+bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaries() &&
+         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                          Diags)
+                 .size() == 1;
 }
