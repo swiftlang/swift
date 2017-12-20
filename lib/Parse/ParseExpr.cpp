@@ -57,6 +57,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
       return makeParserCodeCompletionResult<Expr>();
     if (pattern.isNull())
       return nullptr;
+    SyntaxContext->setCreateSyntax(SyntaxKind::UnresolvedPatternExpr);
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
@@ -1546,6 +1547,13 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
                      ? VarDecl::Specifier::Let
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
+      if (SyntaxContext->isEnabled()) {
+        PatternSyntax PatternNode =
+            SyntaxFactory::makeIdentifierPattern(SyntaxContext->popToken());
+        ExprSyntax ExprNode =
+            SyntaxFactory::makeUnresolvedPatternExpr(PatternNode);
+        SyntaxContext->addSyntax(ExprNode);
+      }
       Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
       break;
     }

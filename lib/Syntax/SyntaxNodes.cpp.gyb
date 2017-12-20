@@ -24,6 +24,12 @@
 using namespace swift;
 using namespace swift::syntax;
 
+
+bool swift::syntax::checkAccessorListOrStmtList(const Syntax &S) {
+  return S.getKind() == SyntaxKind::AccessorList ||
+    S.getKind() == SyntaxKind::StmtList;
+}
+
 % for node in SYNTAX_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
@@ -41,8 +47,11 @@ void ${node.name}::validate() const {
 %         token_kind = child.main_token().kind
 %         choices = ", ".join("\"%s\"" % choice
 %                             for choice in child.text_choices)
-  syntax_assert_child_token_text(raw, ${child.name}, 
+  syntax_assert_child_token_text(raw, ${child.name},
                                  tok::${token_kind}, ${choices});
+%       end
+%       if child.node_choices:
+  syntax_assert_node_choice(raw, ${child.name});
 %       end
 %     end
 }

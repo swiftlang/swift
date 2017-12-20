@@ -315,4 +315,10 @@ EXPR_NODES = [
              Child('Statements', kind='StmtList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
+
+    # unresolved-pattern-expr -> pattern
+    Node('UnresolvedPatternExpr', kind='Expr',
+         children=[
+             Child('Pattern', kind='Pattern'),
+         ]),
 ]

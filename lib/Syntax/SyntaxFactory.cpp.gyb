@@ -146,6 +146,12 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
               return false;
             }
         },
+%       elif child.node_choices:
+        {   ${option},
+            [] (const Syntax &S) {
+              return check${child.name}(S);
+            }
+        },
 %       else:
         {   ${option},
             [](const Syntax &S) {

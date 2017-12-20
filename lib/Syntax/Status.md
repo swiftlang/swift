@@ -111,13 +111,18 @@
   * ThrowStmt
 
 ## Pattern
-### Not-started:
-  * ParenPattern
+### Done:
+  * IdentifierPattern
+  * WildcardPattern
   * TuplePattern
-  * NamedPattern
-  * AnyPattern
-  * TypedPattern
-  * VarPattern
+  * ExpressionPattern
+  * ValueBindingPattern
+  * IsTypePattern
+
+### Not-started:
+  * AsTypePattern
+  * OptionalPattern
+  * EnumCasePattern
 
 ## TypeRepr
 ### Done:

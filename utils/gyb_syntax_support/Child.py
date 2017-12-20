@@ -9,7 +9,7 @@ class Child(object):
     restricted subset of acceptable kinds or texts.
     """
     def __init__(self, name, kind, is_optional=False,
-                 token_choices=None, text_choices=None):
+                 token_choices=None, text_choices=None, node_choices=None):
         self.name = name
         self.swift_name = lowercase_first_word(name)
         self.syntax_kind = kind
@@ -38,6 +38,19 @@ class Child(object):
         # This will force validation logic to check the text passed into the
         # token against the choices.
         self.text_choices = text_choices or []
+
+        # A list of valid choices for a child
+        self.node_choices = node_choices or []
+
+        # Check the choices are either empty or multiple
+        assert len(self.node_choices) != 1
+
+        # Check node choices are well-formed
+        for choice in self.node_choices:
+            assert not choice.is_optional, \
+                "node choice %s cannot be optional" % choice.name
+            assert not choice.node_choices, \
+                "node choice %s cannot have further choices" % choice.name
 
     def is_token(self):
         """
