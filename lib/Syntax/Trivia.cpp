@@ -58,6 +58,9 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   case TriviaKind::CarriageReturn:
     OS << "carriage_return " << Count;
     break;
+  case TriviaKind::CarriageReturnLineFeed:
+    OS << "carriage_return_line_feed " << Count;
+    break;
   case TriviaKind::LineComment:
     OS << "line_comment" << Text.str();
     break;
@@ -101,6 +104,7 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
     break;
   case TriviaKind::Newline:
   case TriviaKind::CarriageReturn:
+  case TriviaKind::CarriageReturnLineFeed:
     Pos.addNewlines(Count);
     break;
   case TriviaKind::Space:
@@ -123,6 +127,7 @@ bool TriviaPiece::trySquash(const TriviaPiece &Next) {
     case TriviaKind::Formfeed:
     case TriviaKind::Newline:
     case TriviaKind::CarriageReturn:
+    case TriviaKind::CarriageReturnLineFeed:
       Count += Next.Count;
       return true;
     case TriviaKind::LineComment:
@@ -154,6 +159,11 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
     break;
   case TriviaKind::CarriageReturn:
     printRepeated(OS, '\r', Count);
+    break;
+  case TriviaKind::CarriageReturnLineFeed:
+    for (unsigned i = 0; i < Count; i++) {
+      OS << "\r\n";
+    }
     break;
   case TriviaKind::LineComment:
   case TriviaKind::BlockComment:

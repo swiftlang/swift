@@ -113,6 +113,9 @@ enum class TriviaKind {
 
   /// A newline '\r' character.
   CarriageReturn,
+  
+  /// A newline consists of contiguous '\r' and '\n' characters.
+  CarriageReturnLineFeed,
 
   /// A developer line comment, starting with '//'
   LineComment,
@@ -189,6 +192,12 @@ public:
   static TriviaPiece carriageReturns(unsigned Count) {
     return {TriviaKind::CarriageReturn, Count};
   }
+  
+  /// Return a piece of trivia for some number of two bytes sequence
+  /// consists of CR and LF in a row.
+  static TriviaPiece carriageReturnLineFeeds(unsigned Count) {
+    return {TriviaKind::CarriageReturnLineFeed, Count};
+  }
 
   /// Return a piece of trivia for a single line of ('//') developer comment.
   static TriviaPiece lineComment(const OwnedString Text) {
@@ -241,6 +250,8 @@ public:
       case TriviaKind::VerticalTab:
       case TriviaKind::Formfeed:
         return Count;
+      case TriviaKind::CarriageReturnLineFeed:
+        return Count * 2;
     }
   }
 
@@ -418,6 +429,15 @@ struct Trivia {
       return {};
     }
     return {{TriviaPiece::carriageReturns(Count)}};
+  }
+  
+  /// Return a collection of trivia of some number of two bytes sequence
+  /// consists of CR and LF in a row.
+  static Trivia carriageReturnLineFeeds(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
+    return {{TriviaPiece::carriageReturnLineFeeds(Count)}};
   }
 
   /// Return a collection of trivia with a single line of ('//')
