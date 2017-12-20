@@ -534,7 +534,9 @@ func doBlockInout(_: @convention(block) ()->(), _: inout Int) {}
 func readBlockWriteInout() {
   var x = 3
   // Around the call: [modify] [static]
-  // Inside closure: [modify] [static]
+  // Inside closure: [read] [static]
+  // expected-warning@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@+1{{conflicting access is here}}
   doBlockInout({ _ = x }, &x)
 }
 
@@ -558,6 +560,8 @@ func readBlockWriteInout() {
 func noEscapeBlock() {
   var x = 3
   doOne {
+    // expected-warning@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-note@+1{{conflicting access is here}}
     doBlockInout({ _ = x }, &x)
   }
 }

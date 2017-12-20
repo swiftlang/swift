@@ -957,9 +957,62 @@ static void checkForViolationWithCall(
   }
 }
 
+/// Given a block used as a noescape function argument, attempt to find
+/// the Swift closure that invoking the block will call.
+static SILValue findClosureStoredIntoBlock(SILValue V) {
+  auto FnType = V->getType().castTo<SILFunctionType>();
+  assert(FnType->getRepresentation() == SILFunctionTypeRepresentation::Block);
+
+  // Given a no escape block argument to a function,
+  // pattern match to find the noescape closure that invoking the block
+  // will call:
+  //     %noescape_closure = ...
+  //     %storage = alloc_stack
+  //     %storage_address = project_block_storage %storage
+  //     store %noescape_closure to [init] %storage_address
+  //     %block = init_block_storage_header %storage invoke %thunk
+  //     %arg = copy_block %block
+
+  InitBlockStorageHeaderInst *IBSHI = nullptr;
+
+  // Look through block copies to find the initialization of block storage.
+  while (true) {
+    if (auto *CBI = dyn_cast<CopyBlockInst>(V)) {
+      V = CBI->getOperand();
+      continue;
+    }
+
+    IBSHI = dyn_cast<InitBlockStorageHeaderInst>(V);
+    break;
+  }
+
+  if (!IBSHI)
+    return nullptr;
+
+  SILValue BlockStorage = IBSHI->getBlockStorage();
+  auto *PBSI = BlockStorage->getSingleUserOfType<ProjectBlockStorageInst>();
+  assert(PBSI && "Couldn't find block storage projection");
+
+  auto *SI = PBSI->getSingleUserOfType<StoreInst>();
+  assert(SI && "Couldn't find single store of function into block storage");
+
+  return SI->getSrc();
+}
+
 /// Look through a value passed as a function argument to determine whether
 /// it is a partial_apply.
 static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
+  auto ArgumentFnType = V->getType().castTo<SILFunctionType>();
+  assert(ArgumentFnType->isNoEscape());
+
+  if (ArgumentFnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Block) {
+    V = findClosureStoredIntoBlock(V);
+
+    if (!V)
+      return nullptr;
+  }
+
   while (true) {
     if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
       V = CFI->getOperand();
@@ -977,11 +1030,6 @@ static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
 /// if any of the @inout_aliasable captures passed to those closures have
 /// in-progress accesses that would conflict with any access the summary
 /// says the closure would perform.
-//
-/// TODO: We currently fail to statically diagnose non-escaping closures pased
-/// via @block_storage convention. To enforce this case, we should statically
-/// recognize when the apply takes a block argument that has been initialized to
-/// a non-escaping closure.
 static void checkForViolationsInNoEscapeClosureArguments(
     const StorageMap &Accesses, ApplySite AS, AccessSummaryAnalysis *ASA,
     llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses,
@@ -1023,12 +1071,20 @@ static void checkForViolationsInNoEscapeClosureArguments(
     if (Callee->empty())
       continue;
 
+
+    // For source compatibility reasons, treat conflicts found by
+    // looking through noescape blocks as warnings. A future compiler
+    // will upgrade these to errors.
+    bool ArgumentIsBlock = (ArgumentFnType->getRepresentation() ==
+                            SILFunctionTypeRepresentation::Block);
+
     // Check the closure's captures, which are a suffix of the closure's
     // parameters.
     unsigned StartIndex =
         Callee->getArguments().size() - PAI->getNumArguments();
     checkForViolationWithCall(Accesses, Callee, StartIndex,
-                              PAI->getArguments(), ASA, DiagnoseAsWarning,
+                              PAI->getArguments(), ASA,
+                              DiagnoseAsWarning || ArgumentIsBlock,
                               ConflictingAccesses);
   }
 }
