@@ -3789,6 +3789,10 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
   // Properties in protocols use sufficiently limited syntax that we have a
   // special parsing loop for them.  SIL mode uses the same syntax.
   if (Flags.contains(PD_InProtocol) || isInSILMode()) {
+    if (Tok.is(tok::r_brace)) {
+      // Give syntax node an empty statement list.
+      SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+    }
     while (Tok.isNot(tok::r_brace)) {
       if (Tok.is(tok::eof))
         return true;
@@ -3863,13 +3867,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     return false;
   }
 
-
   // Otherwise, we have a normal var or subscript declaration, parse the full
   // complement of specifiers, along with their bodies.
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
+    // Give syntax node an empty statement list.
+    SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
     diagnose(Tok, diag::computed_property_no_accessors);
     return true;
   }

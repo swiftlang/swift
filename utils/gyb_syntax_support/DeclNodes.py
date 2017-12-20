@@ -358,9 +358,10 @@ DECL_NODES = [
     Node('AccessorBlock', kind="Syntax",
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             # one of the following children should be required.
-             Child('Accessors', kind='AccessorList', is_optional=True),
-             Child('Statements', kind='StmtList', is_optional=True),
+             Child('AccessorListOrStmtList', kind='Syntax',
+                   node_choices=[
+                      Child('Accessors', kind='AccessorList'),
+                      Child('Statements', kind='StmtList')]),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
