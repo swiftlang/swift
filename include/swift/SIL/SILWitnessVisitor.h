@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
