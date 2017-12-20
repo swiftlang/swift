@@ -1038,7 +1038,7 @@ public:
 /// is produced when parsing types and when name binding type aliases, and is
 /// installed in declaration that use these erroneous types.  All uses of a
 /// declaration of invalid type should be ignored and not re-diagnosed.
-class ErrorType : public TypeBase {
+class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType,
