@@ -1387,6 +1387,14 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              UnresolvedParams, RAngleLoc);
 }
 
+CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
+                                         ArrayRef<CaptureListEntry> captureList,
+                                         ClosureExpr *closureBody) {
+  auto size = totalSizeToAlloc<CaptureListEntry>(captureList.size());
+  auto mem = ctx.Allocate(size, alignof(CaptureListExpr));
+  return ::new(mem) CaptureListExpr(captureList, closureBody);
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc start = SourceLoc();
   SourceLoc end = SourceLoc();
