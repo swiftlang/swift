@@ -1370,6 +1370,31 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
+ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
+                                 ArrayRef<ProtocolConformanceRef> conformances){
+  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+  auto mem = ctx.Allocate(size, alignof(ErasureExpr));
+  return ::new(mem) ErasureExpr(subExpr, type, conformances);
+}
+
+UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
+                                             Expr *SubExpr, SourceLoc LAngleLoc,
+                                             ArrayRef<TypeLoc> UnresolvedParams,
+                                             SourceLoc RAngleLoc) {
+  auto size = totalSizeToAlloc<TypeLoc>(UnresolvedParams.size());
+  auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
+  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                             UnresolvedParams, RAngleLoc);
+}
+
+CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
+                                         ArrayRef<CaptureListEntry> captureList,
+                                         ClosureExpr *closureBody) {
+  auto size = totalSizeToAlloc<CaptureListEntry>(captureList.size());
+  auto mem = ctx.Allocate(size, alignof(CaptureListExpr));
+  return ::new(mem) CaptureListExpr(captureList, closureBody);
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc start = SourceLoc();
   SourceLoc end = SourceLoc();

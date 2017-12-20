@@ -1211,8 +1211,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
           locArgs.push_back(ty);
-        Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
-            Result.get(), LAngleLoc, Context.AllocateCopy(locArgs), RAngleLoc));
+        Result = makeParserResult(UnresolvedSpecializeExpr::create(Context,
+                                  Result.get(), LAngleLoc, locArgs, RAngleLoc));
       }
 
       continue;
@@ -2207,9 +2207,8 @@ Expr *Parser::parseExprIdentifier() {
     SmallVector<TypeLoc, 8> locArgs;
     for (auto ty : args)
       locArgs.push_back(ty);
-    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
-                                               Context.AllocateCopy(locArgs),
-                                               RAngleLoc);
+    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, locArgs,
+                                         RAngleLoc);
   }
   return E;
 }
@@ -2780,8 +2779,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
   if (!captureList.empty())
-    result = new (Context) CaptureListExpr(Context.AllocateCopy(captureList),
-                                           closure);
+    result = CaptureListExpr::create(Context, captureList, closure);
 
   return makeParserResult(Status, result);
 }
