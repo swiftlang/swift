@@ -8,7 +8,7 @@ class Child(object):
     A child of a node, that may be declared optional or a token with a
     restricted subset of acceptable kinds or texts.
     """
-    def __init__(self, name, kind, either_group=None, is_optional=False,
+    def __init__(self, name, kind, is_optional=False,
                  token_choices=None, text_choices=None, node_choices=None):
         self.name = name
         self.swift_name = lowercase_first_word(name)
