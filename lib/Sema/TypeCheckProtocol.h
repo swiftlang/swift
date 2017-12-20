@@ -139,7 +139,7 @@ struct InferredTypeWitnessesSolution {
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_USED
 #endif
-  void dump();
+  void dump() const;
 };
 
 class RequirementEnvironment;
@@ -707,6 +707,12 @@ private:
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    ValueDecl *req);
 
+  /// Infer associated type witnesses for the given associated type.
+  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
+                   ConformanceChecker &checker,
+                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+                   AssociatedTypeDecl *assocType);
+
   /// Infer associated type witnesses for all relevant value requirements.
   ///
   /// \param assocTypes The set of associated types we're interested in.
@@ -733,7 +739,13 @@ private:
 
   /// Check whether the current set of type witnesses meets the
   /// requirements of the protocol.
-  bool checkCurrentTypeWitnesses();
+  bool checkCurrentTypeWitnesses(
+         const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
+           &valueWitnesses);
+
+  /// Check the current type witnesses against the
+  /// requirements of the given constrained extension.
+  bool checkConstrainedExtension(ExtensionDecl *ext);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.
