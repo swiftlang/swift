@@ -302,7 +302,7 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
     llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
   unsigned i = 0;
   for (auto p : PrimaryInputs)
-    if (fn(getAllInputs()[p.second], ++i))
+    if (fn(getAllInputs()[p.second], i++))
       return true;
   return false;
 }
