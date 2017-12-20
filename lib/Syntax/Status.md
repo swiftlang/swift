@@ -113,11 +113,11 @@
 ## Pattern
 ### Done:
   * IdentifierPattern
+  * WildcardPattern
   * TuplePattern
 
 ### Not-started:
   * ParenPattern
-  * AnyPattern
   * TypedPattern
   * VarPattern
 

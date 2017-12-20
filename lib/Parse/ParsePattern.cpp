@@ -848,6 +848,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     return parsePatternTuple();
     
   case tok::kw__:
+    PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
   case tok::identifier: {
