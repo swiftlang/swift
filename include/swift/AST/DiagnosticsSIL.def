@@ -219,6 +219,25 @@ NOTE(designated_init_c_struct_fix,none,
      "use \"self.init()\" to initialize the struct with zero values", ())
 
 
+// SWIFT_ENABLE_TENSORFLOW
+// TensorFlow Support Diagnostics.
+ERROR(tfop_incorrect_silname_operandinfo, none,
+      "tfop _silgen_name type descriptor %0: %1",
+      (StringRef, StringRef))
+
+WARNING(tf_value_implicitly_copied_to_accel, none,
+        "value implicitly copied to accelerator, use .toDevice() to make "
+        "transfer explicit",
+        ())
+WARNING(tf_value_implicitly_copied_to_host, none,
+        "value implicitly copied back to the host, use .toHost() to make "
+        "transfer explicit",
+        ())
+NOTE(tf_value_implicitly_copied_to_host_computed_used_here, none,
+     "value used here", ())
+
+
+
 // Control flow diagnostics.
 ERROR(missing_return,none,
       "missing return in a %select{function|closure}1 expected to return %0",
