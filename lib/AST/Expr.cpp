@@ -1377,6 +1377,16 @@ ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
   return ::new(mem) ErasureExpr(subExpr, type, conformances);
 }
 
+UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
+                                             Expr *SubExpr, SourceLoc LAngleLoc,
+                                             ArrayRef<TypeLoc> UnresolvedParams,
+                                             SourceLoc RAngleLoc) {
+  auto size = totalSizeToAlloc<TypeLoc>(UnresolvedParams.size());
+  auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
+  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                             UnresolvedParams, RAngleLoc);
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc start = SourceLoc();
   SourceLoc end = SourceLoc();
