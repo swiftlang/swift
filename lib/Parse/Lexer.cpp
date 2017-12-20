@@ -2304,11 +2304,15 @@ Restart:
     NextToken.setAtStartOfLine(true);
     switch (CurPtr[-1]) {
     case '\n':
-      // FIXME: CR+LF shoud form one trivia piece
       Pieces.appendOrSquash(TriviaPiece::newlines(1));
       break;
     case '\r':
-      Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
+      if (CurPtr[0] == '\n') {
+        Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
+        CurPtr++;
+      } else {
+        Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
+      }
       break;
     default:
       llvm_unreachable("unexcepted char here");
