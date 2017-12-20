@@ -875,6 +875,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     
   case tok::kw_var:
   case tok::kw_let: {
+    PatternCtx.setCreateSyntax(SyntaxKind::ValueBindingPattern);
     bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
     

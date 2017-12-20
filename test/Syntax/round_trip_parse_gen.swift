@@ -215,4 +215,9 @@ class C {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
+
+  func patternTests() {
+    for let (x, _) in foo {}
+    for var x: Int in foo {}
+  }
 }
