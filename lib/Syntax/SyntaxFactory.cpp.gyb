@@ -100,6 +100,11 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
   }
 }
 
+static bool checkAccessorListOrStmtList(const Syntax &S) {
+  return S.getKind() == SyntaxKind::AccessorList ||
+    S.getKind() == SyntaxKind::StmtList;
+}
+
 Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {
@@ -144,6 +149,12 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
                 return ${all_checks};
               }
               return false;
+            }
+        },
+%       elif child.node_choices:
+        {   ${option},
+            [] (const Syntax &S) {
+              return check${child.name}(S);
             }
         },
 %       else:
