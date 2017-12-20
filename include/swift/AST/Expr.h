@@ -309,6 +309,11 @@ class alignas(8) Expr {
     NumUnresolvedParams : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(CaptureListExpr, Expr, 32,
+    : NumPadBits,
+    NumCaptures : 32
+  );
+
   SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1,
     ThrowsIsSet : 1,
     Throws : 1
@@ -383,6 +388,7 @@ protected:
     SWIFT_INLINE_BITS(CollectionExpr);
     SWIFT_INLINE_BITS(ErasureExpr);
     SWIFT_INLINE_BITS(UnresolvedSpecializeExpr);
+    SWIFT_INLINE_BITS(CaptureListExpr);
   } Bits;
 
 private:
@@ -3680,17 +3686,30 @@ struct CaptureListEntry {
 /// CaptureList wraps the ClosureExpr.  The dynamic semantics are that evaluates
 /// the variable bindings from the capture list, then evaluates the
 /// subexpression (the closure itself) and returns the result.
-class CaptureListExpr : public Expr {
-  ArrayRef<CaptureListEntry> captureList;
+class CaptureListExpr final : public Expr,
+    private llvm::TrailingObjects<CaptureListExpr, CaptureListEntry> {
+  friend TrailingObjects;
+
   ClosureExpr *closureBody;
-public:
+
   CaptureListExpr(ArrayRef<CaptureListEntry> captureList,
                   ClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
-      captureList(captureList), closureBody(closureBody) {
+      closureBody(closureBody) {
+    Bits.CaptureListExpr.NumCaptures = captureList.size();
+    std::uninitialized_copy(captureList.begin(), captureList.end(),
+                            getTrailingObjects<CaptureListEntry>());
   }
 
-  ArrayRef<CaptureListEntry> getCaptureList() { return captureList; }
+public:
+  static CaptureListExpr *create(ASTContext &ctx,
+                                 ArrayRef<CaptureListEntry> captureList,
+                                 ClosureExpr *closureBody);
+
+  ArrayRef<CaptureListEntry> getCaptureList() {
+    return {getTrailingObjects<CaptureListEntry>(),
+            Bits.CaptureListExpr.NumCaptures};
+  }
   ClosureExpr *getClosureBody() { return closureBody; }
   const ClosureExpr *getClosureBody() const { return closureBody; }
 
