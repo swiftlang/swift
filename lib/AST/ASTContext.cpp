@@ -3605,17 +3605,6 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
-ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
-  switch (getKind()) {
-  case TypeKind::Function:
-    return cast<FunctionType>(this)->getParams();
-  case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getParams();
-  default:
-    llvm_unreachable("Undefined function type");
-  }
-}
-
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);

@@ -299,6 +299,21 @@ class alignas(8) Expr {
     IsNonAccessing : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+    : NumPadBits,
+    NumConformances : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
+    : NumPadBits,
+    NumUnresolvedParams : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CaptureListExpr, Expr, 32,
+    : NumPadBits,
+    NumCaptures : 32
+  );
+
   SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1,
     ThrowsIsSet : 1,
     Throws : 1
@@ -371,6 +386,9 @@ protected:
     SWIFT_INLINE_BITS(ParenExpr);
     SWIFT_INLINE_BITS(SequenceExpr);
     SWIFT_INLINE_BITS(CollectionExpr);
+    SWIFT_INLINE_BITS(ErasureExpr);
+    SWIFT_INLINE_BITS(UnresolvedSpecializeExpr);
+    SWIFT_INLINE_BITS(CaptureListExpr);
   } Bits;
 
 private:
@@ -3090,14 +3108,21 @@ public:
 ///
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
-class ErasureExpr : public ImplicitConversionExpr {
-  ArrayRef<ProtocolConformanceRef> Conformances;
+class ErasureExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+  friend TrailingObjects;
 
-public:
   ErasureExpr(Expr *subExpr, Type type,
               ArrayRef<ProtocolConformanceRef> conformances)
-    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
-      Conformances(conformances) {}
+    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
+    Bits.ErasureExpr.NumConformances = conformances.size();
+    std::uninitialized_copy(conformances.begin(), conformances.end(),
+                            getTrailingObjects<ProtocolConformanceRef>());
+  }
+
+public:
+  static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
+                             ArrayRef<ProtocolConformanceRef> conformances);
 
   /// \brief Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3110,7 +3135,8 @@ public:
   /// type is either an archetype or an existential type that conforms to
   /// that corresponding protocol).
   ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return Conformances;
+    return {getTrailingObjects<ProtocolConformanceRef>(),
+            Bits.ErasureExpr.NumConformances };
   }
 
   static bool classof(const Expr *E) {
@@ -3189,28 +3215,43 @@ public:
 
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
-class UnresolvedSpecializeExpr : public Expr {
+class UnresolvedSpecializeExpr final : public Expr,
+    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeLoc> {
+  friend TrailingObjects;
+
   Expr *SubExpr;
   SourceLoc LAngleLoc;
   SourceLoc RAngleLoc;
-  MutableArrayRef<TypeLoc> UnresolvedParams;
-public:
+
   UnresolvedSpecializeExpr(Expr *SubExpr,
                            SourceLoc LAngleLoc,
-                           MutableArrayRef<TypeLoc> UnresolvedParams,
+                           ArrayRef<TypeLoc> UnresolvedParams,
                            SourceLoc RAngleLoc)
     : Expr(ExprKind::UnresolvedSpecialize, /*Implicit=*/false),
-      SubExpr(SubExpr),
-      LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc),
-      UnresolvedParams(UnresolvedParams) { }
+      SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
+    Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
+    std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
+                            getTrailingObjects<TypeLoc>());
+  }
+
+public:
+  static UnresolvedSpecializeExpr *
+  create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
+         ArrayRef<TypeLoc> UnresolvedParams, SourceLoc RAngleLoc);
   
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
   /// \brief Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
-  ArrayRef<TypeLoc> getUnresolvedParams() const { return UnresolvedParams; }
-  MutableArrayRef<TypeLoc> getUnresolvedParams() { return UnresolvedParams; }
+  ArrayRef<TypeLoc> getUnresolvedParams() const {
+    return {getTrailingObjects<TypeLoc>(),
+            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
+  }
+  MutableArrayRef<TypeLoc> getUnresolvedParams() {
+    return {getTrailingObjects<TypeLoc>(),
+            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
+  }
   
   SourceLoc getLoc() const { return LAngleLoc; }
   SourceLoc getLAngleLoc() const { return LAngleLoc; }
@@ -3645,17 +3686,30 @@ struct CaptureListEntry {
 /// CaptureList wraps the ClosureExpr.  The dynamic semantics are that evaluates
 /// the variable bindings from the capture list, then evaluates the
 /// subexpression (the closure itself) and returns the result.
-class CaptureListExpr : public Expr {
-  ArrayRef<CaptureListEntry> captureList;
+class CaptureListExpr final : public Expr,
+    private llvm::TrailingObjects<CaptureListExpr, CaptureListEntry> {
+  friend TrailingObjects;
+
   ClosureExpr *closureBody;
-public:
+
   CaptureListExpr(ArrayRef<CaptureListEntry> captureList,
                   ClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
-      captureList(captureList), closureBody(closureBody) {
+      closureBody(closureBody) {
+    Bits.CaptureListExpr.NumCaptures = captureList.size();
+    std::uninitialized_copy(captureList.begin(), captureList.end(),
+                            getTrailingObjects<CaptureListEntry>());
   }
 
-  ArrayRef<CaptureListEntry> getCaptureList() { return captureList; }
+public:
+  static CaptureListExpr *create(ASTContext &ctx,
+                                 ArrayRef<CaptureListEntry> captureList,
+                                 ClosureExpr *closureBody);
+
+  ArrayRef<CaptureListEntry> getCaptureList() {
+    return {getTrailingObjects<CaptureListEntry>(),
+            Bits.CaptureListExpr.NumCaptures};
+  }
   ClosureExpr *getClosureBody() { return closureBody; }
   const ClosureExpr *getClosureBody() const { return closureBody; }
 
