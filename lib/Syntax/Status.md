@@ -115,11 +115,14 @@
   * IdentifierPattern
   * WildcardPattern
   * TuplePattern
+  * ExpressionPattern
+  * ValueBindingPattern
+  * IsTypePattern
 
 ### Not-started:
-  * ParenPattern
-  * TypedPattern
-  * VarPattern
+  * AsTypePattern
+  * OptionalPattern
+  * EnumCasePattern
 
 ## TypeRepr
 ### Done:
