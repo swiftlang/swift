@@ -977,7 +977,8 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              std::string PostBatchModeMainInputFilename);
+              std::string PostBatchModeMainInputFilename =
+                  "<no main filename from lldb SwiftASTContext.cpp>");
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
