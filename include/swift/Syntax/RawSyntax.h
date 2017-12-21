@@ -100,17 +100,6 @@ using llvm::StringRef;
 #define syntax_assert_token_is(Tok, Kind, Text) ({});
 #endif
 
-#ifndef NDEBUG
-#define syntax_assert_node_choice(Raw, CursorName, NodeName)                   \
-  ({                                                                           \
-    auto Child = Raw->getChild(Cursor::CursorName);                            \
-    auto Node = make<Syntax>(Child);                                           \
-    assert(check##CursorName##In##NodeName(Node));                             \
-  })
-#else
-#define syntax_assert_node_choice(Raw, CursorName, NodeName) ({});
-#endif
-
 namespace swift {
 namespace syntax {
 
