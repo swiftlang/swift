@@ -747,6 +747,62 @@ static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 
+/// Flags for struct layout.
+enum class StructLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline StructLayoutFlags operator|(StructLayoutFlags lhs,
+                                          StructLayoutFlags rhs) {
+  return StructLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline StructLayoutFlags &operator|=(StructLayoutFlags &lhs,
+                                            StructLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline StructLayoutFlags getLayoutAlgorithm(StructLayoutFlags flags) {
+  return StructLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(StructLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
+}
+
+/// Flags for enum layout.
+enum class EnumLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline EnumLayoutFlags operator|(EnumLayoutFlags lhs,
+                                        EnumLayoutFlags rhs) {
+  return EnumLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline EnumLayoutFlags &operator|=(EnumLayoutFlags &lhs,
+                                          EnumLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
+  return EnumLayoutFlags(uintptr_t(flags)
+                           & uintptr_t(EnumLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
+}
+
 } // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */
