@@ -243,7 +243,7 @@ FrontendInputsAndOutputs::preBatchModeReferenceDependenciesFilePath() const {
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeSerializedDiagnosticsPath() const {
-  return preBatchModePathsForAtMostOnePrimary().SerializedDiagnosticsPath;
+  return firstOutputPaths().SerializedDiagnosticsPath;
 }
 
 const std::string &
@@ -305,4 +305,12 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
     if (fn(getAllInputs()[p.second], i++))
       return true;
   return false;
+}
+
+const OutputPaths &FrontendInputsAndOutputs::firstOutputPaths() const {
+  static OutputPaths empties;
+  return hasInputs()
+             ? AllFiles[hasPrimaries() ? PrimaryInputs.front().second : 0]
+                   .outputs()
+             : empties;
 }

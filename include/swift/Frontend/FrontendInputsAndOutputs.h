@@ -89,6 +89,8 @@ public:
 
   const InputFile &firstPrimary() const;
 
+  const OutputPaths &firstOutputPaths() const;
+
   std::vector<std::string> getInputFilenames() const;
 
   unsigned inputCount() const { return getAllInputs().size(); }
