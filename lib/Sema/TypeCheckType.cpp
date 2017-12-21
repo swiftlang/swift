@@ -326,16 +326,23 @@ Type TypeChecker::resolveTypeInContext(
     selfType = resolver->mapTypeIntoContext(
       foundDC->getSelfInterfaceType());
 
-    if (selfType->is<GenericTypeParamType>() &&
-        typeDecl->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      // We found a member of a class from a protocol or protocol
-      // extension.
-      //
-      // Get the superclass of the 'Self' type parameter.
-      auto *sig = foundDC->getGenericSignatureOfContext();
-      auto superclassType = sig->getSuperclassBound(selfType);
-      assert(superclassType);
-      selfType = superclassType;
+    if (selfType->isTypeParameter()) {
+      if (isa<AssociatedTypeDecl>(typeDecl)) {
+        SimpleIdentTypeRepr repr(SourceLoc(), typeDecl->getName());
+        return resolver->resolveDependentMemberType(selfType, fromDC,
+                                                    SourceRange(), &repr);
+      }
+
+      if (typeDecl->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        // We found a member of a class from a protocol or protocol
+        // extension.
+        //
+        // Get the superclass of the 'Self' type parameter.
+        auto *sig = foundDC->getGenericSignatureOfContext();
+        auto superclassType = sig->getSuperclassBound(selfType);
+        assert(superclassType);
+        selfType = superclassType;
+      }
     }
   }
   

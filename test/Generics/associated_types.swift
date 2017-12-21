@@ -225,3 +225,15 @@ class G<T> : sr6097_b where T : AnyObject {
 }
 
 
+// rdar://problem/35756206
+protocol P11 {
+  associatedtype T
+}
+
+protocol P12 {
+  associatedtype T
+}
+
+extension P11 where Self: P12 {
+  func foo() -> T? { return nil }
+}
