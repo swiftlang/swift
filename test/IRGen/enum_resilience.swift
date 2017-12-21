@@ -262,3 +262,4 @@ extension ResilientMultiPayloadGenericEnum {
 }
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
+// CHECK: call void @swift_initEnumMetadataMultiPayload(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 2, i8*** {{.*}})

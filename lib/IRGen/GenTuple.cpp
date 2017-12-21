@@ -343,7 +343,7 @@ namespace {
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
-                            llvm::Value *vwtable,
+                            bool isVWTMutable,
                             SILType T) const override {
       // Tuple value witness tables are instantiated by the runtime along with
       // their metadata. We should never try to initialize one in the compiler.

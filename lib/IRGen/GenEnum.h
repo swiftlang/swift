@@ -372,7 +372,7 @@ public:
 
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
-                                  llvm::Value *vwtable,
+                                  bool isVWTMutable,
                                   SILType T) const = 0;
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;

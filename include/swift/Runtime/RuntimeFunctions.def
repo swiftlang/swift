@@ -968,37 +968,47 @@ FUNCTION(InitClassMetadataUniversal,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-//                                              TypeLayout * const *fieldTypes,
-//                                              size_t *fieldOffsets,
-//                                              value_witness_table_t *vwtable);
-FUNCTION(InitStructMetadataUniversal,
-         swift_initStructMetadata_UniversalStrategy, DefaultCC,
+// void swift_initStructMetadata(Metadata *structType,
+//                               StructLayoutFlags flags,
+//                               size_t numFields,
+//                               TypeLayout * const *fieldTypes,
+//                               size_t *fieldOffsets);
+FUNCTION(InitStructMetadata,
+         swift_initStructMetadata, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(SizeTy, Int8PtrPtrTy->getPointerTo(),
-              SizeTy->getPointerTo(), WitnessTablePtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0),
+              SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
-//                                                   TypeLayout *payload,
-//                                                   unsigned num_empty_cases);
-FUNCTION(InitEnumValueWitnessTableSinglePayload,
-         swift_initEnumValueWitnessTableSinglePayload,
+// void swift_initEnumMetadataSingleCase(Metadata *enumType,
+//                                       EnumLayoutFlags flags,
+//                                       TypeLayout *payload);
+FUNCTION(InitEnumMetadataSingleCase,
+         swift_initEnumMetadataSingleCase,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(WitnessTablePtrTy, Int8PtrPtrTy, Int32Ty),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_initEnumMetadataMultiPayload(value_witness_table_t *vwt,
-//                                         Metadata *enumType,
+// void swift_initEnumMetadataSinglePayload(Metadata *enumType,
+//                                          EnumLayoutFlags flags,
+//                                          TypeLayout *payload,
+//                                          unsigned num_empty_cases);
+FUNCTION(InitEnumMetadataSinglePayload,
+         swift_initEnumMetadataSinglePayload,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_initEnumMetadataMultiPayload(Metadata *enumType,
 //                                         size_t numPayloads,
 //                                         TypeLayout * const *payloadTypes);
 FUNCTION(InitEnumMetadataMultiPayload,
          swift_initEnumMetadataMultiPayload,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, SizeTy,
-              Int8PtrPtrTy->getPointerTo(0)),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind))
 
 // int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,
