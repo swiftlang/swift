@@ -1395,6 +1395,24 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
   return ::new(mem) CaptureListExpr(captureList, closureBody);
 }
 
+TupleShuffleExpr *TupleShuffleExpr::create(ASTContext &ctx,
+                                           Expr *subExpr,
+                                           ArrayRef<int> elementMapping,
+                                           TypeImpact typeImpact,
+                                           ConcreteDeclRef defaultArgsOwner,
+                                           ArrayRef<unsigned> VariadicArgs,
+                                           Type VarargsArrayTy,
+                                           ArrayRef<Expr *> CallerDefaultArgs,
+                                           Type ty) {
+  auto size = totalSizeToAlloc<Expr*, int, unsigned>(CallerDefaultArgs.size(),
+                                                     elementMapping.size(),
+                                                     VariadicArgs.size());
+  auto mem = ctx.Allocate(size, alignof(TupleShuffleExpr));
+  return ::new(mem) TupleShuffleExpr(subExpr, elementMapping, typeImpact,
+                                     defaultArgsOwner, VariadicArgs,
+                                     VarargsArrayTy, CallerDefaultArgs, ty);
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc start = SourceLoc();
   SourceLoc end = SourceLoc();
