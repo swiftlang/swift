@@ -1442,7 +1442,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       // Note: This includes enums, but that's okay. A Clang enum is not always
       // imported as a Swift enum.
       appendOperator("V");
-    } else if (isa<clang::TypedefNameDecl>(clangDecl)) {
+    } else if (isa<clang::TypedefNameDecl>(clangDecl) ||
+               isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
       appendOperator("a");
     } else {
       llvm_unreachable("unknown imported Clang type");
