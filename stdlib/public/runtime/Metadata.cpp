@@ -1278,17 +1278,49 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
 /*** Structs ***************************************************************/
 /***************************************************************************/
 
+static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
+                                                   StructLayoutFlags flags,
+                                                   bool hasExtraInhabitants) {
+  auto oldTable = self->getValueWitnesses();
+
+  // If we can alter the existing table in-place, do so.
+  if (isValueWitnessTableMutable(flags))
+    return const_cast<ValueWitnessTable*>(oldTable);
+
+  // Otherwise, allocate permanent memory for it and copy the existing table.
+  ValueWitnessTable *newTable;
+  if (hasExtraInhabitants) {
+    void *memory = allocateMetadata(sizeof(ExtraInhabitantsValueWitnessTable),
+                                    alignof(ExtraInhabitantsValueWitnessTable));
+    newTable = new (memory) ExtraInhabitantsValueWitnessTable(
+              *static_cast<const ExtraInhabitantsValueWitnessTable*>(oldTable));
+  } else {
+    void *memory = allocateMetadata(sizeof(ValueWitnessTable),
+                                    alignof(ValueWitnessTable));
+    newTable = new (memory) ValueWitnessTable(*oldTable);
+  }
+  self->setValueWitnesses(newTable);
+
+  return newTable;
+}
+
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
-void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
+void swift::swift_initStructMetadata(StructMetadata *structType,
+                                     StructLayoutFlags layoutFlags,
+                                     size_t numFields,
                                      const TypeLayout * const *fieldTypes,
-                                     size_t *fieldOffsets,
-                                     ValueWitnessTable *vwtable) {
+                                     size_t *fieldOffsets) {
   auto layout = BasicLayout::initialForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const TypeLayout *fieldType, size_t offset) {
       assignUnlessEqual(fieldOffsets[i], offset);
     });
+
+  bool hasExtraInhabitants = fieldTypes[0]->flags.hasExtraInhabitants();
+
+  auto vwtable =
+    getMutableVWTableForInit(structType, layoutFlags, hasExtraInhabitants);
 
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
@@ -1296,7 +1328,7 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
-  if (fieldTypes[0]->flags.hasExtraInhabitants()) {
+  if (hasExtraInhabitants) {
     vwtable->flags = vwtable->flags.withExtraInhabitants(true);
     auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
     xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
@@ -2900,3 +2932,6 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
                                                  std::memory_order_relaxed);
 }
 
+void *swift::allocateMetadata(size_t size, size_t alignment) {
+  return MetadataAllocator().Allocate(size, alignment);
+}

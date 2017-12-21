@@ -2901,10 +2901,11 @@ swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
-void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-                                         const TypeLayout * const *fieldTypes,
-                                         size_t *fieldOffsets,
-                                         ValueWitnessTable *vwtable);
+void swift_initStructMetadata(StructMetadata *self,
+                              StructLayoutFlags flags,
+                              size_t numFields,
+                              const TypeLayout * const *fieldTypes,
+                              size_t *fieldOffsets);
 
 /// Relocate the metadata for a class and copy fields from the given template.
 /// The final size of the metadata is calculated at runtime from the size of

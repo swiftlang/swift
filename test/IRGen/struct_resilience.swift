@@ -170,7 +170,6 @@ public func partialApplyOfResilientMethod(s: Size) {
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_StructWithResilientStorage(i8*)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
-// CHECK: [[VWT:%.*]] = load i8**, i8*** getelementptr inbounds ({{.*}} @_T017struct_resilience26StructWithResilientStorageVMf{{.*}}, [[INT]] -1)
 
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 
@@ -195,6 +194,6 @@ public func partialApplyOfResilientMethod(s: Size) {
 // CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
-// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}}, i8** [[VWT]])
+// CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}})
 // CHECK: store atomic %swift.type* {{.*}} @_T017struct_resilience26StructWithResilientStorageVMf{{.*}}, %swift.type** @_T017struct_resilience26StructWithResilientStorageVML release,
 // CHECK: ret void
