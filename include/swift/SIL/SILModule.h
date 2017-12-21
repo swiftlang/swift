@@ -329,7 +329,8 @@ public:
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    std::string PostBatchModeMainInputFilename,
+                    std::string PostBatchModeMainInputFilename =
+                        "<No filename supplied by lldb>",
                     bool WholeModule = false) {
     return std::unique_ptr<SILModule>(new SILModule(
         M, Options, M, WholeModule, PostBatchModeMainInputFilename));
