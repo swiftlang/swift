@@ -91,6 +91,7 @@ public:
   std::vector<InputFile *> getPointersToAllFiles();
 
   const InputFile &firstPrimary() const;
+  const InputFile &lastPrimary() const;
 
   std::vector<std::string> getInputFilenames() const;
 
@@ -101,6 +102,7 @@ public:
   bool hasSingleInput() const { return inputCount() == 1; }
 
   StringRef getFilenameOfFirstInput() const;
+  const InputFile &lastInput() const;
 
   bool isReadingFromStdin() const {
     return hasSingleInput() && getFilenameOfFirstInput() == "-";

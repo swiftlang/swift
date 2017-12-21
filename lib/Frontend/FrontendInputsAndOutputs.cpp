@@ -202,11 +202,33 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
          "have not implemented >1 primary input yet");
 }
 
+const InputFile &FrontendInputsAndOutputs::lastPrimary() const {
+  return getAllInputs()[PrimaryInputs.back().second];
+}
+
+const InputFile &FrontendInputsAndOutputs::lastInput() const {
+  return getAllInputs().back();
+}
+
 StringRef
 FrontendInputsAndOutputs::preBatchModeGetSingleOutputFilename() const {
-  const auto &fns = preBatchModeOutputFilenames();
-  return fns.empty() ? StringRef() : StringRef(fns.back());
+  if (!excessOutputFile().empty())
+    return excessOutputFile();
+  if (hasPrimaries()) {
+    for (auto p : reversed(PrimaryInputs)) {
+      StringRef f = getAllInputs()[p.second].outputs().OutputFilename;
+      if (!f.empty())
+        return f;
+    }
+  }
+  for (const auto &inp : reversed(AllFiles)) {
+    StringRef f = inp.outputs().OutputFilename;
+    if (!f.empty())
+      return f;
+  }
+  return StringRef();
 }
+
 const OutputPaths &
 FrontendInputsAndOutputs::preBatchModePathsForAtMostOnePrimary() const {
   assertMustNotBeMoreThanOnePrimaryInput();
