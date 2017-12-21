@@ -998,7 +998,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     VD->setHasNonPatternBindingInit();
 
   // Parse the optional 'where' guard.
-  if (P.consumeIf(tok::kw_where, result.WhereLoc)) {
+  if (P.Tok.is(tok::kw_where)) {
+    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
+                                         SyntaxKind::WhereClause);
+    result.WhereLoc = P.consumeToken(tok::kw_where);
     SourceLoc startOfGuard = P.Tok.getLoc();
 
     auto diagKind = [=]() -> Diag<> {
@@ -1665,6 +1668,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
   SourceLoc doLoc = consumeToken(tok::kw_do);
 
   ParserStatus status;
@@ -1678,6 +1682,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 
   // If the next token is 'catch', this is a 'do'/'catch' statement.
   if (Tok.is(tok::kw_catch)) {
+    SyntaxParsingContext CatchListCtxt(SyntaxContext,
+                                       SyntaxKind::CatchClauseList);
     // Parse 'catch' clauses 
     SmallVector<CatchStmt*, 4> allClauses;
     do {
@@ -1743,6 +1749,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 /// This routine promises to return a non-null result unless there was
 /// a code-completion token in the pattern.
 ParserResult<CatchStmt> Parser::parseStmtCatch() {
+  SyntaxParsingContext CatchClauseCtxt(SyntaxContext, SyntaxKind::CatchClause);
   // A catch block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CatchVars);
 

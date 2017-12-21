@@ -238,6 +238,13 @@ do {
 }
 
 func statementTests() {
+  do {
+  } catch (var x, let y) {
+  } catch where false {
+  } catch let e where e.foo == bar {
+  } catch {
+  }
+  LABEL: do {}
   LABEL: switch foo {
     case 1:
       fallthrough
