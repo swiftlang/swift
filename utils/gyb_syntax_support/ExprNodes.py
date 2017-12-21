@@ -152,7 +152,11 @@ EXPR_NODES = [
     Node('DictionaryExpr', kind='Expr',
          children=[
              Child('LeftSquare', kind='LeftSquareToken'),
-             Child('Elements', kind='DictionaryElementList'),
+             Child('Content', kind='Syntax',
+                   node_choices=[
+                       Child('Colon', kind='ColonToken'),
+                       Child('Elements', kind='DictionaryElementList'),
+                   ]),
              Child('RightSquare', kind='RightSquareToken'),
          ]),
 
@@ -300,9 +304,11 @@ EXPR_NODES = [
          children=[
              Child('Capture', kind='ClosureCaptureSignature',
                    is_optional=True),
-             # FIXME: one and only one of these two children is required
-             Child('SimpleInput', kind='ClosureParamList', is_optional=True),
-             Child('Input', kind='ParameterClause', is_optional=True),
+             Child('Input', kind='Syntax', is_optional=True,
+                   node_choices=[
+                       Child('SimpleInput', kind='ClosureParamList'),
+                       Child('Input', kind='ParameterClause'),
+                   ]),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),

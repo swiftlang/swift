@@ -149,7 +149,7 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %       elif child.node_choices:
         {   ${option},
             [] (const Syntax &S) {
-              return check${child.name}(S);
+              return check${child.name}In${node.syntax_kind}(S);
             }
         },
 %       else:
