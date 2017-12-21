@@ -25,9 +25,15 @@ using namespace swift;
 using namespace swift::syntax;
 
 
-bool swift::syntax::checkAccessorListOrStmtList(const Syntax &S) {
+bool swift::syntax::
+checkAccessorListOrStmtListInAccessorBlock(const Syntax &S) {
   return S.getKind() == SyntaxKind::AccessorList ||
     S.getKind() == SyntaxKind::StmtList;
+}
+
+bool swift::syntax::checkInputInClosureSignature(const Syntax &S) {
+  return S.getKind() == SyntaxKind::ClosureParamList ||
+    S.getKind() == SyntaxKind::ParameterClause;
 }
 
 % for node in SYNTAX_NODES:
@@ -51,7 +57,7 @@ void ${node.name}::validate() const {
                                  tok::${token_kind}, ${choices});
 %       end
 %       if child.node_choices:
-  syntax_assert_node_choice(raw, ${child.name});
+  syntax_assert_node_choice(raw, ${child.name}, ${node.syntax_kind});
 %       end
 %     end
 }
