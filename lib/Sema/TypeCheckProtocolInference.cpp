@@ -571,12 +571,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     if (!typeDecl || isa<AssociatedTypeDecl>(typeDecl))
       continue;
 
-    // With @_implements attributes.
-    auto implementsAttr = typeDecl->getAttrs().getAttribute<ImplementsAttr>();
-    if (!implementsAttr) continue;
-
-    // FIXME: Validate the @_implements attribute.
-
     // We only find these within a protocol extension.
     auto defaultProto = typeDecl->getDeclContext()
                           ->getAsProtocolOrProtocolExtensionContext();
