@@ -238,12 +238,26 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     using super = LayoutScanner;
 
     ClassMetadataLayout &Layout;
+
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
-    void noteResilientSuperclass() {}
+    void noteResilientSuperclass() {
+      Layout.HasResilientSuperclass = true;
+    }
 
-    void noteStartOfImmediateMembers(ClassDecl *theClass) {}
+    void noteStartOfImmediateMembers(ClassDecl *forClass) {
+      // If our superclass is resilient to us, or the class itself is resilient
+      // to us, we will access metadata members relative to a base offset.
+      if (forClass == Target) {
+        if (Layout.HasResilientSuperclass ||
+            (IGM.Context.LangOpts.EnableClassResilience &&
+             IGM.isResilient(forClass, ResilienceExpansion::Maximal))) {
+          assert(!DynamicOffsetBase);
+          DynamicOffsetBase = NextOffset;
+        }
+      }
+    }
 
     void addClassSize() {
       Layout.MetadataSize = getNextOffset();

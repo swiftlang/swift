@@ -167,6 +167,8 @@ public:
   };
 
 private:
+  bool HasResilientSuperclass = false;
+
   StoredOffset MetadataSize;
 
   StoredOffset InstanceSize;
@@ -208,6 +210,10 @@ private:
 public:
   ClassDecl *getDecl() const {
     return cast<ClassDecl>(Nominal);
+  }
+
+  bool hasResilientSuperclass() const {
+    return HasResilientSuperclass;
   }
 
   Size getMetadataSizeOffset() const;
