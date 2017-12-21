@@ -15,5 +15,6 @@ set(MANDATORY_SOURCES
   Mandatory/ConstantPropagation.cpp
   Mandatory/SemanticARCOpts.cpp
   Mandatory/TFCanonicalizeCFG.cpp
+  Mandatory/TFLowerGraph.cpp
   Mandatory/TFPartition.cpp
   PARENT_SCOPE)
