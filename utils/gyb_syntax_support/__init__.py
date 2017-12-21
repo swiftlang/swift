@@ -28,6 +28,8 @@ def make_missing_child(child):
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
+        if child.node_choices:
+            return make_missing_child(child.node_choices[0])
         return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
 
 

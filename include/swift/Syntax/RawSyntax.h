@@ -101,14 +101,14 @@ using llvm::StringRef;
 #endif
 
 #ifndef NDEBUG
-#define syntax_assert_node_choice(Raw, CursorName)                             \
+#define syntax_assert_node_choice(Raw, CursorName, NodeName)                   \
   ({                                                                           \
     auto Child = Raw->getChild(Cursor::CursorName);                            \
     auto Node = make<Syntax>(Child);                                           \
-    assert(check##CursorName(Node));                                           \
+    assert(check##CursorName##In##NodeName(Node));                             \
   })
 #else
-#define syntax_assert_node_choice(Raw, CursorName) ({});
+#define syntax_assert_node_choice(Raw, CursorName, NodeName) ({});
 #endif
 
 namespace swift {

@@ -100,7 +100,8 @@ public:
 %   end
 % end
 
-bool checkAccessorListOrStmtList(const Syntax &S);
+bool checkAccessorListOrStmtListInAccessorBlock(const Syntax &S);
+bool checkInputInClosureSignature(const Syntax &S);
 }
 }
 
