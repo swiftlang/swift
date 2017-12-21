@@ -569,11 +569,14 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtContinue();
-  case tok::kw_fallthrough:
+  case tok::kw_fallthrough: {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+
+    SyntaxContext->setCreateSyntax(SyntaxKind::FallthroughStmt);
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
+  }
   }
 }
 
@@ -615,6 +618,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 ///     'break' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtBreak() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::BreakStmt);
   SourceLoc Loc = consumeToken(tok::kw_break);
   SourceLoc TargetLoc;
   Identifier Target;
@@ -637,6 +641,7 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
 ///     'continue' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtContinue() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::ContinueStmt);
   SourceLoc Loc = consumeToken(tok::kw_continue);
   SourceLoc TargetLoc;
   Identifier Target;
@@ -660,7 +665,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///     'return' expr?
 ///   
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
-  SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::ReturnStmt);
+  SyntaxContext->setCreateSyntax(SyntaxKind::ReturnStmt);
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   if (Tok.is(tok::code_complete)) {
@@ -725,6 +730,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
 ///   'throw' expr
 ///
 ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::ThrowStmt);
   SourceLoc throwLoc = consumeToken(tok::kw_throw);
   SourceLoc exprLoc;
   if (Tok.isNot(tok::eof))
@@ -759,6 +765,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 ///     'defer' brace-stmt
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::DeferStmt);
   SourceLoc DeferLoc = consumeToken(tok::kw_defer);
   
   // Macro expand out the defer into a closure and call, which we can typecheck
