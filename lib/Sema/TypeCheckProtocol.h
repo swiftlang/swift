@@ -734,6 +734,14 @@ private:
   /// known to the compiler.
   Type computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
+  /// Compute a type witness without using a specific potential witness,
+  /// e.g., using a fixed type (from a refined protocol), default type
+  /// on an associated type, or deriving the type.
+  ///
+  /// \param allowDerived Whether to allow "derived" type witnesses.
+  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType,
+                                  bool allowDerived);
+
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
 

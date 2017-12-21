@@ -857,6 +857,42 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
   return derivedType;
 }
 
+Type
+AssociatedTypeInference::computeAbstractTypeWitness(
+                                              AssociatedTypeDecl *assocType,
+                                              bool allowDerived) {
+  // We don't have a type witness for this associated type, so go
+  // looking for more options.
+  if (Type concreteType = computeFixedTypeWitness(assocType))
+    return concreteType;
+
+  // If we can form a default type, do so.
+  if (Type defaultType = computeDefaultTypeWitness(assocType))
+    return defaultType;
+
+  // If we can derive a type witness, do so.
+  if (allowDerived) {
+    if (Type derivedType = computeDerivedTypeWitness(assocType))
+      return derivedType;
+  }
+
+  // If there is a generic parameter of the named type, use that.
+  if (auto gpList = dc->getGenericParamsOfContext()) {
+    GenericTypeParamDecl *foundGP = nullptr;
+    for (auto gp : *gpList) {
+      if (gp->getName() == assocType->getName()) {
+        foundGP = gp;
+        break;
+      }
+    }
+
+    if (foundGP)
+      return dc->mapTypeIntoContext(foundGP->getDeclaredInterfaceType());
+  }
+
+  return Type();
+}
+
 Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
   // Local function that folds dependent member types with non-dependent
   // bases into actual member references.
@@ -1150,56 +1186,17 @@ void AssociatedTypeInference::findSolutionsRec(
         continue;
       }
 
-      // We don't have a type witness for this associated type, so go
-      // looking for more options.
-      if (Type concreteType = computeFixedTypeWitness(assocType)) {
-        if (concreteType->hasError()) {
+      // Try to compute the type without the aid of a specific potential
+      // witness.
+      if (Type type = computeAbstractTypeWitness(assocType,
+                                                 /*allowDerived=*/true)) {
+        if (type->hasError()) {
           recordMissing();
           return;
         }
 
-        typeWitnesses.insert(assocType, {concreteType, reqDepth});
+        typeWitnesses.insert(assocType, {type, reqDepth});
         continue;
-      }
-
-      // If we can form a default type, do so.
-      if (Type defaultType = computeDefaultTypeWitness(assocType)) {
-        if (defaultType->hasError()) {
-          recordMissing();
-          return;
-        }
-
-        typeWitnesses.insert(assocType, {defaultType, reqDepth});
-        continue;
-      }
-
-      // If we can derive a type witness, do so.
-      if (Type derivedType = computeDerivedTypeWitness(assocType)) {
-        if (derivedType->hasError()) {
-          recordMissing();
-          return;
-        }
-
-        typeWitnesses.insert(assocType, {derivedType, reqDepth});
-        continue;
-      }
-
-      // If there is a generic parameter of the named type, use that.
-      if (auto gpList = dc->getGenericParamsOfContext()) {
-        GenericTypeParamDecl *foundGP = nullptr;
-        for (auto gp : *gpList) {
-          if (gp->getName() == assocType->getName()) {
-            foundGP = gp;
-            break;
-          }
-        }
-
-        if (foundGP) {
-          auto gpType = dc->mapTypeIntoContext(
-                          foundGP->getDeclaredInterfaceType());
-          typeWitnesses.insert(assocType, {gpType, reqDepth});
-          continue;
-        }
       }
 
       // The solution is incomplete.
