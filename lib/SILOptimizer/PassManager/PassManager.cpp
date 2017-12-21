@@ -32,8 +32,6 @@
 
 using namespace swift;
 
-STATISTIC(NumOptzIterations, "Number of optimization iterations");
-
 llvm::cl::opt<bool> SILPrintAll(
     "sil-print-all", llvm::cl::init(false),
     llvm::cl::desc("Print SIL after each pass"));
@@ -138,8 +136,7 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return T->getName().find(Str) != StringRef::npos
-      || T->getTag().find(Str) != StringRef::npos
+    return T->getTag().find(Str) != StringRef::npos
       || T->getID().find(Str) != StringRef::npos;
   };
 
@@ -163,8 +160,7 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return T->getName().find(Str) != StringRef::npos
-      || T->getTag().find(Str) != StringRef::npos
+    return T->getTag().find(Str) != StringRef::npos
       || T->getID().find(Str) != StringRef::npos;
   };
 
@@ -181,8 +177,7 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
 
 static bool isDisabled(SILTransform *T) {
   for (const std::string &NamePattern : SILDisablePass) {
-    if (T->getName().find(NamePattern) != StringRef::npos
-        || T->getTag().find(NamePattern) != StringRef::npos
+    if (T->getTag().find(NamePattern) != StringRef::npos
         || T->getID().find(NamePattern) != StringRef::npos) {
       return true;
     }
@@ -278,21 +273,32 @@ static bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT) {
     return false;
 
   if (SILBreakOnFun.empty()
-      && (SFT->getName() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
+      && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
     return true;
 
   if (SILBreakOnPass.empty() && fnName == SILBreakOnFun)
     return true;
 
   return fnName == SILBreakOnFun
-    && (SFT->getName() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
+    && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
 }
 
-void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
-                                       SILFunction *F) {
+void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
+                                  SILFunction *F) {
+  SILTransform *Tr = Transformations[TransIdx];
+  llvm::dbgs() << "  " << Title << " #" << NumPassesRun << ", stage "
+    << StageName << ", pass " << TransIdx << ": " << Tr->getID()
+    << " (" << Tr->getTag() << ")";
+  if (F)
+    llvm::dbgs() << ", Function: " << F->getName();
+  llvm::dbgs() << '\n';
+}
+
+void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
+  auto *SFT = cast<SILFunctionTransform>(Transformations[TransIdx]);
   SFT->injectPassManager(this);
   SFT->injectFunction(F);
 
@@ -305,17 +311,13 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   if (completedPasses.test((size_t)SFT->getPassKind()) &&
       !SILDisableSkippingPasses) {
     if (SILPrintPassName)
-      llvm::dbgs() << "  (Skip) Stage: " << StageName
-                   << " Pass: " << SFT->getName() << " (" << SFT->getTag() << ")"
-                   << ", Function: " << F->getName() << "\n";
+      dumpPassInfo("(Skip)", TransIdx, F);
     return;
   }
 
   if (isDisabled(SFT)) {
     if (SILPrintPassName)
-      llvm::dbgs() << "  (Disabled) Stage: " << StageName
-                   << " Pass: " << SFT->getName() << " (" << SFT->getTag() << ")"
-                   << ", Function: " << F->getName() << "\n";
+      dumpPassInfo("(Disabled)", TransIdx, F);
     return;
   }
 
@@ -324,14 +326,10 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   CurrentPassHasInvalidated = false;
 
   if (SILPrintPassName)
-    llvm::dbgs() << "  #" << NumPassesRun << " Stage: " << StageName
-                 << " Pass: " << SFT->getName() << " (" << SFT->getTag() << ")"
-                 << ", Function: " << F->getName() << "\n";
+    dumpPassInfo("Run", TransIdx, F);
 
   if (doPrintBefore(SFT, F)) {
-    llvm::dbgs() << "*** SIL function before " << StageName << " "
-                 << SFT->getName() << " (" << SFT->getTag() << ")"
-                 << " (#" << NumOptimizationIterations << ") ***\n";
+    dumpPassInfo("*** SIL function before ", TransIdx);
     F->dump(getOptions().EmitVerboseSIL);
   }
 
@@ -345,15 +343,13 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
-    llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
+    llvm::dbgs() << Delta << " (" << SFT->getID() << "," << F->getName()
                  << ")\n";
   }
 
   // If this pass invalidated anything, print and verify.
   if (doPrintAfter(SFT, F, CurrentPassHasInvalidated && SILPrintAll)) {
-    llvm::dbgs() << "*** SIL function after " << StageName << " "
-                 << SFT->getName() << " (" << SFT->getTag() << ") (#"
-                 << NumOptimizationIterations << ") ***\n";
+    dumpPassInfo("*** SIL function after ", TransIdx);
     F->dump(getOptions().EmitVerboseSIL);
   }
 
@@ -374,8 +370,8 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
 }
 
 void SILPassManager::
-runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
-  if (FuncTransforms.empty())
+runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
+  if (ToTransIdx <= FromTransIdx)
     return;
 
   BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
@@ -412,7 +408,7 @@ runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
     unsigned PipelineIdx = FunctionWorklist[TailIdx].PipelineIdx;
     SILFunction *F = FunctionWorklist[TailIdx].F;
 
-    if (PipelineIdx >= FuncTransforms.size()) {
+    if (PipelineIdx >= (ToTransIdx - FromTransIdx)) {
       // All passes did already run for the function. Pop it off the worklist.
       FunctionWorklist.pop_back();
       continue;
@@ -420,7 +416,7 @@ runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
     assert(!shouldRestartPipeline() &&
         "Did not expect function pipeline set up to restart from beginning!");
 
-    runPassOnFunction(FuncTransforms[PipelineIdx], F);
+    runPassOnFunction(FromTransIdx + PipelineIdx, F);
 
     // Note: Don't get entry reference prior to runPassOnFunction().
     // A pass can push a new function to the worklist which may cause a
@@ -436,7 +432,8 @@ runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
   }
 }
 
-void SILPassManager::runModulePass(SILModuleTransform *SMT) {
+void SILPassManager::runModulePass(unsigned TransIdx) {
+  auto *SMT = cast<SILModuleTransform>(Transformations[TransIdx]);
   if (isDisabled(SMT))
     return;
 
@@ -453,13 +450,10 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   CurrentPassHasInvalidated = false;
 
   if (SILPrintPassName)
-    llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
-                 << " Pass: " << SMT->getName() << " (module pass)\n";
+    dumpPassInfo("Run module pass", TransIdx);
 
   if (doPrintBefore(SMT, nullptr)) {
-    llvm::dbgs() << "*** SIL module before " << StageName << " "
-                 << SMT->getName() << " (" << SMT->getTag() << ") (#"
-                 << NumOptimizationIterations << ") ***\n";
+    dumpPassInfo("*** SIL module before", TransIdx);
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
@@ -472,15 +466,13 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
-    llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
+    llvm::dbgs() << Delta << " (" << SMT->getID() << ",Module)\n";
   }
 
   // If this pass invalidated anything, print and verify.
   if (doPrintAfter(SMT, nullptr,
                    CurrentPassHasInvalidated && SILPrintAll)) {
-    llvm::dbgs() << "*** SIL module after " << StageName << " "
-                 << SMT->getName() << " (" << SMT->getTag() << ") (#"
-                 << NumOptimizationIterations << ") ***\n";
+    dumpPassInfo("*** SIL module after", TransIdx);
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
@@ -493,44 +485,39 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   }
 }
 
-void SILPassManager::runOneIteration() {
+void SILPassManager::execute() {
   const SILOptions &Options = getOptions();
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
         << ") *** \n");
-  if (SILPrintAll && NumOptimizationIterations == 0) {
-    llvm::dbgs() << "*** SIL module before "  << StageName
-                 << " transformation (" << NumOptimizationIterations
-                 << ") ***\n";
+  if (SILPrintAll) {
+    llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);
   }
-  NumOptzIterations++;
-  NumOptimizationIterations++;
-  SmallVector<SILFunctionTransform *, 16> PendingFuncTransforms;
 
   // Run the transforms by alternating between function transforms and
   // module transforms. We'll queue up all the function transforms
   // that we see in a row and then run the entire group of transforms
   // on each function in turn. Then we move on to running the next set
   // of consecutive module transforms.
-  auto It = Transformations.begin();
-  auto End = Transformations.end();
+  unsigned Idx = 0, NumTransforms = Transformations.size();
 
-  while (It != End && continueTransforming()) {
-    assert((isa<SILFunctionTransform>(*It) || isa<SILModuleTransform>(*It)) &&
+  while (Idx < NumTransforms && continueTransforming()) {
+    SILTransform *Tr = Transformations[Idx];
+    assert((isa<SILFunctionTransform>(Tr) || isa<SILModuleTransform>(Tr)) &&
            "Unexpected pass kind!");
 
-    while (It != End && isa<SILFunctionTransform>(*It))
-      PendingFuncTransforms.push_back(cast<SILFunctionTransform>(*It++));
+    unsigned FirstFuncTrans = Idx;
+    while (Idx < NumTransforms && isa<SILFunctionTransform>(Transformations[Idx]))
+      ++Idx;
 
-    runFunctionPasses(PendingFuncTransforms);
-    PendingFuncTransforms.clear();
+    runFunctionPasses(FirstFuncTrans, Idx);
 
-    while (It != End && isa<SILModuleTransform>(*It) &&
-           continueTransforming()) {
-      runModulePass(cast<SILModuleTransform>(*It));
+    while (Idx < NumTransforms && isa<SILModuleTransform>(Transformations[Idx])
+           && continueTransforming()) {
+      runModulePass(Idx);
 
-      ++It;
+      ++Idx;
       ++NumPassesRun;
     }
   }
@@ -613,7 +600,6 @@ void SILPassManager::resetAndRemoveTransformations() {
     delete T;
 
   Transformations.clear();
-  NumOptimizationIterations = 0;
 }
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {

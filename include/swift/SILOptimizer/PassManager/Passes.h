@@ -80,7 +80,6 @@ namespace swift {
   PassKind PassKindFromString(StringRef ID);
   StringRef PassKindID(PassKind Kind);
   StringRef PassKindTag(PassKind Kind);
-  StringRef PassKindName(PassKind Kind);
 
 #define PASS(ID, TAG, NAME) SILTransform *create##ID();
 #define IRGEN_PASS(ID, TAG, NAME)

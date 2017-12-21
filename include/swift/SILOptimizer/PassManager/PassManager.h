@@ -72,9 +72,6 @@ class SILPassManager {
   /// The number of passes run so far.
   unsigned NumPassesRun = 0;
 
-  /// Number of optimization iterations run.
-  unsigned NumOptimizationIterations = 0;
-
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
@@ -138,9 +135,6 @@ public:
   /// \returns the associated IGenModule or null if this is not an IRGen
   /// pass manager.
   irgen::IRGenModule *getIRGenModule() { return IRMod; }
-
-  /// \brief Run one iteration of the optimization pipeline.
-  void runOneIteration();
 
   /// \brief Restart the function pass pipeline on the same function
   /// that is currently being processed.
@@ -272,9 +266,7 @@ public:
   }
 
 private:
-  void execute() {
-    runOneIteration();
-  }
+  void execute();
 
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
@@ -282,17 +274,15 @@ private:
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  /// Run the SIL module transform \p SMT over all the functions in
+  /// Run the \p TransIdx'th SIL module transform over all the functions in
   /// the module.
-  void runModulePass(SILModuleTransform *SMT);
+  void runModulePass(unsigned TransIdx);
 
-  /// Run the pass \p SFT on the function \p F.
-  void runPassOnFunction(SILFunctionTransform *SFT, SILFunction *F);
+  /// Run the \p TransIdx'th pass on the function \p F.
+  void runPassOnFunction(unsigned TransIdx, SILFunction *F);
 
-  /// Run the passes in \p FuncTransforms. Return true
-  /// if the pass manager requested to stop the execution
-  /// of the optimization cycle (this is a debug feature).
-  void runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms);
+  /// Run the passes in Transform from \p FromTransIdx to \p ToTransIdx.
+  void runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.
@@ -300,6 +290,10 @@ private:
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();
+
+  /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
+  void dumpPassInfo(const char *Title, unsigned TransIdx,
+                    SILFunction *F = nullptr);
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.
