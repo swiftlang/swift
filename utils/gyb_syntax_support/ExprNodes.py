@@ -74,6 +74,10 @@ EXPR_NODES = [
              Child('Elements', kind='ExprList'),
          ]),
 
+    Node('ExprList', kind='SyntaxCollection',
+         element='Expr',
+         element_name='Expression'),
+
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
          children=[

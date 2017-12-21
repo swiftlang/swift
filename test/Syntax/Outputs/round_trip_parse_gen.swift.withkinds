@@ -221,18 +221,49 @@ class C <MemberDeclBlock>{<VariableDecl><Attribute>
     for <ValueBindingPattern>let <TuplePattern>(<TuplePatternElement><IdentifierPattern>x</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><WildcardPattern>_</WildcardPattern></TuplePatternElement>) </TuplePattern></ValueBindingPattern>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock>
     for <ValueBindingPattern>var <IdentifierPattern>x</IdentifierPattern></ValueBindingPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock>
   }</CodeBlock></FunctionDecl>
-}</MemberDeclBlock></ClassDecl>
+}</MemberDeclBlock></ClassDecl><DoStmt>
 
 do <CodeBlock>{
   switch <IdentifierExpr>foo </IdentifierExpr>{
-    case <ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern>: break
-    case <ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern>: break
-    case <ValueBindingPattern>let <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><IdentifierPattern>b</IdentifierPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern></ValueBindingPattern>: break
-    case <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><ValueBindingPattern>var <IdentifierPattern>b</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern>: break
-    case <IsTypePattern>is <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></IsTypePattern>: break
-    case <ValueBindingPattern>let <ExpressionPattern>.bar(<FunctionCallArgument><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr></FunctionCallArgument>)</ExpressionPattern></ValueBindingPattern>: break
-    case <ExpressionPattern><MemberAccessExpr><IdentifierExpr>MyEnum</IdentifierExpr>.foo</MemberAccessExpr></ExpressionPattern>: break
-    case <ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern>: break
-    case <ValueBindingPattern>let <ExpressionPattern><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>?</ExpressionPattern></ValueBindingPattern>: break
+    case <ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><IdentifierPattern>b</IdentifierPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><ValueBindingPattern>var <IdentifierPattern>b</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern>: <BreakStmt>break</BreakStmt>
+    case <IsTypePattern>is <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></IsTypePattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern>.bar(<FunctionCallArgument><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr></FunctionCallArgument>)</ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ExpressionPattern><MemberAccessExpr><IdentifierExpr>MyEnum</IdentifierExpr>.foo</MemberAccessExpr></ExpressionPattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>?</ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
   }
-}</CodeBlock>
+}</CodeBlock></DoStmt><FunctionDecl>
+
+func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<DoStmt>
+  do <CodeBlock>{
+  } </CodeBlock><CatchClause>catch <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>var <IdentifierPattern>x</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>y</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleElement>) </TupleExpr></ExpressionPattern><CodeBlock>{
+  } </CodeBlock></CatchClause><CatchClause>catch <WhereClause>where <BooleanLiteralExpr>false </BooleanLiteralExpr></WhereClause><CodeBlock>{
+  } </CodeBlock></CatchClause><CatchClause>catch <ValueBindingPattern>let <IdentifierPattern>e </IdentifierPattern></ValueBindingPattern><WhereClause>where <SequenceExpr><MemberAccessExpr><IdentifierExpr>e</IdentifierExpr>.foo </MemberAccessExpr><BinaryOperatorExpr>== </BinaryOperatorExpr><IdentifierExpr>bar </IdentifierExpr></SequenceExpr></WhereClause><CodeBlock>{
+  } </CodeBlock></CatchClause><CatchClause>catch <CodeBlock>{
+  }</CodeBlock></CatchClause></DoStmt><RepeatWhileStmt>
+  repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>true</BooleanLiteralExpr></RepeatWhileStmt><RepeatWhileStmt>
+  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><DoStmt>
+  LABEL: do <CodeBlock>{}</CodeBlock></DoStmt>
+  LABEL: switch <IdentifierExpr>foo </IdentifierExpr>{
+    case <ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>:<FallthroughStmt>
+      fallthrough</FallthroughStmt>
+    case <ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern>:<BreakStmt>
+      break LABEL</BreakStmt>
+    case <ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern>:<BreakStmt>
+      break</BreakStmt>
+  }
+
+  for <IdentifierPattern>a </IdentifierPattern>in <IdentifierExpr>b </IdentifierExpr><CodeBlock>{<DeferStmt>
+    defer <CodeBlock>{ <TupleExpr>() </TupleExpr>}</CodeBlock></DeferStmt>
+    if <IdentifierExpr>c </IdentifierExpr><CodeBlock>{<ThrowStmt>
+      throw <IdentifierExpr>MyError</IdentifierExpr>()</ThrowStmt><ContinueStmt>
+      continue</ContinueStmt>
+    } </CodeBlock>else <CodeBlock>{<ContinueStmt>
+      continue LABEL</ContinueStmt>
+    }</CodeBlock>
+  }</CodeBlock>
+
+}</CodeBlock></FunctionDecl>
