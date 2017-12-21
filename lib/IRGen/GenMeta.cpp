@@ -5001,8 +5001,9 @@ namespace {
     void layout() {
       if (asImpl().requiresInitializationFunction())
         asImpl().addInitializationFunction();
+      else
+        asImpl().addPaddingForInitializationFunction();
       asImpl().addForeignName();
-      asImpl().addUniquePointer();
       asImpl().addForeignFlags();
       super::layout();
     }
@@ -5015,11 +5016,8 @@ namespace {
 
     void addForeignName() {
       CanType targetType = asImpl().getTargetType();
-      B.add(getMangledTypeName(IGM, targetType));
-    }
-
-    void addUniquePointer() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+      B.addRelativeAddress(getMangledTypeName(IGM, targetType,
+                                              /*relative addressed?*/ true));
     }
 
     void addInitializationFunction() {
@@ -5045,7 +5043,23 @@ namespace {
 
       IGF.Builder.CreateRetVoid();
 
-      B.add(fn);
+      B.addRelativeAddress(fn);
+    }
+    
+    void addPaddingForInitializationFunction() {
+      // The initialization function field is placed at the least offset of the
+      // record so it can be omitted when not needed. However, the metadata
+      // record is still pointer-aligned, so on 64 bit platforms we need to
+      // occupy the space to keep the rest of the record with the right layout.
+      switch (IGM.getPointerSize().getValue()) {
+      case 4:
+        break;
+      case 8:
+        B.addInt32(0);
+        break;
+      default:
+        llvm_unreachable("unsupported word size");
+      }
     }
 
     void noteAddressPoint() {
