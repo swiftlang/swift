@@ -91,24 +91,20 @@
 ### Done:
   * BraceStmt
   * ReturnStmt
-
-### Not-started (UnknownStmt):
   * DeferStmt
-  * IfStmt
-  * GuardStmt
-  * WhileStmt
   * DoStmt
-  * DoCatchStmt
   * RepeatWhileStmt
-  * ForEachStmt
-  * SwitchStmt
-  * CaseStmt
-  * CatchStmt
   * BreakStmt
   * ContinueStmt
   * FallthroughStmt
-  * FailStmt
   * ThrowStmt
+
+### Not-started (UnknownStmt):
+  * IfStmt
+  * GuardStmt
+  * WhileStmt
+  * ForEachStmt
+  * SwitchStmt
 
 ## Pattern
 ### Done:

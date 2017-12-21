@@ -236,3 +236,34 @@ do {
     case let a?: break
   }
 }
+
+func statementTests() {
+  do {
+  } catch (var x, let y) {
+  } catch where false {
+  } catch let e where e.foo == bar {
+  } catch {
+  }
+  repeat { } while true
+  LABEL: repeat { } while false
+  LABEL: do {}
+  LABEL: switch foo {
+    case 1:
+      fallthrough
+    case 2:
+      break LABEL
+    case 3:
+      break
+  }
+
+  for a in b {
+    defer { () }
+    if c {
+      throw MyError()
+      continue
+    } else {
+      continue LABEL
+    }
+  }
+
+}

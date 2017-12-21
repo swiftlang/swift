@@ -569,11 +569,14 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtContinue();
-  case tok::kw_fallthrough:
+  case tok::kw_fallthrough: {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+
+    SyntaxContext->setCreateSyntax(SyntaxKind::FallthroughStmt);
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
+  }
   }
 }
 
@@ -615,6 +618,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 ///     'break' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtBreak() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::BreakStmt);
   SourceLoc Loc = consumeToken(tok::kw_break);
   SourceLoc TargetLoc;
   Identifier Target;
@@ -637,6 +641,7 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
 ///     'continue' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtContinue() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::ContinueStmt);
   SourceLoc Loc = consumeToken(tok::kw_continue);
   SourceLoc TargetLoc;
   Identifier Target;
@@ -660,7 +665,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///     'return' expr?
 ///   
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
-  SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::ReturnStmt);
+  SyntaxContext->setCreateSyntax(SyntaxKind::ReturnStmt);
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   if (Tok.is(tok::code_complete)) {
@@ -725,6 +730,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
 ///   'throw' expr
 ///
 ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::ThrowStmt);
   SourceLoc throwLoc = consumeToken(tok::kw_throw);
   SourceLoc exprLoc;
   if (Tok.isNot(tok::eof))
@@ -759,6 +765,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 ///     'defer' brace-stmt
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::DeferStmt);
   SourceLoc DeferLoc = consumeToken(tok::kw_defer);
   
   // Macro expand out the defer into a closure and call, which we can typecheck
@@ -991,7 +998,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     VD->setHasNonPatternBindingInit();
 
   // Parse the optional 'where' guard.
-  if (P.consumeIf(tok::kw_where, result.WhereLoc)) {
+  if (P.Tok.is(tok::kw_where)) {
+    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
+                                         SyntaxKind::WhereClause);
+    result.WhereLoc = P.consumeToken(tok::kw_where);
     SourceLoc startOfGuard = P.Tok.getLoc();
 
     auto diagKind = [=]() -> Diag<> {
@@ -1615,6 +1625,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 ///   stmt-repeat:
 ///     (identifier ':')? 'repeat' stmt-brace 'while' expr
 ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::RepeatWhileStmt);
   SourceLoc repeatLoc = consumeToken(tok::kw_repeat);
 
   ParserStatus status;
@@ -1658,6 +1669,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
   SourceLoc doLoc = consumeToken(tok::kw_do);
 
   ParserStatus status;
@@ -1671,6 +1683,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 
   // If the next token is 'catch', this is a 'do'/'catch' statement.
   if (Tok.is(tok::kw_catch)) {
+    SyntaxParsingContext CatchListCtxt(SyntaxContext,
+                                       SyntaxKind::CatchClauseList);
     // Parse 'catch' clauses 
     SmallVector<CatchStmt*, 4> allClauses;
     do {
@@ -1736,6 +1750,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 /// This routine promises to return a non-null result unless there was
 /// a code-completion token in the pattern.
 ParserResult<CatchStmt> Parser::parseStmtCatch() {
+  SyntaxParsingContext CatchClauseCtxt(SyntaxContext, SyntaxKind::CatchClause);
   // A catch block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CatchVars);
 
