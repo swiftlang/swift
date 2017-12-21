@@ -166,6 +166,13 @@ extension RandomAccessCollection {
   }
 }
 
+// Provides an alternative default associated type witness for Indices
+// for random access collections with strideable indices.
+extension RandomAccessCollection where Index : Strideable, Index.Stride == Int {
+  @_implements(Collection, Indices)
+  public typealias _Default_Indices = CountableRange<Index>
+}
+
 extension RandomAccessCollection
 where Index : Strideable, 
       Index.Stride == Int,
