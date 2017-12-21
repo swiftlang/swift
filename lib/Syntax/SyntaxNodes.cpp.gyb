@@ -36,6 +36,13 @@ bool swift::syntax::checkInputInClosureSignature(const Syntax &S) {
     S.getKind() == SyntaxKind::ParameterClause;
 }
 
+bool swift::syntax::checkContentInDictionaryExpr(const Syntax &S) {
+  if (auto Tok = S.getAs<TokenSyntax>()) {
+    return Tok->getTokenKind() == tok::colon;
+  }
+  return S.getKind() == SyntaxKind::DictionaryElementList;
+}
+
 % for node in SYNTAX_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
