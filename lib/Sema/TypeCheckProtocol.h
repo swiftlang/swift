@@ -737,6 +737,10 @@ private:
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
 
+  /// Retrieve substitution options with a tentative type witness
+  /// operation that queries the current set of type witnesses.
+  SubstOptions getSubstOptionsWithCurrentTypeWitnesses();
+
   /// Check whether the current set of type witnesses meets the
   /// requirements of the protocol.
   bool checkCurrentTypeWitnesses(
