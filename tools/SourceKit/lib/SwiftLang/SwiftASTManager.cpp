@@ -882,7 +882,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
+      std::unique_ptr<SILModule> SILMod =
+          performSILGeneration(*SF, SILOpts, SF->getFilename());
       runSILDiagnosticPasses(*SILMod);
     }
   }
