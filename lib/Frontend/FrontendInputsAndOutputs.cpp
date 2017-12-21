@@ -218,27 +218,27 @@ FrontendInputsAndOutputs::preBatchModePathsForAtMostOnePrimary() const {
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeObjCHeaderOutputPath() const {
-  return preBatchModePathsForAtMostOnePrimary().ObjCHeaderOutputPath;
+  return firstOutputPaths().ObjCHeaderOutputPath;
 }
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeModuleOutputPath() const {
-  return preBatchModePathsForAtMostOnePrimary().ModuleOutputPath;
+  return firstOutputPaths().ModuleOutputPath;
 }
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeModuleDocOutputPath() const {
-  return preBatchModePathsForAtMostOnePrimary().ModuleDocOutputPath;
+  return firstOutputPaths().ModuleDocOutputPath;
 }
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeDependenciesFilePath() const {
-  return preBatchModePathsForAtMostOnePrimary().DependenciesFilePath;
+  return firstOutputPaths().DependenciesFilePath;
 }
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeReferenceDependenciesFilePath() const {
-  return preBatchModePathsForAtMostOnePrimary().ReferenceDependenciesFilePath;
+  return firstOutputPaths().ReferenceDependenciesFilePath;
 }
 
 const std::string &
@@ -248,11 +248,11 @@ FrontendInputsAndOutputs::preBatchModeSerializedDiagnosticsPath() const {
 
 const std::string &
 FrontendInputsAndOutputs::preBatchModeLoadedModuleTracePath() const {
-  return preBatchModePathsForAtMostOnePrimary().LoadedModuleTracePath;
+  return firstOutputPaths().LoadedModuleTracePath;
 }
 
 const std::string &FrontendInputsAndOutputs::preBatchModeTBDPath() const {
-  return preBatchModePathsForAtMostOnePrimary().TBDPath;
+  return firstOutputPaths().TBDPath;
 }
 
 unsigned FrontendInputsAndOutputs::countOfFilesProducingOutput() const {

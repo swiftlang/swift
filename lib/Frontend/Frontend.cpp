@@ -193,7 +193,6 @@ bool CompilerInstance::setUpInputs() {
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
       !isPrimaryInput(*codeCompletionBufferID)) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
@@ -220,7 +219,6 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   }
 
   if (input.isPrimary()) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
     recordPrimaryInputBuffer(*bufferID);
   }
   return false;

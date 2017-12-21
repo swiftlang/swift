@@ -513,17 +513,15 @@ struct PostSILGenInputs {
   std::unique_ptr<SILModule> TheSILModule;
   bool astGuaranteedToCorrespondToSIL;
   ModuleOrSourceFile ModuleOrPrimarySourceFile;
+  std::string PostBatchModeMainInputFilename;
 };
 
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats);
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, std::string PostBatchModeMainInputFilename,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -810,7 +808,8 @@ static bool performCompile(CompilerInstance &Instance,
   auto mod = Instance.getMainModule();
   std::deque<PostSILGenInputs> PSGIs;
   if (auto SM = Instance.takeSILModule()) {
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
+    PSGIs.push_back(PostSILGenInputs{
+        std::move(SM), false, mod, SM->getSMPostBatchModeMainInputFilename()});
   }
 
   if (PSGIs.empty()) {
@@ -832,8 +831,8 @@ static bool performCompile(CompilerInstance &Instance,
               assert(PSGIs.empty() && "Can only handle one primary AST input");
               auto SM = performSILGeneration(*SASTF, SILOpts, convertedFilename,
                                              None);
-              PSGIs.push_back(
-                  PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
+              PSGIs.push_back(PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF),
+                                               mod, convertedFilename});
             }
           }
         }
@@ -844,8 +843,9 @@ static bool performCompile(CompilerInstance &Instance,
         for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
           auto SM = performSILGeneration(*PrimaryFile, SILOpts,
                                          PrimaryFile->getFilename(), None);
-          PSGIs.push_back(PostSILGenInputs{
-              std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
+          PSGIs.push_back(PostSILGenInputs{std::move(SM),
+                                           !fileIsSIB(PrimaryFile), PrimaryFile,
+                                           PrimaryFile->getFilename()});
         }
       }
     } else {
@@ -855,34 +855,30 @@ static bool performCompile(CompilerInstance &Instance,
           mod, SILOpts, Invocation.getWMOPostBatchModeMainInputFilename(),
           true);
       PSGIs.push_back(PostSILGenInputs{
-          std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
+          std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod,
+          Invocation.getWMOPostBatchModeMainInputFilename()});
     }
   }
 
   while (!PSGIs.empty()) {
     auto PSGI = std::move(PSGIs.front());
     PSGIs.pop_front();
-    if (performCompileStepsPostSILGen(Instance, Invocation,
-                                      std::move(PSGI.TheSILModule),
-                                      PSGI.astGuaranteedToCorrespondToSIL,
-                                      PSGI.ModuleOrPrimarySourceFile,
-                                      moduleIsPublic,
-                                      ReturnValue, observer, Stats))
+    if (performCompileStepsPostSILGen(
+            Instance, Invocation, std::move(PSGI.TheSILModule),
+            PSGI.astGuaranteedToCorrespondToSIL, PSGI.ModuleOrPrimarySourceFile,
+            PSGI.PostBatchModeMainInputFilename, moduleIsPublic, ReturnValue,
+            observer, Stats))
       return true;
   }
   return false;
 }
 
-
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats) {
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, std::string PostBatchModeMainInputFilename,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1134,13 +1130,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (MSF.is<SourceFile*>()) {
     IRModule = performIRGeneration(
         IRGenOpts, *MSF.get<SourceFile *>(), std::move(SM),
-        opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
-        LLVMContext, 0, &HashGlobal);
+        PostBatchModeMainInputFilename, LLVMContext, 0, &HashGlobal);
   } else {
-    IRModule = performIRGeneration(IRGenOpts, MSF.get<ModuleDecl*>(),
-                                   std::move(SM),
-                                   opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(), LLVMContext,
-                                   &HashGlobal);
+    IRModule = performIRGeneration(
+        IRGenOpts, MSF.get<ModuleDecl *>(), std::move(SM),
+        PostBatchModeMainInputFilename, LLVMContext, &HashGlobal);
   }
 
   // Walk the AST for indexing after IR generation. Walking it before seems
@@ -1199,11 +1193,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(
-             IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
-             IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
-             opts.InputsAndOutputs.preBatchModeGetSingleOutputFilename(),
-             Stats) ||
+  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
+                     IRModule.get(), TargetMachine.get(),
+                     EffectiveLanguageVersion, PostBatchModeMainInputFilename,
+                     Stats) ||
          HadError;
 }
 
