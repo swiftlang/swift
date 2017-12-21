@@ -152,7 +152,11 @@ EXPR_NODES = [
     Node('DictionaryExpr', kind='Expr',
          children=[
              Child('LeftSquare', kind='LeftSquareToken'),
-             Child('Elements', kind='DictionaryElementList'),
+             Child('Content', kind='Syntax',
+                   node_choices=[
+                       Child('Colon', kind='ColonToken'),
+                       Child('Elements', kind='DictionaryElementList'),
+                   ]),
              Child('RightSquare', kind='RightSquareToken'),
          ]),
 

@@ -102,6 +102,7 @@ public:
 
 bool checkAccessorListOrStmtListInAccessorBlock(const Syntax &S);
 bool checkInputInClosureSignature(const Syntax &S);
+bool checkContentInDictionaryExpr(const Syntax &S);
 }
 }
 
