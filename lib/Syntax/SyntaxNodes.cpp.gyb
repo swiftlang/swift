@@ -24,25 +24,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-
-bool swift::syntax::
-checkAccessorListOrStmtListInAccessorBlock(const Syntax &S) {
-  return S.getKind() == SyntaxKind::AccessorList ||
-    S.getKind() == SyntaxKind::StmtList;
-}
-
-bool swift::syntax::checkInputInClosureSignature(const Syntax &S) {
-  return S.getKind() == SyntaxKind::ClosureParamList ||
-    S.getKind() == SyntaxKind::ParameterClause;
-}
-
-bool swift::syntax::checkContentInDictionaryExpr(const Syntax &S) {
-  if (auto Tok = S.getAs<TokenSyntax>()) {
-    return Tok->getTokenKind() == tok::colon;
-  }
-  return S.getKind() == SyntaxKind::DictionaryElementList;
-}
-
 % for node in SYNTAX_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
@@ -64,7 +45,13 @@ void ${node.name}::validate() const {
                                  tok::${token_kind}, ${choices});
 %       end
 %       if child.node_choices:
-  syntax_assert_node_choice(raw, ${child.name}, ${node.syntax_kind});
+#ifndef NDEBUG
+        {
+          auto child = make<Syntax>(raw->getChild(Cursor::${child.name}));
+%         content = check_child_condition(child) + '(child)'
+          assert(${content});
+        }
+#endif
 %       end
 %     end
 }
