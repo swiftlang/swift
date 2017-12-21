@@ -974,6 +974,41 @@ static void sanitizeProtocolRequirements(
   }
 }
 
+SubstOptions
+AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
+  SubstOptions options(None);
+  AssociatedTypeInference *self = this;
+  options.getTentativeTypeWitness =
+    [self](const NormalProtocolConformance *conformance,
+           AssociatedTypeDecl *assocType) -> TypeBase * {
+      auto thisProto = self->conformance->getProtocol();
+      if (conformance == self->conformance) {
+        // Okay: we have the associated type we need.
+      } else if (conformance->getType()->isEqual(
+                   self->conformance->getType()) &&
+                 thisProto->inheritsFrom(conformance->getProtocol())) {
+        // Find an associated type with the same name in the given
+        // protocol.
+        AssociatedTypeDecl *foundAssocType = nullptr;
+        for (auto result : thisProto->lookupDirect(
+                                             assocType->getName(),
+                                             /*ignoreNewExtensions=*/true)) {
+          foundAssocType = dyn_cast<AssociatedTypeDecl>(result);
+          if (foundAssocType) break;
+        }
+
+      if (!foundAssocType) return nullptr;
+      assocType = foundAssocType;
+    } else {
+      return nullptr;
+    }
+
+    Type type = self->typeWitnesses.begin(assocType)->first;
+    return type->mapTypeOutOfContext().getPointer();
+  };
+  return options;
+}
+
 bool AssociatedTypeInference::checkCurrentTypeWitnesses(
        const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
          &valueWitnesses) {
@@ -1002,15 +1037,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   if (!proto->isRequirementSignatureComputed()) return false;
 
   // Check any same-type requirements in the protocol's requirement signature.
-  SubstOptions options(None);
-  options.getTentativeTypeWitness =
-    [&](const NormalProtocolConformance *conformance,
-        AssociatedTypeDecl *assocType) -> TypeBase * {
-      if (conformance != this->conformance) return nullptr;
-
-      auto type = typeWitnesses.begin(assocType)->first;
-      return type->mapTypeOutOfContext().getPointer();
-    };
+  SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
 
   auto typeInContext = dc->mapTypeIntoContext(adoptee);
 
@@ -1066,16 +1093,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   auto typeInContext = dc->mapTypeIntoContext(adoptee);
   auto subs = typeInContext->getContextSubstitutions(ext);
 
-  SubstOptions options(None);
-  options.getTentativeTypeWitness =
-    [&](const NormalProtocolConformance *conformance,
-        AssociatedTypeDecl *assocType) -> TypeBase * {
-      if (conformance != this->conformance) return nullptr;
-
-      auto type = typeWitnesses.begin(assocType)->first;
-      return type->mapTypeOutOfContext().getPointer();
-    };
-
+  SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (tc.checkGenericArguments(
                        dc, SourceLoc(), SourceLoc(), adoptee,
                        ext->getGenericSignature()->getGenericParams(),
