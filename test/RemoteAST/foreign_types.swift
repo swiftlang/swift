@@ -27,3 +27,6 @@ printType(RenamedError.Code.self)
 
 printType(Wrapper.MemberEnum.self)
 // CHECK: found type: Wrapper.MemberEnum{{$}}
+
+printType(WrapperByAttribute.self)
+// CHECK: found type: WrapperByAttribute{{$}}

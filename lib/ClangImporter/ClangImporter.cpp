@@ -2323,7 +2323,8 @@ ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
   if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     for (auto clangDecl : lookupResult) {
       if (!isa<clang::TypeDecl>(clangDecl) &&
-          !isa<clang::ObjCContainerDecl>(clangDecl)) {
+          !isa<clang::ObjCContainerDecl>(clangDecl) &&
+          !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
         continue;
       }
       auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);

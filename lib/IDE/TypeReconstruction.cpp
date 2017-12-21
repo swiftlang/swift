@@ -142,18 +142,43 @@ public:
     return DeclsLookupSource(source._module, decl);
   }
 
-  void lookupQualified(DeclBaseName name, NLOptions options,
-                       LazyResolver *typeResolver, ValueDecls &result) {
+  void lookupByMangledName(DeclBaseName name, DeclKind decl_kind,
+                           ValueDecls &result) {
     if (_type == LookupKind::ClangImporter) {
       ASTContext *ast_ctx = _clang_crawler._ast;
       if (ast_ctx) {
-        VisibleDeclsConsumer consumer;
         ClangImporter *swift_clang_importer =
             (ClangImporter *)ast_ctx->getClangModuleLoader();
         if (!swift_clang_importer)
           return;
-        swift_clang_importer->lookupValue(name, consumer);
-        if (consumer) {
+
+        Optional<ClangTypeKind> clangTypeKind;
+        switch (decl_kind) {
+        case DeclKind::Class:
+          clangTypeKind = ClangTypeKind::ObjCClass;
+          break;
+        case DeclKind::Protocol:
+          clangTypeKind = ClangTypeKind::ObjCProtocol;
+          break;
+        case DeclKind::TypeAlias:
+          clangTypeKind = ClangTypeKind::Typedef;
+          break;
+        case DeclKind::Struct:
+          clangTypeKind = ClangTypeKind::Tag;
+          break;
+        default:
+          break;
+        }
+        if (clangTypeKind) {
+          swift_clang_importer->lookupTypeDecl(name.getIdentifier().str(),
+                                               clangTypeKind.getValue(),
+                                               [&](TypeDecl *type_decl) {
+            result.push_back(type_decl);
+          });
+          return;
+        } else {
+          VisibleDeclsConsumer consumer;
+          swift_clang_importer->lookupValue(name, consumer);
           auto iter = consumer.begin(), end = consumer.end();
           while (iter != end) {
             result.push_back(*iter);
@@ -162,8 +187,10 @@ public:
           return;
         }
       }
-    } else if (_type == LookupKind::SwiftModule)
-      lookupQualified(_module, name, options, typeResolver, result);
+    } else if (_type == LookupKind::SwiftModule) {
+      lookupQualified(_module, name, NLOptions(), /*typeResolver*/nullptr,
+                      result);
+    }
     return;
   }
 
@@ -424,6 +451,30 @@ GetIdentifier(ASTContext *ast,
   return Identifier();
 }
 
+static bool FilterDeclsForKind(DeclKind decl_kind,
+                               ArrayRef<swift::ValueDecl *> decls,
+                               VisitNodeResult &result) {
+  for (auto decl : decls) {
+    // Note: Clang nodes are filtered ahead of time based on their Clang decl
+    // kind.
+    if (decl->getKind() != decl_kind && !decl->hasClangNode())
+      continue;
+
+    result._decls = {decl};
+    Type decl_type;
+    if (decl->hasInterfaceType()) {
+      decl_type = decl->getInterfaceType();
+      MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
+      if (meta_type)
+        decl_type = meta_type->getInstanceType();
+    }
+    result._types = {decl_type};
+    return true;
+  }
+
+  return false;
+}
+
 static bool FindFirstNamedDeclWithKind(
     ASTContext *ast, const DeclBaseName &name, DeclKind decl_kind,
     VisitNodeResult &result,
@@ -437,55 +488,13 @@ static bool FindFirstNamedDeclWithKind(
       auto nominal_decl = dyn_cast<NominalTypeDecl>(parent_decl);
 
       if (nominal_decl) {
-        bool check_type_aliases = false;
-
         DeclsLookupSource lookup(
             DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
         SmallVector<ValueDecl *, 4> decls;
         lookup.lookupMember(name, GetIdentifier(ast, priv_decl_id), decls);
 
-        for (auto decl : decls) {
-          const DeclKind curr_decl_kind = decl->getKind();
-
-          if (curr_decl_kind == decl_kind) {
-            result._decls.back() = decl;
-            Type decl_type;
-            if (decl->hasInterfaceType()) {
-              decl_type = decl->getInterfaceType();
-              MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
-              if (meta_type)
-                decl_type = meta_type->getInstanceType();
-            }
-            if (result._types.empty())
-              result._types.push_back(decl_type);
-            else
-              result._types.back() = decl_type;
-            return true;
-          } else if (curr_decl_kind == DeclKind::TypeAlias)
-            check_type_aliases = true;
-        }
-
-        if (check_type_aliases) {
-          for (auto decl : decls) {
-            const DeclKind curr_decl_kind = decl->getKind();
-
-            if (curr_decl_kind == DeclKind::TypeAlias) {
-              result._decls.back() = decl;
-              Type decl_type;
-              if (decl->hasInterfaceType()) {
-                decl_type = decl->getInterfaceType();
-                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
-                if (meta_type)
-                  decl_type = meta_type->getInstanceType();
-              }
-              if (result._types.empty())
-                result._types.push_back(decl_type);
-              else
-                result._types.back() = decl_type;
-              return true;
-            }
-          }
-        }
+        if (FilterDeclsForKind(decl_kind, decls, result))
+          return true;
       }
     }
   } else if (result._module) {
@@ -495,46 +504,9 @@ static bool FindFirstNamedDeclWithKind(
           name, ast->getIdentifier(priv_decl_id.getValue().c_str()),
           decls);
     else
-      result._module.lookupQualified(name, NLOptions(), nullptr, decls);
-    if (!decls.empty()) {
-      bool check_type_aliases = false;
-      // Look for an exact match first
-      for (auto decl : decls) {
-        const DeclKind curr_decl_kind = decl->getKind();
-        if (curr_decl_kind == decl_kind) {
-          result._decls.assign(1, decl);
-          if (decl->hasInterfaceType()) {
-            result._types.assign(1, decl->getInterfaceType());
-            MetatypeType *meta_type =
-                result._types.back()->getAs<MetatypeType>();
-            if (meta_type)
-              result._types.back() = meta_type->getInstanceType();
-          } else {
-            result._types.assign(1, Type());
-          }
-          return true;
-        } else if (curr_decl_kind == DeclKind::TypeAlias)
-          check_type_aliases = true;
-      }
-      // If we didn't find any exact matches, accept any type aliases
-      if (check_type_aliases) {
-        for (auto decl : decls) {
-          if (isa<TypeAliasDecl>(decl)) {
-            result._decls.assign(1, decl);
-            if (decl->hasInterfaceType()) {
-              result._types.assign(1, decl->getInterfaceType());
-              MetatypeType *meta_type =
-                  result._types.back()->getAs<MetatypeType>();
-              if (meta_type)
-                result._types.back() = meta_type->getInstanceType();
-            } else {
-              result._types.assign(1, Type());
-            }
-            return true;
-          }
-        }
-      }
-    }
+      result._module.lookupByMangledName(name, decl_kind, decls);
+    if (FilterDeclsForKind(decl_kind, decls, result))
+      return true;
   }
   result.Clear();
   result._error = "Generic Error";
