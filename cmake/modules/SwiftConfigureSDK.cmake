@@ -123,7 +123,7 @@ macro(configure_sdk_darwin
 
   foreach(arch ${architectures})
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
-        "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+        "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endforeach()
 
   # Add this to the list of known SDKs.
