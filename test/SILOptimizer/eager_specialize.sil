@@ -228,7 +228,6 @@ bb2:
 // CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error Error), normal bb8, error bb7
 
 // CHECK: bb7(%{{.*}} : $Error):
-// CHECK:   %{{.*}} = builtin "willThrow"(%{{.*}} : $Error) : $()
 // CHECK:   br bb3(%{{.*}} : $Error)
 
 // CHECK: bb8(%{{.*}} : $Int):

@@ -171,12 +171,6 @@ emitApplyWithRethrow(SILBuilder &Builder,
     SILValue Error = ErrorBB->createPHIArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
-    Builder.createBuiltin(Loc,
-                          Builder.getASTContext().getIdentifier("willThrow"),
-                          Builder.getModule().Types.getEmptyTupleType(),
-                          SubstitutionList(),
-                          {Error});
-
     EmitCleanup(Builder, Loc);
     addThrowValue(ErrorBB, Error);
   }

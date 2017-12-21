@@ -1427,9 +1427,6 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
     SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {error});
-
     Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
     B.createThrow(loc, error);
   }

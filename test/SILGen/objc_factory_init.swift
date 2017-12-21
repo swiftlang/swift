@@ -57,7 +57,6 @@ extension Hive {
   // CHECK:   return [[HIVE]]
   //
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
-  // CHECK:   builtin "willThrow"([[ERROR]] : $Error)
   // CHECK:   throw [[ERROR]]
   // CHECK: } // end sil function '_T0So4HiveC17objc_factory_initEABSo3BeeC15otherFlakyQueen_tKcfC'
   convenience init(otherFlakyQueen other: Bee) throws {
