@@ -32,7 +32,7 @@ namespace tf {
       SingleBlock,
       Sequence,
       WhileLoop,
-      If
+      Conditional
     };
   protected:
     KindTy kind;
@@ -83,6 +83,10 @@ namespace tf {
       return nodes;
     }
 
+    void addNode(std::unique_ptr<SESERegionTree> node) {
+      nodes.push_back(std::move(node));
+    }
+
     void print(llvm::raw_ostream &OS, unsigned indent = 0) const;
 
     static bool classof(const SESERegionTree *n) {
@@ -96,15 +100,17 @@ namespace tf {
   /// block and the body of the loop.  The body of the loop ends with a backedge
   /// to the header.
   class WhileLoopSESERegion : public SESERegionTree {
-    SILBasicBlock *header, *exit;
+    SILBasicBlock *preheader, *header, *exit;
     std::unique_ptr<SESERegionTree> body;
   public:
-    WhileLoopSESERegion(SILBasicBlock *header, SILBasicBlock *exit,
+    WhileLoopSESERegion(SILBasicBlock *preheader, SILBasicBlock *header,
+                        SILBasicBlock *exit,
                         std::unique_ptr<SESERegionTree> body)
-      : SESERegionTree(WhileLoop), header(header), exit(exit),
-        body(std::move(body)) {
+      : SESERegionTree(WhileLoop), preheader(preheader), header(header),
+        exit(exit), body(std::move(body)) {
     }
 
+    SILBasicBlock *getPreheader() const { return preheader; }
     SILBasicBlock *getHeader() const { return header; }
     SILBasicBlock *getExit() const { return exit; }
     SESERegionTree *getBody() const { return body.get(); }
@@ -116,23 +122,38 @@ namespace tf {
     }
   };
 
-
-  class IfSESERegion : public SESERegionTree {
-    SILBasicBlock *header;
-    // TODO: NOT REALLY IMPLEMENTED.
+  /// This represents a conditional SESE region.  Conditional regions start with
+  /// a basic block that contains a conditional brach, and may optionally have a
+  /// true or false region.  The end block (which is the merge) is not
+  /// considered part of this region.
+  class ConditionalSESERegion : public SESERegionTree {
+    SILBasicBlock *branchBB;
+    std::unique_ptr<SESERegionTree> trueRegion, falseRegion;
   public:
-    IfSESERegion(SILBasicBlock *header) : SESERegionTree(If), header(header) {
+    ConditionalSESERegion(SILBasicBlock *branchBB,
+                          std::unique_ptr<SESERegionTree> trueRegion,
+                          std::unique_ptr<SESERegionTree> falseRegion)
+      : SESERegionTree(Conditional), branchBB(branchBB),
+        trueRegion(std::move(trueRegion)),
+        falseRegion(std::move(falseRegion)) {
     }
 
-    SILBasicBlock *getHeader() const { return header; }
-    //SESERegionTree *getTrue() const { return trueRegion.get(); }
-    //SESERegionTree *getFalse() const { return falseRegion.get(); }
-    //SILBasicBlock *getExit() const { return exit; }
+    SILBasicBlock *getBranchBB() const { return branchBB; }
 
+    /// Return the region if the condition is true.
+    /// NOTE: This returns null if there is no true region.
+    SESERegionTree *getTrue() const {
+      return trueRegion.get();
+    }
+    /// Return the region if the condition is false.
+    /// NOTE: This returns null if there is no false region.
+    SESERegionTree *getFalse() const {
+      return falseRegion.get();
+    }
     void print(llvm::raw_ostream &OS, unsigned indent = 0) const;
 
     static bool classof(const SESERegionTree *n) {
-      return n->getKind() == If;
+      return n->getKind() == Conditional;
     }
   };
 
