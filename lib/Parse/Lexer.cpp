@@ -2298,24 +2298,20 @@ Restart:
   // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
+    if (IsForTrailingTrivia)
+      break;
+    NextToken.setAtStartOfLine(true);
+    Pieces.appendOrSquash(TriviaPiece::newlines(1));
+    break;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
-    switch (CurPtr[-1]) {
-    case '\n':
-      Pieces.appendOrSquash(TriviaPiece::newlines(1));
-      break;
-    case '\r':
-      if (CurPtr[0] == '\n') {
-        Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
-        CurPtr++;
-      } else {
-        Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
-      }
-      break;
-    default:
-      llvm_unreachable("unexcepted char here");
+    if (CurPtr[0] == '\n') {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
+      ++CurPtr;
+    } else {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
     }
     goto Restart;
   case ' ':
