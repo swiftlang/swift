@@ -1291,6 +1291,11 @@ do {
   }
 }
 
+struct TryFlattenIndex<C: Collection> where C.Element: Collection {
+  typealias FlattenedIndex = FlattenCollectionIndex<C>
+}
+
+
 //===--- LazyPrefixWhile --------------------------------------------------===//
 
 let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
