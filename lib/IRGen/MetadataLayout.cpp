@@ -44,6 +44,8 @@ class LayoutScanner : public Base<Impl> {
   Optional<Size> AddressPoint;
 
 protected:
+  Optional<Size> DynamicOffsetBase;
+
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
 
@@ -52,7 +54,13 @@ public:
 
   void noteAddressPoint() { AddressPoint = this->NextOffset; }
   StoredOffset getNextOffset() const {
-    return StoredOffset(this->NextOffset - AddressPoint.getValue());
+    if (DynamicOffsetBase) {
+      return StoredOffset(this->NextOffset - *DynamicOffsetBase,
+                          StoredOffset::Dynamic);
+    }
+
+    return StoredOffset(this->NextOffset - *AddressPoint,
+                        StoredOffset::Static);
   }
 
   Size getAddressPoint() const {

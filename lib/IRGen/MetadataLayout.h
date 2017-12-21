@@ -54,14 +54,19 @@ public:
   };
 
   class StoredOffset {
-    enum State {
+  public:
+    enum Kind {
       /// The high bits are an integer displacement.
       Static = 0,
 
-      /// The high bits are an llvm::Constant* for the displacement,
-      /// which may be null if it hasn't been computed yet.
+      /// The high bits are an integer displacement relative to a offset stored
+      /// in a class metadata base offset global variable. This is used to
+      /// access members of class metadata where the superclass is resilient to
+      /// us, and therefore has an unknown size.
       Dynamic,
     };
+
+  private:
     enum : uint64_t {
       KindBits = 1,
       KindMask = (1 << KindBits) - 1,
@@ -71,28 +76,32 @@ public:
     mutable uintptr_t Data;
   public:
     StoredOffset() : Data(0) {}
-    explicit StoredOffset(llvm::Constant *offset)
-      : Data(reinterpret_cast<uintptr_t>(offset) | Dynamic) {}
-    explicit StoredOffset(Size offset)
-      : Data((static_cast<uint64_t>(offset.getValue()) << KindBits) | Static) {
-      assert(!offset.isZero() && "cannot store a zero offset");
-      assert(getStaticOffset() == offset && "overflow");
+    explicit StoredOffset(Size offset, Kind kind)
+      : Data((static_cast<uint64_t>(offset.getValue()) << KindBits) | kind) {
+      assert(kind == Kind::Dynamic || !offset.isZero() &&
+             "cannot store a zero static offset");
+      if (kind == Kind::Static)
+        assert(getStaticOffset() == offset && "overflow");
+      if (kind == Kind::Dynamic)
+        assert(getRelativeOffset() == offset && "overflow");
     }
 
     bool isValid() const { return Data != 0; }
     bool isStatic() const { return isValid() && (Data & KindMask) == Static; }
     bool isDynamic() const { return (Data & KindMask) == Dynamic; }
+
+    /// If this is a metadata offset into a resilient class, returns the offset
+    /// relative to the size of the superclass metadata.
+    Size getRelativeOffset() const {
+      assert(isDynamic());
+      return Size(static_cast<int64_t>(Data) >> KindBits);
+    }
+
+    /// Returns the offset relative to start of metadata. Only used for
+    /// metadata fields whose offset is completely known at compile time.
     Size getStaticOffset() const {
       assert(isStatic());
       return Size(static_cast<int64_t>(Data) >> KindBits);
-    }
-    llvm::Constant *getDynamicOffsetVariable() const {
-      assert(isDynamic());
-      return reinterpret_cast<llvm::Constant*>(Data & PayloadMask);
-    }
-    void setDynamicOffsetVariable(llvm::Constant *pointer) const {
-      assert(isDynamic());
-      Data = reinterpret_cast<uintptr_t>(pointer) | Dynamic;
     }
   };
 
