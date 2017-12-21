@@ -104,8 +104,10 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
     break;
   case TriviaKind::Newline:
   case TriviaKind::CarriageReturn:
+    Pos.addNewlines(Count, 1);
+    break;
   case TriviaKind::CarriageReturnLineFeed:
-    Pos.addNewlines(Count);
+    Pos.addNewlines(Count, 2);
     break;
   case TriviaKind::Space:
   case TriviaKind::Backtick:
