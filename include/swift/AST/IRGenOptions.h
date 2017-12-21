@@ -65,6 +65,9 @@ enum class IRGenEmbedMode : unsigned {
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
+  /// Ignored for now for batch mode; set by lldb
+  std::string MainInputFilename;
+  
   std::vector<std::string> IRGOutputFilenames;
 
   std::string ModuleName;
