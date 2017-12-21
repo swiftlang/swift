@@ -370,11 +370,14 @@ public:
   bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
 
   /// Emit code to increment a counter for profiling.
-  void emitProfilerIncrement(ASTNode N) {
-    if (SGM.Profiler && SGM.Profiler->hasRegionCounters() &&
-        SGM.M.getOptions().UseProfile.empty())
-      SGM.Profiler->emitCounterIncrement(B, N);
-  }
+  void emitProfilerIncrement(ASTNode Node);
+
+  /// Load the profiled execution count corresponding to \p Node, if one is
+  /// available.
+  ProfileCounter loadProfilerCount(ASTNode Node) const;
+
+  /// Get the PGO node's parent.
+  Optional<ASTNode> getPGOParent(ASTNode Node) const;
 
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
