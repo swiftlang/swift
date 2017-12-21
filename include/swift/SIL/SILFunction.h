@@ -23,6 +23,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/SILProfiler.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -131,6 +132,10 @@ private:
 
   /// The source location and scope of the function.
   const SILDebugScope *DebugScope;
+
+  /// The profiler for instrumentation based profiling, or null if profiling is
+  /// disabled.
+  SILProfiler *Profiler = nullptr;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -251,7 +256,23 @@ public:
     return SILFunctionConventions(LoweredType, getModule());
   }
 
+  SILProfiler *getProfiler() const { return Profiler; }
+
+  void setProfiler(SILProfiler *InheritedProfiler) {
+    assert(!Profiler && "Function already has a profiler");
+    Profiler = InheritedProfiler;
+  }
+
+  void createProfiler(Decl *D) {
+    assert(!Profiler && "Function already has a profiler");
+    Profiler = SILProfiler::create(Module, D);
+  }
+
+  void discardProfiler() { Profiler = nullptr; }
+
   ProfileCounter getEntryCount() const { return EntryCount; }
+
+  void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction() const;
 
