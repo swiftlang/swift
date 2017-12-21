@@ -16,5 +16,6 @@ set(MANDATORY_SOURCES
   Mandatory/PredictableMemOpt.cpp
   Mandatory/SemanticARCOpts.cpp
   Mandatory/ClosureLifetimeFixup.cpp
+  Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFPartition.cpp
   PARENT_SCOPE)
