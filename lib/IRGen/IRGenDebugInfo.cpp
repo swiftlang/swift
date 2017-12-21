@@ -120,7 +120,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
-                     IRGenModule &IGM, llvm::Module &M, SourceFile *SF);
+                     IRGenModule &IGM, llvm::Module &M, SourceFile *SF,
+                     std::string PostBatchModeMainInputFilename);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
@@ -1456,16 +1457,16 @@ private:
   }
 };
 
-IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
-                                       ClangImporter &CI, IRGenModule &IGM,
-                                       llvm::Module &M, SourceFile *SF)
-    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
-      IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
-      LastDebugLoc({}), LastScope(nullptr) {
+IRGenDebugInfoImpl::IRGenDebugInfoImpl(
+    const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
+    llvm::Module &M, SourceFile *SF, std::string PostBatchModeMainInputFilename)
+    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M), IGM(IGM),
+      MetadataTypeDecl(nullptr), InternalType(nullptr), LastDebugLoc({}),
+      LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
   StringRef SourceFileName =
-      SF ? SF->getFilename() : StringRef(Opts.MainInputFilename);
+      SF ? SF->getFilename() : StringRef(PostBatchModeMainInputFilename);
   llvm::SmallString<256> AbsMainFile;
   if (SourceFileName.empty())
     AbsMainFile = "<unknown>";
@@ -2041,12 +2042,12 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 } // anonymous namespace
 
-IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(const IRGenOptions &Opts,
-                                                     ClangImporter &CI,
-                                                     IRGenModule &IGM,
-                                                     llvm::Module &M,
-                                                     SourceFile *SF) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF);
+IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
+    const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
+    llvm::Module &M, SourceFile *SF,
+    std::string PostBatchModeMainInputFilename) {
+  return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF,
+                                PostBatchModeMainInputFilename);
 }
 
 

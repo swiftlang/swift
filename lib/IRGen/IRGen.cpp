@@ -668,7 +668,8 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
   // Create the IR emitter.
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.preBatchModeGetIRGSingleOutputFilename());
+                      "", Opts.preBatchModeGetIRGSingleOutputFilename(),
+                      SILMod->getSMPostBatchModeMainInputFilename());
 
   initLLVMModule(*IGM);
 
@@ -721,7 +722,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, Opts.preBatchModeGetIRGSingleOutputFilename());
+                  ModuleName, Opts.preBatchModeGetIRGSingleOutputFilename(),
+                  SILMod->getSMPostBatchModeMainInputFilename());
 
   initLLVMModule(IGM);
 
@@ -902,9 +904,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
-                                       nextSF, *Context,
-                                       ModuleName, *OutputIter++);
+    IRGenModule *IGM = new IRGenModule(
+        irgen, std::move(targetMachine), nextSF, *Context, ModuleName,
+        *OutputIter++, SILMod->getSMPostBatchModeMainInputFilename());
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -1105,7 +1107,8 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, Opts.preBatchModeGetIRGSingleOutputFilename());
+                  OutputPath, Opts.preBatchModeGetIRGSingleOutputFilename(),
+                  SILMod.getSMPostBatchModeMainInputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =

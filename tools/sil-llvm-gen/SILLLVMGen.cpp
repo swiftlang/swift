@@ -163,7 +163,6 @@ int main(int argc, char **argv) {
 
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
-  Opts.MainInputFilename = InputFilename;
   Opts.IRGOutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
 

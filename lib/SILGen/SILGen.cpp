@@ -1392,8 +1392,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
-                        Optional<unsigned> startElem,
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options,
+                        std::string PostBatchModeMainInputFilename,
+                        FileUnit *SF, Optional<unsigned> startElem,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
@@ -1408,8 +1409,8 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
     DC = mod;
   }
 
-  std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule));
+  std::unique_ptr<SILModule> M(new SILModule(mod, options, DC, isWholeModule,
+                                             PostBatchModeMainInputFilename));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1466,16 +1467,18 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod,
-                            SILOptions &options,
+swift::performSILGeneration(ModuleDecl *mod, SILOptions &options,
+                            std::string PostBatchModeMainInputFilename,
                             bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None,
-                                 wholeModuleCompilation);
+  return SILModule::constructSIL(mod, options, PostBatchModeMainInputFilename,
+                                 nullptr, None, wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, SILOptions &options,
+                            std::string PostBatchModeMainInputFilename,
                             Optional<unsigned> startElem) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
+  return SILModule::constructSIL(sf.getParentModule(), options,
+                                 PostBatchModeMainInputFilename, &sf, startElem,
                                  false);
 }

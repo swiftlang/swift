@@ -58,6 +58,7 @@ void CompilerInstance::createSILModule() {
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
+      Invocation.getUniquePostBatchModeMainInputFilename(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 

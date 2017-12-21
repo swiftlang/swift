@@ -288,6 +288,26 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
+
+  /// The name of the first input file, used by the debug info.
+  /// This one only works when there is one primary.
+  std::string getUniquePostBatchModeMainInputFilename() const {
+    if (!SILOpts.SILOutputFileNameForDebugging.empty())
+      return SILOpts.SILOutputFileNameForDebugging;
+    if (const InputFile *input =
+            FrontendOpts.InputsAndOutputs.getUniquePrimaryInput())
+      return input->file();
+    if (FrontendOpts.InputsAndOutputs.hasSingleInput())
+      return FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+    return "";
+  }
+
+  /// The name of the first input file, used by the debug info.
+  std::string getWMOPostBatchModeMainInputFilename() const {
+    if (!SILOpts.SILOutputFileNameForDebugging.empty())
+      return SILOpts.SILOutputFileNameForDebugging;
+    return FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+  }
  };
 
 /// A class which manages the state and execution of the compiler.
@@ -564,6 +584,12 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+public:
+  std::string getUniquePostBatchModeMainInputFilename() const {
+    // FIXME: dmu use my IDs? A new field???
+    return Invocation.getUniquePostBatchModeMainInputFilename();
+  }
 };
 
 } // namespace swift

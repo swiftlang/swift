@@ -832,6 +832,7 @@ private:
     
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
+                                 CI.getUniquePostBatchModeMainInputFilename(),
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);

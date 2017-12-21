@@ -85,11 +85,14 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule)
+                     const DeclContext *associatedDC, bool wholeModule,
+                     std::string PostBatchModeMainInputFilename)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
       wholeModule(wholeModule), Options(Options), serialized(false),
-      SerializeSILAction(), Types(*this) {}
+      SerializeSILAction(),
+      SMPostBatchModeMainInputFilename(PostBatchModeMainInputFilename),
+      Types(*this) {}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
