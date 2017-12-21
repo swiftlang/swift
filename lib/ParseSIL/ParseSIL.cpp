@@ -2534,17 +2534,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     StringRef Str = P.Tok.getText();
     Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
     P.consumeToken(tok::string_literal);
-    
+
     // Find the builtin in the Builtin module
     SmallVector<ValueDecl*, 2> foundBuiltins;
     P.Context.TheBuiltinModule->lookupMember(foundBuiltins,
                                              P.Context.TheBuiltinModule, Id,
                                              Identifier());
-    if (foundBuiltins.empty()) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");
-      return true;
-    }
-    assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
 
     auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
     GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
@@ -2558,12 +2553,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (!genericEnv) {
         P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
+
+      if (!parsedSubs.empty()) {
+        if (!genericEnv) {
+          P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+          return true;
+        }
+        if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
+          return true;
       }
       subMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
       if (!subMap)
         return true;
     }
-    
+
     if (P.Tok.getKind() != tok::l_paren) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
