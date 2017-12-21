@@ -2692,9 +2692,12 @@ for host in "${ALL_HOSTS[@]}"; do
             # Find the path in which the local clang build is expecting to find
             # the c++ header files.
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
-
-            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
+            # if the folder is already there, 
+            # the local LLVM was built with libcxx, no need to create the symlink
+            if [ ! -d "${BUILT_CXX_INCLUDE_DIR/c++}" ] ; then
+                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+                call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
+            fi
         fi
 
         # Build.
