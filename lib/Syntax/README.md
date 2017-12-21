@@ -562,7 +562,7 @@ Here's a handy checklist when implementing a production in the grammar.
 
 ## Try libSyntax in Xcode
 
-We can experiment libSyntax APIs via a Swift command line tool in Xcode:
+Here's how to build a Swift command line tool in Xcode using libSyntax:
 1. Download the latest open source toolchain from swift.org:
   [Trunk Development (master)](https://swift.org/download/#snapshots).
 2. Run the downloaded package installer.
