@@ -2511,35 +2511,45 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     StringRef Str = P.Tok.getText();
     Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
     P.consumeToken(tok::string_literal);
-    
+
     // Find the builtin in the Builtin module
     SmallVector<ValueDecl*, 2> foundBuiltins;
     P.Context.TheBuiltinModule->lookupMember(foundBuiltins,
                                              P.Context.TheBuiltinModule, Id,
                                              Identifier());
-    if (foundBuiltins.empty()) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");
-      return true;
-    }
-    assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
 
-    auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
-    GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
-    
-    SmallVector<ParsedSubstitution, 4> parsedSubs;
     SmallVector<Substitution, 4> subs;
-    if (parseSubstitutions(parsedSubs))
-      return true;
-    
-    if (!parsedSubs.empty()) {
-      if (!genericEnv) {
-        P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+    if (!foundBuiltins.empty()) {
+      assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
+
+      auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
+      GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
+
+      SmallVector<ParsedSubstitution, 4> parsedSubs;
+      if (parseSubstitutions(parsedSubs))
         return true;
+
+      if (!parsedSubs.empty()) {
+        if (!genericEnv) {
+          P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+          return true;
+        }
+        if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
+          return true;
       }
-      if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
-        return true;
+      // SWIFT_ENABLE_TENSORFLOW: TODO: We can clean this up once Swift has a
+      // better understanding of the tensorflow operations.
+    } else if (Id.str().startswith("__tfop") ||
+      // TODO: tf_tensor_to_i1 can become a named builtin in Builtins.def when
+      // TensorCore become a builtin type.
+               Id.str() == "tf_tensor_to_i1") {
+      // Tensorflow builtins don't have a decl associated with them, and don't
+      // have substitutions.
+    } else {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "builtin name");
+      return true;
     }
-    
+
     if (P.Tok.getKind() != tok::l_paren) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
