@@ -35,6 +35,7 @@ SESERegionTree::~SESERegionTree() {}
 
 void SESERegionTree::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 void SESERegionTree::print(llvm::raw_ostream &OS, unsigned indent) const {
@@ -42,35 +43,51 @@ void SESERegionTree::print(llvm::raw_ostream &OS, unsigned indent) const {
   case SingleBlock: return cast<SingleBlockSESERegion>(this)->print(OS, indent);
   case Sequence:    return cast<SequenceSESERegion>(this)->print(OS, indent);
   case WhileLoop:   return cast<WhileLoopSESERegion>(this)->print(OS, indent);
-  case If:          return cast<IfSESERegion>(this)->print(OS, indent);
+  case Conditional: return cast<ConditionalSESERegion>(this)->print(OS, indent);
   }
 };
 
 void SingleBlockSESERegion::
 print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "Block ";
+  OS.indent(indent) << "block ";
   BB->printAsOperand(OS);
-  OS << "\n";
 }
 
 void SequenceSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "SESESequence {\n";
-  for (auto &n : getNodes())
+  OS.indent(indent) << "[sequence";
+  for (auto &n : getNodes()) {
+    OS << "\n";
     n->print(OS, indent+2);
-  OS.indent(indent) << "}\n";
+  }
+  OS << "]";
 }
 
 void WhileLoopSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "SESEWhile Header: ";
+  OS.indent(indent) << "<while Header: ";
   header->printAsOperand(OS);
   OS << "   exit: ";
   exit->printAsOperand(OS);
   OS << "\n";
   body->print(OS, indent+2);
+  OS << ">";
 }
 
-void IfSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "SESEIf XXX\n";
+void ConditionalSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
+  OS.indent(indent) << "{condition Header: ";
+  branchBB->printAsOperand(OS);
+  OS << "\n";
+  if (auto t = getTrue()) {
+    t->print(OS, indent+2);
+    OS << "\n";
+  } else {
+    OS.indent(indent+2) << "empty true condition block\n";
+  }
+  if (auto f = getFalse()) {
+    f->print(OS, indent+2);
+    OS << "}";
+  } else {
+    OS.indent(indent+2) << "empty false condition block}";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -79,93 +96,139 @@ void IfSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
 
 namespace {
   class SESERegionBuilder {
-    DominanceInfo DT;
+    DominanceInfo DI;
+    PostDominanceInfo PDI;
     SILLoopInfo LI;
+
+    /// processLoops fills in this mapping: it is keyed by the header block of
+    /// each loop, and points to the region produced for it.
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopHeaders;
   public:
-    SESERegionBuilder(SILFunction *F) : DT(F), LI(F, &DT) {}
+    SESERegionBuilder(SILFunction *F) : DI(F), PDI(F), LI(F, &DI) {}
 
-    std::unique_ptr<SESERegionTree> processAcyclicRegion(SILBasicBlock *startBB,
-                                                         SILBasicBlock *endBB);
+    std::unique_ptr<SESERegionTree>
+    processAcyclicRegion(SILBasicBlock *startBB, SILBasicBlock *endBB);
+
+    std::unique_ptr<SESERegionTree>
+    processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
+                                     SILBasicBlock *endBB);
+
 
     /// Process all of the top-level loops in the function in post-order.
     void processLoops() {
       // Apply the standard SIL loop canonicalization transformations.  This
       // automatically gives us the following invariants: loops are guaranteed
       // to have a single preheader, a single backedge block, and exit??
-      canonicalizeAllLoops(&DT, &LI);
+      canonicalizeAllLoops(&DI, &LI);
 
       for (auto *loop : LI)
         processLoop(loop);
     }
 
     void processLoop(SILLoop *loop);
-  private:
-    std::unique_ptr<SESERegionTree>
-    sequence(SESERegionTree *first, std::unique_ptr<SESERegionTree> &&second);
   };
 } // end anonymous namespace
 
-/// Given two nodes where 'first' comes before 'second', return a SESE region
-/// that is a sequencing of one before the other.  This flattens existing
-/// sequences where possible.
-std::unique_ptr<SESERegionTree>
-SESERegionBuilder::sequence(SESERegionTree *first,
-                            std::unique_ptr<SESERegionTree> &&second) {
-  SmallVector<std::unique_ptr<SESERegionTree>, 8> results;
-
-  if (auto *firstSeq = dyn_cast<SequenceSESERegion>(first)) {
-    for (auto &elt : firstSeq->takeNodes())
-      results.push_back(std::move(elt));
-  } else {
-    results.push_back(std::unique_ptr<SESERegionTree>(first));
-  }
-  if (auto *secondSeq = dyn_cast<SequenceSESERegion>(second.get())) {
-    for (auto &elt : secondSeq->takeNodes())
-      results.push_back(std::move(elt));
-  } else {
-    results.push_back(std::move(second));
-  }
-
-  auto resultNode = new SequenceSESERegion(results);
-  return std::unique_ptr<SESERegionTree>(resultNode);
-}
-
-
-/// Transform the specified acyclic region (possibly with nodes collapsed) from
-/// startBB to endBB inclusive into properly nested SESE regions and return
-/// them.
+/// Transform the specified acyclic region (possibly with internal while loop
+/// nodes collapsed) from startBB to endBB inclusive into properly nested SESE
+/// regions and return them.
 std::unique_ptr<SESERegionTree>
 SESERegionBuilder::processAcyclicRegion(SILBasicBlock *startBB,
                                         SILBasicBlock *endBB) {
-  // If the start and end block are the same, then we've bottomed out into a
-  // single basic block region.
-  if (startBB == endBB) {
-    auto result = new SingleBlockSESERegion(startBB);
+  // Process the bulk of the region.
+  auto startRegion = processAcyclicRegionExcludingEnd(startBB, endBB);
+
+  // Create the end block.
+  auto endRegion =
+    std::unique_ptr<SESERegionTree>(new SingleBlockSESERegion(endBB));
+
+  // Merge the end block into the whatever the start of the region was.
+  if (!startRegion)
+    return endRegion;
+  if (auto seq = dyn_cast<SequenceSESERegion>(startRegion.get())) {
+    seq->addNode(std::move(endRegion));
+    return startRegion;
+  }
+
+  std::unique_ptr<SESERegionTree> both[] = {
+    std::move(startRegion), std::move(endRegion)
+  };
+
+  auto result = new SequenceSESERegion(both);
+  return std::unique_ptr<SESERegionTree>(result);
+}
+
+
+/// Transform the specified acyclic region (possibly with internal while loop
+/// nodes collapsed) from startBB to endBB inclusive into properly nested SESE
+/// regions and return them.
+///
+/// This does not process endBB, and returns a null region tree if
+/// startBB == endBB.
+///
+std::unique_ptr<SESERegionTree>
+SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
+                                                    SILBasicBlock *endBB) {
+  assert(PDI.dominates(endBB, startBB) &&
+         "endBB is required to post-dominate startBB");
+  SmallVector<std::unique_ptr<SESERegionTree>, 4> results;
+
+  // Iteratively work our way up the post-dominator tree (moving startBB until
+  // we reach the endBB), producing a sequence of loops, diamonds, and single
+  // block nodes as we go.
+  while (startBB != endBB) {
+    // If this ends with a loop, it will already have been processed and
+    // collapsed into a single node.  Just use it.
+    auto loopIt = loopHeaders.find(startBB);
+    if (loopIt != loopHeaders.end()) {
+      auto whileNode = loopIt->second;
+      loopHeaders.erase(loopIt);
+
+      results.push_back(std::unique_ptr<SESERegionTree>(whileNode));
+      startBB = whileNode->getExit();
+      continue;
+    }
+
+    // If startBB ends with an unconditional branch, then just add it to the
+    // sequence and keep going.  The destination of the branch may have multiple
+    // successors in the case where the destination is endBB.  The successors
+    // could be coming from a parent conditional region.
+    if (auto *branch = dyn_cast<BranchInst>(startBB->getTerminator())) {
+      auto startRegion = new SingleBlockSESERegion(startBB);
+      results.push_back(std::unique_ptr<SESERegionTree>(startRegion));
+      startBB = branch->getDestBB();
+      continue;
+    }
+
+    // Otherwise, we know that startBB ends with a conditional branch.
+    auto *condBr = cast<CondBranchInst>(startBB->getTerminator());
+
+    // Get the immediate postdominator of endBB, which defines a SESE
+    // subregion postdominated by startBB and postdominating endBB.  Note that
+    // the postidom may in fact be endBB.
+    auto postidom = PDI[startBB]->getIDom()->getBlock();
+
+    // Analyze the successors of the branch: each of them is post dominated by
+    // endBB (and any of the successors may be exactly endBB).
+    auto trueRegion =
+      processAcyclicRegionExcludingEnd(condBr->getTrueBB(), endBB);
+    auto falseRegion =
+      processAcyclicRegionExcludingEnd(condBr->getFalseBB(), endBB);
+
+    // Finally, form our conditional region.
+    auto condRegion = new ConditionalSESERegion(startBB, std::move(trueRegion),
+                                                std::move(falseRegion));
+    results.push_back(std::unique_ptr<SESERegionTree>(condRegion));
+    startBB = postidom;
+  }
+
+  switch (results.size()) {
+  case 0: return std::unique_ptr<SESERegionTree>();
+  case 1: return std::move(results[0]);
+  default:
+    auto result = new SequenceSESERegion(results);
     return std::unique_ptr<SESERegionTree>(result);
   }
-
-  // If this is the start of a loop, it will already have been processed and
-  // collapsed into a single node.
-  auto loopIt = loopHeaders.find(startBB);
-  if (loopIt != loopHeaders.end()) {
-    auto whileNode = loopIt->second;
-    loopHeaders.erase(loopIt);
-
-    return sequence(whileNode,
-                    processAcyclicRegion(whileNode->getExit(), endBB));
-  }
-
-
-  // Otherwise, this is some multiblock region.  No problem, there are only two
-  // cases: startBB could end with an unconditional branch or a conditional one.
-  // Handle the simple case first.
-  if (auto *branch = dyn_cast<BranchInst>(startBB->getTerminator())) {
-    return sequence(new SingleBlockSESERegion(startBB),
-                    processAcyclicRegion(branch->getDestBB(), endBB));
-  }
-
-  assert(0 && "SESE FIXME: Handle conditional branches!");
 }
 
 /// Process the specified loop, collapsing it into a SESE region node.  This
@@ -210,13 +273,14 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
     if (loop->contains(exit))
       std::swap(exit, body);
 
-    // Ok, on a normal day, the body of the loop will be the path from the
-    // bodyBB to the latchBB, inclusive.  It is possible that the loop header
-    // is itself a cycle, but that still satisfies the basic form.  Transform
+    // The body of the loop will be the path from the bodyBB to the latchBB,
+    // inclusive.  Because critical edges to exit blocks have already been
+    // split, we will never see a loop header that is a self loop.  Transform
     // the acyclic region represented by the loop body into a SESE region.
     auto bodyRegion = processAcyclicRegion(body, latch);
 
-    auto result = new WhileLoopSESERegion(header, exit, std::move(bodyRegion));
+    auto result = new WhileLoopSESERegion(preheader, header, exit,
+                                          std::move(bodyRegion));
     loopHeaders.insert({header, result});
     return;
   }
@@ -224,8 +288,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
   assert(0 && "SESE FIXME: Imperfect loop exits not handled yet!");
   // splitCriticalEdge
 
-  /// Canonicalize loops as we go: single back edge, then canonicalize the body.
-  /// Keep the dominator tree up to date.
+  // FIXME: Need to handle "break" edges that exit the loop, preventing the body
+  // from being an SESE region.
 }
 
 
@@ -281,7 +345,7 @@ namespace {
 
       llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
       region->print(llvm::outs());
-      llvm::outs() << "--- XLA CFG Canonicalize end\n";
+      llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
       fn->print(llvm::outs());
     }
   };
