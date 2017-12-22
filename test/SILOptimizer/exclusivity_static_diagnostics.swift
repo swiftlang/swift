@@ -64,6 +64,7 @@ func callMutatingMethodThatTakesGlobalStoredPropInout() {
 class ClassWithFinalStoredProp {
   final var s1: StructWithMutatingMethodThatTakesSelfInout = StructWithMutatingMethodThatTakesSelfInout()
   final var s2: StructWithMutatingMethodThatTakesSelfInout = StructWithMutatingMethodThatTakesSelfInout()
+  final var i = 7
 
   func callMutatingMethodThatTakesClassStoredPropInout() {
     s1.mutate(&s2.f) // no-warning
@@ -195,6 +196,13 @@ func callsTakesInoutAndNoEscapeClosure() {
   }
 }
 
+func callsTakesInoutAndNoEscapeClosureWithRead() {
+  var local = 5
+  takesInoutAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    _ = local  // expected-note {{conflicting access is here}}
+  }
+}
+
 func takesInoutAndNoEscapeClosureThatThrows<T>(_ p: inout T, _ c: () throws -> ()) { }
 
 func callsTakesInoutAndNoEscapeClosureThatThrowsWithNonThrowingClosure() {
@@ -252,7 +260,14 @@ func callsStoredClosureLiteral() {
 }
 
 
+// Calling this with an inout expression for the first parameter performs a
+// read access for the duration of a call
 func takesUnsafePointerAndNoEscapeClosure<T>(_ p: UnsafePointer<T>, _ c: () -> ()) { }
+
+// Calling this with an inout expression for the first parameter performs a
+// modify access for the duration of a call
+func takesUnsafeMutablePointerAndNoEscapeClosure<T>(_ p: UnsafeMutablePointer<T>, _ c: () -> ()) { }
+
 
 func callsTakesUnsafePointerAndNoEscapeClosure() {
   var local = 1
@@ -261,6 +276,24 @@ func callsTakesUnsafePointerAndNoEscapeClosure() {
   }
 }
 
+func callsTakesUnsafePointerAndNoEscapeClosureThatReads() {
+  var local = 1
+
+  // Overlapping reads
+  takesUnsafePointerAndNoEscapeClosure(&local) {
+     _ = local // no-error
+  }
+}
+
+func callsTakesUnsafeMutablePointerAndNoEscapeClosureThatReads() {
+  var local = 1
+
+  // Overlapping modify and read
+  takesUnsafeMutablePointerAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+     _ = local  // expected-note {{conflicting access is here}}
+  }
+
+}
 func takesThrowingAutoClosureReturningGeneric<T: Equatable>(_ : @autoclosure () throws -> T) { }
 func takesInoutAndClosure<T>(_: inout T, _ : () -> ()) { }
 
@@ -467,4 +500,30 @@ struct MyStruct<T> {
     // expected-error@-1{{overlapping accesses to 'self.prop', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@-2{{conflicting access is here}}
   }
+}
+
+
+func testForLoopCausesReadAccess() {
+  var a: [Int] = [1]
+  takesInoutAndNoEscapeClosure(&a) { // expected-error {{overlapping accesses to 'a', but modification requires exclusive access; consider copying to a local variable}}
+    for _ in a { // expected-note {{conflicting access is here}}
+    }
+  }
+}
+
+func testKeyPathStructField() {
+  let getF = \StructWithField.f
+  var local = StructWithField()
+  takesInoutAndNoEscapeClosure(&local[keyPath: getF]) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    local.f = 17 // expected-note {{conflicting access is here}}
+  }
+}
+
+func testKeyPathWithClassFinalStoredProperty() {
+  let getI = \ClassWithFinalStoredProp.i
+  let local = ClassWithFinalStoredProp()
+
+  // Ideally we would diagnose statically here, but it is not required by the
+  // model.
+  takesTwoInouts(&local[keyPath: getI], &local[keyPath: getI])
 }
