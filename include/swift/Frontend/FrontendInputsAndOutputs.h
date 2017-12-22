@@ -69,13 +69,13 @@ public:
   //    one of everything in WMO, always, except for the actual object files in
   //    threaded mode.)
   const InputFile *getSingleThreadedWMOInput() const {
-    return isSingleThreadedWMO() ? &AllFiles[0] : nullptr;
+    return isSingleThreadedWMO() ? &firstInput() : nullptr;
   }
   InputFile *getSingleThreadedWMOInput() {
-    return isSingleThreadedWMO() ? &AllFiles[0] : nullptr;
+    return isSingleThreadedWMO() ? &firstInput() : nullptr;
   }
   const OutputPaths *getSingleThreadedWMOOutputs() const {
-    return isSingleThreadedWMO() ? &AllFiles[0].outputs() : nullptr;
+    return isSingleThreadedWMO() ? &firstInput().outputs() : nullptr;
   }
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
@@ -96,6 +96,10 @@ public:
   bool hasInputs() const { return !getAllInputs().empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
+
+  const InputFile &firstInput() const { return getAllInputs()[0]; }
+
+  InputFile &firstInput() { return getAllInputs()[0]; }
 
   StringRef getFilenameOfFirstInput() const;
 

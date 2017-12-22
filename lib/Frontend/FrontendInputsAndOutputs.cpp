@@ -132,7 +132,7 @@ std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
 
 StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
   assert(hasInputs());
-  const InputFile &inp = getAllInputs()[0];
+  const InputFile &inp = firstInput();
   StringRef f = inp.file();
   assert(!f.empty());
   return f;
