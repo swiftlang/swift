@@ -25,7 +25,7 @@ class Box<T> {
 // CHECK:   [[TUPLEB_1:%.*]] = tuple_extract [[BORROWB]] : $(Int, @callee_guaranteed (@in ()) -> @out ()), 1
 // CHECK:   [[COPYB_1:%.*]] = copy_value [[TUPLEB_1]] : $@callee_guaranteed (@in ()) -> @out ()
 // CHECK:   // function_ref Box.__allocating_init(_:)
-// CHECK:   [[INIT_F:%.*]] = function_ref @_T04main3BoxCACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
+// CHECK:   [[INIT_F:%.*]] = function_ref @_T04main3BoxCyACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   end_borrow [[BORROWB]] from %{{.*}} : $(Int, @callee_guaranteed (@in ()) -> @out ()), $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   destroy_value [[TUPLEB]] : $(Int, @callee_guaranteed (@in ()) -> @out ())

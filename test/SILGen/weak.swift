@@ -10,7 +10,7 @@ struct A {
   weak var x: C?
 }
 
-// CHECK:    sil hidden @_T04weak5test0yAA1CC1c_tF : $@convention(thin) (@owned C) -> () {
+// CHECK:    sil hidden @_T04weak5test01cyAA1CC_tF : $@convention(thin) (@owned C) -> () {
 func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : @owned $C):

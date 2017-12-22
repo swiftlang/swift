@@ -7,7 +7,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_T010objc_error20NSErrorError_erasures0D0_pSo0C0CF : $@convention(thin) (@owned NSError) -> @owned Error {
+// CHECK-LABEL: sil hidden @_T010objc_error20NSErrorError_erasureys0D0_pSo0C0CF : $@convention(thin) (@owned NSError) -> @owned Error {
 // CHECK:         bb0([[ERROR:%.*]] : @owned $NSError):
 // CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
@@ -15,12 +15,12 @@ import Foundation
 // CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
 // CHECK:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
-// CHECK:       } // end sil function '_T010objc_error20NSErrorError_erasures0D0_pSo0C0CF'
+// CHECK:       } // end sil function '_T010objc_error20NSErrorError_erasureys0D0_pSo0C0CF'
 func NSErrorError_erasure(_ x: NSError) -> Error {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_T010objc_error30NSErrorError_archetype_erasures0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
+// CHECK-LABEL: sil hidden @_T010objc_error30NSErrorError_archetype_erasureys0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
 // CHECK:         bb0([[ERROR:%.*]] : @owned $T):
 // CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
@@ -29,7 +29,7 @@ func NSErrorError_erasure(_ x: NSError) -> Error {
 // CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
 // CHECK:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
-// CHECK: } // end sil function '_T010objc_error30NSErrorError_archetype_erasures0D0_pxSo0C0CRbzlF'
+// CHECK: } // end sil function '_T010objc_error30NSErrorError_archetype_erasureys0D0_pxSo0C0CRbzlF'
 func NSErrorError_archetype_erasure<T : NSError>(_ t: T) -> Error {
   return t
 }
@@ -61,7 +61,7 @@ class ErrorClass: Error {
 func test_cast_to_nserror() {
   let e = ErrorClass()
 
-  // CHECK: function_ref @_T010Foundation22_convertErrorToNSErrorSo0E0Cs0C0_pF
+  // CHECK: function_ref @_T010Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF
   let nsCoerced = e as Error as NSError
 
   // CHECK: unconditional_checked_cast_addr AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
@@ -87,7 +87,7 @@ func test_cast_to_class_archetype<T: AnyObject>(_: T) {
 // CHECK-LABEL: sil hidden @_T010objc_error15testAcceptError{{[_0-9a-zA-Z]*}}F
 func testAcceptError(error: Error) {
   // CHECK-NOT: return
-  // CHECK: function_ref @_T010Foundation22_convertErrorToNSErrorSo0E0Cs0C0_pF
+  // CHECK: function_ref @_T010Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF
   acceptError(error)
 }
 
@@ -147,7 +147,7 @@ extension Error {
     // CHECK: copy_addr [[SELF]] to [initialization] [[COPY]]
     // CHECK: [[COPY2:%.*]] = alloc_stack $Self
     // CHECK: copy_addr [[COPY]] to [initialization] [[COPY2]]
-    // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @_T0s24_getErrorEmbeddedNSErroryXlSgxs0B0RzlF
+    // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @_T0s24_getErrorEmbeddedNSErroryyXlSgxs0B0RzlF
     // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]<Self>([[COPY2]])
     // CHECK: switch_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>,
     // CHECK-SAME: case #Optional.some!enumelt.1: [[SUCCESS:bb[0-9]+]],
@@ -171,6 +171,6 @@ extension Error {
 }
 
 class Gizmoid : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] @_T010objc_error7GizmoidCACyt3foo_tKcfcTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
+  // CHECK-LABEL: sil hidden [thunk] @_T010objc_error7GizmoidC3fooACyt_tKcfcTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
   @objc init(foo: ()) throws {}
 }

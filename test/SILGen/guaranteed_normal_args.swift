@@ -42,11 +42,11 @@ class KlassWithBuffer {
   var buffer: Buffer
 
   // Make sure that the allocating init forwards into the initializing init at +1.
-  // CHECK-LABEL: sil hidden @_T0s15KlassWithBufferCABs0A0C3inK_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
+  // CHECK-LABEL: sil hidden @_T0s15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
   // CHECK: bb0([[ARG:%.*]] : @owned $Klass,
-  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @_T0s15KlassWithBufferCABs0A0C3inK_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
+  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @_T0s15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
   // CHECK:   apply [[INITIALIZING_INIT]]([[ARG]],
-  // CHECK: } // end sil function '_T0s15KlassWithBufferCABs0A0C3inK_tcfC'
+  // CHECK: } // end sil function '_T0s15KlassWithBufferC3inKABs0A0C_tcfC'
   init(inK: Klass = Klass()) {
     buffer = Buffer(inK: inK)
   }
@@ -80,13 +80,13 @@ class KlassWithBuffer {
 struct StructContainingBridgeObject {
   var rawValue: Builtin.BridgeObject
 
-  // CHECK-LABEL: sil hidden @_T0s28StructContainingBridgeObjectVAByXl8swiftObj_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
+  // CHECK-LABEL: sil hidden @_T0s28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[BORROWED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   [[COPY_CASTED_ARG:%.*]] = copy_value [[CASTED_ARG]]
   // CHECK:   assign [[COPY_CASTED_ARG]] to
-  // CHECK: } // end sil function '_T0s28StructContainingBridgeObjectVAByXl8swiftObj_tcfC'
+  // CHECK: } // end sil function '_T0s28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
   init(swiftObj: AnyObject) {
     rawValue = Builtin.reinterpretCast(swiftObj)
   }

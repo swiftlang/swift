@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_CALLEMISSION_H
 #define SWIFT_IRGEN_CALLEMISSION_H
 
+#include "Address.h"
 #include "Callee.h"
 
 namespace llvm {
@@ -26,7 +27,6 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
-class Address;
 class Explosion;
 class LoadableTypeInfo;
 struct WitnessMetadata;
@@ -36,9 +36,17 @@ class CallEmission {
 public:
   IRGenFunction &IGF;
 
+  struct TypedTemporary {
+    StackAddress Temp;
+    SILType Type;
+  };
+
 private:
   /// The builtin/special arguments to pass to the call.
   SmallVector<llvm::Value*, 8> Args;
+
+  /// Temporaries required by the call.
+  SmallVector<TypedTemporary, 4> Temporaries;
 
   /// The function we're going to call.
   Callee CurCallee;

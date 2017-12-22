@@ -44,7 +44,7 @@ protocol Existentiable {
 func protocol_method(x: Existentiable) -> Loadable {
   return x.foo()
 }
-// CHECK-LABEL: sil hidden @_T09witnesses15protocol_methodAA8LoadableVAA13Existentiable_p1x_tF : $@convention(thin) (@in Existentiable) -> Loadable {
+// CHECK-LABEL: sil hidden @_T09witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in Existentiable) -> Loadable {
 // CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.foo!1
 // CHECK:         apply [[METHOD]]<[[OPENED]]>({{%.*}})
 // CHECK:       }
@@ -52,7 +52,7 @@ func protocol_method(x: Existentiable) -> Loadable {
 func protocol_generic_method(x: Existentiable) -> Loadable {
   return x.generic()
 }
-// CHECK-LABEL: sil hidden @_T09witnesses23protocol_generic_methodAA8LoadableVAA13Existentiable_p1x_tF : $@convention(thin) (@in Existentiable) -> Loadable {
+// CHECK-LABEL: sil hidden @_T09witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in Existentiable) -> Loadable {
 // CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.generic!1
 // CHECK:         apply [[METHOD]]<[[OPENED]], Loadable>({{%.*}}, {{%.*}})
 // CHECK:       }
@@ -61,7 +61,7 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
   func foo()
 }
 
-// CHECK-LABEL: sil hidden @_T09witnesses20protocol_objc_methodyAA8ObjCAble_p1x_tF : $@convention(thin) (@owned ObjCAble) -> ()
+// CHECK-LABEL: sil hidden @_T09witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@owned ObjCAble) -> ()
 // CHECK:         objc_method {{%.*}} : $@opened({{.*}}) ObjCAble, #ObjCAble.foo!1.foreign
 func protocol_objc_method(x: ObjCAble) {
   x.foo()
@@ -156,7 +156,7 @@ func <~>(_ x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { retur
 // CHECK-NEXT:    [[LOADED_ARG2:%.*]] = load [trivial] [[ARG2]] : $*ConformingStruct
 // CHECK-NEXT:    [[LOADED_ARG3:%.*]] = load [trivial] [[ARG3]] : $*ConformingStruct
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[FUNC:%.*]] = function_ref @_T09witnesses3ltgoiAA16ConformingStructVAD_ADtF : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
+// CHECK-NEXT:    [[FUNC:%.*]] = function_ref @_T09witnesses3ltgoiyAA16ConformingStructVAD_ADtF : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
 // CHECK-NEXT:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[LOADED_ARG2]], [[LOADED_ARG3]]) : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
 // CHECK-NEXT:    store [[FUNC_RESULT]] to [trivial] [[ARG1]] : $*ConformingStruct
 // CHECK-NEXT:    %9 = tuple ()
@@ -394,7 +394,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses21IUOFailableClassModelCAA011NonFailableC10Refinement{{[_0-9a-zA-Z]*}}fCTW
   // CHECK: bb0({{.*}}):
-  // CHECK:   [[FUNC:%.*]] = function_ref @_T09witnesses21IUOFailableClassModelCSQyACGSi3foo_tcfC : $@convention(method) (Int, @thick IUOFailableClassModel.Type) -> @owned Optional<IUOFailableClassModel>
+  // CHECK:   [[FUNC:%.*]] = function_ref @_T09witnesses21IUOFailableClassModelC3fooSQyACGSi_tcfC : $@convention(method) (Int, @thick IUOFailableClassModel.Type) -> @owned Optional<IUOFailableClassModel>
   // CHECK:   [[VALUE:%.*]] = apply [[FUNC]]({{.*}})
   // CHECK:   switch_enum [[VALUE]] : $Optional<IUOFailableClassModel>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NONEBB:bb[0-9]+]]
   //
@@ -427,12 +427,12 @@ protocol GenericParameterNameCollisionProtocol {
 struct GenericParameterNameCollision<T: HasAssoc> :
     GenericParameterNameCollisionProtocol {
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3fooyqd__lFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@in τ_1_0, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3fooyyqd__lFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@in τ_1_0, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
   // CHECK:       bb0(%0 : @trivial $*τ_1_0, %1 : @trivial $*GenericParameterNameCollision<τ_0_0>):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func foo<U>(_ x: U) {}
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3bary6Assoc2Qzqd__clFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @noescape @callee_guaranteed (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3baryy6Assoc2Qzqd__clFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @noescape @callee_guaranteed (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
   // CHECK:       bb0(%0 : @owned $@noescape @callee_guaranteed (@in τ_1_0) -> @out τ_0_0.Assoc, %1 : @trivial $*GenericParameterNameCollision<τ_0_0>):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func bar<V>(_ x: (V) -> T.Assoc) {}

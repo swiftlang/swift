@@ -40,7 +40,7 @@ class A {
 // CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
-// CHECK-LABEL:    sil hidden [thunk] @_T08optional1AC3barySSSg1x_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
+// CHECK-LABEL:    sil hidden [thunk] @_T08optional1AC3bar1xySSSg_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:    bb0([[ARG:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $A):
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -48,7 +48,7 @@ class A {
 //
 //   Something branch: project value, translate, inject into result.
 // CHECK:    [[SOME_BB]]([[NSSTR:%.*]] : $NSString):
-// CHECK:      [[T0:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+// CHECK:      [[T0:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
 // CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
 // CHECK-NEXT: [[STRING_META:%.*]] = metatype $@thin String.Type
@@ -63,7 +63,7 @@ class A {
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<String>):
 // CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-// CHECK:      [[T1:%.*]] = function_ref @_T08optional1AC3barySSSg1x_tF
+// CHECK:      [[T1:%.*]] = function_ref @_T08optional1AC3bar1xySSSg_tF
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[BORROWED_SELF_COPY]])
 // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]

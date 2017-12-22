@@ -30,7 +30,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:    [[NOTHING_BLOCK_EXIT]]:
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br [[EXIT]]
-// CHECK: } // end sil function '_T08optional8testCallyyycSgF'
+// CHECK: } // end sil function '_T08optional8testCallyyyycSgF'
 
 func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
@@ -102,7 +102,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @_T08optional16crash_on_deallocys10DictionaryVySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden @_T08optional16crash_on_deallocyys10DictionaryVySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)

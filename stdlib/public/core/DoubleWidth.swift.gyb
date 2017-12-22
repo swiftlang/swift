@@ -18,9 +18,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> : _ExpressibleByBuiltinInteg
   public typealias High = Base
   public typealias Low = Base.Magnitude
 
+#if _endian(big)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _storage: (high: Base, low: Base.Magnitude)
-  
+  internal var _storage: (high: High, low: Low)
+#else
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _storage: (low: Low, high: High)
+#endif
+
   @_inlineable // FIXME(sil-serialize-all)
   public var high: High {
     return _storage.high
@@ -34,7 +39,11 @@ public struct DoubleWidth<Base : FixedWidthInteger> : _ExpressibleByBuiltinInteg
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   init(_ _value: (High, Low)) {
+#if _endian(big)
     self._storage = (high: _value.0, low: _value.1)
+#else
+    self._storage = (low: _value.1, high: _value.0)
+#endif
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -187,8 +196,8 @@ extension DoubleWidth: FixedWidthInteger {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : Collection {
     public enum _IndexValue {
-      case low(Base.Magnitude.Words.Index)
-      case high(Base.Words.Index)
+      case low(Low.Words.Index)
+      case high(High.Words.Index)
     }
     
     @_fixed_layout // FIXME(sil-serialize-all)
@@ -218,8 +227,8 @@ extension DoubleWidth: FixedWidthInteger {
       }
     }
 
-    public var _high: Base.Words
-    public var _low: Base.Magnitude.Words
+    public var _high: High.Words
+    public var _low: Low.Words
 
     @_inlineable // FIXME(sil-serialize-all)
     public init(_ value: DoubleWidth<Base>) {

@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden [noinline] @_T010super_init3FooCACSicfC : $@convention(method) (Int, @thick Foo.Type) -> @owned Foo
+// CHECK-LABEL: sil hidden [noinline] @_T010super_init3FooCyACSicfC : $@convention(method) (Int, @thick Foo.Type) -> @owned Foo
 // CHECK-NOT:     class_method
 // CHECK-NOT:     super_method
-// CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T010super_init3FooCACSicfc
+// CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T010super_init3FooCyACSicfc
 // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]
 
 // CHECK-LABEL: sil hidden [noinline] @_T010super_init3BarC{{[_0-9a-zA-Z]*}}fc
@@ -60,7 +60,7 @@ class Good: Foo {
 
   // CHECK-LABEL: sil hidden [noinline] @_T010super_init4GoodCACycfc
   // CHECK-NOT:     super_method {{%[0-9]+}} : $Good, #Foo.init!initializer.1
-  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T010super_init3FooCACSicfc
+  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T010super_init3FooCyACSicfc
   // CHECK:         apply [[SUPER_INIT]]
   @inline(never)
   override init() {

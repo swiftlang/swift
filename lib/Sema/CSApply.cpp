@@ -4735,7 +4735,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
     break;
 
   case DefaultArgumentKind::EmptyDictionary:
-    init = DictionaryExpr::create(tc.Context, loc, {}, loc);
+    init = DictionaryExpr::create(tc.Context, loc, {}, {}, loc);
     init->setImplicit();
     break;
   }
@@ -4975,16 +4975,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   }
   
   // Create the tuple shuffle.
-  ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
-  auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
   return
-    cs.cacheType(new (tc.Context) TupleShuffleExpr(
-                     expr, mapping,
+    cs.cacheType(TupleShuffleExpr::create(tc.Context,
+                     expr, sources,
                      TupleShuffleExpr::TupleToTuple,
                      callee,
-                     tc.Context.AllocateCopy(variadicArgs),
+                     variadicArgs,
                      arrayType,
-                     callerDefaultArgsCopy,
+                     callerDefaultArgs,
                      toSugarType));
 }
 
@@ -5073,13 +5071,13 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
                             
-  return cs.cacheType(new (tc.Context) TupleShuffleExpr(expr,
-                                        tc.Context.AllocateCopy(elements),
+  return cs.cacheType(TupleShuffleExpr::create(tc.Context, expr,
+                                        elements,
                                         TupleShuffleExpr::ScalarToTuple,
                                         callee,
-                                        tc.Context.AllocateCopy(variadicArgs),
+                                        variadicArgs,
                                         arrayType,
-                                     tc.Context.AllocateCopy(callerDefaultArgs),
+                                        callerDefaultArgs,
                                         destSugarTy));
 }
 
@@ -5215,8 +5213,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
           new (ctx) OpaqueValueExpr(expr->getLoc(),
                                     fromType));
     
-    auto *result =
-      cs.cacheType(new (ctx) ErasureExpr(archetypeVal, toType, conformances));
+    auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
+                                                    conformances));
     return cs.cacheType(
         new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
                                       cs.getType(result)));
@@ -5238,7 +5236,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     }
   }
 
-  return cs.cacheType(new (ctx) ErasureExpr(expr, toType, conformances));
+  return cs.cacheType(ErasureExpr::create(ctx, expr, toType, conformances));
 }
 
 /// Given that the given expression is an implicit conversion added
@@ -5704,17 +5702,10 @@ Expr *ExprRewriter::coerceCallArguments(
   }
 
   // Create the tuple shuffle.
-  ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
-  auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  return
-    cs.cacheType(new (tc.Context) TupleShuffleExpr(
-                     arg, mapping,
-                     typeImpact,
-                     callee,
-                     tc.Context.AllocateCopy(variadicArgs),
-                     sliceType,
-                     callerDefaultArgsCopy,
-                     paramType));
+  return cs.cacheType(TupleShuffleExpr::create(tc.Context, arg, sources,
+                                               typeImpact, callee, variadicArgs,
+                                               sliceType, callerDefaultArgs,
+                                               paramType));
 }
 
 static ClosureExpr *getClosureLiteralExpr(Expr *expr) {

@@ -738,7 +738,7 @@ public class DD : PP {
 // Check that the body of the function
 // contains a trap followed by unreachable
 // and no code afterwards.
-// CHECK-LABEL: sil @_T012cast_folding7getAsDDAA0E0CAA2CCCF
+// CHECK-LABEL: sil @_T012cast_folding7getAsDDyAA0E0CAA2CCCF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -749,7 +749,7 @@ public func getAsDD(_ c: CC) -> DD {
 // Check that the body of the function
 // contains a trap followed by unreachable
 // and no code afterwards.
-// CHECK-LABEL: sil @_T012cast_folding7callFooSiAA2CCCF
+// CHECK-LABEL: sil @_T012cast_folding7callFooySiAA2CCCF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -765,7 +765,7 @@ func callFooGeneric<T : PP>(_ c: T) -> Int {
 
 // Check that the inlined version of callFooGeneric contains only a trap
 // followed by unreachable and no code afterwards
-// CHECK-LABEL: sil [noinline] @_T012cast_folding16callForGenericCCyAA0F0CF
+// CHECK-LABEL: sil [noinline] @_T012cast_folding16callForGenericCCyyAA0F0CF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }

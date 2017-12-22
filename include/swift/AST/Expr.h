@@ -140,7 +140,24 @@ class alignas(8) Expr {
     Implicit : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumExprBits,
+    /// True if the type of this collection expr was inferred by the collection
+    /// fallback type, like [Any].
+    IsTypeDefaulted : 1,
+    /// Number of comma source locations.
+    NumCommas : 32 - 1 - NumExprBits,
+    /// Number of entries in the collection. If this is a DictionaryLiteral,
+    /// each entry is a Tuple with the key and value pair.
+    NumSubExprs : 32
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
+
+  SWIFT_INLINE_BITFIELD(ParenExpr, IdentityExpr, 1,
+    /// \brief Whether we're wrapping a trailing closure expression.
+    HasTrailingClosure : 1
+  );
 
   SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1,
     IsNegative : 1
@@ -167,7 +184,12 @@ class alignas(8) Expr {
     IsSuper : 1
   );
 
-  SWIFT_INLINE_BITFIELD(TupleExpr, Expr, 1+1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TupleElementExpr, Expr, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+1+32,
     /// Whether this tuple has a trailing closure.
     HasTrailingClosure : 1,
 
@@ -175,7 +197,10 @@ class alignas(8) Expr {
     HasElementNames : 1,
 
     /// Whether this tuple has label locations.
-    HasElementNameLocations : 1
+    HasElementNameLocations : 1,
+
+    : NumPadBits,
+    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 2,
@@ -262,8 +287,17 @@ class alignas(8) Expr {
 
   SWIFT_INLINE_BITFIELD_EMPTY(ImplicitConversionExpr, Expr);
 
-  SWIFT_INLINE_BITFIELD(TupleShuffleExpr, ImplicitConversionExpr, 2,
-    TypeImpact : 2
+  SWIFT_INLINE_BITFIELD_FULL(TupleShuffleExpr, ImplicitConversionExpr, 2+16+16+16,
+    TypeImpact : 2,
+    : NumPadBits,
+    NumCallerDefaultArgs : 16,
+    /// This contains an entry for each element in the Expr type.  Each element
+    /// specifies which index from the SubExpr that the destination element gets.
+    /// If the element value is DefaultInitialize, then the destination value
+    /// gets the default initializer for that tuple element value.
+    NumElementMappings : 16,
+    /// The arguments that are packed into the variadic element.
+    NumVariadicArgs : 16
   );
 
   SWIFT_INLINE_BITFIELD(InOutToPointerExpr, ImplicitConversionExpr, 1,
@@ -272,6 +306,21 @@ class alignas(8) Expr {
 
   SWIFT_INLINE_BITFIELD(ArrayToPointerExpr, ImplicitConversionExpr, 1,
     IsNonAccessing : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+    : NumPadBits,
+    NumConformances : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
+    : NumPadBits,
+    NumUnresolvedParams : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CaptureListExpr, Expr, 32,
+    : NumPadBits,
+    NumCaptures : 32
   );
 
   SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1,
@@ -309,6 +358,11 @@ class alignas(8) Expr {
     IsObjC : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
+
 protected:
   union {
     SWIFT_INLINE_BITS(Expr);
@@ -317,6 +371,7 @@ protected:
     SWIFT_INLINE_BITS(DeclRefExpr);
     SWIFT_INLINE_BITS(UnresolvedDeclRefExpr);
     SWIFT_INLINE_BITS(TupleExpr);
+    SWIFT_INLINE_BITS(TupleElementExpr);
     SWIFT_INLINE_BITS(MemberRefExpr);
     SWIFT_INLINE_BITS(UnresolvedDotExpr);
     SWIFT_INLINE_BITS(SubscriptExpr);
@@ -337,6 +392,12 @@ protected:
     SWIFT_INLINE_BITS(ArrayToPointerExpr);
     SWIFT_INLINE_BITS(ObjCSelectorExpr);
     SWIFT_INLINE_BITS(KeyPathExpr);
+    SWIFT_INLINE_BITS(ParenExpr);
+    SWIFT_INLINE_BITS(SequenceExpr);
+    SWIFT_INLINE_BITS(CollectionExpr);
+    SWIFT_INLINE_BITS(ErasureExpr);
+    SWIFT_INLINE_BITS(UnresolvedSpecializeExpr);
+    SWIFT_INLINE_BITS(CaptureListExpr);
   } Bits;
 
 private:
@@ -1863,17 +1924,13 @@ public:
 class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
   
-  /// \brief Whether we're wrapping a trailing closure expression.
-  /// FIXME: Pack bit into superclass.
-  bool HasTrailingClosure;
-
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
             Type ty = Type())
     : IdentityExpr(ExprKind::Paren, subExpr, ty),
-      LParenLoc(lploc), RParenLoc(rploc),
-      HasTrailingClosure(hasTrailingClosure) {
+      LParenLoc(lploc), RParenLoc(rploc) {
+    Bits.ParenExpr.HasTrailingClosure = hasTrailingClosure;
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
   }
@@ -1891,13 +1948,13 @@ public:
   SourceLoc getEndLoc() const {
     // If we have a trailing closure, our end point is the end of the
     // trailing closure.
-    if (RParenLoc.isInvalid() || HasTrailingClosure)
+    if (RParenLoc.isInvalid() || Bits.ParenExpr.HasTrailingClosure)
       return getSubExpr()->getEndLoc();
     return RParenLoc;
   }
 
   /// \brief Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return HasTrailingClosure; }
+  bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
@@ -1911,7 +1968,6 @@ class TupleExpr final : public Expr,
 
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
-  unsigned NumElements;
 
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
@@ -1981,7 +2037,7 @@ public:
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
   
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return Bits.TupleExpr.NumElements; }
   
   Expr *getElement(unsigned i) const {
     return getElements()[i];
@@ -2035,36 +2091,66 @@ class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
 
-  /// ASTContext allocated element lists.  Each entry is one entry of the
-  /// collection.  If this is a DictionaryLiteral, each entry is a Tuple with
-  /// the key and value pair.
-  MutableArrayRef<Expr*> Elements;
-
   Expr *SemanticExpr = nullptr;
 
-  /// True if the type of this collection expr was inferred by the collection
-  /// fallback type, like [Any].
-  bool IsTypeDefaulted = false;
+  /// Retrieve the intrusive pointer storage from the subtype
+  Expr *const *getTrailingObjectsPointer() const;
+  Expr **getTrailingObjectsPointer() {
+    const CollectionExpr *temp = this;
+    return const_cast<Expr**>(temp->getTrailingObjectsPointer());
+  }
+
+  /// Retrieve the intrusive pointer storage from the subtype
+  const SourceLoc *getTrailingSourceLocs() const;
+  SourceLoc *getTrailingSourceLocs() {
+    const CollectionExpr *temp = this;
+    return const_cast<SourceLoc*>(temp->getTrailingSourceLocs());
+  }
 
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
-                 MutableArrayRef<Expr*> Elements,
+                 ArrayRef<Expr*> Elements, ArrayRef<SourceLoc> CommaLocs,
                  SourceLoc RBracketLoc, Type Ty)
     : Expr(Kind, /*Implicit=*/false, Ty),
-      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc),
-      Elements(Elements) { }
+      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc) {
+    Bits.CollectionExpr.IsTypeDefaulted = false;
+    Bits.CollectionExpr.NumSubExprs = Elements.size();
+    Bits.CollectionExpr.NumCommas = CommaLocs.size();
+    assert(Bits.CollectionExpr.NumCommas == CommaLocs.size() && "Truncation");
+    std::uninitialized_copy(Elements.begin(), Elements.end(),
+                            getTrailingObjectsPointer());
+    std::uninitialized_copy(CommaLocs.begin(), CommaLocs.end(),
+                            getTrailingSourceLocs());
+  }
 
 public:
 
   /// Retrieve the elements stored in the collection.
-  ArrayRef<Expr *> getElements() const { return Elements; }
-  MutableArrayRef<Expr *> getElements() { return Elements; }
-  Expr *getElement(unsigned i) const { return Elements[i]; }
-  void setElement(unsigned i, Expr *E) { Elements[i] = E; }
-  unsigned getNumElements() const { return Elements.size(); }
+  ArrayRef<Expr *> getElements() const {
+    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+  }
+  MutableArrayRef<Expr *> getElements() {
+    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+  }
+  Expr *getElement(unsigned i) const { return getElements()[i]; }
+  void setElement(unsigned i, Expr *E) { getElements()[i] = E; }
+  unsigned getNumElements() const { return Bits.CollectionExpr.NumSubExprs; }
 
-  bool isTypeDefaulted() const { return IsTypeDefaulted; }
-  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = value; }
+  /// Retrieve the comma source locations stored in the collection. Please note
+  /// that trailing commas are currently allowed, and that invalid code may have
+  /// stray or missing commas.
+  MutableArrayRef<SourceLoc> getCommaLocs() {
+    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+  }
+  ArrayRef<SourceLoc> getCommaLocs() const {
+    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+  }
+  unsigned getNumCommas() const { return Bits.CollectionExpr.NumCommas; }
+
+  bool isTypeDefaulted() const { return Bits.CollectionExpr.IsTypeDefaulted; }
+  void setIsTypeDefaulted(bool value = true) {
+    Bits.CollectionExpr.IsTypeDefaulted = value;
+  }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
@@ -2083,16 +2169,23 @@ public:
 };
  
 /// \brief An array literal expression [a, b, c].
-class ArrayExpr : public CollectionExpr {
-  /// ASTContext allocated list of comma locations, there is one less entry here
-  /// than the number of elements.
-  MutableArrayRef<SourceLoc> CommaLocs;
+class ArrayExpr final : public CollectionExpr,
+    private llvm::TrailingObjects<ArrayExpr, Expr*, SourceLoc> {
+  friend TrailingObjects;
+  friend CollectionExpr;
 
-  ArrayExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
-            MutableArrayRef<SourceLoc> CommaLocs,
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumElements();
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return getNumCommas();
+  }
+
+  ArrayExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
+            ArrayRef<SourceLoc> CommaLocs,
             SourceLoc RBracketLoc, Type Ty)
-  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty),
-    CommaLocs(CommaLocs) {}
+  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, CommaLocs,
+                   RBracketLoc, Ty) { }
 public:
   static ArrayExpr *create(ASTContext &C, SourceLoc LBracketLoc,
                            ArrayRef<Expr*> Elements,
@@ -2100,28 +2193,36 @@ public:
                            SourceLoc RBracketLoc,
                            Type Ty = Type());
 
-  /// ASTContext allocated list of comma locations, there is one less entry here
-  /// than the number of elements.
-  MutableArrayRef<SourceLoc> getCommaLocs() { return CommaLocs; }
-  ArrayRef<SourceLoc> getCommaLocs() const { return CommaLocs; }
-
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
   }
 };
 
 /// \brief A dictionary literal expression [a : x, b : y, c : z].
-class DictionaryExpr : public CollectionExpr {
-  DictionaryExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+class DictionaryExpr final : public CollectionExpr,
+    private llvm::TrailingObjects<DictionaryExpr, Expr*, SourceLoc> {
+  friend TrailingObjects;
+  friend CollectionExpr;
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumElements();
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return getNumCommas();
+  }
+
+  DictionaryExpr(SourceLoc LBracketLoc, ArrayRef<Expr*> Elements,
+                 ArrayRef<SourceLoc> CommaLocs,
                  SourceLoc RBracketLoc, Type Ty)
-    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, RBracketLoc,
-                     Ty) { }
+    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, CommaLocs,
+                     RBracketLoc, Ty) { }
 public:
 
   static DictionaryExpr *create(ASTContext &C, SourceLoc LBracketLoc,
-                                ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                                ArrayRef<Expr*> Elements,
+                                ArrayRef<SourceLoc> CommaLocs,
+                                SourceLoc RBracketLoc,
                                 Type Ty = Type());
-
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
@@ -2312,20 +2413,21 @@ public:
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc NameLoc;
-  unsigned FieldNo;
   SourceLoc DotLoc;
 
 public:
   TupleElementExpr(Expr *SubExpr, SourceLoc DotLoc, unsigned FieldNo,
                    SourceLoc NameLoc, Type Ty)
     : Expr(ExprKind::TupleElement, /*Implicit=*/false, Ty), SubExpr(SubExpr),
-      NameLoc(NameLoc), FieldNo(FieldNo), DotLoc(DotLoc) {}
+      NameLoc(NameLoc), DotLoc(DotLoc) {
+    Bits.TupleElementExpr.FieldNo = FieldNo;
+  }
 
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
-  unsigned getFieldNumber() const { return FieldNo; }
+  unsigned getFieldNumber() const { return Bits.TupleElementExpr.FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
   SourceLoc getDotLoc() const { return DotLoc; }
   
@@ -2749,7 +2851,20 @@ public:
 /// If hasScalarSource() is true, the subexpression should be treated
 /// as if it were implicitly injected into a single-element tuple
 /// type.  Otherwise, the subexpression is known to have a tuple type.
-class TupleShuffleExpr : public ImplicitConversionExpr {
+class TupleShuffleExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<TupleShuffleExpr, Expr *, int, unsigned> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return Bits.TupleShuffleExpr.NumCallerDefaultArgs;
+  }
+  size_t numTrailingObjects(OverloadToken<int>) const {
+    return Bits.TupleShuffleExpr.NumElementMappings;
+  }
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return Bits.TupleShuffleExpr.NumVariadicArgs;
+  }
+
 public:
   enum : int {
     /// The element mapping value indicating that a field of the destination
@@ -2784,12 +2899,6 @@ public:
   };
 
 private:
-  /// This contains an entry for each element in the Expr type.  Each element
-  /// specifies which index from the SubExpr that the destination element gets.
-  /// If the element value is DefaultInitialize, then the destination value
-  /// gets the default initializer for that tuple element value.
-  ArrayRef<int> ElementMapping;
-
   /// If we're doing a varargs shuffle, this is the array type to build.
   Type VarargsArrayTy;
 
@@ -2797,28 +2906,41 @@ private:
   /// declaration.
   ConcreteDeclRef DefaultArgsOwner;
 
-  /// The arguments that are packed into the variadic element.
-  ArrayRef<unsigned> VariadicArgs;
-
-  MutableArrayRef<Expr *> CallerDefaultArgs;
-
-public:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping,
                    TypeImpact typeImpact,
                    ConcreteDeclRef defaultArgsOwner,
                    ArrayRef<unsigned> VariadicArgs,
                    Type VarargsArrayTy,
-                   MutableArrayRef<Expr *> CallerDefaultArgs,
+                   ArrayRef<Expr *> CallerDefaultArgs,
                    Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
-      ElementMapping(elementMapping), VarargsArrayTy(VarargsArrayTy),
-      DefaultArgsOwner(defaultArgsOwner), VariadicArgs(VariadicArgs),
-      CallerDefaultArgs(CallerDefaultArgs)
-  {
+      VarargsArrayTy(VarargsArrayTy), DefaultArgsOwner(defaultArgsOwner) {
     Bits.TupleShuffleExpr.TypeImpact = typeImpact;
+    Bits.TupleShuffleExpr.NumCallerDefaultArgs = CallerDefaultArgs.size();
+    Bits.TupleShuffleExpr.NumElementMappings = elementMapping.size();
+    Bits.TupleShuffleExpr.NumVariadicArgs = VariadicArgs.size();
+    std::uninitialized_copy(CallerDefaultArgs.begin(), CallerDefaultArgs.end(),
+                            getTrailingObjects<Expr*>());
+    std::uninitialized_copy(elementMapping.begin(), elementMapping.end(),
+                            getTrailingObjects<int>());
+    std::uninitialized_copy(VariadicArgs.begin(), VariadicArgs.end(),
+                            getTrailingObjects<unsigned>());
   }
 
-  ArrayRef<int> getElementMapping() const { return ElementMapping; }
+public:
+  static TupleShuffleExpr *create(ASTContext &ctx, Expr *subExpr,
+                                  ArrayRef<int> elementMapping,
+                                  TypeImpact typeImpact,
+                                  ConcreteDeclRef defaultArgsOwner,
+                                  ArrayRef<unsigned> VariadicArgs,
+                                  Type VarargsArrayTy,
+                                  ArrayRef<Expr *> CallerDefaultArgs,
+                                  Type ty);
+
+  ArrayRef<int> getElementMapping() const {
+    return {getTrailingObjects<int>(),
+            Bits.TupleShuffleExpr.NumElementMappings};
+  }
 
   /// What is the type impact of this shuffle?
   TypeImpact getTypeImpact() const {
@@ -2842,16 +2964,25 @@ public:
   }
 
   /// Retrieve the argument indices for the variadic arguments.
-  ArrayRef<unsigned> getVariadicArgs() const { return VariadicArgs; }
+  ArrayRef<unsigned> getVariadicArgs() const {
+    return {getTrailingObjects<unsigned>(),
+            Bits.TupleShuffleExpr.NumVariadicArgs};
+  }
 
   /// Retrieve the owner of the default arguments.
   ConcreteDeclRef getDefaultArgsOwner() const { return DefaultArgsOwner; }
 
   /// Retrieve the caller-defaulted arguments.
-  ArrayRef<Expr *> getCallerDefaultArgs() const { return CallerDefaultArgs; }
+  ArrayRef<Expr *> getCallerDefaultArgs() const {
+    return {getTrailingObjects<Expr*>(),
+            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+  }
 
   /// Retrieve the caller-defaulted arguments.
-  MutableArrayRef<Expr *> getCallerDefaultArgs() { return CallerDefaultArgs; }
+  MutableArrayRef<Expr *> getCallerDefaultArgs() {
+    return {getTrailingObjects<Expr*>(),
+            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;
@@ -3015,14 +3146,21 @@ public:
 ///
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
-class ErasureExpr : public ImplicitConversionExpr {
-  ArrayRef<ProtocolConformanceRef> Conformances;
+class ErasureExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+  friend TrailingObjects;
 
-public:
   ErasureExpr(Expr *subExpr, Type type,
               ArrayRef<ProtocolConformanceRef> conformances)
-    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
-      Conformances(conformances) {}
+    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
+    Bits.ErasureExpr.NumConformances = conformances.size();
+    std::uninitialized_copy(conformances.begin(), conformances.end(),
+                            getTrailingObjects<ProtocolConformanceRef>());
+  }
+
+public:
+  static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
+                             ArrayRef<ProtocolConformanceRef> conformances);
 
   /// \brief Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3035,7 +3173,8 @@ public:
   /// type is either an archetype or an existential type that conforms to
   /// that corresponding protocol).
   ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return Conformances;
+    return {getTrailingObjects<ProtocolConformanceRef>(),
+            Bits.ErasureExpr.NumConformances };
   }
 
   static bool classof(const Expr *E) {
@@ -3114,28 +3253,43 @@ public:
 
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
-class UnresolvedSpecializeExpr : public Expr {
+class UnresolvedSpecializeExpr final : public Expr,
+    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeLoc> {
+  friend TrailingObjects;
+
   Expr *SubExpr;
   SourceLoc LAngleLoc;
   SourceLoc RAngleLoc;
-  MutableArrayRef<TypeLoc> UnresolvedParams;
-public:
+
   UnresolvedSpecializeExpr(Expr *SubExpr,
                            SourceLoc LAngleLoc,
-                           MutableArrayRef<TypeLoc> UnresolvedParams,
+                           ArrayRef<TypeLoc> UnresolvedParams,
                            SourceLoc RAngleLoc)
     : Expr(ExprKind::UnresolvedSpecialize, /*Implicit=*/false),
-      SubExpr(SubExpr),
-      LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc),
-      UnresolvedParams(UnresolvedParams) { }
+      SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
+    Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
+    std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
+                            getTrailingObjects<TypeLoc>());
+  }
+
+public:
+  static UnresolvedSpecializeExpr *
+  create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
+         ArrayRef<TypeLoc> UnresolvedParams, SourceLoc RAngleLoc);
   
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
   /// \brief Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
-  ArrayRef<TypeLoc> getUnresolvedParams() const { return UnresolvedParams; }
-  MutableArrayRef<TypeLoc> getUnresolvedParams() { return UnresolvedParams; }
+  ArrayRef<TypeLoc> getUnresolvedParams() const {
+    return {getTrailingObjects<TypeLoc>(),
+            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
+  }
+  MutableArrayRef<TypeLoc> getUnresolvedParams() {
+    return {getTrailingObjects<TypeLoc>(),
+            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
+  }
   
   SourceLoc getLoc() const { return LAngleLoc; }
   SourceLoc getLAngleLoc() const { return LAngleLoc; }
@@ -3203,12 +3357,10 @@ class SequenceExpr final : public Expr,
     private llvm::TrailingObjects<SequenceExpr, Expr *> {
   friend TrailingObjects;
 
-  unsigned NumElements;
-
   SequenceExpr(ArrayRef<Expr*> elements)
-    : Expr(ExprKind::Sequence, /*Implicit=*/false),
-      NumElements(elements.size()) {
-    assert(NumElements > 0 && "zero-length sequence!");
+    : Expr(ExprKind::Sequence, /*Implicit=*/false) {
+    Bits.SequenceExpr.NumElements = elements.size();
+    assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
                             getTrailingObjects<Expr*>());
   }
@@ -3223,14 +3375,14 @@ public:
     return getElement(getNumElements() - 1)->getEndLoc();
   }
   
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), NumElements};
+    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), NumElements};
+    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
   }
 
   Expr *getElement(unsigned i) const {
@@ -3572,17 +3724,30 @@ struct CaptureListEntry {
 /// CaptureList wraps the ClosureExpr.  The dynamic semantics are that evaluates
 /// the variable bindings from the capture list, then evaluates the
 /// subexpression (the closure itself) and returns the result.
-class CaptureListExpr : public Expr {
-  ArrayRef<CaptureListEntry> captureList;
+class CaptureListExpr final : public Expr,
+    private llvm::TrailingObjects<CaptureListExpr, CaptureListEntry> {
+  friend TrailingObjects;
+
   ClosureExpr *closureBody;
-public:
+
   CaptureListExpr(ArrayRef<CaptureListEntry> captureList,
                   ClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
-      captureList(captureList), closureBody(closureBody) {
+      closureBody(closureBody) {
+    Bits.CaptureListExpr.NumCaptures = captureList.size();
+    std::uninitialized_copy(captureList.begin(), captureList.end(),
+                            getTrailingObjects<CaptureListEntry>());
   }
 
-  ArrayRef<CaptureListEntry> getCaptureList() { return captureList; }
+public:
+  static CaptureListExpr *create(ASTContext &ctx,
+                                 ArrayRef<CaptureListEntry> captureList,
+                                 ClosureExpr *closureBody);
+
+  ArrayRef<CaptureListEntry> getCaptureList() {
+    return {getTrailingObjects<CaptureListEntry>(),
+            Bits.CaptureListExpr.NumCaptures};
+  }
   ClosureExpr *getClosureBody() { return closureBody; }
   const ClosureExpr *getClosureBody() const { return closureBody; }
 
@@ -4916,6 +5081,22 @@ public:
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
+}
+
+inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {
+  if (auto ty = dyn_cast<ArrayExpr>(this))
+    return ty->getTrailingObjects<Expr*>();
+  if (auto ty = dyn_cast<DictionaryExpr>(this))
+    return ty->getTrailingObjects<Expr*>();
+  llvm_unreachable("Unhandled CollectionExpr!");
+}
+
+inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
+  if (auto ty = dyn_cast<ArrayExpr>(this))
+    return ty->getTrailingObjects<SourceLoc>();
+  if (auto ty = dyn_cast<DictionaryExpr>(this))
+    return ty->getTrailingObjects<SourceLoc>();
+  llvm_unreachable("Unhandled CollectionExpr!");
 }
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO

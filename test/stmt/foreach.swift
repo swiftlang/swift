@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances
+// RUN: %target-typecheck-verify-swift
 
 // Bad containers and ranges
 struct BadContainer1 {

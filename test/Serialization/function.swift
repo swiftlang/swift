@@ -23,30 +23,30 @@ var raw = getZero()
 var cooked : Int = raw
 
 
-// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInputS2i1x_tF : $@convention(thin) (Int) -> Int
+// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInput1xS2i_tF : $@convention(thin) (Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_INPUT]]({{%.+}}) : $@convention(thin) (Int) -> Int
 var raw2 = getInput(x: raw)
 
-// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecondS2i_Si1ytF : $@convention(thin) (Int, Int) -> Int
+// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecond_1yS2i_SitF : $@convention(thin) (Int, Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_SECOND]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int, Int) -> Int
 var raw3 = getSecond(raw, y: raw2)
 
-// SIL:   [[USE_NESTED:%.+]] = function_ref @_T08def_func9useNestedySi1x_Si1yt_Si1ntF : $@convention(thin) (Int, Int, Int) -> ()
+// SIL:   [[USE_NESTED:%.+]] = function_ref @_T08def_func9useNested_1nySi1x_Si1yt_SitF : $@convention(thin) (Int, Int, Int) -> ()
 // SIL:   {{%.+}} = apply [[USE_NESTED]]({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(thin) (Int, Int, Int) -> ()
 useNested((raw, raw2), n: raw3)
 
 // SIL:   [[VA_SIZE:%.+]] = integer_literal $Builtin.Word, 2
 // SIL:   {{%.+}} = apply {{%.*}}<Int>([[VA_SIZE]])
-// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func8variadicySd1x_SidtF : $@convention(thin) (Double, @owned Array<Int>) -> ()
+// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func8variadic1x_ySd_SidtF : $@convention(thin) (Double, @owned Array<Int>) -> ()
 // SIL:   {{%.+}} = apply [[VARIADIC]]({{%.+}}, {{%.+}}) : $@convention(thin) (Double, @owned Array<Int>) -> ()
 variadic(x: 2.5, 4, 5)
 
-// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func9variadic2ySid_Sd1xtF : $@convention(thin) (@owned Array<Int>, Double) -> ()
+// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func9variadic2_1xySid_SdtF : $@convention(thin) (@owned Array<Int>, Double) -> ()
 variadic2(1, 2, 3, x: 5.0)
 
 // SIL:   [[SLICE_SIZE:%.+]] = integer_literal $Builtin.Word, 3
 // SIL:   {{%.+}} = apply {{%.*}}<Int>([[SLICE_SIZE]])
-// SIL:   [[SLICE:%.+]] = function_ref @_T08def_func5sliceySaySiG1x_tF : $@convention(thin) (@owned Array<Int>) -> ()
+// SIL:   [[SLICE:%.+]] = function_ref @_T08def_func5slice1xySaySiG_tF : $@convention(thin) (@owned Array<Int>) -> ()
 // SIL:   {{%.+}} = apply [[SLICE]]({{%.+}}) : $@convention(thin) (@owned Array<Int>) -> ()
 slice(x: [2, 4, 5])
 
@@ -80,14 +80,14 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrappedSbx1a_q_1btAA0D0RzAaER_5ValueQy_AFRtzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrapped1a1bSbx_q_tAA0D0RzAaER_5ValueQy_AFRtzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 
 _ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())
 
 
-// SIL:   {{%.+}} = function_ref @_T08def_func10overloadedySi1x_tF : $@convention(thin) (Int) -> ()
-// SIL:   {{%.+}} = function_ref @_T08def_func10overloadedySb1x_tF : $@convention(thin) (Bool) -> ()
+// SIL:   {{%.+}} = function_ref @_T08def_func10overloaded1xySi_tF : $@convention(thin) (Int) -> ()
+// SIL:   {{%.+}} = function_ref @_T08def_func10overloaded1xySb_tF : $@convention(thin) (Bool) -> ()
 
 overloaded(x: 1)
 overloaded(x: false)

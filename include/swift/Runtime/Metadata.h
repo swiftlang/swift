@@ -1567,86 +1567,152 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
   using InitializationFunction_t =
-    void (*)(TargetForeignTypeMetadata<Runtime> *selectedMetadata);
+    void (TargetForeignTypeMetadata<Runtime> *selectedMetadata);
   using RuntimeMetadataPointer =
       ConstTargetMetadataPointer<Runtime, swift::TargetForeignTypeMetadata>;
+
+  /// An invasive cache for the runtime-uniqued lookup structure that is stored
+  /// in the header prefix of foreign metadata records.
+  ///
+  /// Prior to initialization, as emitted by the compiler, this contains the
+  /// initialization flags.
+  /// After initialization, it holds a pointer to the actual, runtime-uniqued
+  /// metadata for this type.
+  struct CacheValue {
+    StoredSize Value;
+    
+    /// Work around a bug in libstdc++'s std::atomic that requires the type to
+    /// be default-constructible.
+    CacheValue() = default;
+    
+    explicit CacheValue(RuntimeMetadataPointer p)
+      : Value(reinterpret_cast<StoredSize>(p))
+    {}
+
+    /// Various flags. The largest flag bit should be less than 4096 so that
+    /// a flag set is distinguishable from a valid pointer.
+    enum : StoredSize {
+      /// This metadata has an initialization callback function.  If
+      /// this flag is not set, the metadata object needn't actually
+      /// have a InitializationFunction field, and that field will be
+      /// undefined.
+      HasInitializationFunction = 0x1,
+      
+      LargestFlagMask = 0xFFF,
+    };    
+
+    /// True if the metadata record associated with this cache has not been
+    /// initialized, so contains a flag set describing parameters to the
+    /// initialization operation. isFlags() == !isInitialized()
+    bool isFlags() const {
+      return Value <= LargestFlagMask;
+    }
+    /// True if the metadata record associated with this cache has an
+    /// initialization function which must be run if it is picked as the
+    /// canonical metadata record for its key.
+    ///
+    /// Undefined if !isFlags().
+    bool hasInitializationFunction() const {
+      assert(isFlags());
+      return Value & HasInitializationFunction;
+    }
+    
+    /// True if the metadata record associated with this cache has been
+    /// initialized, so the cache contains an absolute pointer to the
+    /// canonical metadata record for its key. isInitialized() == !isFlags()
+    bool isInitialized() const {
+      return !isFlags();
+    }
+    
+    /// Gets the cached pointer to the unique canonical metadata record for
+    /// this metadata record's key.
+    ///
+    /// Undefined if !isInitialized().
+    RuntimeMetadataPointer getCachedUniqueMetadata() const {
+      assert(isInitialized());
+      return RuntimeMetadataPointer(Value);
+    }
+  };
+
 
   /// Foreign type metadata may have extra header fields depending on
   /// the flags.
   struct HeaderPrefix {
     /// An optional callback performed when a particular metadata object
     /// is chosen as the unique structure.
+    ///
     /// If there is no initialization function, this metadata record can be
     /// assumed to be immutable (except for the \c Unique invasive cache
-    /// field).
-    InitializationFunction_t InitializationFunction;
+    /// field). The field is not present unless the HasInitializationFunction
+    /// flag is set.
+    RelativeDirectPointer<InitializationFunction_t> InitializationFunction;
     
-    /// The Swift-mangled name of the type. This is the uniquing key for the
-    /// type.
-    TargetPointer<Runtime, const char> Name;
+    /// The uniquing key for the metadata record. Metadata records with the
+    /// same Name string are considered equivalent by the runtime, and the
+    /// runtime will pick one to be canonical.
+    RelativeDirectPointer<const char> Name;
 
-    /// A pointer to the actual, runtime-uniqued metadata for this
-    /// type.  This is essentially an invasive cache for the lookup
-    /// structure.
-    mutable std::atomic<RuntimeMetadataPointer> Unique;
-
-    /// Various flags.
-    enum : StoredSize {
-      /// This metadata has an initialization callback function.  If
-      /// this flag is not set, the metadata object needn't actually
-      /// have a InitializationFunction field.
-      HasInitializationFunction = 0x1,
-    } Flags;
+    mutable std::atomic<CacheValue> Cache;
   };
 
   struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
 
-  static constexpr int OffsetToName =
-    (int) offsetof(HeaderType, Name) - (int) sizeof(HeaderType);
+  static constexpr int32_t OffsetToName =
+    (int32_t) offsetof(HeaderType, Name) - (int32_t) sizeof(HeaderType);
 
   TargetPointer<Runtime, const char> getName() const {
     return reinterpret_cast<TargetPointer<Runtime, const char>>(
-      asFullMetadata(this)->Name);
+      asFullMetadata(this)->Name.get());
   }
 
-  RuntimeMetadataPointer getCachedUniqueMetadata() const {
-#if __alpha__
-    // TODO: This can be a relaxed-order load if there is no initialization
-    // function. On platforms we care about, consume is no more expensive than
-    // relaxed, so there's no reason to branch here (and LLVM isn't smart
-    // enough to eliminate it when it's not needed).
-    if (!hasInitializationFunction())
-      return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
-#endif
-    return asFullMetadata(this)->Unique.load(SWIFT_MEMORY_ORDER_CONSUME);
+  CacheValue getCacheValue() const {
+    /// NB: This can be a relaxed-order load if there is no initialization
+    /// function. On platforms Swift currently targets, consume is no more
+    /// expensive than relaxed, so there's no reason to branch here (and LLVM
+    /// isn't smart enough to eliminate it when it's not needed).
+    ///
+    /// A port to a platform where relaxed is significantly less expensive than
+    /// consume (historically, Alpha) would probably want to preserve the
+    /// 'hasInitializationFunction' bit in its own word to be able to avoid
+    /// the consuming load when not needed.
+    return asFullMetadata(this)->Cache
+      .load(SWIFT_MEMORY_ORDER_CONSUME);
   }
 
   void setCachedUniqueMetadata(RuntimeMetadataPointer unique) const {
-    assert((static_cast<RuntimeMetadataPointer>(asFullMetadata(this)->Unique) ==
-                nullptr ||
-            asFullMetadata(this)->Unique == unique) &&
-           "already set unique metadata");
+    auto cache = getCacheValue();
+
+    // If the cache was already set to a pointer, we're done. We ought to
+    // converge on a single unique pointer.
+    if (cache.isInitialized()) {
+      assert(cache.getCachedUniqueMetadata() == unique
+             && "already set unique metadata to something else");
+      return;
+    }
+    
+    auto newCache = CacheValue(unique);
 
     // If there is no initialization function, this can be a relaxed store.
-    if (!hasInitializationFunction())
-      asFullMetadata(this)->Unique.store(unique, std::memory_order_relaxed);
+    if (cache.hasInitializationFunction())
+      asFullMetadata(this)->Cache.store(newCache, std::memory_order_relaxed);
     
     // Otherwise, we need a release store to publish the result of
-    // initialization
+    // initialization.
     else
-      asFullMetadata(this)->Unique.store(unique, std::memory_order_release);
+      asFullMetadata(this)->Cache.store(newCache, std::memory_order_release);
   }
   
-  StoredSize getFlags() const {
-    return asFullMetadata(this)->Flags;
-  }
+  /// Return the initialization function for this metadata record.
+  ///
+  /// As a prerequisite, the metadata record must not have been initialized yet,
+  /// and must have an initialization function to begin with, otherwise the
+  /// result is undefined.
+  InitializationFunction_t *getInitializationFunction() const {
+#ifndef NDEBUG
+    auto cache = getCacheValue();
+    assert(cache.hasInitializationFunction());
+#endif
 
-  bool hasInitializationFunction() const {
-    return getFlags() & HeaderPrefix::HasInitializationFunction;
-  }
-
-  InitializationFunction_t getInitializationFunction() const {
-    assert(hasInitializationFunction());
     return asFullMetadata(this)->InitializationFunction;
   }
 };
@@ -2901,10 +2967,11 @@ swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
-void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-                                         const TypeLayout * const *fieldTypes,
-                                         size_t *fieldOffsets,
-                                         ValueWitnessTable *vwtable);
+void swift_initStructMetadata(StructMetadata *self,
+                              StructLayoutFlags flags,
+                              size_t numFields,
+                              const TypeLayout * const *fieldTypes,
+                              size_t *fieldOffsets);
 
 /// Relocate the metadata for a class and copy fields from the given template.
 /// The final size of the metadata is calculated at runtime from the size of

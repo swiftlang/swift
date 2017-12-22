@@ -312,6 +312,73 @@ void Remangler::mangle##ID(Node *node) {        \
 }
 #include "swift/Demangling/DemangleNodes.def"
 
+/// Re-apply labels from the function to its parameter type
+/// to preserve old mangling style.
+///
+/// \param LabelList The list of labels to apply.
+/// \param OrigType  The function parameter type to apply labels to.
+/// \param Factory   The node factory to use to allocate new nodes.
+static NodePointer applyParamLabels(NodePointer LabelList, NodePointer OrigType,
+                                    NodeFactory &Factory) {
+  if (LabelList->getNumChildren() == 0)
+    return OrigType;
+
+  auto applyParamLabels = [&](NodePointer ArgTuple) -> NodePointer {
+    assert(ArgTuple->getKind() == Node::Kind::ArgumentTuple);
+
+    auto ParamsType = Factory.createNode(Node::Kind::ArgumentTuple);
+    auto Tuple = Factory.createNode(Node::Kind::Tuple);
+
+    auto OrigTuple = ArgTuple->getFirstChild()->getFirstChild();
+    assert(OrigTuple->getKind() == Node::Kind::Tuple);
+
+    for (unsigned i = 0, n = OrigTuple->getNumChildren(); i != n; ++i) {
+      const auto Label = LabelList->getChild(i);
+      if (Label->getKind() == Node::Kind::FirstElementMarker) {
+        Tuple->addChild(OrigTuple->getChild(i), Factory);
+        continue;
+      }
+
+      auto OrigElt = OrigTuple->getChild(i);
+      auto NewElt = Factory.createNode(Node::Kind::TupleElement);
+
+      NewElt->addChild(Factory.createNodeWithAllocatedText(
+                           Node::Kind::TupleElementName, Label->getText()),
+                       Factory);
+
+      for (auto &Child : *OrigElt)
+        NewElt->addChild(Child, Factory);
+
+      Tuple->addChild(NewElt, Factory);
+    }
+
+    auto Type = Factory.createNode(Node::Kind::Type);
+    Type->addChild(Tuple, Factory);
+    ParamsType->addChild(Type, Factory);
+    return ParamsType;
+  };
+
+  auto visitTypeChild = [&](NodePointer Child) -> NodePointer {
+    if (Child->getKind() != Node::Kind::FunctionType)
+      return Child;
+
+    auto FuncType = Factory.createNode(Node::Kind::FunctionType);
+    for (unsigned i = 0, n = Child->getNumChildren(); i != n; ++i) {
+      NodePointer FuncChild = Child->getChild(i);
+      if (FuncChild->getKind() == Node::Kind::ArgumentTuple)
+        FuncChild = applyParamLabels(FuncChild);
+      FuncType->addChild(FuncChild, Factory);
+    }
+    return FuncType;
+  };
+
+  auto Type = Factory.createNode(OrigType->getKind());
+  for (auto &Child : *OrigType)
+    Type->addChild(visitTypeChild(Child), Factory);
+
+  return Type;
+}
+
 /// Reset the currently-active set of substitutions.  This is useful
 /// when part of the mangling is done independently, e.g. when an
 /// optimization pass modifies a pass.
@@ -778,19 +845,36 @@ void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
   Out << 'F';
   mangleEntityContext(storageNode->getChild(0), ctx);
   Out << accessorCode;
-  switch (storageNode->getKind()) {
-  case Demangle::Node::Kind::Variable:
-    mangleChildNode(storageNode, 1);
-    mangleEntityType(storageNode->getChild(2), ctx);
-    break;
-  case Demangle::Node::Kind::Subscript:
-    if (storageNode->getNumChildren() > 2 &&
-        storageNode->getChild(2)->getKind() == Node::Kind::PrivateDeclName) {
-      mangleChildNode(storageNode, 2);
+
+  auto mangleAccessorType = [&](unsigned TypeIndex) {
+    auto LabelList = storageNode->getChild(TypeIndex);
+    if (LabelList->getKind() == Node::Kind::LabelList) {
+      auto Type = storageNode->getChild(TypeIndex + 1);
+      mangleEntityType(applyParamLabels(LabelList, Type, Factory), ctx);
+    } else {
+      mangleEntityType(storageNode->getChild(TypeIndex), ctx);
     }
-    mangleIdentifier("subscript", OperatorKind::NotOperator);
-    mangleEntityType(storageNode->getChild(1), ctx);
+  };
+
+  switch (storageNode->getKind()) {
+  case Demangle::Node::Kind::Variable: {
+    mangleChildNode(storageNode, 1);
+    mangleAccessorType(2);
     break;
+  }
+
+  case Demangle::Node::Kind::Subscript: {
+    auto NumChildren = storageNode->getNumChildren();
+    assert(NumChildren <= 4);
+
+    auto PrivateName = storageNode->getChild(NumChildren - 1);
+    if (PrivateName->getKind() == Node::Kind::PrivateDeclName)
+      mangle(PrivateName);
+
+    mangleIdentifier("subscript", OperatorKind::NotOperator);
+    mangleAccessorType(1);
+    break;
+  }
   default:
       unreachable("Not a storage node");
   }
@@ -922,22 +1006,36 @@ void Remangler::mangleNamedEntity(Node *node, char basicKind,
 void Remangler::mangleTypedEntity(Node *node, char basicKind,
                                   StringRef entityKind,
                                   EntityContext &ctx) {
-  assert(node->getNumChildren() == 2);
+  assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
   Out << basicKind;
   mangleEntityContext(node->begin()[0], ctx);
   Out << entityKind;
-  mangleEntityType(node->begin()[1], ctx);
+
+  if (node->begin()[1]->getKind() == Node::Kind::LabelList) {
+    auto LabelList = node->begin()[1];
+    auto Type = node->begin()[2];
+    mangleEntityType(applyParamLabels(LabelList, Type, Factory), ctx);
+  } else {
+    mangleEntityType(node->begin()[1], ctx);
+  }
 }
 
 void Remangler::mangleNamedAndTypedEntity(Node *node, char basicKind,
                                           StringRef entityKind,
                                           EntityContext &ctx) {
-  assert(node->getNumChildren() == 3);
+  assert(node->getNumChildren() == 3 || node->getNumChildren() == 4);
   Out << basicKind;
   mangleEntityContext(node->begin()[0], ctx);
   Out << entityKind;
   mangleChildNode(node, 1); // decl name / index
-  mangleEntityType(node->begin()[2], ctx);
+
+  if (node->begin()[2]->getKind() == Node::Kind::LabelList) {
+    auto LabelList = node->begin()[2];
+    auto Type = node->begin()[3];
+    mangleEntityType(applyParamLabels(LabelList, Type, Factory), ctx);
+  } else {
+    mangleEntityType(node->begin()[2], ctx);
+  }
 }
 
 void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
@@ -1647,6 +1745,13 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 void Remangler::mangleTypeList(Node *node) {
   mangleChildNodes(node); // all types
   Out << '_';
+}
+
+void Remangler::mangleLabelList(Node *node) {
+  if (node->getNumChildren() == 0)
+    Out << 'y';
+  else
+    mangleChildNodes(node);
 }
 
 void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {

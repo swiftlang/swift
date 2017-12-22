@@ -482,8 +482,8 @@ public:
   FuncDecl *getEqualIntDecl() const;
 
   /// Retrieve the declaration of
-  /// Swift._mixForSynthesizedHashValue (Int, Int) -> Int.
-  FuncDecl *getMixForSynthesizedHashValueDecl() const;
+  /// Swift._combineHashValues(Int, Int) -> Int.
+  FuncDecl *getCombineHashValuesDecl() const;
 
   /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
   FuncDecl *getMixIntDecl() const;

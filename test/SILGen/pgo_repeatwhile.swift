@@ -12,9 +12,9 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_repeatwhile.guessWhile
-// SIL-LABEL: sil @_T015pgo_repeatwhile10guessWhiles5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
-// IR-LABEL: define swiftcc i32 @_T015pgo_repeatwhile10guessWhiles5Int32VAD1x_tF
-// IR-OPT-LABEL: define swiftcc i32 @_T015pgo_repeatwhile10guessWhiles5Int32VAD1x_tF
+// SIL-LABEL: sil @_T015pgo_repeatwhile10guessWhile1xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
+// IR-LABEL: define swiftcc i32 @_T015pgo_repeatwhile10guessWhile1xs5Int32VAE_tF
+// IR-OPT-LABEL: define swiftcc i32 @_T015pgo_repeatwhile10guessWhile1xs5Int32VAE_tF
 
 public func guessWhile(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(176400) !false_count(420)

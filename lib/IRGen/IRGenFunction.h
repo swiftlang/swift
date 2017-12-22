@@ -127,10 +127,16 @@ public:
   }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
-                       const llvm::Twine &name);
-  Address createAlloca(llvm::Type *ty, llvm::Value *ArraySize, Alignment align,
-                       const llvm::Twine &name);
+                       const llvm::Twine &name = "");
+  Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
+                       const llvm::Twine &name = "");
   Address createFixedSizeBufferAlloca(const llvm::Twine &name);
+
+  StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
+  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
+                                 Alignment align,
+                                 const llvm::Twine &name = "");
+  void emitDeallocateDynamicAlloca(StackAddress address);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);

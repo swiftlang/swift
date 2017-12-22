@@ -20,7 +20,7 @@ var gClass = MyClass()
 // CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vvp : $*MyStruct
 // CHECK:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]] : $*MyStruct
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyAA8MyStructVzF : $@convention(thin) (@inout MyStruct) -> ()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyyAA8MyStructVzF : $@convention(thin) (@inout MyStruct) -> ()
 // CHECK:  {{%.*}} = apply [[TAKES_INOUT_FUNC]]([[WRITE]]) : $@convention(thin) (@inout MyStruct) -> ()
 func inoutGlobalStruct() {
   takesInout(&gStruct)
@@ -33,7 +33,7 @@ func inoutGlobalStruct() {
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
 // CHECK:  [[ELEMENT_ADDR:%.*]] = struct_element_addr [[WRITE]] : $*MyStruct, #MyStruct.storedProperty
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[ELEMENT_ADDR]] : $*Int) : $()
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  {{%.*}} = apply [[TAKES_INOUT_FUNC]]([[ELEMENT_ADDR]]) : $@convention(thin) (@inout Int) -> ()
 func inoutGlobalStructStoredProperty() {
   // This should generate two TSan inout instrumentations; one for the address
@@ -58,7 +58,7 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  [[BUFFER_ADDRESS_DEPENDENCE:%.*]] = mark_dependence [[BUFFER_ADDRESS]] : $*Int on [[LOADED_CLASS]] : $MyClass
 // CHECK:  end_borrow [[BORROWED_CLASS]] from [[LOADED_CLASS]] : $MyClass, $MyClass
 // CHECK:  {{%.*}} builtin "tsanInoutAccess"([[BUFFER_ADDRESS_DEPENDENCE]] : $*Int) : $()
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS_DEPENDENCE]]) : $@convention(thin) (@inout Int) -> ()
 func inoutGlobalClassStoredProperty() {
   // This generates two TSan inout instrumentations. One for the value

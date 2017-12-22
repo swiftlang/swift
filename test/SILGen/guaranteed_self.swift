@@ -462,7 +462,7 @@ class LetFieldClass {
   // CHECK-NEXT: end_access [[READ]] : $*Kraken
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[BORROWED_KRAKEN]]
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
@@ -475,7 +475,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT: end_access [[READ]] : $*Kraken
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
@@ -502,7 +502,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[BORROWED_KRAKEN]]
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
@@ -513,7 +513,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[WRITE]]
   // CHECK-NEXT: end_access [[WRITE]] : $*Kraken
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]

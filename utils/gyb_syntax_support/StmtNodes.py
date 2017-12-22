@@ -73,14 +73,10 @@ STMT_NODES = [
                    is_optional=True),
          ]),
 
-    Node('ExprList', kind='SyntaxCollection',
-         element='Expr',
-         element_name='Expression'),
-
     Node('WhereClause', kind='Syntax',
          children=[
              Child('WhereKeyword', kind='WhereToken'),
-             Child('Expressions', kind='ExprList'),
+             Child('GuardResult', kind='Expr'),
          ]),
 
     # for-in-stmt -> label? ':'? 'for' 'case'? pattern 'in' expr 'where'?
@@ -134,7 +130,8 @@ STMT_NODES = [
                    is_optional=True),
              Child('DoKeyword', kind='DoToken'),
              Child('Body', kind='CodeBlock'),
-             Child('CatchClauses', kind='CatchClauseList'),
+             Child('CatchClauses', kind='CatchClauseList',
+                   is_optional=True),
              Child('Semicolon', kind='SemicolonToken',
                    is_optional=True),
          ]),

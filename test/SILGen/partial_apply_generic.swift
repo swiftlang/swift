@@ -67,16 +67,16 @@ func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
 // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil hidden @_T021partial_apply_generic23getNonCanonicalSelfFuncyq_cxcxm1t_t7CuddlesQy_RszAA5PandaR_r0_lF : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@thick T.Type) -> @owned @callee_guaranteed (@in T) -> @owned @callee_guaranteed (@in U) -> () {
+// CHECK-LABEL: sil hidden @_T021partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lF : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@thick T.Type) -> @owned @callee_guaranteed (@in T) -> @owned @callee_guaranteed (@in U) -> () {
 func getNonCanonicalSelfFunc<T : Foo, U : Panda>(t: T.Type) -> (T) -> (U) -> () where U.Cuddles == T {
-// CHECK: [[REF:%.*]] = function_ref @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_0_0) -> @owned @callee_guaranteed (@in τ_1_0) -> ()
+// CHECK: [[REF:%.*]] = function_ref @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_0_0) -> @owned @callee_guaranteed (@in τ_1_0) -> ()
 // CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REF]]<T, U>()
   return t.makesSelfNonCanonical
 // CHECK-NEXT: return [[CLOSURE]]
 }
 
 // curry thunk of Foo.makesSelfNonCanonical<A where ...> (A1) -> ()
-// CHECK-LABEL: sil shared [thunk] @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <Self><T where Self == T.Cuddles, T : Panda> (@in Self) -> @owned @callee_guaranteed (@in T) -> () {
+// CHECK-LABEL: sil shared [thunk] @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <Self><T where Self == T.Cuddles, T : Panda> (@in Self) -> @owned @callee_guaranteed (@in T) -> () {
 // CHECK: [[REF:%.*]] = witness_method $Self, #Foo.makesSelfNonCanonical!1 : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method: Foo) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REF]]<Self, T>(%0)
 // CHECK-NEXT: return [[CLOSURE]]

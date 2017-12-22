@@ -50,6 +50,13 @@ static std::string stringWithFormat(const char *fmt_str, ...) {
   return std::string(formatted.get());
 }
 
+static bool
+CompareFunctionTypes(const AnyFunctionType *f, const AnyFunctionType *g,
+                     Optional<std::vector<StringRef>> fLabels = None,
+                     Optional<std::vector<StringRef>> gLabels = None,
+                     bool *input_matches = nullptr,
+                     bool *output_matches = nullptr);
+
 class DeclsLookupSource {
 public:
   typedef SmallVectorImpl<ValueDecl *> ValueDecls;
@@ -799,6 +806,7 @@ static void VisitNodeConstructor(
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
   VisitNodeResult kind_type_result;
   VisitNodeResult type_result;
+  std::vector<StringRef> labels;
 
   Demangle::Node::iterator end = cur_node->end();
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
@@ -809,6 +817,16 @@ static void VisitNodeConstructor(
     case Demangle::Node::Kind::Structure:
       VisitNode(ast, *pos, kind_type_result);
       break;
+    case Demangle::Node::Kind::LabelList: {
+      for (const auto &label : **pos) {
+        if (label->getKind() == Demangle::Node::Kind::FirstElementMarker)
+          labels.push_back(StringRef());
+        else {
+          labels.push_back(label->getText());
+        }
+      }
+      break;
+    }
     case Demangle::Node::Kind::Type:
       VisitNode(ast, *pos, type_result);
       break;
@@ -850,10 +868,8 @@ static void VisitNodeConstructor(
 
             const AnyFunctionType *type_func =
                 type_result._types.front()->getAs<AnyFunctionType>();
-            if (identifier_func->getResult()->isEqual(
-                    type_func->getResult()) &&
-                identifier_func->getInput()->isEqual(
-                    type_func->getInput())) {
+
+            if (CompareFunctionTypes(type_func, identifier_func, labels)) {
               result._module = kind_type_result._module;
               result._decls.push_back(kind_type_result._decls[i]);
               result._types.push_back(
@@ -1081,25 +1097,42 @@ static bool AreBothFunctionTypes(TypeKind a, TypeKind b) {
 
 static bool CompareFunctionTypes(const AnyFunctionType *f,
                                  const AnyFunctionType *g,
-                                 bool *input_matches = nullptr,
-                                 bool *output_matches = nullptr) {
-  bool in_matches = false, out_matches = false;
+                                 Optional<std::vector<StringRef>> fLabels,
+                                 Optional<std::vector<StringRef>> gLabels,
+                                 bool *input_matches, bool *output_matches) {
   if (nullptr == f)
     return (nullptr == g);
   if (nullptr == g)
     return false;
 
-  auto f_input = f->getInput();
-  auto g_input = g->getInput();
+  auto getLabel = [&](Optional<std::vector<StringRef>> labels,
+                      AnyFunctionType::Param &param,
+                      unsigned index) -> StringRef {
+    return (labels && labels->size() > index) ? (*labels)[index]
+                                              : param.getLabel().str();
+  };
 
-  auto f_output = f->getResult();
-  auto g_output = g->getResult();
+  auto params1 = f->getParams();
+  auto params2 = g->getParams();
 
-  if (f_input->isEqual(g_input)) {
-    in_matches = true;
-    if (f_output->isEqual(g_output))
-      out_matches = true;
+  bool in_matches = params1.size() == params2.size(), out_matches = true;
+  auto numParams = std::min(params2.size(), params1.size());
+
+  for (unsigned i = 0; i != numParams; ++i) {
+    auto param1 = params1[i];
+    auto param2 = params2[i];
+
+    auto label1 = getLabel(fLabels, param1, i);
+    auto label2 = getLabel(gLabels, param2, i);
+
+    if (label1.equals(label2) && param1.getType()->isEqual(param2.getType()))
+      continue;
+
+    in_matches = false;
+    break;
   }
+
+  out_matches = f->getResult()->isEqual(g->getResult());
 
   if (input_matches)
     *input_matches = in_matches;
@@ -1116,6 +1149,8 @@ static void VisitNodeFunction(
   VisitNodeResult identifier_result;
   VisitNodeResult type_result;
   VisitNodeResult decl_scope_result;
+  std::vector<StringRef> labels;
+
   Demangle::Node::iterator end = cur_node->end();
   bool found_univocous = false;
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
@@ -1140,6 +1175,17 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Extension:
       VisitNode(ast, *pos, decl_scope_result);
       break;
+
+    case Demangle::Node::Kind::LabelList: {
+      for (const auto &label : **pos) {
+        if (label->getKind() == Demangle::Node::Kind::FirstElementMarker)
+          labels.push_back(StringRef());
+        else {
+          labels.push_back(label->getText());
+        }
+      }
+      break;
+    }
 
     case Demangle::Node::Kind::LocalDeclName: {
       if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
@@ -1235,7 +1281,7 @@ static void VisitNodeFunction(
             identifier_type->getAs<AnyFunctionType>();
         const AnyFunctionType *type_func =
             type_result._types.front()->getAs<AnyFunctionType>();
-        if (CompareFunctionTypes(identifier_func, type_func)) {
+        if (CompareFunctionTypes(type_func, identifier_func, labels)) {
           result._module = identifier_result._module;
           result._decls.push_back(identifier_result._decls[i]);
           result._types.push_back(

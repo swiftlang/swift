@@ -203,7 +203,7 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
 /********************************** CLASSES ***********************************/
 
 ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
-    : NominalMetadataLayout(Kind::Class), NumImmediateMembers(0) {
+    : NominalMetadataLayout(Kind::Class, decl), NumImmediateMembers(0) {
 
   struct Scanner : LayoutScanner<Scanner, ClassMetadataScanner> {
     using super = LayoutScanner;
@@ -211,6 +211,15 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     ClassMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteResilientSuperclass() {}
+
+    void noteStartOfImmediateMembers(ClassDecl *theClass) {}
+
+    void addClassSize() {
+      Layout.MetadataSize = getNextOffset();
+      super::addClassSize();
+    }
 
     void addInstanceSize() {
       Layout.InstanceSize = getNextOffset();
@@ -286,6 +295,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
   };
 
   Scanner(IGM, decl, *this).layout();
+}
+
+Size ClassMetadataLayout::getMetadataSizeOffset() const {
+  assert(MetadataSize.isStatic());
+  return MetadataSize.getStaticOffset();
 }
 
 Size ClassMetadataLayout::getInstanceSizeOffset() const {
@@ -387,7 +401,7 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
-    : NominalMetadataLayout(Kind::Enum) {
+    : NominalMetadataLayout(Kind::Enum, decl) {
 
   struct Scanner : LayoutScanner<Scanner, EnumMetadataScanner> {
     using super = LayoutScanner;
@@ -424,7 +438,7 @@ EnumMetadataLayout::getPayloadSizeOffset() const {
 /********************************** STRUCTS ***********************************/
 
 StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
-    : NominalMetadataLayout(Kind::Struct) {
+    : NominalMetadataLayout(Kind::Struct, decl) {
 
   struct Scanner : LayoutScanner<Scanner, StructMetadataScanner> {
     using super = LayoutScanner;

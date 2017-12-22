@@ -43,7 +43,7 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcx_Sg* nocapture dereferenceable({{.*}})
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcx_Sg* nocapture dereferenceable({{.*}})
 // CHECK: call void @_T0SqWy
 // CHECK: call void @_T0SqWe
 // CHECK: ret void
@@ -93,7 +93,7 @@ public class BigClass {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
+// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
 // CHECK: getelementptr inbounds %T22big_types_corner_cases8BigClassC, %T22big_types_corner_cases8BigClassC*
 // CHECK: call void @_T0SqWy
 // CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
@@ -116,7 +116,7 @@ class Foo {
   func myMethod(_ callback: (MyStruct, Int) -> Void) -> Void { }
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc { i8*, %swift.refcounted* } @_T022big_types_corner_cases3FooC8myMethodyyAA8MyStructV_SitcFTc(%T22big_types_corner_cases3FooC*)
+// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc { i8*, %swift.refcounted* } @_T022big_types_corner_cases3FooC8myMethodyyyAA8MyStructV_SitcFTc(%T22big_types_corner_cases3FooC*)
 // CHECK: getelementptr inbounds %T22big_types_corner_cases3FooC, %T22big_types_corner_cases3FooC*
 // CHECK: getelementptr inbounds void (i8*, %swift.refcounted*, %T22big_types_corner_cases3FooC*)*, void (i8*, %swift.refcounted*, %T22big_types_corner_cases3FooC*)**
 // CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata*
@@ -144,7 +144,7 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: _T0s5printyypd_SS9separatorSS10terminatortF
+// CHECK-64: _T0s5print_9separator10terminatoryypd_S2StF
 // CHECK-64: ret void
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*)

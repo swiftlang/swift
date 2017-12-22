@@ -9,7 +9,7 @@ import gizmo
 class A {
   // CHECK-LABEL: sil hidden @_T014objc_metatypes1AC3foo{{[_0-9a-zA-Z]*}}F
 
-  // CHECK-LABEL: sil hidden [thunk] @_T014objc_metatypes1AC3fooAA9ObjCClassCmAFmFTo
+  // CHECK-LABEL: sil hidden [thunk] @_T014objc_metatypes1AC3fooyAA9ObjCClassCmAFmFTo
   @objc dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : @trivial $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : @unowned $A):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $A
@@ -21,7 +21,7 @@ class A {
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[OBJC_RESULT:%[0-9]+]] = thick_to_objc_metatype [[NATIVE_RESULT]] : $@thick ObjCClass.Type to $@objc_metatype ObjCClass.Type
     // CHECK:   return [[OBJC_RESULT]] : $@objc_metatype ObjCClass.Type
-    // CHECK: } // end sil function '_T014objc_metatypes1AC3fooAA9ObjCClassCmAFmFTo'
+    // CHECK: } // end sil function '_T014objc_metatypes1AC3fooyAA9ObjCClassCmAFmFTo'
     return m
   }
 

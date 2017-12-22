@@ -90,7 +90,7 @@ class Good: Foo {
   // CHECK:         [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
   // CHECK:         [[X:%.*]] = load [trivial] [[READ]] : $*Int
   // CHECK:         end_borrow [[BORROWED_SUPER]] from [[SUPER_OBJ]]
-  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T022super_init_refcounting3FooCACSicfc : $@convention(method) (Int, @owned Foo) -> @owned Foo
+  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T022super_init_refcounting3FooCyACSicfc : $@convention(method) (Int, @owned Foo) -> @owned Foo
   // CHECK:         apply [[SUPER_INIT]]([[X]], [[SUPER_OBJ]])
   override init() {
     x = 10

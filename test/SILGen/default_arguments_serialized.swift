@@ -14,18 +14,18 @@ import default_arguments_other
 // CHECK-LABEL: sil @_T028default_arguments_serialized0A6StringSSyF : $@convention(thin) () -> @owned String
 public func defaultString() -> String { return "hi" }
 
-// SWIFT3-LABEL: sil @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA_ : $@convention(thin) () -> Int
-// SWIFT4-LABEL: sil [serialized] @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA_ : $@convention(thin) () -> Int
+// SWIFT3-LABEL: sil @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
+// SWIFT4-LABEL: sil [serialized] @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
 
-// SWIFT3-LABEL: sil @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA0_ : $@convention(thin) () -> @owned String
-// SWIFT4-LABEL: sil [serialized] @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA0_ : $@convention(thin) () -> @owned String
+// SWIFT3-LABEL: sil @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
+// SWIFT4-LABEL: sil [serialized] @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
 
 public func hasDefaultArguments(x: Int = 0, y: String = defaultString()) {}
 
 // CHECK-LABEL: sil @_T028default_arguments_serialized21callsDefaultArgumentsyyF : $@convention(thin) () -> ()
-// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA_ : $@convention(thin) () -> Int
-// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytFfA0_ : $@convention(thin) () -> @owned String
-// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArgumentsySi1x_SS1ytF : $@convention(thin) (Int, @owned String) -> ()
+// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
+// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
+// CHECK: function_ref @_T028default_arguments_serialized19hasDefaultArguments1x1yySi_SStF : $@convention(thin) (Int, @owned String) -> ()
 // CHECK: apply
 // CHECK: return
 public func callsDefaultArguments() {
@@ -37,8 +37,8 @@ public func callsDefaultArguments() {
 // even if *this* module is built in Swift 3 mode.
 
 // CHECK-LABEL: sil @_T028default_arguments_serialized26callsOtherDefaultArgumentsyyF : $@convention(thin) () -> ()
-// CHECK: function_ref @_T023default_arguments_other0C16DefaultArgumentsySi1x_tFfA_ : $@convention(thin) () -> Int
-// CHECK: function_ref @_T023default_arguments_other0C16DefaultArgumentsySi1x_tF : $@convention(thin) (Int) -> ()
+// CHECK: function_ref @_T023default_arguments_other0C16DefaultArguments1xySi_tFfA_ : $@convention(thin) () -> Int
+// CHECK: function_ref @_T023default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 // CHECK: apply
 // CHECK: return
 
@@ -48,14 +48,14 @@ public func callsDefaultArguments() {
 // OPT-LABEL: sil @_T028default_arguments_serialized26callsOtherDefaultArgumentsyyF : $@convention(thin) () -> ()
 // OPT: [[INT_VAL:%.*]] = integer_literal [[INT_TYPE:\$Builtin.Int(32|64)]], 0
 // OPT: [[INT:%.*]] = struct $Int ([[INT_VAL]] : [[INT_TYPE]]
-// OPT: [[FN:%.*]] = function_ref @_T023default_arguments_other0C16DefaultArgumentsySi1x_tF : $@convention(thin) (Int) -> ()
+// OPT: [[FN:%.*]] = function_ref @_T023default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 // OPT: apply [[FN]]([[INT]]) : $@convention(thin) (Int) -> ()
 // OPT: return
 public func callsOtherDefaultArguments() {
   otherDefaultArguments()
 }
 
-// CHECK-LABEL: sil [serialized] @_T023default_arguments_other0C16DefaultArgumentsySi1x_tFfA_ : $@convention(thin) () -> Int
+// CHECK-LABEL: sil [serialized] @_T023default_arguments_other0C16DefaultArguments1xySi_tFfA_ : $@convention(thin) () -> Int
 
-// CHECK-LABEL: sil @_T023default_arguments_other0C16DefaultArgumentsySi1x_tF : $@convention(thin) (Int) -> ()
+// CHECK-LABEL: sil @_T023default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 

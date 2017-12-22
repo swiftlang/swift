@@ -777,6 +777,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   
   // Now parse an optional type annotation.
   if (Tok.is(tok::colon)) {
+    SyntaxParsingContext TypeAnnoCtx(SyntaxContext, SyntaxKind::TypeAnnotation);
     SourceLoc colonLoc = consumeToken(tok::colon);
     
     if (result.isNull())  // Recover by creating AnyPattern.
@@ -841,14 +842,17 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///   pattern ::= 'let' pattern
 ///
 ParserResult<Pattern> Parser::parsePattern() {
+  SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
     
   case tok::kw__:
+    PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
   case tok::identifier: {
+    PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     bool isLet = (InVarOrLetPattern != IVOLP_InVar);
@@ -871,6 +875,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     
   case tok::kw_var:
   case tok::kw_let: {
+    PatternCtx.setCreateSyntax(SyntaxKind::ValueBindingPattern);
     bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
     
@@ -953,6 +958,8 @@ Parser::parsePatternTupleElement() {
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern> Parser::parsePatternTuple() {
+  SyntaxParsingContext TuplePatternCtxt(SyntaxContext,
+                                        SyntaxKind::TuplePattern);
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
@@ -963,7 +970,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
     parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
-              SyntaxKind::Unknown,
+              SyntaxKind::TuplePatternElementList,
               [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
@@ -1029,9 +1036,11 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // parse pattern nodes for productions shared by pattern and expression
   // grammar. For short-term ease of initial implementation, we always go
   // through the expr parser for ambiguous productions.
+  SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
 
   // Parse productions that can only be patterns.
   if (Tok.isAny(tok::kw_var, tok::kw_let)) {
+    PatternCtx.setCreateSyntax(SyntaxKind::ValueBindingPattern);
     assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
     bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
@@ -1041,6 +1050,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
+    PatternCtx.setCreateSyntax(SyntaxKind::IsTypePattern);
     SourceLoc isLoc = consumeToken(tok::kw_is);
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
@@ -1059,7 +1069,14 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return makeParserCodeCompletionStatus();
   if (subExpr.isNull())
     return nullptr;
-  
+
+  if (SyntaxContext->isEnabled()) {
+    if (auto UPES = PatternCtx.popIf<UnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getPattern());
+    } else {
+      PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+    }
+  }
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate
   // UnresolvedPatternExpr.  Transform this now to simplify later code.
@@ -1145,4 +1162,3 @@ bool Parser::canParseTypedPattern() {
     return canParseType();
   return true;
 }
-

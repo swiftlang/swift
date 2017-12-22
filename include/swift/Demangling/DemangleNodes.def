@@ -198,5 +198,6 @@ NODE(OutlinedAssignWithCopy)
 NODE(OutlinedDestroy)
 NODE(OutlinedVariable)
 NODE(AssocTypePath)
+NODE(LabelList)
 #undef CONTEXT_NODE
 #undef NODE

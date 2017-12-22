@@ -68,10 +68,10 @@
   * ImportDecl
   * TypeAliasDecl
   * IfConfigDecl
-
-### In-progress (UnknownDecl):
   * PatternBindingDecl
   * VarDecl
+
+### In-progress (UnknownDecl):
   * ExtensionDecl (SR-6572)
 
 ### Not-started (UnknownDecl):
@@ -91,34 +91,34 @@
 ### Done:
   * BraceStmt
   * ReturnStmt
-
-### Not-started (UnknownStmt):
   * DeferStmt
-  * IfStmt
-  * GuardStmt
-  * WhileStmt
   * DoStmt
-  * DoCatchStmt
   * RepeatWhileStmt
-  * ForEachStmt
-  * SwitchStmt
-  * CaseStmt
-  * CatchStmt
   * BreakStmt
   * ContinueStmt
   * FallthroughStmt
-  * FailStmt
   * ThrowStmt
 
-## Pattern
-### Not-started:
-  * ParenPattern
-  * TuplePattern
-  * NamedPattern
-  * AnyPattern
-  * TypedPattern
-  * VarPattern
+### Not-started (UnknownStmt):
+  * IfStmt
+  * GuardStmt
+  * WhileStmt
+  * ForEachStmt
+  * SwitchStmt
 
+## Pattern
+### Done:
+  * IdentifierPattern
+  * WildcardPattern
+  * TuplePattern
+  * ExpressionPattern
+  * ValueBindingPattern
+  * IsTypePattern
+
+### Not-started:
+  * AsTypePattern
+  * OptionalPattern
+  * EnumCasePattern
 
 ## TypeRepr
 ### Done:

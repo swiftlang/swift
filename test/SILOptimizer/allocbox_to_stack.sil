@@ -353,9 +353,9 @@ bb3:
   br bb2
 }
 
-// CHECK-LABEL: sil @_T06struct5applySiSiyc1f_tF
+// CHECK-LABEL: sil @_T06struct5apply1fS2iyc_tF
 // struct.apply (f : () -> Swift.Int) -> Swift.Int
-sil @_T06struct5applySiSiyc1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
+sil @_T06struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   strong_retain %0 : $@callee_owned () -> Int     // id: %2
@@ -364,17 +364,17 @@ bb0(%0 : $@callee_owned () -> Int):
   return %3 : $Int                                // id: %5
 }
 
-// CHECK-LABEL: sil @_T06struct6escapeSiycSiyc1f_tF
+// CHECK-LABEL: sil @_T06struct6escape1fSiycSiyc_tF
 // struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-sil @_T06struct6escapeSiycSiyc1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
+sil @_T06struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   return %0 : $@callee_owned () -> Int            // id: %2
 }
 
-// CHECK-LABEL: sil @_T06struct8useStackySi1t_tF
+// CHECK-LABEL: sil @_T06struct8useStack1tySi_tF
 // struct.useStack (t : Swift.Int) -> ()
-sil @_T06struct8useStackySi1t_tF : $@convention(thin) (Int) -> () {
+sil @_T06struct8useStack1tySi_tF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_stack
@@ -382,10 +382,10 @@ bb0(%0 : $Int):
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
-  %4 = function_ref @_T06struct5applySiSiyc1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
-  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_T06struct8useStackySi1t_tFSiycfU_Tf0s_n
+  %4 = function_ref @_T06struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
+  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_T06struct8useStack1tySi_tFSiycfU_Tf0s_n
   // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_T06struct8useStackySi1t_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
+  %5 = function_ref @_T06struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
   strong_retain %2 : $<τ_0_0> { var τ_0_0 } <Int>     // id: %6
   // CHECK: [[PA:%[a-zA-Z0-9]+]] = partial_apply [[FUNC]]
   %7 = partial_apply %5(%2) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %8
@@ -395,10 +395,10 @@ bb0(%0 : $Int):
   return %10 : $()                                // id: %11
 }
 
-// CHECK-LABEL: sil shared @_T06struct8useStackySi1t_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private @_T06struct8useStackySi1t_tFSiycfU_
+// CHECK-LABEL: sil shared @_T06struct8useStack1tySi_tFSiycfU_Tf0s_n
+// CHECK-LABEL: sil private @_T06struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private @_T06struct8useStackySi1t_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private @_T06struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
@@ -414,9 +414,9 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
 sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
 
-// CHECK-LABEL: sil @_T06struct6useBoxySi1t_tF
+// CHECK-LABEL: sil @_T06struct6useBox1tySi_tF
 // struct.useBox (t : Swift.Int) -> ()
-sil @_T06struct6useBoxySi1t_tF : $@convention(thin) (Int) -> () {
+sil @_T06struct6useBox1tySi_tF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_box
@@ -424,9 +424,9 @@ bb0(%0 : $Int):
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-  %4 = function_ref @_T06struct6escapeSiycSiyc1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
+  %4 = function_ref @_T06struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
   // function_ref struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_T06struct6useBoxySi1t_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
+  %5 = function_ref @_T06struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
   strong_retain %2 : $<τ_0_0> { var τ_0_0 } <Int>     // id: %6
   %7 = partial_apply %5(%2) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %8
   %8 = apply %4(%7) : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
@@ -436,9 +436,9 @@ bb0(%0 : $Int):
   return %11 : $()                                // id: %12
 }
 
-// CHECK-LABEL: sil private @_T06struct6useBoxySi1t_tFSiycfU_
+// CHECK-LABEL: sil private @_T06struct6useBox1tySi_tFSiycfU_
 // struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-sil private @_T06struct6useBoxySi1t_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private @_T06struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A

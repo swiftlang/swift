@@ -2424,9 +2424,7 @@ namespace {
   public:
     ClassNominalTypeDescriptorBuilder(IRGenModule &IGM,
                                        ClassDecl *c)
-      : super(IGM),
-        SILVTableVisitor<ClassNominalTypeDescriptorBuilder>(IGM.getSILTypes()),
-        Target(c)
+      : super(IGM), Target(c)
     {
       auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
@@ -2781,14 +2779,9 @@ namespace {
     bool HasDependentMetadata = false;
     
     /// Set to true if the value witness table for the generic type is dependent
-    /// on its generic parameters. If true, the value witness will be
-    /// tail-emplaced inside the metadata pattern and initialized by the fill
-    /// function. Implies HasDependentMetadata.
+    /// on its generic parameters. Implies HasDependentMetadata.
     bool HasDependentVWT = false;
     
-    /// The offset of the tail-allocated dependent VWT, if any.
-    Size DependentVWTPoint = Size::invalid();
-
     template <class... T>
     GenericMetadataBuilderBase(IRGenModule &IGM, T &&...args)
       : super(IGM, std::forward<T>(args)...) {}
@@ -2854,31 +2847,13 @@ namespace {
         value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
         IGF.Builder.CreateStore(value, dest);
       }
-      
-      // Initialize the instantiated dependent value witness table, if we have
-      // one.
-      llvm::Value *vwtableValue = nullptr;
-      if (HasDependentVWT) {
-        assert(!AddressPoint.isInvalid() && "did not set valid address point!");
-        assert(!DependentVWTPoint.isInvalid() && "did not set dependent VWT point!");
-        
-        // Fill in the pointer from the metadata to the VWT. The VWT pointer
-        // always immediately precedes the address point.
-        auto vwtAddr = createPointerSizedGEP(IGF, metadataWords,
-                                             DependentVWTPoint - AddressPoint);
-        vwtableValue = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
-                                                 IGF.IGM.WitnessTablePtrTy);
 
-        auto vwtAddrVal = IGF.Builder.CreateBitCast(vwtableValue, IGM.Int8PtrTy);
-        auto vwtRefAddr = createPointerSizedGEP(IGF, metadataWords,
-                                                Size(0) - IGM.getPointerSize());
-        IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
-        
+      // A dependent VWT means that we have dependent metadata.
+      if (HasDependentVWT)
         HasDependentMetadata = true;
-      }
 
       if (HasDependentMetadata) {
-        asImpl().emitInitializeMetadata(IGF, metadataValue, vwtableValue);
+        asImpl().emitInitializeMetadata(IGF, metadataValue, false);
       }
       
       // The metadata is now complete.
@@ -2913,13 +2888,6 @@ namespace {
 
       // Lay out the template data.
       super::layout();
-      
-      // If we have a dependent value witness table, emit its template.
-      if (HasDependentVWT) {
-        // Note the dependent VWT offset.
-        DependentVWTPoint = getNextOffsetFromTemplateHeader();
-        asImpl().addDependentValueWitnessTablePattern();
-      }
       
       // Fill in the header:
 
@@ -3011,7 +2979,7 @@ namespace {
 void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                             SILType T,
                                             llvm::Value *metadata,
-                                            llvm::Value *vwtable) {
+                                            bool isVWTMutable) {
   auto *target = T.getNominalOrBoundGenericNominal();
   llvm::Value *fieldVector
     = emitAddressOfFieldOffsetVector(IGF, metadata, target)
@@ -3047,15 +3015,18 @@ void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
 
   if (isa<ClassDecl>(target)) {
-    assert(vwtable == nullptr);
     IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
                            {metadata, numFields,
                             fields.getAddress(), fieldVector});
   } else {
     assert(isa<StructDecl>(target));
-    IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
-                           {numFields, fields.getAddress(),
-                            fieldVector, vwtable});
+    StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+    if (isVWTMutable)
+      flags |= StructLayoutFlags::IsVWTMutable;
+
+    IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataFn(),
+                           {metadata, IGF.IGM.getSize(Size(uintptr_t(flags))),
+                            numFields, fields.getAddress(), fieldVector});
   }
 
   IGF.Builder.CreateLifetimeEnd(fields,
@@ -3226,6 +3197,8 @@ namespace {
     using super::Target;
     using super::asImpl;
 
+    bool HasResilientSuperclass = false;
+
     ConstantStructBuilder &B;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
@@ -3241,6 +3214,45 @@ namespace {
         Members(IGM, theClass, builder, layout, fieldLayout) {}
 
   public:
+    void noteResilientSuperclass() {
+      // FIXME: Perform sliding
+      HasResilientSuperclass = true;
+    }
+
+    void noteStartOfImmediateMembers(ClassDecl *theClass) {
+      // Only classes defined in resilient modules, or those that have
+      // a resilient superclass need this.
+      if (!HasResilientSuperclass &&
+          !IGM.isResilient(theClass, ResilienceExpansion::Minimal)) {
+        return;
+      }
+
+      if (theClass == Target) {
+        auto *offsetAddr =
+          IGM.getAddrOfClassMetadataBaseOffset(theClass,
+                                               ForDefinition);
+        auto *offsetVar = cast<llvm::GlobalVariable>(offsetAddr);
+
+        if (HasResilientSuperclass) {
+          // If the superclass is resilient to us, we have to compute and
+          // initialize the global when we initialize the metadata.
+          auto *init = llvm::ConstantInt::get(IGM.SizeTy, 0);
+
+          offsetVar->setInitializer(init);
+          offsetVar->setConstant(false);
+          return;
+        }
+
+        // Otherwise, we know the offset at compile time, even if our
+        // clients do not, so just emit a constant.
+        auto value = asImpl().getNextOffsetFromAddressPoint().getValue();
+        auto *init = llvm::ConstantInt::get(IGM.SizeTy, value);
+
+        offsetVar->setInitializer(init);
+        offsetVar->setConstant(true);
+      }
+    }
+
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
     ///
@@ -3462,25 +3474,15 @@ namespace {
 
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
                                                          llvm::Value *metadata) {
-      // We assume that we've already filled in the class's generic arguments.
-      // We need to:
-      //   - fill out the subclass's field offset vector, if its layout
-      //     wasn't fixed;
-      //   - copy field offsets and generic arguments from higher in the
-      //     class hierarchy, if 
-      //   - copy the superclass data, if there are generic arguments
-      //     or field offset vectors there that weren't filled in;
-      //   - populate the field offset vector, if layout isn't fixed, and
-      //   - register the class with the ObjC runtime, if ObjC interop is
-      //     enabled.
-      //
-      // emitInitializeFieldOffsetVector will do everything in the full case.
       if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
+        // We need to:
+        //   - fill out the subclass's field offset vector
+        //   - copy field offsets and generic arguments from higher in the
+        //     class hierarchy
         auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
         auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
         emitInitializeFieldOffsetVector(IGF, loweredClassTy,
-                                        metadata,
-                                        /*vwtable=*/nullptr);
+                                        metadata, /*VWT is mutable*/ false);
 
         // Realizing the class with the ObjC runtime will copy back to the
         // field offset globals for us; but if ObjC interop is disabled, we
@@ -3488,9 +3490,8 @@ namespace {
         // correctly in the first place.
         if (!IGF.IGM.ObjCInterop)
           emitInitializeFieldOffsets(IGF, metadata);
-
-      // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
+        // Otherwise, all we need to do is register with the ObjC runtime.
         metadata = emitFinishIdempotentInitialization(IGF, metadata);
       }
 
@@ -3499,6 +3500,43 @@ namespace {
       emitInitializeMethodOverrides(IGF, metadata);
 
       return metadata;
+    }
+
+    // Store the runtime-computed metadata size of our superclass into the
+    // target class's metadata base offset global variable.
+    //
+    // Note that this code will run for each generic instantiation of the
+    // class, if the class is generic. This should be OK because the
+    // metadata size does not change between generic instantiations, so
+    // all stores after the first should be idempotent.
+    void emitInitializeClassMetadataBaseOffset(IRGenFunction &IGF,
+                                               llvm::Value *superMetadata) {
+      if (!HasResilientSuperclass)
+        return;
+
+      auto &layout = IGM.getMetadataLayout(Target);
+
+      // Load the size of the superclass metadata.
+      Address metadataAsBytes(
+          IGF.Builder.CreateBitCast(superMetadata, IGF.IGM.Int8PtrTy),
+          IGM.getPointerAlignment());
+
+      Address slot = IGF.Builder.CreateConstByteArrayGEP(
+          metadataAsBytes,
+          layout.getMetadataSizeOffset());
+      slot = IGF.Builder.CreateBitCast(slot, IGM.Int32Ty->getPointerTo());
+      llvm::Value *size = IGF.Builder.CreateLoad(slot);
+      if (IGM.SizeTy != IGM.Int32Ty)
+        size = IGF.Builder.CreateZExt(size, IGM.SizeTy);
+
+      Address offsetAddr(
+          IGM.getAddrOfClassMetadataBaseOffset(Target,
+                                               NotForDefinition),
+          IGM.getPointerAlignment());
+
+      // FIXME: Do we need to worry about memory barriers here, and when we
+      // load from the global?
+      IGF.Builder.CreateStore(size, offsetAddr);
     }
 
     // Update vtable entries for method overrides. The runtime copies in
@@ -3606,6 +3644,7 @@ namespace {
     using super::Target;
     using super::B;
     using super::addReferenceToHeapMetadata;
+    using super::emitInitializeClassMetadataBaseOffset;
     using super::emitFinishInitializationOfClassMetadata;
     using super::emitFinishIdempotentInitialization;
     using super::emitFieldOffsetGlobals;
@@ -3701,15 +3740,18 @@ namespace {
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
         auto superclass = type->getSuperclass()->getCanonicalType();
-        llvm::Value *superclassMetadata =
+        llvm::Value *superMetadata =
           emitClassHeapMetadataRef(IGF, superclass,
                                    MetadataValueType::TypeMetadata,
                                    /*allowUninit*/ false);
+
+        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
+
         Address superField =
           emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
         superField = IGF.Builder.CreateElementBitCast(superField,
                                                      IGM.TypeMetadataPtrTy);
-        IGF.Builder.CreateStore(superclassMetadata, superField);
+        IGF.Builder.CreateStore(superMetadata, superField);
       }
 
       // Relocate the metadata if it has a superclass that is resilient
@@ -3798,12 +3840,13 @@ namespace {
         superMetadata =
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);
+
+        emitInitializeClassMetadataBaseOffset(IGF, superMetadata);
       } else if (IGM.ObjCInterop) {
         superMetadata = emitObjCHeapMetadataRef(IGF,
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target));
       } else {
-        superMetadata
-          = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+        superMetadata = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       }
 
       auto numImmediateMembers =
@@ -3856,10 +3899,6 @@ namespace {
       DependentMetaclassRODataPoint -= TemplateHeaderSize;
     }
                             
-    void addDependentValueWitnessTablePattern() {
-      llvm_unreachable("classes should never have dependent vwtables");
-    }
-
     void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
     
     void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
@@ -3893,7 +3932,7 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
-                                llvm::Value *vwtable) {
+                                bool isVWTMutable) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
 
       // Fill in the metaclass pointer.
@@ -4415,7 +4454,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the vtable entry for this method.
-  SILDeclRef overridden = IGF.IGM.getSILTypes().getOverriddenVTableEntry(method);
+  SILDeclRef overridden = method.getOverriddenVTableEntry();
 
   // Find the metadata.
   llvm::Value *metadata;
@@ -4486,12 +4525,8 @@ emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
   SILType loweredType = IGF.IGM.getLoweredType(AbstractionPattern(type), type);
   auto &ti = IGF.IGM.getTypeInfo(loweredType);
   if (!ti.isFixedSize()) {
-    // We assume that that value witness table will already have been written
-    // into the metadata; just load it.
-    llvm::Value *vwtable = IGF.emitValueWitnessTableRefForMetadata(metadata);
-
     // Initialize the metadata.
-    ti.initializeMetadata(IGF, metadata, vwtable, loweredType.getAddressType());
+    ti.initializeMetadata(IGF, metadata, true, loweredType.getAddressType());
   }
 
   return metadata;
@@ -4592,7 +4627,7 @@ namespace {
 
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
-      B.add(emitValueWitnessTable(IGM, type));
+      B.add(emitValueWitnessTable(IGM, type, false));
     }
 
     void createMetadataAccessFunction() {
@@ -4610,11 +4645,8 @@ namespace {
     CanType unboundType
       = decl->getDeclaredType()->getCanonicalType();
     
-    dependent = hasDependentValueWitnessTable(IGM, unboundType);    
-    if (dependent)
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    else
-      return emitValueWitnessTable(IGM, unboundType);
+    dependent = hasDependentValueWitnessTable(IGM, unboundType);
+    return emitValueWitnessTable(IGM, unboundType, dependent);
   }
   
   /// A builder for metadata templates.
@@ -4645,18 +4677,13 @@ namespace {
                                                     HasDependentVWT));
     }
                         
-    void addDependentValueWitnessTablePattern() {
-      emitDependentValueWitnessTablePattern(IGM, B,
-                        Target->getDeclaredType()->getCanonicalType());
-    }
-                        
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
-                                llvm::Value *vwtable) {
+                                bool isVWTMutable) {
       // Nominal types are always preserved through SIL lowering.
       auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
       IGM.getTypeInfoForUnlowered(structTy)
-        .initializeMetadata(IGF, metadata, vwtable,
+        .initializeMetadata(IGF, metadata, isVWTMutable,
                             IGF.IGM.getLoweredType(structTy));
     }
   };
@@ -4747,7 +4774,7 @@ namespace {
 
     void addValueWitnessTable() {
       auto type = Target->getDeclaredType()->getCanonicalType();
-      B.add(emitValueWitnessTable(IGM, type));
+      B.add(emitValueWitnessTable(IGM, type, false));
     }
 
     void addPayloadSize() {
@@ -4795,11 +4822,6 @@ namespace {
                                                     HasDependentVWT));
     }
 
-    void addDependentValueWitnessTablePattern() {
-      emitDependentValueWitnessTablePattern(IGM, B,
-                          Target->getDeclaredType()->getCanonicalType());
-    }
-
     void addPayloadSize() {
       // In all cases where a payload size is demanded in the metadata, it's
       // runtime-dependent, so fill in a zero here.
@@ -4813,11 +4835,11 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
-                                llvm::Value *vwtable) {
+                                bool isVWTMutable) {
       // Nominal types are always preserved through SIL lowering.
       auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
       IGM.getTypeInfoForUnlowered(enumTy)
-        .initializeMetadata(IGF, metadata, vwtable,
+        .initializeMetadata(IGF, metadata, isVWTMutable,
                             IGF.IGM.getLoweredType(enumTy));
     }
   };
@@ -4934,8 +4956,9 @@ namespace {
     void layout() {
       if (asImpl().requiresInitializationFunction())
         asImpl().addInitializationFunction();
+      else
+        asImpl().addPaddingForInitializationFunction();
       asImpl().addForeignName();
-      asImpl().addUniquePointer();
       asImpl().addForeignFlags();
       super::layout();
     }
@@ -4948,11 +4971,8 @@ namespace {
 
     void addForeignName() {
       CanType targetType = asImpl().getTargetType();
-      B.add(getMangledTypeName(IGM, targetType));
-    }
-
-    void addUniquePointer() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+      B.addRelativeAddress(getMangledTypeName(IGM, targetType,
+                                              /*relative addressed?*/ true));
     }
 
     void addInitializationFunction() {
@@ -4978,7 +4998,23 @@ namespace {
 
       IGF.Builder.CreateRetVoid();
 
-      B.add(fn);
+      B.addRelativeAddress(fn);
+    }
+    
+    void addPaddingForInitializationFunction() {
+      // The initialization function field is placed at the least offset of the
+      // record so it can be omitted when not needed. However, the metadata
+      // record is still pointer-aligned, so on 64 bit platforms we need to
+      // occupy the space to keep the rest of the record with the right layout.
+      switch (IGM.getPointerSize().getValue()) {
+      case 4:
+        break;
+      case 8:
+        B.addInt32(0);
+        break;
+      default:
+        llvm_unreachable("unsupported word size");
+      }
     }
 
     void noteAddressPoint() {
@@ -5060,7 +5096,7 @@ namespace {
 
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
-      B.add(emitValueWitnessTable(IGM, type));
+      B.add(emitValueWitnessTable(IGM, type, false));
     }
 
     void flagUnfilledFieldOffset() {
@@ -5089,7 +5125,7 @@ namespace {
 
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
-      B.add(emitValueWitnessTable(IGM, type));
+      B.add(emitValueWitnessTable(IGM, type, false));
     }
     
     void addPayloadSize() const {

@@ -6,7 +6,7 @@ enum Foo {
 }
 
 // <rdar://problem/16020428>
-// CHECK-LABEL: sil hidden @_T06tuples8matchFooyAA0C0O1x_tF
+// CHECK-LABEL: sil hidden @_T06tuples8matchFoo1xyAA0C0O_tF
 func matchFoo(x x: Foo) {
   switch x {
   case .X(let x):
@@ -138,7 +138,7 @@ func testTupleUnsplat() {
 // Make sure that we use a load_borrow instead of a load [take] when RValues are
 // formed with isGuaranteed set.
 extension P {
-  // CHECK-LABEL: sil hidden @_T06tuples1PPAAE12immutableUseyAA1CC5index_x5valuet5tuple_tFZ
+  // CHECK-LABEL: sil hidden @_T06tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
   // CHECK: bb0([[TUP0:%.*]] : @owned $C, [[TUP1:%.*]] : @trivial $*Self
   // Allocate space for the RValue.
   // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"

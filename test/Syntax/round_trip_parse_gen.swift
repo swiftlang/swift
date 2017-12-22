@@ -34,6 +34,7 @@ class C {
     _ = bar2(a : bar2(a: 1, b: 2, c: 3), b: 2, c: 3)
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
+    _ = [:]
     _ = [1, 2, 3, 4]
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
@@ -209,4 +210,60 @@ class C {
 protocol P {
   var a: Int { get set }
   var a: Int {}
+}
+
+class C {
+  @objc
+  static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
+  let (a, b) = (1,2), _ = 4 {}
+
+  func patternTests() {
+    for let (x, _) in foo {}
+    for var x: Int in foo {}
+  }
+}
+
+do {
+  switch foo {
+    case let a: break
+    case let a as Int: break
+    case let (a, b): break
+    case (let a, var b): break
+    case is Int: break
+    case let .bar(x): break
+    case MyEnum.foo: break
+    case let a as Int: break
+    case let a?: break
+  }
+}
+
+func statementTests() {
+  do {
+  } catch (var x, let y) {
+  } catch where false {
+  } catch let e where e.foo == bar {
+  } catch {
+  }
+  repeat { } while true
+  LABEL: repeat { } while false
+  LABEL: do {}
+  LABEL: switch foo {
+    case 1:
+      fallthrough
+    case 2:
+      break LABEL
+    case 3:
+      break
+  }
+
+  for a in b {
+    defer { () }
+    if c {
+      throw MyError()
+      continue
+    } else {
+      continue LABEL
+    }
+  }
+
 }

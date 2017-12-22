@@ -24,9 +24,7 @@
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -119,9 +117,6 @@ public:
 
   /// Fallback for unexpected protocol requirements.
   void visitDecl(Decl *d) {
-#ifndef NDEBUG
-    d->print(llvm::errs());
-#endif
     llvm_unreachable("unhandled protocol requirement");
   }
 

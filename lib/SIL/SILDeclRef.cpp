@@ -844,6 +844,18 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   return SILDeclRef();
 }
 
+SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
+  SILDeclRef cur = *this, next = *this;
+  do {
+    cur = next;
+    if (cur.requiresNewVTableEntry())
+      return cur;
+    next = cur.getNextOverriddenVTableEntry();
+  } while (next);
+
+  return cur;
+}
+
 SILLocation SILDeclRef::getAsRegularLocation() const {
   if (hasDecl())
     return RegularLocation(getDecl());

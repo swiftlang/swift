@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Strings.h"
 #include <cstdio>
@@ -277,6 +278,7 @@ private:
     case Node::Kind::Type:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
+    case Node::Kind::LabelList:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -541,46 +543,87 @@ private:
     }
   }
 
-  void printFunctionType(NodePointer node) {
+  NodePointer getChildIf(NodePointer Node, Node::Kind Kind) {
+    auto result =
+        std::find_if(Node->begin(), Node->end(), [&](NodePointer child) {
+          return child->getKind() == Kind;
+        });
+    return result != Node->end() ? *result : nullptr;
+  }
+
+  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
+                               bool showTypes) {
+    assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
+
+    NodePointer Parameters = ParameterType->getFirstChild();
+    assert(Parameters->getKind() == Node::Kind::Type);
+    Parameters = Parameters->getFirstChild();
+    if (Parameters->getKind() != Node::Kind::Tuple) {
+      // only a single not-named parameter
+      if (showTypes) {
+        Printer << '(';
+        print(Parameters);
+        Printer << ')';
+      } else {
+        Printer << "(_:)";
+      }
+      return;
+    }
+
+    auto getLabelFor = [&](NodePointer Param, unsigned Index) -> std::string {
+      auto Label = LabelList->getChild(Index);
+      assert(Label && (Label->getKind() == Node::Kind::Identifier ||
+                       Label->getKind() == Node::Kind::FirstElementMarker));
+      return Label->getKind() == Node::Kind::Identifier ? Label->getText()
+                                                        : "_";
+    };
+
+    unsigned ParamIndex = 0;
+    bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
+
+    Printer << '(';
+    interleave(Parameters->begin(), Parameters->end(),
+               [&](NodePointer Param) {
+                 assert(Param->getKind() == Node::Kind::TupleElement);
+
+                 if (hasLabels) {
+                   Printer << getLabelFor(Param, ParamIndex) << ':';
+                 } else if (!showTypes) {
+                   if (auto Label = getChildIf(Param,
+                                               Node::Kind::TupleElementName))
+                     Printer << Label->getText() << ":";
+                   else
+                     Printer << "_:";
+                 }
+
+                 if (hasLabels && showTypes)
+                   Printer << ' ';
+
+                 ++ParamIndex;
+
+                 if (showTypes)
+                   print(Param);
+               },
+               [&]() { Printer << (showTypes ? ", " : ""); });
+    Printer << ')';
+  }
+
+  void printFunctionType(NodePointer LabelList, NodePointer node) {
     assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
     unsigned startIndex = 0;
-    bool throws = false;
-    if (node->getNumChildren() == 3) {
-      assert(node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation);
-      startIndex++;
-      throws = true;
-    }
-    if (Options.ShowFunctionArgumentTypes) {
-      print(node->getChild(startIndex));
-      if (throws) Printer << " throws";
-      print(node->getChild(startIndex+1));
+    if (node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation)
+      startIndex = 1;
+
+    printFunctionParameters(LabelList, node->getChild(startIndex),
+                            Options.ShowFunctionArgumentTypes);
+
+    if (!Options.ShowFunctionArgumentTypes)
       return;
-    }
-    // Print simplified arguments
-    NodePointer Args = node->getChild(startIndex);
-    assert(Args->getKind() == Node::Kind::ArgumentTuple);
-    Args = Args->getFirstChild();
-    assert(Args->getKind() == Node::Kind::Type);
-    Args = Args->getFirstChild();
-    if (Args->getKind() != Node::Kind::Tuple) {
-      // only a single not-named argument
-      Printer << "(_:)";
-      return;
-    }
-    Printer << '(';
-    for (NodePointer Arg : *Args) {
-      assert(Arg->getKind() == Node::Kind::TupleElement);
-      unsigned NameIdx = 0;
-      if (Arg->getFirstChild()->getKind() == Node::Kind::VariadicMarker)
-        NameIdx = 1;
-      if (Arg->getChild(NameIdx)->getKind() == Node::Kind::TupleElementName) {
-        Printer << Arg->getChild(NameIdx)->getText();
-      } else {
-        Printer << '_';
-      }
-      Printer << ':';
-    }
-    Printer << ')';
+
+    if (startIndex == 1)
+      Printer << " throws";
+
+    print(node->getChild(startIndex + 1));
   }
 
   void printImplFunctionType(NodePointer fn) {
@@ -910,7 +953,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::TypeMangling:
-    print(Node->getChild(0));
+    if (Node->getChild(0)->getKind() == Node::Kind::LabelList) {
+      printFunctionType(Node->getChild(0), Node->getChild(1)->getFirstChild());
+    } else {
+      print(Node->getChild(0));
+    }
     return nullptr;
   case Node::Kind::Class:
   case Node::Kind::Structure:
@@ -950,39 +997,19 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
-    printFunctionType(Node);
+    printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::ThinFunctionType:
     Printer << "@convention(thin) ";
-    printFunctionType(Node);
+    printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
-    printFunctionType(Node);
+    printFunctionType(nullptr, Node);
     return nullptr;
-  case Node::Kind::ArgumentTuple: {
-    bool need_parens = false;
-    if (Node->getNumChildren() > 1)
-      need_parens = true;
-    else {
-      if (!Node->hasChildren())
-        need_parens = true;
-      else {
-        Node::Kind child0_kind = Node->getChild(0)->getKind();
-        if (child0_kind == Node::Kind::Type)
-          child0_kind = Node->getChild(0)->getChild(0)->getKind();
-
-        if (child0_kind != Node::Kind::Tuple)
-          need_parens = true;
-      }
-    }
-    if (need_parens)
-      Printer << "(";
-    printChildren(Node);
-    if (need_parens)
-      Printer << ")";
+  case Node::Kind::ArgumentTuple:
+    printFunctionParameters(nullptr, Node, Options.ShowFunctionArgumentTypes);
     return nullptr;
-  }
   case Node::Kind::Tuple: {
     Printer << "(";
     printChildren(Node, ", ");
@@ -990,27 +1017,16 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::TupleElement: {
-    unsigned Idx = 0;
-    bool isVariadic = false;
-    if (Node->getNumChildren() >= 1 &&
-        Node->getFirstChild()->getKind() == Node::Kind::VariadicMarker) {
-      isVariadic = true;
-      Idx++;
-    }
-    NodePointer type = nullptr;
-    if (Node->getNumChildren() == Idx + 1) {
-      type = Node->getChild(Idx);
-    } else if (Node->getNumChildren() == Idx + 2) {
-      NodePointer id = Node->getChild(Idx);
-      type = Node->getChild(Idx + 1);
-      print(id);
-    }
-    if (isVariadic) {
-      print(type);
+    if (auto Label = getChildIf(Node, Node::Kind::TupleElementName))
+      Printer << Label->getText() << ": ";
+
+    auto Type = getChildIf(Node, Node::Kind::Type);
+    assert(Type && "malformed Node::Kind::TupleElement");
+
+    print(Type);
+
+    if (auto isVariadic = getChildIf(Node, Node::Kind::VariadicMarker))
       Printer << "...";
-    } else {
-      print(type);
-    }
     return nullptr;
   }
   case Node::Kind::TupleElementName:
@@ -1401,12 +1417,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::CFunctionPointer: {
     Printer << "@convention(c) ";
-    printFunctionType(Node);
+    printFunctionType(nullptr, Node);
     return nullptr;
   }
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
-    printFunctionType(Node);
+    printFunctionType(nullptr, Node);
     return nullptr;
   }
   case Node::Kind::SILBoxType: {
@@ -1602,6 +1618,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::TypeList:
     printChildren(Node);
+    return nullptr;
+  case Node::Kind::LabelList:
     return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
@@ -1889,7 +1907,12 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
     if (!OverwriteName.empty()) {
       Printer << OverwriteName;
     } else {
-      print(Entity->getChild(1));
+      auto Name = Entity->getChild(1);
+      if (Name->getKind() != Node::Kind::PrivateDeclName)
+        print(Name);
+
+      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
+        print(PrivateName);
     }
     if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
       Printer << '.';
@@ -1900,10 +1923,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       Printer << ExtraIndex;
   }
   if (TypePr != TypePrinting::NoType) {
-    NodePointer type = Entity->getChild(1);
-    if (type->getKind() != Node::Kind::Type)
-      type = Entity->getChild(2);
-    assert(type->getKind() == Node::Kind::Type);
+    NodePointer type = getChildIf(Entity, Node::Kind::Type);
+    assert(type && "malformed entity");
     type = type->getChild(0);
     if (TypePr == TypePrinting::FunctionStyle) {
       // We expect to see a function type here, but if we don't, use the colon.
@@ -1917,17 +1938,33 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
         TypePr = TypePrinting::WithColon;
       }
     }
+
+    auto printEntityType = [&](NodePointer type) {
+      if (auto labelList = getChildIf(Entity, Node::Kind::LabelList)) {
+        if (type->getKind() == Node::Kind::DependentGenericType) {
+          print(type->getChild(0)); // generic signature
+
+          auto dependentType = type->getChild(1);
+          if (needSpaceBeforeType(dependentType))
+            Printer << ' ';
+          type = dependentType->getFirstChild();
+        }
+        printFunctionType(labelList, type);
+      } else {
+        print(type);
+      }
+    };
+
     if (TypePr == TypePrinting::WithColon) {
       if (Options.DisplayEntityTypes) {
         Printer << " : ";
-        print(type);
+        printEntityType(type);
       }
     } else {
       assert(TypePr == TypePrinting::FunctionStyle);
       if (MultiWordName || needSpaceBeforeType(type))
         Printer << ' ';
-
-      print(type);
+      printEntityType(type);
     }
   }
   if (!asPrefixContext && PostfixContext) {

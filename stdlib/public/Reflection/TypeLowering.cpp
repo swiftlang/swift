@@ -975,7 +975,7 @@ public:
       // further.
       if (CaseTI != nullptr) {
         // Below logic should match the runtime function
-        // swift_initEnumValueWitnessTableSinglePayload().
+        // swift_initEnumMetadataSinglePayload().
         NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
         if (NumExtraInhabitants >= NoPayloadCases) {
           // Extra inhabitants can encode all no-payload cases.

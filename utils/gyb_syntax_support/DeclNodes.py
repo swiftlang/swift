@@ -358,9 +358,34 @@ DECL_NODES = [
     Node('AccessorBlock', kind="Syntax",
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             # one of the following children should be required.
-             Child('Accessors', kind='AccessorList', is_optional=True),
-             Child('Statements', kind='StmtList', is_optional=True),
+             Child('AccessorListOrStmtList', kind='Syntax',
+                   node_choices=[
+                      Child('Accessors', kind='AccessorList'),
+                      Child('Statements', kind='StmtList')]),
              Child('RightBrace', kind='RightBraceToken'),
+         ]),
+
+    # Pattern: Type = Value { get {} },
+    Node('PatternBinding', kind="Syntax",
+         children=[
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
+             Child('Initializer', kind='InitializerClause', is_optional=True),
+             Child('Accesor', kind='AccessorBlock', is_optional=True),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('PatternBindingList', kind="SyntaxCollection",
+         element='PatternBinding'),
+
+    Node('VariableDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
+             Child('LetOrVarKeyword', kind='Token',
+                   token_choices=[
+                       'LetToken', 'VarToken',
+                   ]),
+             Child('Bindings', kind='PatternBindingList'),
          ]),
 ]

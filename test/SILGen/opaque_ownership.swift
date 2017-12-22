@@ -19,7 +19,7 @@ public protocol Decoder {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil @_T0s11takeDecoderBi1_s0B0_p4from_tKF : $@convention(thin) (@in Decoder) -> (Builtin.Int1, @error Error) {
+// CHECK-LABEL: sil @_T0s11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in Decoder) -> (Builtin.Int1, @error Error) {
 // CHECK: bb0(%0 : @owned $Decoder):
 // CHECK:  [[BORROW1:%.*]] = begin_borrow %0 : $Decoder
 // CHECK:  [[OPENED:%.*]] = open_existential_value [[BORROW1]] : $Decoder to $@opened("{{.*}}") Decoder
@@ -36,7 +36,7 @@ public protocol Decoder {
 // CHECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
 // CHECK:  destroy_value %0 : $Decoder
 // CHECK:  return [[RET2]] : $Builtin.Int1
-// CHECK-LABEL: } // end sil function '_T0s11takeDecoderBi1_s0B0_p4from_tKF'
+// CHECK-LABEL: } // end sil function '_T0s11takeDecoder4fromBi1_s0B0_p_tKF'
 public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
   let container = try decoder.unkeyedContainer()
   return container.isAtEnd
@@ -44,7 +44,7 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 
 // Test unsafe_bitwise_cast nontrivial ownership.
 // ---
-// CHECK-LABEL: sil @_T0s13unsafeBitCastq_x_q_m2totr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
+// CHECK-LABEL: sil @_T0s13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
 // CHECK: bb0(%0 : @owned $T, %1 : @trivial $@thick U.Type):
 // CHECK:   %4 = begin_borrow %0 : $T
 // CHECK:   %5 = copy_value %4 : $T
@@ -54,7 +54,7 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 // CHECK:   end_borrow %4 from %0 : $T, $T
 // CHECK:   destroy_value %0 : $T
 // CHECK:   return %7 : $U
-// CHECK-LABEL: } // end sil function '_T0s13unsafeBitCastq_x_q_m2totr0_lF'
+// CHECK-LABEL: } // end sil function '_T0s13unsafeBitCast_2toq_x_q_mtr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
@@ -156,12 +156,12 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
 
 // Test ownership of multi-case Enum values in the context of @trivial to @in thunks.
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T0s17FloatingPointSignOs9EquatablessACP2eeoiSbx_xtFZTW : $@convention(witness_method: Equatable) (@in FloatingPointSign, @in FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T0s17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in FloatingPointSign, @in FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
 // CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
-// CHECK:   %3 = function_ref @_T0s2eeoiSbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK:   %3 = function_ref @_T0s2eeoiySbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK:   %4 = apply %3<FloatingPointSign, Int64>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK:   return %4 : $Bool
-// CHECK-LABEL: } // end sil function '_T0s17FloatingPointSignOs9EquatablessACP2eeoiSbx_xtFZTW'
+// CHECK-LABEL: } // end sil function '_T0s17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW'
 public enum FloatingPointSign: Int64 {
   /// The sign for a positive value.
   case plus
@@ -174,7 +174,7 @@ public enum FloatingPointSign: Int64 {
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
-// CHECK-OSX-LABEL: sil @_T0s26_unsafeDowncastToAnyObjectyXlyp04fromD0_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
+// CHECK-OSX-LABEL: sil @_T0s26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
 // CHECK-OSX: bb0(%0 : @owned $Any):
 // CHECK-OSX:   [[BORROW:%.*]] = begin_borrow %0 : $Any
 // CHECK-OSX:   [[COPY:%.*]] = copy_value [[BORROW]] : $Any
@@ -187,7 +187,7 @@ public enum FloatingPointSign: Int64 {
 // CHECK-OSX:   end_borrow [[BORROW]] from %0 : $Any, $Any
 // CHECK-OSX:   destroy_value %0 : $Any
 // CHECK-OSX:   return undef : $AnyObject
-// CHECK-OSX-LABEL: } // end sil function '_T0s26_unsafeDowncastToAnyObjectyXlyp04fromD0_tF'
+// CHECK-OSX-LABEL: } // end sil function '_T0s26_unsafeDowncastToAnyObject04fromD0yXlyp_tF'
 public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
@@ -198,13 +198,13 @@ public protocol Error {}
 #if os(OSX)
 // Test open_existential_box_value in a conversion context.
 // ---
-// CHECK-OSX-LABEL: sil @_T0s3fooys5Error_pSg1e_tF : $@convention(thin) (@owned Optional<Error>) -> () {
+// CHECK-OSX-LABEL: sil @_T0s3foo1eys5Error_pSg_tF : $@convention(thin) (@owned Optional<Error>) -> () {
 // CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
 // CHECK-OSX: end_borrow [[BORROW]] from %{{.*}} : $Error, $Error
-// CHECK-OSX-LABEL: } // end sil function '_T0s3fooys5Error_pSg1e_tF'
+// CHECK-OSX-LABEL: } // end sil function '_T0s3foo1eys5Error_pSg_tF'
 public func foo(e: Error?) {
   if let u = e {
     let a: Any = u
@@ -250,7 +250,7 @@ public struct EnumIter<Base : IP> : IP, Seq {
 // CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[BORROW]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  end_borrow [[BORROW]] from [[COPY]] : $Base, $Base
 // CHECK:  destroy_value [[COPY]] : $Base
-// CHECK: [[FN:%.*]] = function_ref @_T0s8EnumIterVAByxGx5_base_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
+// CHECK: [[FN:%.*]] = function_ref @_T0s8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  return [[RET]] : $EnumIter<Base.Iterator>
 // CHECK-LABEL: } // end sil function '_T0s7EnumSeqV12makeIterators0A4IterVy0D0QzGyF'

@@ -51,7 +51,7 @@ func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
   var x = x
   return x.value
 }
-// CHECK-LABEL: sil hidden @_T0s026dynamicMetatypeFromGenericB0s1CCms0dB0VyACGF
+// CHECK-LABEL: sil hidden @_T0s026dynamicMetatypeFromGenericB0ys1CCms0dB0VyACGF
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var GenericMetatype<C> }
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[READ:%.*]] = begin_access [read] [unknown] [[PX]] : $*GenericMetatype<C>
@@ -88,7 +88,7 @@ func dynamicMetatypeToGeneric(_ x: C.Type) {
   var x = x
   takeGeneric(x)
 }
-// CHECK-LABEL: sil hidden @_T0s024dynamicMetatypeToGenericB0ys1CCmF
+// CHECK-LABEL: sil hidden @_T0s024dynamicMetatypeToGenericB0yys1CCmF
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var @thick C.Type }
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[READ:%.*]] = begin_access [read] [unknown] [[PX]] : $*@thick C.Type
@@ -109,13 +109,13 @@ func genericMetatypeToGenericMetatype<U>(_ x: U.Type) {
   takeGenericMetatype(x)
 }
 
-// CHECK-LABEL: sil hidden @_T0s019static_metatype_of_B0s1SVmmACF
+// CHECK-LABEL: sil hidden @_T0s019static_metatype_of_B0ys1SVmmACF
 // CHECK:         metatype $@thin S.Type.Type
 func static_metatype_of_metatype(_ x: S) -> S.Type.Type {
   return type(of: type(of: x))
 }
 
-// CHECK-LABEL: sil hidden @_T0s018class_metatype_of_B0s1CCmmACF
+// CHECK-LABEL: sil hidden @_T0s018class_metatype_of_B0ys1CCmmACF
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick C.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick C.Type.Type, [[METATYPE]]
 func class_metatype_of_metatype(_ x: C) -> C.Type.Type {
