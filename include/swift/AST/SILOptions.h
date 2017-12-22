@@ -67,7 +67,8 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
-  /// Enable TensorFlow partitioning transformation. (SWIFT_ENABLE_TENSORFLOW)
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Enable TensorFlow partitioning transformation.
   bool EnableTFPartition = false;
 
   /// Should we run any SIL performance optimizations

@@ -554,6 +554,19 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   return P;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+//===----------------------------------------------------------------------===//
+//                          TensorFlow Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+SILPassPipelinePlan SILPassPipelinePlan::getTFParitionPassPipeline() {
+  SILPassPipelinePlan P;
+  P.startPipeline("TensorFlow Partitioning");
+  P.addTFPartition();
+  return P;
+}
+/// SWIFT_ENABLE_TENSORFLOW End
+
 //===----------------------------------------------------------------------===//
 //                          Inst Count Pass Pipeline
 //===----------------------------------------------------------------------===//
