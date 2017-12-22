@@ -1184,6 +1184,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+  Opts.UseDarwinPreStableABIBit = false;
+#else
+  Opts.UseDarwinPreStableABIBit = true;
+#endif
+
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
