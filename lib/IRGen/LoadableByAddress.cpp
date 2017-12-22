@@ -637,6 +637,12 @@ static bool shouldConvertBBArg(SILArgument *arg, irgen::IRGenModule &Mod) {
   if (!genEnv && loweredTy->isPolymorphic()) {
     genEnv = getGenericEnvironment(F->getModule(), loweredTy);
   }
+  CanType currCanType = storageType.getSwiftRValueType();
+  if (auto funcType = dyn_cast<SILFunctionType>(currCanType)) {
+    if (funcType->isPolymorphic()) {
+      genEnv = getGenericEnvironment(F->getModule(), funcType);
+    }
+  }
   SILType newSILType = getNewSILType(genEnv, storageType, Mod);
   // We (currently) only care about function signatures
   if (!isLargeLoadableType(genEnv, storageType, Mod) &&
