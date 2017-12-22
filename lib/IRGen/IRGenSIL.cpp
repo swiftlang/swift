@@ -3759,10 +3759,31 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   bool isEntryBlock = (i->getParent() == i->getFunction()->getEntryBlock());
   auto addr =
       type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
-
-  emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
-  
   setLoweredStackAddress(i, addr);
+
+  // Generate Debug Info.
+  if (!Decl)
+    return;
+  emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
+
+  // To make it unambiguous whether a `var` binding has been initialized,
+  // zero-initialize the first pointer-sized field. LLDB uses this to
+  // recognize to detect uninitizialized variables. This can be removed once
+  // swiftc switches to @llvm.dbg.addr() intrinsics. This dead store will get
+  // optimized away when optimizations are enabled.
+  if (!Decl->getType()->getClassOrBoundGenericClass())
+    return;
+
+  auto *AI = dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress());
+  if (!AI)
+    return;
+
+  auto &DL = IGM.DataLayout;
+  if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSize())
+    return;
+  auto *BC = Builder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
+  Builder.CreateStore(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
+                      IGM.getPointerAlignment());
 }
 
 static void
