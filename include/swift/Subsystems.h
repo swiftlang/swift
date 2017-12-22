@@ -232,6 +232,8 @@ namespace swift {
   /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, SILOptions &options,
+                       std::string PostBatchModeMainInputFilename =
+                           "<lldb does not supply this>",
                        bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
@@ -240,6 +242,8 @@ namespace swift {
   /// SourceFile, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, SILOptions &options,
+                       std::string PostBatchModeMainInputFilename =
+                           "<lldb does not supply this>",
                        Optional<unsigned> StartElem = None);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;

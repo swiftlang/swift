@@ -251,8 +251,9 @@ bool swift::immediate::IRGenImportedModules(
     if (!ImportedModules.insert(import).second)
       continue;
 
-    std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
-                                                             CI.getSILOptions());
+    std::unique_ptr<SILModule> SILMod =
+        performSILGeneration(import, CI.getSILOptions(),
+                             CI.getUniquePostBatchModeMainInputFilename());
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;

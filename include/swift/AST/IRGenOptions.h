@@ -24,6 +24,7 @@
 #include "swift/Basic/OptimizationMode.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
+#include "swift/Basic/InputFile.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
@@ -64,9 +65,11 @@ enum class IRGenEmbedMode : unsigned {
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
-  /// The name of the first input file, used by the debug info.
+  /// Ignored for now for batch mode; set by lldb
   std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
+  
+  std::vector<std::string> IRGOutputFilenames;
+
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -190,10 +193,15 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
+  StringRef preBatchModeGetIRGSingleOutputFilename() const {
+    if (IRGOutputFilenames.size() >= 1)
+      return IRGOutputFilenames.back();
     return StringRef();
+  }
+  
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  StringRef getSingleOutputFilename() const {
+    return preBatchModeGetIRGSingleOutputFilename();
   }
 
   // Get a hash of all options which influence the llvm compilation but are not

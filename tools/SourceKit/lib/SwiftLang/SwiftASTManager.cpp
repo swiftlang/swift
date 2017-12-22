@@ -83,13 +83,14 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().Inputs.hasUniquePrimaryInput() &&
+    assert(this->Invok.getFrontendOptions()
+               .InputsAndOutputs.hasUniquePrimaryInput() &&
            "Must have exactly one primary input for code completion, etc.");
   }
 
   void applyTo(CompilerInvocation &CompInvok) const;
   void applyToSubstitutingInputs(CompilerInvocation &CompInvok,
-                                 FrontendInputs &&Inputs) const;
+                                 FrontendInputsAndOutputs &&Inputs) const;
   void profile(llvm::FoldingSetNodeID &ID) const;
   void raw(std::vector<std::string> &Args, std::string &PrimaryFile) const;
 
@@ -135,9 +136,9 @@ void InvocationOptions::applyTo(CompilerInvocation &CompInvok) const {
   CompInvok = this->Invok;
 }
 void InvocationOptions::applyToSubstitutingInputs(
-    CompilerInvocation &CompInvok, FrontendInputs &&inputs) const {
+    CompilerInvocation &CompInvok, FrontendInputsAndOutputs &&inputs) const {
   CompInvok = this->Invok;
-  CompInvok.getFrontendOptions().Inputs = inputs;
+  CompInvok.getFrontendOptions().InputsAndOutputs = inputs;
 }
 
 void InvocationOptions::raw(std::vector<std::string> &Args,
@@ -371,13 +372,16 @@ static void setModuleName(CompilerInvocation &Invocation) {
   if (!Invocation.getModuleName().empty())
     return;
 
-  StringRef Filename = Invocation.getOutputFilename();
+  StringRef Filename =
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.preBatchModeGetSingleOutputFilename();
   if (Filename.empty()) {
-    if (!Invocation.getFrontendOptions().Inputs.hasInputs()) {
+    if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
       Invocation.setModuleName("__main__");
       return;
     }
-    Filename = Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
+    Filename = Invocation.getFrontendOptions()
+                   .InputsAndOutputs.getFilenameOfFirstInput();
   }
   Filename = llvm::sys::path::filename(Filename);
   StringRef ModuleName = llvm::sys::path::stem(Filename);
@@ -409,16 +413,16 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
   }
 }
 
-static FrontendInputs
+static FrontendInputsAndOutputs
 convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
-  FrontendInputs inputs;
+  FrontendInputsAndOutputs inputs;
   for (const FileContent &content : contents)
     inputs.addInput(InputFile(content));
   return inputs;
 }
 
-static FrontendInputs
-resolveSymbolicLinksInInputs(FrontendInputs &inputs,
+static FrontendInputsAndOutputs
+resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputs,
                              StringRef UnresolvedPrimaryFile,
                              std::string &Error) {
   unsigned primaryCount = 0;
@@ -426,8 +430,8 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
       SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
-  FrontendInputs replacementInputs;
-  for (const InputFile &input : inputs.getAllFiles()) {
+  FrontendInputsAndOutputs replacementInputs;
+  for (const InputFile &input : inputs.getAllInputs()) {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.file());
     bool newIsPrimary = input.isPrimary() ||
@@ -465,8 +469,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-  Invocation.getFrontendOptions().Inputs = resolveSymbolicLinksInInputs(
-      Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error);
+  Invocation.getFrontendOptions().InputsAndOutputs =
+      resolveSymbolicLinksInInputs(
+          Invocation.getFrontendOptions().InputsAndOutputs,
+          UnresolvedPrimaryFile, Error);
   if (!Error.empty())
     return true;
 
@@ -474,7 +480,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   setModuleName(Invocation);
-  Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
@@ -707,9 +712,9 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   // Check if the inputs changed.
   SmallVector<BufferStamp, 8> InputStamps;
   InputStamps.reserve(
-      Invok.Opts.Invok.getFrontendOptions().Inputs.inputCount());
+      Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
-       Invok.Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
+       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     StringRef File = input.file();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
@@ -723,7 +728,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
       InputStamps.push_back(MgrImpl.getBufferStamp(File));
   }
   assert(InputStamps.size() ==
-         Invok.Opts.Invok.getFrontendOptions().Inputs.inputCount());
+         Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   if (Stamps != InputStamps)
     return true;
 
@@ -877,7 +882,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
+      std::unique_ptr<SILModule> SILMod =
+          performSILGeneration(*SF, SILOpts, SF->getFilename());
       runSILDiagnosticPasses(*SILMod);
     }
   }
@@ -896,7 +902,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
     SmallVectorImpl<FileContent> &Contents, std::string &Error) const {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
-       Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
+       Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     StringRef File = input.file();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;
@@ -920,5 +926,5 @@ void ASTProducer::findSnapshotAndOpenFiles(
     Contents.push_back(std::move(Content));
   }
   assert(Contents.size() ==
-         Opts.Invok.getFrontendOptions().Inputs.inputCount());
+         Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
 }
