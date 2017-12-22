@@ -530,9 +530,6 @@ will be re-generated whenever any Python files are changed.
 ## Adding new Syntax Nodes
 
 Here's a handy checklist when implementing a production in the grammar.
-- Check that the corresponding `lib/AST` node has `SourceLocs` for all terms. If
-  it doesn't, [file a Swift bug][NewSwiftBug] and fix that first.
-  - **Add the `Syntax` bug label!**
 - Check if it's not already being worked on, and then
   [file a Swift bug][NewSwiftBug], noting which grammar productions
   are affected.
@@ -558,7 +555,7 @@ Here's a handy checklist when implementing a production in the grammar.
     - check for a zero-diff print with `-round-trip-parse`
 - Update `lib/Syntax/Status.md` if applicable.
 
-[NewSwiftBug]: https://bugs.swift.org/secure/CreateIssue!default.jspa)
+[NewSwiftBug]: (https://bugs.swift.org/secure/CreateIssue!default.jspa)
 
 ## Try libSyntax in Xcode
 
