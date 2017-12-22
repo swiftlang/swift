@@ -253,7 +253,7 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
       inheritedTypesBufferSize + attrsBufferSize + elementsBufferSize +
       structureArrayBufferSize + structureBufferSize + headerSize);
 
-  char *start = const_cast<char *>(result->getBufferStart());
+  char *start = result->getBufferStart();
   char *headerPtr = start;
   char *ptr = start + headerSize;
 
@@ -277,7 +277,7 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
   assert(headerPtr == start + (headerSize - sizeof(topOffset)));
   memcpy(headerPtr, &topOffset, sizeof(topOffset));
 
-  return result;
+  return std::move(result);
 }
 
 namespace {
