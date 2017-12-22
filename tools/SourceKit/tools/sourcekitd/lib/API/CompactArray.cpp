@@ -72,7 +72,7 @@ unsigned CompactArrayBuilderImpl::getOffsetForString(StringRef Str) {
 std::unique_ptr<llvm::MemoryBuffer>
 CompactArrayBuilderImpl::createBuffer() const {
   std::unique_ptr<llvm::MemoryBuffer> Buf;
-  Buf = llvm::MemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
+  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
   copyInto(const_cast<char *>(Buf->getBufferStart()), Buf->getBufferSize());
   return Buf;
 }
