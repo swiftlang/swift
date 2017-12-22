@@ -207,6 +207,10 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
 
+option(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+    "Enable the Swift stable ABI's class marker bit"
+    FALSE)
+
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
 

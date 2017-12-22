@@ -1355,7 +1355,7 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
 
   /// Is this object a valid swift type metadata?
   bool isTypeMetadata() const {
-    return (Data & 1);
+    return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
   }
   /// A different perspective on the same bit
   bool isPureObjC() const {

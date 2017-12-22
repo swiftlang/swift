@@ -443,7 +443,7 @@ static NSString *_getClassDescription(Class cls) {
 bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   if (!theClass->isTypeMetadata()) return false;
-  return (theClass->getFlags() & ClassFlags::UsesSwift1Refcounting);
+  return (theClass->getFlags() & ClassFlags::UsesSwiftRefcounting);
 #else
   return true;
 #endif

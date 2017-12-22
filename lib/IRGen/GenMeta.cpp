@@ -3321,16 +3321,16 @@ namespace {
     }
 
     void addClassFlags() {
-      // Always set a flag saying that this is a Swift 1.0 class.
-      ClassFlags flags = ClassFlags::IsSwift1;
+      auto flags = ClassFlags();
 
-      // Set a flag if the class uses Swift 1.0 refcounting.
+      // Set a flag if the class uses Swift refcounting.
       auto type = Target->getDeclaredType()->getCanonicalType();
       if (getReferenceCountingForType(IGM, type)
             == ReferenceCounting::Native) {
-        flags |= ClassFlags::UsesSwift1Refcounting;
+        flags |= ClassFlags::UsesSwiftRefcounting;
       }
 
+      // Set a flag if the class has a custom ObjC name.
       DeclAttributes attrs = Target->getAttrs();
       if (auto objc = attrs.getAttribute<ObjCAttr>()) {
         if (objc->getName())
@@ -3399,17 +3399,21 @@ namespace {
       if (!IGM.ObjCInterop) {
         // with no Objective-C runtime, just give an empty pointer with the
         // swift bit set.
+        // FIXME: Remove null data altogether rdar://problem/18801263
         B.addInt(IGM.IntPtrTy, 1);
         return;
       }
+
       // Derive the RO-data.
       llvm::Constant *data = emitClassPrivateData(IGM, Target);
 
-      // We always set the low bit to indicate this is a Swift class.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data,
-                                    llvm::ConstantInt::get(IGM.IntPtrTy, 1));
+      // Set a low bit to indicate this class has Swift metadata.
+      auto bit = llvm::ConstantInt::get(IGM.IntPtrTy,
+                                        IGM.UseDarwinPreStableABIBit ? 1 : 2);
 
+      // Emit data + bit.
+      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+      data = llvm::ConstantExpr::getAdd(data, bit);
       B.add(data);
     }
 
