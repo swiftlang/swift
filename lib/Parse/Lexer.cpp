@@ -2119,6 +2119,8 @@ Restart:
 
   case '\n':
   case '\r':
+    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
+           "newlines should be eaten by lexTrivia as LeadingTrivia");
     NextToken.setAtStartOfLine(true);
     goto Restart;  // Skip whitespace.
 
@@ -2302,7 +2304,7 @@ Restart:
       break;
     NextToken.setAtStartOfLine(true);
     Pieces.appendOrSquash(TriviaPiece::newlines(1));
-    break;
+    goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
