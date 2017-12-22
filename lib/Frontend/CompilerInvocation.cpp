@@ -646,7 +646,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
-  Opts.EnableTFPartition |= Args.hasArg(OPT_tensorflow);  // SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
+  Opts.EnableTFPartition |= Args.hasArg(OPT_tensorflow);
 
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);

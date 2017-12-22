@@ -35,6 +35,8 @@ PASSPIPELINE(OwnershipEliminator, "Utility pass to just run the ownership elimin
 PASSPIPELINE_WITH_OPTIONS(SILOptPrepare, "Passes that prepare SIL for -O")
 PASSPIPELINE_WITH_OPTIONS(Performance, "Passes run at -O")
 PASSPIPELINE(Onone, "Passes run at -Onone")
+// SWIFT_ENABLE_TENSORFLOW
+PASSPIPELINE(TFParition, "TensorFlow Partitioning Passes")
 PASSPIPELINE(InstCount, "Utility pipeline to just run the inst count pass")
 PASSPIPELINE(Lowering, "SIL Address Lowering")
 PASSPIPELINE_WITH_OPTIONS(IRGenPrepare, "Pipeline to run during IRGen")
