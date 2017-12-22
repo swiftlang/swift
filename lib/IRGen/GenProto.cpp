@@ -323,18 +323,9 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
-  } else {
-    // If the Self type is concrete, we have a witness thunk with a
-    // fully substituted Self type. The witness table parameter is not
-    // used.
-    //
-    // FIXME: As above, we should fulfill the Self metadata and
-    // conformance from our two special paramaters here. However, the
-    // Self metadata will be inexact.
-    //
-    // For now, just fulfill the generic arguments of 'Self'.
-    considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
   }
+
+  considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
 
   // The witness table for the Self : P conformance can be
   // fulfilled from the Self witness table parameter.
