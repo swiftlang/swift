@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -tf-partition %s -o /dev/null | %FileCheck %s
 
-
 import Builtin
 import Swift
 struct TensorCore<Element> {}

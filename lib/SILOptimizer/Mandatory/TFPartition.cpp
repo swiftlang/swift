@@ -465,6 +465,9 @@ public:
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
+  /// These are all the tensor ops found in the initial scan over the function.
+  SmallPtrSet<SILInstruction*, 8> tensorOpsSet;
+
   /// This keeps track of the set of blocks that are marked as needing to be
   /// partitioned out to the accelerator.  If the block is in this set, then
   /// some instruction in the block has to run on the accelerator.
@@ -732,12 +735,13 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
         // TODO: This will not happen when TensorCore is a builtin type, this
         // code can be deleted then.
         if (auto *SE = dyn_cast<StructExtractInst>(user)) {
-          if (SE->hasOneUse())
+          if (SE->hasOneUse()) {
             if (auto RCI = dyn_cast<RefCountingInst>(
                                              SE->getSingleUse()->getUser())) {
               markInstruction(*user, Marking::Delete);
               markInstruction(*RCI, Marking::Delete);
             }
+          }
         }
       }
   }
@@ -871,6 +875,11 @@ void TFFunctionPartition::markValue(SILValue value) {
   if (markedInstructions.count(inst))
     return;
 
+  // If this is a reference to a tensor op that we haven't gotten to yet, just
+  // ignore it.  The outer marking loop will find it and mark it.
+  if (tensorOpsSet.count(inst))
+    return;
+
   // If the value is defined outside of the region dominated by the tensor
   // operations, then it is passed in as an argument to the tensor function.
   if (!DI.properlyDominates(tensorStartPoint, inst)) {
@@ -942,8 +951,10 @@ void TFFunctionPartition::markFunction() {
   SmallVector<SILInstruction*, 32> tensorOps;
   for (auto *BB : llvm::depth_first(&fn)) {
     for (auto &inst : *BB) {
-      if (TensorOpInfo(inst).decode())
+      if (TensorOpInfo(inst).decode()) {
         tensorOps.push_back(&inst);
+        tensorOpsSet.insert(&inst);
+      }
     }
   }
 
@@ -1551,10 +1562,27 @@ void PartitionCloner::finalizeOriginal() {
     bool needsCopy = false;
     for (auto operand : arg->getUses()) {
       auto user = operand->getUser();
-      if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user))
+      if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user)) {
         instToRemove.push_back(user);
-      else
-        needsCopy = true;
+        continue;
+      }
+      // Also handle retain(struct_extract(tensorcore)), which shouldn't
+      // come up, but it does.
+      // TODO: This will not happen when TensorCore is a builtin type, this
+      // code can be deleted then.
+      if (auto *SE = dyn_cast<StructExtractInst>(user)) {
+        if (SE->hasOneUse()) {
+          if (auto RCI = dyn_cast<RefCountingInst>(
+                                           SE->getSingleUse()->getUser())) {
+            instToRemove.push_back(RCI);
+            instToRemove.push_back(SE);
+            continue;
+          }
+        }
+      }
+
+      needsCopy = true;
+      break;
     }
 
     if (needsCopy)
@@ -1653,8 +1681,6 @@ static void contractUncondBranches(SILFunction *fn) {
 /// has been generated if there is.
 ///
 SILFunction *TFFunctionPartition::run() {
-  DI.print(llvm::errs());
-
   // Mark the tensor operations that we need to move to the accelerator.
   markFunction();
 
@@ -1866,8 +1892,6 @@ public:
       return;
     }
 
-#if 0  // TODO: Land the other passes.
-
 
     // TODO: Once the partitioned function is in its own SIL module, we'll set
     // up a PassManager here, and the other TF subsystems will become passes.
@@ -1877,8 +1901,6 @@ public:
 
     // Next translate it to a graph.
     emitTensorFlowGraph(partitionedFn, partitionedFn->getName().str());
-
-#endif
 
     // Finally, we're done.  Remove the partitioned function so it doesn't go
     // through the normal compiler flow.
