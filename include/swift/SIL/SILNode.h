@@ -145,6 +145,22 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
 
+  SWIFT_INLINE_BITFIELD_FULL(StructInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    NumOperands : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    NumOperands : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(BuiltinInst, SingleValueInstruction,
+                             64-NumSingleValueInstructionBits,
+    NumSubstitutions : 32-NumSingleValueInstructionBits,
+    NumOperands : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
@@ -153,6 +169,18 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(FloatLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(StringLiteralInst, LiteralInst, 2+32,
+    TheEncoding : 2,
+    : NumPadBits,
+    Length : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(ConstStringLiteralInst, LiteralInst, 1+32,
+    TheEncoding : 1,
+    : NumPadBits,
+    Length : 32
   );
 
   SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
@@ -339,6 +367,11 @@ protected:
     SWIFT_INLINE_BITS(BeginAccessInst);
     SWIFT_INLINE_BITS(EndAccessInst);
     SWIFT_INLINE_BITS(MetatypeInst);
+    SWIFT_INLINE_BITS(BuiltinInst);
+    SWIFT_INLINE_BITS(StringLiteralInst);
+    SWIFT_INLINE_BITS(ConstStringLiteralInst);
+    SWIFT_INLINE_BITS(StructInst);
+    SWIFT_INLINE_BITS(TupleInst);
   } Bits;
 
 private:

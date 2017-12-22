@@ -2604,26 +2604,21 @@ public:
 
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
-class BuiltinInst
+class BuiltinInst final
     : public InstructionBase<SILInstructionKind::BuiltinInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<BuiltinInst, Operand, Substitution> {
+  friend TrailingObjects;
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
-  
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions;
-  
-  /// The value arguments to the builtin.
-  TailAllocatedOperandList<0> Operands;
-  
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return SILInstruction::Bits.BuiltinInst.NumOperands;
   }
-  const Substitution *getSubstitutionsStorage() const {
-    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions;
   }
 
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
@@ -2635,6 +2630,12 @@ class BuiltinInst
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
+  ~BuiltinInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// Return the name of the builtin operation.
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
@@ -2670,29 +2671,33 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return NumSubstitutions != 0;
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
   }
 
   /// Return the type parameters to the builtin.
   SubstitutionList getSubstitutions() const {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   /// Return the type parameters to the builtin.
   MutableArrayRef<Substitution> getSubstitutions() {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   
   /// The arguments to the builtin.
   ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.BuiltinInst.NumOperands};
   }
   /// The arguments to the builtin.
   MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.BuiltinInst.NumOperands};
   }
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
-    return Operands.asValueArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 };
   
@@ -2837,9 +2842,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   StringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                     Encoding encoding, SILType ty);
 
@@ -2849,11 +2851,14 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {getTrailingObjects<char>(), Length};
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.StringLiteralInst.Length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.StringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
@@ -2881,9 +2886,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                          Encoding encoding, SILType ty);
 
@@ -2893,10 +2895,15 @@ private:
 
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
-  StringRef getValue() const { return {getTrailingObjects<char>(), Length}; }
+  StringRef getValue() const {
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.ConstStringLiteralInst.Length};
+  }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.ConstStringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
@@ -4382,12 +4389,12 @@ class UnconditionalCheckedCastValueInst final
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst
+class StructInst final
     : public InstructionBase<SILInstructionKind::StructInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<StructInst, Operand> {
+  friend TrailingObjects;
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
@@ -4399,18 +4406,32 @@ class StructInst
                             ArrayRef<SILValue> Elements, SILModule &M);
 
 public:
+  ~StructInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// The elements referenced by this StructInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
   }
 
   /// The elements referenced by this StructInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef({getTrailingObjects<Operand>(),
+                                 SILInstruction::Bits.StructInst.NumOperands});
   }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
+  }
 
   SILValue getFieldValue(const VarDecl *V) const {
     return getOperandForField(V)->get();
@@ -4740,12 +4761,12 @@ public:
 
 
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst
+class TupleInst final
     : public InstructionBase<SILInstructionKind::TupleInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<TupleInst, Operand> {
+  friend TrailingObjects;
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
@@ -4757,14 +4778,22 @@ class TupleInst
                            ArrayRef<SILValue> Elements, SILModule &M);
 
 public:
+  ~TupleInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// The elements referenced by this TupleInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
   }
 
   /// The elements referenced by this TupleInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef({getTrailingObjects<Operand>(),
+                                 SILInstruction::Bits.TupleInst.NumOperands});
   }
 
   /// Return the i'th value referenced by this TupleInst.
@@ -4777,8 +4806,14 @@ public:
     return operand->getOperandNumber();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
+  }
 
   TupleType *getTupleType() const {
     return getType().getSwiftRValueType()->castTo<TupleType>();
