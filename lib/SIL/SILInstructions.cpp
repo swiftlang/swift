@@ -941,15 +941,20 @@ ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
 
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
                              ArrayRef<SILValue> Elements, SILModule &M) {
-  void *Buffer = M.allocateInst(sizeof(TupleInst) +
-                            decltype(Operands)::getExtraSize(Elements.size()),
-                            alignof(TupleInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buffer = M.allocateInst(Size, alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 
 TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
                      ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty), Operands(this, Elems) {}
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.TupleInst.NumOperands = Elems.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Elems) {
+    new (dynamicSlot++) Operand(this, value);
+  }
+}
 
 MetatypeInst::MetatypeInst(SILDebugLocation Loc, SILType Metatype,
                            ArrayRef<SILValue> TypeDependentOperands)

@@ -4761,12 +4761,12 @@ public:
 
 
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst
+class TupleInst final
     : public InstructionBase<SILInstructionKind::TupleInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<TupleInst, Operand> {
+  friend TrailingObjects;
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
@@ -4778,14 +4778,22 @@ class TupleInst
                            ArrayRef<SILValue> Elements, SILModule &M);
 
 public:
+  ~TupleInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// The elements referenced by this TupleInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
   }
 
   /// The elements referenced by this TupleInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef({getTrailingObjects<Operand>(),
+                                 SILInstruction::Bits.TupleInst.NumOperands});
   }
 
   /// Return the i'th value referenced by this TupleInst.
@@ -4798,8 +4806,14 @@ public:
     return operand->getOperandNumber();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.TupleInst.NumOperands};
+  }
 
   TupleType *getTupleType() const {
     return getType().getSwiftRValueType()->castTo<TupleType>();

@@ -150,6 +150,11 @@ protected:
     NumOperands : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(TupleInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    NumOperands : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(BuiltinInst, SingleValueInstruction,
                              64-NumSingleValueInstructionBits,
     NumSubstitutions : 32-NumSingleValueInstructionBits,
@@ -366,6 +371,7 @@ protected:
     SWIFT_INLINE_BITS(StringLiteralInst);
     SWIFT_INLINE_BITS(ConstStringLiteralInst);
     SWIFT_INLINE_BITS(StructInst);
+    SWIFT_INLINE_BITS(TupleInst);
   } Bits;
 
 private:
