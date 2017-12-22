@@ -2604,26 +2604,21 @@ public:
 
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
-class BuiltinInst
+class BuiltinInst final
     : public InstructionBase<SILInstructionKind::BuiltinInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<BuiltinInst, Operand, Substitution> {
+  friend TrailingObjects;
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
-  
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions;
-  
-  /// The value arguments to the builtin.
-  TailAllocatedOperandList<0> Operands;
-  
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return SILInstruction::Bits.BuiltinInst.NumOperands;
   }
-  const Substitution *getSubstitutionsStorage() const {
-    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions;
   }
 
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
@@ -2635,6 +2630,12 @@ class BuiltinInst
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
+  ~BuiltinInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// Return the name of the builtin operation.
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
@@ -2670,29 +2671,33 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return NumSubstitutions != 0;
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
   }
 
   /// Return the type parameters to the builtin.
   SubstitutionList getSubstitutions() const {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   /// Return the type parameters to the builtin.
   MutableArrayRef<Substitution> getSubstitutions() {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   
   /// The arguments to the builtin.
   ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.BuiltinInst.NumOperands};
   }
   /// The arguments to the builtin.
   MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.BuiltinInst.NumOperands};
   }
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
-    return Operands.asValueArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 };
   

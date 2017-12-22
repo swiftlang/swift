@@ -373,11 +373,9 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILModule &M) {
-  void *Buffer = M.allocateInst(
-                              sizeof(BuiltinInst)
-                                + decltype(Operands)::getExtraSize(Args.size())
-                                + sizeof(Substitution) * Substitutions.size(),
-                              alignof(BuiltinInst));
+  auto Size = totalSizeToAlloc<swift::Operand, Substitution>(Args.size(),
+                                                          Substitutions.size());
+  auto Buffer = M.allocateInst(Size, alignof(BuiltinInst));
   return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
                                     Args);
 }
@@ -385,12 +383,17 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          SILType ReturnType, SubstitutionList Subs,
                          ArrayRef<SILValue> Args)
-    : InstructionBase(Loc, ReturnType), Name(Name),
-      NumSubstitutions(Subs.size()), Operands(this, Args) {
-  static_assert(IsTriviallyCopyable<Substitution>::value,
-                "assuming Substitution is trivially copyable");
-  memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());
+    : InstructionBase(Loc, ReturnType), Name(Name) {
+  SILInstruction::Bits.BuiltinInst.NumSubstitutions = Subs.size();
+  assert(SILInstruction::Bits.BuiltinInst.NumSubstitutions == Subs.size() &&
+         "Truncation");
+  SILInstruction::Bits.BuiltinInst.NumOperands = Args.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Args) {
+    new (dynamicSlot++) Operand(this, value);
+  }
+  std::uninitialized_copy(Subs.begin(), Subs.end(),
+                          getTrailingObjects<Substitution>());
 }
 
 InitBlockStorageHeaderInst *

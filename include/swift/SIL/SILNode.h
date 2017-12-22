@@ -145,6 +145,12 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
 
+  SWIFT_INLINE_BITFIELD_FULL(BuiltinInst, SingleValueInstruction,
+                             64-NumSingleValueInstructionBits,
+    NumSubstitutions : 32-NumSingleValueInstructionBits,
+    NumOperands : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
@@ -339,6 +345,7 @@ protected:
     SWIFT_INLINE_BITS(BeginAccessInst);
     SWIFT_INLINE_BITS(EndAccessInst);
     SWIFT_INLINE_BITS(MetatypeInst);
+    SWIFT_INLINE_BITS(BuiltinInst);
   } Bits;
 
 private:
