@@ -842,7 +842,7 @@ static bool performCompile(CompilerInstance &Instance,
         // once for each such input.
         for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
           auto SM = performSILGeneration(*PrimaryFile, SILOpts,
-                                         PrimaryFile->getFilename(), None);
+                                         PrimaryFile->xxxshouldbemaininputfilename(), None);
           PSGIs.push_back(PostSILGenInputs{std::move(SM),
                                            !fileIsSIB(PrimaryFile), PrimaryFile,
                                            PrimaryFile->getFilename()});
