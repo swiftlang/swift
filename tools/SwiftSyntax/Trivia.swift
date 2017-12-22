@@ -46,6 +46,9 @@ public enum TriviaPiece: Codable {
     case "CarriageReturn":
       let value = try container.decode(Int.self, forKey: .value)
       self = .carriageReturns(value)
+    case "CarriageReturnLineFeed":
+      let value = try container.decode(Int.self, forKey: .value)
+      self = .carriageReturnLineFeeds(value)
     case "Backtick":
       let value = try container.decode(Int.self, forKey: .value)
       self = .backticks(value)
@@ -102,6 +105,9 @@ public enum TriviaPiece: Codable {
     case .carriageReturns(let count):
       try container.encode("CarriageReturn", forKey: .kind)
       try container.encode(count, forKey: .value)
+    case .carriageReturnLineFeeds(let count):
+      try container.encode("CarriageReturnLineFeeds", forKey: .kind)
+      try container.encode(count, forKey: .value)
     case .spaces(let count):
       try container.encode("Space", forKey: .kind)
       try container.encode(count, forKey: .value)
@@ -132,6 +138,9 @@ public enum TriviaPiece: Codable {
 
   /// A carriage-return '\r' character.
   case carriageReturns(Int)
+  
+  /// A newline two bytes sequence consists of '\r' and '\n' characters.
+  case carriageReturnLineFeeds(Int)
 
   /// A backtick '`' character, used to escape identifiers.
   case backticks(Int)
@@ -168,6 +177,7 @@ extension TriviaPiece: TextOutputStreamable {
     case let .formfeeds(count): printRepeated("\u{240C}", count: count)
     case let .newlines(count): printRepeated("\n", count: count)
     case let .carriageReturns(count): printRepeated("\r", count: count)
+    case let .carriageReturnLineFeeds(count): printRepeated("\r\n", count: count)
     case let .backticks(count): printRepeated("`", count: count)
     case let .lineComment(text),
          let .blockComment(text),
@@ -195,6 +205,8 @@ extension TriviaPiece: TextOutputStreamable {
       return (lines: n, lastColumn: 0, utf8Length: n)
     case .carriageReturns(let n):
       return (lines: n, lastColumn: 0, utf8Length: n)
+    case .carriageReturnLineFeeds(let n):
+      return (lines: n, lastColumn: 0, utf8Length: n * 2)
     case .lineComment(let text),
          .docLineComment(let text):
       let length = text.utf8.count
@@ -205,15 +217,29 @@ extension TriviaPiece: TextOutputStreamable {
       var lines = 0
       var col = 0
       var total = 0
+      var prevChar: UInt8? = nil
+      // TODO: CR + LF should be regarded as one newline
       for char in text.utf8 {
         total += 1
-        if char == 0x0a /* ASCII newline */
-          || char == 0x0d /* ASCII carriage-return */{
+        switch char {
+        case 0x0a:
+          if prevChar == 0x0d {
+            /* ASCII CR LF */
+            assert(col == 0)
+          } else {
+            /* ASCII newline */
+            col = 0
+            lines += 1
+          }
+        /* ASCII carriage-return */
+        case 0x0d:
           col = 0
           lines += 1
-        } else {
+        
+        default:
           col += 1
         }
+        prevChar = char
       }
       return (lines: lines, lastColumn: col, utf8Length: total)
     }
@@ -288,6 +314,12 @@ public struct Trivia: Codable {
   /// in a row.
   public static func carriageReturns(_ count: Int) -> Trivia {
     return [.carriageReturns(count)]
+  }
+
+  /// Return a piece of trivia for some number of two bytes sequence
+  /// consists of CR and LF in a row.
+  public static func carriageReturnLineFeeds(_ count: Int) -> Trivia {
+    return [.carriageReturnLineFeeds(count)]
   }
 
   /// Return a piece of trivia for some number of backtick '`' characters
