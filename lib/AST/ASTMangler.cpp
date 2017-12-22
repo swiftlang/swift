@@ -1186,10 +1186,22 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
   }
 
   // Nested types imported from C should also get use the special "So" context.
-  if (isa<TypeDecl>(decl))
-    if (auto *clangDecl = decl->getClangDecl())
-      if (clangDecl->getDeclContext()->isTranslationUnit())
+  if (isa<TypeDecl>(decl)) {
+    if (auto *clangDecl = cast_or_null<clang::NamedDecl>(decl->getClangDecl())){
+      bool hasNameForLinkage;
+      if (auto *tagDecl = dyn_cast<clang::TagDecl>(clangDecl))
+        hasNameForLinkage = tagDecl->hasNameForLinkage();
+      else
+        hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
+      if (hasNameForLinkage) {
+        auto *clangDC = clangDecl->getDeclContext();
+        assert(clangDC->getRedeclContext()->isTranslationUnit() &&
+               "non-top-level Clang types not supported yet");
+        (void)clangDC;
         return appendOperator("So");
+      }
+    }
+  }
 
   // Just mangle the decl's DC.
   appendContext(decl->getDeclContext());
@@ -1426,29 +1438,48 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
 
   appendContextOf(decl);
 
-  // Always use Clang names for imported Clang declarations.
-  auto *clangDecl = dyn_cast_or_null<clang::NamedDecl>(decl->getClangDecl());
-  if (clangDecl && !clangDecl->getName().empty()) {
-    appendIdentifier(clangDecl->getName());
+  // Always use Clang names for imported Clang declarations, unless they don't
+  // have one.
+  auto tryAppendClangName = [this](const clang::Decl *clangDecl) -> bool {
+    auto *namedDecl = dyn_cast_or_null<clang::NamedDecl>(clangDecl);
+    if (!namedDecl)
+      return false;
+
+    // Use an anonymous enum's enclosing typedef for the mangled name, if
+    // present. This matches C++'s rules for linkage names of tag declarations.
+    if (namedDecl->getDeclName().isEmpty())
+      if (auto *tagDecl = dyn_cast<clang::TagDecl>(namedDecl))
+        if (auto *typedefDecl = tagDecl->getTypedefNameForAnonDecl())
+          namedDecl = typedefDecl;
+
+    if (namedDecl->getDeclName().isEmpty())
+      return false;
+
+    appendIdentifier(namedDecl->getName());
+
     // The important distinctions to maintain here are Objective-C's various
     // namespaces: protocols, tags (struct/enum/union), and unqualified names.
     // We continue to mangle "class" the standard Swift way because it feels
     // weird to call that an alias, but they're really in the same namespace.
-    if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+    if (isa<clang::ObjCInterfaceDecl>(namedDecl)) {
       appendOperator("C");
-    } else if (isa<clang::ObjCProtocolDecl>(clangDecl)) {
+    } else if (isa<clang::ObjCProtocolDecl>(namedDecl)) {
       appendOperator("P");
-    } else if (isa<clang::TagDecl>(clangDecl)) {
+    } else if (isa<clang::TagDecl>(namedDecl)) {
       // Note: This includes enums, but that's okay. A Clang enum is not always
       // imported as a Swift enum.
       appendOperator("V");
-    } else if (isa<clang::TypedefNameDecl>(clangDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+    } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
-  } else {
+
+    return true;
+  };
+
+  if (!tryAppendClangName(decl->getClangDecl())) {
     appendDeclName(decl);
 
     switch (decl->getKind()) {

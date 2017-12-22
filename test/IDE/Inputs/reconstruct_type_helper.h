@@ -8,6 +8,18 @@ enum TagTypedefCollision {
   TagTypedefCollisionX
 } __attribute__((swift_name("TTCollisionTag")));
 
+
+enum EnumByTag {
+  EnumByTagX
+};
+typedef enum {
+  EnumByTypedefX
+} EnumByTypedef;
+typedef enum EnumByBoth {
+  EnumByBothX
+} EnumByBoth;
+
+
 #if __OBJC__
 #include "swift_name_objc.h"
 

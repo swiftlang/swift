@@ -7,7 +7,10 @@ func test(
   d: SNColorChoice,
   e: Unwrapped,
   f: TTCollisionTypedef,
-  g: TTCollisionTag
+  g: TTCollisionTag,
+  h: EnumByTag,
+  i: EnumByTypedef,
+  j: EnumByBoth
 ) {
   // CHECK: type: Wrapped	for 'a' mangled=$SSo7WrappedaD
   _ = a
@@ -23,6 +26,12 @@ func test(
   _ = f
   // CHECK: type: TTCollisionTag	for 'g' mangled=$SSo19TagTypedefCollisionVD
   _ = g
+  // CHECK: type: EnumByTag	for 'h' mangled=$SSo9EnumByTagVD
+  _ = h
+  // CHECK: type: EnumByTypedef	for 'i' mangled=$SSo13EnumByTypedefaD
+  _ = i
+  // CHECK: type: EnumByBoth	for 'j' mangled=$SSo10EnumByBothVD
+  _ = j
 }
 
 #if _runtime(_ObjC)

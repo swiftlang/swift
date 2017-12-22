@@ -13,7 +13,7 @@ import Swift
 // CHECK-x86_64: %TSo26BitfieldSeparatorReferenceV = type [[BITFIELD_SEP_TYPE:<{ %Ts5UInt8V, \[3 x i8\], %Ts5UInt8V }>]]
 // CHECK-x86_64: %TSo25BitfieldSeparatorSameNameV = type [[BITFIELD_SEP_TYPE]]
 // CHECK-x86_64: %TSo36BitfieldSeparatorDifferentNameStructV = type [[BITFIELD_SEP_TYPE]]
-// CHECK-x86_64: %TSo21BitfieldSeparatorAnonV = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %TSo21BitfieldSeparatorAnona = type [[BITFIELD_SEP_TYPE]]
 
 sil public_external @createBitfieldOne : $@convention(c) () -> BitfieldOne
 sil public_external @consumeBitfieldOne : $@convention(c) (BitfieldOne) -> ()
