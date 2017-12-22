@@ -1438,6 +1438,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 ///    'else' stmt-brace
 ///    'else' stmt-if
 ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::IfStmt);
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParserStatus Status;
@@ -1498,10 +1499,12 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::kw_else)) {
     ElseLoc = consumeToken(tok::kw_else);
-    if (Tok.is(tok::kw_if))
+    if (Tok.is(tok::kw_if)) {
+      SyntaxParsingContext ElseIfCtxt(SyntaxContext, SyntaxKind::IfStmt);
       ElseBody = parseStmtIf(LabeledStmtInfo());
-    else
+    } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
+    }
     Status |= ElseBody;
   }
 
@@ -1515,6 +1518,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
 ///     'guard' condition 'else' stmt-brace
 ///
 ParserResult<Stmt> Parser::parseStmtGuard() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::GuardStmt);
   SourceLoc GuardLoc = consumeToken(tok::kw_guard);
   
   ParserStatus Status;
