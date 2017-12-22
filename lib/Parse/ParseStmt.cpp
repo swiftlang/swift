@@ -1834,6 +1834,7 @@ static bool isStmtForCStyle(Parser &P) {
 ///     (identifier ':')? 'for' pattern 'in' expr-basic \
 ///             ('where' expr-basic)? stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::ForInStmt);
   SourceLoc ForLoc = consumeToken(tok::kw_for);
   ParserStatus Status;
   ParserResult<Pattern> pattern;
@@ -1929,7 +1930,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   // Parse the 'where' expression if present.
   ParserResult<Expr> Where;
-  if (consumeIf(tok::kw_where)) {
+  if (Tok.is(tok::kw_where)) {
+    SyntaxParsingContext WhereClauseCtxt(SyntaxContext,
+                                         SyntaxKind::WhereClause);
+    consumeToken();
     Where = parseExprBasic(diag::expected_foreach_where_expr);
     if (Where.isNull())
       Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));

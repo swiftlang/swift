@@ -278,4 +278,7 @@ func statementTests() {
   }
 
   guard let a = b else {}
+
+  for var i in foo where i.foo {}
+  for case is Int in foo {}
 }
