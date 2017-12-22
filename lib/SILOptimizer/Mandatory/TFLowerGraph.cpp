@@ -16,10 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "TensorFlow.h"
-#if SWIFT_ENABLE_TENSORFLOW
+#ifdef SWIFT_ENABLE_TENSORFLOW
 #include "TFCanonicalizeCFG.h"
+#ifdef CMAKE_INTDIR
 #include "tensorflow/c/c_api.h"
-#include "tensorflow/c/eager/c_api.h"
+#else
+#include "tensorflow/c/c_api.h"
+#endif
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
@@ -33,7 +36,7 @@
 using namespace swift;
 using namespace tf;
 
-#if SWIFT_ENABLE_TENSORFLOW
+#ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -498,22 +501,26 @@ void TFGraphLowering::lowerBlock(SILBasicBlock &BB) {
 
 /// Lower the specified SIL function (which was formed by the partitioner)
 /// into a TensorFlow graph, and write it to disk.
-void tf::emitTensorFlowGraph(SILFunction *F, StringRef fnName) {
+void tf::emitTensorFlowGraph(SILFunction *fn, StringRef fnName) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
+  // This should never be called if TensorFlow support isn't enabled, but just
+  // in case, emit an error message so a misconfiguration is diagnosable.
   llvm::errs() << "TensorFlow support is not built into this Swift compiler.\n";
   exit(1);
 #else
   // If we're generating a graph for XLA, we need to structurize the CFG into
   // single-entry-single-exit regions.
-  auto structure = canonicalizeCFGForXLA(F);
+  auto structure = canonicalizeCFGForXLA(fn);
 
-  llvm::errs() << "---- CFG SESE STRUCTURE ----------\n";
-  structure->dump();
-  llvm::errs() << "---- END SESE CFG STRUCTURE ----------\n";
 
+  llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
+  structure->print(llvm::outs());
+  llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
+
+  return;
 
   // Right now we only support lowering graphs that are a single basic block.
-  assert(F->getBlocks().size() == 1 &&
+  assert(fn->getBlocks().size() == 1 &&
          "TFLowerGraph can only handle single basic block programs");
 
   // TensorFlow likes to print out lots of informational messages to the
@@ -521,9 +528,9 @@ void tf::emitTensorFlowGraph(SILFunction *F, StringRef fnName) {
   // an environment variable, so we set it to silence these informational logs.
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
-  TFGraphLowering L(F);
-  L.lowerArguments();
-  L.lowerBlock(*F->getBlocks().begin());
-  L.writeFile(fnName);
+  TFGraphLowering graphGen(fn);
+  graphGen.lowerArguments();
+  graphGen.lowerBlock(*fn->getBlocks().begin());
+  graphGen.writeFile(fnName);
 #endif
 }
