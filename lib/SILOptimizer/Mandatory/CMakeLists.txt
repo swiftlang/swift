@@ -14,6 +14,7 @@ set(MANDATORY_SOURCES
   Mandatory/PredictableMemOpt.cpp
   Mandatory/ConstantPropagation.cpp
   Mandatory/SemanticARCOpts.cpp
+  # SWIFT_ENABLE_TENSORFLOW
   Mandatory/TensorFlow.cpp
   Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFLowerGraph.cpp

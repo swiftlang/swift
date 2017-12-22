@@ -39,6 +39,21 @@ STATISTIC(NumEscapingAllocas, "Number of aggregate allocas not chopped up "
 STATISTIC(NumChoppedAllocas, "Number of chopped up aggregate allocas.");
 STATISTIC(NumUnhandledAllocas, "Number of non struct, tuple allocas.");
 
+
+// SWIFT_ENABLE_TENSORFLOW
+//
+// TF Compiler hack: Never scalarize 'TensorCore'.  Eventually turn this
+// into an @tf.compiler.noscalarize attribute of some sort.
+static bool shouldNeverSRoA(SILType ty) {
+  if (auto *SD = ty.getSwiftRValueType()->getStructOrBoundGenericStruct())
+    if (SD->getNameStr() == "TensorCore")
+      return true;
+
+  return false;
+}
+
+
+
 namespace {
 
 class SROAMemoryUseAnalyzer {
@@ -133,7 +148,8 @@ bool SROAMemoryUseAnalyzer::analyze() {
 
   // Check that the allocated type is a struct or a tuple and that there are
   // no unreferenced fields.
-  if (HasUnrefField || (!TT && !SD)) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (HasUnrefField || (!TT && !SD) || shouldNeverSRoA(AI->getElementType())) {
     ++NumUnhandledAllocas;
     return false;
   }
@@ -296,7 +312,9 @@ static bool runSROAOnFunction(SILFunction &Fn) {
     for (auto &I : BB)
       // If the instruction is an alloc stack inst, add it to the worklist.
       if (auto *AI = dyn_cast<AllocStackInst>(&I))
-        if (shouldExpand(Fn.getModule(), AI->getElementType()))
+        if (shouldExpand(Fn.getModule(), AI->getElementType()) &&
+            // SWIFT_ENABLE_TENSORFLOW
+            !shouldNeverSRoA(AI->getElementType()))
           Worklist.push_back(AI);
 
   while (!Worklist.empty()) {
