@@ -373,11 +373,9 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILModule &M) {
-  void *Buffer = M.allocateInst(
-                              sizeof(BuiltinInst)
-                                + decltype(Operands)::getExtraSize(Args.size())
-                                + sizeof(Substitution) * Substitutions.size(),
-                              alignof(BuiltinInst));
+  auto Size = totalSizeToAlloc<swift::Operand, Substitution>(Args.size(),
+                                                          Substitutions.size());
+  auto Buffer = M.allocateInst(Size, alignof(BuiltinInst));
   return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
                                     Args);
 }
@@ -385,12 +383,17 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          SILType ReturnType, SubstitutionList Subs,
                          ArrayRef<SILValue> Args)
-    : InstructionBase(Loc, ReturnType), Name(Name),
-      NumSubstitutions(Subs.size()), Operands(this, Args) {
-  static_assert(IsTriviallyCopyable<Substitution>::value,
-                "assuming Substitution is trivially copyable");
-  memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());
+    : InstructionBase(Loc, ReturnType), Name(Name) {
+  SILInstruction::Bits.BuiltinInst.NumSubstitutions = Subs.size();
+  assert(SILInstruction::Bits.BuiltinInst.NumSubstitutions == Subs.size() &&
+         "Truncation");
+  SILInstruction::Bits.BuiltinInst.NumOperands = Args.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Args) {
+    new (dynamicSlot++) Operand(this, value);
+  }
+  std::uninitialized_copy(Subs.begin(), Subs.end(),
+                          getTrailingObjects<Substitution>());
 }
 
 InitBlockStorageHeaderInst *
@@ -736,8 +739,9 @@ APFloat FloatLiteralInst::getValue() const {
 
 StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
                                      Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty), Length(Text.size()),
-      TheEncoding(encoding) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.StringLiteralInst.TheEncoding = unsigned(encoding);
+  SILInstruction::Bits.StringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
@@ -752,16 +756,18 @@ StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
 }
 
 uint64_t StringLiteralInst::getCodeUnitCount() {
-  if (TheEncoding == Encoding::UTF16)
+  auto E = unsigned(Encoding::UTF16);
+  if (SILInstruction::Bits.StringLiteralInst.TheEncoding == E)
     return unicode::getUTF16Length(getValue());
-  return Length;
+  return SILInstruction::Bits.StringLiteralInst.Length;
 }
 
 ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
                                                StringRef Text,
                                                Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty),
-      Length(Text.size()), TheEncoding(encoding) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.ConstStringLiteralInst.TheEncoding = unsigned(encoding);
+  SILInstruction::Bits.ConstStringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
@@ -777,9 +783,10 @@ ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
 }
 
 uint64_t ConstStringLiteralInst::getCodeUnitCount() {
-  if (TheEncoding == Encoding::UTF16)
+  auto E = unsigned(Encoding::UTF16);
+  if (SILInstruction::Bits.ConstStringLiteralInst.TheEncoding == E)
     return unicode::getUTF16Length(getValue());
-  return Length;
+  return SILInstruction::Bits.ConstStringLiteralInst.Length;
 }
 
 StoreInst::StoreInst(
@@ -902,15 +909,19 @@ UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILModule &M) {
-  void *Buffer = M.allocateInst(sizeof(StructInst) +
-                            decltype(Operands)::getExtraSize(Elements.size()),
-                            alignof(StructInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buffer = M.allocateInst(Size, alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
 }
 
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty), Operands(this, Elems) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.StructInst.NumOperands = Elems.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Elems) {
+    new (dynamicSlot++) Operand(this, value);
+  }
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
@@ -930,15 +941,20 @@ ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
 
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
                              ArrayRef<SILValue> Elements, SILModule &M) {
-  void *Buffer = M.allocateInst(sizeof(TupleInst) +
-                            decltype(Operands)::getExtraSize(Elements.size()),
-                            alignof(TupleInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buffer = M.allocateInst(Size, alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 
 TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
                      ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty), Operands(this, Elems) {}
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.TupleInst.NumOperands = Elems.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Elems) {
+    new (dynamicSlot++) Operand(this, value);
+  }
+}
 
 MetatypeInst::MetatypeInst(SILDebugLocation Loc, SILType Metatype,
                            ArrayRef<SILValue> TypeDependentOperands)
