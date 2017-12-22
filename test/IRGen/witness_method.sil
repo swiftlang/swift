@@ -110,7 +110,7 @@ class TPSReport<CoverSheet> : Strategy {
   func disrupt() -> GrowthHack
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @classArchetypeWitnessMethod(%swift.type* %CoverSheet, %T14witness_method9TPSReportC** noalias nocapture swiftself dereferenceable({{4|8}}), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @classArchetypeWitnessMethod(%T14witness_method9TPSReportC** noalias nocapture swiftself dereferenceable({{4|8}}), %swift.type* %Self, i8** %SelfWitnessTable)
 
 sil @classArchetypeWitnessMethod : $@convention(witness_method: Strategy) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> () {
 entry(%self : $*T):
