@@ -531,8 +531,8 @@ will be re-generated whenever any Python files are changed.
 
 Here's a handy checklist when implementing a production in the grammar.
 - Check if it's not already being worked on, and then
-  [file a Swift bug][NewSwiftBug], noting which grammar productions
-  are affected.
+  [file a Swift bug](https://bugs.swift.org/secure/CreateIssue!default.jspa),
+  noting which grammar productions are affected.
   - **Add the `Syntax` bug label!**
 - Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt,
   Pattern, etc.).
@@ -554,8 +554,6 @@ Here's a handy checklist when implementing a production in the grammar.
     - check for a zero-diff print with `-round-trip-lex`, and
     - check for a zero-diff print with `-round-trip-parse`
 - Update `lib/Syntax/Status.md` if applicable.
-
-[NewSwiftBug]: (https://bugs.swift.org/secure/CreateIssue!default.jspa)
 
 ## Try libSyntax in Xcode
 
