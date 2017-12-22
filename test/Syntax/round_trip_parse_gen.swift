@@ -266,4 +266,11 @@ func statementTests() {
     }
   }
 
+  if
+    foo,
+    let a = foo,
+    let b: Int = foo,
+    var c = foo,
+    case (let v, _) = foo,
+    case (let v, _): (Int, Int) = foo {}
 }

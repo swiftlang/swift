@@ -1083,6 +1083,8 @@ static void validateAvailabilitySpecList(Parser &P,
 
 // #available(...)
 ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
+  SyntaxParsingContext ConditonCtxt(SyntaxContext,
+                                    SyntaxKind::AvailabilityCondition);
   SourceLoc PoundLoc = consumeToken(tok::pound_available);
 
   if (!Tok.isFollowingLParen()) {
@@ -1257,6 +1259,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     }
   }
 
+  SyntaxParsingContext ConditionCtxt(SyntaxContext);
+
   SourceLoc IntroducerLoc;
   if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
     BindingKindStr = Tok.getText();
@@ -1272,7 +1276,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
       .fixItInsert(Tok.getLoc(), BindingKindStr.str()+" ");
   }
 
-    
   // We're parsing a conditional binding.
   assert(CurDeclContext->isLocalContext() &&
           "conditional binding in non-local context?!");
@@ -1280,12 +1283,14 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   ParserResult<Pattern> ThePattern;
     
   if (BindingKindStr == "case") {
+    ConditionCtxt.setCreateSyntax(SyntaxKind::MatchingPatternCondition);
     // In our recursive parse, remember that we're in a matching pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, IVOLP_InMatchingPattern);
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
   } else if ((BindingKindStr == "let" || BindingKindStr == "var") &&
               Tok.is(tok::kw_case)) {
+    ConditionCtxt.setCreateSyntax(SyntaxKind::Unknown);
     // If will probably be a common typo to write "if let case" instead of
     // "if case let" so detect this and produce a nice fixit.
     diagnose(IntroducerLoc, diag::wrong_condition_case_location,
@@ -1311,6 +1316,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     }
 
   } else {
+    ConditionCtxt.setCreateSyntax(SyntaxKind::OptionalBindingCondition);
     // Otherwise, this is an implicit optional binding "if let".
     ThePattern = parseMatchingPatternAsLetOrVar(BindingKindStr == "let",
                                                 IntroducerLoc,
@@ -1329,7 +1335,9 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 
   // Conditional bindings must have an initializer.
   Expr *Init;
-  if (consumeIf(tok::equal)) {
+  if (Tok.is(tok::equal)) {
+    SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
+    consumeToken();
     ParserResult<Expr> InitExpr
       = parseExprBasic(diag::expected_expr_conditional_var);
     Status |= InitExpr;
@@ -1371,6 +1379,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 ///
 ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                         Diag<> DefaultID, StmtKind ParentKind) {
+  SyntaxParsingContext ConditionListCtxt(SyntaxContext,
+                                         SyntaxKind::ConditionElementList);
   ParserStatus Status;
   Condition = StmtCondition();
 
@@ -1384,6 +1394,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   // a variety of common errors situations (including migrating from Swift 2
   // syntax).
   while (true) {
+    SyntaxParsingContext ConditionElementCtxt(SyntaxContext,
+                                              SyntaxKind::ConditionElement);
     Status |= parseStmtConditionElement(result, DefaultID, ParentKind,
                                         BindingKindStr);
     if (Status.shouldStopParsing())
