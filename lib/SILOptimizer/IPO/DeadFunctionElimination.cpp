@@ -94,11 +94,40 @@ protected:
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  //
+  // FIXME: This is a truly gross hack that is only necessary until a proper
+  //   TensorFlow library is integrated next to the Swift standard library.
+  //
+
+  /// Enhance DeadFunctionElimination to eliminate public functions from script
+  /// files - just don't treat them as anchor functions brecause they are marked
+  /// public.
+  static inline bool isPossiblyUsedExternallyFn(SILFunction *F) {
+    // Only change behavior if the tf-compiler flag is passed.
+    if (!F->getModule().getOptions().EnableTFPartition)
+      return F->isPossiblyUsedExternally();
+
+    // If its linkage makes it obvious it isn't used externally, then we're
+    // good.
+    if (!F->isPossiblyUsedExternally())
+      return false;
+
+    // If the linkage is public, if the module has a main function, and if this
+    // isn't it, then we can drop it.
+    if (F->getModule().getSwiftModule()->hasEntryPoint() &&
+        F->getName() != "main")
+      return false;
+
+    return true;
+  }
+
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
     // Functions that may be used externally cannot be removed.
-    if (F->isPossiblyUsedExternally())
+    // SWIFT_ENABLE_TENSORFLOW
+    if (isPossiblyUsedExternallyFn(F))
       return true;
 
     // ObjC functions are called through the runtime and are therefore alive

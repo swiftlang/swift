@@ -16,6 +16,7 @@ set(MANDATORY_SOURCES
   Mandatory/PredictableMemOpt.cpp
   Mandatory/SemanticARCOpts.cpp
   Mandatory/ClosureLifetimeFixup.cpp
+  # SWIFT_ENABLE_TENSORFLOW
   Mandatory/TensorFlow.cpp
   Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFLowerGraph.cpp
