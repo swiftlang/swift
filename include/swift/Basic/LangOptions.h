@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/Config.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
@@ -127,6 +128,10 @@ namespace swift {
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
+
+    /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
+    /// classes instead of the stable ABI's bit.
+    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.

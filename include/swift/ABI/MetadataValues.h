@@ -86,12 +86,16 @@ inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
 }
 
 /// Swift class flags.
+/// These flags are valid only when isTypeMetadata().
+/// When !isTypeMetadata() these flags will collide with other Swift ABIs.
 enum class ClassFlags : uint32_t {
-  /// Is this a Swift 1 class?
-  IsSwift1 = 0x1,
+  /// Is this a Swift class from the Darwin pre-stable ABI?
+  /// This bit is clear in stable ABI Swift classes.
+  /// The Objective-C runtime also reads this bit.
+  IsSwiftPreStableABI = 0x1,
 
-  /// Does this class use Swift 1.0 refcounting?
-  UsesSwift1Refcounting = 0x2,
+  /// Does this class use Swift refcounting?
+  UsesSwiftRefcounting = 0x2,
 
   /// Has this class a custom name, specified with the @objc attribute?
   HasCustomObjCName = 0x4

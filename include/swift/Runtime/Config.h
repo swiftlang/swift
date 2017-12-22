@@ -65,6 +65,16 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
+/// Which bits in the class metadata are used to distinguish Swift classes
+/// from ObjC classes?
+#ifndef SWIFT_CLASS_IS_SWIFT_MASK
+# if __APPLE__ && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+# else
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+# endif
+#endif
+
 // We try to avoid global constructors in the runtime as much as possible.
 // These macros delimit allowed global ctors.
 #if __clang__
