@@ -2119,6 +2119,8 @@ Restart:
 
   case '\n':
   case '\r':
+    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
+           "newlines should be eaten by lexTrivia as LeadingTrivia");
     NextToken.setAtStartOfLine(true);
     goto Restart;  // Skip whitespace.
 
@@ -2287,7 +2289,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   return L.peekNextToken();
 }
 
-void Lexer::lexTrivia(syntax::TriviaList &Pieces, bool IsForTrailingTrivia) {
+void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
   if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
     return;
 
@@ -2298,46 +2300,34 @@ Restart:
   // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
+    if (IsForTrailingTrivia)
+      break;
+    NextToken.setAtStartOfLine(true);
+    Pieces.appendOrSquash(TriviaPiece::newlines(1));
+    goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
-    LLVM_FALLTHROUGH;
-  case ' ':
-  case '\t':
-  case '\v':
-  case '\f': {
-    auto Char = CurPtr[-1];
-    // Consume consective same characters.
-    while (*CurPtr == Char)
+    if (CurPtr[0] == '\n') {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
       ++CurPtr;
-
-    auto Length = CurPtr - TriviaStart;
-    switch (Char) {
-    case ' ':
-      Pieces.push_back(TriviaPiece::spaces(Length));
-      break;
-    case '\n':
-      // FIXME: CR+LF shoud form one trivia piece
-      Pieces.push_back(TriviaPiece::newlines(Length));
-      break;
-    case '\r':
-      Pieces.push_back(TriviaPiece::carriageReturns(Length));
-      break;
-    case '\t':
-      Pieces.push_back(TriviaPiece::tabs(Length));
-      break;
-    case '\v':
-      Pieces.push_back(TriviaPiece::verticalTabs(Length));
-      break;
-    case '\f':
-      Pieces.push_back(TriviaPiece::formfeeds(Length));
-      break;
-    default:
-      llvm_unreachable("Invalid character for whitespace trivia");
+    } else {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
     }
     goto Restart;
-  }
+  case ' ':
+    Pieces.appendOrSquash(TriviaPiece::spaces(1));
+    goto Restart;
+  case '\t':
+    Pieces.appendOrSquash(TriviaPiece::tabs(1));
+    goto Restart;
+  case '\v':
+    Pieces.appendOrSquash(TriviaPiece::verticalTabs(1));
+    goto Restart;
+  case '\f':
+    Pieces.appendOrSquash(TriviaPiece::formfeeds(1));
+    goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
       // Don't lex comments as trailing trivias (for now).
