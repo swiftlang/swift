@@ -734,6 +734,9 @@ static bool performCompile(CompilerInstance &Instance,
                                opts);
 
   if (shouldTrackReferences) {
+    if (Instance.getPrimarySourceFiles().empty())
+      Context.Diags.diagnose(
+          SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     for (auto *SF : Instance.getPrimarySourceFiles()) {
       emitReferenceDependencies(Context.Diags, SF,
                                 *Instance.getDependencyTracker(), opts);
