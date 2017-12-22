@@ -2710,6 +2710,24 @@ public:
         }
       }
 
+      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        if (!CD->getInterfaceType() ||
+            !CD->getInterfaceType()->is<AnyFunctionType>()) {
+          Out << "Expected FuncDecl to have a function type!\n";
+          abort();
+        }
+
+        auto resultTy = CD->getResultInterfaceType();
+
+        // FIXME: Update to look for plain Optional once
+        // ImplicitlyUnwrappedOptional is removed
+        if (!resultTy->getAnyOptionalObjectType()) {
+          Out << "implicitly unwrapped optional attribute should only be set "
+                 "on functions with optional return types\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(CD);
     }
 
