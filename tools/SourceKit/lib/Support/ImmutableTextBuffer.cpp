@@ -187,7 +187,7 @@ getMemBufferFromRope(StringRef Filename, const RewriteRope &Rope) {
     Ptr += Text.size();
   }
 
-  return MemBuf;
+  return std::move(MemBuf);
 }
 
 ImmutableTextBufferRef EditableTextBuffer::getBufferForSnapshot(
