@@ -909,15 +909,19 @@ UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILModule &M) {
-  void *Buffer = M.allocateInst(sizeof(StructInst) +
-                            decltype(Operands)::getExtraSize(Elements.size()),
-                            alignof(StructInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buffer = M.allocateInst(Size, alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
 }
 
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty), Operands(this, Elems) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.StructInst.NumOperands = Elems.size();
+  Operand *dynamicSlot = getTrailingObjects<Operand>();
+  for (auto value : Elems) {
+    new (dynamicSlot++) Operand(this, value);
+  }
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 

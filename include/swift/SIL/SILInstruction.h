@@ -4389,12 +4389,12 @@ class UnconditionalCheckedCastValueInst final
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst
+class StructInst final
     : public InstructionBase<SILInstructionKind::StructInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      private llvm::TrailingObjects<StructInst, Operand> {
+  friend TrailingObjects;
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
@@ -4406,18 +4406,32 @@ class StructInst
                             ArrayRef<SILValue> Elements, SILModule &M);
 
 public:
+  ~StructInst() {
+    for (auto &op : getAllOperands()) {
+      op.~Operand();
+    }
+  }
+
   /// The elements referenced by this StructInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
   }
 
   /// The elements referenced by this StructInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef({getTrailingObjects<Operand>(),
+                                 SILInstruction::Bits.StructInst.NumOperands});
   }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(),
+            SILInstruction::Bits.StructInst.NumOperands};
+  }
 
   SILValue getFieldValue(const VarDecl *V) const {
     return getOperandForField(V)->get();
