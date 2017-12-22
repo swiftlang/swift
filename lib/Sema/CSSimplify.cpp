@@ -1532,7 +1532,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::matchTypesBindTypeVar(
     while (resultTy->is<AnyFunctionType>())
       resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
-    if (resultTy->getAnyOptionalObjectType()) {
+    // FIXME: We shouldn't see LValues here but seem to for some clang
+    //        imported function types.
+    if (resultTy->getRValueType()->getAnyOptionalObjectType()) {
       isOptional = true;
     }
   }
