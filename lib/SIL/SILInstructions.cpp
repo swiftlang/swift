@@ -739,8 +739,9 @@ APFloat FloatLiteralInst::getValue() const {
 
 StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
                                      Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty), Length(Text.size()),
-      TheEncoding(encoding) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.StringLiteralInst.TheEncoding = unsigned(encoding);
+  SILInstruction::Bits.StringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
@@ -755,16 +756,18 @@ StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
 }
 
 uint64_t StringLiteralInst::getCodeUnitCount() {
-  if (TheEncoding == Encoding::UTF16)
+  auto E = unsigned(Encoding::UTF16);
+  if (SILInstruction::Bits.StringLiteralInst.TheEncoding == E)
     return unicode::getUTF16Length(getValue());
-  return Length;
+  return SILInstruction::Bits.StringLiteralInst.Length;
 }
 
 ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
                                                StringRef Text,
                                                Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty),
-      Length(Text.size()), TheEncoding(encoding) {
+    : InstructionBase(Loc, Ty) {
+  SILInstruction::Bits.ConstStringLiteralInst.TheEncoding = unsigned(encoding);
+  SILInstruction::Bits.ConstStringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
@@ -780,9 +783,10 @@ ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
 }
 
 uint64_t ConstStringLiteralInst::getCodeUnitCount() {
-  if (TheEncoding == Encoding::UTF16)
+  auto E = unsigned(Encoding::UTF16);
+  if (SILInstruction::Bits.ConstStringLiteralInst.TheEncoding == E)
     return unicode::getUTF16Length(getValue());
-  return Length;
+  return SILInstruction::Bits.ConstStringLiteralInst.Length;
 }
 
 StoreInst::StoreInst(

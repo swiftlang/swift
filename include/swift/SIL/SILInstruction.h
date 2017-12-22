@@ -2842,9 +2842,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   StringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                     Encoding encoding, SILType ty);
 
@@ -2854,11 +2851,14 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {getTrailingObjects<char>(), Length};
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.StringLiteralInst.Length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.StringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
@@ -2886,9 +2886,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                          Encoding encoding, SILType ty);
 
@@ -2898,10 +2895,15 @@ private:
 
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
-  StringRef getValue() const { return {getTrailingObjects<char>(), Length}; }
+  StringRef getValue() const {
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.ConstStringLiteralInst.Length};
+  }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.ConstStringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
