@@ -89,8 +89,11 @@ extension DoubleWidth : Comparable {
 extension DoubleWidth : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    // FIXME: Align this computation with that of synthesized Hashable types.
-    return _mixInt(high.hashValue) ^ low.hashValue
+    var result = 0
+    result = _combineHashValues(result, _storage.high.hashValue)
+    result = _combineHashValues(result, _storage.low.hashValue)
+    result = _mixInt(result)
+    return result
   }
 }
 
