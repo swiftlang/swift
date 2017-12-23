@@ -1404,7 +1404,7 @@ namespace {
           if (solution.getDisjunctionChoice(disjunctionLocator)) {
             return coerceImplicitlyUnwrappedOptionalToValue(
                 newSubscript,
-                cs.getType(newSubscript)->getOptionalObjectType());
+                cs.getType(newSubscript)->getAnyOptionalObjectType());
           }
         }
       }
@@ -2420,7 +2420,7 @@ namespace {
       } else {
         return coerceImplicitlyUnwrappedOptionalToValue(
             newExpr, optionalTy->getWithoutSpecifierType()
-                         ->getOptionalObjectType());
+                         ->getAnyOptionalObjectType());
       }
     }
 
@@ -3519,7 +3519,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return visitCoerceExpr(expr, None);
@@ -3604,7 +3604,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return handleForcedCheckedCastExpr(expr);
@@ -3684,7 +3684,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return handleConditionalCheckedCastExpr(expr);
@@ -7304,7 +7304,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     if (unwrapResult) {
       return coerceImplicitlyUnwrappedOptionalToValue(
-          result, cs.getType(result)->getOptionalObjectType());
+          result, cs.getType(result)->getAnyOptionalObjectType());
     }
 
     return result;
