@@ -566,9 +566,6 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
   // Check callee - need new generic env:
   CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
   GenericEnvironment *genEnvCallee = nullptr;
-  if (origSILFunctionType->isPolymorphic()) {
-    genEnvCallee = getGenericEnvironment(origSILFunctionType);
-  }
   auto newSILFunctionType =
       getNewSILFunctionType(genEnvCallee, origSILFunctionType, pass.Mod);
   if (origSILFunctionType != newSILFunctionType) {
@@ -1230,12 +1227,7 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
-      Lowering::GenericContextScope GenericScope(
-          silModule.Types, origSILFunctionType->getGenericSignature());
       GenericEnvironment *genEnv = nullptr;
-      if (origSILFunctionType->isPolymorphic()) {
-        genEnv = getGenericEnvironment(origSILFunctionType);
-      }
       if (!shouldTransformResults(genEnv, origSILFunctionType, pass.Mod)) {
         continue;
       }
@@ -2187,12 +2179,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     }
   }
   CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
-  Lowering::GenericContextScope GenericScope(
-      getModule()->Types, origSILFunctionType->getGenericSignature());
   GenericEnvironment *genEnv = nullptr;
-  if (origSILFunctionType->isPolymorphic()) {
-    genEnv = getGenericEnvironment(origSILFunctionType);
-  }
   CanSILFunctionType newSILFunctionType =
       getNewSILFunctionType(genEnv, origSILFunctionType, *currIRMod);
   SILFunctionConventions newSILFunctionConventions(newSILFunctionType,
