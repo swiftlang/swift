@@ -2171,25 +2171,6 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
   return op;
 }
 
-static SmallVector<Substitution, 4>
-getNewSubs(SubstitutionList origSubs, swift::irgen::IRGenModule *currIRMod,
-           swift::GenericEnvironment *genEnv) {
-  SmallVector<Substitution, 4> newSubs;
-  for (auto sub : origSubs) {
-    Type origType = sub.getReplacement();
-    CanType origCanType = origType->getCanonicalType();
-    if (!origCanType->isLegalSILType()) {
-      newSubs.push_back(sub);
-      continue;
-    }
-    SILType origSILType = SILType::getPrimitiveObjectType(origCanType);
-    SILType newSILType = getNewSILType(genEnv, origSILType, *currIRMod);
-    Type newType = newSILType.getSwiftRValueType()->getRValueType();
-    newSubs.push_back(Substitution(newType, sub.getConformances()));
-  }
-  return newSubs;
-}
-
 void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   auto *F = applyInst->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
@@ -2229,8 +2210,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto newAlloc = allApplyRetToAllocMap.find(applyInst)->second;
     callArgs.push_back(newAlloc);
   }
-  SmallVector<Substitution, 4> newSubs =
-      getNewSubs(applySite.getSubstitutions(), currIRMod, genEnv);
+
   // Collect arg operands
   for (Operand &operand : applySite.getArgumentOperands()) {
     SILValue currOperand = operand.get();
@@ -2243,7 +2223,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   case SILInstructionKind::ApplyInst: {
     auto *castedApply = cast<ApplyInst>(applyInst);
     SILValue newApply =
-      applyBuilder.createApply(castedApply->getLoc(), callee, newSubs,
+      applyBuilder.createApply(castedApply->getLoc(), callee,
+                               applySite.getSubstitutions(),
                                callArgs, castedApply->isNonThrowing());
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2251,7 +2232,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   case SILInstructionKind::TryApplyInst: {
     auto *castedApply = cast<TryApplyInst>(applyInst);
     applyBuilder.createTryApply(
-        castedApply->getLoc(), callee, newSubs, callArgs,
+        castedApply->getLoc(), callee,
+        applySite.getSubstitutions(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
     break;
   }
@@ -2264,7 +2246,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
 
     auto newApply =
       applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      newSubs, callArgs,
+                                      applySite.getSubstitutions(), callArgs,
                                       partialApplyConvention);
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2445,8 +2427,6 @@ void LoadableByAddress::recreateBuiltinInstrs() {
     }
     auto resultTy = builtinInstr->getType();
     auto newResultTy = getNewSILType(genEnv, resultTy, *currIRMod);
-    auto newSubs =
-        getNewSubs(builtinInstr->getSubstitutions(), currIRMod, genEnv);
 
     llvm::SmallVector<SILValue, 5> newArgs;
     for (auto oldArg : builtinInstr->getArguments()) {
@@ -2455,7 +2435,8 @@ void LoadableByAddress::recreateBuiltinInstrs() {
 
     SILBuilderWithScope builtinBuilder(builtinInstr);
     auto *newInstr = builtinBuilder.createBuiltin(
-        builtinInstr->getLoc(), builtinInstr->getName(), newResultTy, newSubs,
+        builtinInstr->getLoc(), builtinInstr->getName(), newResultTy,
+        builtinInstr->getSubstitutions(),
         newArgs);
     builtinInstr->replaceAllUsesWith(newInstr);
     builtinInstr->getParent()->erase(builtinInstr);
