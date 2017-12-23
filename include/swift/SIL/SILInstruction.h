@@ -1506,13 +1506,10 @@ public:
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
 class AllocBoxInst final
-    : public InstructionBase<SILInstructionKind::AllocBoxInst,
-                             AllocationInst>,
-      private llvm::TrailingObjects<AllocBoxInst, Operand, char> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                           SILInstructionKind::AllocBoxInst,
+                                           AllocBoxInst, AllocationInst, char> {
   friend SILBuilder;
-
-  unsigned NumOperands;
 
   TailAllocatedDebugVariable VarInfo;
 
@@ -1525,18 +1522,7 @@ class AllocBoxInst final
                               SILOpenedArchetypesState &OpenedArchetypes,
                               SILDebugVariable Var);
 
-  size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
 public:
-  ~AllocBoxInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-  
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
@@ -1554,14 +1540,6 @@ public:
   SILDebugVariable getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();

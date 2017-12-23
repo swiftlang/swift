@@ -244,11 +244,9 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, SILDebugVariable Var)
-    : InstructionBase(Loc, SILType::getPrimitiveObjectType(BoxType)),
-      NumOperands(TypeDependentOperands.size()),
+    : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
+                                      SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
-  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                         TypeDependentOperands);
 }
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
@@ -259,10 +257,10 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoxType);
-  void *Buffer = allocateDebugVarCarryingInst<AllocBoxInst>(
-      F.getModule(), Var, TypeDependentOperands);
-  return ::new (Buffer)
-      AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
+  auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
+                                                   Var.Name.size());
+  auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
+  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
 }
 
 /// getDecl - Return the underlying variable declaration associated with this

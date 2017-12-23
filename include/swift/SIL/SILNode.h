@@ -184,6 +184,8 @@ protected:
     OnStack : 1
   );
 
+  // Ensure that AllocBoxInst bitfield does not overflow.
+  IBWTO_BITFIELD(AllocBoxInst, AllocationInst, 0, : NumPadBits);
   // Ensure that AllocExistentialBoxInst bitfield does not overflow.
   IBWTO_BITFIELD(AllocExistentialBoxInst, AllocationInst, 0, : NumPadBits);
   SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
