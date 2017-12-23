@@ -123,10 +123,10 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
 
   // Special handling for UnaryInstructionWithTypeDependentOperandsBase
-  SWIFT_INLINE_BITFIELD(UIWTDOB, SILNode, 32,
+  SWIFT_INLINE_BITFIELD(IBWTO, SILNode, 32,
     // DO NOT allocate bits at the front!
-    // UIWTDOB is a template, and must allocate bits from back to front and
-    // update UIWTDOB_BITFIELD().
+    // IBWTO is a template, and must allocate bits from back to front and
+    // update IBWTO_BITFIELD().
 
     /*pad*/ : 32-NumSILNodeBits,
 
@@ -134,11 +134,13 @@ protected:
     // It is number of type dependent operands + 1.
     NumOperands : 32;
     template<SILInstructionKind Kind, typename, typename, typename...>
-    friend class UnaryInstructionWithTypeDependentOperandsBase
+    friend class InstructionBaseWithTrailingOperands
   );
 
-#define UIWTDOB_BITFIELD(T, U, C, ...) \
+#define IBWTO_BITFIELD(T, U, C, ...) \
   SWIFT_INLINE_BITFIELD_FULL(T, U, (C)+32, __VA_ARGS__)
+#define UIWTDOB_BITFIELD(T, U, C, ...) \
+  IBWTO_BITFIELD(T, U, (C), __VA_ARGS__)
 
   SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
@@ -326,7 +328,7 @@ protected:
     SWIFT_INLINE_BITS(SILNode);
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
-    SWIFT_INLINE_BITS(UIWTDOB);
+    SWIFT_INLINE_BITS(IBWTO);
     SWIFT_INLINE_BITS(AllocStackInst);
     SWIFT_INLINE_BITS(AllocRefInstBase);
     SWIFT_INLINE_BITS(AllocValueBufferInst);

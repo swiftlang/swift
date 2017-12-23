@@ -1061,22 +1061,17 @@ public:
   }
 };
 
-/// A template base class for instructions that take a single regular SILValue
-/// operand, a set of type dependent operands and has no result
-/// or a single value result. The operands are tail allocated after the
-/// instruction. Further trailing data can be allocated as well if
-/// TRAILING_TYPES are provided.
+/// A template base class for instructions that a variable number of SILValue
+/// operands, and has zero or one value results. The operands are tail allocated
+/// after the instruction. Further trailing data can be allocated as well if
+/// OtherTrailingTypes are provided.
 template<SILInstructionKind Kind,
          typename Derived,
          typename Base,
          typename... OtherTrailingTypes>
-class UnaryInstructionWithTypeDependentOperandsBase
+class InstructionBaseWithTrailingOperands
     : public InstructionBase<Kind, Base>,
       protected llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...> {
-
-  unsigned getNumOperandsStorage() const {
-    return SILInstruction::Bits.UIWTDOB.NumOperands;
-  }
 
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
@@ -1088,54 +1083,112 @@ protected:
 
 public:
   template <typename... Args>
-  UnaryInstructionWithTypeDependentOperandsBase(
-      SILDebugLocation debugLoc, SILValue operand,
-      ArrayRef<SILValue> typeDependentOperands,
-      Args &&...args)
-        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...) {
-    SILInstruction::Bits.UIWTDOB.NumOperands = 1 + typeDependentOperands.size();
+  InstructionBaseWithTrailingOperands(ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           operand, typeDependentOperands);
+                                           Operands);
+  }
+
+  template <typename... Args>
+  InstructionBaseWithTrailingOperands(SILValue Operand0,
+                                      ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size() + 1;
+    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                           Operand0, Operands);
+  }
+
+  template <typename... Args>
+  InstructionBaseWithTrailingOperands(SILValue Operand0,
+                                      SILValue Operand1,
+                                      ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size() + 2;
+    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                           Operand0, Operand1, Operands);
   }
 
   // Destruct tail allocated objects.
-  ~UnaryInstructionWithTypeDependentOperandsBase() {
-    Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = getNumOperandsStorage(); i < end; ++i) {
+  ~InstructionBaseWithTrailingOperands() {
+    Operand *Operands = TrailingObjects::template getTrailingObjects<Operand>();
+    auto end = SILInstruction::Bits.IBWTO.NumOperands;
+    for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
-  size_t numTrailingObjects(
-    typename TrailingObjects::template OverloadToken<Operand>) const {
-    return getNumOperandsStorage();
+  size_t numTrailingObjects(typename TrailingObjects::template
+                            OverloadToken<Operand>) const {
+    return SILInstruction::Bits.IBWTO.NumOperands;
   }
-
-  unsigned getNumTypeDependentOperands() const {
-    return getNumOperandsStorage() - 1;
-  }
-
-  SILValue getOperand() const { return getAllOperands()[0].get(); }
-  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
-
-  Operand &getOperandRef() { return getAllOperands()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(getNumOperandsStorage())};
+            SILInstruction::Bits.IBWTO.NumOperands};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(getNumOperandsStorage())};
+            SILInstruction::Bits.IBWTO.NumOperands};
+  }
+};
+
+/// A template base class for instructions that take a single regular SILValue
+/// operand, a set of type dependent operands and has no result
+/// or a single value result. The operands are tail allocated after the
+/// instruction. Further trailing data can be allocated as well if
+/// TRAILING_TYPES are provided.
+template<SILInstructionKind Kind,
+         typename Derived,
+         typename Base,
+         typename... OtherTrailingTypes>
+class UnaryInstructionWithTypeDependentOperandsBase
+    : public InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                                 OtherTrailingTypes...> {
+protected:
+  friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                             OtherTrailingTypes...>;
+
+  typedef InstructionBaseWithTrailingOperands<
+      Kind, Derived, Operand, OtherTrailingTypes...> TrailingObjects;
+
+public:
+  template <typename... Args>
+  UnaryInstructionWithTypeDependentOperandsBase(SILDebugLocation debugLoc,
+                                       SILValue operand,
+                                       ArrayRef<SILValue> typeDependentOperands,
+                                       Args &&...args)
+      : InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                            OtherTrailingTypes...>(
+                                              operand, typeDependentOperands,
+                                              debugLoc,
+                                              std::forward<Args>(args)...) {}
+
+  unsigned getNumTypeDependentOperands() const {
+    return this->getAllOperands().size() - 1;
+  }
+
+  SILValue getOperand() const {
+    return this->getAllOperands()[0].get();
+  }
+  void setOperand(SILValue V) {
+    this->getAllOperands()[0].set(V);
+  }
+
+  Operand &getOperandRef() {
+    return this->getAllOperands()[0];
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(1);
+    return this->getAllOperands().slice(1);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(1);
+    return this->getAllOperands().slice(1);
   }
 };
 
