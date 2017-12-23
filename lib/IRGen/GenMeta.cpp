@@ -2825,8 +2825,7 @@ namespace {
       
       // Execute the fill ops. Cast the parameters to word pointers because the
       // fill indexes are word-indexed.
-      Address metadataWords(IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy),
-                            IGM.getPointerAlignment());
+      auto *metadataWords = IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy);
 
       auto genericReqtOffset = IGM.getMetadataLayout(Target)
           .getGenericRequirementsOffset(IGF);
@@ -2839,13 +2838,15 @@ namespace {
           value = IGF.emitTypeMetadataRef(fillOp.Type);
         }
 
-        auto dest = createPointerSizedGEP(IGF, metadataWords,
-                                          genericReqtOffset.getStatic());
-        genericReqtOffset = genericReqtOffset.offsetBy(
-          IGF, IGM.getPointerSize());
+        auto dest = IGF.emitAddressAtOffset(metadataWords, genericReqtOffset,
+                                            IGM.Int8PtrTy,
+                                            IGM.getPointerAlignment());
 
         value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
         IGF.Builder.CreateStore(value, dest);
+
+        genericReqtOffset = genericReqtOffset.offsetBy(
+            IGF, IGM.getPointerSize());
       }
 
       // A dependent VWT means that we have dependent metadata.
