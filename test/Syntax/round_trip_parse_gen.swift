@@ -266,4 +266,19 @@ func statementTests() {
     }
   }
 
+  if
+    foo,
+    let a = foo,
+    let b: Int = foo,
+    var c = foo,
+    case (let v, _) = foo,
+    case (let v, _): (Int, Int) = foo {
+  } else if foo {
+  } else {
+  }
+
+  guard let a = b else {}
+
+  for var i in foo where i.foo {}
+  for case is Int in foo {}
 }

@@ -50,10 +50,10 @@ class C <MemberDeclBlock>{<FunctionDecl>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr>, </TupleElement><TupleElement><IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement>first: <IntegerLiteralExpr>1</IntegerLiteralExpr>, </TupleElement><TupleElement>second: <IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
-    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement>first: <IntegerLiteralExpr>1</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr>
-    if <PrefixOperatorExpr>!<BooleanLiteralExpr>true </BooleanLiteralExpr></PrefixOperatorExpr><CodeBlock>{<ReturnStmt>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement>first: <IntegerLiteralExpr>1</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><IfStmt>
+    if <ConditionElement><PrefixOperatorExpr>!<BooleanLiteralExpr>true </BooleanLiteralExpr></PrefixOperatorExpr></ConditionElement><CodeBlock>{<ReturnStmt>
       return</ReturnStmt>
-    }</CodeBlock>
+    }</CodeBlock></IfStmt>
   }</CodeBlock></FunctionDecl><FunctionDecl>
 
   func foo3<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
@@ -217,9 +217,9 @@ class C <MemberDeclBlock>{<VariableDecl><Attribute>
   static </DeclModifier><DeclModifier>private </DeclModifier>var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IntegerLiteralExpr>3 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock>, </PatternBinding><PatternBinding><IdentifierPattern>b</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeAnnotation>, </PatternBinding><PatternBinding><IdentifierPattern>c </IdentifierPattern><InitializerClause>= <IntegerLiteralExpr>4</IntegerLiteralExpr></InitializerClause>, </PatternBinding><PatternBinding><IdentifierPattern>d </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>get <CodeBlock>{}</CodeBlock></AccessorDecl>}</AccessorBlock>, </PatternBinding><PatternBinding><TuplePattern>(<TuplePatternElement><IdentifierPattern>a</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><IdentifierPattern>b</IdentifierPattern></TuplePatternElement>)</TuplePattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeAnnotation></PatternBinding></VariableDecl><VariableDecl>
   let <PatternBinding><TuplePattern>(<TuplePatternElement><IdentifierPattern>a</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><IdentifierPattern>b</IdentifierPattern></TuplePatternElement>) </TuplePattern><InitializerClause>= <TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr>,</TupleElement><TupleElement><IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></InitializerClause>, </PatternBinding><PatternBinding><WildcardPattern>_ </WildcardPattern><InitializerClause>= <IntegerLiteralExpr>4 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{}</AccessorBlock></PatternBinding></VariableDecl><FunctionDecl>
 
-  func patternTests<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{
-    for <ValueBindingPattern>let <TuplePattern>(<TuplePatternElement><IdentifierPattern>x</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><WildcardPattern>_</WildcardPattern></TuplePatternElement>) </TuplePattern></ValueBindingPattern>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock>
-    for <ValueBindingPattern>var <IdentifierPattern>x</IdentifierPattern></ValueBindingPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock>
+  func patternTests<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ForInStmt>
+    for <ValueBindingPattern>let <TuplePattern>(<TuplePatternElement><IdentifierPattern>x</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><WildcardPattern>_</WildcardPattern></TuplePatternElement>) </TuplePattern></ValueBindingPattern>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock></ForInStmt><ForInStmt>
+    for <ValueBindingPattern>var <IdentifierPattern>x</IdentifierPattern></ValueBindingPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock></ForInStmt>
   }</CodeBlock></FunctionDecl>
 }</MemberDeclBlock></ClassDecl><DoStmt>
 
@@ -254,16 +254,31 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
       break LABEL</BreakStmt>
     case <ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern>:<BreakStmt>
       break</BreakStmt>
-  }
+  }<ForInStmt>
 
   for <IdentifierPattern>a </IdentifierPattern>in <IdentifierExpr>b </IdentifierExpr><CodeBlock>{<DeferStmt>
-    defer <CodeBlock>{ <TupleExpr>() </TupleExpr>}</CodeBlock></DeferStmt>
-    if <IdentifierExpr>c </IdentifierExpr><CodeBlock>{<ThrowStmt>
+    defer <CodeBlock>{ <TupleExpr>() </TupleExpr>}</CodeBlock></DeferStmt><IfStmt>
+    if <ConditionElement><IdentifierExpr>c </IdentifierExpr></ConditionElement><CodeBlock>{<ThrowStmt>
       throw <IdentifierExpr>MyError</IdentifierExpr>()</ThrowStmt><ContinueStmt>
       continue</ContinueStmt>
     } </CodeBlock>else <CodeBlock>{<ContinueStmt>
       continue LABEL</ContinueStmt>
-    }</CodeBlock>
-  }</CodeBlock>
+    }</CodeBlock></IfStmt>
+  }</CodeBlock></ForInStmt><IfStmt>
 
+  if<ConditionElement><IdentifierExpr>
+    foo</IdentifierExpr>,</ConditionElement><ConditionElement><OptionalBindingCondition>
+    let <IdentifierPattern>a </IdentifierPattern><InitializerClause>= <IdentifierExpr>foo</IdentifierExpr></InitializerClause></OptionalBindingCondition>,</ConditionElement><ConditionElement><OptionalBindingCondition>
+    let <IdentifierPattern>b</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IdentifierExpr>foo</IdentifierExpr></InitializerClause></OptionalBindingCondition>,</ConditionElement><ConditionElement><OptionalBindingCondition>
+    var <IdentifierPattern>c </IdentifierPattern><InitializerClause>= <IdentifierExpr>foo</IdentifierExpr></InitializerClause></OptionalBindingCondition>,</ConditionElement><ConditionElement><MatchingPatternCondition>
+    case <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>v</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><DiscardAssignmentExpr>_</DiscardAssignmentExpr></TupleElement>) </TupleExpr></ExpressionPattern><InitializerClause>= <IdentifierExpr>foo</IdentifierExpr></InitializerClause></MatchingPatternCondition>,</ConditionElement><ConditionElement><MatchingPatternCondition>
+    case <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>v</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><DiscardAssignmentExpr>_</DiscardAssignmentExpr></TupleElement>)</TupleExpr></ExpressionPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><InitializerClause>= <IdentifierExpr>foo </IdentifierExpr></InitializerClause></MatchingPatternCondition></ConditionElement><CodeBlock>{
+  } </CodeBlock>else <IfStmt>if <ConditionElement><IdentifierExpr>foo </IdentifierExpr></ConditionElement><CodeBlock>{
+  } </CodeBlock>else <CodeBlock>{
+  }</CodeBlock></IfStmt></IfStmt><GuardStmt>
+
+  guard <ConditionElement><OptionalBindingCondition>let <IdentifierPattern>a </IdentifierPattern><InitializerClause>= <IdentifierExpr>b </IdentifierExpr></InitializerClause></OptionalBindingCondition></ConditionElement>else <CodeBlock>{}</CodeBlock></GuardStmt><ForInStmt>
+
+  for <ValueBindingPattern>var <IdentifierPattern>i </IdentifierPattern></ValueBindingPattern>in <IdentifierExpr>foo </IdentifierExpr><WhereClause>where <MemberAccessExpr><IdentifierExpr>i</IdentifierExpr>.foo </MemberAccessExpr></WhereClause><CodeBlock>{}</CodeBlock></ForInStmt><ForInStmt>
+  for case <IsTypePattern>is <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></IsTypePattern>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock></ForInStmt>
 }</CodeBlock></FunctionDecl>
