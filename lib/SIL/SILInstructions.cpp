@@ -1723,10 +1723,8 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
                                LookupType);
-  void *Buffer =
-      Mod.allocateInst(sizeof(WitnessMethodInst) +
-                           sizeof(Operand) * TypeDependentOperands.size(),
-                       alignof(WitnessMethodInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
+  auto Buffer = Mod.allocateInst(Size, alignof(WitnessMethodInst));
 
   declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,

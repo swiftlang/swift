@@ -274,10 +274,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD_FULL(WitnessMethodInst, MethodInst, 32,
-    : NumPadBits,
-    NumOperands : 32
-  );
+  // Ensure that WitnessMethodInst bitfield does not overflow.
+  IBWTO_BITFIELD(WitnessMethodInst, MethodInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);

@@ -5576,29 +5576,20 @@ class ObjCSuperMethodInst
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
 class WitnessMethodInst final
-    : public InstructionBase<SILInstructionKind::WitnessMethodInst,
-                             MethodInst>,
-      llvm::TrailingObjects<WitnessMethodInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                          SILInstructionKind::WitnessMethodInst,
+                                          WitnessMethodInst, MethodInst> {
   friend SILBuilder;
 
   CanType LookupType;
   ProtocolConformanceRef Conformance;
 
-  unsigned getNumOperands() const {
-    return SILInstruction::Bits.WitnessMethodInst.NumOperands;
-  }
-
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
-      : InstructionBase(DebugLoc, Ty, Member),
-        LookupType(LookupType), Conformance(Conformance) {
-    SILInstruction::Bits.WitnessMethodInst.NumOperands =
-      TypeDependentOperands.size();
-    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           TypeDependentOperands);
-  }
+      : InstructionBaseWithTrailingOperands(TypeDependentOperands,
+                                            DebugLoc, Ty, Member),
+        LookupType(LookupType), Conformance(Conformance) {}
 
   /// Create a witness method call of a protocol requirement, passing in a lookup
   /// type and conformance.
@@ -5618,13 +5609,6 @@ class WitnessMethodInst final
          SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~WitnessMethodInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = getNumOperands(); i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
     return getMember().getDecl()->getDeclContext()
@@ -5633,20 +5617,12 @@ public:
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
-  ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
-  }
-
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
+    return getAllOperands();
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
+    return getAllOperands();
   }
 };
 
