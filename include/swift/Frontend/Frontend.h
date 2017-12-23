@@ -54,7 +54,7 @@ class SerializedModuleLoader;
 ///   - options for all stages of translation,
 ///   - information about the build environment,
 ///   - information about the job being performed, and
-///   - lists of inputs.
+///   - lists of inputsAndOutputs.
 ///
 /// A CompilerInvocation can be built from a frontend command line
 /// using parseArgs.  It can then be used to build a CompilerInstance,
@@ -431,8 +431,8 @@ public:
     return Invocation.getFrontendOptions().EnableSourceImport;
   }
 
-  /// Gets the set of SourceFiles which are the primary inputs for this
-  /// CompilerInstance.
+  /// Gets the set of SourceFiles which are the primary inputsAndOutputs for
+  /// this CompilerInstance.
   const llvm::SetVector<SourceFile*> &getPrimarySourceFiles() {
     return PrimarySourceFiles;
   }
@@ -449,7 +449,7 @@ public:
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
-  /// if there are _multiple_ primary inputs, fails with an assertion.
+  /// if there are _multiple_ primary inputsAndOutputs, fails with an assertion.
   ///
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.

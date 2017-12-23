@@ -58,7 +58,7 @@ void CompilerInstance::createSILModule() {
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
-      Invocation.getFrontendOptions().Inputs.isWholeModule());
+      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
@@ -182,7 +182,7 @@ bool CompilerInstance::setUpInputs() {
   const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllInputs())
+       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs())
     if (setUpForInput(input))
       return true;
 
