@@ -3827,22 +3827,14 @@ public:
 /// Binds memory at the raw pointer %0 to type $T with enough capacity
 /// to hold $1 values.
 class BindMemoryInst final :
-    public InstructionBase<SILInstructionKind::BindMemoryInst,
-                           NonValueInstruction>,
-    protected llvm::TrailingObjects<BindMemoryInst, Operand> {
-
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingObjects;
-  friend TrailingObjects;
-  using TrailingObjects::totalSizeToAlloc;
-
+    public InstructionBaseWithTrailingOperands<
+                                          SILInstructionKind::BindMemoryInst,
+                                          BindMemoryInst, NonValueInstruction> {
   friend SILBuilder;
 
   enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
 
   SILType BoundType;
-
-  // Fixed operands + opened archetype operands.
-  unsigned NumOperands;
 
   static BindMemoryInst *create(
     SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
@@ -3850,45 +3842,23 @@ class BindMemoryInst final :
 
   BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
                  SILType BoundType,
-                 ArrayRef<SILValue> TypeDependentOperands);
+                 ArrayRef<SILValue> TypeDependentOperands)
+    : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
+                                          Loc), BoundType(BoundType) {}
 
 public:
-  // Destruct tail allocated objects.
-  ~BindMemoryInst() {
-    Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
 
   SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
 
-  SILType getBoundType() const { return BoundType ; }
-
-  // Implement llvm::TrailingObjects.
-  size_t numTrailingObjects(
-    typename TrailingObjects::template OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
+  SILType getBoundType() const { return BoundType; }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(2);
+    return getAllOperands().slice(NumFixedOpers);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(2);
+    return getAllOperands().slice(NumFixedOpers);
   }
 };
 

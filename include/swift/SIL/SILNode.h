@@ -209,6 +209,9 @@ protected:
       atomicity : 1
   );
 
+  // Ensure that BindMemoryInst bitfield does not overflow.
+  IBWTO_BITFIELD(BindMemoryInst, NonValueInstruction, 0, : NumPadBits);
+
   // Ensure that MetatypeInst bitfield does not overflow.
   IBWTO_BITFIELD(MetatypeInst, SingleValueInstruction, 0, : NumPadBits);
 

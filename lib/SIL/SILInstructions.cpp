@@ -874,23 +874,11 @@ BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoundType.getSwiftRValueType());
-  void *Buffer = F.getModule().allocateInst(
-      sizeof(BindMemoryInst) +
-          sizeof(Operand) * (TypeDependentOperands.size() + NumFixedOpers),
-      alignof(BindMemoryInst));
-  return ::new (Buffer)
-    BindMemoryInst(Loc, Base, Index, BoundType, TypeDependentOperands);
-}
-
-BindMemoryInst::BindMemoryInst(SILDebugLocation Loc, SILValue Base,
-                               SILValue Index,
-                               SILType BoundType,
-                               ArrayRef<SILValue> TypeDependentOperands)
-  : InstructionBase(Loc),
-    BoundType(BoundType),
-    NumOperands(NumFixedOpers + TypeDependentOperands.size()) {
-  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                         Base, Index, TypeDependentOperands);
+  auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size() +
+                                               NumFixedOpers);
+  auto Buffer = F.getModule().allocateInst(Size, alignof(BindMemoryInst));
+  return ::new (Buffer) BindMemoryInst(Loc, Base, Index, BoundType,
+                                       TypeDependentOperands);
 }
 
 UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
