@@ -251,8 +251,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       // to us, we will access metadata members relative to a base offset.
       if (forClass == Target) {
         if (Layout.HasResilientSuperclass ||
-            (IGM.Context.LangOpts.EnableClassResilience &&
-             IGM.isResilient(forClass, ResilienceExpansion::Maximal))) {
+            IGM.isResilient(forClass, ResilienceExpansion::Maximal)) {
           assert(!DynamicOffsetBase);
           DynamicOffsetBase = NextOffset;
         }
