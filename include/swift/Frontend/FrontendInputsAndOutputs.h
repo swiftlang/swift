@@ -39,6 +39,12 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
+public:
+  /// The specified output files. If only a single outputfile is generated,
+  /// the name of the last specified file is taken.
+  std::vector<std::string> OutputFilenames;
+
+private:
   OutputPaths SupplementaryOutputPaths;
 
 public:
@@ -49,6 +55,7 @@ public:
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     SupplementaryOutputPaths = other.SupplementaryOutputPaths;
+    OutputFilenames = other.OutputFilenames;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
@@ -57,6 +64,7 @@ public:
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     SupplementaryOutputPaths = other.SupplementaryOutputPaths;
+    OutputFilenames = other.OutputFilenames;
     return *this;
   }
 
@@ -183,6 +191,27 @@ public:
 
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
+
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const {
+    if (OutputFilenames.size() >= 1)
+      return OutputFilenames.back();
+    return StringRef();
+  }
+  /// Sets a single filename as output filename.
+  void setSingleOutputFilename(const std::string &FileName) {
+    OutputFilenames.clear();
+    OutputFilenames.push_back(FileName);
+  }
+  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
+  bool isOutputFilenameStdout() const {
+    return getSingleOutputFilename() == "-";
+  }
+  bool isOutputFileDirectory() const;
+  bool hasNamedOutputFile() const {
+    return !OutputFilenames.empty() && !isOutputFilenameStdout();
+  }
 
   const std::string &getObjCHeaderOutputPath() const {
     return SupplementaryOutputPaths.ObjCHeaderOutputPath;
