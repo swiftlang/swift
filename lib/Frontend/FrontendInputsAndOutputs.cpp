@@ -253,3 +253,54 @@ bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
   return hasNamedOutputFile() &&
          llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
+
+std::vector<StringRef> FrontendInputsAndOutputs::getOutputFilenames() const {
+  std::vector<StringRef> outputs;
+  for (const std::string &s : OutputFilenames)
+    outputs.push_back(s);
+  return outputs;
+}
+
+std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
+  std::vector<std::string> outputs;
+  for (const std::string s : OutputFilenames)
+    outputs.push_back(s);
+  return outputs;
+}
+
+void FrontendInputsAndOutputs::setOutputFilenames(
+    ArrayRef<std::string> outputs) {
+  assert(getOutputFilenames().empty() && "re-setting OutputFilenames");
+  for (StringRef s : outputs)
+    OutputFilenames.push_back(s);
+}
+
+/// Gets the name of the specified output filename.
+/// If multiple files are specified, the last one is returned.
+StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
+  if (OutputFilenames.size() >= 1)
+    return OutputFilenames.back();
+  return StringRef();
+}
+/// Sets a single filename as output filename.
+void FrontendInputsAndOutputs::setSingleOutputFilename(
+    const std::string &FileName) {
+  OutputFilenames.clear();
+  OutputFilenames.push_back(FileName);
+}
+void FrontendInputsAndOutputs::setOutputFilenameToStdout() {
+  setSingleOutputFilename("-");
+}
+bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
+  return getSingleOutputFilename() == "-";
+}
+
+bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
+  return !OutputFilenames.empty() && !isOutputFilenameStdout();
+}
+
+void FrontendInputsAndOutputs::forEachOutputFilename(
+    llvm::function_ref<void(const std::string)> fn) const {
+  for (const std::string &s : OutputFilenames)
+    fn(s);
+}

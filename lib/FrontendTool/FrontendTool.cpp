@@ -1229,10 +1229,10 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
     if (index::indexAndRecord(
-            Instance.getMainModule(), opts.InputsAndOutputs.OutputFilenames,
-            moduleToken, opts.IndexStorePath, opts.IndexSystemModules,
-            isDebugCompilation, Invocation.getTargetTriple(),
-            *Instance.getDependencyTracker())) {
+            Instance.getMainModule(),
+            opts.InputsAndOutputs.copyOutputFilenames(), moduleToken,
+            opts.IndexStorePath, opts.IndexSystemModules, isDebugCompilation,
+            Invocation.getTargetTriple(), *Instance.getDependencyTracker())) {
       return true;
     }
   }

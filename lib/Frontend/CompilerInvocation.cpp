@@ -825,7 +825,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.MainInputFilename =
         FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
-  Opts.IRGOutputFilenames = FrontendOpts.InputsAndOutputs.OutputFilenames;
+  Opts.IRGOutputFilenames = FrontendOpts.InputsAndOutputs.copyOutputFilenames();
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
