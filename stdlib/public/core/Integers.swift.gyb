@@ -2596,6 +2596,10 @@ ${operatorComment('&' + x.operator, True)}
 % end
 }
 
+%{
+  bitSizes = [8, 16, 32, 64]
+}%
+
 extension FixedWidthInteger {
   /// Returns a random representation of this integer.
   ///
@@ -2608,14 +2612,10 @@ extension FixedWidthInteger {
   @_inlineable
   public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
     switch bitWidth {
-    case 8:
-      return Self.init(truncatingIfNeeded: generator.next(UInt8.self))
-    case 16:
-      return Self.init(truncatingIfNeeded: generator.next(UInt16.self))
-    case 32:
-      return Self.init(truncatingIfNeeded: generator.next(UInt32.self))
-    case 64:
-      return Self.init(truncatingIfNeeded: generator.next(UInt64.self))
+% for bitSize in bitSizes:
+    case ${bitSize}:
+      return Self.init(truncatingIfNeeded: generator.next(UInt${bitSize}.self))
+% end
     default:
       return Self.init(truncatingIfNeeded: generator.next())
     }
