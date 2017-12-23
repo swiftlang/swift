@@ -6525,17 +6525,17 @@ public:
 ///
 /// This is a terminator because the caller can abort the coroutine,
 /// e.g. if an error is thrown and an unwind is provoked.
-class YieldInst
-  : public InstructionBase<SILInstructionKind::YieldInst,
-                           TermInst> {
+class YieldInst final
+  : public InstructionBaseWithTrailingOperands<SILInstructionKind::YieldInst,
+                                               YieldInst, TermInst> {
   friend SILBuilder;
 
   SILSuccessor DestBBs[2];
 
-  TailAllocatedOperandList<0> Operands;
-
   YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
-            SILBasicBlock *normalBB, SILBasicBlock *unwindBB);
+            SILBasicBlock *normalBB, SILBasicBlock *unwindBB)
+    : InstructionBaseWithTrailingOperands(yieldedValues, loc),
+      DestBBs{{this, normalBB}, {this, unwindBB}} {}
 
   static YieldInst *create(SILDebugLocation loc,
                            ArrayRef<SILValue> yieldedValues,
@@ -6567,11 +6567,8 @@ public:
   SILBasicBlock *getUnwindBB() const { return DestBBs[1]; }
 
   OperandValueArrayRef getYieldedValues() const {
-    return Operands.asValueArray();
+    return OperandValueArrayRef(getAllOperands());
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;

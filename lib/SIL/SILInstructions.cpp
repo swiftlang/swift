@@ -1111,20 +1111,13 @@ bool TermInst::isFunctionExiting() const {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
-YieldInst::YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
-                     SILBasicBlock *normalBB, SILBasicBlock *unwindBB)
-  : InstructionBase(loc),
-    DestBBs{{this, normalBB}, {this, unwindBB}},
-    Operands(this, yieldedValues) {}
-
 YieldInst *YieldInst::create(SILDebugLocation loc,
                              ArrayRef<SILValue> yieldedValues,
                              SILBasicBlock *normalBB, SILBasicBlock *unwindBB,
                              SILFunction &F) {
-  void *buffer = F.getModule().allocateInst(sizeof(YieldInst) +
-                        decltype(Operands)::getExtraSize(yieldedValues.size()),
-                                            alignof(YieldInst));
-  return ::new (buffer) YieldInst(loc, yieldedValues, normalBB, unwindBB);
+  auto Size = totalSizeToAlloc<swift::Operand>(yieldedValues.size());
+  void *Buffer = F.getModule().allocateInst(Size, alignof(YieldInst));
+  return ::new (Buffer) YieldInst(loc, yieldedValues, normalBB, unwindBB);
 }
 
 BranchInst *BranchInst::create(SILDebugLocation Loc, SILBasicBlock *DestBB,
