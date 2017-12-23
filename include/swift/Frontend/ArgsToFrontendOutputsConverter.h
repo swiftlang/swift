@@ -28,21 +28,22 @@ using namespace llvm::opt;
 
 namespace swift {
 
-/// Given the command line arguments and information about the inputs,
-/// Fill in all the information in FrontendInputs.
+/// Given the command line arguments and information about the inputsAndOutputs,
+/// Fill in all the information in FrontendInputsAndOutputs.
 
 class ArgsToFrontendOutputsConverter {
   const ArgList &Args;
   StringRef ModuleName;
   // FIXME: dmu more functional, return this
-  FrontendInputs &Inputs;
+  FrontendInputsAndOutputs &InputsAndOutputs;
   DiagnosticEngine &Diags;
 
 public:
   ArgsToFrontendOutputsConverter(const ArgList &args, StringRef moduleName,
-                                 FrontendInputs &inputs,
+                                 FrontendInputsAndOutputs &inputsAndOutputs,
                                  DiagnosticEngine &diags)
-      : Args(args), ModuleName(moduleName), Inputs(inputs), Diags(diags) {}
+      : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
+        Diags(diags) {}
   Optional<std::pair<std::vector<std::string>, OutputPaths>> convert();
 
   static std::vector<std::string>
@@ -54,7 +55,7 @@ public:
 class OutputFilesComputer {
   const ArgList &Args;
   DiagnosticEngine &Diags;
-  const FrontendInputs &Inputs;
+  const FrontendInputsAndOutputs &InputsAndOutputs;
 
   const std::vector<std::string> OutputFileArguments;
   const StringRef OutputDirectoryArgument;
@@ -67,7 +68,7 @@ class OutputFilesComputer {
 
 public:
   OutputFilesComputer(const ArgList &args, DiagnosticEngine &diags,
-                      const FrontendInputs &inputs);
+                      const FrontendInputsAndOutputs &inputsAndOutputs);
 
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
@@ -106,7 +107,7 @@ private:
 class OutputPathsComputer {
   const ArgList &Args;
   DiagnosticEngine &Diags;
-  const FrontendInputs &Inputs;
+  const FrontendInputsAndOutputs &InputsAndOutputs;
   ArrayRef<std::string> OutputFiles;
   StringRef ModuleName;
 
@@ -114,7 +115,7 @@ class OutputPathsComputer {
 
 public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
-                      const FrontendInputs &inputs,
+                      const FrontendInputsAndOutputs &inputsAndOutputs,
                       ArrayRef<std::string> outputFiles, StringRef moduleName);
   Optional<OutputPaths> computeOutputPaths() const;
 

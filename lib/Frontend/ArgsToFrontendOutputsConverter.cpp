@@ -38,11 +38,12 @@ ArgsToFrontendOutputsConverter::convert() {
     return std::make_pair(std::vector<std::string>(), OutputPaths());
 
   Optional<std::vector<std::string>> outputFiles =
-      OutputFilesComputer(Args, Diags, Inputs).computeOutputFiles();
+      OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
   if (!outputFiles)
     return None;
   Optional<OutputPaths> outputPaths =
-      OutputPathsComputer(Args, Diags, Inputs, *outputFiles, ModuleName)
+      OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
+                          ModuleName)
           .computeOutputPaths();
   if (!outputPaths)
     return None;
@@ -85,10 +86,10 @@ OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
   return args.getAllArgValues(options::OPT_o);
 }
 
-OutputFilesComputer::OutputFilesComputer(const ArgList &args,
-                                         DiagnosticEngine &diags,
-                                         const FrontendInputs &inputs)
-    : Args(args), Diags(diags), Inputs(inputs),
+OutputFilesComputer::OutputFilesComputer(
+    const ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs)
+    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
       OutputFileArguments(
           getOutputFilenamesFromCommandLineOrFilelist(Args, Diags)),
       OutputDirectoryArgument(
@@ -98,9 +99,11 @@ OutputFilesComputer::OutputFilesComputer(const ArgList &args,
               : StringRef()),
       DoOutputFileArgumentsMatchInputs(
           OutputDirectoryArgument.empty() &&
-          OutputFileArguments.size() == Inputs.countOfFilesProducingOutput()),
-      FirstInput(Inputs.hasSingleInput() ? Inputs.getFilenameOfFirstInput()
-                                         : StringRef()),
+          OutputFileArguments.size() ==
+              InputsAndOutputs.countOfFilesProducingOutput()),
+      FirstInput(InputsAndOutputs.hasSingleInput()
+                     ? InputsAndOutputs.getFilenameOfFirstInput()
+                     : StringRef()),
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)),
       ModuleNameArg(Args.getLastArg(options::OPT_module_name)),
@@ -113,7 +116,7 @@ Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
 
-  bool hadError = Inputs.forEachInputProducingOutput(
+  bool hadError = InputsAndOutputs.forEachInputProducingOutput(
       [&](const InputFile &input, unsigned i) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
@@ -183,19 +186,18 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   return path.str();
 }
 
-OutputPathsComputer::OutputPathsComputer(const ArgList &args,
-                                         DiagnosticEngine &diags,
-                                         const FrontendInputs &inputs,
-                                         ArrayRef<std::string> outputFiles,
-                                         StringRef moduleName)
-    : Args(args), Diags(diags), Inputs(inputs), OutputFiles(outputFiles),
-      ModuleName(moduleName),
+OutputPathsComputer::OutputPathsComputer(
+    const ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    ArrayRef<std::string> outputFiles, StringRef moduleName)
+    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+      OutputFiles(outputFiles), ModuleName(moduleName),
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
 Optional<OutputPaths> OutputPathsComputer::computeOutputPaths() const {
-  return computeOutputPathsForOneInput(OutputFiles[0],
-                                       Inputs.firstInputProducingOutput());
+  return computeOutputPathsForOneInput(
+      OutputFiles[0], InputsAndOutputs.firstInputProducingOutput());
 }
 
 Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(

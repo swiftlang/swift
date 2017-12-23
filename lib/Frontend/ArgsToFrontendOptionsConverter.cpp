@@ -94,14 +94,15 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   computeDumpScopeMapLocations();
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
+          .convert())
     return true;
 
   Opts.RequestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.Inputs.hasPrimaryInputs()) {
+      Opts.InputsAndOutputs.hasPrimaryInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -341,10 +342,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
 bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   using namespace options;
   bool treatAsSIL =
-      Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
-  bool treatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
+      Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL();
+  bool treatAsLLVM = Opts.InputsAndOutputs.shouldTreatAsLLVM();
 
-  if (Opts.Inputs.verifyInputs(
+  if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
           Opts.RequestedAction == FrontendOptions::ActionType::REPL,
           Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
@@ -352,7 +353,7 @@ bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   }
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate) {
     Opts.ImmediateArgv.push_back(
-        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
+        Opts.InputsAndOutputs.getFilenameOfFirstInput()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));
@@ -413,7 +414,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     return false;
   }
   // In order to pass some tests, must leave ModuleName empty.
-  if (!Opts.Inputs.hasInputs()) {
+  if (!Opts.InputsAndOutputs.hasInputs()) {
     Opts.ModuleName = StringRef();
     // FIXME: dmu This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
@@ -428,7 +429,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   auto nameToStem = ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
                         outputFilenames)
                         ? outputFilenames.front()
-                        : Opts.Inputs.getFilenameOfFirstInput().str();
+                        : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
@@ -438,8 +439,8 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.hasPrimaryInputs() && !Opts.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
+                                    !Opts.ModuleOutputPath.empty();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
@@ -457,7 +458,8 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
   Optional<std::pair<std::vector<std::string>, OutputPaths>> outs =
-      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName, Opts.Inputs, Diags)
+      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
+                                     Opts.InputsAndOutputs, Diags)
           .convert();
   if (!outs)
     return true;
