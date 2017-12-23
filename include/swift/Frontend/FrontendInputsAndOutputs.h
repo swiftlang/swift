@@ -39,7 +39,6 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
-public:
   /// The specified output files. If only a single outputfile is generated,
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
@@ -192,26 +191,26 @@ public:
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
 
+  std::vector<StringRef> getOutputFilenames() const;
+  std::vector<std::string> copyOutputFilenames() const;
+
+  void
+  forEachOutputFilename(llvm::function_ref<void(const std::string)> fn) const;
+
+  void setOutputFilenames(ArrayRef<std::string> outputs);
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
+  StringRef getSingleOutputFilename() const;
+
   /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
-  }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
-  }
+  void setSingleOutputFilename(const std::string &FileName);
+
+  void setOutputFilenameToStdout();
+  bool isOutputFilenameStdout() const;
+
   bool isOutputFileDirectory() const;
-  bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
-  }
+  bool hasNamedOutputFile() const;
 
   const std::string &getObjCHeaderOutputPath() const {
     return SupplementaryOutputPaths.ObjCHeaderOutputPath;
