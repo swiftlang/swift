@@ -673,7 +673,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    StringRef BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -825,7 +825,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.MainInputFilename =
         FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
-  Opts.IRGOutputFilenames = FrontendOpts.OutputFilenames;
+  Opts.IRGOutputFilenames = FrontendOpts.InputsAndOutputs.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

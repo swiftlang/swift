@@ -100,8 +100,8 @@ void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const std::string &OutputFileName : OutputFilenames) {
-      fn(OutputFileName);
+    for (const std::string &OutputFilename : InputsAndOutputs.OutputFilenames) {
+      fn(OutputFilename);
     }
   }
   const std::string outputs[] = {InputsAndOutputs.getModuleOutputPath(),
@@ -115,9 +115,9 @@ void FrontendOptions::forAllOutputPaths(
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (hasNamedOutputFile())
+  if (InputsAndOutputs.hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
-    return getSingleOutputFilename();
+    return InputsAndOutputs.getSingleOutputFilename();
 
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
@@ -127,10 +127,6 @@ StringRef FrontendOptions::originalPath() const {
                : StringRef(ModuleName);
 }
 
-bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() &&
-         llvm::sys::fs::is_directory(getSingleOutputFilename());
-}
 
 const char *
 FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
