@@ -1127,11 +1127,6 @@ YieldInst *YieldInst::create(SILDebugLocation loc,
   return ::new (buffer) YieldInst(loc, yieldedValues, normalBB, unwindBB);
 }
 
-BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,
-                       ArrayRef<SILValue> Args)
-    : InstructionBase(Loc), DestBB(this, DestBB),
-      Operands(this, Args) {}
-
 BranchInst *BranchInst::create(SILDebugLocation Loc, SILBasicBlock *DestBB,
                                SILFunction &F) {
   return create(Loc, DestBB, {}, F);
@@ -1140,9 +1135,8 @@ BranchInst *BranchInst::create(SILDebugLocation Loc, SILBasicBlock *DestBB,
 BranchInst *BranchInst::create(SILDebugLocation Loc,
                                SILBasicBlock *DestBB, ArrayRef<SILValue> Args,
                                SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(BranchInst) +
-                              decltype(Operands)::getExtraSize(Args.size()),
-                            alignof(BranchInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Args.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(BranchInst));
   return ::new (Buffer) BranchInst(Loc, DestBB, Args);
 }
 

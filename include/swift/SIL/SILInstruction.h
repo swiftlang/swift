@@ -6579,17 +6579,17 @@ public:
 };
 
 /// BranchInst - An unconditional branch.
-class BranchInst
-    : public InstructionBase<SILInstructionKind::BranchInst,
-                             TermInst> {
+class BranchInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::BranchInst,
+                                                 BranchInst, TermInst> {
   friend SILBuilder;
 
   SILSuccessor DestBB;
-  // FIXME: probably needs dynamic adjustment
-  TailAllocatedOperandList<0> Operands;
 
   BranchInst(SILDebugLocation DebugLoc, SILBasicBlock *DestBB,
-             ArrayRef<SILValue> Args);
+             ArrayRef<SILValue> Args)
+    : InstructionBaseWithTrailingOperands(Args, DebugLoc),
+      DestBB(this, DestBB) {}
 
   /// Construct a BranchInst that will branch to the specified block.
   /// The destination block must take no parameters.
@@ -6606,17 +6606,16 @@ public:
   SILBasicBlock *getDestBB() const { return DestBB; }
 
   /// The arguments for the destination BB.
-  OperandValueArrayRef getArgs() const { return Operands.asValueArray(); }
+  OperandValueArrayRef getArgs() const {
+    return OperandValueArrayRef(getAllOperands());
+  }
 
   SuccessorListTy getSuccessors() {
     return SuccessorListTy(&DestBB, 1);
   }
 
-  unsigned getNumArgs() const { return Operands.size(); }
-  SILValue getArg(unsigned i) const { return Operands[i].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  unsigned getNumArgs() const { return getAllOperands().size(); }
+  SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
 };
 
 /// A conditional branch.

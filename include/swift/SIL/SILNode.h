@@ -303,6 +303,8 @@ protected:
   UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
   UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
 
+  // Ensure that BranchInst bitfield does not overflow.
+  IBWTO_BITFIELD(BranchInst, TermInst, 0, : NumPadBits);
   SWIFT_INLINE_BITFIELD_FULL(SwitchValueInst, TermInst, 1+32,
     HasDefault : 1,
     : NumPadBits,
