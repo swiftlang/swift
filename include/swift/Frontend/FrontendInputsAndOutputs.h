@@ -1,4 +1,4 @@
-//===--- FrontendInputs.h --------------------------------------*- C++
+//===--- FrontendInputsAndOutputs.h --------------------------------------*- C++
 //-*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -11,12 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef FrontendInputsAndOutputs_h
-#define FrontendInputsAndOutputs_h
+#ifndef FrontendInputsAndOutputsAndOutputs_h
+#define FrontendInputsAndOutputsAndOutputs_h
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -29,9 +29,9 @@ class MemoryBuffer;
 
 namespace swift {
 
-/// Information about all the inputs and outputs to the frontend.
+/// Information about all the inputsAndOutputs and outputs to the frontend.
 
-class FrontendInputs {
+class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllFiles;
@@ -40,15 +40,15 @@ class FrontendInputs {
   bool IsSingleThreadedWMO = false;
 
 public:
-  FrontendInputs() = default;
+  FrontendInputsAndOutputs() = default;
 
-  FrontendInputs(const FrontendInputs &other) {
+  FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
     for (InputFile input : other.getAllInputs())
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   }
 
-  FrontendInputs &operator=(const FrontendInputs &other) {
+  FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
     for (InputFile input : other.getAllInputs())
       addInput(input);
@@ -183,4 +183,4 @@ public:
 
 } // namespace swift
 
-#endif /* FrontendInputsAndOutputs_h */
+#endif /* FrontendInputsAndOutputsAndOutputs_h */

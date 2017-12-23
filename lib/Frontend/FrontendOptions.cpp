@@ -124,7 +124,7 @@ StringRef FrontendOptions::originalPath() const {
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  const auto input = Inputs.getUniquePrimaryInput();
+  const auto input = InputsAndOutputs.getUniquePrimaryInput();
   return input ? llvm::sys::path::filename(input->file())
                : StringRef(ModuleName);
 }

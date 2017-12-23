@@ -139,7 +139,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
     for (auto const &path :
-         reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
+         reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -545,14 +545,16 @@ static bool performCompile(CompilerInstance &Instance,
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
       ImporterOpts.BridgingHeader =
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
+          Invocation.getFrontendOptions()
+              .InputsAndOutputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-        Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.getFilenameOfFirstInput(),
         opts.getSingleOutputFilename());
   }
 
@@ -563,15 +565,17 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getFrontendOptions().Inputs.hasSingleInput() &&
+    assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
         llvm::MemoryBuffer::getFileOrSTDIN(
-            Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
+            Invocation.getFrontendOptions()
+                .InputsAndOutputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
       Instance.getASTContext().Diags.diagnose(
           SourceLoc(), diag::error_open_input_file,
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Invocation.getFrontendOptions()
+              .InputsAndOutputs.getFilenameOfFirstInput(),
           FileBufOrErr.getError().message());
       return true;
     }
@@ -586,7 +590,8 @@ static bool performCompile(CompilerInstance &Instance,
       // if available.
       Instance.getASTContext().Diags.diagnose(
           SourceLoc(), diag::error_parse_input_file,
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Invocation.getFrontendOptions()
+              .InputsAndOutputs.getFilenameOfFirstInput(),
           Err.getMessage());
       return true;
     }
@@ -804,16 +809,16 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.Inputs.hasPrimaryInputs()) {
+    if (opts.InputsAndOutputs.hasPrimaryInputs()) {
       if (Instance.getPrimarySourceFiles().empty()) {
         // If we have primary inputs but no primary _source files_, we might
         // have a primary serialized input.
         for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
-            if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
-                  InputFile::
-                    convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-                      SASTF->getFilename()))) {
+            if (Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(
+                    InputFile::
+                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                            SASTF->getFilename()))) {
               assert(PSGIs.empty() && "Can only handle one primary AST input");
               auto SM = performSILGeneration(*SASTF, SILOpts, None);
               PSGIs.push_back(
@@ -1450,7 +1455,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName = FEOpts.Inputs.getNameOfUniquePrimaryInputFile();
+    StringRef InputName =
+        FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);

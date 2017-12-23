@@ -15,7 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -33,7 +33,7 @@ class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
 public:
-  FrontendInputs Inputs;
+  FrontendInputsAndOutputs InputsAndOutputs;
 
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
@@ -315,7 +315,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasSingleInput();
+    return InputKind == InputFileKind::IFK_Swift &&
+           InputsAndOutputs.hasSingleInput();
   }
 
 private:
