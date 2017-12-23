@@ -100,9 +100,7 @@ void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const std::string &OutputFilename : InputsAndOutputs.OutputFilenames) {
-      fn(OutputFilename);
-    }
+    InputsAndOutputs.forEachOutputFilename(fn);
   }
   const std::string outputs[] = {InputsAndOutputs.getModuleOutputPath(),
                                  InputsAndOutputs.getModuleDocOutputPath(),
