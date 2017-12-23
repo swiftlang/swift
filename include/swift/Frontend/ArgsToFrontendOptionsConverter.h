@@ -23,6 +23,9 @@
 
 namespace swift {
 
+/// Parse the command line arguments and fill out all the info in
+/// FrontendOptions.
+
 class ArgsToFrontendOptionsConverter {
 private:
   DiagnosticEngine &Diags;
@@ -37,7 +40,8 @@ private:
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
-  bool computeOutputFilenames();
+
+  bool computeOutputFilenamesAndSupplementaryFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -83,6 +87,9 @@ private:
   bool checkForUnusedOutputPaths() const;
 
   std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
+  bool setUpForSILOrLLVM();
+
+  bool checkUnusedOutputPaths() const;
 
 public:
   ArgsToFrontendOptionsConverter(DiagnosticEngine &Diags,
@@ -96,3 +103,4 @@ public:
 } // namespace swift
 
 #endif /* SWIFT_FRONTEND_ARGSTOFRONTENDOPTIONSCONVERTER_H */
+

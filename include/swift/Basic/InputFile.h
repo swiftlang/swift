@@ -42,7 +42,8 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(!name.empty());
+    assert(name.begin() != Filename.c_str());
+    assert(!name.empty() && "Empty strings signify no inputs in other places");
   }
 
   bool isPrimary() const { return IsPrimary; }
@@ -59,7 +60,6 @@ public:
     return filename.equals("<stdin>") ? "-" : filename;
   }
 };
-
 } // namespace swift
 
 #endif /* SWIFT_FRONTEND_INPUTFILE_H */

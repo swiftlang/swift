@@ -27,7 +27,6 @@ namespace llvm {
 
 namespace swift {
 
-
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;

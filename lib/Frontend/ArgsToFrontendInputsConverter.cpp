@@ -3,17 +3,13 @@
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -45,7 +41,13 @@ bool ArgsToFrontendInputsConverter::convert() {
     return true;
   std::set<StringRef> unusedPrimaryFiles =
       createInputFilesConsumingPrimaries(*primaryFiles);
-  return checkForMissingPrimaryFiles(unusedPrimaryFiles);
+  if (checkForMissingPrimaryFiles(unusedPrimaryFiles))
+    return true;
+
+  // Must be set before we iterate over inputs needing outputs.
+  Inputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
+
+  return false;
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -148,4 +150,11 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
                    FilelistPathArg->getValue());
   }
   return !primaryFiles.empty();
+}
+
+bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  return Inputs.hasInputs() && !Inputs.hasPrimaryInputs() &&
+         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                          Diags)
+                 .size() == 1;
 }
