@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.MainInputFilename = InputFilename;
-  Opts.OutputFilenames.push_back(OutputFilename);
+  Opts.IRGOutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;
