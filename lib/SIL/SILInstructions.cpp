@@ -916,12 +916,7 @@ StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
 
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty) {
-  SILInstruction::Bits.StructInst.NumOperands = Elems.size();
-  Operand *dynamicSlot = getTrailingObjects<Operand>();
-  for (auto value : Elems) {
-    new (dynamicSlot++) Operand(this, value);
-  }
+    : InstructionBaseWithTrailingOperands(Elems, Loc, Ty) {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 

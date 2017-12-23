@@ -147,10 +147,8 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
 
-  SWIFT_INLINE_BITFIELD_FULL(StructInst, SingleValueInstruction, 32,
-    : NumPadBits,
-    NumOperands : 32
-  );
+  // Ensure that StructInst bitfield does not overflow.
+  IBWTO_BITFIELD(StructInst, SingleValueInstruction, 0, : NumPadBits);
 
   // Ensure that TupleInst bitfield does not overflow.
   IBWTO_BITFIELD(TupleInst, SingleValueInstruction, 0, : NumPadBits);
