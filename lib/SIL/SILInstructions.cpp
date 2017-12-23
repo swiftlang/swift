@@ -302,17 +302,6 @@ VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-AllocExistentialBoxInst::AllocExistentialBoxInst(
-    SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
-    ArrayRef<ProtocolConformanceRef> Conformances,
-    ArrayRef<SILValue> TypeDependentOperands, SILFunction *Parent)
-    : InstructionBase(Loc, ExistentialType.getObjectType()),
-      NumOperands(TypeDependentOperands.size()),
-      ConcreteType(ConcreteType), Conformances(Conformances) {
-  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                         TypeDependentOperands);
-}
-
 static void declareWitnessTable(SILModule &Mod,
                                 ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) return;
@@ -332,10 +321,8 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
                                ConcreteType);
   SILModule &Mod = F->getModule();
-  void *Buffer =
-      Mod.allocateInst(sizeof(AllocExistentialBoxInst) +
-                           sizeof(Operand) * (TypeDependentOperands.size()),
-                       alignof(AllocExistentialBoxInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
+  auto Buffer = Mod.allocateInst(Size, alignof(AllocExistentialBoxInst));
   for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,

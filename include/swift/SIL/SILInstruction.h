@@ -1578,12 +1578,10 @@ public:
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
 class AllocExistentialBoxInst final
-    : public InstructionBase<SILInstructionKind::AllocExistentialBoxInst,
-                             AllocationInst>,
-      private llvm::TrailingObjects<AllocExistentialBoxInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                   SILInstructionKind::AllocExistentialBoxInst,
+                                   AllocExistentialBoxInst, AllocationInst> {
   friend SILBuilder;
-  unsigned NumOperands;
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
@@ -1591,7 +1589,10 @@ class AllocExistentialBoxInst final
                           CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           ArrayRef<SILValue> TypeDependentOperands,
-                          SILFunction *Parent);
+                          SILFunction *Parent)
+    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+                                          ExistentialType.getObjectType()),
+      ConcreteType(ConcreteType), Conformances(Conformances) {}
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
@@ -1599,27 +1600,12 @@ class AllocExistentialBoxInst final
          SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~AllocExistentialBoxInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   CanType getFormalConcreteType() const { return ConcreteType; }
 
   SILType getExistentialType() const { return getType(); }
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(), NumOperands};
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
