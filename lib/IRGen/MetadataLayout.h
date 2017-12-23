@@ -134,6 +134,8 @@ protected:
   NominalMetadataLayout(Kind kind, NominalTypeDecl *nominal)
       : MetadataLayout(kind), Nominal(nominal) {}
 
+  Offset emitOffset(IRGenFunction &IGF, StoredOffset offset) const;
+
 public:
   NominalTypeDecl *getDecl() const {
     return Nominal;
@@ -214,9 +216,6 @@ public:
 
   Size getInstanceAlignMaskOffset() const;
 
-  /// Should only be used when emitting the nominal type descriptor.
-  Size getStaticVTableOffset() const;
-
   /// Returns the start of the vtable in the class metadata.
   Offset getVTableOffset(IRGenFunction &IGF) const;
 
@@ -244,7 +243,13 @@ public:
   Size getStaticFieldOffset(VarDecl *field) const;
 
   /// Should only be used when emitting the nominal type descriptor.
+  Size getRelativeGenericRequirementsOffset() const;
+
   Size getStaticFieldOffsetVectorOffset() const;
+  Size getRelativeFieldOffsetVectorOffset() const;
+
+  Size getStaticVTableOffset() const;
+  Size getRelativeVTableOffset() const;
 
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
 
