@@ -1215,7 +1215,7 @@ static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
-  auto &silModue = pass.F->getModule();
+  auto &silModule = pass.F->getModule();
   for (auto &BB : *pass.F) {
     for (auto &II : BB) {
       auto *currIns = &II;
@@ -1231,7 +1231,7 @@ void LoadableStorageAllocation::convertApplyResults() {
       }
       CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
       Lowering::GenericContextScope GenericScope(
-          silModue.Types, origSILFunctionType->getGenericSignature());
+          silModule.Types, origSILFunctionType->getGenericSignature());
       GenericEnvironment *genEnv = nullptr;
       if (origSILFunctionType->isPolymorphic()) {
         genEnv = getGenericEnvironment(origSILFunctionType);
