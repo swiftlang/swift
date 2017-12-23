@@ -946,16 +946,6 @@ TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 
-TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
-                     ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc, Ty) {
-  SILInstruction::Bits.TupleInst.NumOperands = Elems.size();
-  Operand *dynamicSlot = getTrailingObjects<Operand>();
-  for (auto value : Elems) {
-    new (dynamicSlot++) Operand(this, value);
-  }
-}
-
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   SILModule &Mod = getModule();
 

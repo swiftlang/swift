@@ -4815,38 +4815,29 @@ public:
 
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst final
-    : public InstructionBase<SILInstructionKind::TupleInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<TupleInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::TupleInst,
+                                                  TupleInst,
+                                                  SingleValueInstruction> {
   friend SILBuilder;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
-  TupleInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements);
+  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems)
+    : InstructionBaseWithTrailingOperands(Elems, DebugLoc, Ty) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
                            ArrayRef<SILValue> Elements, SILModule &M);
 
 public:
-  ~TupleInst() {
-    for (auto &op : getAllOperands()) {
-      op.~Operand();
-    }
-  }
-
   /// The elements referenced by this TupleInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return {getTrailingObjects<Operand>(),
-            SILInstruction::Bits.TupleInst.NumOperands};
+    return getAllOperands();
   }
 
   /// The elements referenced by this TupleInst.
   OperandValueArrayRef getElements() const {
-    return OperandValueArrayRef({getTrailingObjects<Operand>(),
-                                 SILInstruction::Bits.TupleInst.NumOperands});
+    return OperandValueArrayRef(getAllOperands());
   }
 
   /// Return the i'th value referenced by this TupleInst.
@@ -4857,15 +4848,6 @@ public:
   unsigned getElementIndex(Operand *operand) {
     assert(operand->getUser() == this);
     return operand->getOperandNumber();
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(),
-            SILInstruction::Bits.TupleInst.NumOperands};
-  }
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(),
-            SILInstruction::Bits.TupleInst.NumOperands};
   }
 
   TupleType *getTupleType() const {
