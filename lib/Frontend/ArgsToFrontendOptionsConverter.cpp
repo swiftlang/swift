@@ -439,8 +439,9 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-                                    !Opts.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |=
+        !Opts.InputsAndOutputs.hasPrimaryInputs() &&
+        !Opts.InputsAndOutputs.getModuleOutputPath().empty();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
@@ -464,16 +465,7 @@ bool ArgsToFrontendOptionsConverter::
   if (!outs)
     return true;
   Opts.OutputFilenames = outs->first;
-
-  Opts.ObjCHeaderOutputPath = outs->second.ObjCHeaderOutputPath;
-  Opts.ModuleOutputPath = outs->second.ModuleOutputPath;
-  Opts.ModuleDocOutputPath = outs->second.ModuleDocOutputPath;
-  Opts.DependenciesFilePath = outs->second.DependenciesFilePath;
-  Opts.ReferenceDependenciesFilePath =
-      outs->second.ReferenceDependenciesFilePath;
-  Opts.SerializedDiagnosticsPath = outs->second.SerializedDiagnosticsPath;
-  Opts.LoadedModuleTracePath = outs->second.LoadedModuleTracePath;
-  Opts.TBDPath = outs->second.TBDPath;
+  Opts.InputsAndOutputs.setSupplementaryOutputPaths(outs->second);
 
   return false;
 }
