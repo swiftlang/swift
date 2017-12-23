@@ -14,7 +14,10 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/InputFile.h"
+#include "swift/Frontend/FrontendInputs.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>
@@ -25,187 +28,9 @@ namespace llvm {
 
 namespace swift {
 
-enum class InputFileKind {
-  IFK_None,
-  IFK_Swift,
-  IFK_Swift_Library,
-  IFK_Swift_REPL,
-  IFK_SIL,
-  IFK_LLVM_IR
-};
-
-// Inputs may include buffers that override contents, and eventually should
-// always include a buffer.
-class InputFile {
-  std::string Filename;
-  bool IsPrimary;
-  /// Null if the contents are not overridden.
-  llvm::MemoryBuffer *Buffer;
-
-public:
-  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
-  /// string.
-  InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(!name.empty());
-  }
-
-  bool isPrimary() const { return IsPrimary; }
-  llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const {
-    assert(!Filename.empty());
-    return Filename;
-  }
-
-  /// Return Swift-standard file name from a buffer name set by
-  /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
-  static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-      StringRef filename) {
-    return filename.equals("<stdin>") ? "-" : filename;
-  }
-};
-
-/// Information about all the inputs to the frontend.
-class FrontendInputs {
-  friend class ArgsToFrontendInputsConverter;
-
-  std::vector<InputFile> AllFiles;
-  typedef llvm::StringMap<unsigned> InputFileMap;
-  InputFileMap PrimaryInputs;
-
-public:
-  FrontendInputs() = default;
-
-  FrontendInputs(const FrontendInputs &other) {
-    for (InputFile input : other.getAllFiles())
-      addInput(input);
-  }
-
-  FrontendInputs &operator=(const FrontendInputs &other) {
-    clearInputs();
-    for (InputFile input : other.getAllFiles())
-      addInput(input);
-    return *this;
-  }
-
-  // Readers:
-
-  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-
-  std::vector<std::string> getInputFilenames() const {
-    std::vector<std::string> filenames;
-    for (auto &input : getAllFiles()) {
-      filenames.push_back(input.file());
-    }
-    return filenames;
-  }
-
-  unsigned inputCount() const { return getAllFiles().size(); }
-
-  bool hasInputs() const { return !AllFiles.empty(); }
-
-  bool hasSingleInput() const { return inputCount() == 1; }
-
-  StringRef getFilenameOfFirstInput() const {
-    assert(hasInputs());
-    const InputFile &inp = getAllFiles()[0];
-    StringRef f = inp.file();
-    assert(!f.empty());
-    return f;
-  }
-
-  bool isReadingFromStdin() const {
-    return hasSingleInput() && getFilenameOfFirstInput() == "-";
-  }
-
-  // If we have exactly one input filename, and its extension is "bc" or "ll",
-  // treat the input as LLVM_IR.
-  bool shouldTreatAsLLVM() const;
-
-  // Primary input readers
-
-private:
-  void assertMustNotBeMoreThanOnePrimaryInput() const {
-    assert(primaryInputCount() < 2 &&
-           "have not implemented >1 primary input yet");
-  }
-  bool areAllNonPrimariesSIB() const;
-
-public:
-  unsigned primaryInputCount() const { return PrimaryInputs.size(); }
-
-  // Primary count readers:
-
-  bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
-
-  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
-
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
-
-  // Count-dependend readers:
-
-  /// Return the unique primary input, if one exists.
-  const InputFile *getUniquePrimaryInput() const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    const auto b = PrimaryInputs.begin();
-    return b == PrimaryInputs.end() ? nullptr : &AllFiles[b->second];
-  }
-
-  const InputFile &getRequiredUniquePrimaryInput() const {
-    if (const auto *input = getUniquePrimaryInput())
-      return *input;
-    llvm_unreachable("No primary when one is required");
-  }
-
-  /// Return the name of the unique primary input, or an empty StrinRef if there
-  /// isn't one.
-  StringRef getNameOfUniquePrimaryInputFile() const {
-    const auto *input = getUniquePrimaryInput();
-    return input == nullptr ? StringRef() : input->file();
-  }
-
-  bool isFilePrimary(StringRef file) {
-    auto iterator = PrimaryInputs.find(file);
-    return iterator != PrimaryInputs.end() &&
-           AllFiles[iterator->second].isPrimary();
-  }
-
-  unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
-
-  // Multi-facet readers
-
-  bool shouldTreatAsSIL() const;
-
-  /// Return true for error
-  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                    bool isREPLRequested, bool isNoneRequested) const;
-
-  // Writers
-
-  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, false, buffer));
-  }
-  void addPrimaryInputFile(StringRef file,
-                           llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, true, buffer));
-  }
-
-  void addInput(const InputFile &input) {
-    if (!input.file().empty() && input.isPrimary())
-      PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
-    AllFiles.push_back(input);
-  }
-
-  void clearInputs() {
-    AllFiles.clear();
-    PrimaryInputs.clear();
-  }
-};
-
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
-  friend class FrontendArgsToOptionsConverter;
+  friend class ArgsToFrontendOptionsConverter;
 
 public:
   FrontendInputs Inputs;
@@ -494,7 +319,6 @@ public:
   }
 
 private:
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
   bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
@@ -507,9 +331,11 @@ private:
   bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
+public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
 };
 
 }
