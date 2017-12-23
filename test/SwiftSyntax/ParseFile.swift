@@ -14,6 +14,16 @@ struct Foo {
   private(set) var y: [Bool]
 }
 
+class Test: NSObject {
+  @objc var bar: Int
+  func test() {
+    print(#selector(function))
+    print(#keyPath(bar))
+  }
+  @objc func function() {
+  }
+}
+
 ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
   expectDoesNotThrow({
