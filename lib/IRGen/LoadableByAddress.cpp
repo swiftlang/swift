@@ -592,8 +592,6 @@ void LargeValueVisitor::visitMethodInst(MethodInst *instr) {
   if (fnType->isPolymorphic()) {
     genEnv = getGenericEnvironment(fnType);
   }
-  Lowering::GenericContextScope GenericScope(
-      instr->getModule().Types, fnType->getGenericSignature());
   if (shouldTransformFunctionType(genEnv, fnType, pass.Mod)) {
     pass.methodInstsToMod.push_back(instr);
     return;
@@ -2024,8 +2022,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
 void LoadableByAddress::runOnFunction(SILFunction *F) {
   CanSILFunctionType funcType = F->getLoweredFunctionType();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
-  Lowering::GenericContextScope GenericScope(getModule()->Types,
-                                             funcType->getGenericSignature());
+
   if (F->isExternalDeclaration()) {
     if (!modifiableFunction(funcType)) {
       return;
@@ -2216,10 +2213,7 @@ void LoadableByAddress::recreateUncheckedEnumDataInstrs() {
   for (auto *enumInstr : uncheckedEnumDataOfFunc) {
     SILBuilderWithScope enumBuilder(enumInstr);
     SILFunction *F = enumInstr->getFunction();
-    CanSILFunctionType funcType = F->getLoweredFunctionType();
     IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
-    Lowering::GenericContextScope GenericScope(getModule()->Types,
-                                               funcType->getGenericSignature());
     SILType origType = enumInstr->getType();
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     SILType newType = getNewSILType(genEnv, origType, *currIRMod);
@@ -2246,10 +2240,7 @@ void LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst() {
   for (auto *enumInstr : uncheckedTakeEnumDataAddrOfFunc) {
     SILBuilderWithScope enumBuilder(enumInstr);
     SILFunction *F = enumInstr->getFunction();
-    CanSILFunctionType funcType = F->getLoweredFunctionType();
     IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
-    Lowering::GenericContextScope GenericScope(getModule()->Types,
-                                               funcType->getGenericSignature());
     SILType origType = enumInstr->getType();
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     SILType newType = getNewSILType(genEnv, origType, *currIRMod);
@@ -2298,9 +2289,6 @@ void LoadableByAddress::recreateConvInstrs() {
       currSILType = thinToPointer->getOperand()->getType();
     }
     auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
-    Lowering::GenericContextScope GenericScope(
-        getModule()->Types,
-        currSILFunctionType->getGenericSignature());
     GenericEnvironment *genEnv =
         convInstr->getFunction()->getGenericEnvironment();
     CanSILFunctionType newFnType =
@@ -2363,8 +2351,6 @@ void LoadableByAddress::recreateBuiltinInstrs() {
 void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   CanSILFunctionType funcType = F->getLoweredFunctionType();
-  Lowering::GenericContextScope GenericScope(getModule()->Types,
-                                             funcType->getGenericSignature());
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   if (!genEnv && funcType->isPolymorphic()) {
     genEnv = getGenericEnvironment(funcType);
