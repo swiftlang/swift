@@ -464,7 +464,7 @@ bool ArgsToFrontendOptionsConverter::
           .convert();
   if (!outs)
     return true;
-  Opts.OutputFilenames = outs->first;
+  Opts.InputsAndOutputs.OutputFilenames = outs->first;
   Opts.InputsAndOutputs.setSupplementaryOutputPaths(outs->second);
 
   return false;

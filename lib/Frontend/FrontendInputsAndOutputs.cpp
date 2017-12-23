@@ -248,3 +248,8 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
       return true;
   return false;
 }
+
+bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
+  return hasNamedOutputFile() &&
+         llvm::sys::fs::is_directory(getSingleOutputFilename());
+}

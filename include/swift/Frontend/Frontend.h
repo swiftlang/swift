@@ -238,7 +238,7 @@ public:
 
 
   StringRef getOutputFilename() const {
-    return FrontendOpts.getSingleOutputFilename();
+    return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
