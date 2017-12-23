@@ -4192,7 +4192,9 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   auto builtinName = specializedEmitter.getBuiltinName();
   SmallVector<SILValue, 4> consumedArgs;
   for (auto arg : uncurriedArgs) {
-    consumedArgs.push_back(arg.forward(SGF));
+    // Builtins have a special convention that takes everything at +1.
+    auto maybePlusOne = arg.ensurePlusOne(SGF, uncurriedLoc.getValue());
+    consumedArgs.push_back(maybePlusOne.forward(SGF));
   }
   SILFunctionConventions substConv(substFnType, SGF.SGM.M);
   auto resultVal = SGF.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
