@@ -36,9 +36,8 @@
 using namespace swift;
 using namespace swift::irgen;
 
-static GenericEnvironment *getGenericEnvironment(SILModule &Mod,
-                                                 CanSILFunctionType loweredTy) {
-  return loweredTy->getGenericSignature()->createGenericEnvironment();
+static GenericEnvironment *getGenericEnvironment(CanSILFunctionType loweredTy) {
+  return loweredTy->getGenericSignature().getGenericEnvironment();
 }
 
 /// Utility to determine if this is a large loadable type
@@ -201,22 +200,16 @@ getNewSILFunctionType(GenericEnvironment *env,
 }
 
 // Get the function type or the optional function type
-static SILFunctionType *getInnerFunctionType(SILType storageType) {
-  CanType currCanType = storageType.getSwiftRValueType();
-  if (SILFunctionType *currSILFunctionType =
-          dyn_cast<SILFunctionType>(currCanType.getPointer())) {
+static CanSILFunctionType getInnerFunctionType(SILType storageType) {
+  if (auto currSILFunctionType = storageType.getAs<SILFunctionType>()) {
     return currSILFunctionType;
   }
-  OptionalTypeKind optKind;
-  if (auto optionalType = currCanType.getAnyOptionalObjectType(optKind)) {
-    assert(optKind != OptionalTypeKind::OTK_None &&
-           "Expected Real Optional Type");
-    if (auto *currSILFunctionType =
-            dyn_cast<SILFunctionType>(optionalType.getPointer())) {
+  if (auto optionalType = storageType.getAnyOptionalObjectType()) {
+    if (auto currSILFunctionType = optionalType.getAs<SILFunctionType>()) {
       return currSILFunctionType;
     }
   }
-  return nullptr;
+  return CanSILFunctionType();
 }
 
 static SILType getNewOptionalFunctionType(GenericEnvironment *GenericEnv,
@@ -258,7 +251,7 @@ static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod) {
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   auto loweredTy = F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
 
   return shouldTransformResults(genEnv, loweredTy, Mod);
@@ -547,7 +540,7 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   for (Operand &operand : applySite.getArgumentOperands()) {
     SILValue currOperand = operand.get();
@@ -574,8 +567,7 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
   CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
   GenericEnvironment *genEnvCallee = nullptr;
   if (origSILFunctionType->isPolymorphic()) {
-    genEnvCallee = getGenericEnvironment(
-        applySite.getModule(), CanSILFunctionType(origSILFunctionType));
+    genEnvCallee = getGenericEnvironment(origSILFunctionType);
   }
   auto newSILFunctionType =
       getNewSILFunctionType(genEnvCallee, origSILFunctionType, pass.Mod);
@@ -608,7 +600,7 @@ void LargeValueVisitor::visitMethodInst(MethodInst *instr) {
 
   GenericEnvironment *genEnv = nullptr;
   if (fnType->isPolymorphic()) {
-    genEnv = getGenericEnvironment(instr->getModule(), fnType);
+    genEnv = getGenericEnvironment(fnType);
   }
   Lowering::GenericContextScope GenericScope(
       instr->getModule().Types, fnType->getGenericSignature());
@@ -635,12 +627,12 @@ static bool shouldConvertBBArg(SILArgument *arg, irgen::IRGenModule &Mod) {
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   auto loweredTy = F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   CanType currCanType = storageType.getSwiftRValueType();
   if (auto funcType = dyn_cast<SILFunctionType>(currCanType)) {
     if (funcType->isPolymorphic()) {
-      genEnv = getGenericEnvironment(F->getModule(), funcType);
+      genEnv = getGenericEnvironment(funcType);
     }
   }
   SILType newSILType = getNewSILType(genEnv, storageType, Mod);
@@ -724,7 +716,7 @@ void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
   GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
   auto loweredTy = instr->getFunction()->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(instr->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   SILType currSILType = instr->getType().getObjectType();
   SILType newSILType = getNewSILType(genEnv, currSILType, pass.Mod);
@@ -741,12 +733,10 @@ void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
 
 void LargeValueVisitor::visitTupleInst(SingleValueInstruction *instr) {
   SILType currSILType = instr->getType().getObjectType();
-  CanType currCanType = currSILType.getSwiftRValueType();
-  if (auto funcType = dyn_cast<SILFunctionType>(currCanType)) {
-    CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
+  if (auto funcType = currSILType.getAs<SILFunctionType>()) {
     GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
-    if (!genEnv && canFuncType->isPolymorphic()) {
-      genEnv = getGenericEnvironment(instr->getModule(), canFuncType);
+    if (!genEnv && funcType->isPolymorphic()) {
+      genEnv = getGenericEnvironment(funcType);
     }
     auto newSILFunctionType =
         getNewSILFunctionType(genEnv, funcType, pass.Mod);
@@ -792,7 +782,7 @@ static bool modNonFuncTypeResultType(SILFunction *F, irgen::IRGenModule &Mod) {
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   auto loweredTy = F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
 
   return modNonFuncTypeResultType(genEnv, loweredTy, Mod);
@@ -976,8 +966,7 @@ static bool usesContainApplies(LoadInst *unoptimizableLoad,
       auto loweredTy =
           unoptimizableLoad->getFunction()->getLoweredFunctionType();
       if (!genEnv && loweredTy->isPolymorphic()) {
-        genEnv =
-            getGenericEnvironment(unoptimizableLoad->getModule(), loweredTy);
+        genEnv = getGenericEnvironment(loweredTy);
       }
       SILType newSILType = getNewSILType(genEnv, currType, Mod);
       if (currType == newSILType) {
@@ -1035,7 +1024,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
           userIns->getFunction()->getGenericEnvironment();
       auto loweredTy = userIns->getFunction()->getLoweredFunctionType();
       if (!genEnv && loweredTy->isPolymorphic()) {
-        genEnv = getGenericEnvironment(userIns->getModule(), loweredTy);
+        genEnv = getGenericEnvironment(loweredTy);
       }
       SILType newSILType = getNewSILType(genEnv, currType, pass.Mod);
       if (currType == newSILType) {
@@ -1157,7 +1146,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   auto singleResult = loweredTy->getSingleResult();
   SILType resultStorageType = singleResult.getSILStorageType();
@@ -1185,7 +1174,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
 
   for (SILArgument *arg : entry->getArguments()) {
@@ -1245,7 +1234,7 @@ void LoadableStorageAllocation::convertApplyResults() {
           silModue.Types, origSILFunctionType->getGenericSignature());
       GenericEnvironment *genEnv = nullptr;
       if (origSILFunctionType->isPolymorphic()) {
-        genEnv = getGenericEnvironment(silModue, origSILFunctionType);
+        genEnv = getGenericEnvironment(origSILFunctionType);
       }
       if (!shouldTransformResults(genEnv, origSILFunctionType, pass.Mod)) {
         continue;
@@ -1254,14 +1243,12 @@ void LoadableStorageAllocation::convertApplyResults() {
       auto resultStorageType = singleResult.getSILStorageType();
       if (!isLargeLoadableType(genEnv, resultStorageType, pass.Mod)) {
         // Make sure it is a function type
-        auto canType = resultStorageType.getSwiftRValueType();
-        if (!isa<SILFunctionType>(canType)) {
-          // Check if it is an optional funciton type
-          OptionalTypeKind optKind;
-          auto optionalType = canType.getAnyOptionalObjectType(optKind);
+        if (!resultStorageType.is<SILFunctionType>()) {
+          // Check if it is an optional function type
+          auto optionalType = resultStorageType.getAnyOptionalObjectType();
           assert(optionalType &&
                  "Expected SILFunctionType or Optional for the result type");
-          assert(dyn_cast<SILFunctionType>(optionalType.getPointer()) &&
+          assert(optionalType.is<SILFunctionType>() &&
                  "Expected a SILFunctionType inside the optional Type");
         }
         continue;
@@ -1296,7 +1283,7 @@ void LoadableStorageAllocation::
     GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
     auto loweredTy = pass.F->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     SILType newSILType = getNewSILType(genEnv, storageType, pass.Mod);
     if (!isLargeLoadableType(genEnv, storageType, pass.Mod) &&
@@ -1315,7 +1302,7 @@ void LoadableStorageAllocation::convertIndirectBasicBlockArgs() {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   for (SILBasicBlock &BB : *pass.F) {
     if (&BB == entry) {
@@ -1578,7 +1565,7 @@ static bool allUsesAreReplaceable(SingleValueInstruction *instr,
           instr->getFunction()->getGenericEnvironment();
       auto loweredTy = instr->getFunction()->getLoweredFunctionType();
       if (!genEnv && loweredTy->isPolymorphic()) {
-        genEnv = getGenericEnvironment(instr->getModule(), loweredTy);
+        genEnv = getGenericEnvironment(loweredTy);
       }
       SILType newSILType = getNewSILType(genEnv, currType, Mod);
       if (currType == newSILType) {
@@ -1602,7 +1589,7 @@ static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod) {
   auto funcType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
   if (!genEnv && funcType->isPolymorphic()) {
-    genEnv = getGenericEnvironment(instr->getModule(), funcType);
+    genEnv = getGenericEnvironment(funcType);
   }
   auto newFnType = getNewSILFunctionType(genEnv, funcType, Mod);
   SILType newSILType =
@@ -1675,7 +1662,7 @@ static void rewriteFunction(StructLoweringState &pass,
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   bool repeat = false;
   llvm::SetVector<SILInstruction *> currentModApplies;
@@ -1719,9 +1706,7 @@ static void rewriteFunction(StructLoweringState &pass,
           loadArg->setOperand(newArg);
 
           // If the load is of a function type - do not replace it.
-          auto loadedType = loadArg->getType();
-          auto canLoadedType = loadedType.getSwiftRValueType();
-          if (dyn_cast<SILFunctionType>(canLoadedType.getPointer())) {
+          if (loadArg->getType().is<SILFunctionType>()) {
             continue;
           }
 
@@ -1763,9 +1748,7 @@ static void rewriteFunction(StructLoweringState &pass,
       instr->getParent()->erase(instr);
 
       // If the load is of a function type - do not replace it.
-      auto loadedType = loadArg->getType();
-      auto canLoadedType = loadedType.getSwiftRValueType();
-      if (dyn_cast<SILFunctionType>(canLoadedType.getPointer())) {
+      if (loadArg->getType().is<SILFunctionType>()) {
         continue;
       }
 
@@ -1795,9 +1778,7 @@ static void rewriteFunction(StructLoweringState &pass,
             allocateAndSetForArgumentOperand(pass, currOperand, applyInst);
           } else if (auto *load = dyn_cast<LoadInst>(currOperandInstr)) {
             // If the load is of a function type - do not replace it.
-            auto loadedType = load->getType();
-            auto canLoadedType = loadedType.getSwiftRValueType();
-            if (dyn_cast<SILFunctionType>(canLoadedType.getPointer())) {
+            if (load->getType().is<SILFunctionType>()) {
               continue;
             }
 
@@ -1984,8 +1965,7 @@ static void rewriteFunction(StructLoweringState &pass,
     auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
     GenericEnvironment *genEnvForMethod = nullptr;
     if (currSILFunctionType->isPolymorphic()) {
-      genEnvForMethod = getGenericEnvironment(
-          instr->getModule(), CanSILFunctionType(currSILFunctionType));
+      genEnvForMethod = getGenericEnvironment(currSILFunctionType);
     }
     SILType newSILType = SILType::getPrimitiveObjectType(
         getNewSILFunctionType(genEnvForMethod, currSILFunctionType, pass.Mod));
@@ -2075,7 +2055,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   SILFunction *F = pass.F;
   SILType resultTy = loweredTy->getAllResultsType();
@@ -2116,7 +2096,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     auto loweredTy = F->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     if (shouldTransformFunctionType(genEnv, F->getLoweredFunctionType(),
                                     *currIRMod)) {
@@ -2165,11 +2145,10 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
                                   IRGenModule &Mod, SILBuilder &builder) {
   SILType currSILType = op->getType();
   if (auto funcType = currSILType.getAs<SILFunctionType>()) {
-    CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
     GenericEnvironment *genEnv =
         containingInstr->getFunction()->getGenericEnvironment();
-    if (!genEnv && canFuncType->isPolymorphic()) {
-      genEnv = getGenericEnvironment(containingInstr->getModule(), canFuncType);
+    if (!genEnv && funcType->isPolymorphic()) {
+      genEnv = getGenericEnvironment(funcType);
     }
     auto newFnType = getNewSILFunctionType(genEnv, funcType, Mod);
     SILType newSILType = SILType::getPrimitiveObjectType(newFnType);
@@ -2227,18 +2206,15 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     }
   }
   CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
-  auto origCanType = CanSILFunctionType(origSILFunctionType);
   Lowering::GenericContextScope GenericScope(
-      getModule()->Types, origCanType->getGenericSignature());
+      getModule()->Types, origSILFunctionType->getGenericSignature());
   GenericEnvironment *genEnv = nullptr;
   if (origSILFunctionType->isPolymorphic()) {
-    genEnv = getGenericEnvironment(applyInst->getModule(),
-                                   CanSILFunctionType(origSILFunctionType));
+    genEnv = getGenericEnvironment(origSILFunctionType);
   }
   CanSILFunctionType newSILFunctionType =
       getNewSILFunctionType(genEnv, origSILFunctionType, *currIRMod);
-  CanSILFunctionType newCanSILFuncType(newSILFunctionType);
-  SILFunctionConventions newSILFunctionConventions(newCanSILFuncType,
+  SILFunctionConventions newSILFunctionConventions(newSILFunctionType,
                                                    *getModule());
   SmallVector<SILValue, 8> callArgs;
   SILBuilderWithScope applyBuilder(applyInst);
@@ -2246,7 +2222,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   // Find the new alloc we created earlier.
   // and pass it as first parameter:
   if (applyInst->getKind() != SILInstructionKind::PartialApplyInst &&
-      modNonFuncTypeResultType(genEnv, origCanType, *currIRMod) &&
+      modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule())) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
@@ -2283,8 +2259,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<PartialApplyInst>(applyInst);
     // Change the type of the Closure
     auto partialApplyConvention = castedApply->getType()
-                                      .getSwiftRValueType()
-                                      ->getAs<SILFunctionType>()
+                                      .getAs<SILFunctionType>()
                                       ->getCalleeConvention();
 
     auto newApply =
@@ -2334,7 +2309,7 @@ void LoadableByAddress::recreateUncheckedEnumDataInstrs() {
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     auto loweredTy = F->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     SILType newType = getNewSILType(genEnv, origType, *currIRMod);
     auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
@@ -2368,7 +2343,7 @@ void LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst() {
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     auto loweredTy = F->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     SILType newType = getNewSILType(genEnv, origType, *currIRMod);
     auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
@@ -2423,7 +2398,7 @@ void LoadableByAddress::recreateConvInstrs() {
         convInstr->getFunction()->getGenericEnvironment();
     auto loweredTy = convInstr->getFunction()->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(convInstr->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     CanSILFunctionType newFnType =
         getNewSILFunctionType(genEnv, currSILFunctionType, *currIRMod);
@@ -2466,7 +2441,7 @@ void LoadableByAddress::recreateBuiltinInstrs() {
     GenericEnvironment *genEnv = F->getGenericEnvironment();
     auto loweredTy = F->getLoweredFunctionType();
     if (!genEnv && loweredTy->isPolymorphic()) {
-      genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+      genEnv = getGenericEnvironment(loweredTy);
     }
     auto resultTy = builtinInstr->getType();
     auto newResultTy = getNewSILType(genEnv, resultTy, *currIRMod);
@@ -2495,7 +2470,7 @@ void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   auto loweredTy = F->getLoweredFunctionType();
   if (!genEnv && loweredTy->isPolymorphic()) {
-    genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+    genEnv = getGenericEnvironment(loweredTy);
   }
   auto newFuncTy = getNewSILFunctionType(genEnv, funcType, *currIRMod);
   F->rewriteLoweredTypeUnsafe(newFuncTy);
@@ -2563,40 +2538,39 @@ void LoadableByAddress::run() {
         } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(&I)) {
           SILValue val = CFI->getConverted();
           SILType currType = val->getType();
-          CanType currCanType = currType.getSwiftRValueType();
-          auto *fType = dyn_cast<SILFunctionType>(currCanType.getPointer());
+          auto fType = currType.getAs<SILFunctionType>();
           assert(fType && "Expected SILFunctionType");
-          if (modifiableFunction(CanSILFunctionType(fType))) {
+          if (modifiableFunction(fType)) {
             conversionInstrs.insert(CFI);
           }
         } else if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(&I)) {
 
-          CanType canType = TTI->getCallee()->getType().getSwiftRValueType();
-          auto *fType = canType->castTo<SILFunctionType>();
+          auto canType = TTI->getCallee()->getType();
+          auto fType = canType.castTo<SILFunctionType>();
 
-          if (modifiableFunction(CanSILFunctionType(fType)))
+          if (modifiableFunction(fType))
             conversionInstrs.insert(TTI);
 
         } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
           SILType currType = LI->getType();
-          if (auto *fType = getInnerFunctionType(currType)) {
-            if (modifiableFunction(CanSILFunctionType(fType))) {
+          if (auto fType = getInnerFunctionType(currType)) {
+            if (modifiableFunction(fType)) {
               // need to re-create these loads: re-write type cache
               loadInstrsOfFunc.insert(LI);
             }
           }
         } else if (auto *UED = dyn_cast<UncheckedEnumDataInst>(&I)) {
           SILType currType = UED->getType();
-          if (auto *fType = getInnerFunctionType(currType)) {
-            if (modifiableFunction(CanSILFunctionType(fType))) {
+          if (auto fType = getInnerFunctionType(currType)) {
+            if (modifiableFunction(fType)) {
               // need to re-create these loads: re-write type cache
               uncheckedEnumDataOfFunc.insert(UED);
             }
           }
         } else if (auto *UED = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I)) {
           SILType currType = UED->getType();
-          if (auto *fType = getInnerFunctionType(currType)) {
-            if (modifiableFunction(CanSILFunctionType(fType))) {
+          if (auto fType = getInnerFunctionType(currType)) {
+            if (modifiableFunction(fType)) {
               // need to re-create these loads: re-write type cache
               uncheckedTakeEnumDataAddrOfFunc.insert(UED);
             }
