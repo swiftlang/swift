@@ -68,42 +68,17 @@ public:
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
 
-  /// An Objective-C header to import and make implicitly visible.
-  std::string ImplicitObjCHeaderPath;
-
-  /// The name of the module which the frontend is building.
-  std::string ModuleName;
-
-  /// The path to which we should emit a serialized module.
-  std::string ModuleOutputPath;
-
-  /// The path to which we should emit a module documentation file.
-  std::string ModuleDocOutputPath;
-
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The path to which we should emit an Objective-C header for the module.
-  std::string ObjCHeaderOutputPath;
-
-  /// Path to a file which should contain serialized diagnostics for this
-  /// frontend invocation.
-  std::string SerializedDiagnosticsPath;
-
-  /// The path to which we should output a Make-style dependencies file.
-  std::string DependenciesFilePath;
-
-  /// The path to which we should output a Swift reference dependencies file.
-  std::string ReferenceDependenciesFilePath;
+  /// An Objective-C header to import and make implicitly visible.
+  std::string ImplicitObjCHeaderPath;
 
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
 
-  /// The path to which we should output a loaded module trace file.
-  std::string LoadedModuleTracePath;
-
-  /// The path to which we should output a TBD file.
-  std::string TBDPath;
+  /// The name of the module which the frontend is building.
+  std::string ModuleName;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;

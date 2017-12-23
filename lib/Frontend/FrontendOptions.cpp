@@ -104,14 +104,12 @@ void FrontendOptions::forAllOutputPaths(
       fn(OutputFileName);
     }
   }
-  const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
+  const std::string outputs[] = {InputsAndOutputs.getModuleOutputPath(),
+                                 InputsAndOutputs.getModuleDocOutputPath(),
+                                 InputsAndOutputs.getObjCHeaderOutputPath()};
+  for (const std::string next : outputs) {
+    if (!next.empty())
+      fn(next);
   }
 }
 
@@ -189,7 +187,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
+  return !InputsAndOutputs.getDependenciesFilePath().empty() &&
          !canActionEmitDependencies(RequestedAction);
 }
 
@@ -225,7 +223,8 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
+  return !InputsAndOutputs.getObjCHeaderOutputPath().empty() &&
+         !canActionEmitHeader(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitHeader(ActionType action) {
@@ -260,7 +259,7 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
+  return !InputsAndOutputs.getLoadedModuleTracePath().empty() &&
          !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
@@ -296,11 +295,13 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
+  return !InputsAndOutputs.getModuleOutputPath().empty() &&
+         !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
+  return !InputsAndOutputs.getModuleDocOutputPath().empty() &&
+         !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {

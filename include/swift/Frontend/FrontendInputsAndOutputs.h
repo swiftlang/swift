@@ -16,7 +16,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Frontend/FrontendInputsAndOutputs.h"
+#include "swift/Frontend/OutputPaths.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -39,6 +39,8 @@ class FrontendInputsAndOutputs {
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
+  OutputPaths SupplementaryOutputPaths;
+
 public:
   FrontendInputsAndOutputs() = default;
 
@@ -46,6 +48,7 @@ public:
     for (InputFile input : other.getAllInputs())
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+    SupplementaryOutputPaths = other.SupplementaryOutputPaths;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
@@ -53,6 +56,7 @@ public:
     for (InputFile input : other.getAllInputs())
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+    SupplementaryOutputPaths = other.SupplementaryOutputPaths;
     return *this;
   }
 
@@ -179,6 +183,35 @@ public:
 
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
+
+  const std::string &getObjCHeaderOutputPath() const {
+    return SupplementaryOutputPaths.ObjCHeaderOutputPath;
+  }
+  const std::string &getModuleOutputPath() const {
+    return SupplementaryOutputPaths.ModuleOutputPath;
+  }
+  const std::string &getModuleDocOutputPath() const {
+    return SupplementaryOutputPaths.ModuleDocOutputPath;
+  }
+  const std::string &getDependenciesFilePath() const {
+    return SupplementaryOutputPaths.DependenciesFilePath;
+  }
+  const std::string &getReferenceDependenciesFilePath() const {
+    return SupplementaryOutputPaths.ReferenceDependenciesFilePath;
+  }
+  const std::string &getSerializedDiagnosticsPath() const {
+    return SupplementaryOutputPaths.SerializedDiagnosticsPath;
+  }
+  const std::string &getLoadedModuleTracePath() const {
+    return SupplementaryOutputPaths.LoadedModuleTracePath;
+  }
+  const std::string &getTBDPath() const {
+    return SupplementaryOutputPaths.TBDPath;
+  }
+
+  void setSupplementaryOutputPaths(OutputPaths op) {
+    SupplementaryOutputPaths = op;
+  }
 };
 
 } // namespace swift
