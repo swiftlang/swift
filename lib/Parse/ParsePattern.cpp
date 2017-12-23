@@ -998,10 +998,13 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 ParserResult<Pattern> Parser::
 parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
                                    bool isOptional) {
+  if (!Tok.is(tok::colon))
+    return result;
 
   // Parse an optional type annotation.
-  if (!consumeIf(tok::colon))
-    return result;
+  SyntaxParsingContext TypeAnnotationCtxt(SyntaxContext,
+                                          SyntaxKind::TypeAnnotation);
+  consumeToken(tok::colon);
 
   Pattern *P;
   if (result.isNull())
