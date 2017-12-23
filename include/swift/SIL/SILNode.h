@@ -213,10 +213,8 @@ protected:
       atomicity : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(MetatypeInst, SingleValueInstruction, 32,
-      : NumPadBits,
-      NumOperands : 32
-  );
+  // Ensure that MetatypeInst bitfield does not overflow.
+  IBWTO_BITFIELD(MetatypeInst, SingleValueInstruction, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
     /// IsTakeOfSrc - True if ownership will be taken from the value at the

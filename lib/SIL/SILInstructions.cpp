@@ -956,14 +956,6 @@ TupleInst::TupleInst(SILDebugLocation Loc, SILType Ty,
   }
 }
 
-MetatypeInst::MetatypeInst(SILDebugLocation Loc, SILType Metatype,
-                           ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBase(Loc, Metatype) {
-  SILInstruction::Bits.MetatypeInst.NumOperands = TypeDependentOperands.size();
-  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                         TypeDependentOperands);
-}
-
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   SILModule &Mod = getModule();
 
@@ -2068,11 +2060,8 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
                                Ty.castTo<MetatypeType>().getInstanceType());
-  void *Buffer =
-      Mod.allocateInst(sizeof(MetatypeInst) +
-                           sizeof(Operand) * TypeDependentOperands.size(),
-                       alignof(MetatypeInst));
-
+  auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
+  auto Buffer = Mod.allocateInst(Size, alignof(MetatypeInst));
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
 }
 

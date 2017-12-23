@@ -5238,46 +5238,28 @@ public:
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst final
-    : public InstructionBase<SILInstructionKind::MetatypeInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<MetatypeInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                         SILInstructionKind::MetatypeInst,
+                                         MetatypeInst, SingleValueInstruction> {
   friend SILBuilder;
-
-  unsigned _getNumOperands() const {
-    return SILInstruction::Bits.MetatypeInst.NumOperands;
-  };
 
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
-               ArrayRef<SILValue> TypeDependentOperands);
+               ArrayRef<SILValue> TypeDependentOperands)
+    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+                                          Metatype) {}
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F,
                               SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~MetatypeInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = _getNumOperands(); i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
-  }
-
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
+    return getAllOperands();
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
+    return getAllOperands();
   }
 };
 
