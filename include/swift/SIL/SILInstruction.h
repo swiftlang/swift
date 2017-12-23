@@ -2658,21 +2658,13 @@ public:
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
 class BuiltinInst final
-    : public InstructionBase<SILInstructionKind::BuiltinInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<BuiltinInst, Operand, Substitution> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                   SILInstructionKind::BuiltinInst, BuiltinInst,
+                                   SingleValueInstruction, Substitution> {
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
-
-  size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return SILInstruction::Bits.BuiltinInst.NumOperands;
-  }
-  size_t numTrailingObjects(OverloadToken<Substitution>) const {
-    return SILInstruction::Bits.BuiltinInst.NumSubstitutions;
-  }
 
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
               SubstitutionList Substitutions, ArrayRef<SILValue> Args);
@@ -2683,12 +2675,6 @@ class BuiltinInst final
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
-  ~BuiltinInst() {
-    for (auto &op : getAllOperands()) {
-      op.~Operand();
-    }
-  }
-
   /// Return the name of the builtin operation.
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
@@ -2738,16 +2724,6 @@ public:
             SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   
-  /// The arguments to the builtin.
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(),
-            SILInstruction::Bits.BuiltinInst.NumOperands};
-  }
-  /// The arguments to the builtin.
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(),
-            SILInstruction::Bits.BuiltinInst.NumOperands};
-  }
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());

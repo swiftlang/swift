@@ -153,10 +153,9 @@ protected:
   // Ensure that TupleInst bitfield does not overflow.
   IBWTO_BITFIELD(TupleInst, SingleValueInstruction, 0, : NumPadBits);
 
-  SWIFT_INLINE_BITFIELD_FULL(BuiltinInst, SingleValueInstruction,
-                             64-NumSingleValueInstructionBits,
-    NumSubstitutions : 32-NumSingleValueInstructionBits,
-    NumOperands : 32
+  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumSubstitutions : 32-NumSingleValueInstructionBits
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
