@@ -263,6 +263,16 @@ ResilientClassTestSuite.test("ChildOfResilientOutsideParentWithResilientStoredPr
 }
 #endif
 
+class ChildWithMethodOverride : ResilientOutsideParent {
+  override func getValue() -> Int {
+    return 1
+  }
+}
+
+ResilientClassTestSuite.test("ChildWithMethodOverride") {
+  let c = ChildWithMethodOverride()
+  expectEqual(c.getValue(), 1)
+}
 
 ResilientClassTestSuite.test("TypeByName") {
   expectTrue(_typeByName("main.ClassWithResilientProperty")

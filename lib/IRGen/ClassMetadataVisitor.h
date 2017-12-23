@@ -94,10 +94,8 @@ private:
     if (Type superclass = type->getSuperclass()) {
       auto *superclassDecl = superclass->getClassOrBoundGenericClass();
       if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
-        // Just note that we have a resilient superclass and move on.
-        //
-        // Runtime metadata instantiation needs to slide our entries down
-        // and copy in the superclass metadata.
+        // Runtime metadata instantiation will initialize our field offset
+        // vector and vtable entries.
         //
         // Metadata access needs to access our fields relative to a
         // global variable.
