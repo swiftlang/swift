@@ -14,8 +14,9 @@ struct Foo {
   private(set) var y: [Bool]
 }
 
+#if os(macOS)
 class Test: NSObject {
-  @objc var bar: Int
+  @objc var bar: Int = 0
   func test() {
     print(#selector(function))
     print(#keyPath(bar))
@@ -23,6 +24,7 @@ class Test: NSObject {
   @objc func function() {
   }
 }
+#endif
 
 ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
