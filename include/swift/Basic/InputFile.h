@@ -63,7 +63,7 @@ public:
     return SupplementaryOutputPaths;
   }
 
-  void setSupplementaryOutputPaths(OutputPaths &outs) {
+  void setSupplementaryOutputPaths(const OutputPaths &outs) {
     SupplementaryOutputPaths = outs;
   }
 };

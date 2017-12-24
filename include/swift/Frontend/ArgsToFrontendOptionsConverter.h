@@ -60,7 +60,7 @@ private:
 
   bool setUpForSILOrLLVM();
 
-  bool checkUnusedOutputPaths() const;
+  bool checkUnusedSupplementaryOutputPaths() const;
 
 public:
   ArgsToFrontendOptionsConverter(DiagnosticEngine &Diags,

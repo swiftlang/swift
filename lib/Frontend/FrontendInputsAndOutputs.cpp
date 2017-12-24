@@ -182,19 +182,42 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
 }
 
 unsigned FrontendInputsAndOutputs::countOfFilesProducingOutput() const {
-  return hasPrimaryInputs() ? primaryInputCount() : inputCount();
+  return isSingleThreadedWMO()
+             ? 1
+             : hasPrimaryInputs() ? primaryInputCount() : inputCount();
 }
 
 const InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() const {
   return isSingleThreadedWMO()
-             ? *getSingleThreadedWMOInput()
+             ? firstInput()
              : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
 }
 
 void FrontendInputsAndOutputs::forEachInputProducingOutput(
     llvm::function_ref<void(const InputFile &)> fn) const {
   isSingleThreadedWMO()
-      ? fn(*getSingleThreadedWMOInput())
+      ? fn(firstInput())
+      : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
+}
+
+unsigned
+FrontendInputsAndOutputs::countOfFilesProducingSupplementaryOutput() const {
+  return isWholeModule()
+             ? 1
+             : hasPrimaryInputs() ? primaryInputCount() : inputCount();
+}
+
+const InputFile &
+FrontendInputsAndOutputs::firstInputProducingSupplementaryOutput() const {
+  return isWholeModule()
+             ? firstInput()
+             : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
+}
+
+void FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  isWholeModule()
+      ? fn(firstInput())
       : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
@@ -230,14 +253,20 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
 }
 
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
-    ArrayRef<std::string> outputFiles, OutputPaths supplementaryOutputs) {
+    ArrayRef<std::string> outputFiles,
+    ArrayRef<const OutputPaths> supplementaryOutputs) {
   assert(getOutputFilenames().empty() && "re-setting OutputFilenames");
   for (StringRef s : outputFiles)
     OutputFilenames.push_back(s);
-  if (AllFiles.empty())
-    return;
-  AllFiles[hasPrimaryInputs() ? PrimaryInputs.front().second : 0]
-      .setSupplementaryOutputPaths(supplementaryOutputs);
+  assert(countOfFilesProducingSupplementaryOutput() ==
+         supplementaryOutputs.size());
+  if (hasPrimaryInputs()) {
+    unsigned i = 0;
+    for (auto p : PrimaryInputs)
+      AllFiles[p.second].setSupplementaryOutputPaths(supplementaryOutputs[i++]);
+  } else
+    for (auto i : indices(supplementaryOutputs)) // Only 1 if WMO
+      AllFiles[i].setSupplementaryOutputPaths(supplementaryOutputs[i]);
 }
 
 /// Gets the name of the specified output filename.
@@ -294,5 +323,5 @@ const OutputPaths &FrontendInputsAndOutputs::supplementaryOutputPaths() const {
   if (!hasInputs())
     return empty;
   assertMustNotBeMoreThanOnePrimaryInput();
-  return firstInputProducingOutput().supplementaryOutputPaths();
+  return firstInputProducingSupplementaryOutput().supplementaryOutputPaths();
 }
