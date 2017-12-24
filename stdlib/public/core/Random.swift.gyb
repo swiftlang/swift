@@ -199,6 +199,10 @@ extension Randomizable where Self: BinaryFloatingPoint {
   /// Shorthand for using the random(in:using:) function. This uses the default
   /// random implementation defined in the standard library.
   public static func random(in range: ${Range}<Self>) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Range should not be empty when getting a random number"
+    )
     return range.random!
   }
 
@@ -212,6 +216,10 @@ extension Randomizable where Self: BinaryFloatingPoint {
     in range: ${Range}<Self>,
     using generator: T
   ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Range should not be empty when getting a random number"
+    )
     return range.random(using: generator)!
   }
 }
@@ -229,6 +237,10 @@ extension Randomizable where Self: Strideable, Self.Stride: SignedInteger {
   /// Shorthand for using the random(in:using:) function. This uses the default
   /// random implementation defined in the standard library.
   public static func random(in range: ${Range}<Self>) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Range should not be empty when getting a random number"
+    )
     return range.random!
   }
 
@@ -242,6 +254,10 @@ extension Randomizable where Self: Strideable, Self.Stride: SignedInteger {
     in range: ${Range}<Self>,
     using generator: T
   ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Range should not be empty when getting a random number"
+    )
     return range.random(using: generator)!
   }
 }

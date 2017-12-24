@@ -2112,7 +2112,7 @@ extension BinaryFloatingPoint {
     let bits = MemoryLayout<Self>.size * 8
     let fraction = bits - Self.exponentBitCount
     let random = generator.next(UInt64.self) >> (bits - fraction)
-    return Self(random) / Self(1 << fraction)
+    return Self.init(random) / Self.init(1 << fraction)
   }
 
   /*  TODO: uncomment these default implementations when it becomes possible
