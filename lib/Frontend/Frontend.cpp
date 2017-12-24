@@ -183,10 +183,15 @@ bool CompilerInstance::setUpInputs() {
   // per-input setup.
   const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
-  for (const InputFile &input :
-       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs())
-    if (setUpForInput(input))
+  {
+    bool hadError = false;
+    Invocation.getFrontendOptions().InputsAndOutputs.forEachInput(
+        [&](const InputFile &input) {
+          hadError = setUpForInput(input) || hadError;
+        });
+    if (hadError)
       return true;
+  }
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&

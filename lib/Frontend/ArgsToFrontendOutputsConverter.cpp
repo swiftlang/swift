@@ -116,18 +116,21 @@ Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
 
-  bool hadError = InputsAndOutputs.forEachInputProducingOutput(
-      [&](const InputFile &input, unsigned i) -> bool {
+  bool hadError = false;
+  unsigned i = 0;
+  InputsAndOutputs.forEachInputProducingOutput(
+      [&](const InputFile &input) -> void {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
                                   : StringRef(OutputFileArguments[i]);
-
+        ++i;
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
-        if (!outputFile)
-          return true;
+        if (!outputFile) {
+          hadError = true;
+          return;
+        }
         outputFiles.push_back(*outputFile);
-        return false;
       });
   return hadError ? None : Optional<std::vector<std::string>>(outputFiles);
 }
