@@ -170,12 +170,6 @@ namespace {
     //   - or has a field with resilient layout.
     bool ClassMetadataRequiresDynamicInitialization = false;
 
-    // Does the superclass have a fixed number of stored properties?
-    // If not, and the class has generally-dependent layout, we have to
-    // access stored properties through an indirect offset into the field
-    // offset vector.
-    bool ClassHasFixedFieldCount = true;
-
     // Does the class have a fixed size up until the current point?
     // If not, we have to access stored properties either ivar offset globals,
     // or through the field offset vector, based on whether the layout has
@@ -304,9 +298,7 @@ namespace {
           //
           // FIXME: We need to implement indirect field/vtable entry access
           // before we can enable this
-          if (IGM.Context.LangOpts.EnableClassResilience) {
-            ClassHasFixedFieldCount = false;
-          } else {
+          if (!IGM.Context.LangOpts.EnableClassResilience) {
             addFieldsForClass(superclass, superclassType);
             NumInherited = Elements.size();
           }
@@ -405,16 +397,7 @@ namespace {
 
       // If layout depends on generic parameters, we have to load the
       // offset from the class metadata.
-
-      // If the layout of the class metadata is statically known, then
-      // there should be a fixed offset to the right offset.
-      if (ClassHasFixedFieldCount) {
-        return FieldAccess::ConstantIndirect;
-      }
-
-      // Otherwise, the offset of the offset is stored in a global variable
-      // that will be set up by the runtime.
-      return FieldAccess::NonConstantIndirect;
+      return FieldAccess::ConstantIndirect;
     }
   };
 } // end anonymous namespace

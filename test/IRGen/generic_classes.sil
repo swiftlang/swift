@@ -324,10 +324,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[T0]], i64 6)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Put the generic arguments in their correct positions.
-// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 18
+// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 18
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %A to i8*
 // CHECK:   store i8* [[T0]], i8** [[A_ADDR]], align 8
-// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 19
+// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i64 19
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8*
 // CHECK:   store i8* [[T0]], i8** [[B_ADDR]], align 8
 //   Set up the isa.

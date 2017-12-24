@@ -14,7 +14,6 @@
 // CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd = {{(protected )?}}global [[INT]] 0
 
 // CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvpWvd = {{(protected )?}}global [[INT]] {{8|16}}
-// CHECK: @_T016class_resilience21ResilientGenericChildC5fields5Int32VvpWvi = {{(protected )?}}global [[INT]] {{56|88}}
 
 // CHECK: @_T016class_resilience26ClassWithResilientPropertyCMo = {{(protected )?}}constant [[INT]] {{52|80}}
 
@@ -231,10 +230,8 @@ public class MyResilientChild : MyResilientParent {
 
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds %T16class_resilience21ResilientGenericChildC, %T16class_resilience21ResilientGenericChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK-NEXT: [[INDIRECT_OFFSET:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience21ResilientGenericChildC5fields5Int32VvpWvi
-// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to i8*
-// CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_ADDR]], [[INT]] [[INDIRECT_OFFSET]]
-// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = bitcast i8* [[FIELD_OFFSET_TMP]] to [[INT]]*
+// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
+// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] {{11|14}}
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T16class_resilience21ResilientGenericChildC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
