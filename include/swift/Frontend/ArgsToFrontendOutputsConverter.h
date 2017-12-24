@@ -44,7 +44,8 @@ public:
                                  DiagnosticEngine &diags)
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
-  Optional<std::pair<std::vector<std::string>, OutputPaths>> convert();
+  Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
+  convert();
 
   static std::vector<std::string>
   readOutputFileList(const StringRef filelistPath, DiagnosticEngine &diags);
@@ -117,7 +118,7 @@ public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
                       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  Optional<OutputPaths> computeOutputPaths() const;
+  Optional<std::vector<const OutputPaths>> computeOutputPaths() const;
 
 private:
   Optional<OutputPaths> computeOutputPathsForOneInput(StringRef outputFilename,

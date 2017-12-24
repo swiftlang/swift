@@ -116,7 +116,7 @@ bool ArgsToFrontendOptionsConverter::convert() {
   if (computeOutputFilenamesAndSupplementaryFilenames())
     return true;
 
-  if (checkUnusedOutputPaths())
+  if (checkUnusedSupplementaryOutputPaths())
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
@@ -458,20 +458,22 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
 }
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
-  Optional<std::pair<std::vector<std::string>, OutputPaths>> outs =
-      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
-                                     Opts.InputsAndOutputs, Diags)
-          .convert();
+  Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
+      outs = ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
+                                            Opts.InputsAndOutputs, Diags)
+                 .convert();
   if (!outs)
     return true;
-  Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(outs->first,
-                                                       outs->second);
+  if (FrontendOptions::doesActionProduceOutput(Opts.RequestedAction))
+    Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(outs->first,
+                                                         outs->second);
 
   return false;
 }
 
-bool ArgsToFrontendOptionsConverter::checkUnusedOutputPaths() const {
-  if (Opts.InputsAndOutputs.countOfFilesProducingOutput() == 0)
+bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
+    const {
+  if (Opts.InputsAndOutputs.countOfFilesProducingSupplementaryOutput() == 0)
     return false;
 
   if (Opts.hasUnusedDependenciesFilePath()) {

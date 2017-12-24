@@ -67,7 +67,7 @@ public:
     return *this;
   }
 
-  // Single-threaded WMO routines:
+  // WMO routines:
 
   //  SingleThreadedWMO mode needs only one of each output file for the entire
   //  invocation. WMO can get away with that because it doesn't even attempt to
@@ -79,9 +79,9 @@ public:
   //    the command line, and it hasn't been critical. So right now there's only
   //    one of everything in WMO, always, except for the actual object files in
   //    threaded mode.)
-  const InputFile *getSingleThreadedWMOInput() const {
-    return isSingleThreadedWMO() ? &firstInput() : nullptr;
-  }
+  //
+  // MultithreadedWMO needs only one set of supplementary outputs for the entire
+  // invocation.
 
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
 
@@ -133,6 +133,13 @@ public:
   const InputFile &firstInputProducingOutput() const;
 
   void forEachInputProducingOutput(
+      llvm::function_ref<void(const InputFile &)> fn) const;
+
+  unsigned countOfFilesProducingSupplementaryOutput() const;
+
+  const InputFile &firstInputProducingSupplementaryOutput() const;
+
+  void forEachInputProducingSupplementaryOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
 
   /// Return the unique primary input, if one exists.
@@ -195,8 +202,9 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-  void setMainAndSupplementaryOutputs(ArrayRef<std::string> outputFiles,
-                                      OutputPaths supplementaryOutputs);
+  void setMainAndSupplementaryOutputs(
+      ArrayRef<std::string> outputFiles,
+      ArrayRef<const OutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 };
