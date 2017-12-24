@@ -8,6 +8,12 @@
 #ifndef OutputPaths_h
 #define OutputPaths_h
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
+
+#include <vector>
+
+namespace swift {
 struct OutputPaths {
   /// The path to which we should emit an Objective-C header for the module.
   std::string ObjCHeaderOutputPath;
@@ -47,8 +53,32 @@ struct OutputPaths {
         SerializedDiagnosticsPath(serializedDiagnosticsPath),
         LoadedModuleTracePath(loadedModuleTracePath), TBDPath(tbdPath) {}
 
+  OutputPaths(unsigned i, Optional<std::vector<std::string>> &objCHeaderOutputs,
+              Optional<std::vector<std::string>> &moduleOutput,
+              Optional<std::vector<std::string>> &moduleDocOutputs,
+              Optional<std::vector<std::string>> &dependenciesFiles,
+              Optional<std::vector<std::string>> &referenceDependenciesFiles,
+              Optional<std::vector<std::string>> &serializedDiagnostics,
+              Optional<std::vector<std::string>> &loadedModuleTrace,
+              Optional<std::vector<std::string>> &TBDs)
+      : ObjCHeaderOutputPath(ith(objCHeaderOutputs, i)),
+        ModuleOutputPath(ith(moduleOutput, i)),
+        ModuleDocOutputPath(ith(moduleDocOutputs, i)),
+        DependenciesFilePath(ith(dependenciesFiles, i)),
+        ReferenceDependenciesFilePath(ith(referenceDependenciesFiles, i)),
+        SerializedDiagnosticsPath(ith(serializedDiagnostics, i)),
+        LoadedModuleTracePath(ith(loadedModuleTrace, i)),
+        TBDPath(ith(TBDs, i)) {}
+
   OutputPaths() = default;
   OutputPaths(const OutputPaths &) = default;
+
+private:
+  static std::string ith(Optional<std::vector<std::string>> &names,
+                         unsigned i) {
+    return !names ? "" : (*names)[i];
+  }
 };
+} // namespace swift
 
 #endif /* OutputPaths_h */
