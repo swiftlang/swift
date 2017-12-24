@@ -464,8 +464,8 @@ bool ArgsToFrontendOptionsConverter::
           .convert();
   if (!outs)
     return true;
-  Opts.InputsAndOutputs.setOutputFilenames(outs->first);
-  Opts.InputsAndOutputs.setSupplementaryOutputPaths(outs->second);
+  Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(outs->first,
+                                                       outs->second);
 
   return false;
 }

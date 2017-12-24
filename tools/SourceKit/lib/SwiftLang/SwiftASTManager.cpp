@@ -431,7 +431,7 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputs,
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputs;
-  for (const InputFile &input : inputs.getAllInputs()) {
+  inputs.forEachInput([&](const InputFile &input) -> void {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.file());
     bool newIsPrimary = input.isPrimary() ||
@@ -442,7 +442,7 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputs,
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputs.addInput(
         InputFile(newFilename, newIsPrimary, input.buffer()));
-  }
+  });
 
   if (PrimaryFile.empty() || primaryCount == 1) {
     return replacementInputs;
@@ -713,20 +713,20 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   SmallVector<BufferStamp, 8> InputStamps;
   InputStamps.reserve(
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
-  for (const auto &input :
-       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
-    bool FoundSnapshot = false;
-    for (auto &Snap : Snapshots) {
-      if (Snap->getFilename() == File) {
-        FoundSnapshot = true;
-        InputStamps.push_back(Snap->getStamp());
-        break;
-      }
-    }
-    if (!FoundSnapshot)
-      InputStamps.push_back(MgrImpl.getBufferStamp(File));
-  }
+  Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.forEachInput(
+      [&](const InputFile &input) -> void {
+        StringRef File = input.file();
+        bool FoundSnapshot = false;
+        for (auto &Snap : Snapshots) {
+          if (Snap->getFilename() == File) {
+            FoundSnapshot = true;
+            InputStamps.push_back(Snap->getStamp());
+            break;
+          }
+        }
+        if (!FoundSnapshot)
+          InputStamps.push_back(MgrImpl.getBufferStamp(File));
+      });
   assert(InputStamps.size() ==
          Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   if (Stamps != InputStamps)
@@ -900,30 +900,29 @@ void ASTProducer::findSnapshotAndOpenFiles(
     ArrayRef<ImmutableTextSnapshotRef> Snapshots,
     SmallVectorImpl<FileContent> &Contents, std::string &Error) const {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
-  for (const auto &input :
-       Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
-    bool IsPrimary = input.isPrimary();
-    bool FoundSnapshot = false;
-    for (auto &Snap : Snapshots) {
-      if (Snap->getFilename() == File) {
-        FoundSnapshot = true;
-        Contents.push_back(getFileContentFromSnap(Snap, IsPrimary, File));
-        break;
-      }
-    }
-    if (FoundSnapshot)
-      continue;
-
-    auto Content = MgrImpl.getFileContent(File, IsPrimary, Error);
-    if (!Content.Buffer) {
-      LOG_WARN_FUNC("failed getting file contents for " << File << ": "
-                                                        << Error);
-      // File may not exist, continue and recover as if it was empty.
-      Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
-    }
-    Contents.push_back(std::move(Content));
-  }
+  Opts.Invok.getFrontendOptions().InputsAndOutputs.forEachInput(
+      [&](const InputFile &input) -> void {
+        StringRef File = input.file();
+        bool IsPrimary = input.isPrimary();
+        bool FoundSnapshot = false;
+        for (auto &Snap : Snapshots) {
+          if (Snap->getFilename() == File) {
+            FoundSnapshot = true;
+            Contents.push_back(getFileContentFromSnap(Snap, IsPrimary, File));
+            break;
+          }
+        }
+        if (!FoundSnapshot) {
+          auto Content = MgrImpl.getFileContent(File, IsPrimary, Error);
+          if (!Content.Buffer) {
+            LOG_WARN_FUNC("failed getting file contents for " << File << ": "
+                                                              << Error);
+            // File may not exist, continue and recover as if it was empty.
+            Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
+          }
+          Contents.push_back(std::move(Content));
+        }
+      });
   assert(Contents.size() ==
          Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
 }

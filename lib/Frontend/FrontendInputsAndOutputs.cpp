@@ -61,7 +61,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const std::pair<StringRef, unsigned> &elem) -> bool {
-        StringRef filename = getAllInputs()[elem.second].file();
+        StringRef filename = AllFiles[elem.second].file();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
@@ -99,7 +99,7 @@ bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
 }
 
 bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
-  for (const InputFile &input : getAllInputs()) {
+  for (const InputFile &input : AllFiles) {
     if (input.isPrimary())
       continue;
     if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
@@ -109,18 +109,14 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   return true;
 }
 
-InputFile &FrontendInputsAndOutputs::firstPrimaryInput() {
-  assert(!PrimaryInputs.empty());
-  return getAllInputs()[PrimaryInputs.front().second];
-}
 const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
   assert(!PrimaryInputs.empty());
-  return getAllInputs()[PrimaryInputs.front().second];
+  return AllFiles[PrimaryInputs.front().second];
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
   std::vector<std::string> filenames;
-  for (auto &input : getAllInputs()) {
+  for (auto &input : AllFiles) {
     filenames.push_back(input.file());
   }
   return filenames;
@@ -137,7 +133,7 @@ StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
 const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
   assertMustNotBeMoreThanOnePrimaryInput();
   const auto b = PrimaryInputs.begin();
-  return b == PrimaryInputs.end() ? nullptr : &getAllInputs()[b->second];
+  return b == PrimaryInputs.end() ? nullptr : &AllFiles[b->second];
 }
 
 const InputFile &
@@ -166,12 +162,12 @@ void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
 }
 
 void FrontendInputsAndOutputs::addInput(const InputFile &input) {
-  getAllInputs().push_back(input);
+  AllFiles.push_back(input);
   if (input.isPrimary()) {
     // Take care to push a reference to the string in the InputFile stored in
     // AllFiles, NOT in the input parameter.
-    PrimaryInputs.insert(std::make_pair(getAllInputs().back().file(),
-                                        getAllInputs().size() - 1));
+    PrimaryInputs.insert(
+        std::make_pair(AllFiles.back().file(), AllFiles.size() - 1));
   }
 }
 
@@ -195,58 +191,23 @@ const InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() const {
              : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
 }
 
-bool FrontendInputsAndOutputs::forEachInputProducingOutput(
-    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-  return isSingleThreadedWMO()
-             ? fn(*getSingleThreadedWMOInput(), 0)
-             : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
+void FrontendInputsAndOutputs::forEachInputProducingOutput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  isSingleThreadedWMO()
+      ? fn(*getSingleThreadedWMOInput())
+      : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
-bool FrontendInputsAndOutputs::forEachInput(
-    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-  for (auto i : indices(getAllInputs()))
-    if (fn(getAllInputs()[i], i))
-      return true;
-  return false;
+void FrontendInputsAndOutputs::forEachInput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  for (const InputFile &input : AllFiles)
+    fn(input);
 }
 
-bool FrontendInputsAndOutputs::forEachPrimaryInput(
-    llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-  unsigned i = 0;
+void FrontendInputsAndOutputs::forEachPrimaryInput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
   for (const auto p : PrimaryInputs)
-    if (fn(getAllInputs()[p.second], i++))
-      return true;
-  return false;
-}
-
-InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() {
-  return isSingleThreadedWMO()
-             ? *getSingleThreadedWMOInput()
-             : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
-}
-
-bool FrontendInputsAndOutputs::forEachInputProducingOutput(
-    llvm::function_ref<bool(InputFile &, unsigned)> fn) {
-  return isSingleThreadedWMO()
-             ? fn(*getSingleThreadedWMOInput(), 0)
-             : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
-}
-
-bool FrontendInputsAndOutputs::forEachInput(
-    llvm::function_ref<bool(InputFile &, unsigned)> fn) {
-  for (auto i : indices(getAllInputs()))
-    if (fn(getAllInputs()[i], i))
-      return true;
-  return false;
-}
-
-bool FrontendInputsAndOutputs::forEachPrimaryInput(
-    llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
-  unsigned i = 0;
-  for (auto p : PrimaryInputs)
-    if (fn(getAllInputs()[p.second], i++))
-      return true;
-  return false;
+    fn(AllFiles[p.second]);
 }
 
 bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
@@ -268,11 +229,12 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
   return outputs;
 }
 
-void FrontendInputsAndOutputs::setOutputFilenames(
-    ArrayRef<std::string> outputs) {
+void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
+    ArrayRef<std::string> outputFiles, OutputPaths supplementaryOutputs) {
   assert(getOutputFilenames().empty() && "re-setting OutputFilenames");
-  for (StringRef s : outputs)
+  for (StringRef s : outputFiles)
     OutputFilenames.push_back(s);
+  SupplementaryOutputPaths = supplementaryOutputs;
 }
 
 /// Gets the name of the specified output filename.
@@ -282,15 +244,7 @@ StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
     return OutputFilenames.back();
   return StringRef();
 }
-/// Sets a single filename as output filename.
-void FrontendInputsAndOutputs::setSingleOutputFilename(
-    const std::string &FileName) {
-  OutputFilenames.clear();
-  OutputFilenames.push_back(FileName);
-}
-void FrontendInputsAndOutputs::setOutputFilenameToStdout() {
-  setSingleOutputFilename("-");
-}
+
 bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
   return getSingleOutputFilename() == "-";
 }
