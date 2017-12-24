@@ -29,19 +29,20 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
-Optional<std::pair<std::vector<std::string>, OutputPaths>>
+Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
 ArgsToFrontendOutputsConverter::convert() {
   const auto requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
 
   if (!FrontendOptions::doesActionProduceOutput(requestedAction))
-    return std::make_pair(std::vector<std::string>(), OutputPaths());
+    return std::make_pair(std::vector<std::string>(),
+                          std::vector<const OutputPaths>());
 
   Optional<std::vector<std::string>> outputFiles =
       OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
   if (!outputFiles)
     return None;
-  Optional<OutputPaths> outputPaths =
+  Optional<std::vector<const OutputPaths>> outputPaths =
       OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
                           ModuleName)
           .computeOutputPaths();
@@ -198,9 +199,21 @@ OutputPathsComputer::OutputPathsComputer(
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
-Optional<OutputPaths> OutputPathsComputer::computeOutputPaths() const {
-  return computeOutputPathsForOneInput(
-      OutputFiles[0], InputsAndOutputs.firstInputProducingOutput());
+Optional<std::vector<const OutputPaths>>
+OutputPathsComputer::computeOutputPaths() const {
+  std::vector<const OutputPaths> outputs;
+  bool hadError = false;
+  unsigned i = 0;
+  InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> void {
+        Optional<OutputPaths> outputPaths =
+            computeOutputPathsForOneInput(OutputFiles[i], input);
+        i++;
+        if (!outputPaths)
+          hadError = true;
+        outputs.push_back(*outputPaths);
+      });
+  return hadError ? None : Optional<std::vector<const OutputPaths>>(outputs);
 }
 
 Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
