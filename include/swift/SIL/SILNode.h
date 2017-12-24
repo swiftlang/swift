@@ -163,6 +163,10 @@ protected:
     NumBaseElements : 32-NumSingleValueInstructionBits
   );
 
+  IBWTO_BITFIELD(SelectEnumInstBase, SingleValueInstruction, 1,
+    HasDefault : 1
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
@@ -387,6 +391,7 @@ protected:
     SWIFT_INLINE_BITS(TupleInst);
     SWIFT_INLINE_BITS(ObjectInst);
     SWIFT_INLINE_BITS(CondBranchInst);
+    SWIFT_INLINE_BITS(SelectEnumInstBase);
   } Bits;
 
 private:

@@ -4914,38 +4914,39 @@ public:
   }
 };
 
-// Base class of all select instructions like select_enum, select_value, etc.
-// The template parameter represents a type of case values to be compared
-// with the operand of a select instruction.
+// Abstract base class of all select instructions like select_enum,
+// select_value, etc. The template parameter represents a type of case values
+// to be compared with the operand of a select instruction.
+//
+// Subclasses must provide tail allocated storage.
+// The first operand is the operand of select_xxx instruction. The rest of
+// the operands are the case values and results of a select instruction.
 template <class Derived, class T>
 class SelectInstBase : public SingleValueInstruction {
-protected:
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
-
-  /// The first operand is the operand of select_xxx instruction. The rest of
-  /// the operands are the case values and results of a select instruction.
-  TailAllocatedOperandList<1> Operands;
-
 public:
-  SelectInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc,
-                 SILType type, unsigned numCases, bool hasDefault,
-                 ArrayRef<SILValue> operands, SILValue operand)
-      : SingleValueInstruction(kind, DebugLoc, type), NumCases(numCases),
-        HasDefault(hasDefault), Operands(this, operands, operand) {}
+  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type)
+      : SingleValueInstruction(kind, Loc, type) {}
 
-  SILValue getOperand() const { return Operands[0].get(); }
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return static_cast<const Derived *>(this)->getAllOperands();
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return static_cast<Derived *>(this)->getAllOperands();
+  }
 
-  std::pair<T, SILValue> getCase(unsigned i) {
+  std::pair<T, SILValue> getCase(unsigned i) const {
     return static_cast<const Derived *>(this)->getCase(i);
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return static_cast<const Derived *>(this)->getNumCases();
+  }
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return static_cast<const Derived *>(this)->hasDefault();
+  }
 
   SILValue getDefaultResult() const {
     return static_cast<const Derived *>(this)->getDefaultResult();
@@ -4960,19 +4961,19 @@ class SelectEnumInstBase
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
   
-  EnumElementDecl **getCaseBuf() {
-    return reinterpret_cast<EnumElementDecl**>(Operands.asArray().end());
-  }
-  EnumElementDecl * const* getCaseBuf() const {
-    return reinterpret_cast<EnumElementDecl* const*>(Operands.asArray().end());
+  EnumElementDecl **getEnumElementDeclStorage();
+  EnumElementDecl * const* getEnumElementDeclStorage() const {
+    return const_cast<SelectEnumInstBase*>(this)->getEnumElementDeclStorage();
   }
 
 protected:
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
-                     SILType type, SILValue enumValue, SILValue defaultValue,
-                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> cases,
+                     SILType type, bool defaultValue,
                      Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                     ProfileCounter DefaultCount);
+                     ProfileCounter DefaultCount)
+      : SelectInstBase(kind, debugLoc, type) {
+    SILInstruction::Bits.SelectEnumInstBase.HasDefault = defaultValue;
+  }
   template <typename SELECT_ENUM_INST>
   static SELECT_ENUM_INST *
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
@@ -4983,12 +4984,16 @@ protected:
                    ProfileCounter DefaultCount);
 
 public:
+  ArrayRef<Operand> getAllOperands() const;
+  MutableArrayRef<Operand> getAllOperands();
+
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
   SILValue getEnumOperand() const { return getOperand(); }
   
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
-    return std::make_pair(getCaseBuf()[i], Operands[i+1].get());
+    return std::make_pair(getEnumElementDeclStorage()[i],
+                          getAllOperands()[i+1].get());
   }
   
   /// Return the value that will be used as the result for the specified enum
@@ -5006,9 +5011,17 @@ public:
   /// \brief If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
+  bool hasDefault() const {
+    return SILInstruction::Bits.SelectEnumInstBase.HasDefault;
+  }
+
   SILValue getDefaultResult() const {
-    assert(HasDefault && "doesn't have a default");
-    return Operands[NumCases + 1].get();
+    assert(hasDefault() && "doesn't have a default");
+    return getAllOperands().back().get();
+  }
+
+  unsigned getNumCases() const {
+    return getAllOperands().size() - 1 - hasDefault();
   }
 
   /// If there is a single case that returns a literal "true" value (an
@@ -5021,21 +5034,29 @@ public:
 };
   
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumInst
-    : public InstructionBase<SILInstructionKind::SelectEnumInst,
-                             SelectEnumInstBase> {
+class SelectEnumInst final
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::SelectEnumInst,
+                                        SelectEnumInst,
+                                        SelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
 
 private:
   friend SelectEnumInstBase;
 
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                 SILValue DefaultValue,
-                 ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                 bool DefaultValue,
+                 ArrayRef<SILValue> CaseValues,
+                 ArrayRef<EnumElementDecl *> CaseDecls,
                  Optional<ArrayRef<ProfileCounter>> CaseCounts,
                  ProfileCounter DefaultCount)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
-                        CaseCounts, DefaultCount) {}
+      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
+                                            bool(DefaultValue), CaseCounts,
+                                            DefaultCount) {
+    assert(CaseValues.size() - DefaultValue == CaseDecls.size());
+    std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
+                            getTrailingObjects<EnumElementDecl *>());
+  }
   static SelectEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
@@ -5045,20 +5066,28 @@ private:
 };
 
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumAddrInst
-    : public InstructionBase<SILInstructionKind::SelectEnumAddrInst,
-                             SelectEnumInstBase> {
+class SelectEnumAddrInst final
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::SelectEnumAddrInst,
+                                        SelectEnumAddrInst,
+                                        SelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
   friend SelectEnumInstBase;
 
   SelectEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-      SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+      bool DefaultValue,
+      ArrayRef<SILValue> CaseValues,
+      ArrayRef<EnumElementDecl *> CaseDecls,
       Optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
-                        CaseCounts, DefaultCount) {}
+      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
+                                            bool(DefaultValue), CaseCounts,
+                                            DefaultCount) {
+    assert(CaseValues.size() - DefaultValue == CaseDecls.size());
+    std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
+                            getTrailingObjects<EnumElementDecl *>());
+  }
   static SelectEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
@@ -5068,36 +5097,49 @@ class SelectEnumAddrInst
 };
 
 /// Select on a value of a builtin integer type.
-class SelectValueInst
-    : public InstructionBase<SILInstructionKind::SelectValueInst,
-                             SelectInstBase<SelectValueInst, SILValue>> {
+///
+/// There is 'the' operand, followed by pairs of operands for each case,
+/// followed by an optional default operand.
+class SelectValueInst final
+    : public InstructionBaseWithTrailingOperands<
+                                    SILInstructionKind::SelectValueInst,
+                                    SelectValueInst,
+                                    SelectInstBase<SelectValueInst, SILValue>> {
   friend SILBuilder;
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults);
+                  ArrayRef<SILValue> CaseValuesAndResults)
+      : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
+                                            DebugLoc, Type) {}
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILFunction &F);
 
-  OperandValueArrayRef getCaseBuf() const {
-    return Operands.getDynamicValuesAsArray();
-  }
-
 public:
-  ~SelectValueInst();
-
   std::pair<SILValue, SILValue>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
-    return {getCaseBuf()[i*2], getCaseBuf()[i*2+1]};
+    auto cases = getAllOperands().slice(1);
+    return {cases[i*2].get(), cases[i*2+1].get()};
+  }
+
+  unsigned getNumCases() const {
+    // Ignore the first non-case operand.
+    auto count = getAllOperands().size() - 1;
+    // This implicitly ignore the optional default operand.
+    return count / 2;
+  }
+
+  bool hasDefault() const {
+    // If the operand count is even, then we have a default value.
+    return (getAllOperands().size() & 1) == 0;
   }
 
   SILValue getDefaultResult() const {
-    assert(HasDefault && "doesn't have a default");
-    return getCaseBuf()[NumCases*2];
+    assert(hasDefault() && "doesn't have a default");
+    return getAllOperands().back().get();
   }
 };
 
@@ -5669,8 +5711,6 @@ class InitExistentialRefInst final
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
          SILOpenedArchetypesState &OpenedArchetypes);
-
-  //size_t numTrailingObjects(OverloadToken<Operand>) const { return NumOperands; }
 
 public:
   CanType getFormalConcreteType() const {
@@ -7743,6 +7783,33 @@ inline MutableArrayRef<Operand> AllocRefInstBase::getAllOperands() {
   if (auto I = dyn_cast<AllocRefDynamicInst>(this))
     return I->getAllOperands();
   llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline ArrayRef<Operand> SelectEnumInstBase::getAllOperands() const {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+}
+
+inline MutableArrayRef<Operand> SelectEnumInstBase::getAllOperands() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+}
+
+inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getTrailingObjects<EnumElementDecl*>();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getTrailingObjects<EnumElementDecl*>();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
 }
 
 } // end swift namespace

@@ -1277,23 +1277,6 @@ SwitchValueInst *SwitchValueInst::create(
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
-SelectValueInst::SelectValueInst(SILDebugLocation Loc, SILValue Operand,
-                                 SILType Type, SILValue DefaultResult,
-                                 ArrayRef<SILValue> CaseValuesAndResults)
-    : InstructionBase(Loc, Type,
-                      CaseValuesAndResults.size() / 2, bool(DefaultResult),
-                      CaseValuesAndResults, Operand) {
-
-  unsigned OperandBitWidth = 0;
-
-  if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
-    OperandBitWidth = OperandTy->getGreatestWidth();
-  }
-}
-
-SelectValueInst::~SelectValueInst() {
-}
-
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
                         SILValue DefaultResult,
@@ -1311,58 +1294,40 @@ SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
   if ((bool)DefaultResult)
     CaseValuesAndResults.push_back(DefaultResult);
 
-  size_t bufSize = sizeof(SelectValueInst) + decltype(Operands)::getExtraSize(
-                                               CaseValuesAndResults.size());
-  void *buf = F.getModule().allocateInst(bufSize, alignof(SelectValueInst));
-  return ::new (buf)
-      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
-}
-
-static SmallVector<SILValue, 4>
-getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
-                SILValue DefaultValue) {
-  SmallVector<SILValue, 4> result;
-
-  for (auto &pair : CaseValues)
-    result.push_back(pair.second);
-  if (DefaultValue)
-    result.push_back(DefaultValue);
-
-  return result;
-}
-
-SelectEnumInstBase::SelectEnumInstBase(
-    SILInstructionKind Kind, SILDebugLocation Loc, SILType Ty, SILValue Operand,
-    SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
-    : SelectInstBase(Kind, Loc, Ty, CaseValues.size(), bool(DefaultValue),
-                     getCaseOperands(CaseValues, DefaultValue), Operand) {
-  // Initialize the case and successor arrays.
-  auto *cases = getCaseBuf();
-  for (unsigned i = 0, size = CaseValues.size(); i < size; ++i) {
-    cases[i] = CaseValues[i].first;
-  }
+  auto Size = totalSizeToAlloc<swift::Operand>(CaseValuesAndResults.size() + 1);
+  auto Buf = F.getModule().allocateInst(Size, alignof(SelectValueInst));
+  return ::new (Buf) SelectValueInst(Loc, Operand, Type, DefaultResult,
+                                     CaseValuesAndResults);
 }
 
 template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> DeclsAndValues,
+    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
-  unsigned numCases = CaseValues.size();
+  unsigned numCases = DeclsAndValues.size();
+  SmallVector<SILValue, 4> CaseValues;
+  SmallVector<EnumElementDecl*, 4> CaseDecls;
+  for (auto &pair : DeclsAndValues) {
+    CaseValues.push_back(pair.second);
+    CaseDecls.push_back(pair.first);
+  }
 
-  void *buf = F.getModule().allocateInst(
-      sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
-          sizeof(ProfileCounter) + TailAllocatedOperandList<1>::getExtraSize(
-                                       numCases + (bool)DefaultValue),
-      alignof(SELECT_ENUM_INST));
-  return ::new (buf) SELECT_ENUM_INST(Loc, Operand, Ty, DefaultValue,
-                                      CaseValues, CaseCounts, DefaultCount);
+  if (DefaultValue)
+    CaseValues.push_back(DefaultValue);
+
+  auto Size = SELECT_ENUM_INST::template
+    totalSizeToAlloc<swift::Operand, EnumElementDecl*>(CaseValues.size() + 1,
+                                                       CaseDecls.size());
+  auto Buf = F.getModule().allocateInst(Size + sizeof(ProfileCounter),
+                                        alignof(SELECT_ENUM_INST));
+  return ::new (Buf) SELECT_ENUM_INST(Loc, Operand, Ty, bool(DefaultValue),
+                                      CaseValues, CaseDecls, CaseCounts,
+                                      DefaultCount);
 }
 
 SelectEnumInst *SelectEnumInst::create(
