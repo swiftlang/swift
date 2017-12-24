@@ -8,7 +8,9 @@
 #ifndef InputFile_h
 #define InputFile_h
 
+#include "swift/Basic/OutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
+
 #include <string>
 #include <vector>
 
@@ -31,12 +33,17 @@ class InputFile {
   /// Null if the contents are not overridden.
   llvm::MemoryBuffer *Buffer;
 
+  /// The supplementary outputs associated with this input:
+  /// Temporarily keep in the first output-producing input.
+  OutputPaths SupplementaryOutputPaths;
+
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+      : Filename(name), IsPrimary(isPrimary), Buffer(buffer),
+        SupplementaryOutputPaths(OutputPaths()) {
     assert(name.begin() != Filename.c_str());
     assert(!name.empty() && "Empty strings signify no inputs in other places");
   }
@@ -50,6 +57,14 @@ public:
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
+  }
+
+  const OutputPaths &supplementaryOutputPaths() const {
+    return SupplementaryOutputPaths;
+  }
+
+  void setSupplementaryOutputPaths(OutputPaths &outs) {
+    SupplementaryOutputPaths = outs;
   }
 };
 } // namespace swift

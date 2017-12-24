@@ -234,7 +234,10 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
   assert(getOutputFilenames().empty() && "re-setting OutputFilenames");
   for (StringRef s : outputFiles)
     OutputFilenames.push_back(s);
-  SupplementaryOutputPaths = supplementaryOutputs;
+  if (AllFiles.empty())
+    return;
+  AllFiles[hasPrimaryInputs() ? PrimaryInputs.front().second : 0]
+      .setSupplementaryOutputPaths(supplementaryOutputs);
 }
 
 /// Gets the name of the specified output filename.
@@ -257,4 +260,39 @@ void FrontendInputsAndOutputs::forEachOutputFilename(
     llvm::function_ref<void(const std::string)> fn) const {
   for (const std::string &s : OutputFilenames)
     fn(s);
+}
+
+const std::string &FrontendInputsAndOutputs::getObjCHeaderOutputPath() const {
+  return supplementaryOutputPaths().ObjCHeaderOutputPath;
+}
+const std::string &FrontendInputsAndOutputs::getModuleOutputPath() const {
+  return supplementaryOutputPaths().ModuleOutputPath;
+}
+const std::string &FrontendInputsAndOutputs::getModuleDocOutputPath() const {
+  return supplementaryOutputPaths().ModuleDocOutputPath;
+}
+const std::string &FrontendInputsAndOutputs::getDependenciesFilePath() const {
+  return supplementaryOutputPaths().DependenciesFilePath;
+}
+const std::string &
+FrontendInputsAndOutputs::getReferenceDependenciesFilePath() const {
+  return supplementaryOutputPaths().ReferenceDependenciesFilePath;
+}
+const std::string &
+FrontendInputsAndOutputs::getSerializedDiagnosticsPath() const {
+  return supplementaryOutputPaths().SerializedDiagnosticsPath;
+}
+const std::string &FrontendInputsAndOutputs::getLoadedModuleTracePath() const {
+  return supplementaryOutputPaths().LoadedModuleTracePath;
+}
+const std::string &FrontendInputsAndOutputs::getTBDPath() const {
+  return supplementaryOutputPaths().TBDPath;
+}
+
+const OutputPaths &FrontendInputsAndOutputs::supplementaryOutputPaths() const {
+  static const OutputPaths empty;
+  if (!hasInputs())
+    return empty;
+  assertMustNotBeMoreThanOnePrimaryInput();
+  return firstInputProducingOutput().supplementaryOutputPaths();
 }
