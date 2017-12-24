@@ -885,16 +885,10 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
 ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements,
                                unsigned NumBaseElements, SILModule &M) {
-  void *Buffer = M.allocateInst(sizeof(ObjectInst) +
-                            decltype(Operands)::getExtraSize(Elements.size()),
-                            alignof(ObjectInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buffer = M.allocateInst(Size, alignof(ObjectInst));
   return ::new(Buffer) ObjectInst(Loc, Ty, Elements, NumBaseElements);
 }
-
-ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
-                       ArrayRef<SILValue> Elems, unsigned NumBaseElements)
-    : InstructionBase(Loc, Ty),
-      NumBaseElements(NumBaseElements), Operands(this, Elems) {}
 
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
                              ArrayRef<SILValue> Elements, SILModule &M) {

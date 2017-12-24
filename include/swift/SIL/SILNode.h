@@ -158,6 +158,11 @@ protected:
     NumSubstitutions : 32-NumSingleValueInstructionBits
   );
 
+  IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumBaseElements : 32-NumSingleValueInstructionBits
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
     : NumPadBits,
     numBits : 32
@@ -377,6 +382,7 @@ protected:
     SWIFT_INLINE_BITS(ConstStringLiteralInst);
     SWIFT_INLINE_BITS(StructInst);
     SWIFT_INLINE_BITS(TupleInst);
+    SWIFT_INLINE_BITS(ObjectInst);
   } Bits;
 
 private:

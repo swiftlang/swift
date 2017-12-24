@@ -4655,19 +4655,19 @@ class StrongUnpinInst
 ///
 /// This instruction can only appear at the end of a gobal variable's
 /// static initializer list.
-class ObjectInst
-    : public InstructionBase<SILInstructionKind::ObjectInst,
-                             SingleValueInstruction> {
+class ObjectInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::ObjectInst,
+                                                 ObjectInst,
+                                                 SingleValueInstruction> {
   friend SILBuilder;
-
-  unsigned NumBaseElements;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
   ObjectInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements, unsigned NumBaseElements);
+            ArrayRef<SILValue> Elements, unsigned NumBaseElements)
+    : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty) {
+      SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
+  }
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -4677,28 +4677,26 @@ class ObjectInst
 public:
   /// All elements referenced by this ObjectInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// All elements referenced by this ObjectInst.
   OperandValueArrayRef getAllElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 
   /// The elements which initialize the stored properties of the object itself.
   OperandValueArrayRef getBaseElements() const {
-    return Operands.getDynamicValuesAsArray().slice(0, NumBaseElements);
+    return OperandValueArrayRef(getAllOperands().slice(0,
+                              SILInstruction::Bits.ObjectInst.NumBaseElements));
   }
 
   /// The elements which initialize the tail allocated elements.
   OperandValueArrayRef getTailElements() const {
-    return Operands.getDynamicValuesAsArray().slice(NumBaseElements);
+    return OperandValueArrayRef(getAllOperands().slice(
+                              SILInstruction::Bits.ObjectInst.NumBaseElements));
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
-
 
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst final
