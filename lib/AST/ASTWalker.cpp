@@ -197,6 +197,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (TAD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+
+      if (visitGenericParamList(TAD->getGenericParams()))
+        return true;
+    }
+
     return doIt(TAD->getUnderlyingTypeLoc());
   }
 
@@ -222,15 +229,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         Walker.shouldWalkIntoGenericParams();
 
     if (WalkGenerics) {
-      // Visit generic params
-      for (auto GP : NTD->getGenericParams()->getParams()) {
-        if (doIt(GP))
-          return true;
-      }
-      for (auto Req: NTD->getGenericParams()->getNonTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+      visitGenericParamList(NTD->getGenericParams());
     }
 
     for (auto &Inherit : NTD->getInherited()) {
@@ -273,15 +272,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool WalkGenerics = SD->getGenericParams() &&
       Walker.shouldWalkIntoGenericParams();
     if (WalkGenerics) {
-      // Visit generic params
-      for (auto &P : SD->getGenericParams()->getParams()) {
-        if (doIt(P))
-          return true;
-      }
-      for (auto Req : SD->getGenericParams()->getNonTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+      visitGenericParamList(SD->getGenericParams());
     }
     visit(SD->getIndices());
     if (doIt(SD->getElementTypeLoc()))
@@ -312,16 +303,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         (!isa<FuncDecl>(AFD) || !cast<FuncDecl>(AFD)->isAccessor());
 
     if (WalkGenerics) {
-      // Visit generic params
-      for (auto &P : AFD->getGenericParams()->getParams()) {
-        if (doIt(P))
-          return true;
-      }
-      // Visit param conformance
-      for (auto Req : AFD->getGenericParams()->getNonTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
+      visitGenericParamList(AFD->getGenericParams());
     }
 
     for (auto PL : AFD->getParameterLists()) {
@@ -383,6 +365,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
     }
+    return false;
+  }
+
+  bool visitGenericParamList(GenericParamList *GPL) {
+    // Visit generic params
+    for (auto &P : GPL->getParams()) {
+      if (doIt(P))
+        return true;
+    }
+
+    // Visit param conformance
+    for (auto Req : GPL->getNonTrailingRequirements()) {
+      if (doIt(Req))
+        return true;
+    }
+
     return false;
   }
 
