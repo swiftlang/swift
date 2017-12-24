@@ -44,10 +44,6 @@ class FrontendInputsAndOutputs {
   /// Only one set of outputs (one OutputFilename, one OutputPaths) is produced.
   bool IsSingleThreadedWMO = false;
 
-  /// The specified output files. If only a single outputfile is generated,
-  /// the name of the last specified file is taken.
-  std::vector<std::string> OutputFilenames;
-
 public:
   FrontendInputsAndOutputs() = default;
 
@@ -55,7 +51,6 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    OutputFilenames = other.OutputFilenames;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
@@ -63,7 +58,6 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    OutputFilenames = other.OutputFilenames;
     return *this;
   }
 
@@ -102,6 +96,8 @@ public:
   const InputFile &firstInput() const { return AllFiles[0]; }
   InputFile &firstInput() { return AllFiles[0]; }
 
+  const InputFile &lastInput() const { return AllFiles.back(); }
+
   StringRef getFilenameOfFirstInput() const;
 
   bool isReadingFromStdin() const {
@@ -113,6 +109,7 @@ public:
   // Primaries:
 
   const InputFile &firstPrimaryInput() const;
+  const InputFile &lastPrimaryInput() const;
 
   void
   forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const;
@@ -131,6 +128,7 @@ public:
   unsigned countOfFilesProducingOutput() const;
 
   const InputFile &firstInputProducingOutput() const;
+  const InputFile &lastInputProducingOutput() const;
 
   void forEachInputProducingOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;

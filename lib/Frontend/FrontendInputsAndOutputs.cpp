@@ -114,6 +114,11 @@ const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
   return AllFiles[PrimaryInputs.front().second];
 }
 
+const InputFile &FrontendInputsAndOutputs::lastPrimaryInput() const {
+  assert(!PrimaryInputs.empty());
+  return AllFiles[PrimaryInputs.back().second];
+}
+
 std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
   std::vector<std::string> filenames;
   for (auto &input : AllFiles) {
@@ -193,6 +198,12 @@ const InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() const {
              : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
 }
 
+const InputFile &FrontendInputsAndOutputs::lastInputProducingOutput() const {
+  return isSingleThreadedWMO()
+             ? firstInput()
+             : hasPrimaryInputs() ? lastPrimaryInput() : lastInput();
+}
+
 void FrontendInputsAndOutputs::forEachInputProducingOutput(
     llvm::function_ref<void(const InputFile &)> fn) const {
   isSingleThreadedWMO()
@@ -240,41 +251,48 @@ bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
 
 std::vector<StringRef> FrontendInputsAndOutputs::getOutputFilenames() const {
   std::vector<StringRef> outputs;
-  for (const std::string &s : OutputFilenames)
-    outputs.push_back(s);
+  forEachInputProducingOutput([&](const InputFile &input) -> void {
+    outputs.push_back(input.outputFilename());
+  });
   return outputs;
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
   std::vector<std::string> outputs;
-  for (const std::string s : OutputFilenames)
-    outputs.push_back(s);
+  forEachInputProducingOutput([&](const InputFile &input) -> void {
+    outputs.push_back(input.outputFilename());
+  });
   return outputs;
 }
 
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     ArrayRef<std::string> outputFiles,
     ArrayRef<const OutputPaths> supplementaryOutputs) {
-  assert(getOutputFilenames().empty() && "re-setting OutputFilenames");
-  for (StringRef s : outputFiles)
-    OutputFilenames.push_back(s);
+  assert(countOfFilesProducingOutput() == outputFiles.size());
   assert(countOfFilesProducingSupplementaryOutput() ==
          supplementaryOutputs.size());
   if (hasPrimaryInputs()) {
     unsigned i = 0;
-    for (auto p : PrimaryInputs)
-      AllFiles[p.second].setSupplementaryOutputPaths(supplementaryOutputs[i++]);
-  } else
-    for (auto i : indices(supplementaryOutputs)) // Only 1 if WMO
-      AllFiles[i].setSupplementaryOutputPaths(supplementaryOutputs[i]);
+    for (auto p : PrimaryInputs) {
+      AllFiles[p.second].setOutputFileNameAndSupplementaryOutputPaths(
+          outputFiles[i], supplementaryOutputs[i]);
+      ++i;
+    }
+  } else if (isSingleThreadedWMO()) {
+    AllFiles[0].setOutputFileNameAndSupplementaryOutputPaths(
+        outputFiles[0], supplementaryOutputs[0]);
+  } else {
+    for (auto i : indices(AllFiles))
+      AllFiles[i].setOutputFilename(outputFiles[i]);
+    AllFiles[0].setSupplementaryOutputPaths(supplementaryOutputs[0]);
+  }
 }
 
 /// Gets the name of the specified output filename.
 /// If multiple files are specified, the last one is returned.
 StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
-  if (OutputFilenames.size() >= 1)
-    return OutputFilenames.back();
-  return StringRef();
+  return hasInputs() ? StringRef(lastInputProducingOutput().outputFilename())
+                     : StringRef();
 }
 
 bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
@@ -282,13 +300,13 @@ bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
 }
 
 bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
-  return !OutputFilenames.empty() && !isOutputFilenameStdout();
+  return hasInputs() && !isOutputFilenameStdout();
 }
 
 void FrontendInputsAndOutputs::forEachOutputFilename(
     llvm::function_ref<void(const std::string)> fn) const {
-  for (const std::string &s : OutputFilenames)
-    fn(s);
+  forEachInputProducingOutput(
+      [&](const InputFile &input) -> void { fn(input.outputFilename()); });
 }
 
 const std::string &FrontendInputsAndOutputs::getObjCHeaderOutputPath() const {
