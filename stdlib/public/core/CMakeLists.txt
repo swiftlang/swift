@@ -57,7 +57,7 @@ set(SWIFTLIB_ESSENTIAL
   Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift
-  Flatten.swift.gyb
+  Flatten.swift
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
@@ -78,7 +78,7 @@ set(SWIFTLIB_ESSENTIAL
   Integers.swift.gyb
   Join.swift
   KeyPath.swift
-  LazyCollection.swift.gyb
+  LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
@@ -228,8 +228,6 @@ endif()
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
-list(APPEND swift_stdlib_compile_flags
-     "-enable-experimental-conditional-conformances")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

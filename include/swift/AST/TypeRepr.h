@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -37,50 +38,51 @@ namespace swift {
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
+#define LAST_TYPEREPR(ID) Last_TypeRepr = ID,
 #include "TypeReprNodes.def"
 };
+enum : unsigned { NumTypeReprKindBits =
+  countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// \brief Representation of a type as written in source.
 class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
-  class TypeReprBitfields {
-    friend class TypeRepr;
+  SWIFT_INLINE_BITFIELD_BASE(TypeRepr, bitmax(NumTypeReprKindBits,8)+1+1,
     /// The subclass of TypeRepr that this is.
-    unsigned Kind : 6;
+    Kind : bitmax(NumTypeReprKindBits,8),
 
     /// Whether this type representation is known to contain an invalid
     /// type.
-    unsigned Invalid : 1;
+    Invalid : 1,
 
     /// Whether this type representation had a warning emitted related to it.
     /// This is a hack related to how we resolve type exprs multiple times in
     /// generic contexts.
-    unsigned Warned : 1;
-  };
-  enum { NumTypeReprBits = 8 };
-  class TupleTypeReprBitfields {
-    friend class TupleTypeRepr;
-    unsigned : NumTypeReprBits;
+    Warned : 1
+  );
 
-    /// The number of elements contained.
-    unsigned NumElements : 16;
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+16,
     /// Whether this tuple has '...' and its position.
-    unsigned HasEllipsis : 1;
-  };
+    HasEllipsis : 1,
+    : NumPadBits,
+    /// The number of elements contained.
+    NumElements : 16
+  );
 
 protected:
   union {
-    TypeReprBitfields TypeReprBits;
-    TupleTypeReprBitfields TupleTypeReprBits;
-  };
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITS(TypeRepr);
+    SWIFT_INLINE_BITS(TupleTypeRepr);
+  } Bits;
 
   TypeRepr(TypeReprKind K) {
-    TypeReprBits.Kind = static_cast<unsigned>(K);
-    TypeReprBits.Invalid = false;
-    TypeReprBits.Warned = false;
+    Bits.OpaqueBits = 0;
+    Bits.TypeRepr.Kind = static_cast<unsigned>(K);
+    Bits.TypeRepr.Invalid = false;
+    Bits.TypeRepr.Warned = false;
   }
 
 private:
@@ -88,19 +90,19 @@ private:
 
 public:
   TypeReprKind getKind() const {
-    return static_cast<TypeReprKind>(TypeReprBits.Kind);
+    return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }
 
   /// Is this type representation known to be invalid?
-  bool isInvalid() const { return TypeReprBits.Invalid; }
+  bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
   /// Note that this type representation describes an invalid type.
-  void setInvalid() { TypeReprBits.Invalid = true; }
+  void setInvalid() { Bits.TypeRepr.Invalid = true; }
 
   /// If a warning is produced about this type repr, keep track of that so we
   /// don't emit another one upon further reanalysis.
-  bool isWarnedAbout() const { return TypeReprBits.Warned; }
-  void setWarned() { TypeReprBits.Warned = true; }
+  bool isWarnedAbout() const { return Bits.TypeRepr.Warned; }
+  void setWarned() { Bits.TypeRepr.Warned = true; }
   
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
@@ -616,14 +618,14 @@ class TupleTypeRepr final : public TypeRepr,
   SourceRange Parens;
   
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
-    return TupleTypeReprBits.NumElements;
+    return Bits.TupleTypeRepr.NumElements;
   }
 
   TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                 SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
 
 public:
-  unsigned getNumElements() const { return TupleTypeReprBits.NumElements; }
+  unsigned getNumElements() const { return Bits.TupleTypeRepr.NumElements; }
   bool hasElementNames() const {
     for (auto &Element : getElements()) {
       if (Element.NameLoc.isValid()) {
@@ -635,7 +637,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             TupleTypeReprBits.NumElements };
+             Bits.TupleTypeRepr.NumElements };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -677,7 +679,7 @@ public:
   SourceRange getParens() const { return Parens; }
 
   bool hasEllipsis() const {
-    return TupleTypeReprBits.HasEllipsis;
+    return Bits.TupleTypeRepr.HasEllipsis;
   }
 
   SourceLoc getEllipsisLoc() const {
@@ -688,12 +690,12 @@ public:
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
       getTrailingObjects<SourceLocAndIdx>()[0].second :
-        TupleTypeReprBits.NumElements;
+        Bits.TupleTypeRepr.NumElements;
   }
 
   void removeEllipsis() {
     if (hasEllipsis()) {
-      TupleTypeReprBits.HasEllipsis = false;
+      Bits.TupleTypeRepr.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {
         SourceLoc(),
         getNumElements()
@@ -702,7 +704,7 @@ public:
   }
 
   bool isParenType() const {
-    return TupleTypeReprBits.NumElements == 1 &&
+    return Bits.TupleTypeRepr.NumElements == 1 &&
            getElementNameLoc(0).isInvalid() &&
            !hasEllipsis();
   }

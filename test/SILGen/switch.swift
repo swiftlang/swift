@@ -313,7 +313,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden @_T06switch10test_isa_1yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T06switch10test_isa_11pyAA1P_p_tF
 func test_isa_1(p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
   // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
@@ -360,7 +360,7 @@ func test_isa_1(p: P) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_T06switch10test_isa_2yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T06switch10test_isa_21pyAA1P_p_tF
 func test_isa_2(p: P) {
   switch (p, foo()) {
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -430,7 +430,7 @@ class D1 : C {}
 class D2 : D1 {}
 class E : C {}
 
-// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_1yAA1BC1x_tF : $@convention(thin) (@owned B) -> () {
+// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@owned B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : $B):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
@@ -522,9 +522,9 @@ func test_isa_class_1(x: B) {
   // CHECK:   destroy_value [[X]]
   f()
 }
-// CHECK: } // end sil function '_T06switch16test_isa_class_1yAA1BC1x_tF'
+// CHECK: } // end sil function '_T06switch16test_isa_class_11xyAA1BC_tF'
 
-// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2yXlAA1BC1x_tF : $@convention(thin)
+// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_21xyXlAA1BC_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
@@ -639,7 +639,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
-// CHECK: } // end sil function '_T06switch16test_isa_class_2yXlAA1BC1x_tF'
+// CHECK: } // end sil function '_T06switch16test_isa_class_21xyXlAA1BC_tF'
 
 enum MaybePair {
   case Neither
@@ -648,7 +648,7 @@ enum MaybePair {
   case Both(Int, String)
 }
 
-// CHECK-LABEL: sil hidden @_T06switch12test_union_1yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_11uyAA9MaybePairO_tF
 func test_union_1(u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
@@ -694,7 +694,7 @@ func test_union_1(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
+// CHECK-LABEL: sil hidden @_T06switch12test_union_31uyAA9MaybePairO_tF : $@convention(thin) (@owned MaybePair) -> () {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : $MaybePair):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -741,7 +741,7 @@ func test_union_3(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_T06switch12test_union_4yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_41uyAA9MaybePairO_tF
 func test_union_4(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -780,7 +780,7 @@ func test_union_4(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_T06switch12test_union_5yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_51uyAA9MaybePairO_tF
 func test_union_5(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -826,7 +826,7 @@ enum MaybeAddressOnlyPair {
   case Both(P, String)
 }
 
-// CHECK-LABEL: sil hidden @_T06switch22test_union_addr_only_1yAA20MaybeAddressOnlyPairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch22test_union_addr_only_11uyAA20MaybeAddressOnlyPairO_tF
 func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   switch u {
   // CHECK: switch_enum_addr [[ENUM_ADDR:%.*]] : $*MaybeAddressOnlyPair,
@@ -889,7 +889,7 @@ func test_union_generic_instance(u: Generic<Int, String>) {
 
 enum Foo { case A, B }
 
-// CHECK-LABEL: sil hidden @_T06switch05test_A11_two_unionsyAA3FooO1x_AD1ytF
+// CHECK-LABEL: sil hidden @_T06switch05test_A11_two_unions1x1yyAA3FooO_AFtF
 func test_switch_two_unions(x: Foo, y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
   // CHECK:   [[X:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 0
@@ -956,7 +956,7 @@ func rdar14835992<T, U>(t: Rdar14835992, tt: T, uu: U) {
 // <rdar://problem/17272985>
 enum ABC { case A, B, C }
 
-// CHECK-LABEL: sil hidden @_T06switch18testTupleWildcardsyAA3ABCO_ADtF 
+// CHECK-LABEL: sil hidden @_T06switch18testTupleWildcardsyyAA3ABCO_ADtF
 // CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
 // CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]
@@ -994,7 +994,7 @@ enum LabeledScalarPayload {
   case Payload(name: Int)
 }
 
-// CHECK-LABEL: sil hidden @_T06switch24testLabeledScalarPayloadypAA0cdE0OF
+// CHECK-LABEL: sil hidden @_T06switch24testLabeledScalarPayloadyypAA0cdE0OF
 func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
@@ -1008,7 +1008,7 @@ func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
 }
 
 // There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch19testOptionalPatternySiSgF
+// CHECK-LABEL: sil hidden @_T06switch19testOptionalPatternyySiSgF
 func testOptionalPattern(_ value : Int?) {
   // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
@@ -1022,7 +1022,7 @@ func testOptionalPattern(_ value : Int?) {
 
 // x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixS2iSgF
+// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixyS2iSgF
 func testOptionalEnumMix(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
@@ -1044,7 +1044,7 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
 
 // x? and nil should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilS2iSgF
+// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilyS2iSgF
 func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
@@ -1065,7 +1065,7 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
 }
 
 // SR-3518
-// CHECK-LABEL: sil hidden @_T06switch43testMultiPatternsWithOuterScopeSameNamedVarySiSg4base_AC6filtertF
+// CHECK-LABEL: sil hidden @_T06switch43testMultiPatternsWithOuterScopeSameNamedVar4base6filterySiSg_AEtF
 func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
     
@@ -1115,12 +1115,12 @@ func testUninhabitedSwitchScrutinee() {
   }
   func test3(x : Never) {
     // CHECK: unreachable
-    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test3L_ys5NeverO1x_tF'
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test3L_1xys5NeverO_tF'
     switch (x, 5, x) {}
   }
   func test4(x : Never) {
     // CHECK: unreachable
-    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test4L_ys5NeverO1x_tF'
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test4L_1xys5NeverO_tF'
     switch ((8, 6, 7), (5, 3, (0, x))) {}
   }
   func test5() {

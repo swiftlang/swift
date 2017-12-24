@@ -18,8 +18,8 @@ func inner_function<T : P & Q>(In In : T) { }
 @inline(never)
 func outer_function<T : P & Q>(In In : T) { inner_function(In: In) }
 
-//CHECK: sil shared [noinline] @_T010spec_conf214outer_functionyx2In_tAA1PRzAA1QRzlFAA3FooC_Tg5
-//CHECK: function_ref @_T010spec_conf214inner_functionyx2In_tAA1PRzAA1QRzlFAA3FooC_Tg5
+//CHECK: sil shared [noinline] @_T010spec_conf214outer_function2Inyx_tAA1PRzAA1QRzlFAA3FooC_Tg5
+//CHECK: function_ref @_T010spec_conf214inner_function2Inyx_tAA1PRzAA1QRzlFAA3FooC_Tg5
 //CHECK-NEXT: apply
 //CHECK: return
 

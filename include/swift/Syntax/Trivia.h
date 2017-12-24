@@ -111,6 +111,12 @@ enum class TriviaKind {
   /// A newline '\n' character.
   Newline,
 
+  /// A newline '\r' character.
+  CarriageReturn,
+  
+  /// A newline consists of contiguous '\r' and '\n' characters.
+  CarriageReturnLineFeed,
+
   /// A developer line comment, starting with '//'
   LineComment,
 
@@ -175,10 +181,22 @@ public:
     return {TriviaKind::Formfeed, Count};
   }
 
-  /// Return a piece of trivia for some number of newline characters
+  /// Return a piece of trivia for some number of newline (LF) characters
   /// in a row.
   static TriviaPiece newlines(unsigned Count) {
     return {TriviaKind::Newline, Count};
+  }
+
+  /// Return a piece of trivia for some number of carriage-return (CR)
+  /// characters in a row.
+  static TriviaPiece carriageReturns(unsigned Count) {
+    return {TriviaKind::CarriageReturn, Count};
+  }
+  
+  /// Return a piece of trivia for some number of two bytes sequence
+  /// consists of CR and LF in a row.
+  static TriviaPiece carriageReturnLineFeeds(unsigned Count) {
+    return {TriviaKind::CarriageReturnLineFeed, Count};
   }
 
   /// Return a piece of trivia for a single line of ('//') developer comment.
@@ -225,16 +243,23 @@ public:
       case TriviaKind::GarbageText:
         return Text.size();
       case TriviaKind::Newline:
+      case TriviaKind::CarriageReturn:
       case TriviaKind::Space:
       case TriviaKind::Backtick:
       case TriviaKind::Tab:
       case TriviaKind::VerticalTab:
       case TriviaKind::Formfeed:
         return Count;
+      case TriviaKind::CarriageReturnLineFeed:
+        return Count * 2;
     }
   }
 
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
+  
+  /// Try to compose this and Next to one TriviaPiece.
+  /// It returns true if it is succeeded.
+  bool trySquash(const TriviaPiece &Next);
 
   /// Print a debug representation of this trivia piece to the provided output
   /// stream and indentation level.
@@ -326,6 +351,10 @@ struct Trivia {
       Len += P.getTextLength();
     return Len;
   }
+  
+  /// Append Next TriviaPiece or compose last TriviaPiece and
+  /// Next TriviaPiece to one last TriviaPiece if it can.
+  void appendOrSquash(const TriviaPiece &Next);
 
   /// Dump a debug representation of this Trivia collection to standard error.
   void dump() const;
@@ -385,7 +414,7 @@ struct Trivia {
   }
 
   /// Return a collection of trivia of some number of newline characters
-  // in a row.
+  /// in a row.
   static Trivia newlines(unsigned Count) {
     if (Count == 0) {
       return {};
@@ -393,8 +422,26 @@ struct Trivia {
     return {{TriviaPiece::newlines(Count)}};
   }
 
+  /// Return a collection of trivia of some number of carriage-return characters
+  /// in a row.
+  static Trivia carriageReturns(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
+    return {{TriviaPiece::carriageReturns(Count)}};
+  }
+  
+  /// Return a collection of trivia of some number of two bytes sequence
+  /// consists of CR and LF in a row.
+  static Trivia carriageReturnLineFeeds(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
+    return {{TriviaPiece::carriageReturnLineFeeds(Count)}};
+  }
+
   /// Return a collection of trivia with a single line of ('//')
-  // developer comment.
+  /// developer comment.
   static Trivia lineComment(const OwnedString Text) {
     assert(Text.str().startswith("//"));
     return {{TriviaPiece::lineComment(Text)}};
@@ -414,7 +461,7 @@ struct Trivia {
   }
 
   /// Return a collection of trivia with a documentation block
-  // comment ('/** ... */')
+  /// comment ('/** ... */')
   static Trivia docBlockComment(const OwnedString Text) {
     assert(Text.str().startswith("/**"));
     assert(Text.str().endswith("*/"));

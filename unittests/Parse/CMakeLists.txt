@@ -1,6 +1,7 @@
 add_swift_unittest(SwiftParseTests
   BuildConfigTests.cpp
   LexerTests.cpp
+  LexerTriviaTests.cpp
   TokenizerTests.cpp
 )
 

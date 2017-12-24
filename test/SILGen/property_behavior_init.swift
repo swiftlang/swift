@@ -53,7 +53,7 @@ struct Foo {
     // CHECK: [[GETTER:%.*]] = function_ref @_T022property_behavior_init3FooV1xSivg
     // CHECK: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]])
     // CHECK: store [[VALUE]] to [trivial] [[INOUT]]
-    // CHECK: [[WHACK:%.*]] = function_ref @_T022property_behavior_init5whackyxzlF
+    // CHECK: [[WHACK:%.*]] = function_ref @_T022property_behavior_init5whackyyxzlF
     // CHECK: apply [[WHACK]]<Int>([[INOUT]])
     // CHECK: [[VALUE:%.*]] = load [trivial] [[INOUT]]
     // CHECK: [[SETTER:%.*]] = function_ref @_T022property_behavior_init3FooV1xSivs

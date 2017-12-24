@@ -86,6 +86,9 @@ class Lexer {
   /// produce a code completion token.
   const char *CodeCompletionPtr = nullptr;
 
+  /// Points to BufferStart or past the end of UTF-8 BOM sequence if it exists.
+  const char *ContentStart;
+
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
@@ -123,13 +126,13 @@ class Lexer {
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::TriviaList LeadingTrivia;
+  syntax::Trivia LeadingTrivia;
 
   /// The current trailing trivia for the next token.
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::TriviaList TrailingTrivia;
+  syntax::Trivia TrailingTrivia;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -252,7 +255,7 @@ public:
       TokStart = Tok.getLoc();
     auto S = getStateForBeginningOfTokenLoc(TokStart);
     if (TriviaRetention == TriviaRetentionMode::WithTrivia)
-      S.LeadingTrivia = LeadingTrivia.Pieces;
+      S.LeadingTrivia = LeadingTrivia;
     return S;
   }
 
@@ -482,18 +485,16 @@ private:
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
 
-  /// Advance to the end of the line but leave the current buffer pointer
-  /// at that newline character.
-  void skipUpToEndOfLine();
-
-  /// Advance past the next newline character.
-  void skipToEndOfLine();
+  /// Advance to the end of the line.
+  /// If EatNewLine is true, CurPtr will be at end of newline character.
+  /// Otherwise, CurPtr will be at newline character.
+  void skipToEndOfLine(bool EatNewline);
 
   /// Skip to the end of the line of a // comment.
-  void skipSlashSlashComment();
+  void skipSlashSlashComment(bool EatNewline);
 
   /// Skip a #! hashbang line.
-  void skipHashbang();
+  void skipHashbang(bool EatNewline);
 
   void skipSlashStarComment();
   void lexHash();
@@ -502,7 +503,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::TriviaList &T, bool IsForTrailingTrivia);
+  void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
@@ -516,7 +517,7 @@ private:
 
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
-  bool tryLexConflictMarker();
+  bool tryLexConflictMarker(bool EatNewline);
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first

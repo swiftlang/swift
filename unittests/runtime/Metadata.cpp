@@ -912,7 +912,8 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
   // The last witness is computed dynamically at instantiation time.
   ((void **) instantiatedTable)[2] = (void *) 345;
 
-  auto conditionalTables = (WitnessTableSlice *)instantiationArgs;
+  auto conditionalTables =
+      reinterpret_cast<const WitnessTableSlice *>(instantiationArgs);
 
   EXPECT_EQ(conditionalTables->count, 1UL);
   EXPECT_EQ(conditionalTables->tables[0], (void *)678);
@@ -1036,14 +1037,21 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
+                  reinterpret_cast<void *>(0));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
+                  reinterpret_cast<void *>(678));
 
-        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
-        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
-        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
-        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 456);
-        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 567);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[0],
+                  reinterpret_cast<void *>(123));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
+                  reinterpret_cast<void *>(234));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
+                  reinterpret_cast<void *>(345));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
+                  reinterpret_cast<void *>(456));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
+                  reinterpret_cast<void *>(567));
 
         return instantiatedTable;
       });
@@ -1068,14 +1076,21 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
+                  reinterpret_cast<void *>(0));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
+                  reinterpret_cast<void *>(678));
 
-        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
-        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
-        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
-        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 456);
-        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) fakeDefaultWitness2);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[0],
+                  reinterpret_cast<void *>(123));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
+                  reinterpret_cast<void *>(234));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
+                  reinterpret_cast<void *>(345));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
+                  reinterpret_cast<void *>(456));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
+                  reinterpret_cast<void *>(fakeDefaultWitness2));
 
         return instantiatedTable;
       });
@@ -1101,14 +1116,21 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(((void **) instantiatedTable)[-2], (void *) 0);
-        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 678);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
+                  reinterpret_cast<void *>(0));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
+                  reinterpret_cast<void *>(678));
 
-        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
-        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
-        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
-        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) fakeDefaultWitness1);
-        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) fakeDefaultWitness2);
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[0],
+                  reinterpret_cast<void *>(123));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
+                  reinterpret_cast<void *>(234));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
+                  reinterpret_cast<void *>(345));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
+                  reinterpret_cast<void *>(fakeDefaultWitness1));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
+                  reinterpret_cast<void *>(fakeDefaultWitness2));
 
         return instantiatedTable;
       });

@@ -63,6 +63,8 @@ bool isPatternKind(SyntaxKind Kind);
 bool isTokenKind(SyntaxKind Kind);
 
 bool isUnknownKind(SyntaxKind Kind);
+
+SyntaxKind getUnknownKind(SyntaxKind Kind);
 } // end namespace syntax
 
 namespace json {

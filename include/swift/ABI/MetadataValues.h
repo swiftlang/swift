@@ -86,12 +86,16 @@ inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
 }
 
 /// Swift class flags.
+/// These flags are valid only when isTypeMetadata().
+/// When !isTypeMetadata() these flags will collide with other Swift ABIs.
 enum class ClassFlags : uint32_t {
-  /// Is this a Swift 1 class?
-  IsSwift1 = 0x1,
+  /// Is this a Swift class from the Darwin pre-stable ABI?
+  /// This bit is clear in stable ABI Swift classes.
+  /// The Objective-C runtime also reads this bit.
+  IsSwiftPreStableABI = 0x1,
 
-  /// Does this class use Swift 1.0 refcounting?
-  UsesSwift1Refcounting = 0x2,
+  /// Does this class use Swift refcounting?
+  UsesSwiftRefcounting = 0x2,
 
   /// Has this class a custom name, specified with the @objc attribute?
   HasCustomObjCName = 0x4
@@ -745,6 +749,62 @@ static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
 }
 static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
+}
+
+/// Flags for struct layout.
+enum class StructLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline StructLayoutFlags operator|(StructLayoutFlags lhs,
+                                          StructLayoutFlags rhs) {
+  return StructLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline StructLayoutFlags &operator|=(StructLayoutFlags &lhs,
+                                            StructLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline StructLayoutFlags getLayoutAlgorithm(StructLayoutFlags flags) {
+  return StructLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(StructLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
+}
+
+/// Flags for enum layout.
+enum class EnumLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline EnumLayoutFlags operator|(EnumLayoutFlags lhs,
+                                        EnumLayoutFlags rhs) {
+  return EnumLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline EnumLayoutFlags &operator|=(EnumLayoutFlags &lhs,
+                                          EnumLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
+  return EnumLayoutFlags(uintptr_t(flags)
+                           & uintptr_t(EnumLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
 }
 
 } // end namespace swift

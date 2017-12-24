@@ -89,11 +89,6 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                                 : ParameterConvention::Direct_Unowned,
                             witnessMethodConformance);
 }
-inline CanSILFunctionType
-adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
-  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone());
-}
-  
 
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
@@ -704,11 +699,6 @@ public:
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
 
-  /// Return the most derived override which requires a new vtable entry.
-  /// If the method does not override anything or no override is vtable
-  /// dispatched, will return the least derived method.
-  SILDeclRef getOverriddenVTableEntry(SILDeclRef method);
-
   /// Returns the SILFunctionType that must be used to perform a vtable dispatch
   /// to the given declaration.
   ///
@@ -729,7 +719,7 @@ public:
     if (next.isNull())
       return getConstantInfo(constant);
 
-    auto base = getOverriddenVTableEntry(constant);
+    auto base = constant.getOverriddenVTableEntry();
     return getConstantOverrideInfo(constant, base);
   }
 

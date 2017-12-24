@@ -8,7 +8,7 @@ _ = printSourceLocation()
 // CHECK: [[CALLER_FILE:%.*]] = apply {{.*}}([[CALLER_FILE_VAL]],
 // CHECK: [[CALLER_LINE_VAL:%.*]] = integer_literal $Builtin.Int{{[0-9]+}}, 10000,
 // CHECK: [[CALLER_LINE:%.*]] = apply {{.*}}([[CALLER_LINE_VAL]],
-// CHECK: [[PRINT_SOURCE_LOCATION:%.*]] = function_ref @_T015source_location19printSourceLocationySS4file_Si4linetF
+// CHECK: [[PRINT_SOURCE_LOCATION:%.*]] = function_ref @_T015source_location19printSourceLocation4file4lineySS_SitF
 // CHECK: apply [[PRINT_SOURCE_LOCATION]]([[CALLER_FILE]], [[CALLER_LINE]])
 
 #sourceLocation(file: "inplace.swift", line: 20000)

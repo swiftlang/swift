@@ -53,10 +53,10 @@ public func err() {
 
 // LOC-CHECK: define {{.*}}4date
 public func date() {
-  // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L1:.*]]
+  // LOC-CHECK: call {{.*}} @_T0SS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC{{.*}}, !dbg ![[L1:.*]]
   let d1 = DateFormatter()
   d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2:.*]]
-  // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L3:.*]]
+  // LOC-CHECK: call {{.*}} @_T0SS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC{{.*}}, !dbg ![[L3:.*]]
   let d2 = DateFormatter()
   d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4:.*]]
 }

@@ -427,6 +427,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         diag::rethrowing_function_type : diag::throw_in_function_type;
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
+      if (Tok.is(tok::kw_throw))
+        Tok.setKind(tok::kw_throws);
     }
     throwsLoc = consumeToken();
   }
@@ -440,6 +442,27 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
+
+    if (SyntaxContext->isEnabled()) {
+      FunctionTypeSyntaxBuilder Builder;
+      Builder.useReturnType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      Builder.useArrow(SyntaxContext->popToken());
+      if (throwsLoc.isValid())
+        Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+
+      auto InputNode = SyntaxContext->popIf<TypeSyntax>().getValue();
+      if (auto TupleTypeNode = InputNode.getAs<TupleTypeSyntax>()) {
+        // Decompose TupleTypeSyntax and repack into FunctionType.
+        Builder
+          .useLeftParen(TupleTypeNode->getLeftParen())
+          .useArguments(TupleTypeNode->getElements())
+          .useRightParen(TupleTypeNode->getRightParen());
+      } else {
+        Builder
+          .addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(InputNode));
+      }
+      SyntaxContext->addSyntax(Builder.build());
+    }
     tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
                                          SecondHalf.get());
   } else if (generics) {
@@ -466,6 +489,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (tyR)
       tyR->walk(walker);
   }
+  if (specifierLoc.isValid() || !attrs.empty())
+    SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
   return makeParserResult(applyAttributeToType(tyR, attrs, specifier,
                                                specifierLoc));
@@ -655,6 +680,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
                                                      HandleCodeCompletion);
@@ -662,7 +688,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     return makeParserCodeCompletionResult<TypeRepr>();
   if (FirstType.isNull() || !Tok.isContextualPunctuator("&"))
     return FirstType;
-  
+
   SmallVector<TypeRepr *, 4> Types;
   ParserStatus Status(FirstType);
   SourceLoc FirstTypeLoc = FirstType.get()->getStartLoc();
@@ -681,16 +707,34 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   };
 
   addType(FirstType.get());
-  
-  while (Tok.isContextualPunctuator("&")) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::CompositionType);
+  assert(Tok.isContextualPunctuator("&"));
+  do {
     consumeToken(); // consume '&'
+
+    if (SyntaxContext->isEnabled() && Status.isSuccess()) {
+      CompositionTypeElementSyntaxBuilder Builder;
+      Builder
+        .useAmpersand(SyntaxContext->popToken())
+        .useType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      SyntaxContext->addSyntax(Builder.build());
+    }
+
+    // Parse next type.
     ParserResult<TypeRepr> ty =
       parseTypeSimple(diag::expected_identifier_for_type, HandleCodeCompletion);
     if (ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     Status |= ty;
     addType(ty.getPtrOrNull());
-  };
+  } while (Tok.isContextualPunctuator("&"));
+
+  if (SyntaxContext->isEnabled() && Status.isSuccess()) {
+    auto LastNode = SyntaxFactory::makeCompositionTypeElement(
+        SyntaxContext->popIf<TypeSyntax>().getValue(), None);
+    SyntaxContext->addSyntax(LastNode);
+  }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
   return makeParserResult(Status, CompositionTypeRepr::create(
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
@@ -719,7 +763,6 @@ Parser::parseAnyType() {
 ///     type-identifier
 ///     type-composition-list-deprecated ',' type-identifier
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
 
   // Start a context for creating type syntax.
@@ -829,7 +872,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     identifier ':' type
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
+  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
@@ -839,7 +882,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
-                                  SyntaxKind::Unknown,
+                                  SyntaxKind::TupleTypeElementList,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
 
@@ -877,8 +920,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       // Consume the ':'.
       if (!consumeIf(tok::colon, element.ColonLoc))
         diagnose(Tok, diag::expected_parameter_colon);
+
     } else if (Backtracking) {
-      // If we don't have labels, 'inout' is not a deprecated use.
+      // If we don't have labels, 'inout' is not a obsoleted use.
       ObsoletedInOutLoc = SourceLoc();
     }
     Backtracking.reset();
@@ -925,6 +969,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitContext(SyntaxContext,
+                                       SyntaxKind::InitializerClause);
       SourceLoc equalLoc = consumeToken(tok::equal);
       auto init = parseExpr(diag::expected_init_value);
       auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
@@ -943,12 +989,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
-  // If there were any labels, figure out which labels should go into the type
-  // representation.
-
   bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
                                   tok::kw_rethrows);
 
+  // If there were any labels, figure out which labels should go into the type
+  // representation.
   for (auto &element : ElementsR) {
     // True tuples have labels.
     if (!isFunctionType) {
@@ -981,11 +1026,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         diag.fixItReplace(SourceRange(element.NameLoc), "_");
     }
 
-    if (element.NameLoc.isValid() || element.SecondNameLoc.isValid()) {
+    if (element.SecondNameLoc.isValid()) {
       // Form the named parameter type representation.
+      element.UnderscoreLoc = element.NameLoc;
       element.Name = element.SecondName;
       element.NameLoc = element.SecondNameLoc;
-      element.UnderscoreLoc = element.NameLoc;
     }
   }
 

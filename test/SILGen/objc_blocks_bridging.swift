@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 @objc class Foo {
-// CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3fooS3ic_Si1xtFTo :
+// CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3foo_1xS3ic_SitFTo :
   // CHECK: bb0([[ARG1:%.*]] : @unowned $@convention(block) @noescape (Int) -> Int, {{.*}}, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[ARG1_COPY:%.*]] = copy_block [[ARG1]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -19,12 +19,12 @@ import Foundation
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @noescape @callee_guaranteed (Int) -> Int, Int, @guaranteed Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3fooS3ic_Si1xtFTo'
+  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3foo_1xS3ic_SitFTo'
   dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3barS3Sc_SS1xtFTo : $@convention(objc_method) (@convention(block) @noescape (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3bar_1xS3Sc_SStFTo : $@convention(objc_method) (@convention(block) @noescape (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (NSString) -> @autoreleased NSString, [[NSSTRING:%.*]] : @unowned $NSString, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[NSSTRING_COPY:%.*]] = copy_value [[NSSTRING]]
@@ -36,7 +36,7 @@ import Foundation
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @noescape @callee_guaranteed (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3barS3Sc_SS1xtFTo'
+  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3bar_1xS3Sc_SStFTo'
   dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
   }
@@ -49,7 +49,7 @@ import Foundation
   // GUARANTEED:   apply [[BLOCK]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
   // GUARANTEED: } // end sil function '_T0So8NSStringCABIyBya_S2SIgxo_TR'
 
-  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgA2Ec_AE1xtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
+  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3bas_1xSSSgA2Fc_AFtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]

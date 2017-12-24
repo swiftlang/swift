@@ -120,7 +120,7 @@ SILValue SILGenFunction::emitClassMethodRef(SILLocation loc,
 
   // Not every override gets a dispatch thunk; find the least derived one
   // that does.
-  auto base = SGM.M.Types.getOverriddenVTableEntry(constant);
+  auto base = constant.getOverriddenVTableEntry();
 
   if (shouldUseDispatchThunk(base, &F, SGM.M)) {
     auto *thunkFn = SGM.getDispatchThunk(base, NotForDefinition);
@@ -358,8 +358,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   // The reference to the thunk is likely @noescape, but declarations are always
   // escaping.
   auto thunkDeclType =
-      adjustFunctionType(thunkType, thunkType->getExtInfo().withNoEscape(false),
-                         thunkType->getWitnessMethodConformanceOrNone());
+      thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
 
   // Mangle the reabstraction thunk.
   // Substitute context parameters out of the "from" and "to" types.

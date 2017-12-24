@@ -154,7 +154,7 @@ func constPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstPointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafePointer<Int>${suffix}'}}
   takesConstPointer([0, 1, 2])
   // <rdar://problem/22308330> QoI: CSDiags doesn't handle array -> pointer impl conversions well
-  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
+  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type '[Double]' to expected argument type 'UnsafePointer<Int>}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}

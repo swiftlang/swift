@@ -38,7 +38,7 @@ func PQtoP() {
 // Make sure uninitialized existentials are properly deallocated when we
 // have an early return.
 
-// CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP1yAA1P_pKF
+// CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP1yyAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
 // CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
@@ -63,7 +63,7 @@ func openExistentialToP1(_ p: P) throws {
   try useP(p.downgrade(throwingFunc()))
 }
 
-// CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP2yAA1P_pKF
+// CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP2yyAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
 // CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
@@ -94,7 +94,7 @@ extension Error {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T019existential_erasure12errorHandlers5Error_psAC_pKF
+// CHECK-LABEL: sil hidden @_T019existential_erasure12errorHandlerys5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
 // CHECK: bb0([[ARG:%.*]] : @owned $Error):
 // CHECK:  debug_value [[ARG]] : $Error

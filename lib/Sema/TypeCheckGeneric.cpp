@@ -204,8 +204,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
             ->getAsProtocolOrProtocolExtensionContext()) {
       // Fast path: if there are no type parameters in the concrete type, just
       // return it.
-      if (!concrete->getInterfaceType()->hasTypeParameter())
-        return concrete->getInterfaceType();
+      if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
+        return concrete->getDeclaredInterfaceType();
 
       tc.validateDecl(proto);
       auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -1305,6 +1305,13 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       if (kind != RequirementKind::Layout) {
         rawSecondType = rawReq.getSecondType();
         secondType = req.getSecondType();
+      }
+
+      // Don't do further checking on error types.
+      if (firstType->hasError() || (secondType && secondType->hasError())) {
+        // Another requirement will fail later; just continue.
+        valid = false;
+        continue;
       }
 
       bool requirementFailure = false;

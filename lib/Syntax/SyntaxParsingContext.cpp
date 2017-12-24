@@ -47,7 +47,7 @@ static RC<RawSyntax> createSyntaxAs(SyntaxKind Kind,
     return Node->getRaw();
 
   // Fallback to unknown syntax for the category.
-  return makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind), Parts);
+  return makeUnknownSyntax(getUnknownKind(Kind), Parts);
 }
 
 } // End of anonymous namespace

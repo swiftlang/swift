@@ -261,7 +261,6 @@ public:
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                     bool isInEntryBlock,
                                      const llvm::Twine &name) const = 0;
 
   /// Deallocate a variable of this type.
@@ -393,7 +392,7 @@ public:
   /// for fixed-size types.
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
-                                  llvm::Value *vwtable,
+                                  bool isVWTMutable,
                                   SILType T) const = 0;
 
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g

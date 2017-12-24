@@ -26,13 +26,14 @@
 namespace swift {
 namespace irgen {
 
+using SwiftAggLowering = clang::CodeGen::swiftcall::SwiftAggLowering;
+
 class NativeConventionSchema {
-  clang::CodeGen::swiftcall::SwiftAggLowering Lowering;
+  SwiftAggLowering Lowering;
   bool RequiresIndirect;
 
 public:
-  using EnumerationCallback =
-      clang::CodeGen::swiftcall::SwiftAggLowering::EnumerationCallback;
+  using EnumerationCallback = SwiftAggLowering::EnumerationCallback;
 
   NativeConventionSchema(IRGenModule &IGM, const TypeInfo *TI, bool isResult);
 

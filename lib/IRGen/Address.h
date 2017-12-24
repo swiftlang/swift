@@ -120,6 +120,11 @@ public:
   StackAddress(Address address, llvm::Value *SP)
       : Addr(address), StackPtrResetLocation(SP) {}
 
+  /// Return a StackAddress with the address changed in some superficial way.
+  StackAddress withAddress(Address addr) const {
+    return StackAddress(addr, StackPtrResetLocation);
+  }
+
   llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
   Alignment getAlignment() const { return Addr.getAlignment(); }
   Address getAddress() const { return Addr; }

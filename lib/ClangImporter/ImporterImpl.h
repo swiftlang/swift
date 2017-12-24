@@ -1149,7 +1149,7 @@ public:
   loadAllMembers(Decl *D, uint64_t unused) override;
 
   virtual Optional<TinyPtrVector<ValueDecl *>>
-  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+  loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
 private:

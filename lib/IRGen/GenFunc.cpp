@@ -813,7 +813,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
       auto stackAddr = outResultTI.allocateStack(
-          subIGF, outConv.getSILResultType(), false, "return.temp");
+          subIGF, outConv.getSILResultType(), "return.temp");
       resultValueAddr = stackAddr.getAddress();
       auto resultAddr = subIGF.Builder.CreateBitCast(
           resultValueAddr,
@@ -967,7 +967,15 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto paramInfo = substType->getParameters()[paramI];
       auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
       Explosion param;
-      param.add(subIGF.coerceValue(rawData, ti.getStorageType(), subIGF.IGM.DataLayout));
+      auto ref = rawData;
+      // We can get a '{ swift.refcounted* }' type for AnyObject on linux.
+      if (!ti.getStorageType()->isPointerTy() &&
+          ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal))
+        ref = subIGF.coerceValue(rawData, ti.getStorageType(),
+                                 subIGF.IGM.DataLayout);
+      else
+        ref = subIGF.Builder.CreateBitCast(rawData, ti.getStorageType());
+      param.add(ref);
       bindPolymorphicParameter(subIGF, origType, substType, param, paramI);
       (void)param.claimAll();
     }
@@ -1089,7 +1097,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
-        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, false, "arg.temp");
+        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
         auto addressPointer = stackAddr.getAddress().getAddress();
         fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
                                    fieldTy, false);

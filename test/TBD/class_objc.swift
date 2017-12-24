@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %s
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %s
 
 // REQUIRES: objc_interop
 

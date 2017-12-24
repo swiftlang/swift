@@ -1087,6 +1087,9 @@ ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
+NOTE(access_control_in_protocol_detail,none,
+     "protocol requirements implicitly have the same access as the "
+     "protocol itself", ())
 ERROR(access_control_setter,none,
       "'%select{private|fileprivate|internal|public|open}0(set)' modifier can only "
       "be applied to variables and subscripts",
@@ -1368,9 +1371,6 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
-ERROR(experimental_conditional_conformances,none,
-      "conditional conformance of %0 to %1 depends on an experimental feature "
-      "(SE-0143)", (Type, Type))
 
 ERROR(protocol_does_not_conform_objc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",
@@ -2510,7 +2510,8 @@ ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,none,
       "protocol 'ExpressibleByNilLiteral' is broken", ())
-
+ERROR(array_protocol_broken,none,
+      "ExpressibleByArrayLiteral protocol definition is broken", ())
 ERROR(builtin_integer_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
@@ -2544,10 +2545,9 @@ ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 // Array literals
-ERROR(array_protocol_broken,none,
-      "ExpressibleByArrayLiteral protocol definition is broken", ())
-ERROR(type_is_not_array,none,
-      "contextual type %0 cannot be used with array literal", (Type))
+ERROR(should_use_dictionary_literal,none,
+      "dictionary of type %0 cannot be %select{used|initialized}1 "
+      "with array literal", (Type, bool))
 NOTE(meant_dictionary_lit,none,
      "did you mean to use a dictionary literal instead?", ())
 ERROR(should_use_empty_dictionary_literal,none,
@@ -3859,6 +3859,11 @@ WARNING(redundant_particular_literal_case,none,
         "consider removing it",())
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
+
+ERROR(cannot_prove_exhaustive_switch,none,
+      "analysis of uncovered switch statement is too complex to perform in a "
+      "reasonable amount of time; "
+      "insert a 'default' clause to cover this switch statement", ())
 
 // HACK: Downgrades the above to warnings if any of the cases is marked
 // @_downgrade_exhaustivity_check.

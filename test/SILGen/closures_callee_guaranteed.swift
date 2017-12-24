@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -enable-guaranteed-closure-contexts -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library  -emit-silgen %s | %FileCheck %s
 import Swift
 
 // CHECK-LABEL: sil @{{.*}}apply{{.*}} : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int)

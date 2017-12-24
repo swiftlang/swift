@@ -194,8 +194,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
-  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
+  /// func _combineHashValues(Int, Int) -> Int
+  FuncDecl *CombineHashValuesDecl = nullptr;
 
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
@@ -1048,9 +1048,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
-  if (Impl.MixForSynthesizedHashValueDecl)
-    return Impl.MixForSynthesizedHashValueDecl;
+FuncDecl *ASTContext::getCombineHashValuesDecl() const {
+  if (Impl.CombineHashValuesDecl)
+    return Impl.CombineHashValuesDecl;
 
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
@@ -1066,8 +1066,8 @@ FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
   };
 
   auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_mixForSynthesizedHashValue", resolver, callback);
-  Impl.MixForSynthesizedHashValueDecl = decl;
+      *this, "_combineHashValues", resolver, callback);
+  Impl.CombineHashValuesDecl = decl;
   return decl;
 }
 
@@ -1667,9 +1667,9 @@ static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
 
 ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
   // If we already computed the set of overridden associated types, return it.
-  if (AssociatedTypeDeclBits.ComputedOverridden) {
+  if (Bits.AssociatedTypeDecl.ComputedOverridden) {
     // We didn't override any associated types, so return the empty set.
-    if (!AssociatedTypeDeclBits.HasOverridden)
+    if (!Bits.AssociatedTypeDecl.HasOverridden)
       return { };
 
     // Look up the overrides.
@@ -1680,8 +1680,8 @@ ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
 
   // While we are computing overridden declarations, pretend there are none.
   auto mutableThis = const_cast<AssociatedTypeDecl *>(this);
-  mutableThis->AssociatedTypeDeclBits.ComputedOverridden = true;
-  mutableThis->AssociatedTypeDeclBits.HasOverridden = false;
+  mutableThis->Bits.AssociatedTypeDecl.ComputedOverridden = true;
+  mutableThis->Bits.AssociatedTypeDecl.HasOverridden = false;
 
   // Find associated types with the given name in all of the inherited
   // protocols.
@@ -1717,25 +1717,25 @@ ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
                        inheritedAssociatedTypes.end(),
                        compareSimilarAssociatedTypes);
 
-  mutableThis->AssociatedTypeDeclBits.ComputedOverridden = false;
+  mutableThis->Bits.AssociatedTypeDecl.ComputedOverridden = false;
   return mutableThis->setOverriddenDecls(inheritedAssociatedTypes);
 }
 
 ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::setOverriddenDecls(
                                   ArrayRef<AssociatedTypeDecl *> overridden) {
-  assert(!AssociatedTypeDeclBits.ComputedOverridden &&
+  assert(!Bits.AssociatedTypeDecl.ComputedOverridden &&
          "Overridden decls already computed");
-  AssociatedTypeDeclBits.ComputedOverridden = true;
+  Bits.AssociatedTypeDecl.ComputedOverridden = true;
 
   // If the set of overridden declarations is empty, note that.
   if (overridden.empty()) {
-    AssociatedTypeDeclBits.HasOverridden = false;
+    Bits.AssociatedTypeDecl.HasOverridden = false;
     return { };
   }
 
   // Record the overrides in the context.
   auto &ctx = getASTContext();
-  AssociatedTypeDeclBits.HasOverridden = true;
+  Bits.AssociatedTypeDecl.HasOverridden = true;
   auto overriddenCopy = ctx.AllocateCopy(overridden);
   auto inserted =
     ctx.Impl.AssociatedTypeOverrides.insert({this, overriddenCopy}).second;
@@ -3246,7 +3246,7 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
   : TypeBase(theKind, context, properties),
     TheDecl(theDecl), Parent(parent)
 {
-  BoundGenericTypeBits.GenericArgCount = genericArgs.size();
+  Bits.BoundGenericType.GenericArgCount = genericArgs.size();
   // Subtypes are required to provide storage for the generic arguments
   std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
                           getTrailingObjectsPointer());
@@ -3488,9 +3488,9 @@ AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
                                  Optional<MetatypeRepresentation> repr)
     : TypeBase(kind, C, properties), InstanceType(instanceType) {
   if (repr) {
-    AnyMetatypeTypeBits.Representation = static_cast<char>(*repr) + 1;
+    Bits.AnyMetatypeType.Representation = static_cast<char>(*repr) + 1;
   } else {
-    AnyMetatypeTypeBits.Representation = 0;
+    Bits.AnyMetatypeType.Representation = 0;
   }
 }
 
@@ -3603,17 +3603,6 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   if (Result->getRecursiveProperties().hasError())
     properties |= RecursiveTypeProperties::HasError;
   return properties;
-}
-
-ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
-  switch (getKind()) {
-  case TypeKind::Function:
-    return cast<FunctionType>(this)->getParams();
-  case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getParams();
-  default:
-    llvm_unreachable("Undefined function type");
-  }
 }
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
@@ -3874,14 +3863,13 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
       GenericSig(genericSig),
       WitnessMethodConformance(witnessMethodConformance) {
 
-  SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
-  SILFunctionTypeBits.ExtInfo = ext.Bits;
+  Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
+  Bits.SILFunctionType.ExtInfo = ext.Bits;
   // The use of both assert() and static_assert() below is intentional.
-  assert(SILFunctionTypeBits.ExtInfo == ext.Bits && "Bits were dropped!");
-  static_assert(ExtInfo::NumMaskBits ==
-                SILFunctionTypeBitfields::NumExtInfoBits,
+  assert(Bits.SILFunctionType.ExtInfo == ext.Bits && "Bits were dropped!");
+  static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
-  SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
+  Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
     assert(yields.empty());
@@ -3902,7 +3890,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
   }
 
   assert(!isIndirectFormalParameter(calleeConvention));
-  SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
+  Bits.SILFunctionType.CalleeConvention = unsigned(calleeConvention);
 
   memcpy(getMutableParameters().data(), params.data(),
          params.size() * sizeof(SILParameterInfo));

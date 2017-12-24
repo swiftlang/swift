@@ -414,8 +414,8 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
                           getTrailingObjects<TupleTypeReprElement>());
-  TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
-  TupleTypeReprBits.NumElements = Elements.size();
+  Bits.TupleTypeRepr.HasEllipsis = Ellipsis.isValid();
+  Bits.TupleTypeRepr.NumElements = Elements.size();
 
   // Set ellipsis location and index.
   if (Ellipsis.isValid()) {
@@ -477,7 +477,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
   Printer << "(";
 
-  for (unsigned i = 0, e = TupleTypeReprBits.NumElements; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleTypeRepr.NumElements; i != e; ++i) {
     if (i) Printer << ", ";
     Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
     auto name = getElementName(i);

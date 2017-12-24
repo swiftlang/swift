@@ -189,9 +189,6 @@ def debugger_support : Flag<["-"], "debugger-support">,
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 
-def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-contexts">,
-  HelpText<"Use @guaranteed convention for closure context">;
-
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
@@ -202,6 +199,8 @@ def enable_access_control : Flag<["-"], "enable-access-control">,
 
 def code_complete_inits_in_postfix_expr : Flag<["-"], "code-complete-inits-in-postfix-expr">,
   HelpText<"Include initializers when completing a postfix expression">;
+def code_complete_call_pattern_heuristics : Flag<["-"], "code-complete-call-pattern-heuristics">,
+  HelpText<"Use heuristics to guess whether we want call pattern completions">;
 
 def disable_autolink_framework : Separate<["-"],"disable-autolink-framework">,
   HelpText<"Disable autolinking against the provided framework">;

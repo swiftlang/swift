@@ -32,7 +32,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 -code-complete-call-pattern-heuristics | %FileCheck %s -check-prefix=FIRST_ARG_NAME_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
@@ -342,8 +343,7 @@ func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
   firstArg(#^FIRST_ARG_NAME_1^#
 }
-// Skip the RParen, since it will be annotated in the second test.
-// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}
+// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}[')']
 func testArg2Name1() {
   firstArg(#^FIRST_ARG_NAME_2^#)
 }
@@ -352,6 +352,7 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
+// FIRST_ARG_NAME_4: Pattern/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {

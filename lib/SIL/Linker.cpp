@@ -311,6 +311,13 @@ bool SILLinkerVisitor::process() {
   while (!Worklist.empty()) {
     auto *Fn = Worklist.pop_back_val();
 
+    if (Fn->getModule().isSerialized()) {
+      // If the containing module has been serialized,
+      // Remove The Serialized state (if any)
+      //  This allows for more optimizations
+      Fn->setSerialized(IsSerialized_t::IsNotSerialized);
+    }
+
     DEBUG(llvm::dbgs() << "Process imports in function: "
                        << Fn->getName() << "\n");
 

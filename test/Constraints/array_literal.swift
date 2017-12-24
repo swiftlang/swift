@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances
+// RUN: %target-typecheck-verify-swift
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -338,5 +338,5 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{contextual type 'PArray<String>' cannot be used with array literal}}
+  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
 }

@@ -366,7 +366,7 @@ ExistentialToArchetype(o: o, t: o)
 // value cast. We could do the promotion, but the optimizer would need
 // to insert the Optional unwrapping logic before the cast.
 //
-// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast15genericDownCastq_x_q_mtr0_lFAA1CCSg_AA1DCTg5 : $@convention(thin) (@owned Optional<C>, @thick D.Type) -> @owned D {
+// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast15genericDownCastyq_x_q_mtr0_lFAA1CCSg_AA1DCTg5 : $@convention(thin) (@owned Optional<C>, @thick D.Type) -> @owned D {
 // CHECK: bb0(%0 : $Optional<C>, %1 : $@thick D.Type):
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $Optional<C>

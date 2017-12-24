@@ -231,8 +231,6 @@ public:
     llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
-  template<unsigned N> struct incomplete;
-  
   /// \brief One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
   /// kinds further (e.g., the position of a tuple element).

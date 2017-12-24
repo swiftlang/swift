@@ -38,13 +38,12 @@ class ${node.name}Builder {
 
 public:
 %     for child in node.children:
+  ${node.name}Builder &use${child.name}(${child.type_name} ${child.name});
 %       child_node = NODE_MAP.get(child.syntax_kind)
 %       if child_node and child_node.is_syntax_collection():
 %         child_elt = child_node.collection_element_name
 %         child_elt_type = child_node.collection_element_type
   ${node.name}Builder &add${child_elt}(${child_elt_type} ${child_elt});
-%       else:
-  ${node.name}Builder &use${child.name}(${child.type_name} ${child.name});
 %       end
 %     end
 

@@ -14,7 +14,7 @@ typealias MyFloat = Float
 // CHECK-SAME:                        %[[ALLOCA]], metadata ![[A:[0-9]+]]
 
 // Closure with promoted capture.
-// PROMO-CHECK: define {{.*}}@_T05inout13modifyFooHeapys5Int64Vz_SftFADycfU_
+// PROMO-CHECK: define {{.*}}@_T05inout13modifyFooHeapyys5Int64Vz_SftFADycfU_
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata !DIExpression())
 
@@ -37,7 +37,7 @@ func modifyFooHeap(_ a: inout Int64,
 }
 
 // Inout reference type.
-// FOO-CHECK: define {{.*}}@_T05inout9modifyFooys5Int64Vz_SftF
+// FOO-CHECK: define {{.*}}@_T05inout9modifyFooyys5Int64Vz_SftF
 // FOO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata !DIExpression())
 func modifyFoo(_ u: inout Int64,

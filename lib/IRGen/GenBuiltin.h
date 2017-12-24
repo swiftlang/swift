@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+  class BuiltinInfo;
   class Identifier;
   class SILType;
 
@@ -30,8 +31,8 @@ namespace irgen {
   class IRGenFunction;
 
   /// Emit a call to a builtin function.
-  void emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
-                       SILType resultType,
+  void emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &builtin,
+                       Identifier fnId, SILType resultType,
                        Explosion &args, Explosion &result,
                        SubstitutionList substitutions);
 

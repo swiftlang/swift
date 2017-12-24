@@ -57,6 +57,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
       return makeParserCodeCompletionResult<Expr>();
     if (pattern.isNull())
       return nullptr;
+    SyntaxContext->setCreateSyntax(SyntaxKind::UnresolvedPatternExpr);
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
@@ -1211,8 +1212,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
           locArgs.push_back(ty);
-        Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
-            Result.get(), LAngleLoc, Context.AllocateCopy(locArgs), RAngleLoc));
+        Result = makeParserResult(UnresolvedSpecializeExpr::create(Context,
+                                  Result.get(), LAngleLoc, locArgs, RAngleLoc));
       }
 
       continue;
@@ -1546,6 +1547,13 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
                      ? VarDecl::Specifier::Let
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
+      if (SyntaxContext->isEnabled()) {
+        PatternSyntax PatternNode =
+            SyntaxFactory::makeIdentifierPattern(SyntaxContext->popToken());
+        ExprSyntax ExprNode =
+            SyntaxFactory::makeUnresolvedPatternExpr(PatternNode);
+        SyntaxContext->addSyntax(ExprNode);
+      }
       Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
       break;
     }
@@ -2207,9 +2215,8 @@ Expr *Parser::parseExprIdentifier() {
     SmallVector<TypeLoc, 8> locArgs;
     for (auto ty : args)
       locArgs.push_back(ty);
-    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
-                                               Context.AllocateCopy(locArgs),
-                                               RAngleLoc);
+    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, locArgs,
+                                         RAngleLoc);
   }
   return E;
 }
@@ -2245,6 +2252,13 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+      // Don't feed to syntax token recorder.
+      ConsumeTokenReceiver DisabledRec;
+      llvm::SaveAndRestore<ConsumeTokenReceiver *> R(TokReceiver, &DisabledRec);
+      SyntaxParsingContext SContext(SyntaxContext);
+      SContext.disable();
+
       Tok.setKind(tok::unknown); // we might be at tok::eof now.
       consumeTokenWithoutFeedingReceiver();
       return parseType().getPtrOrNull();
@@ -2773,8 +2787,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
   if (!captureList.empty())
-    result = new (Context) CaptureListExpr(Context.AllocateCopy(captureList),
-                                           closure);
+    result = CaptureListExpr::create(Context, captureList, closure);
 
   return makeParserResult(Status, result);
 }
@@ -3210,7 +3223,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
     return makeParserResult(
-                  DictionaryExpr::create(Context, LSquareLoc, {}, RSquareLoc));
+               DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
   }
 
   bool ParseDict;
@@ -3304,6 +3317,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
   // Each subexpression is a (key, value) tuple.
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
   SourceLoc RSquareLoc;
 
   // Function that adds a new key/value pair.
@@ -3342,12 +3356,17 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
+
+    if (Tok.is(tok::comma))
+      CommaLocs.push_back(Tok.getLoc());
+
     return ParserStatus(Key) | ParserStatus(Value);
   });
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status, DictionaryExpr::create(Context, LSquareLoc,
-                                                         SubExprs, RSquareLoc));
+                                                         SubExprs, CommaLocs,
+                                                         RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

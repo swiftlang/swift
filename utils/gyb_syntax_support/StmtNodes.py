@@ -20,7 +20,7 @@ STMT_NODES = [
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('WhileKeyword', kind='WhileToken'),
-             Child('Conditions', kind='ConditionList'),
+             Child('Conditions', kind='ConditionElementList'),
              Child('Body', kind='CodeBlock'),
              Child('Semicolon', kind='SemicolonToken',
                    is_optional=True),
@@ -66,21 +66,17 @@ STMT_NODES = [
     Node('GuardStmt', kind='Stmt',
          children=[
              Child('GuardKeyword', kind='GuardToken'),
-             Child('Conditions', kind='ConditionList'),
+             Child('Conditions', kind='ConditionElementList'),
              Child('ElseKeyword', kind='ElseToken'),
              Child('Body', kind='CodeBlock'),
              Child('Semicolon', kind='SemicolonToken',
                    is_optional=True),
          ]),
 
-    Node('ExprList', kind='SyntaxCollection',
-         element='Expr',
-         element_name='Expression'),
-
     Node('WhereClause', kind='Syntax',
          children=[
              Child('WhereKeyword', kind='WhereToken'),
-             Child('Expressions', kind='ExprList'),
+             Child('GuardResult', kind='Expr'),
          ]),
 
     # for-in-stmt -> label? ':'? 'for' 'case'? pattern 'in' expr 'where'?
@@ -94,9 +90,11 @@ STMT_NODES = [
              Child('ForKeyword', kind='ForToken'),
              Child('CaseKeyword', kind='CaseToken',
                    is_optional=True),
-             Child('ItemPattern', kind='Pattern'),
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation',
+                   is_optional=True),
              Child('InKeyword', kind='InToken'),
-             Child('CollectionExpr', kind='Expr'),
+             Child('SequenceExpr', kind='Expr'),
              Child('WhereClause', kind='WhereClause',
                    is_optional=True),
              Child('Body', kind='CodeBlock'),
@@ -134,7 +132,8 @@ STMT_NODES = [
                    is_optional=True),
              Child('DoKeyword', kind='DoToken'),
              Child('Body', kind='CodeBlock'),
-             Child('CatchClauses', kind='CatchClauseList'),
+             Child('CatchClauses', kind='CatchClauseList',
+                   is_optional=True),
              Child('Semicolon', kind='SemicolonToken',
                    is_optional=True),
          ]),
@@ -179,21 +178,53 @@ STMT_NODES = [
     Node('CaseItemList', kind='SyntaxCollection',
          element='CaseItem'),
 
-    Node('Condition', kind='Syntax',
-         children=[
-             Child('Condition', kind='Syntax'),
-             Child('TrailingComma', kind='CommaToken',
-                   is_optional=True),
-         ]),
-
-    # condition-list -> condition
-    #                 | condition ','? condition-list
     # condition -> expression
     #            | availability-condition
     #            | case-condition
     #            | optional-binding-condition
-    Node('ConditionList', kind='SyntaxCollection',
-         element='Condition'),
+    Node('ConditionElement', kind='Syntax',
+         children=[
+             Child('Condition', kind='Syntax',
+                   node_choices=[
+                       Child('Expression', kind='Expr'),
+                       Child('Availablity', kind='AvailabilityCondition'),
+                       Child('MatchingPattern',
+                             kind='MatchingPatternCondition'),
+                       Child('OptionalBinding',
+                             kind='OptionalBindingCondition'),
+                   ]),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
+    Node('AvailabilityCondition', kind='Syntax',
+         children=[
+             Child('PoundAvailableKeyword', kind='PoundAvailableToken'),
+             Child('Arguments', kind='TokenList'),
+         ]),
+    Node('MatchingPatternCondition', kind='Syntax',
+         children=[
+             Child('CaseKeyword', kind='CaseToken'),
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation',
+                   is_optional=True),
+             Child('Initializer', kind='InitializerClause'),
+         ]),
+    Node('OptionalBindingCondition', kind='Syntax',
+         children=[
+             Child('LetOrVarKeyword', kind='Token',
+                   token_choices=[
+                       'LetToken', 'VarToken',
+                   ]),
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation',
+                   is_optional=True),
+             Child('Initializer', kind='InitializerClause'),
+         ]),
+
+    # condition-list -> condition
+    #                 | condition ','? condition-list
+    Node('ConditionElementList', kind='SyntaxCollection',
+         element='ConditionElement'),
 
     # A declaration in statement position.
     # struct Foo {};
@@ -222,9 +253,15 @@ STMT_NODES = [
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('IfKeyword', kind='IfToken'),
-             Child('Conditions', kind='ConditionList'),
+             Child('Conditions', kind='ConditionElementList'),
              Child('Body', kind='CodeBlock'),
-             Child('ElseClause', kind='Syntax',
+             Child('ElseKeyword', kind='ElseToken',
+                   is_optional=True),
+             Child('ElseBody', kind='Syntax',
+                   node_choices=[
+                       Child('IfStmt', kind='IfStmt'),
+                       Child('CodeBlock', kind='CodeBlock'),
+                   ],
                    is_optional=True),
              Child('Semicolon', kind='SemicolonToken',
                    is_optional=True),

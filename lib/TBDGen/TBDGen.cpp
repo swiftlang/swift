@@ -25,6 +25,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -285,6 +286,37 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   visitNominalTypeDecl(CD);
+
+  // The below symbols are only emitted if the class is resilient.
+  if (CD->hasFixedLayout())
+    return;
+
+  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
+  // Emit dispatch thunks for every new vtable entry.
+  struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
+    TBDGenVisitor &TBD;
+    ClassDecl *CD;
+
+  public:
+    VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
+        : TBD(TBD), CD(CD) {}
+
+    void addMethod(SILDeclRef method) {
+      if (method.getDecl()->getDeclContext() == CD)
+        TBD.addSymbol(method.mangle(SILDeclRef::ManglingKind::SwiftDispatchThunk));
+    }
+
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
+
+    void addPlaceholder(MissingMemberDecl *) {}
+
+    void doIt() {
+      addVTableEntries(CD);
+    }
+  };
+
+  VTableVisitor(*this, CD).doIt();
 }
 
 void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
@@ -327,12 +359,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
-                                           bool hasMultipleIRGenThreads,
+                                           bool hasMultipleIGMs,
                                            llvm::raw_ostream *os,
                                            StringRef installName) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, hasMultipleIRGenThreads, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, hasMultipleIGMs, isWholeModule);
 
   TBDGenVisitor visitor(symbols, target, linkInfo, M, installName);
 
@@ -369,20 +401,18 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   bool hasMultipleIRGenThreads) {
-  enumeratePublicSymbolsAndWrite(
-      file->getParentModule(), file, symbols, hasMultipleIRGenThreads,
-      nullptr, StringRef());
+                                   bool hasMultipleIGMs) {
+  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
+                                 hasMultipleIGMs, nullptr, StringRef());
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   bool hasMultipleIRGenThreads) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
-                                 nullptr, StringRef());
+                                   bool hasMultipleIGMs) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, nullptr,
+                                 StringRef());
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         bool hasMultipleIRGenThreads,
-                         StringRef installName) {
+                         bool hasMultipleIGMs, StringRef installName) {
   StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
-                                 &os, installName);
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, &os,
+                                 installName);
 }

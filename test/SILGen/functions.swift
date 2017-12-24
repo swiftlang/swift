@@ -481,7 +481,7 @@ struct OptmodeTestStruct {
   @_optimize(speed)
   var x: Int { return getInt() }
 
-  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVBi64_Bi64_cig :
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVyBi64_Bi64_cig :
   @_optimize(speed)
   subscript(l: Int) -> Int { return getInt() }
 }

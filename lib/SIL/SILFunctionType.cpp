@@ -206,6 +206,29 @@ CanSILFunctionType Lowering::adjustFunctionType(
                               witnessMethodConformance);
 }
 
+CanSILFunctionType
+SILFunctionType::getWithRepresentation(Representation repr) {
+  return getWithExtInfo(getExtInfo().withRepresentation(repr));
+}
+
+CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
+  auto oldExt = getExtInfo();
+  if (newExt == oldExt)
+    return CanSILFunctionType(this);
+
+  auto calleeConvention =
+    (newExt.hasContext()
+       ? (oldExt.hasContext()
+            ? getCalleeConvention()
+            : Lowering::DefaultThickCalleeConvention)
+       : ParameterConvention::Direct_Unowned);
+
+  return get(getGenericSignature(), newExt, getCoroutineKind(),
+             calleeConvention, getParameters(), getYields(),
+             getResults(), getOptionalErrorResult(), getASTContext(),
+             getWitnessMethodConformanceOrNone());
+}
+
 namespace {
 
 enum class ConventionsKind : uint8_t {
@@ -2117,18 +2140,6 @@ static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
   return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
                          /*resolver*/nullptr);
-}
-
-SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
-  SILDeclRef cur = method, next = method;
-  do {
-    cur = next;
-    if (cur.requiresNewVTableEntry())
-      return cur;
-    next = cur.getNextOverriddenVTableEntry();
-  } while (next);
-
-  return cur;
 }
 
 // FIXME: This makes me very upset. Can we do without this?

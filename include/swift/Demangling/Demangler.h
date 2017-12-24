@@ -378,6 +378,9 @@ protected:
                                  NodePointer Child2);
   NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
                                  NodePointer Child2, NodePointer Child3);
+  NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
+                                 NodePointer Child2, NodePointer Child3,
+                                 NodePointer Child4);
   NodePointer createWithPoppedType(Node::Kind kind) {
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
@@ -413,6 +416,7 @@ protected:
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
   NodePointer popFunctionParams(Node::Kind kind);
+  NodePointer popFunctionParamLabels(NodePointer FuncType);
   NodePointer popTuple();
   NodePointer popTypeList();
   NodePointer popProtocol();
@@ -460,6 +464,7 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+  NodePointer demangleTypeMangling();
 
   void dump();
 

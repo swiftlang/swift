@@ -17,8 +17,8 @@ sil_global @staticProp : $Int
 sil [serialized] @globalinit_func0 : $@convention(thin) () -> ()
 
 // We should not serialize this.
-// CHECK-NOT: sil public_external @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer {
-sil @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-NOT: sil public_external @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
+sil @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
@@ -30,8 +30,8 @@ bb0:
 }
 
 // This references a public global so we *SHOULD* deserialize this.
-// CHECK-LABEL: sil public_external [serialized] @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer {
-sil [serialized] @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-LABEL: sil public_external [serialized] @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer {
+sil [serialized] @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   // CHECK: alloc_global @public_global
   alloc_global @public_global
@@ -134,8 +134,8 @@ bb0(%0 : $() -> Int):
 
 sil [serialized] @return_constant : $@convention(thin) () -> Int {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
-  %1 = function_ref @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  // CHECK: function_ref @_T0Si25convertFromIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  %1 = function_ref @_T0Si25convertFromIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
   // CHECK: metatype $@thin Int.Type
   %2 = metatype $@thin Int.Type
@@ -149,12 +149,12 @@ bb0:                                         // CHECK: bb0:
   return %4 : $Int
 }
 
-sil [serialized] @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+sil [serialized] @_T0Si25convertFromIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
 // Parse SIL generated from the following swift program:
 // func x(_ a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil [serialized] @_T0Sb13getLogicValueBi1_ycSbzF : $@convention(method) (@inout Bool) -> Builtin.Int1
-sil [serialized] @_T0Si33_convertFromBuiltinIntegerLiteralSiBi128_3val_tcSimF : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
+sil [serialized] @_T0Sb13getLogicValueyBi1_ycSbzF : $@convention(method) (@inout Bool) -> Builtin.Int1
+sil [serialized] @_T0Si33_convertFromBuiltinIntegerLiteralySiBi128_3val_tcSimF : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
 
 protocol P {
@@ -251,7 +251,7 @@ protocol Runcible {
 protocol Bendable { }
 
 // CHECK-LABEL: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
-sil [serialized] @_T04todo18erasure_from_protoAA8Runcible_pAaC_AA8Bendablep1x_tF : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
+sil [serialized] @_T04todo18erasure_from_proto1xAA8Runcible_pAaD_AA8Bendablep_tF : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
 bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Bendable & Runcible)>
@@ -276,8 +276,8 @@ protocol ClassBound : class {
   func classBoundMethod()
 }
 
-// CHECK-LABEL: @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> ()
-sil [serialized] @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> () {
+// CHECK-LABEL: @_T04todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned ClassBound) -> ()
+sil [serialized] @_T04todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ClassBound>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>, 0
@@ -297,7 +297,7 @@ bb0(%0 : $ClassBound):
 struct Val {
 }
 
-//sil @_T04todo3ValVACycACmcfC : $@convention(thin) (@thin Val.Type) -> Val {
+//sil @_T04todo3ValVyACycACmcfC : $@convention(thin) (@thin Val.Type) -> Val {
 //bb0(%0 : $@thin Val.Type):
   //%1 = alloc_stack $Val
   //%3 = load %1#1 : $*Val
@@ -311,16 +311,16 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK-LABEL: @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
-sil [serialized] @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph {
+// CHECK-LABEL: @_T06struct5AlephVyAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
+sil [serialized] @_T06struct5AlephVyAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
   return %3 : $Aleph  // CHECK: return
 }
 
-// CHECK-LABEL: @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
-sil [serialized] @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph {
+// CHECK-LABEL: @_T06struct5AlephVyACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
+sil [serialized] @_T06struct5AlephVyACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Aleph>       // CHECK: alloc_box
@@ -385,11 +385,11 @@ bb0(%0 : $*Gimel, %1 : $*Q):
   return %t : $()
 }
 
-sil [serialized] @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
+sil [serialized] @_T05tuple5float1xySf_tF : $@convention(thin) (Float32) -> ()
 sil [serialized] @_T05tupleAASi_SftyF : $@convention(thin) () -> (Int, Float32)
 
-// CHECK-LABEL: @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float) -> ()
-sil [serialized] @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float) -> () {
+// CHECK-LABEL: @_T05tuple0A8_element1xySi_Sft_tF : $@convention(thin) (Int, Float) -> ()
+sil [serialized] @_T05tuple0A8_element1xySi_Sft_tF : $@convention(thin) (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float32):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Float32)>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Float32)>, 0
@@ -406,7 +406,7 @@ bb0(%0 : $Int, %1 : $Float32):
   // CHECK: apply
   %15 = apply %14() : $@convention(thin) () -> (Int, Float32)
   // CHECK: function_ref
-  %19 = function_ref @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
+  %19 = function_ref @_T05tuple5float1xySf_tF : $@convention(thin) (Float32) -> ()
   // CHECK: tuple_extract {{%.*}} : $(Int, Float), 1
   %17 = tuple_extract %15 : $(Int, Float), 1
   // CHECK: apply
@@ -421,8 +421,8 @@ class M {
   init()
 }
 
-// CHECK-LABEL: @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
-sil [serialized] @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> () {
+// CHECK-LABEL: @_T03ref1CC3fooyySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
+sil [serialized] @_T03ref1CC3fooyySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> () {
 bb0(%0 : $Int, %1 : $M):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -446,8 +446,8 @@ bb0(%0 : $Int, %1 : $M):
 class B { }
 class E : B { }
 
-// CHECK-LABEL: @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1
-sil [serialized] @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1 {
+// CHECK-LABEL: @_T04null3isa1bSbAA1BC_tF : $@convention(thin) (B) -> Builtin.Int1
+sil [serialized] @_T04null3isa1bSbAA1BC_tF : $@convention(thin) (B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
@@ -469,11 +469,11 @@ isa(%6 : $Builtin.Int1):
 
 sil [serialized] @_T07literal8literalsyyF : $@convention(thin) () -> ()
 
-sil [serialized] @_T0Sd31_convertFromBuiltinFloatLiteralSdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil [serialized] @_T0SS32_convertFromBuiltinStringLiteralSSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil [serialized] @_T0Sd31_convertFromBuiltinFloatLiteralySdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+sil [serialized] @_T0SS32_convertFromBuiltinStringLiteralySSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
-// CHECK-LABEL: @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
-sil [serialized] @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+// CHECK-LABEL: @_T05index5gep641p1iBpBp_Bi64_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+sil [serialized] @_T05index5gep641p1iBpBp_Bi64_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
@@ -896,7 +896,7 @@ bb0:
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [serialized] [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
@@ -905,13 +905,13 @@ bb0:
 // CHECK-LABEL: [always_inline] @always_inline_callee
 sil [serialized] [always_inline] @always_inline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [serialized] [transparent] @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [serialized] [transparent] @_T0Si33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
 // CHECK-LABEL: [_semantics "foo"] @test_semantics : $@convention(thin) () -> ()
 sil [serialized] [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
@@ -1349,7 +1349,7 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil [serialized] @_T014witness_tables15ConformingAssocV14requiredMethodyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> () {
+sil [serialized] @_T014witness_tables15ConformingAssocV14requiredMethodyyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
@@ -1359,7 +1359,7 @@ bb0(%0 : $ConformingAssoc):
 sil [serialized] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
-  %2 = function_ref @_T014witness_tables15ConformingAssocV14requiredMethodyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> ()
+  %2 = function_ref @_T014witness_tables15ConformingAssocV14requiredMethodyyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> ()
   %3 = apply %2(%1) : $@convention(method) (@guaranteed ConformingAssoc) -> ()
   return %3 : $()
 }
@@ -1409,8 +1409,8 @@ sil_witness_table [serialized] InheritedConformance: AnyProtocol module witness_
 
 sil [serialized] [transparent] @_T09def_basic13serialize_allyyF : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer
-  %1 = function_ref @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer
+  %0 = function_ref @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer
+  %1 = function_ref @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@convention(thin) () -> ()
   %4 = function_ref @test2 : $@convention(thin) (Int) -> ()
   %6 = function_ref @named_tuple : $@convention(thin) () -> (Builtin.Word, Builtin.Word)
@@ -1419,23 +1419,23 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
-  %27 = function_ref @_T04todo18erasure_from_protoAA8Runcible_pAaC_AA8Bendablep1x_tF : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
-  %29 = function_ref @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> ()
-  %31 = function_ref @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
-  %33 = function_ref @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
+  %27 = function_ref @_T04todo18erasure_from_proto1xAA8Runcible_pAaD_AA8Bendablep_tF : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+  %29 = function_ref @_T04todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned ClassBound) -> ()
+  %31 = function_ref @_T06struct5AlephVyAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
+  %33 = function_ref @_T06struct5AlephVyACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
   %35 = function_ref @test_union_empty_case : $@convention(thin) () -> Beth
   %37 = function_ref @test_union_data_case : $@convention(thin) Int -> Beth
   %39 = function_ref @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel
   %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel
-  %43 = function_ref @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
+  %43 = function_ref @_T05tuple5float1xySf_tF : $@convention(thin) (Float32) -> ()
   %45 = function_ref @_T05tupleAASi_SftyF : $@convention(thin) () -> (Int, Float32)
-  %47 = function_ref @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float32) -> ()
-  %49 = function_ref @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
-  %51 = function_ref @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1
-  %53 = function_ref @_T0Sd31_convertFromBuiltinFloatLiteralSdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-  %55 = function_ref @_T0SS32_convertFromBuiltinStringLiteralSSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+  %47 = function_ref @_T05tuple0A8_element1xySi_Sft_tF : $@convention(thin) (Int, Float32) -> ()
+  %49 = function_ref @_T03ref1CC3fooyySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
+  %51 = function_ref @_T04null3isa1bSbAA1BC_tF : $@convention(thin) (B) -> Builtin.Int1
+  %53 = function_ref @_T0Sd31_convertFromBuiltinFloatLiteralySdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+  %55 = function_ref @_T0SS32_convertFromBuiltinStringLiteralySSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
   %57 = function_ref @_T07literal8literalsyyF : $@convention(thin) () -> ()
-  %59 = function_ref @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+  %59 = function_ref @_T05index5gep641p1iBpBp_Bi64_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
   %61 = function_ref @global_object : $@convention(thin) () -> GlobalObject
   %63 = function_ref @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type)

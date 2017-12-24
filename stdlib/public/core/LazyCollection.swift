@@ -1,4 +1,4 @@
-//===--- LazyCollection.swift.gyb -----------------------------*- swift -*-===//
+//===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
-
 /// A collection on which normally-eager operations such as `map` and
 /// `filter` are implemented lazily.
 ///
@@ -21,8 +19,7 @@
 /// To add new lazy collection operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
 /// `LazyCollectionProtocol`s.
-public protocol LazyCollectionProtocol
-  : Collection, LazySequenceProtocol {
+public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol {
   /// A `Collection` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -30,12 +27,20 @@ public protocol LazyCollectionProtocol
   associatedtype Elements : Collection = Self
 }
 
-/// When there's no special associated `Elements` type, the `elements`
-/// property is provided.
-extension LazyCollectionProtocol where Elements == Self {
-  /// Identical to `self`.
+extension LazyCollectionProtocol {
+  // Lazy things are already lazy
   @_inlineable // FIXME(sil-serialize-all)
-  public var elements: Self { return self }
+  public var lazy: LazyCollection<Elements> {
+    return elements.lazy
+  }
+}
+
+extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
+  // Lazy things are already lazy
+  @_inlineable // FIXME(sil-serialize-all)
+  public var lazy: Elements {
+    return elements
+  }
 }
 
 /// A collection containing the same elements as a `Base` collection,
@@ -44,21 +49,7 @@ extension LazyCollectionProtocol where Elements == Self {
 ///
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
 @_fixed_layout
-public struct LazyCollection<Base : Collection> : LazyCollectionProtocol {
-
-  /// The type of the underlying collection.
-  public typealias Elements = Base
-
-  /// The underlying collection.
-  @_inlineable
-  public var elements: Elements { return _base }
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = Base.Index
-
+public struct LazyCollection<Base : Collection> {
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
   @_inlineable
@@ -69,12 +60,20 @@ public struct LazyCollection<Base : Collection> : LazyCollectionProtocol {
 
   @_versioned
   internal var _base: Base
+} 
+
+extension LazyCollection: LazyCollectionProtocol {
+  /// The type of the underlying collection.
+  public typealias Elements = Base
+
+  /// The underlying collection.
+  @_inlineable
+  public var elements: Elements { return _base }
 }
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension LazyCollection : Sequence {
-  
   public typealias Iterator = Base.Iterator
 
   /// Returns an iterator over the elements of this sequence.
@@ -114,13 +113,19 @@ extension LazyCollection : Sequence {
 }
 
 extension LazyCollection : Collection {
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public typealias Element = Base.Element
+  public typealias Index = Base.Index
+  public typealias Indices = Base.Indices
+
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   @_inlineable
-  public var startIndex: Base.Index {
-    return _base.startIndex
-  }
+  public var startIndex: Index { return _base.startIndex }
 
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
@@ -128,18 +133,14 @@ extension LazyCollection : Collection {
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
   @_inlineable
-  public var endIndex: Base.Index {
-    return _base.endIndex
-  }
+  public var endIndex: Index { return _base.endIndex }
 
   @_inlineable
-  public var indices: Base.Indices {
-    return _base.indices
-  }
+  public var indices: Indices { return _base.indices }
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable
-  public func index(after i: Base.Index) -> Base.Index {
+  public func index(after i: Index) -> Index {
     return _base.index(after: i)
   }
 
@@ -148,17 +149,8 @@ extension LazyCollection : Collection {
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @_inlineable
-  public subscript(position: Base.Index) -> Base.Element {
+  public subscript(position: Index) -> Element {
     return _base[position]
-  }
-
-  /// Returns a collection representing a contiguous sub-range of
-  /// `self`'s elements.
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> Slice<LazyCollection<Base>> {
-    return Slice(base: self, bounds: bounds)
   }
 
   /// A Boolean value indicating whether the collection is empty.
@@ -190,14 +182,14 @@ extension LazyCollection : Collection {
   /// - Complexity: O(*n*)
   @_inlineable
   public func _customIndexOfEquatableElement(
-    _ element: Base.Iterator.Element
+    _ element: Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   @_inlineable
-  public var first: Base.Element? {
+  public var first: Element? {
     return _base.first
   }
 
@@ -226,12 +218,12 @@ extension LazyCollection : Collection {
 extension LazyCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
   @_inlineable
-  public func index(before i: Base.Index) -> Base.Index {
+  public func index(before i: Index) -> Index {
     return _base.index(before: i)
   }
 
   @_inlineable
-  public var last: Base.Element? {
+  public var last: Element? {
     return _base.last
   }
 }
@@ -253,26 +245,12 @@ extension Collection {
   }
 }
 
-% for Traversal in TRAVERSALS:
-%   TraversalCollection = collectionForTraversal(Traversal)
-// Without this specific overload the non-re-wrapping extension on
-// LazyCollectionProtocol (below) is not selected for some reason.
-extension ${TraversalCollection} where Self : LazyCollectionProtocol {
-  /// Identical to `self`.
-  @_inlineable
-  public var lazy: Self { // Don't re-wrap already-lazy collections
-    return self
-  }
-}
-% end
-
 extension Slice: LazySequenceProtocol where Base: LazySequenceProtocol { }
 extension Slice: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
+extension ReversedCollection: LazySequenceProtocol where Base: LazySequenceProtocol { }
+extension ReversedCollection: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
 
 @available(*, deprecated, renamed: "LazyCollection")
 public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
 @available(*, deprecated, renamed: "LazyCollection")
 public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

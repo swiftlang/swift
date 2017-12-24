@@ -11,7 +11,7 @@ extension Foo {
   dynamic var cox: Int { return 0 }
 }
 
-// CHECK-LABEL: sil hidden @_T015extensions_objc19extensionReferencesyAA3FooCF
+// CHECK-LABEL: sil hidden @_T015extensions_objc19extensionReferencesyyAA3FooCF
 // CHECK: bb0([[ARG:%.*]] : @owned $Foo):
 func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.

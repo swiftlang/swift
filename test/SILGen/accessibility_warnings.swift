@@ -33,7 +33,7 @@ private struct PrivateStruct {
 
 
 extension PublicStruct {
-  // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructVACSi1x_tcfC
+  // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructV1xACSi_tcfC
   public init(x: Int) { self.init() }
 
   // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructV18publicVarExtensionSivg
@@ -41,7 +41,7 @@ extension PublicStruct {
 }
 
 extension InternalStruct {
-  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructVACSi1x_tcfC
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV1xACSi_tcfC
   public init(x: Int) { self.init() }
 
   // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV18publicVarExtensionSivg
@@ -49,7 +49,7 @@ extension InternalStruct {
 }
 
 extension PrivateStruct {
-  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLVADSi1x_tcfC
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV1xADSi_tcfC
   public init(x: Int) { self.init() }
 
   // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV18publicVarExtensionSivg
@@ -104,8 +104,8 @@ public protocol PublicReadOnlyOperations {
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV4sizeSivg
   public private(set) var size = 0
-  // CHECK-DAG: sil hidden @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalVS2icig
-  // CHECK-DAG: sil private @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalVS2icis
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icig
+  // CHECK-DAG: sil private @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icis
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}

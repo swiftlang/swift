@@ -161,6 +161,10 @@ public:
   bool shouldOptimize() const {
     return OptMode > OptimizationMode::NoOptimization;
   }
+
+  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

@@ -106,13 +106,13 @@ extension Sub {
   override func objCBaseMethod() {}
 }
 
-// CHECK-LABEL: sil hidden @_T015objc_extensions20testOverridePropertyyAA3SubCF
+// CHECK-LABEL: sil hidden @_T015objc_extensions20testOverridePropertyyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
   // CHECK: bb0([[ARG:%.*]] : @owned $Sub):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: = objc_method [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
   obj.prop = "abc"
-} // CHECK: } // end sil function '_T015objc_extensions20testOverridePropertyyAA3SubCF'
+} // CHECK: } // end sil function '_T015objc_extensions20testOverridePropertyyyAA3SubCF'
 
 testOverrideProperty(Sub())
 

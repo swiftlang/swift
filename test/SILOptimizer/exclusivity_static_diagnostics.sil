@@ -12,6 +12,7 @@ sil @makesInt : $@convention(thin) () -> Int
 sil @takesInoutAndNoEscapeClosure : $@convention(thin) (@inout Int, @noescape @owned @callee_owned () -> ()) -> ()
 sil @takesInoutAndNoEscapeClosureTakingArgument : $@convention(thin) (@inout Int, @noescape @owned @callee_owned (Int) -> ()) -> ()
 sil @takesInoutAndNoEscapeClosureWithGenericReturn : $@convention(thin) <T> (@inout Int, @owned @noescape @callee_owned (Int) -> @out T) -> ()
+sil @takesInoutAndNoEscapeBlockClosure : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
 
 // CHECK-LABEL: sil hidden @twoLocalInoutsDisaliased
 sil hidden @twoLocalInoutsDisaliased : $@convention(thin) (Int) -> () {
@@ -553,7 +554,7 @@ bb0(%0 : $Storage, %1 : $Builtin.Word):
 
 sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
-  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note {{conflicting access is here}}
+  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 2{{conflicting access is here}}
   end_access %1 : $*Int
   %2 = tuple ()
   return %2 : $()
@@ -656,6 +657,35 @@ bb0(%0 : $Int):
   %13 = tuple ()
   return %13 : $()
 }
+
+sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage
+sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesInoutAndNoEscapeBlockClosure : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
+  %5 = function_ref @closureThatModifiesCapture_1 : $@convention(thin) (@inout_aliasable Int) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %conv = convert_function %6 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %7 = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  %8 = project_block_storage %7 : $*@block_storage @noescape @callee_guaranteed () -> ()
+  store %conv to [init] %8 : $*@noescape  @callee_guaranteed () -> ()
+  %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  %11 = init_block_storage_header %7 : $*@block_storage @noescape @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %12 = copy_block %11 : $@convention(block) @noescape () -> ()
+  %13 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %14 = apply %4(%13, %12) : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
+  end_access %13 : $*Int
+  destroy_addr %8 : $*@callee_guaranteed @noescape () -> ()
+  dealloc_stack %7 : $*@block_storage @callee_guaranteed @noescape () -> ()
+  destroy_value %2 : ${ var Int }
+  %ret = tuple ()
+  return %ret : $()
+}
+
 
 // Stored property relaxation.
 

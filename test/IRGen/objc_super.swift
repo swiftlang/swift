@@ -48,7 +48,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1x_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitC1xACSi_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(x:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(init)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
@@ -58,7 +58,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1y_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitC1yACSi_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(y:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(initWithBellsOn:)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*, i64)*)([[SUPER]]* {{.*}}, i8* {{.*}}, i64 {{.*}})
@@ -74,7 +74,7 @@ func acceptFn(_ fn: () -> Void) { }
 class PartialApply : Gizmo {
   // CHECK: define hidden swiftcc void @_T010objc_super12PartialApplyC4frobyyF([[PARTIAL_APPLY_CLASS]]* swiftself) {{.*}} {
   override func frob() {
-    // CHECK: call swiftcc void @_T010objc_super8acceptFnyyycF(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %4)
+    // CHECK: call swiftcc void @_T010objc_super8acceptFnyyyycF(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %4)
     acceptFn(super.frob)
   }
   // CHECK: }

@@ -30,21 +30,21 @@ bb0(%0 : $@thick X.Type):
   return %14 : $()
 }
 
-sil @_T014dynamic_lookup1XCS2icigTo : $@convention(objc_method) (Int, X) -> Int {
+sil @_T014dynamic_lookup1XCyS2icigTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
-  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
-sil @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
+sil @_T0Si33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
 
 // [objc] dynamic_lookup.X.value.getter : Swift.Int
 sil @_T014dynamic_lookup1XC5valueSivgTo : $@convention(objc_method) (X) -> Int {
 bb0(%0 : $X):
-  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9

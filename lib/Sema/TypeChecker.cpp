@@ -471,6 +471,14 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.finalizeDecl(decl);
     }
 
+    // Ensure that the requirements of the given conformance are
+    // fully checked.
+    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
+      auto conformance = TC.PartiallyCheckedConformances[i];
+      TC.checkConformanceRequirements(conformance);
+    }
+    TC.PartiallyCheckedConformances.clear();
+
     // Complete any conformances that we used.
     for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
       auto conformance = TC.UsedConformances[i];
@@ -483,7 +491,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
-           !TC.UsedConformances.empty());
+           !TC.UsedConformances.empty() ||
+           !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;

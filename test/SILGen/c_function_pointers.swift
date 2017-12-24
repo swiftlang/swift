@@ -3,7 +3,7 @@
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
-// CHECK-LABEL: sil hidden @_T019c_function_pointers6valuesS2iXCS2iXCF
+// CHECK-LABEL: sil hidden @_T019c_function_pointers6valuesyS2iXCS2iXCF
 // CHECK:       bb0(%0 : @trivial $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
@@ -11,7 +11,7 @@ func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int
 func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
-// CHECK-LABEL: sil hidden @_T019c_function_pointers5callsS3iXC_SitF
+// CHECK-LABEL: sil hidden @_T019c_function_pointers5callsyS3iXC_SitF
 // CHECK:       bb0(%0 : @trivial $@convention(c) @noescape (Int) -> Int, %1 : @trivial $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
@@ -25,23 +25,23 @@ func global(_ x: Int) -> Int { return x }
 
 func no_args() -> Int { return 42 }
 
-// CHECK-LABEL: sil hidden @_T019c_function_pointers0B19_to_swift_functionsySiF
+// CHECK-LABEL: sil hidden @_T019c_function_pointers0B19_to_swift_functionsyySiF
 func pointers_to_swift_functions(_ x: Int) {
 // CHECK: bb0([[X:%.*]] : @trivial $Int):
 
   func local(_ y: Int) -> Int { return y }
 
-  // CHECK:   [[GLOBAL_C:%.*]] = function_ref @_T019c_function_pointers6globalS2iFTo
+  // CHECK:   [[GLOBAL_C:%.*]] = function_ref @_T019c_function_pointers6globalyS2iFTo
   // CHECK:   [[CVT:%.*]] = convert_function [[GLOBAL_C]]
   // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls(global, x)
 
-  // CHECK:   [[LOCAL_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiF5localL_S2iFTo
+  // CHECK:   [[LOCAL_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsyySiF5localL_yS2iFTo
   // CHECK:   [[CVT:%.*]] = convert_function [[LOCAL_C]]
   // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls(local, x)
 
-  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiFS2icfU_To
+  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsyySiFS2icfU_To
   // CHECK:   [[CVT:%.*]] = convert_function [[CLOSURE_C]]
   // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls({ $0 + 1 }, x)

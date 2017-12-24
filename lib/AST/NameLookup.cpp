@@ -1033,7 +1033,7 @@ public:
     assert(LastExtensionIncluded == nullptr);
     for (auto const &i : Lookup) {
       for (auto d : i.getSecond()) {
-        d->ValueDeclBits.AlreadyInLookupTable = false;
+        d->setAlreadyInLookupTable(false);
       }
     }
     Lookup.clear();
@@ -1102,10 +1102,10 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // If this declaration is already in the lookup table, don't add it
   // again.
-  if (vd->ValueDeclBits.AlreadyInLookupTable) {
+  if (vd->isAlreadyInLookupTable()) {
     return;
   }
-  vd->ValueDeclBits.AlreadyInLookupTable = true;
+  vd->setAlreadyInLookupTable();
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.
@@ -1249,7 +1249,8 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
+  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
+                                              ci->memberData)) {
     IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;

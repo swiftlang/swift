@@ -52,7 +52,7 @@ func test_var_1() {
   case var x:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1aySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -70,14 +70,14 @@ func test_var_2() {
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var6runcedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6runced1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   // -- TODO: Clean up these empty waypoint bbs.
   case var x where runced(x: x):
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1aySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -86,13 +86,13 @@ func test_var_2() {
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var6fungedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6funged1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case var y where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1bySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1b1xySi_tF
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b(x: y)
@@ -104,7 +104,7 @@ func test_var_2() {
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1cySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1c1xySi_tF
   // CHECK:   destroy_value [[ZADDR]]
   // CHECK:   br [[CONT]]
     c(x: z)
@@ -123,13 +123,13 @@ func test_var_3() {
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 0
-  // CHECK:   function_ref @_T010switch_var6runcedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6runced1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case var x where runced(x: x.0):
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var2aaySi_Sit1x_tF
+  // CHECK:   function_ref @_T010switch_var2aa1xySi_Sit_tF
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     aa(x: x)
@@ -143,16 +143,16 @@ func test_var_3() {
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var6fungedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6funged1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case (var y, var z) where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1aySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1a1xySi_tF
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1bySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1b1xySi_tF
   // CHECK:   destroy_value [[ZADDR]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
@@ -163,13 +163,13 @@ func test_var_3() {
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[W]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 0
-  // CHECK:   function_ref @_T010switch_var5ansedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var5ansed1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   case var w where ansed(x: w.0):
   // CHECK: [[CASE3]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[W]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var2bbySi_Sit1x_tF
+  // CHECK:   function_ref @_T010switch_var2bb1xySi_Sit_tF
   // CHECK:   br [[CONT]]
     bb(x: w)
   // CHECK: [[NO_CASE3]]:
@@ -181,7 +181,7 @@ func test_var_3() {
   // CHECK:   [[V:%.*]] = project_box [[VADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[V]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var2ccySi_Sit1x_tF
+  // CHECK:   function_ref @_T010switch_var2cc1xySi_Sit_tF
   // CHECK:   destroy_value [[VADDR]]
   // CHECK:   br [[CONT]]
     cc(x: v)
@@ -197,7 +197,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden @_T010switch_var05test_B2_4yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T010switch_var05test_B2_41pyAA1P_p_tF
 func test_var_4(p p: P) {
   // CHECK:   function_ref @_T010switch_var3fooSiyF
   switch (p, foo()) {
@@ -216,11 +216,11 @@ func test_var_4(p p: P) {
   // CHECK:   store [[PAIR_1]] to [trivial] [[X]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var6runcedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6runced1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case (is X, var x) where runced(x: x):
   // CHECK: [[CASE1]]:
-  // CHECK:   function_ref @_T010switch_var1aySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
@@ -247,14 +247,14 @@ func test_var_4(p p: P) {
   // CHECK:   store [[PAIR_1]] to [trivial] [[Y]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var6fungedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var6funged1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
 
   case (is Y, var y) where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1bySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1b1xySi_tF
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
@@ -275,13 +275,13 @@ func test_var_4(p p: P) {
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 1
-  // CHECK:   function_ref @_T010switch_var5ansedSbSi1x_tF
+  // CHECK:   function_ref @_T010switch_var5ansed1xSbSi_tF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[DFLT_NO_CASE3:bb[0-9]+]]
   case var z where ansed(x: z.1):
   // CHECK: [[CASE3]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 1
-  // CHECK:   function_ref @_T010switch_var1cySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1c1xySi_tF
   // CHECK:   destroy_value [[ZADDR]]
   // CHECK-NEXT: dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
@@ -297,7 +297,7 @@ func test_var_4(p p: P) {
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[W]]
   // CHECK:   load [trivial] [[READ]]
-  // CHECK:   function_ref @_T010switch_var1dySi1x_tF
+  // CHECK:   function_ref @_T010switch_var1d1xySi_tF
   // CHECK:   destroy_value [[WADDR]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
   // CHECK:   dealloc_stack [[PAIR]]
@@ -409,7 +409,7 @@ func test_let() {
   // CHECK: [[CASE1]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
-  // CHECK:   [[A:%.*]] = function_ref @_T010switch_var1aySS1x_tF
+  // CHECK:   [[A:%.*]] = function_ref @_T010switch_var1a1xySS_tF
   // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
@@ -427,7 +427,7 @@ func test_let() {
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [[VAL_COPY_2]]
   // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_2]]
-  // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1bySS1x_tF
+  // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1b1xySS_tF
   // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY_2]] from [[VAL_COPY_2]]
   // CHECK:   destroy_value [[VAL_COPY_2]]
@@ -488,7 +488,7 @@ func test_mixed_let_var() {
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOX]]
   // CHECK:   [[X:%.*]] = load [copy] [[READ]]
-  // CHECK:   [[A:%.*]] = function_ref @_T010switch_var1aySS1x_tF
+  // CHECK:   [[A:%.*]] = function_ref @_T010switch_var1a1xySS_tF
   // CHECK:   apply [[A]]([[X]])
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -506,7 +506,7 @@ func test_mixed_let_var() {
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
-  // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1bySS1x_tF
+  // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1b1xySS_tF
   // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
@@ -568,7 +568,7 @@ func test_multiple_patterns1() {
     // CHECK:     debug_value [[SECOND_X:%.*]] :
     // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
     // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
-    // CHECK:     [[A:%.*]] = function_ref @_T010switch_var1aySi1x_tF
+    // CHECK:     [[A:%.*]] = function_ref @_T010switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
   default:
@@ -641,7 +641,7 @@ func test_multiple_patterns3() {
     // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
-    // CHECK:     [[FUNC_A:%.*]] = function_ref @_T010switch_var1aySi1x_tF
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_T010switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
   }
@@ -682,7 +682,7 @@ func test_multiple_patterns4() {
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
-    // CHECK:     [[FUNC_A:%.*]] = function_ref @_T010switch_var1aySi1x_tF
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_T010switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
   }
@@ -722,7 +722,7 @@ func test_multiple_patterns5() {
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
     // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int
     // CHECK:     [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOX_X]]
-    // CHECK:     [[FUNC_AAA:%.*]] = function_ref @_T010switch_var3aaaySiz1x_tF
+    // CHECK:     [[FUNC_AAA:%.*]] = function_ref @_T010switch_var3aaa1xySiz_tF
     // CHECK:     apply [[FUNC_AAA]]([[WRITE]])
     aaa(x: &x)
   }

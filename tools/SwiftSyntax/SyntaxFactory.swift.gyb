@@ -120,21 +120,18 @@ public enum SyntaxFactory {
                          rightParen: makeRightParenToken())
   }
 
-  public static func makeTupleTypeElement(label: TokenSyntax?,
+  public static func makeTupleTypeElement(name: TokenSyntax?,
     colon: TokenSyntax?, type: TypeSyntax,
-    comma: TokenSyntax?) -> TupleTypeElementSyntax {
-    let annotation = makeTypeAnnotation(attributes: makeBlankAttributeList(),
-                                        inOutKeyword: nil,
-                                        type: type)
-    return makeTupleTypeElement(label: label, colon: colon, 
-                                typeAnnotation: annotation,
-                                comma: comma)
+    trailingComma: TokenSyntax?) -> TupleTypeElementSyntax {
+    return makeTupleTypeElement(inOut: nil, name: name, secondName: nil,
+                                colon: colon, type: type, ellipsis: nil,
+                                initializer: nil, trailingComma: trailingComma)
   }
 
   public static func makeTupleTypeElement(type: TypeSyntax,
-    comma: TokenSyntax?) -> TupleTypeElementSyntax  {
-    return makeTupleTypeElement(label: nil, colon: nil, 
-                                type: type, comma: comma)
+    trailingComma: TokenSyntax?) -> TupleTypeElementSyntax  {
+    return makeTupleTypeElement(name: nil, colon: nil, 
+                                type: type, trailingComma: trailingComma)
   }
 
   public static func makeGenericParameter(name: TokenSyntax,
