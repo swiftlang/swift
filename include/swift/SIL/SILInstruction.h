@@ -3517,17 +3517,16 @@ public:
 /// MarkFunctionEscape - Represents the escape point of set of variables due to
 /// a function definition which uses the variables.  This is only valid in Raw
 /// SIL.
-class MarkFunctionEscapeInst
-    : public InstructionBase<SILInstructionKind::MarkFunctionEscapeInst,
-                             NonValueInstruction> {
+class MarkFunctionEscapeInst final
+    : public InstructionBaseWithTrailingOperands<
+                                  SILInstructionKind::MarkFunctionEscapeInst,
+                                  MarkFunctionEscapeInst, NonValueInstruction> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Private constructor.  Because this is variadic, object creation goes
   /// through 'create()'.
-  MarkFunctionEscapeInst(SILDebugLocation DebugLoc,
-                         ArrayRef<SILValue> Elements);
+  MarkFunctionEscapeInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elements)
+    : InstructionBaseWithTrailingOperands(Elements, DebugLoc) {}
 
   /// Construct a MarkFunctionEscapeInst.
   static MarkFunctionEscapeInst *create(SILDebugLocation DebugLoc,
@@ -3537,16 +3536,13 @@ class MarkFunctionEscapeInst
 public:
   /// The elements referenced by this instruction.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// The elements referenced by this instruction.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// Define the start or update to a symbolic variable value (for loadable

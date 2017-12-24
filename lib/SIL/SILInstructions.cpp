@@ -816,16 +816,10 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
                                ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocateInst(sizeof(MarkFunctionEscapeInst) +
-                              decltype(Operands)::getExtraSize(Elements.size()),
-                                        alignof(MarkFunctionEscapeInst));
-  return ::new(Buffer) MarkFunctionEscapeInst(Loc, Elements);
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
+  auto Buf = F.getModule().allocateInst(Size, alignof(MarkFunctionEscapeInst));
+  return ::new(Buf) MarkFunctionEscapeInst(Loc, Elements);
 }
-
-MarkFunctionEscapeInst::MarkFunctionEscapeInst(SILDebugLocation Loc,
-                                               ArrayRef<SILValue> Elems)
-    : InstructionBase(Loc),
-      Operands(this, Elems) {}
 
 static SILType getPinResultType(SILType operandType) {
   return SILType::getPrimitiveObjectType(
