@@ -13,11 +13,11 @@
 
 #include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/OutputPaths.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 #include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/OutputPaths.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
@@ -471,6 +471,9 @@ bool ArgsToFrontendOptionsConverter::
 }
 
 bool ArgsToFrontendOptionsConverter::checkUnusedOutputPaths() const {
+  if (Opts.InputsAndOutputs.countOfFilesProducingOutput() == 0)
+    return false;
+
   if (Opts.hasUnusedDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
