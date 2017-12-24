@@ -35,22 +35,26 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllFiles;
+
   typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
+
+  /// In Single-threaded WMO mode, all inputs are used
+  /// both for importing and compiling.
+  /// Only one set of outputs (one OutputFilename, one OutputPaths) is produced.
   bool IsSingleThreadedWMO = false;
 
   /// The specified output files. If only a single outputfile is generated,
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
 
-private:
   OutputPaths SupplementaryOutputPaths;
 
 public:
   FrontendInputsAndOutputs() = default;
 
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
-    for (InputFile input : other.getAllInputs())
+    for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     SupplementaryOutputPaths = other.SupplementaryOutputPaths;
@@ -59,7 +63,7 @@ public:
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
-    for (InputFile input : other.getAllInputs())
+    for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     SupplementaryOutputPaths = other.SupplementaryOutputPaths;
@@ -82,31 +86,25 @@ public:
   const InputFile *getSingleThreadedWMOInput() const {
     return isSingleThreadedWMO() ? &firstInput() : nullptr;
   }
-  InputFile *getSingleThreadedWMOInput() {
-    return isSingleThreadedWMO() ? &firstInput() : nullptr;
-  }
 
-  void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
+
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
 
   // Readers:
 
-  ArrayRef<InputFile> getAllInputs() const { return AllFiles; }
-  std::vector<InputFile> &getAllInputs() { return AllFiles; }
-
-  InputFile &firstPrimaryInput();
-  const InputFile &firstPrimaryInput() const;
+  // All inputs:
 
   std::vector<std::string> getInputFilenames() const;
 
-  unsigned inputCount() const { return getAllInputs().size(); }
+  unsigned inputCount() const { return AllFiles.size(); }
 
-  bool hasInputs() const { return !getAllInputs().empty(); }
+  bool hasInputs() const { return !AllFiles.empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
-  const InputFile &firstInput() const { return getAllInputs()[0]; }
-  InputFile &firstInput() { return getAllInputs()[0]; }
+  const InputFile &firstInput() const { return AllFiles[0]; }
+  InputFile &firstInput() { return AllFiles[0]; }
 
   StringRef getFilenameOfFirstInput() const;
 
@@ -114,48 +112,32 @@ public:
     return hasSingleInput() && getFilenameOfFirstInput() == "-";
   }
 
-  // If we have exactly one input filename, and its extension is "bc" or "ll",
-  // treat the input as LLVM_IR.
-  bool shouldTreatAsLLVM() const;
+  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const;
 
-  // Primary input readers
+  // Primaries:
 
-  bool areAllNonPrimariesSIB() const;
+  const InputFile &firstPrimaryInput() const;
 
-public:
-  unsigned countOfFilesProducingOutput() const;
-
-  const InputFile &firstInputProducingOutput() const;
-
-  bool forEachInputProducingOutput(
-      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
-
-  bool
-  forEachInput(llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
-
-  bool forEachPrimaryInput(
-      llvm::function_ref<bool(const InputFile &, unsigned)> fn) const;
-
-  InputFile &firstInputProducingOutput();
-
-  bool forEachInputProducingOutput(
-      llvm::function_ref<bool(InputFile &, unsigned)> fn);
-  bool forEachInput(llvm::function_ref<bool(InputFile &, unsigned)> fn);
-
-  bool
-  forEachPrimaryInput(llvm::function_ref<bool(InputFile &input, unsigned)> fn);
+  void
+  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const;
 
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
-
-  // Primary count readers:
 
   bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
+  // FIXME: dmu fix uses / remove these when batch mode works
+  void assertMustNotBeMoreThanOnePrimaryInput() const;
 
-  // Count-dependend readers:
+  // Outputs
+
+  unsigned countOfFilesProducingOutput() const;
+
+  const InputFile &firstInputProducingOutput() const;
+
+  void forEachInputProducingOutput(
+      llvm::function_ref<void(const InputFile &)> fn) const;
 
   /// Return the unique primary input, if one exists.
   const InputFile *getUniquePrimaryInput() const;
@@ -170,45 +152,17 @@ public:
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
-  // Multi-facet readers
-
-  bool shouldTreatAsSIL() const;
-
-  /// Return true for error
-  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                    bool isREPLRequested, bool isNoneRequested) const;
-
-  // Writers
-
-  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
-  void addPrimaryInputFile(StringRef file,
-                           llvm::MemoryBuffer *buffer = nullptr);
-
-  void addInput(const InputFile &input);
-
-  void clearInputs();
-
-  // FIXME: dmu fix uses / remove these when batch mode works
-  void assertMustNotBeMoreThanOnePrimaryInput() const;
-
   std::vector<StringRef> getOutputFilenames() const;
   std::vector<std::string> copyOutputFilenames() const;
 
   void
   forEachOutputFilename(llvm::function_ref<void(const std::string)> fn) const;
 
-  void setOutputFilenames(ArrayRef<std::string> outputs);
-
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const;
 
-  /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName);
-
-  void setOutputFilenameToStdout();
   bool isOutputFilenameStdout() const;
-
   bool isOutputFileDirectory() const;
   bool hasNamedOutputFile() const;
 
@@ -237,9 +191,32 @@ public:
     return SupplementaryOutputPaths.TBDPath;
   }
 
-  void setSupplementaryOutputPaths(OutputPaths op) {
-    SupplementaryOutputPaths = op;
-  }
+  // Queries
+
+  // If we have exactly one input filename, and its extension is "bc" or "ll",
+  // treat the input as LLVM_IR.
+  bool shouldTreatAsLLVM() const;
+  bool shouldTreatAsSIL() const;
+
+  bool areAllNonPrimariesSIB() const;
+
+  /// Return true for error
+  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
+                    bool isREPLRequested, bool isNoneRequested) const;
+
+public:
+  void clearInputs();
+  void addInput(const InputFile &input);
+  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
+  void addPrimaryInputFile(StringRef file,
+                           llvm::MemoryBuffer *buffer = nullptr);
+
+private:
+  friend class ArgsToFrontendOptionsConverter;
+  void setMainAndSupplementaryOutputs(ArrayRef<std::string> outputFiles,
+                                      OutputPaths supplementaryOutputs);
+
+  void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 };
 
 } // namespace swift
