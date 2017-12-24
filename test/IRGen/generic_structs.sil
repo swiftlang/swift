@@ -214,7 +214,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Fill type argument.
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 3
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 3
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 //   Lay out fields.
