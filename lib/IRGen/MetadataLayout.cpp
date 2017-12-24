@@ -147,14 +147,15 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
     IGF.IGM.getPointerAlignment());
 
   // FIXME: Should this be an invariant load?
-  auto *offsetBaseVal =
-    IGF.Builder.CreateLoad(offsetBaseAddr, "base");
+  llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
 
   auto relativeOffset = offset.getRelativeOffset().getValue();
-  auto *offsetVal =
-    IGF.Builder.CreateAdd(offsetBaseVal,
-                          llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                                 relativeOffset));
+  if (relativeOffset != 0) {
+    offsetVal = IGF.Builder.CreateAdd(offsetVal,
+                                      llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                                             relativeOffset));
+  }
+
   return Offset(offsetVal);
 }
 
