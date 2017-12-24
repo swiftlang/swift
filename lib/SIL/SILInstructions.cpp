@@ -1262,9 +1262,8 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,
                                  SILBasicBlock *DefaultBB,
                                  ArrayRef<SILValue> Cases,
                                  ArrayRef<SILBasicBlock *> BBs)
-    : InstructionBase(Loc), Operands(this, Cases, Operand) {
+    : InstructionBaseWithTrailingOperands(Operand, Cases, Loc) {
   SILInstruction::Bits.SwitchValueInst.HasDefault = bool(DefaultBB);
-  SILInstruction::Bits.SwitchValueInst.NumCases = Cases.size();
   // Initialize the successor array.
   auto *succs = getSuccessorBuf();
   unsigned OperandBitWidth = 0;
@@ -1324,10 +1323,9 @@ SwitchValueInst *SwitchValueInst::create(
     Cases.push_back(pair.first);
     BBs.push_back(pair.second);
   }
-  size_t bufSize = sizeof(SwitchValueInst) +
-                   decltype(Operands)::getExtraSize(Cases.size()) +
-                   sizeof(SILSuccessor) * numSuccessors;
-  void *buf = F.getModule().allocateInst(bufSize, alignof(SwitchValueInst));
+  auto size = totalSizeToAlloc<swift::Operand, SILSuccessor>(numCases + 1,
+                                                             numSuccessors);
+  auto buf = F.getModule().allocateInst(size, alignof(SwitchValueInst));
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 

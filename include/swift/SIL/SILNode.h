@@ -307,10 +307,8 @@ protected:
   IBWTO_BITFIELD(BranchInst, TermInst, 0, : NumPadBits);
   // Ensure that YieldInst bitfield does not overflow.
   IBWTO_BITFIELD(YieldInst, TermInst, 0, : NumPadBits);
-  SWIFT_INLINE_BITFIELD_FULL(SwitchValueInst, TermInst, 1+32,
-    HasDefault : 1,
-    : NumPadBits,
-    NumCases : 32
+  IBWTO_BITFIELD(SwitchValueInst, TermInst, 1,
+    HasDefault : 1
   );
   SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
     HasDefault : 1,

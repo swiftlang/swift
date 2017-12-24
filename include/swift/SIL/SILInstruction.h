@@ -6741,12 +6741,11 @@ public:
 };
 
 /// A switch on a value of a builtin type.
-class SwitchValueInst
-    : public InstructionBase<SILInstructionKind::SwitchValueInst,
-                             TermInst> {
+class SwitchValueInst final
+    : public InstructionBaseWithTrailingOperands<
+                                      SILInstructionKind::SwitchValueInst,
+                                      SwitchValueInst, TermInst, SILSuccessor> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<1> Operands;
 
   SwitchValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                   SILBasicBlock *DefaultBB, ArrayRef<SILValue> Cases,
@@ -6759,16 +6758,15 @@ class SwitchValueInst
   //   destinations for each case, ending with the default destination if
   //   present.
 
-
   OperandValueArrayRef getCaseBuf() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands().slice(1));
   }
 
   SILSuccessor *getSuccessorBuf() {
-    return reinterpret_cast<SILSuccessor*>(Operands.asArray().end());
+    return getTrailingObjects<SILSuccessor>();
   }
   const SILSuccessor *getSuccessorBuf() const {
-    return reinterpret_cast<const SILSuccessor *>(Operands.asArray().end());
+    return getTrailingObjects<SILSuccessor>();
   }
 
   static SwitchValueInst *
@@ -6780,10 +6778,7 @@ public:
   /// Clean up tail-allocated successor records for the switch cases.
   ~SwitchValueInst();
 
-  SILValue getOperand() const { return Operands[0].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
@@ -6791,7 +6786,7 @@ public:
   }
 
   unsigned getNumCases() const {
-    return SILInstruction::Bits.SwitchValueInst.NumCases;
+    return getAllOperands().size() - 1;
   }
   std::pair<SILValue, SILBasicBlock*>
   getCase(unsigned i) const {
