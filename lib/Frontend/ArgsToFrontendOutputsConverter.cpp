@@ -196,6 +196,10 @@ OutputPathsComputer::OutputPathsComputer(
     ArrayRef<std::string> outputFiles, StringRef moduleName)
     : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
       OutputFiles(outputFiles), ModuleName(moduleName),
+      SupplementaryFilenamesFromFilelists(
+          getSupplementaryFilenamesFromFilelists(
+              Args, Diags,
+              InputsAndOutputs.countOfFilesProducingSupplementaryOutput())),
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
@@ -206,8 +210,8 @@ OutputPathsComputer::computeOutputPaths() const {
   unsigned i = 0;
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> void {
-        Optional<OutputPaths> outputPaths =
-            computeOutputPathsForOneInput(OutputFiles[i], input);
+        Optional<OutputPaths> outputPaths = computeOutputPathsForOneInput(
+            OutputFiles[i], SupplementaryFilenamesFromFilelists[i], input);
         i++;
         if (!outputPaths)
           hadError = true;
@@ -216,50 +220,102 @@ OutputPathsComputer::computeOutputPaths() const {
   return hadError ? None : Optional<std::vector<const OutputPaths>>(outputs);
 }
 
+std::vector<OutputPaths>
+OutputPathsComputer::getSupplementaryFilenamesFromFilelists(
+    const ArgList &args, DiagnosticEngine &diags, const unsigned inputCount) {
+
+  auto objCHeaderOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_objCHeaderOutput_filelist, inputCount);
+  auto moduleOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_moduleOutput_filelist, inputCount);
+  auto moduleDocOutput = readSupplementaryOutputFileList(
+      args, diags, options::OPT_moduleDocOutput_filelist, inputCount);
+  auto dependenciesFile = readSupplementaryOutputFileList(
+      args, diags, options::OPT_dependenciesFile_filelist, inputCount);
+  auto referenceDependenciesFile = readSupplementaryOutputFileList(
+      args, diags, options::OPT_referenceDependenciesFile_filelist, inputCount);
+  auto serializedDiagnostics = readSupplementaryOutputFileList(
+      args, diags, options::OPT_serializedDiagnostics_filelist, inputCount);
+  auto loadedModuleTrace = readSupplementaryOutputFileList(
+      args, diags, options::OPT_loadedModuleTrace_filelist, inputCount);
+  auto TBD = readSupplementaryOutputFileList(
+      args, diags, options::OPT_TBD_filelist, inputCount);
+
+  std::vector<OutputPaths> result;
+
+  for (unsigned i = 0; i < inputCount; ++i) {
+    result.push_back(
+        OutputPaths(i, objCHeaderOutput, moduleOutput, moduleDocOutput,
+                    dependenciesFile, referenceDependenciesFile,
+                    serializedDiagnostics, loadedModuleTrace, TBD));
+  }
+  return result;
+}
+
+Optional<std::vector<std::string>>
+OutputPathsComputer::readSupplementaryOutputFileList(const ArgList &args,
+                                                     DiagnosticEngine &diags,
+                                                     swift::options::ID id,
+                                                     unsigned requiredCount) {
+  Arg *A = args.getLastArg(id);
+  if (!A)
+    return None;
+  auto r =
+      ArgsToFrontendOutputsConverter::readOutputFileList(A->getValue(), diags);
+  assert(r.size() == requiredCount);
+  return r;
+}
+
 Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
-    StringRef outputFile, const InputFile &input) const {
+    StringRef outputFile, const OutputPaths &pathsFromFilelists,
+    const InputFile &input) const {
   StringRef implicitBasis = deriveImplicitBasis(outputFile, input);
 
   using namespace options;
 
   auto dependenciesFilePath = determineSupplementaryOutputFilename(
-      OPT_emit_dependencies_path, OPT_emit_dependencies, "d", "",
-      implicitBasis);
+      OPT_emit_dependencies_path, OPT_emit_dependencies,
+      pathsFromFilelists.DependenciesFilePath, "d", "", implicitBasis);
   if (!dependenciesFilePath)
     return None;
 
   auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
       OPT_emit_reference_dependencies_path, OPT_emit_reference_dependencies,
-      "swiftdeps", "", implicitBasis);
+      pathsFromFilelists.ReferenceDependenciesFilePath, "swiftdeps", "",
+      implicitBasis);
   if (!referenceDependenciesFilePath)
     return None;
 
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
-      OPT_serialize_diagnostics_path, OPT_serialize_diagnostics, "dia", "",
-      implicitBasis);
+      OPT_serialize_diagnostics_path, OPT_serialize_diagnostics,
+      pathsFromFilelists.SerializedDiagnosticsPath, "dia", "", implicitBasis);
 
   if (!serializedDiagnosticsPath)
     return None;
 
   auto objCHeaderOutputPath = determineSupplementaryOutputFilename(
-      OPT_emit_objc_header_path, OPT_emit_objc_header, "h", "", implicitBasis);
+      OPT_emit_objc_header_path, OPT_emit_objc_header,
+      pathsFromFilelists.ObjCHeaderOutputPath, "h", "", implicitBasis);
   if (!objCHeaderOutputPath)
     return None;
 
   auto loadedModuleTracePath = determineSupplementaryOutputFilename(
       OPT_emit_loaded_module_trace_path, OPT_emit_loaded_module_trace,
-      "trace.json", "", implicitBasis);
+      pathsFromFilelists.LoadedModuleTracePath, "trace.json", "",
+      implicitBasis);
   if (!loadedModuleTracePath)
     return None;
 
   auto tbdPath = determineSupplementaryOutputFilename(
-      OPT_emit_tbd_path, OPT_emit_tbd, "tbd", "", implicitBasis);
+      OPT_emit_tbd_path, OPT_emit_tbd, pathsFromFilelists.TBDPath, "tbd", "",
+      implicitBasis);
   if (!tbdPath)
     return None;
 
   auto moduleDocOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_module_doc_path, OPT_emit_module_doc,
-      SERIALIZED_MODULE_DOC_EXTENSION, "", implicitBasis);
+      pathsFromFilelists.ModuleDocOutputPath, SERIALIZED_MODULE_DOC_EXTENSION,
+      "", implicitBasis);
   if (!moduleDocOutputPath)
     return None;
 
@@ -270,7 +326,8 @@ Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
                              mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
-      OPT_emit_module_path, emitModuleOption, moduleExtension,
+      OPT_emit_module_path, emitModuleOption,
+      pathsFromFilelists.ModuleOutputPath, moduleExtension,
       mainOutputIfUsableForModule, implicitBasis);
   if (!moduleOutputPath)
     return None;
@@ -298,16 +355,25 @@ OutputPathsComputer::deriveImplicitBasis(StringRef outputFilename,
 }
 
 Optional<std::string> OutputPathsComputer::determineSupplementaryOutputFilename(
-    options::ID pathOpt, options::ID emitOpt, StringRef extension,
-    StringRef mainOutputIfUsable, StringRef implicitBasis) const {
+    options::ID pathOpt, options::ID emitOpt, StringRef pathFromFilelists,
+    StringRef extension, StringRef mainOutputIfUsable,
+    StringRef implicitBasis) const {
   using namespace options;
 
   {
     const Arg *argWithPath = Args.getLastArg(pathOpt);
-    if (argWithPath) {
+    if (argWithPath)
       Args.ClaimAllArgs(pathOpt);
-      return std::string(argWithPath->getValue());
+    if (argWithPath && !pathFromFilelists.empty()) {
+      // FIXME: dmu write out arg name and file list name
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_filelist_and_argument);
+      return None; // FIXME: dmu bail on supp filelist and argument?
     }
+    if (!pathFromFilelists.empty())
+      return pathFromFilelists.str();
+    if (argWithPath)
+      return std::string(argWithPath->getValue());
   }
 
   if (!Args.hasArg(emitOpt))

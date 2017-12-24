@@ -112,6 +112,7 @@ class OutputPathsComputer {
   ArrayRef<std::string> OutputFiles;
   StringRef ModuleName;
 
+  std::vector<OutputPaths> SupplementaryFilenamesFromFilelists;
   const FrontendOptions::ActionType RequestedAction;
 
 public:
@@ -121,13 +122,25 @@ public:
   Optional<std::vector<const OutputPaths>> computeOutputPaths() const;
 
 private:
-  Optional<OutputPaths> computeOutputPathsForOneInput(StringRef outputFilename,
-                                                      const InputFile &) const;
+  static std::vector<OutputPaths> getSupplementaryFilenamesFromFilelists(
+      const ArgList &args, DiagnosticEngine &diags, unsigned inputCount);
+
+  static Optional<std::vector<std::string>>
+  readSupplementaryOutputFileList(const ArgList &args, DiagnosticEngine &diags,
+                                  swift::options::ID id,
+                                  unsigned requiredCount);
+
+  Optional<OutputPaths>
+  computeOutputPathsForOneInput(StringRef outputFilename,
+                                const OutputPaths &pathsFromFilelists,
+                                const InputFile &) const;
+
   StringRef deriveImplicitBasis(StringRef outputFilename,
                                 const InputFile &) const;
   Optional<std::string> determineSupplementaryOutputFilename(
-      options::ID pathOpt, options::ID emitOpt, StringRef extension,
-      StringRef mainOutputIfUsable, StringRef implicitBasis) const;
+      options::ID pathOpt, options::ID emitOpt, StringRef pathFromFilelists,
+      StringRef extension, StringRef mainOutputIfUsable,
+      StringRef implicitBasis) const;
 
   void deriveModulePathParameters(options::ID &emitOption,
                                   std::string &extension,
