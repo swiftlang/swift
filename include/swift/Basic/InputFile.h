@@ -33,6 +33,11 @@ class InputFile {
   /// Null if the contents are not overridden.
   llvm::MemoryBuffer *Buffer;
 
+  /// The specified output file.
+  /// If only a single outputfile is generated,
+  /// the name of the last specified file is taken.
+  std::string OutputFilename;
+
   /// The supplementary outputs associated with this input:
   /// Temporarily keep in the first output-producing input.
   OutputPaths SupplementaryOutputPaths;
@@ -59,12 +64,24 @@ public:
     return filename.equals("<stdin>") ? "-" : filename;
   }
 
+  const std::string &outputFilename() const { return OutputFilename; }
+
+  void setOutputFilename(StringRef outputFilename) {
+    OutputFilename = outputFilename;
+  }
+
   const OutputPaths &supplementaryOutputPaths() const {
     return SupplementaryOutputPaths;
   }
 
   void setSupplementaryOutputPaths(const OutputPaths &outs) {
     SupplementaryOutputPaths = outs;
+  }
+
+  void setOutputFileNameAndSupplementaryOutputPaths(StringRef outputFilename,
+                                                    const OutputPaths &outs) {
+    setOutputFilename(outputFilename);
+    setSupplementaryOutputPaths(outs);
   }
 };
 } // namespace swift
