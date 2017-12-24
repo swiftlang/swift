@@ -1126,12 +1126,13 @@ CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
                                ArrayRef<SILValue> Args, unsigned NumTrue,
                                unsigned NumFalse, ProfileCounter TrueBBCount,
                                ProfileCounter FalseBBCount)
-    : InstructionBase(Loc), DestBBs{{this, TrueBB, TrueBBCount},
-                                    {this, FalseBB, FalseBBCount}},
-      NumTrueArgs(NumTrue), NumFalseArgs(NumFalse),
-      Operands(this, Args, Condition) {
-  assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&
-         "Invalid number of args");
+    : InstructionBaseWithTrailingOperands(Condition, Args, Loc),
+                                        DestBBs{{this, TrueBB, TrueBBCount},
+                                                {this, FalseBB, FalseBBCount}} {
+  assert(Args.size() == (NumTrue + NumFalse) && "Invalid number of args");
+  SILInstruction::Bits.CondBranchInst.NumTrueArgs = NumTrue;
+  assert(SILInstruction::Bits.CondBranchInst.NumTrueArgs == NumTrue &&
+         "Truncation");
   assert(TrueBB != FalseBB && "Identical destinations");
 }
 
@@ -1155,20 +1156,11 @@ CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());
 
-  void *Buffer = F.getModule().allocateInst(sizeof(CondBranchInst) +
-                              decltype(Operands)::getExtraSize(Args.size()),
-                            alignof(CondBranchInst));
+  auto Size = totalSizeToAlloc<swift::Operand>(Args.size() + NumFixedOpers);
+  auto Buffer = F.getModule().allocateInst(Size, alignof(CondBranchInst));
   return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args,
                                        TrueArgs.size(), FalseArgs.size(),
                                        TrueBBCount, FalseBBCount);
-}
-
-OperandValueArrayRef CondBranchInst::getTrueArgs() const {
-  return Operands.asValueArray().slice(1, NumTrueArgs);
-}
-
-OperandValueArrayRef CondBranchInst::getFalseArgs() const {
-  return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
 SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
@@ -1186,35 +1178,11 @@ SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
   }
 
   if (DestBB == getTrueBB())
-    return Operands[1 + ArgIndex].get();
+    return getAllOperands()[NumFixedOpers + ArgIndex].get();
 
   assert(DestBB == getFalseBB()
          && "By process of elimination BB must be false BB");
-  return Operands[1 + NumTrueArgs + ArgIndex].get();
-}
-
-ArrayRef<Operand> CondBranchInst::getTrueOperands() const {
-  if (NumTrueArgs == 0)
-    return ArrayRef<Operand>();
-  return ArrayRef<Operand>(&Operands[1], NumTrueArgs);
-}
-
-MutableArrayRef<Operand> CondBranchInst::getTrueOperands() {
-  if (NumTrueArgs == 0)
-    return MutableArrayRef<Operand>();
-  return MutableArrayRef<Operand>(&Operands[1], NumTrueArgs);
-}
-
-ArrayRef<Operand> CondBranchInst::getFalseOperands() const {
-  if (NumFalseArgs == 0)
-    return ArrayRef<Operand>();
-  return ArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
-}
-
-MutableArrayRef<Operand> CondBranchInst::getFalseOperands() {
-  if (NumFalseArgs == 0)
-    return MutableArrayRef<Operand>();
-  return MutableArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
+  return getAllOperands()[NumFixedOpers + getNumTrueArgs() + ArgIndex].get();
 }
 
 void CondBranchInst::swapSuccessors() {
@@ -1224,7 +1192,7 @@ void CondBranchInst::swapSuccessors() {
   DestBBs[1] = First;
 
   // If we don't have any arguments return.
-  if (!NumTrueArgs && !NumFalseArgs)
+  if (!getNumTrueArgs() && !getNumFalseArgs())
     return;
 
   // Otherwise swap our true and false arguments.
@@ -1234,16 +1202,17 @@ void CondBranchInst::swapSuccessors() {
     TrueOps.push_back(V);
 
   auto FalseArgs = getFalseArgs();
-  for (unsigned i = 0, e = NumFalseArgs; i < e; ++i) {
-    Ops[1+i].set(FalseArgs[i]);
+  for (unsigned i = 0, e = getNumFalseArgs(); i < e; ++i) {
+    Ops[NumFixedOpers+i].set(FalseArgs[i]);
   }
 
-  for (unsigned i = 0, e = NumTrueArgs; i < e; ++i) {
-    Ops[1+i+NumFalseArgs].set(TrueOps[i]);
+  for (unsigned i = 0, e = getNumTrueArgs(); i < e; ++i) {
+    Ops[NumFixedOpers+i+getNumFalseArgs()].set(TrueOps[i]);
   }
 
-  // Finally swap the number of arguments that we have.
-  std::swap(NumTrueArgs, NumFalseArgs);
+  // Finally swap the number of arguments that we have. The number of false
+  // arguments is derived from the number of true arguments, therefore:
+  SILInstruction::Bits.CondBranchInst.NumTrueArgs = getNumFalseArgs();
 }
 
 SwitchValueInst::SwitchValueInst(SILDebugLocation Loc, SILValue Operand,

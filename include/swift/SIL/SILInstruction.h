@@ -6610,15 +6610,18 @@ public:
 };
 
 /// A conditional branch.
-class CondBranchInst
-    : public InstructionBase<SILInstructionKind::CondBranchInst,
-                             TermInst> {
+class CondBranchInst final
+    : public InstructionBaseWithTrailingOperands<
+                                             SILInstructionKind::CondBranchInst,
+                                             CondBranchInst,
+                                             TermInst> {
   friend SILBuilder;
 
 public:
   enum {
     /// The operand index of the condition value used for the branch.
-    ConditionIdx
+    ConditionIdx,
+    NumFixedOpers,
   };
   enum {
     // Map branch targets to block successor indices.
@@ -6628,12 +6631,15 @@ public:
 private:
   SILSuccessor DestBBs[2];
   /// The number of arguments for the True branch.
-  unsigned NumTrueArgs;
+  unsigned getNumTrueArgs() const {
+    return SILInstruction::Bits.CondBranchInst.NumTrueArgs;
+  }
   /// The number of arguments for the False branch.
-  unsigned NumFalseArgs;
+  unsigned getNumFalseArgs() const {
+    return getAllOperands().size() - NumFixedOpers -
+        SILInstruction::Bits.CondBranchInst.NumTrueArgs;
+  }
 
-  /// The first argument is the condition; the rest are BB arguments.
-  TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
@@ -6656,9 +6662,9 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return Operands[ConditionIdx].get(); }
+  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
   void setCondition(SILValue newCondition) {
-    Operands[ConditionIdx].set(newCondition);
+    getAllOperands()[ConditionIdx].set(newCondition);
   }
 
   SuccessorListTy getSuccessors() {
@@ -6676,17 +6682,31 @@ public:
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 
   /// Get the arguments to the true BB.
-  OperandValueArrayRef getTrueArgs() const;
+  OperandValueArrayRef getTrueArgs() const {
+    return OperandValueArrayRef(getTrueOperands());
+  }
   /// Get the arguments to the false BB.
-  OperandValueArrayRef getFalseArgs() const;
+  OperandValueArrayRef getFalseArgs() const {
+    return OperandValueArrayRef(getFalseOperands());
+  }
 
   /// Get the operands to the true BB.
-  ArrayRef<Operand> getTrueOperands() const;
-  MutableArrayRef<Operand> getTrueOperands();
+  ArrayRef<Operand> getTrueOperands() const {
+    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
+  }
+  MutableArrayRef<Operand> getTrueOperands() {
+    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
+  }
 
   /// Get the operands to the false BB.
-  ArrayRef<Operand> getFalseOperands() const;
-  MutableArrayRef<Operand> getFalseOperands();
+  ArrayRef<Operand> getFalseOperands() const {
+    // The remaining arguments are 'false' operands.
+    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+  MutableArrayRef<Operand> getFalseOperands() {
+    // The remaining arguments are 'false' operands.
+    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
@@ -6698,7 +6718,7 @@ public:
   bool isTrueOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
            "OpIndex must be an index for an actual operand");
-    if (NumTrueArgs == 0)
+    if (getNumTrueArgs() == 0)
       return false;
 
     auto Operands = getTrueOperands();
@@ -6710,7 +6730,7 @@ public:
   bool isFalseOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
            "OpIndex must be an index for an actual operand");
-    if (NumFalseArgs == 0)
+    if (getNumFalseArgs() == 0)
       return false;
 
     auto Operands = getFalseOperands();
@@ -6729,9 +6749,6 @@ public:
                            unsigned ArgIndex) const;
 
   void swapSuccessors();
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// A switch on a value of a builtin type.
