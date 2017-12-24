@@ -16,7 +16,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Frontend/OutputPaths.h"
+#include "swift/Basic/OutputPaths.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -48,8 +48,6 @@ class FrontendInputsAndOutputs {
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
 
-  OutputPaths SupplementaryOutputPaths;
-
 public:
   FrontendInputsAndOutputs() = default;
 
@@ -57,7 +55,6 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    SupplementaryOutputPaths = other.SupplementaryOutputPaths;
     OutputFilenames = other.OutputFilenames;
   }
 
@@ -66,7 +63,6 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    SupplementaryOutputPaths = other.SupplementaryOutputPaths;
     OutputFilenames = other.OutputFilenames;
     return *this;
   }
@@ -166,30 +162,16 @@ public:
   bool isOutputFileDirectory() const;
   bool hasNamedOutputFile() const;
 
-  const std::string &getObjCHeaderOutputPath() const {
-    return SupplementaryOutputPaths.ObjCHeaderOutputPath;
-  }
-  const std::string &getModuleOutputPath() const {
-    return SupplementaryOutputPaths.ModuleOutputPath;
-  }
-  const std::string &getModuleDocOutputPath() const {
-    return SupplementaryOutputPaths.ModuleDocOutputPath;
-  }
-  const std::string &getDependenciesFilePath() const {
-    return SupplementaryOutputPaths.DependenciesFilePath;
-  }
-  const std::string &getReferenceDependenciesFilePath() const {
-    return SupplementaryOutputPaths.ReferenceDependenciesFilePath;
-  }
-  const std::string &getSerializedDiagnosticsPath() const {
-    return SupplementaryOutputPaths.SerializedDiagnosticsPath;
-  }
-  const std::string &getLoadedModuleTracePath() const {
-    return SupplementaryOutputPaths.LoadedModuleTracePath;
-  }
-  const std::string &getTBDPath() const {
-    return SupplementaryOutputPaths.TBDPath;
-  }
+  const std::string &getObjCHeaderOutputPath() const;
+  const std::string &getModuleOutputPath() const;
+  const std::string &getModuleDocOutputPath() const;
+  const std::string &getDependenciesFilePath() const;
+  const std::string &getReferenceDependenciesFilePath() const;
+  const std::string &getSerializedDiagnosticsPath() const;
+  const std::string &getLoadedModuleTracePath() const;
+  const std::string &getTBDPath() const;
+
+  const OutputPaths &supplementaryOutputPaths() const;
 
   // Queries
 
