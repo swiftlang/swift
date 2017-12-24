@@ -423,6 +423,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprObjectLiteral;
     case SyntaxStructureKind::TupleExpression:
       return KindExprTuple;
+    case SyntaxStructureKind::ClosureExpression:
+      return KindExprClosure;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
