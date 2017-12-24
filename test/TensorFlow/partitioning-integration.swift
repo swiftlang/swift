@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -tensorflow -emit-sil -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -O -tensorflow -emit-sil -verify %s | FileCheck %s
 
 import TensorFlow
 
@@ -7,6 +7,10 @@ public func testTensor() {
   x += x
   x -= x
   print(x)
+
+  var y = Tensor1D<Float>(1, 2, 3.0)
+  y += y
+  print(y)
 }
 
 // FIXME: The optimizer is crashing, so I can't get this to deabstract all the

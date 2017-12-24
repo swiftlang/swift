@@ -62,7 +62,7 @@ extension TensorCore : CustomPlaygroundQuickLookable {
 // These each get a @_versioned attribute, which allows the symbol to be
 // accessible outside of the module even though it doesn't have public access
 // control.  This is required because the Tensor type and higher level
-// operations are all @_inlinable.  Trivia: @_versioned and @_in_inlinable are
+// operations are all @_inlineable.  Trivia: @_versioned and @_inlineable are
 // going to get renamed in mainline in the next couple months.
 //
 // The body of these ops just abort, since they are never actually run: these
