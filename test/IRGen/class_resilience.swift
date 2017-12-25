@@ -15,6 +15,10 @@
 
 // CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvpWvd = {{(protected )?}}global [[INT]] {{8|16}}
 
+// CHECK: @_T016class_resilience14ResilientChildCMo = {{(protected )?}}global [[INT]] 0
+
+// CHECK: @_T016class_resilience21ResilientGenericChildCMo = {{(protected )?}}global [[INT]] 0
+
 // CHECK: @_T016class_resilience26ClassWithResilientPropertyCMo = {{(protected )?}}constant [[INT]] {{52|80}}
 
 // CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd = {{(protected )?}}constant [[INT]] {{8|16}}
@@ -23,11 +27,33 @@
 // CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd = {{(protected )?}}constant [[INT]] {{8|16}}
 // CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd = {{(protected )?}}constant [[INT]] {{12|24}}
 
-// CHECK: @_T016class_resilience14ResilientChildCMo = {{(protected )?}}global [[INT]] 0
+// CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [36 x i8] c"16class_resilience14ResilientChildC\00"
+// CHECK: [[RESILIENTCHILD_FIELDS:@.*]] = private constant [7 x i8] c"field\00\00"
+
+// CHECK: @_T016class_resilience14ResilientChildCMn = {{(protected )?}}constant <{{.*}}> <{
+// --       name:
+// CHECK-SAME:   [36 x i8]* [[RESILIENTCHILD_NAME]]
+// --       num fields
+// CHECK-SAME:   i32 1,
+// --       field offset vector offset
+// CHECK-SAME:   i32 3,
+// --       field names,
+// CHECK-SAME:   [7 x i8]* [[RESILIENTCHILD_FIELDS]]
+// --       kind 0 (class)
+// CHECK-SAME:   i32 0,
+// --       generic parameter vector offset
+// CHECK-SAME:   i32 0,
+// --       generic parameter count, primary count
+// CHECK-SAME:   i32 0, i32 0,
+// --       nesting depth
+// CHECK-SAME:   i16 1,
+// --       flags -- has vtable, has resilient superclass
+// CHECK-SAME:   i16 12,
+// --       generic parameters at depth 0
+// CHECK-SAME:   i32 0
+// CHECK-SAME: }>
 
 // CHECK: @_T016class_resilience16FixedLayoutChildCMo = {{(protected )?}}global [[INT]] 0
-
-// CHECK: @_T016class_resilience21ResilientGenericChildCMo = {{(protected )?}}global [[INT]] 0
 
 // CHECK: @_T016class_resilience17MyResilientParentCMo = {{(protected )?}}constant [[INT]] {{52|80}}
 
@@ -101,7 +127,7 @@ public class ClassWithIndirectResilientEnum {
 // offsets is not known at compile time
 
 public class ResilientChild : ResilientOutsideParent {
-  public let field: Int32 = 0
+  public var field: Int32 = 0
 }
 
 // Superclass is resilient, but the class is fixed-layout.
@@ -110,14 +136,14 @@ public class ResilientChild : ResilientOutsideParent {
 // global.
 
 @_fixed_layout public class FixedLayoutChild : ResilientOutsideParent {
-  public let field: Int32 = 0
+  public var field: Int32 = 0
 }
 
 // Superclass is resilient, so the number of fields and their
 // offsets is not known at compile time
 
 public class ResilientGenericChild<T> : ResilientGenericOutsideParent<T> {
-  public let field: Int32 = 0
+  public var field: Int32 = 0
 }
 
 
@@ -133,6 +159,12 @@ public class MyResilientChild : MyResilientParent {
   public let field: Int32 = 0
 }
 
+
+extension ResilientGenericOutsideParent {
+  public func genericExtensionMethod() -> A.Type {
+    return A.self
+  }
+}
 
 // ClassWithResilientProperty.color getter
 
@@ -217,9 +249,34 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: call void @swift_endAccess
 // CHECK: ret i32 [[FIELD_VALUE]]
 
+// ResilientChild.field getter dispatch thunk
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience14ResilientChildC5fields5Int32VvgTj(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience14ResilientChildCMo
+// CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
+// CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[BASE]]
+// CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to i32 (%T16class_resilience14ResilientChildC*)**
+// CHECK-NEXT: [[METHOD:%.*]] = load i32 (%T16class_resilience14ResilientChildC*)*, i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
+// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i32 [[METHOD]](%T16class_resilience14ResilientChildC* swiftself %0)
+// CHECK-NEXT: ret i32 [[RESULT]]
+
+// ResilientChild.field setter dispatch thunk
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T016class_resilience14ResilientChildC5fields5Int32VvsTj(i32, %T16class_resilience14ResilientChildC* swiftself)
+// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %1, i32 0, i32 0, i32 0
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience14ResilientChildCMo
+// CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
+// CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
+// CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[METADATA_OFFSET]]
+// CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to void (i32, %T16class_resilience14ResilientChildC*)**
+// CHECK-NEXT: [[METHOD:%.*]] = load void (i32, %T16class_resilience14ResilientChildC*)*, void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
+// CHECK-NEXT: call swiftcc void [[METHOD]](i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
+// CHECK-NEXT: ret void
 
 // ResilientGenericChild.field getter
-
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience21ResilientGenericChildC5fields5Int32Vvg(%T16class_resilience21ResilientGenericChildC* swiftself)
 
@@ -230,8 +287,11 @@ public class MyResilientChild : MyResilientParent {
 
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds %T16class_resilience21ResilientGenericChildC, %T16class_resilience21ResilientGenericChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] {{11|14}}
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience21ResilientGenericChildCMo
+// CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{16|32}}
+// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to i8*
+// CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_ADDR]], [[INT]] [[METADATA_OFFSET]]
+// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = bitcast i8* [[FIELD_OFFSET_TMP]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T16class_resilience21ResilientGenericChildC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
@@ -253,6 +313,19 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: call void @swift_endAccess
 // CHECK:      ret i32 [[RESULT]]
 
+
+// ResilientGenericOutsideParent.genericExtensionMethod()
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @_T015resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T15resilient_class29ResilientGenericOutsideParentC* %0 to %swift.type**
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class29ResilientGenericOutsideParentCMo
+// CHECK-NEXT: [[GENERIC_PARAM_OFFSET:%.*]] = add [[INT]] [[BASE]], 0
+// CHECK-NEXT: [[ISA_TMP:%.*]] = bitcast %swift.type* [[ISA]] to i8*
+// CHECK-NEXT: [[GENERIC_PARAM_TMP:%.*]] = getelementptr inbounds i8, i8* [[ISA_TMP]], [[INT]] [[GENERIC_PARAM_OFFSET]]
+// CHECK-NEXT: [[GENERIC_PARAM_ADDR:%.*]] = bitcast i8* [[GENERIC_PARAM_TMP]] to %swift.type**
+// CHECK-NEXT: [[GENERIC_PARAM:%.*]] = load %swift.type*, %swift.type** [[GENERIC_PARAM_ADDR]]
+// CHECK-NEXT: ret %swift.type* [[GENERIC_PARAM]]
 
 // ClassWithResilientProperty metadata initialization function
 
@@ -306,7 +379,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
 
 // Relocate metadata if necessary...
-// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 1)
+// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
 
 // CHECK:              ret void
 
@@ -327,7 +400,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
 
 // Relocate metadata if necessary...
-// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 1)
+// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
 
 // CHECK:              ret void
 
@@ -345,5 +418,5 @@ public class MyResilientChild : MyResilientParent {
 // Initialize class metadata base offset...
 // CHECK:              store [[INT]] {{.*}}, [[INT]]* @_T016class_resilience21ResilientGenericChildCMo
 
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 2)
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER_TMP]], [[INT]] 5)
 // CHECK:              ret %swift.type* [[METADATA]]

@@ -2192,6 +2192,8 @@ namespace {
         auto &layout = IGM.getMetadataLayout(cd);
         if (layout.getVTableSize() > 0)
           flags = flags.withHasVTable(true);
+        if (layout.hasResilientSuperclass())
+          flags = flags.withHasResilientSuperclass(true);
       }
 
       // Calculate the number of generic parameters at each nesting depth.
@@ -2427,13 +2429,19 @@ namespace {
       : super(IGM), Target(c)
     {
       auto &layout = IGM.getMetadataLayout(Target);
-      FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
-      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
 
       VTable = IGM.getSILModule().lookUpVTable(Target);
-
-      VTableOffset = layout.getStaticVTableOffset();
       VTableSize = layout.getVTableSize();
+
+      if (layout.hasResilientSuperclass()) {
+        FieldVectorOffset = layout.getRelativeFieldOffsetVectorOffset();
+        GenericParamsOffset = layout.getRelativeGenericRequirementsOffset();
+        VTableOffset = layout.getRelativeVTableOffset();
+      } else {
+        FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
+        GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+        VTableOffset = layout.getStaticVTableOffset();
+      }
     }
     
     ClassDecl *getTarget() { return Target; }

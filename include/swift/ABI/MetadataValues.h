@@ -315,7 +315,8 @@ enum class ProtocolDispatchStrategy: uint8_t {
 class GenericParameterDescriptorFlags {
   typedef uint16_t int_type;
   enum : int_type {
-    HasVTable        = 0x0004,
+    HasVTable              = 0x0004,
+    HasResilientSuperclass = 0x0008,
   };
   int_type Data;
   
@@ -333,6 +334,23 @@ public:
   /// descriptor.
   bool hasVTable() const {
     return Data & HasVTable;
+  }
+
+  constexpr GenericParameterDescriptorFlags withHasResilientSuperclass(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasResilientSuperclass)
+                                             : (Data & ~HasResilientSuperclass));
+  }
+
+  /// If this type is a class, does it have a resilient superclass?
+  /// If so, the generic parameter offset, field offset vector offset
+  /// and vtable start offsets are relative to the start of the class's
+  /// immediate members in the metadata, and not the start of the
+  /// metadata itself.
+  ///
+  /// Note that the immediate members begin at the same offset where the
+  /// superclass metadata ends.
+  bool hasResilientSuperclass() const {
+    return Data & HasResilientSuperclass;
   }
 
   int_type getIntValue() const {
