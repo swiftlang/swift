@@ -71,6 +71,14 @@ class C <MemberDeclBlock>{<FunctionDecl>
     super</SuperRefExpr>.bar</MemberAccessExpr>()</FunctionCallExpr><SequenceExpr><SubscriptExpr><SuperRefExpr>
     super</SuperRefExpr>[<FunctionCallArgument><IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>] </SubscriptExpr><AssignmentExpr>= </AssignmentExpr><IntegerLiteralExpr>1</IntegerLiteralExpr></SequenceExpr><FunctionCallExpr><MemberAccessExpr><SuperRefExpr>
     super</SuperRefExpr>.init</MemberAccessExpr>()</FunctionCallExpr>
+  }</CodeBlock></FunctionDecl><FunctionDecl>
+
+  func implictMember<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>(<FunctionCallArgument>x: <IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ImplicitMemberExpr>.foo </ImplicitMemberExpr><ClosureExpr>{ <IntegerLiteralExpr>12 </IntegerLiteralExpr>}</ClosureExpr></FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><SubscriptExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>[<FunctionCallArgument><IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>.bar</MemberAccessExpr></SequenceExpr>
   }</CodeBlock></FunctionDecl>
 }</MemberDeclBlock></ClassDecl>
 
@@ -252,7 +260,7 @@ do <CodeBlock>{
     case <ValueBindingPattern>let <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><IdentifierPattern>b</IdentifierPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
     case <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><ValueBindingPattern>var <IdentifierPattern>b</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleElement>)</TupleExpr></ExpressionPattern>: <BreakStmt>break</BreakStmt>
     case <IsTypePattern>is <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></IsTypePattern>: <BreakStmt>break</BreakStmt>
-    case <ValueBindingPattern>let <ExpressionPattern>.bar(<FunctionCallArgument><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr></FunctionCallArgument>)</ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
+    case <ValueBindingPattern>let <ExpressionPattern><FunctionCallExpr><ImplicitMemberExpr>.bar</ImplicitMemberExpr>(<FunctionCallArgument><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr></FunctionCallArgument>)</FunctionCallExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
     case <ExpressionPattern><MemberAccessExpr><IdentifierExpr>MyEnum</IdentifierExpr>.foo</MemberAccessExpr></ExpressionPattern>: <BreakStmt>break</BreakStmt>
     case <ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>
     case <ValueBindingPattern>let <ExpressionPattern><OptionalChainingExpr><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>?</OptionalChainingExpr></ExpressionPattern></ValueBindingPattern>: <BreakStmt>break</BreakStmt>

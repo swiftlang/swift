@@ -1124,6 +1124,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         break;
       }
 
+      Tok.setKind(tok::period);
       consumeToken();
 
       // Handle "x.42" - a tuple index.
@@ -1623,6 +1624,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
   case tok::period:              //=.foo
   case tok::period_prefix: {     // .foo
+    Tok.setKind(tok::period_prefix);
     SourceLoc DotLoc = consumeToken();
     
     // Special case ".<integer_literal>" like ".4".  This isn't valid, but the
@@ -1682,6 +1684,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
                                     diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
+    SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitMemberExpr);
 
     // Check for a () suffix, which indicates a call when constructing
     // this member.  Note that this cannot be the start of a new line.
@@ -1702,6 +1705,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
       if (status.isError())
         return nullptr;
 
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       Result = makeParserResult(
                  status,
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
@@ -1716,10 +1720,17 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
     // Check for a trailing closure, if allowed.
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
+      if (SyntaxContext->isEnabled()) {
+        // Add dummy blank argument list to the call expression syntax.
+        SyntaxContext->addSyntax(
+            SyntaxFactory::makeBlankFunctionCallArgumentList());
+      }
+
       ParserResult<Expr> closure =
         parseTrailingClosure(NameLoc.getSourceRange());
       if (closure.isNull()) return nullptr;
 
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       // Handle .foo by just making an AST node.
       Result = makeParserResult(
                  ParserStatus(closure),

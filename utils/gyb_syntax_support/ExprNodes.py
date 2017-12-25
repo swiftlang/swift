@@ -162,6 +162,13 @@ EXPR_NODES = [
              Child('RightSquare', kind='RightSquareToken'),
          ]),
 
+    # .foo
+    Node('ImplicitMemberExpr', kind='Expr',
+         children=[
+             Child("Dot", kind='PrefixPeriodToken'),
+             Child("Name", kind='Token')
+         ]),
+
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
          children=[

@@ -72,6 +72,14 @@ class C {
     super[12] = 1
     super.init()
   }
+
+  func implictMember() {
+    _ = .foo
+    _ = .foo(x: 12)
+    _ = .foo { 12 }
+    _ = .foo[12]
+    _ = .foo.bar
+  }
 }
 
 #endif
