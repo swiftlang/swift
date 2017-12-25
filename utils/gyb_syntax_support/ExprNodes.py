@@ -50,6 +50,12 @@ EXPR_NODES = [
              Child('Identifier', kind='IdentifierToken'),
          ]),
 
+    # An 'super' expression.
+    Node('SuperRefExpr', kind='Expr',
+         children=[
+             Child('SuperKeyword', kind='SuperToken'),
+         ]),
+
     # A nil expression.
     Node('NilLiteralExpr', kind='Expr',
          children=[
@@ -129,14 +135,6 @@ EXPR_NODES = [
              Child('FloatingDigits', kind='FloatingLiteralToken'),
          ]),
 
-    Node('FunctionCallExpr', kind='Expr',
-         children=[
-             Child('CalledExpression', kind='Expr'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('ArgumentList', kind='FunctionCallArgumentList'),
-             Child('RightParen', kind='RightParenToken'),
-         ]),
-
     Node('TupleExpr', kind='Expr',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -162,6 +160,13 @@ EXPR_NODES = [
                        Child('Elements', kind='DictionaryElementList'),
                    ]),
              Child('RightSquare', kind='RightSquareToken'),
+         ]),
+
+    # .foo
+    Node('ImplicitMemberExpr', kind='Expr',
+         children=[
+             Child("Dot", kind='PrefixPeriodToken'),
+             Child("Name", kind='Token')
          ]),
 
     # function-call-argument -> label? ':'? expression ','?
@@ -330,5 +335,51 @@ EXPR_NODES = [
     Node('UnresolvedPatternExpr', kind='Expr',
          children=[
              Child('Pattern', kind='Pattern'),
+         ]),
+
+    # call-expr -> expr '(' call-argument-list ')' closure-expr?
+    #            | expr closure-expr
+    Node('FunctionCallExpr', kind='Expr',
+         children=[
+             Child('CalledExpression', kind='Expr'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
+    Node('SubscriptExpr', kind='Expr',
+         children=[
+             Child('CalledExpression', kind='Expr'),
+             Child('LeftBracket', kind='LeftSquareBracketToken'),
+             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('RightBracket', kind='RightSquareBracketToken'),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # optional-chaining-expr -> expr '?'
+    Node('OptionalChainingExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('QuetionMark', kind='PostfixQuestionMarkToken'),
+         ]),
+
+    # forced-value-expr -> expr '!'
+    Node('ForcedValueExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('ExclamationMark', kind='ExclamationMarkToken'),
+         ]),
+
+    # postfix-unary-expr -> expr postfix-operator
+    Node('PostfixUnaryExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('OperatorToken', kind='PostfixOperatorToken'),
          ]),
 ]
