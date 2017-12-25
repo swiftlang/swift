@@ -710,11 +710,6 @@ public:
   /// Options that control the parsing of declarations.
   typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
 
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
-
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
