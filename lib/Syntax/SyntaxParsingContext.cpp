@@ -110,13 +110,20 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     return;
 
   switch (Kind) {
+  case SyntaxKind::SuperRefExpr:
   case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::ImplicitMemberExpr:
+  case SyntaxKind::OptionalChainingExpr:
+  case SyntaxKind::ForcedValueExpr:
+  case SyntaxKind::PostfixUnaryExpr:
   case SyntaxKind::TernaryExpr: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::FunctionCallExpr:
+  case SyntaxKind::SubscriptExpr:
   case SyntaxKind::ExprList: {
     createNodeInPlace(Kind, Parts.size());
     break;
