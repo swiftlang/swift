@@ -65,6 +65,13 @@ class C {
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
   }
+  
+  func superExpr() {
+    _ = super.foo
+    super.bar()
+    super[12] = 1
+    super.init()
+  }
 }
 
 #endif

@@ -110,6 +110,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     return;
 
   switch (Kind) {
+  case SyntaxKind::SuperRefExpr:
   case SyntaxKind::MemberAccessExpr:
   case SyntaxKind::OptionalChainingExpr:
   case SyntaxKind::ForcedValueExpr:

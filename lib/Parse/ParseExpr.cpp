@@ -834,6 +834,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
+  SyntaxParsingContext SuperCtxt(SyntaxContext, SyntaxContextKind::Expr);
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
   
@@ -842,6 +843,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                                          superLoc);
   bool ErrorOccurred = selfDecl == nullptr;
 
+  SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
   Expr *superRef = !ErrorOccurred
     ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
                                             /*Implicit=*/false))
@@ -869,6 +871,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
     if (!name)
       return nullptr;
 
+    SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
     return makeParserResult(
              new (Context) UnresolvedDotExpr(superRef, dotLoc, name, nameLoc,
                                              /*Implicit=*/false));
@@ -901,6 +904,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
       return nullptr;
+    SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
     return makeParserResult(
       SubscriptExpr::create(Context, superRef, lSquareLoc, indexArgs,
                             indexArgLabels, indexArgLabelLocs, rSquareLoc,

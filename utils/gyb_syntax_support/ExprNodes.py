@@ -50,6 +50,12 @@ EXPR_NODES = [
              Child('Identifier', kind='IdentifierToken'),
          ]),
 
+    # An 'super' expression.
+    Node('SuperRefExpr', kind='Expr',
+         children=[
+             Child('SuperKeyword', kind='SuperToken'),
+         ]),
+
     # A nil expression.
     Node('NilLiteralExpr', kind='Expr',
          children=[

@@ -64,6 +64,13 @@ class C <MemberDeclBlock>{<FunctionDecl>
     (<TupleElement><SequenceExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>1</IntegerLiteralExpr></SequenceExpr></TupleElement>)</TupleExpr>.a</MemberAccessExpr>.b</MemberAccessExpr>.foo</MemberAccessExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><IdentifierExpr>a </IdentifierExpr><AsExpr>as <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></AsExpr><BinaryOperatorExpr>|| </BinaryOperatorExpr><IdentifierExpr>a </IdentifierExpr><AsExpr>as! <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></AsExpr><BinaryOperatorExpr>|| </BinaryOperatorExpr><IdentifierExpr>a </IdentifierExpr><AsExpr>as? <SimpleTypeIdentifier>Bool</SimpleTypeIdentifier></AsExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><IdentifierExpr>a </IdentifierExpr><IsExpr>is <SimpleTypeIdentifier>Bool</SimpleTypeIdentifier></IsExpr></SequenceExpr>
+  }</CodeBlock></FunctionDecl><FunctionDecl>
+  
+  func superExpr<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><SuperRefExpr>super</SuperRefExpr>.foo</MemberAccessExpr></SequenceExpr><FunctionCallExpr><MemberAccessExpr><SuperRefExpr>
+    super</SuperRefExpr>.bar</MemberAccessExpr>()</FunctionCallExpr><SequenceExpr><SubscriptExpr><SuperRefExpr>
+    super</SuperRefExpr>[<FunctionCallArgument><IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>] </SubscriptExpr><AssignmentExpr>= </AssignmentExpr><IntegerLiteralExpr>1</IntegerLiteralExpr></SequenceExpr><FunctionCallExpr><MemberAccessExpr><SuperRefExpr>
+    super</SuperRefExpr>.init</MemberAccessExpr>()</FunctionCallExpr>
   }</CodeBlock></FunctionDecl>
 }</MemberDeclBlock></ClassDecl>
 
