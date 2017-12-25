@@ -896,7 +896,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                         indexArgLabelLocs,
                                         rSquareLoc,
                                         trailingClosure,
-                                        SyntaxKind::Unknown);
+                                        SyntaxKind::FunctionCallArgumentList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
@@ -1222,6 +1222,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       continue;
     }
 
@@ -1246,7 +1247,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
           indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
-          SyntaxKind::Unknown);
+          SyntaxKind::FunctionCallArgumentList);
       if (status.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
       if (status.isError() || Result.isNull())
@@ -1255,6 +1256,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           Context, Result.get(), lSquareLoc, indexArgs, indexArgLabels,
           indexArgLabelLocs, rSquareLoc, trailingClosure, ConcreteDeclRef(),
           /*implicit=*/false));
+      SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
       continue;
     }
 
@@ -1268,6 +1270,12 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           isa<TupleExpr>(callee))
         break;
 
+      if (SyntaxContext->isEnabled()) {
+        // Add dummy blank argument list to the call expression syntax.
+        SyntaxContext->addSyntax(
+            SyntaxFactory::makeBlankFunctionCallArgumentList());
+      }
+
       ParserResult<Expr> closure =
           parseTrailingClosure(callee->getSourceRange());
       if (closure.isNull())
@@ -1278,6 +1286,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           ParserStatus(closure),
           CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
                            SourceLoc(), closure.get(), /*implicit=*/false));
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
       if (Result.hasCodeCompletion())
         return Result;
@@ -1293,6 +1302,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(
           new (Context) BindOptionalExpr(Result.get(), TokLoc, /*depth*/ 0));
+      SyntaxContext->createNodeInPlace(SyntaxKind::OptionalChainingExpr);
       hasBindOptional = true;
       continue;
     }
@@ -1301,6 +1311,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::exclaim_postfix)) {
       Result =
           makeParserResult(new (Context) ForceValueExpr(Result.get(), TokLoc));
+      SyntaxContext->createNodeInPlace(SyntaxKind::ForcedValueExpr);
       continue;
     }
 
@@ -1314,6 +1325,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Expr *oper = parseExprOperator();
       Result =
           makeParserResult(new (Context) PostfixUnaryExpr(oper, Result.get()));
+      SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }
 
@@ -1566,6 +1578,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       break;
     }
 

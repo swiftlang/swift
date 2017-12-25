@@ -165,31 +165,46 @@ func tryfoo() {
 }
 #else
 func closure() {
-  {[weak a,
+  _ = {[weak a,
     unowned(safe) self,
     b = 3,
     unowned(unsafe) c = foo().bar] in
   }
-  {[] in }
+  _ = {[] in }
 
-  { [] a, b, _ -> Int in
+  _ = { [] a, b, _ -> Int in
     return 2
   }
-  { [] (a: Int, b: Int, _: Int) -> Int in
+  _ = { [] (a: Int, b: Int, _: Int) -> Int in
     return 2
   }
-  { [] a, b, _ throws -> Int in
+  _ = { [] a, b, _ throws -> Int in
     return 2
   }
-  { [] (a: Int, _ b: Int) throws -> Int in
+  _ = { [] (a: Int, _ b: Int) throws -> Int in
     return 2
   }
-  { a, b in }
-  {}
-  { s1, s2 in s1 > s2 }
-  { $0 > $1 }
+  _ = { a, b in }
+  _ = {}
+  _ = { s1, s2 in s1 > s2 }
+  _ = { $0 > $1 }
 }
 #endif
+
+func postfix() {
+  foo()
+  foo() {}
+  foo {}
+  foo.bar()
+  foo.bar() {}
+  foo.bar {}
+  foo[]
+  foo[1]
+  foo[] {}
+  foo[1] {}
+  foo[1][2,x:3]
+  foo?++.bar!(baz)
+}
 
 #if blah
 #else
