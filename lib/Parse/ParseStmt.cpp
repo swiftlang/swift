@@ -247,8 +247,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   ParserStatus BraceItemsStatus;
 
   bool PreviousHadSemi = true;
-  while ((Kind == BraceItemListKind::TopLevelLibrary ||
-          Tok.isNot(tok::r_brace)) &&
+  while ((IsTopLevel || Tok.isNot(tok::r_brace)) &&
          Tok.isNot(tok::pound_endif) &&
          Tok.isNot(tok::pound_elseif) &&
          Tok.isNot(tok::pound_else) &&
@@ -265,9 +264,13 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     SyntaxParsingContext StmtContext(SyntaxContext, SyntaxContextKind::Stmt);
 
-    if (Kind == BraceItemListKind::TopLevelLibrary &&
-        skipExtraTopLevelRBraces())
+    if (Tok.is(tok::r_brace)) {
+      assert(IsTopLevel);
+      diagnose(Tok, diag::extra_rbrace)
+        .fixItRemove(Tok.getLoc());
+      consumeToken();
       continue;
+    }
 
     // Eat invalid tokens instead of allowing them to produce downstream errors.
     if (consumeIf(tok::unknown))
