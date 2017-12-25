@@ -245,7 +245,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   }
 
   ParserStatus BraceItemsStatus;
-  SmallVector<Decl*, 8> TmpDecls;
 
   bool PreviousHadSemi = true;
   while ((Kind == BraceItemListKind::TopLevelLibrary ||
@@ -292,9 +291,40 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (isStartOfDecl()
-        && Tok.isNot(
-            tok::pound_if, tok::pound_sourceLocation, tok::pound_line)) {
+    if (Tok.is(tok::pound_if)) {
+      auto IfConfigResult = parseIfConfig(
+        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
+          parseBraceItems(Elements, Kind, IsActive
+                            ? BraceItemListKind::ActiveConditionalBlock
+                            : BraceItemListKind::InactiveConditionalBlock);
+        });
+      if (auto ICD = IfConfigResult.getPtrOrNull()) {
+        Result = ICD;
+        // Add the #if block itself
+        Entries.push_back(ICD);
+
+        for (auto &Entry : ICD->getActiveClauseElements()) {
+          if (Entry.is<Decl *>() && isa<IfConfigDecl>(Entry.get<Decl *>()))
+            // Don't hoist nested '#if'.
+            continue;
+          Entries.push_back(Entry);
+          if (Entry.is<Decl *>())
+            Entry.get<Decl *>()->setEscapedFromIfConfig(true);
+        }
+      } else {
+        NeedParseErrorRecovery = true;
+        continue;
+      }
+    } else if (Tok.is(tok::pound_line)) {
+      ParserStatus Status = parseLineDirective(true);
+      BraceItemsStatus |= Status;
+      NeedParseErrorRecovery = Status.isError();
+    } else if (Tok.is(tok::pound_sourceLocation)) {
+      ParserStatus Status = parseLineDirective(false);
+      BraceItemsStatus |= Status;
+      NeedParseErrorRecovery = Status.isError();
+    } else if (isStartOfDecl()) {
+      SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     [&](Decl *D) {TmpDecls.push_back(D);});
@@ -307,51 +337,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         }
       }
       Result = DeclResult.getPtrOrNull();
-
-      for (Decl *D : TmpDecls)
-        Entries.push_back(D);
-      TmpDecls.clear();
-    } else if (Tok.is(tok::pound_if)) {
-      auto IfConfigResult = parseIfConfig(
-        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-          parseBraceItems(Elements, Kind, IsActive
-                            ? BraceItemListKind::ActiveConditionalBlock
-                            : BraceItemListKind::InactiveConditionalBlock);
-        });
-      
-      if (IfConfigResult.isParseError()) {
-        NeedParseErrorRecovery = true;
-        continue;
-      }
-      
-      Result = IfConfigResult.get();
-      
-      if (!Result) {
-        NeedParseErrorRecovery = true;
-        continue;
-      }
-
-      // Add the #if block itself
-      Entries.push_back(Result);
-
-      IfConfigDecl *ICD = cast<IfConfigDecl>(Result.get<Decl*>());
-      for (auto &Entry : ICD->getActiveClauseElements()) {
-        if (Entry.is<Decl*>() && isa<IfConfigDecl>(Entry.get<Decl*>()))
-          // Don't hoist nested '#if'.
-          continue;
-        Entries.push_back(Entry);
-        if (Entry.is<Decl*>()) {
-          Entry.get<Decl*>()->setEscapedFromIfConfig(true);
-        }
-      }
-    } else if (Tok.is(tok::pound_line)) {
-      ParserStatus Status = parseLineDirective(true);
-      BraceItemsStatus |= Status;
-      NeedParseErrorRecovery = Status.isError();
-    } else if (Tok.is(tok::pound_sourceLocation)) {
-      ParserStatus Status = parseLineDirective(false);
-      BraceItemsStatus |= Status;
-      NeedParseErrorRecovery = Status.isError();
+      Entries.append(TmpDecls.begin(), TmpDecls.end());
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
