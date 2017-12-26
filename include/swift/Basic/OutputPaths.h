@@ -11,6 +11,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 
+#include <string>
 #include <vector>
 
 namespace swift {
