@@ -32,6 +32,8 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 /// module, and we'll just recognize them by what module they are in, just like
 /// how the swift stdlib is a well-known module for the compiler.
 static bool isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx) {
+  if (loc.getSourceLoc().isInvalid())
+    return false;
   auto str = Ctx.SourceMgr.getBufferIdentifierForLoc(loc.getSourceLoc());
   if (str.contains("Sources/TensorOps.swift") ||
       str.contains("Sources/Tensor.swift") ||
@@ -43,14 +45,13 @@ static bool isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx) {
   return false;
 }
 
-/// If the specified type is the well-known TensorCore<T> type, then return
+/// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.
-Type tf::isTensorCore(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>()) {
-    if (bgst->getDecl()->getNameStr() == "TensorCore") {
-      assert(bgst->getGenericArgs().size() == 1 && "Expected one generic arg");
-
-      return bgst->getGenericArgs()[0];
+Type tf::isTensorHandle(Type ty) {
+  if (auto bgct = ty->getAs<BoundGenericClassType>()) {
+    if (bgct->getDecl()->getNameStr() == "TensorHandle") {
+      assert(bgct->getGenericArgs().size() == 1 && "Expected one generic arg");
+      return bgct->getGenericArgs()[0];
     }
   }
   return Type();
@@ -179,7 +180,7 @@ bool TensorOpInfo::decode() {
       case OpCommand::Tensor: {
         auto op = getNextOperand();
         if (!op) return false;
-        if (!isTensorCore(op->getType().getSwiftRValueType())) {
+        if (!isTensorHandle(op->getType().getSwiftRValueType())) {
           diagInvalid("expected " +
                       llvm::utostr(nextOperand-2) + " to be a tensor");
           return false;
@@ -187,7 +188,7 @@ bool TensorOpInfo::decode() {
         break;
       }
       case OpCommand::AddDType:
-        // Could check that at least one input/result is a TensorCore.
+        // Could check that at least one input/result is a TensorHandle.
         break;
       case OpCommand::Constant: {
         // If this requires a constant value and doesn't have one (i.e., it's a

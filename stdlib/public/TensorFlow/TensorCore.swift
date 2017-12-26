@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TensorCore type and the primitive Tensor "op"
+// This file defines the TensorHandle type and the primitive Tensor "op"
 // functions, in a simple and predictable style that can be mapped onto
 // TensorFlow ops.
 //
@@ -18,13 +18,8 @@
 
 import Swift
 
-/// This type is the internal implementation goop that should only be used by
-/// Tensor.  It is the primitive thing that reflects the state managed by the
-/// tf-compiler partitioner.
-@_versioned
-struct TensorCore<Element : TensorElementProtocol> {
-  // FIXME: Replace the internals of this with a builtin type.
-  private var tmpState : UnsafePointer<Int>? = nil
+public class TensorHandle<T: TensorElementProtocol> {
+  // FIXME: Implement in terms of a TensorFlow TensorHandle, using the C API.
 }
 
 // For "print", REPL, and Playgrounds integeration, we'll eventually want to
@@ -32,14 +27,14 @@ struct TensorCore<Element : TensorElementProtocol> {
 // disabled.
 #if false
 /// Make "print(someTensor)" print a pretty form of the tensor.
-extension TensorCore : CustomStringConvertible {
+extension TensorHandle : CustomStringConvertible {
   public var description: String {
     fatalError("unimplemented")
   }
 }
 
 // Make Tensors show up nicely in the Xcode Playground results sidebar.
-extension TensorCore : CustomPlaygroundQuickLookable {
+extension TensorHandle : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
@@ -81,15 +76,15 @@ extension TensorCore : CustomPlaygroundQuickLookable {
 // on how to transform them into in the graph node.  Here are the codes that are
 // recognized so far:
 //
-//    t: the next operand is a TensorCore, and is an "input" to the TF node.
-//    d: the dtype attribute must be added, corresponding to the last TensorCore
+//    t: the next operand is a TensorHandle, and is an "input" to the TF node.
+//    d: the dtype attribute must be added, corresponding to the last tensor
 //       operand we saw, or the result type of the function if first.
 //    c: the next operand is a standard library integer or FP type.  We should
 //       pass the value(s) as the 'value' attribute.
 //
 // The tf-compiler expects that all operands passed to the op function will be
 // described by the codes above.  The node created will have results equal to
-// the results of the function, currently they must all be TensorCore results.
+// the results of the function, currently they must all be TensorHandle results.
 //
 // Here are some example encodings:
 //   1) 'Add' is @_silgen_name("__tfop_Add__tt__").
@@ -107,7 +102,7 @@ func opBody() -> Never {
 /// unanticipated copies back and forth.
 @_versioned @inline(never)
 @_silgen_name("__tfop_send") // Special name, not a TF op!
-func tfop_send<T>(_ c : TensorCore<T>) -> TensorCore<T> {
+func tfop_send<T>(_ c : TensorHandle<T>) -> TensorHandle<T> {
   return c
 }
 
@@ -117,32 +112,32 @@ func tfop_send<T>(_ c : TensorCore<T>) -> TensorCore<T> {
 /// unanticipated copies back and forth.
 @_versioned @inline(never)
 @_silgen_name("__tfop_receive") // Special name, not a TF op!
-func tfop_receive<T>(_ c : TensorCore<T>) -> TensorCore<T> {
+func tfop_receive<T>(_ c : TensorHandle<T>) -> TensorHandle<T> {
   return c
 }
 
 @_versioned @inline(never) @_silgen_name("_tfop_rank")
-func tfop_rank<T>(_ c : TensorCore<T>) -> Int { opBody() }
+func tfop_rank<T>(_ c : TensorHandle<T>) -> Int { opBody() }
 
 
 @_versioned @inline(never) @_silgen_name("_tfop_shape")
-func tfop_shape<T>(_ c : TensorCore<T>) -> [Int] { opBody() }
+func tfop_shape<T>(_ c : TensorHandle<T>) -> [Int] { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Const__dc__")
-func tfop_literal_0d<T>(_ value: T) -> TensorCore<T> { opBody() }
+func tfop_literal_0d<T>(_ value: T) -> TensorHandle<T> { opBody() }
 
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_literal_1d_")
-func tfop_literal_1d<T>(_ values: [T]) -> TensorCore<T> {
+func tfop_literal_1d<T>(_ values: [T]) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_literal_2d_")
-func tfop_literal_2d<T>(_ values: [[T]]) -> TensorCore<T> {
+func tfop_literal_2d<T>(_ values: [[T]]) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
@@ -150,14 +145,15 @@ func tfop_literal_2d<T>(_ values: [[T]]) -> TensorCore<T> {
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_init_zeros")
 func tfop_init_zeros<T>(_ dimensions: UnsafeBufferPointer<Int>)
-  -> TensorCore<T> {
+  -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_init_ones")
-func tfop_init_ones<T>(_ dimensions: UnsafeBufferPointer<Int>) -> TensorCore<T>{
+func tfop_init_ones<T>(_ dimensions: UnsafeBufferPointer<Int>)
+  -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
@@ -168,7 +164,7 @@ func tfop_init_ones<T>(_ dimensions: UnsafeBufferPointer<Int>) -> TensorCore<T>{
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_init_random_normal")
 func tfop_init_random_normal<T>(_ dimensions: [Int], _ mean: Double,
-                                _ stddev: Double) -> TensorCore<T> {
+                                _ stddev: Double) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
@@ -176,28 +172,29 @@ func tfop_init_random_normal<T>(_ dimensions: [Int], _ mean: Double,
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_init_eye")
-func tfop_init_eye<T>(_ dimensions: [Int]) -> TensorCore<T> {
+func tfop_init_eye<T>(_ dimensions: [Int]) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_subscript_tensor")
-func tfop_subscript_tensor<T>(_ c : TensorCore<T>,
-                              _ indices : [Int]) -> TensorCore<T> {
+func tfop_subscript_tensor<T>(_ c : TensorHandle<T>,
+                              _ indices : [Int]) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_subscript_scalar_")
-func tfop_subscript_scalar<T>(_ c : TensorCore<T>, _ indices : [Int]) -> T {
+func tfop_subscript_scalar<T>(_ c : TensorHandle<T>, _ indices : [Int]) -> T {
   fatalError("this should become an op")
 }
 
 // FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_slice")
-func tfop_slice<T>(_ c : TensorCore<T>, start: Int, end: Int) -> TensorCore<T> {
+func tfop_slice<T>(_ c : TensorHandle<T>, start: Int, end: Int)
+  -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
@@ -205,15 +202,15 @@ func tfop_slice<T>(_ c : TensorCore<T>, start: Int, end: Int) -> TensorCore<T> {
 /// new dimensions with rank = 1.
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_broadcast")
-func tfop_broadcast<T>(_ c : TensorCore<T>, _ rank: Int) -> TensorCore<T> {
+func tfop_broadcast<T>(_ c : TensorHandle<T>, _ rank: Int) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 /// Broadcast tensor A to the same shape as B
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_broadcast_to")
-func tfop_broadcast_to<T>(_ a : TensorCore<T>,
-                          _ b: TensorCore<T>) -> TensorCore<T> {
+func tfop_broadcast_to<T>(_ a : TensorHandle<T>,
+                          _ b: TensorHandle<T>) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
@@ -222,28 +219,28 @@ func tfop_broadcast_to<T>(_ a : TensorCore<T>,
 /// the specified other tensor, but with dimension=1 for each rank.
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_broadcast_scalar_")
-func tfop_broadcast_scalar<T>(_ value : T, _ rank: Int) -> TensorCore<T> {
+func tfop_broadcast_scalar<T>(_ value : T, _ rank: Int) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_transpose")
-func tfop_transpose<T>(_ value : TensorCore<T>) -> TensorCore<T> {
+func tfop_transpose<T>(_ value : TensorHandle<T>) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Tanh__t__")
-func tfop_tanh<T>(_ value : TensorCore<T>) -> TensorCore<T> { opBody() }
+func tfop_tanh<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Log__t__")
-func tfop_log<T>(_ value : TensorCore<T>) -> TensorCore<T> { opBody() }
+func tfop_log<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Exp__t__")
-func tfop_exp<T>(_ value : TensorCore<T>) -> TensorCore<T> { opBody() }
+func tfop_exp<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_sum_")
-func tfop_sum<T>(_ c : TensorCore<T>) -> T {
+func tfop_sum<T>(_ c : TensorHandle<T>) -> T {
   fatalError("this should become an op")
 }
 
@@ -251,21 +248,21 @@ func tfop_sum<T>(_ c : TensorCore<T>) -> T {
 // FIXME: The issue is that we can't reason about array parameters.
 // TODO: Push the indices array out of this.  Use UnsafeBufferPointer instead.
 @_versioned @inline(never) @_silgen_name("_tfop_sum_axis")
-func tfop_sum_axis<T>(_ c : TensorCore<T>, _ axis : [Int]) -> TensorCore<T> {
+func tfop_sum_axis<T>(_ c : TensorHandle<T>, _ axis : [Int]) -> TensorHandle<T>{
   fatalError("this should become an op")
 }
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
 // FIXME: The issue is that we can't reason about array parameters.
 @_versioned @inline(never) @_silgen_name("_tfop_max_axis")
-func tfop_max_axis<T>(_ c : TensorCore<T>, _ axis : [Int]) -> TensorCore<T> {
+func tfop_max_axis<T>(_ c : TensorHandle<T>, _ axis : [Int]) -> TensorHandle<T>{
   fatalError("this should become an op")
 }
 
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_mean_")
-func tfop_mean<T>(_ c : TensorCore<T>) -> T {
+func tfop_mean<T>(_ c : TensorHandle<T>) -> T {
   fatalError("this should become an op")
 }
 
@@ -273,7 +270,7 @@ func tfop_mean<T>(_ c : TensorCore<T>) -> T {
 /// TODO: Should this return a Tensor0D to keep it in the guaranteed tensor
 /// domain?
 @_versioned @inline(never) @_silgen_name("_tfop_max_")
-func tfop_max<T>(_ c : TensorCore<T>) -> T {
+func tfop_max<T>(_ c : TensorHandle<T>) -> T {
   fatalError("this should become an op")
 }
 
@@ -281,7 +278,7 @@ func tfop_max<T>(_ c : TensorCore<T>) -> T {
 /// TODO: Should this return a Tensor0D to keep it in the guaranteed tensor
 /// domain?
 @_versioned @inline(never) @_silgen_name("_tfop_argmax_")
-func tfop_argmax<T>(_ c : TensorCore<T>) -> Int64 {
+func tfop_argmax<T>(_ c : TensorHandle<T>) -> Int64 {
   fatalError("this should become an op")
 }
 
@@ -289,47 +286,47 @@ func tfop_argmax<T>(_ c : TensorCore<T>) -> Int64 {
 /// TODO: Should this return a Tensor0D to keep it in the guaranteed tensor
 /// domain?
 @_versioned @inline(never) @_silgen_name("_tfop_min_")
-func tfop_min<T>(_ c : TensorCore<T>) -> T {
+func tfop_min<T>(_ c : TensorHandle<T>) -> T {
   fatalError("this should become an op")
 }
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_elt_convert")
-func tfop_elt_convert<From, To>(_ c : TensorCore<From>) -> TensorCore<To> {
+func tfop_elt_convert<From, To>(_ c : TensorHandle<From>) -> TensorHandle<To> {
   fatalError("this should become an op")
 }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Add__tt__")
-func tfop_elt_add<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<T> { opBody() }
+func tfop_elt_add<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<T> { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Sub__tt__")
-func tfop_elt_subtract<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<T> { opBody() }
+func tfop_elt_subtract<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<T> { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Mul__tt__")
-func tfop_elt_multiply<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<T> { opBody() }
+func tfop_elt_multiply<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<T> { opBody() }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Div__tt__")
-func tfop_elt_divide<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<T> { opBody() }
+func tfop_elt_divide<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<T> { opBody() }
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_elt_matmul")
-func tfop_elt_matmul<T>(_ lhs : TensorCore<T>,
-                        _ rhs : TensorCore<T>) -> TensorCore<T> {
+func tfop_elt_matmul<T>(_ lhs : TensorHandle<T>,
+                        _ rhs : TensorHandle<T>) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
 @_versioned @inline(never) @_silgen_name("__tfop_Less__tt__")
-func tfop_elt_less<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<Bool> { opBody() }
+func tfop_elt_less<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<Bool> { opBody() }
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_concat")
-func tfop_concat<T>(_ lhs : TensorCore<T>, _ rhs : TensorCore<T>)
-  -> TensorCore<T> {
+func tfop_concat<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
+  -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 

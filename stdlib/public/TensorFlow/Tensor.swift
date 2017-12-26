@@ -33,11 +33,11 @@ public struct Tensor<Element : TensorElementProtocol> {
   // State owned by this tensor.
   @_versioned
   internal // FIXME: Should be fileprivate, but Swift doesn't allow that yet.
-  let core : TensorCore<Element>
+  let core : TensorHandle<Element>
 
   @_versioned
   @_inlineable
-  internal init(_ c : TensorCore<Element>) {
+  internal init(_ c : TensorHandle<Element>) {
     core = c
   }
 
@@ -346,7 +346,7 @@ public extension Tensor {
 }
 
 
-/// TODO: When TensorCore can produce a summary, we should wire this in.
+/// TODO: When TensorHandle can produce a summary, we should wire this in.
 #if false
 /// Make "print(someTensor)" print a pretty form of the tensor.
 extension Tensor : CustomStringConvertible {
