@@ -31,7 +31,7 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 /// FIXME: This is a hack: eventually, these routines will be in their own
 /// module, and we'll just recognize them by what module they are in, just like
 /// how the swift stdlib is a well-known module for the compiler.
-bool tf::isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx) {
+static bool isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx) {
   auto str = Ctx.SourceMgr.getBufferIdentifierForLoc(loc.getSourceLoc());
   if (str.contains("Sources/TensorOps.swift") ||
       str.contains("Sources/Tensor.swift") ||

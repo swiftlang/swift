@@ -21,6 +21,7 @@ import Swift
 /// This type is the internal implementation goop that should only be used by
 /// Tensor.  It is the primitive thing that reflects the state managed by the
 /// tf-compiler partitioner.
+@_versioned
 struct TensorCore<Element : TensorElementProtocol> {
   // FIXME: Replace the internals of this with a builtin type.
   private var tmpState : UnsafePointer<Int>? = nil
