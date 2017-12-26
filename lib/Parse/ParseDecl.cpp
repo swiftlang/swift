@@ -272,8 +272,10 @@ bool Parser::parseTopLevel() {
                             InPoundLineEnvironment);
 
   // If we are done parsing the whole file, finalize the token receiver.
-  if (Tok.is(tok::eof))
+  if (Tok.is(tok::eof)) {
+    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
     TokReceiver->finalize();
+  }
 
   return FoundTopLevelCodeToExecute;
 }
