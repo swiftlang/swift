@@ -232,6 +232,11 @@ protected:
     assert(isLogical() && "LogicalPathComponent Kind isn't logical");
   }
 
+  /// Materialize this component into a temporary and return the temporary's
+  /// address.
+  ManagedValue materializeIntoTemp(SILGenFunction &SGF, SILLocation loc,
+                                   ManagedValue base) &&;
+
 public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
