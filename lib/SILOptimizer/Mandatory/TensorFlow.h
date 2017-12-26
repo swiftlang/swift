@@ -22,10 +22,6 @@
 
 namespace swift {
 namespace tf {
-  /// Return true if the specified source location is inside of the tensor
-  /// library, which should be opaque to the user.
-  bool isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx);
-
   /// If the specified type is the well-known TensorCore<T> type, then return
   /// "T".  If not, return a null type.
   Type isTensorCore(Type ty);
