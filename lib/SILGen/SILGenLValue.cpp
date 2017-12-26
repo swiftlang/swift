@@ -2104,7 +2104,20 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
-  return SGF.emitRValueAsSingleValue(e, ctx);
+  ManagedValue mv = SGF.emitRValueAsSingleValue(e, ctx);
+  if (mv.isPlusZeroRValueOrTrivial())
+    return mv;
+
+  // Any temporaries needed to materialize the lvalue must be destroyed when
+  // at the end of the lvalue's formal evaluation scope.
+  // e.g. for foo(self.bar)
+  //   %self = load [copy] %ptr_self
+  //   %rvalue = barGetter(%self)
+  //   destroy_value %self // self must be released before calling foo.
+  //   foo(%rvalue)
+  SILValue value = mv.forward(SGF);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(CleanupLocation(e),
+                                                      value);
 }
 
 LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind,
