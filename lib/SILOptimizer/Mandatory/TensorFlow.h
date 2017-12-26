@@ -22,9 +22,9 @@
 
 namespace swift {
 namespace tf {
-  /// If the specified type is the well-known TensorCore<T> type, then return
+  /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
-  Type isTensorCore(Type ty);
+  Type isTensorHandle(Type ty);
 
   /// This is the interpretation of the operand passed into a SILInstruction for
   /// an op in the host program.

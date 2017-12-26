@@ -467,7 +467,7 @@ enum class Marking {
 class TFFunctionPartition {
 public:
   SILFunction &fn;
-  StructDecl *tensorCoreType;
+  ClassDecl *tensorHandleType;
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -526,10 +526,10 @@ public:
   /// extracted function.
   SmallVector<SILValue, 4> resultValues;
 public:
-  TFFunctionPartition(SILFunction &Fn, StructDecl *tensorCoreType,
+  TFFunctionPartition(SILFunction &Fn, ClassDecl *tensorHandleType,
                       SILPassManager *PM)
     : fn(Fn),
-      tensorCoreType(tensorCoreType),
+      tensorHandleType(tensorHandleType),
       DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
       tensorCodeBlocks(Fn) {
   }
@@ -735,20 +735,6 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
         auto user = operand->getUser();
         if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user))
           markInstruction(*user, Marking::Delete);
-
-        // Also handle retain(struct_extract(tensorcore)), which shouldn't
-        // come up, but it does.
-        // TODO: This will not happen when TensorCore is a builtin type, this
-        // code can be deleted then.
-        if (auto *SE = dyn_cast<StructExtractInst>(user)) {
-          if (SE->hasOneUse()) {
-            if (auto RCI = dyn_cast<RefCountingInst>(
-                                             SE->getSingleUse()->getUser())) {
-              markInstruction(*user, Marking::Delete);
-              markInstruction(*RCI, Marking::Delete);
-            }
-          }
-        }
       }
   }
 
@@ -832,9 +818,9 @@ void TFFunctionPartition::markArgument(SILArgument *arg) {
     return;
   }
 
-  // Otherwise, if this is a value of TensorCore type, then we move it to the
+  // Otherwise, if this is a value of TensorHandle type, then we move it to the
   // accelerator.  If it is also used on the host, it will be copied back.
-  if (isTensorCore(arg->getType().getSwiftRValueType())) {
+  if (isTensorHandle(arg->getType().getSwiftRValueType())) {
     // We cannot move over arguments, but they should never be in the dominated
     // region anyway.
     assert(!isa<SILFunctionArgument>(arg) &&
@@ -1101,13 +1087,13 @@ public:
 
   SILType remapType(SILType Ty) {
     // If this is a valid TensorFlow element type "T", like Builtin.Int32, turn
-    // it into a TensorCore<T> type.
+    // it into a TensorHandle<T> type.
     if (!isValidTensorFlowElementType(Ty.getSwiftRValueType()))
       return Ty;
 
     auto tensorType =
-      BoundGenericStructType::get(FP.tensorCoreType, /*parent*/Type(),
-                                  Ty.getSwiftRValueType());
+      BoundGenericClassType::get(FP.tensorHandleType, /*parent*/Type(),
+                                 Ty.getSwiftRValueType());
 
     return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
   }
@@ -1194,7 +1180,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 
   auto cond = getOpValue(inst->getCondition());
 
-  if (auto eltTy = isTensorCore(cond->getType().getSwiftRValueType())) {
+  if (auto eltTy = isTensorHandle(cond->getType().getSwiftRValueType())) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
     auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
@@ -1279,7 +1265,7 @@ void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
     operands.push_back(remapValue(op.get()));
 
   // The type of the new builtin is usually the same as the input type, but
-  // "remapped", which turns Float into TensorCore<Float>.
+  // "remapped", which turns Float into TensorHandle<Float>.
   auto resultType = inst->getType();
   if (isOverflowCheckingInst) {
     // In the input program, cverflow checking instructions return something
@@ -1572,21 +1558,6 @@ void PartitionCloner::finalizeOriginal() {
         instToRemove.push_back(user);
         continue;
       }
-      // Also handle retain(struct_extract(tensorcore)), which shouldn't
-      // come up, but it does.
-      // TODO: This will not happen when TensorCore is a builtin type, this
-      // code can be deleted then.
-      if (auto *SE = dyn_cast<StructExtractInst>(user)) {
-        if (SE->hasOneUse()) {
-          if (auto RCI = dyn_cast<RefCountingInst>(
-                                           SE->getSingleUse()->getUser())) {
-            instToRemove.push_back(RCI);
-            instToRemove.push_back(SE);
-            continue;
-          }
-        }
-      }
-
       needsCopy = true;
       break;
     }
@@ -1817,18 +1788,14 @@ SILFunction *TFFunctionPartition::run() {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-/// Find the TensorCore declaration so we can synthesize types.
-/// FIXME: This should go away if/when TensorCore becomes a builtin type, or
-/// when we have a formal TensorFlow Swift library.
-static StructDecl *findTensorCoreDecl(ModuleDecl *tensorFlowModule) {
-  // Get the module that the function we're partitioning lives in.
-
+/// Find the TensorHandle declaration so we can synthesize types.
+static ClassDecl *findTensorHandleDecl(ModuleDecl *tensorFlowModule) {
   SmallVector<ValueDecl *, 1> results;
-  auto name = tensorFlowModule->getASTContext().getIdentifier("TensorCore");
+  auto name = tensorFlowModule->getASTContext().getIdentifier("TensorHandle");
   tensorFlowModule->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
 
   for (auto result : results)
-    if (auto SD = dyn_cast<StructDecl>(result))
+    if (auto SD = dyn_cast<ClassDecl>(result))
       return SD;
   return nullptr;
 }
@@ -1848,17 +1815,17 @@ public:
     // anything.  This avoids impacting compile time for non-TensorFlow using
     // Swift programs by doing extraneous analysis.
     auto tfModule = Ctx.getLoadedModule(Ctx.getIdentifier("TensorFlow"));
+    if (!tfModule)
+      return;
 
     // Ignore non-public functions.
     if (fn->getLinkage() != SILLinkage::Public)
       return;
 
-    // Make sure that the TensorCore type is findable.
-    // TODO: TensorCore will eventually become a builtin type, and this will go
-    // away.
-    auto tensorCore = findTensorCoreDecl(tfModule);
-    if (!tensorCore) {
-      llvm::errs() << " *** DIDN'T FIND TensorCore<> TYPE\n";
+    // Make sure that the TensorHandle type is findable.
+    auto tensorHandle = findTensorHandleDecl(tfModule);
+    if (!tensorHandle) {
+      llvm::errs() << " *** DIDN'T FIND TensorHandle<> TYPE\n";
       return;
     }
 
@@ -1870,7 +1837,7 @@ public:
     // delete it.
 
     // Try to partition the specified function.
-    auto *partitionedFn = TFFunctionPartition(*fn, tensorCore, PM).run();
+    auto *partitionedFn = TFFunctionPartition(*fn, tensorHandle, PM).run();
     if (!partitionedFn) return;
 
     // If we got something, we can process the tensor program further.
@@ -1893,7 +1860,7 @@ public:
     if (isTest) {
       // Finally, we're done.  Remove the partitioned function so it doesn't go
       // through the normal compiler flow.
-      partitionedFn->getModule().eraseFunction(fn);
+      partitionedFn->getModule().eraseFunction(partitionedFn);
       return;
     }
 

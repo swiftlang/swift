@@ -15,13 +15,13 @@ public func testTensor() {
 }
 
 // CHECK: --- TFPartition Accelerator Result: _T04main10testTensoryyF
-// CHECK:  sil private @_T04main10testTensoryyF.tf_partition : $@callee_owned (TensorCore<Float>) -> TensorCore<Float> {
-// CHECK: bb0(%0 : $TensorCore<Float>):
-// CHECK:   %1 = builtin "__tfop_Add__tt__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float>
-// CHECK:   %2 = builtin "__tfop_Sub__tt__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
-// CHECK:   %3 = builtin "tensorflowSend_1"<TensorCore<Float>>(%2 : $TensorCore<Float>) : $()
-// CHECK:   %4 = builtin "tensorflowReceive_0"<TensorCore<Float>>() : $TensorCore<Float>
-// CHECK:   %5 = builtin "__tfop_Add__tt__"(%4 : $TensorCore<Float>, %4 : $TensorCore<Float>) : $TensorCore<Float>
-// CHECK:   return %5 : $TensorCore<Float>
+// CHECK:  sil private @_T04main10testTensoryyF.tf_partition : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK:   %1 = builtin "__tfop_Add__tt__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:   %2 = builtin "__tfop_Sub__tt__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:   %3 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%2 : $TensorHandle<Float>) : $()
+// CHECK:   %4 = builtin "tensorflowReceive_0"<TensorHandle<Float>>() : $TensorHandle<Float>
+// CHECK:   %5 = builtin "__tfop_Add__tt__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:   return %5 : $TensorHandle<Float>
 
 
