@@ -2089,6 +2089,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     return baseName;
   }
 
+  // TODO: Support compound name in libSyntax.
+
   // Try to parse a compound name.
   BacktrackingScope backtrack(*this);
 
@@ -2097,11 +2099,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
-    // The following code may backtrack; so we disable the syntax tree creation
-    // in this scope.
-    SyntaxParsingContext DisabledContext(SyntaxContext);
-    SyntaxContext->disable();
-
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {
       rparenLoc = consumeToken(tok::r_paren);
