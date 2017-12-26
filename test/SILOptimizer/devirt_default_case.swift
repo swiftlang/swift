@@ -40,7 +40,7 @@ private class Derived2 : Base2 {
 
 // Check that call to Base2.middle can be devirtualized
 //
-// CHECK-LABEL: sil @_T019devirt_default_case9callOuterS2iF
+// CHECK-LABEL: sil @_T019devirt_default_case9callOuteryS2iF
 // CHECK: function_ref @_T019devirt_default_case5Base233_{{.*}}5inner
 // CHECK: function_ref @_T019devirt_default_case8Derived233_{{.*}}6middle
 // CHECK-NOT: class_method
@@ -97,7 +97,7 @@ class C3 : A3 {}
 class D3: C3 {}
 class E3 :C3 {}
 
-// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_T019devirt_default_case3fooSiAA2A3CF
+// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_T019devirt_default_case3fooySiAA2A3CF
 
 public func testfoo1() -> Int {
   return foo(E2())
@@ -132,7 +132,7 @@ class Base4 {
 func foo(_ a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
-// CHECK-NORMAL: sil{{( shared)?}} [noinline] @_T019devirt_default_case3fooSiAA2A3CFTf4g_n
+// CHECK-NORMAL: sil{{( shared)?}} [noinline] @_T019devirt_default_case3fooySiAA2A3CFTf4g_n
 // CHECK-NORMAL: function_ref @_T019devirt_default_case2B3C1fSiyFTf4d_n
 // CHECK-NORMAL: function_ref @_T019devirt_default_case2A3C1fSiyFTf4d_n
 // CHECK-NORMAL-NOT: class_method
@@ -168,7 +168,7 @@ class D6 : C6 {
 func check_static_class_devirt(_ c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil shared [noinline] @_T019devirt_default_case019check_static_class_A0SiAA2C6CFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T019devirt_default_case019check_static_class_A0ySiAA2C6CFTf4g_n
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method

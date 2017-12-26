@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/Config.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
@@ -116,6 +117,10 @@ namespace swift {
     /// expression.
     bool CodeCompleteInitsInPostfixExpr = false;
 
+    /// Whether to use heuristics to decide whether to show call-pattern
+    /// completions.
+    bool CodeCompleteCallPatternHeuristics = false;
+
     ///
     /// Flags for use by tests
     ///
@@ -123,6 +128,10 @@ namespace swift {
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
+
+    /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
+    /// classes instead of the stable ABI's bit.
+    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
@@ -133,9 +142,6 @@ namespace swift {
     /// If true, <code>@testable import Foo</code> produces an error if \c Foo
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
-
-    /// Whether SE-0143: Conditional Conformances are enabled.
-    bool EnableConditionalConformances = false;
 
     ///
     /// Flags for developers

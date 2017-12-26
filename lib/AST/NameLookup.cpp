@@ -1365,11 +1365,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
 
-  if (getBaseName().getIdentifier().str().equals("NotificationCenter") &&
-      name.getBaseName().getKind() == DeclBaseName::Kind::Normal &&
-      name.getBaseName().getIdentifier().str().equals("addObserver"))
-    fprintf(stderr, "---NotificatiobCenter.addObserver\n");
-
   // FIXME: At present, lazy member loading conflicts with a bunch of other code
   // that appears to special-case initializers (clang-imported initializer
   // sorting, implicit initializer synthesis), so for the time being we have to

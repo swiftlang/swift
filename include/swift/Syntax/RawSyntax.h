@@ -126,27 +126,51 @@ public:
   }
 
   /// Add some number of newlines to the position, resetting the column.
-  void addNewlines(uint32_t NewLines) {
+  /// Size is byte size of newline char.
+  /// '\n' and '\r' are 1, '\r\n' is 2.
+  void addNewlines(uint32_t NewLines, uint32_t Size) {
     Line += NewLines;
     Column = 1;
-    Offset += NewLines;
+    Offset += NewLines * Size;
   }
-
+  
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
   void addText(StringRef Str) {
-    for (auto C : Str) {
-      addCharacter(C);
+    const char * C = Str.begin();
+    while (C != Str.end()) {
+      switch (*C++) {
+      case '\n':
+        addNewlines(1, 1);
+        break;
+      case '\r':
+        if (C != Str.end() && *C == '\n') {
+          addNewlines(1, 2);
+          ++C;
+        } else {
+          addNewlines(1, 1);
+        }
+        break;
+      default:
+        addColumns(1);
+        break;
+      }
     }
   }
 
   /// Use some character as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
+  /// Take care that consecutive call of this function with '\r' and '\n'
+  /// causes increase of 2 Line but desirable result may be 1 Line.
   void addCharacter(char C) {
-    if (C == '\n') {
-      addNewlines(1);
-    } else {
+    switch (C) {
+    case '\n':
+    case '\r':
+      addNewlines(1, 1);
+      break;
+    default:
       addColumns(1);
+      break;
     }
   }
 

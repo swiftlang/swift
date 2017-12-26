@@ -203,8 +203,8 @@ class Foo {
   // x86_64-macosx:      call void @llvm.lifetime.start
   // x86_64-macosx:      store i32 {{.*}}
   // x86_64-macosx:      store i32 {{.*}}
-  // x86_64-macosx:      getelementptr inbounds { i64 }, { i64 }
-  // x86_64-macosx:      load i64, i64* %12, align 8
+  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds { i64 }, { i64 }
+  // x86_64-macosx:      load i64, i64* [[T0]], align 8
   // x86_64-macosx:      bitcast
   // x86_64-macosx:      call void @llvm.lifetime.end
   // x86_64-macosx:      ret i64
@@ -253,14 +253,14 @@ class Foo {
   //
   // armv7-ios-fixme:     define hidden i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1, %T8abitypes3FooC*) {{.*}} {
   // armv7-ios-fixme:     define internal signext i8 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, i8 signext) unnamed_addr {{.*}} {
-  // armv7-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_T010ObjectiveC22_convertObjCBoolToBoolSbAA0cD0V1x_tF
+  // armv7-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_T010ObjectiveC22_convertObjCBoolToBool1xSbAA0cD0V_tF
   // armv7-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1 [[R1]]
   // armv7-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_T010ObjectiveC22_convertBoolToObjCBoolAA0eF0VSb1x_tF(i1 [[R2]]
   // armv7-ios-fixme:     ret i8 [[R3]]
   //
   // armv7s-ios-fixme:     define hidden i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1, %T8abitypes3FooC*) {{.*}} {
   // armv7s-ios-fixme:     define internal signext i8 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, i8 signext) unnamed_addr {{.*}} {
-  // armv7s-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_T010ObjectiveC22_convertObjCBoolToBoolSbAA0cD0V1x_tF
+  // armv7s-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_T010ObjectiveC22_convertObjCBoolToBool1xSbAA0cD0V_tF
   // armv7s-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1 [[R1]]
   // armv7s-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_T010ObjectiveC22_convertBoolToObjCBoolAA0eF0VSb1x_tF(i1 [[R2]]
   // armv7s-ios-fixme:     ret i8 [[R3]]
@@ -291,9 +291,9 @@ class Foo {
 
   // i386-watchos:  define hidden swiftcc i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1, %T8abitypes3FooC* swiftself)
   // i386-watchos:  define hidden zeroext i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}FTo
-  // i386-watchos:  [[R1:%[0-9]+]] = call swiftcc i1 @_T010ObjectiveC22_convertObjCBoolToBoolSbAA0cD0VF(i1 %2)
+  // i386-watchos:  [[R1:%[0-9]+]] = call swiftcc i1 @_T010ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF(i1 %2)
   // i386-watchos:  [[R2:%[0-9]+]] = call swiftcc i1 @_T08abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F(i1 [[R1]]
-  // i386-watchos:  [[R3:%[0-9]+]] = call swiftcc i1 @_T010ObjectiveC22_convertBoolToObjCBoolAA0eF0VSbF(i1 [[R2]])
+  // i386-watchos:  [[R3:%[0-9]+]] = call swiftcc i1 @_T010ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF(i1 [[R2]])
   // i386-watchos:  ret i1 [[R3]]
 
   dynamic func negate(_ b: Bool) -> Bool {
@@ -417,19 +417,19 @@ class Foo {
     return g.negate(b)
   }
 
-  // x86_64-macosx: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // x86_64-macosx: define hidden swiftcc i1 @_T08abitypes3FooC7negate3yS2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
   // x86_64-macosx: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // x86_64-macosx: ret i1 [[NEG]]
   // x86_64-macosx: }
 
-  // x86_64-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // x86_64-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3yS2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
   // x86_64-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // x86_64-ios: ret i1 [[NEG]]
   // x86_64-ios: }
 
-  // i386-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // i386-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3yS2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 4
   // i386-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // i386-ios: ret i1 [[NEG]]
@@ -440,17 +440,17 @@ class Foo {
     return g.invert(b)
   }
 
-  // x86_64-macosx: define hidden swiftcc void @_T08abitypes3FooC10throwsTestySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
+  // x86_64-macosx: define hidden swiftcc void @_T08abitypes3FooC10throwsTestyySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
   // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-macosx: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // x86_64-macosx: }
 
-  // x86_64-ios: define hidden swiftcc void @_T08abitypes3FooC10throwsTestySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
+  // x86_64-ios: define hidden swiftcc void @_T08abitypes3FooC10throwsTestyySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-ios: call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // x86_64-ios: }
 
-  // i386-ios: define hidden swiftcc void @_T08abitypes3FooC10throwsTestySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error**) {{.*}} {
+  // i386-ios: define hidden swiftcc void @_T08abitypes3FooC10throwsTestyySbKF(i1, %T8abitypes3FooC* swiftself, %swift.error**) {{.*}} {
   // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 4
   // i386-ios: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // i386-ios: }
@@ -529,7 +529,7 @@ class Foo {
 // armv7k-watchos: define internal %struct.One @makeOne(float %f, float %s)
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.
-// x86_64-macosx: define{{( protected)?}} swiftcc float @_T08abitypes13testInlineAggSfSC6MyRectVF(i64, i64) {{.*}} {
+// x86_64-macosx: define{{( protected)?}} swiftcc float @_T08abitypes13testInlineAggySfSC6MyRectVF(i64, i64) {{.*}} {
 // x86_64-macosx: [[COERCED:%.*]] = alloca %TSC6MyRectV, align 8
 // x86_64-macosx: store i64 %
 // x86_64-macosx: store i64 %

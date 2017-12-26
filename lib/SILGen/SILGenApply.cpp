@@ -357,7 +357,7 @@ public:
   static Callee forClassMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionList subs,
                                SILLocation l) {
-    auto base = SGF.SGM.Types.getOverriddenVTableEntry(c);
+    auto base = c.getOverriddenVTableEntry();
     auto &baseCI = SGF.getConstantInfo(base);
     auto &derivedCI = SGF.getConstantInfo(c);
     return Callee(Kind::ClassMethod, SGF, c,
@@ -563,7 +563,7 @@ public:
       ManagedValue castValue = borrowedCastToOriginalSelfType(
         SGF, Loc, *borrowedSelf);
 
-      auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
+      auto base = constant->getOverriddenVTableEntry();
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
 
@@ -642,7 +642,7 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::SuperMethod: {
-      auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
+      auto base = constant->getOverriddenVTableEntry();
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());

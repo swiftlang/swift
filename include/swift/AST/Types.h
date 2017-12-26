@@ -289,12 +289,13 @@ protected:
   );
 
   enum { NumAFTExtInfoBits = 7 };
-  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+10,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfo : NumAFTExtInfoBits,
 
-    NumParams : 10
+    : NumPadBits,
+    NumParams : 16
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
@@ -380,13 +381,14 @@ protected:
     SWIFT_INLINE_BITS(ProtocolCompositionType);
     SWIFT_INLINE_BITS(TupleType);
     SWIFT_INLINE_BITS(BoundGenericType);
-  };
+  } Bits;
 
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr), OpaqueBits(0) {
-    TypeBaseBits.Kind = static_cast<unsigned>(kind);
+    : CanonicalType((TypeBase*)nullptr) {
+    Bits.OpaqueBits = 0;
+    Bits.TypeBase.Kind = static_cast<unsigned>(kind);
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
@@ -394,13 +396,13 @@ protected:
   }
 
   void setRecursiveProperties(RecursiveTypeProperties properties) {
-    TypeBaseBits.Properties = properties.getBits();
-    assert(TypeBaseBits.Properties == properties.getBits() && "Bits dropped!");
+    Bits.TypeBase.Properties = properties.getBits();
+    assert(Bits.TypeBase.Properties == properties.getBits() && "Bits dropped!");
   }
 
 public:
   /// getKind - Return what kind of type this is.
-  TypeKind getKind() const { return static_cast<TypeKind>(TypeBaseBits.Kind); }
+  TypeKind getKind() const { return static_cast<TypeKind>(Bits.TypeBase.Kind); }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
@@ -408,10 +410,20 @@ public:
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
   bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
-  
+
+private:
+  void computeCanonicalType();
+
+public:
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  CanType getCanonicalType();
+  CanType getCanonicalType() {
+    if (isCanonical())
+      return CanType(this);
+    if (!hasCanonicalTypeComputed())
+      computeCanonicalType();
+    return CanType(CanonicalType.get<TypeBase*>());
+  }
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
@@ -464,7 +476,7 @@ public:
   /// getRecursiveProperties - Returns the properties defined on the
   /// structure of this type.
   RecursiveTypeProperties getRecursiveProperties() const {
-    return RecursiveTypeProperties(TypeBaseBits.Properties);
+    return RecursiveTypeProperties(Bits.TypeBase.Properties);
   }
 
   /// hasReferenceSemantics() - Do objects of this type have reference
@@ -1026,7 +1038,7 @@ public:
 /// is produced when parsing types and when name binding type aliases, and is
 /// installed in declaration that use these erroneous types.  All uses of a
 /// declaration of invalid type should be ignored and not re-diagnosed.
-class ErrorType : public TypeBase {
+class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType,
@@ -1034,10 +1046,10 @@ class ErrorType : public TypeBase {
       : TypeBase(TypeKind::Error, &C, properties) {
     assert(properties.hasError());
     if (originalType) {
-      ErrorTypeBits.HasOriginalType = true;
+      Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
     } else {
-      ErrorTypeBits.HasOriginalType = false;
+      Bits.ErrorType.HasOriginalType = false;
     }
   }
 
@@ -1051,7 +1063,7 @@ public:
   /// Retrieve the original type that this error type replaces, or none if
   /// there is no such type.
   Type getOriginalType() const {
-    if (ErrorTypeBits.HasOriginalType)
+    if (Bits.ErrorType.HasOriginalType)
       return *reinterpret_cast<const Type *>(this + 1);
 
     return Type();
@@ -1505,7 +1517,7 @@ public:
 
   /// Get the parameter flags
   ParameterTypeFlags getParameterFlags() const {
-    return ParameterTypeFlags::fromRaw(ParenTypeBits.Flags);
+    return ParameterTypeFlags::fromRaw(Bits.ParenType.Flags);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -1594,7 +1606,7 @@ public:
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
-  unsigned getNumElements() const { return TupleTypeBits.Count; }
+  unsigned getNumElements() const { return Bits.TupleType.Count; }
 
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
@@ -1630,7 +1642,7 @@ public:
   
   /// Returns true if this tuple has inout elements.
   bool hasInOutElement() const {
-    return static_cast<bool>(TupleTypeBits.HasInOutElement);
+    return static_cast<bool>(Bits.TupleType.HasInOutElement);
   }
   
   // Implement isa/cast/dyncast/etc.
@@ -1649,8 +1661,8 @@ private:
             RecursiveTypeProperties properties,
             bool hasInOut)
      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     TupleTypeBits.HasInOutElement = hasInOut;
-     TupleTypeBits.Count = elements.size();
+     Bits.TupleType.HasInOutElement = hasInOut;
+     Bits.TupleType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
   }
@@ -1754,7 +1766,7 @@ public:
 
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const {
-    return {getTrailingObjectsPointer(), BoundGenericTypeBits.GenericArgCount};
+    return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -2051,7 +2063,7 @@ public:
   ///
   /// Only SIL metatype types have a representation.
   bool hasRepresentation() const {
-    return AnyMetatypeTypeBits.Representation > 0;
+    return Bits.AnyMetatypeType.Representation > 0;
   }
   
   /// Retrieve the metatype representation.
@@ -2060,10 +2072,10 @@ public:
   /// metatypes can be lowered away to empty types in IR, unless a
   /// metatype value is required at an abstraction level.
   MetatypeRepresentation getRepresentation() const {
-    assert(AnyMetatypeTypeBits.Representation &&
+    assert(Bits.AnyMetatypeType.Representation &&
            "metatype has no representation");
     return static_cast<MetatypeRepresentation>(
-             AnyMetatypeTypeBits.Representation - 1);
+             Bits.AnyMetatypeType.Representation - 1);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -2583,11 +2595,11 @@ protected:
                   Type Input, Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, const ExtInfo &Info)
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
-    AnyFunctionTypeBits.ExtInfo = Info.Bits;
-    AnyFunctionTypeBits.NumParams = NumParams;
-    assert(AnyFunctionTypeBits.NumParams == NumParams && "Params dropped!");
+    Bits.AnyFunctionType.ExtInfo = Info.Bits;
+    Bits.AnyFunctionType.NumParams = NumParams;
+    assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
-    assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
+    assert(Bits.AnyFunctionType.ExtInfo == Info.Bits && "Bits were dropped!");
     static_assert(ExtInfo::NumMaskBits == NumAFTExtInfoBits,
                  "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
   }
@@ -2611,12 +2623,12 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
-  unsigned getNumParams() const { return AnyFunctionTypeBits.NumParams; }
+  unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
   
   ExtInfo getExtInfo() const {
-    return ExtInfo(AnyFunctionTypeBits.ExtInfo);
+    return ExtInfo(Bits.AnyFunctionType.ExtInfo);
   }
 
   /// \brief Get the representation of the function type.
@@ -2965,9 +2977,9 @@ enum class ParameterConvention {
   /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
 };
-// Check that the enum values fit inside SILFunctionTypeBits.
+// Check that the enum values fit inside Bits.SILFunctionType.
 static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
-              "fits in SILFunctionTypeBits and SILParameterInfo");
+              "fits in Bits.SILFunctionType and SILParameterInfo");
 
 // Does this parameter convention require indirect storage? This reflects a
 // SILFunctionType's formal (immutable) conventions, as opposed to the transient
@@ -3543,7 +3555,7 @@ public:
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
   ParameterConvention getCalleeConvention() const {
-    return ParameterConvention(SILFunctionTypeBits.CalleeConvention);
+    return ParameterConvention(Bits.SILFunctionType.CalleeConvention);
   }
   bool isCalleeConsumed() const {
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
@@ -3560,7 +3572,7 @@ public:
     return getCoroutineKind() != SILCoroutineKind::None;
   }
   SILCoroutineKind getCoroutineKind() const {
-    return SILCoroutineKind(SILFunctionTypeBits.CoroutineKind);
+    return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
   /// Return the array of all the yields.
@@ -3662,7 +3674,7 @@ public:
 
   /// Does this function have a blessed Swift-native error result?
   bool hasErrorResult() const {
-    return SILFunctionTypeBits.HasErrorResult;
+    return Bits.SILFunctionType.HasErrorResult;
   }
   SILResultInfo getErrorResult() const {
     return const_cast<SILFunctionType*>(this)->getMutableErrorResult();
@@ -3718,7 +3730,7 @@ public:
     return WitnessMethodConformance;
   }
 
-  ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
+  ExtInfo getExtInfo() const { return ExtInfo(Bits.SILFunctionType.ExtInfo); }
 
   /// \brief Returns the language-level calling convention of the function.
   Language getLanguage() const {
@@ -3841,7 +3853,7 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              SILBoxTypeBits.NumGenericArgs);
+                              Bits.SILBoxType.NumGenericArgs);
   }
   
   // In SILType.h:
@@ -4135,7 +4147,7 @@ public:
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
   ArrayRef<Type> getMembers() const {
-    return {getTrailingObjects<Type>(), ProtocolCompositionTypeBits.Count};
+    return {getTrailingObjects<Type>(), Bits.ProtocolCompositionType.Count};
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -4152,7 +4164,7 @@ public:
 
   /// True if the class requirement is stated directly via '& AnyObject'.
   bool hasExplicitAnyObject() {
-    return ProtocolCompositionTypeBits.HasExplicitAnyObject;
+    return Bits.ProtocolCompositionType.HasExplicitAnyObject;
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4169,8 +4181,8 @@ private:
                           bool hasExplicitAnyObject,
                           RecursiveTypeProperties properties)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
-    ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
-    ProtocolCompositionTypeBits.Count = members.size();
+    Bits.ProtocolCompositionType.HasExplicitAnyObject = hasExplicitAnyObject;
+    Bits.ProtocolCompositionType.Count = members.size();
     std::uninitialized_copy(members.begin(), members.end(),
                             getTrailingObjects<Type>());
   }
@@ -4283,15 +4295,15 @@ class ArchetypeType final : public SubstitutableType,
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
-    return ArchetypeTypeBits.NumProtocols;
+    return Bits.ArchetypeType.NumProtocols;
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return ArchetypeTypeBits.HasSuperclass ? 1 : 0;
+    return Bits.ArchetypeType.HasSuperclass ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<LayoutConstraint>) const {
-    return ArchetypeTypeBits.HasLayoutConstraint ? 1 : 0;
+    return Bits.ArchetypeType.HasLayoutConstraint ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<UUID>) const {
@@ -4383,7 +4395,7 @@ public:
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const {
     return { getTrailingObjects<ProtocolDecl *>(),
-             ArchetypeTypeBits.NumProtocols };
+             Bits.ArchetypeType.NumProtocols };
   }
   
   /// requiresClass - True if the type can only be substituted with class types.
@@ -4393,14 +4405,14 @@ public:
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const {
-    if (!ArchetypeTypeBits.HasSuperclass) return Type();
+    if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
     return *getTrailingObjects<Type>();
   }
 
   /// \brief Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
-    if (!ArchetypeTypeBits.HasLayoutConstraint) return LayoutConstraint();
+    if (!Bits.ArchetypeType.HasLayoutConstraint) return LayoutConstraint();
 
     return *getTrailingObjects<LayoutConstraint>();
   }
@@ -4769,7 +4781,7 @@ class TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
-    TypeVariableTypeBits.ID = ID;
+    Bits.TypeVariableType.ID = ID;
   }
 
   class Implementation;
@@ -4805,7 +4817,7 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
-  unsigned getID() const { return TypeVariableTypeBits.ID; }
+  unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -5092,6 +5104,17 @@ inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<BoundGenericClassType>(this))
     return ty->getTrailingObjects<Type>();
   llvm_unreachable("Unhandled BoundGenericType!");
+}
+
+inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getParams();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
 }
   
 /// \brief If this is a method in a type or extension thereof, compute

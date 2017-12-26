@@ -612,6 +612,13 @@ public protocol Sequence {
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
 }
 
+// Provides a default associated type witness for Iterator when the
+// Self type is both a Sequence and an Iterator.
+extension Sequence where Self: IteratorProtocol {
+  // @_implements(Sequence, Iterator)
+  public typealias _Default_Iterator = Self
+}
+
 /// A default makeIterator() function for `IteratorProtocol` instances that
 /// are declared to conform to `Sequence`
 extension Sequence where Self.Iterator == Self {
@@ -621,7 +628,6 @@ extension Sequence where Self.Iterator == Self {
     return self
   }
 }
-
 
 /// A sequence that lazily consumes and drops `n` elements from an underlying
 /// `Base` iterator before possibly returning the first available element.

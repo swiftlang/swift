@@ -5,7 +5,7 @@
 // Check that pre-specialization works at -Onone.
 // This test requires the standard library to be compiled with pre-specializations!
 
-// CHECK-LABEL: sil [noinline] @_T013prespecialize4testySaySiGz_Si4sizetF 
+// CHECK-LABEL: sil [noinline] @_T013prespecialize4test_4sizeySaySiGz_SitF
 //
 // function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
 // CHECK: function_ref @_T0s10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyFs14CountableRangeVySiG_Tg5
@@ -14,7 +14,7 @@
 // CHECK: function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyFs14CountableRangeVySiG_Tg5
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref {{@_T0SaxSicigSi_Tg5|@_TTSg5Si___TFSaap9subscriptFSix}}
+// CHECK: function_ref @_T0s14CountableRangeV15uncheckedBoundsAByxGx5lower_x5uppert_tcfCSi_Tg5
 // CHECK: return
 @inline(never)
 public func test(_ a: inout [Int], size: Int) {
@@ -27,7 +27,7 @@ public func test(_ a: inout [Int], size: Int) {
 
 // CHECK-LABEL: sil [noinline] @_T013prespecialize3runyyF
 // Look for generic specialization <Swift.Int> of Swift.Array.init (repeating : A, count : Swift.Int) -> Swift.Array<A>
-// CHECK: function_ref @_T0S2ayxGx9repeating_Si5counttcfCSi_Tg5
+// CHECK: function_ref @_T0Sa9repeating5countSayxGx_SitcfCSi_Tg5
 // CHECK: return
 @inline(never)
 public func run() {

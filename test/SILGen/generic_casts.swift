@@ -30,7 +30,7 @@ func opaque_archetype_is_opaque_archetype
   // CHECK: [[CONT]]([[I1:%.*]] : @trivial $Builtin.Int1):
   // -- apply the _getBool library fn
   // CHECK-NEXT:  function_ref Swift._getBool
-  // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @_T0s8_getBoolSbBi1_F :
+  // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @_T0s8_getBoolySbBi1_F :
   // CHECK-NEXT:  [[RES:%.*]] = apply [[GETBOOL]]([[I1]])
   // -- we don't consume the checked value
   // CHECK:   return [[RES]] : $Bool
@@ -216,7 +216,7 @@ func class_existential_is_class(_ p: ClassBound) -> Bool {
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil hidden @_T013generic_casts27optional_anyobject_to_classAA1CCSgyXlSgF 
+// CHECK-LABEL: sil hidden @_T013generic_casts27optional_anyobject_to_classyAA1CCSgyXlSgF
 // CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
 func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
   return p as? C

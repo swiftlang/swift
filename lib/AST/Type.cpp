@@ -1045,17 +1045,9 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-/// getCanonicalType - Return the canonical version of this type, which has
-/// sugar from all levels stripped off.
-CanType TypeBase::getCanonicalType() {
-  // If the type is itself canonical, return it.
-  if (isCanonical())
-    return CanType(this);
-  // If the canonical type was already computed, just return what we have.
-  if (TypeBase *CT = CanonicalType.get<TypeBase*>())
-    return CanType(CT);
+void TypeBase::computeCanonicalType() {
+  assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
-  // Otherwise, compute and cache it.
   TypeBase *Result = nullptr;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
@@ -1227,12 +1219,10 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   }
-    
-  
+
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
-  return CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
@@ -1315,7 +1305,7 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
     UnderlyingType(flags.isInOut()
                      ? InOutType::get(baseType)
                      : baseType) {
-  ParenTypeBits.Flags = flags.toRaw();
+  Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
   if (baseType->is<InOutType>())
@@ -2006,6 +1996,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
              nullptr };
   }
 
+  // Give special dispensation to builtin types for testing purposes.
+  if (type->is<BuiltinType>())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   auto nominal = type->getAnyNominal();
   if (!nominal) return failure();
 
@@ -2384,7 +2378,7 @@ bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     if (getTrailingObjects<TupleTypeElt>()[i].getName() == I)
       return i;
   }
@@ -2397,10 +2391,10 @@ int TupleType::getNamedElementId(Identifier I) const {
 /// scalar, return the field number that the scalar is assigned to.  If not,
 /// return -1.
 int TupleType::getElementForScalarInit() const {
-  if (TupleTypeBits.Count == 0) return -1;
+  if (Bits.TupleType.Count == 0) return -1;
   
   int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
@@ -2424,7 +2418,7 @@ int TupleType::getElementForScalarInit() const {
 /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
 /// Otherwise, this returns Type().
 Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
       return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
   }
@@ -2451,10 +2445,10 @@ ArchetypeType::ArchetypeType(
   }
 
   // Set up the bits we need for trailing objects to work.
-  ArchetypeTypeBits.ExpandedNestedTypes = false;
-  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
-  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
-  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+  Bits.ArchetypeType.ExpandedNestedTypes = false;
+  Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
+  Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
+  Bits.ArchetypeType.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
@@ -2479,10 +2473,10 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
                         RecursiveTypeProperties::HasOpenedExistential)),
     ParentOrOpenedOrEnvironment(Existential.getPointer()) {
   // Set up the bits we need for trailing objects to work.
-  ArchetypeTypeBits.ExpandedNestedTypes = false;
-  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
-  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
-  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+  Bits.ArchetypeType.ExpandedNestedTypes = false;
+  Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
+  Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
+  Bits.ArchetypeType.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
@@ -2546,7 +2540,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (ArchetypeTypeBits.HasSuperclass)
+  if (Bits.ArchetypeType.HasSuperclass)
     return true;
   if (auto layout = getLayoutConstraint())
     if (layout->isClass())
@@ -2582,7 +2576,7 @@ namespace {
 } // end anonymous namespace
 
 void ArchetypeType::populateNestedTypes() const {
-  if (ArchetypeTypeBits.ExpandedNestedTypes) return;
+  if (Bits.ArchetypeType.ExpandedNestedTypes) return;
 
   // Collect the set of nested types of this archetype.
   SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
@@ -2657,10 +2651,10 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 void ArchetypeType::setNestedTypes(
                                  ASTContext &Ctx,
                                  ArrayRef<std::pair<Identifier, Type>> Nested) {
-  assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
+  assert(!Bits.ArchetypeType.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
   std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
-  ArchetypeTypeBits.ExpandedNestedTypes = true;
+  Bits.ArchetypeType.ExpandedNestedTypes = true;
 }
 
 void ArchetypeType::registerNestedType(Identifier name, Type nested) {
@@ -4104,7 +4098,7 @@ SILBoxType::SILBoxType(ASTContext &C,
                        SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
            getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
-  SILBoxTypeBits.NumGenericArgs = Args.size();
+  Bits.SILBoxType.NumGenericArgs = Args.size();
 #ifndef NDEBUG
   // Check that the generic args are reasonable for the box's signature.
   if (Layout->getGenericSignature())

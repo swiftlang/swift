@@ -15,7 +15,7 @@ import gizmo
     // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
-    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxGSo5NSSetCSgFZ
+    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxGSo5NSSetCSgFZ
     // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
     // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
@@ -71,7 +71,7 @@ import gizmo
   // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
-  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxGSo5NSSetCSgFZ
+  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxGSo5NSSetCSgFZ
   // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
   // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])

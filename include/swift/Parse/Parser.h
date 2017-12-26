@@ -710,11 +710,6 @@ public:
   /// Options that control the parsing of declarations.
   typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
 
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
-
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
@@ -849,6 +844,8 @@ public:
                 TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
   };
+
+  void parseAccessorAttributes(DeclAttributes &Attributes);
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
@@ -1293,6 +1290,10 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
+  ParserStatus
+  parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
+                            Diag<> DefaultID, StmtKind ParentKind,
+                            StringRef &BindingKindStr);
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();

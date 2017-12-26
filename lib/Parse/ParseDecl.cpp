@@ -196,8 +196,6 @@ bool Parser::parseTopLevel() {
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
 
-  skipExtraTopLevelRBraces();
-
   // If we are in SIL mode, and if the first token is the start of a sil
   // declaration, parse that one SIL function and return to the top level.  This
   // allows type declarations and other things to be parsed, name bound, and
@@ -279,19 +277,6 @@ bool Parser::parseTopLevel() {
 
   return FoundTopLevelCodeToExecute;
 }
-
-bool Parser::skipExtraTopLevelRBraces() {
-  if (!Tok.is(tok::r_brace))
-    return false;
-  while (Tok.is(tok::r_brace)) {
-    diagnose(Tok, diag::extra_rbrace)
-        .fixItRemove(Tok.getLoc());
-    consumeToken();
-  }
-  return true;
-}
-
-
 
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
@@ -1618,6 +1603,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     
     // Recover by eating @foo(...) when foo is not known.
     consumeToken();
+    SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
     if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
       ParserPosition LParenPosition = getParserPosition();
       skipSingle();
@@ -1633,6 +1620,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
+  
+  // Accumulate attribute argument '( ... )' as a token list.
+  SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
 
   bool isAutoclosureEscaping = false;
   SourceRange autoclosureEscapingParenRange;
@@ -1916,9 +1906,11 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
     SpecifierLoc = consumeToken();
   }
 
+  SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   while (Tok.is(tok::at_sign)) {
     if (Attributes.AtLoc.isInvalid())
       Attributes.AtLoc = Tok.getLoc();
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     consumeToken();
     if (parseTypeAttribute(Attributes))
       return true;
@@ -2316,6 +2308,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
       consumeToken(tok::kw_class);
       // Otherwise this is the start of a class declaration.
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       break;
     }
@@ -2426,6 +2419,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
       break;
     case tok::kw_let:
     case tok::kw_var: {
+      // Collect all modifiers into a modifier list.
+      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
+      DeclParsingContext.setCreateSyntax(SyntaxKind::VariableDecl);
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
                                 StaticSpelling, tryLoc);
@@ -3583,6 +3579,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   // If the SpecifierLoc is invalid, then the caller just wants us to synthesize
   // the default, not actually try to parse something.
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
+    SyntaxParsingContext ParamCtx(P.SyntaxContext, SyntaxKind::AccessorParameter);
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
@@ -3747,6 +3744,23 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
              getAccessorNameForDiagnostic(accessorKind, addressorKind));
 }
 
+void Parser::parseAccessorAttributes(DeclAttributes &Attributes) {
+  bool FoundCCToken;
+  parseDeclAttributeList(Attributes, FoundCCToken);
+  SyntaxParsingContext ModifierCtx(SyntaxContext, SyntaxKind::DeclModifier);
+  // Parse the contextual keywords for 'mutating' and 'nonmutating' before
+  // get and set.
+  if (Tok.isContextualKeyword("mutating")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
+  } else if (Tok.isContextualKeyword("nonmutating")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+  } else if (Tok.isContextualKeyword("__consuming")) {
+    parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
+  } else {
+    ModifierCtx.setTransparent();
+  }
+}
+
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
@@ -3757,29 +3771,21 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
-
   // Properties in protocols use sufficiently limited syntax that we have a
   // special parsing loop for them.  SIL mode uses the same syntax.
   if (Flags.contains(PD_InProtocol) || isInSILMode()) {
+    if (Tok.is(tok::r_brace)) {
+      // Give syntax node an empty statement list.
+      SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+    }
     while (Tok.isNot(tok::r_brace)) {
       if (Tok.is(tok::eof))
         return true;
 
+      SyntaxParsingContext AccessorCtx(SyntaxContext, SyntaxKind::AccessorDecl);
       // Parse any leading attributes.
       DeclAttributes Attributes;
-      bool FoundCCToken;
-      parseDeclAttributeList(Attributes, FoundCCToken);
-
-      // Parse the contextual keywords for 'mutating' and 'nonmutating' before
-      // get and set.
-      if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
-      } else if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
-      } else if (Tok.isContextualKeyword("__consuming")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
-      }
-
+      parseAccessorAttributes(Attributes);
       AccessorKind Kind;
       AddressorKind addressorKind = AddressorKind::NotAddressor;
       FuncDecl **TheDeclPtr;
@@ -3801,6 +3807,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         Kind = AccessorKind::IsMutableAddressor;
         TheDeclPtr = &accessors.MutableAddressor;
       } else {
+        AccessorCtx.setTransparent();
         AccessorKeywordLoc = SourceLoc();
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
@@ -3845,13 +3852,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     return false;
   }
 
-
   // Otherwise, we have a normal var or subscript declaration, parse the full
   // complement of specifiers, along with their bodies.
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
+    // Give syntax node an empty statement list.
+    SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
     diagnose(Tok, diag::computed_property_no_accessors);
     return true;
   }
@@ -3860,7 +3868,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof))
       return true;
-
+    SyntaxParsingContext AccessorCtx(SyntaxContext, SyntaxKind::AccessorDecl);
     // If there are any attributes, we are going to parse them.  Because these
     // attributes might not be appertaining to the accessor, but to the first
     // declaration inside the implicit getter, we need to save the parser
@@ -3871,19 +3879,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
-    bool FoundCCToken;
-    parseDeclAttributeList(Attributes, FoundCCToken);
-
-    // Parse the contextual keywords for 'mutating' and 'nonmutating' before
-    // get and set.
-    if (Tok.isContextualKeyword("mutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
-    } else if (Tok.isContextualKeyword("nonmutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
-    } else if (Tok.isContextualKeyword("__consuming")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
-    }
-    
+    parseAccessorAttributes(Attributes);
     bool isImplicitGet = false;
     AccessorKind Kind;
     AddressorKind addressorKind = AddressorKind::NotAddressor;
@@ -3958,6 +3954,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, *this, Kind);
 
+    SyntaxParsingContext BlockCtx(SyntaxContext, SyntaxKind::CodeBlock);
+    if (AccessorKeywordLoc.isInvalid()) {
+      // If the keyword is absent, we shouldn't make these sub-nodes.
+      BlockCtx.setTransparent();
+      AccessorCtx.setTransparent();
+    }
+
     SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
     // FIXME: Use outer '{' loc if isImplicitGet.
     bool ExternalAsmName = false;
@@ -4030,12 +4033,15 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
                          TypeLoc ElementTy, ParsedAccessors &accessors,
                          SourceLoc StaticLoc,
                          SmallVectorImpl<Decl *> &Decls) {
+  SyntaxParsingContext AccessorsCtx(SyntaxContext, SyntaxKind::AccessorBlock);
   accessors.LBLoc = consumeToken(tok::l_brace);
   SourceLoc LastValidLoc = accessors.LBLoc;
   bool Invalid = parseGetSetImpl(Flags, GenericParams, Indices, ElementTy,
                                  accessors, LastValidLoc, StaticLoc,
                                  accessors.LBLoc, Decls);
 
+  // Collect all explicit accessors to a list.
+  AccessorsCtx.collectNodesInPlace(SyntaxKind::AccessorList);
   // Parse the final '}'.
   if (Invalid)
     skipUntil(tok::r_brace);
@@ -4517,8 +4523,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // Always return the result for PBD.
     return makeParserResult(Status, PBD);
   };
-  
+  SyntaxParsingContext PBListCtx(SyntaxContext, SyntaxKind::PatternBindingList);
+  bool HasNext;
   do {
+    SyntaxParsingContext PatternBindingCtx(SyntaxContext,
+                                           SyntaxKind::PatternBinding);
     Pattern *pattern;
     {
       // In our recursive parse, remember that we're in a var/let pattern.
@@ -4549,6 +4558,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     
     // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitCtx(SyntaxContext, SyntaxKind::InitializerClause);
       // If we're not in a local context, we'll need a context to parse initializers
       // into (should we have one).  This happens for properties and global
       // variables in libraries.
@@ -4739,8 +4749,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
         }
       }
     }
-  } while (consumeIf(tok::comma));
-  
+     HasNext = consumeIf(tok::comma);
+  } while (HasNext);
+
   if (HasAccessors && PBDEntries.size() > 1) {
     diagnose(VarLoc, diag::disallowed_var_multiple_getset);
     Status.setIsParseError();
@@ -5480,6 +5491,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   CD->setGenericParams(GenericParams);
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;

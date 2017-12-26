@@ -28,7 +28,52 @@ def make_missing_child(child):
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
+        if child.node_choices:
+            return make_missing_child(child.node_choices[0])
         return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
+
+
+def check_child_condition(child):
+    """
+    Generates a C++ closure to check whether a given syntax node S can satisfy
+    the requirements of child.
+    """
+    result = '[](const Syntax &S) {\n'
+    result += '  // check %s\n' % child.name
+    if child.token_choices:
+        # Check token kind choices are met.
+        result += 'if (auto Tok = S.getAs<TokenSyntax>()) {\n'
+        result += '  auto Kind = Tok->getTokenKind();\n'
+        tok_checks = []
+        for choice in child.token_choices:
+            tok_checks.append("Kind == tok::%s" % choice.kind)
+        all_checks = ' || '.join(tok_checks)
+        result += '  return %s;\n' % all_checks
+        result += '}\n'
+        result += 'return false;\n'
+    elif child.text_choices:
+        # Check token text choices are met.
+        result += 'if (auto Tok = S.getAs<TokenSyntax>()) {\n'
+        result += '  auto Text = Tok->getText();\n'
+        tok_checks = []
+        for choice in child.text_choices:
+            tok_checks.append("Text == \"%s\"" % choice)
+        all_checks = ' || '.join(tok_checks)
+        result += '  return %s;\n' % all_checks
+        result += '}\n'
+        result += 'return false;\n'
+    elif child.node_choices:
+        # Recursively, check one of the node choices' conditions are met.
+        node_checks = []
+        for choice in child.node_choices:
+            node_checks.append(check_child_condition(choice) + '(S)')
+        all_checks = ' || '.join(node_checks)
+        result += 'return %s;\n' % all_checks
+    else:
+        # For remaining children, simply check the syntax kind.
+        result += 'return S.getAs<%s>().hasValue();\n' % child.type_name
+    result += '}'
+    return result
 
 
 def make_missing_swift_child(child):

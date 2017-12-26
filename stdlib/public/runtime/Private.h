@@ -193,6 +193,8 @@ namespace swift {
 #endif
   }
 
+  void *allocateMetadata(size_t size, size_t align);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

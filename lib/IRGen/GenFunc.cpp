@@ -813,7 +813,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
       auto stackAddr = outResultTI.allocateStack(
-          subIGF, outConv.getSILResultType(), false, "return.temp");
+          subIGF, outConv.getSILResultType(), "return.temp");
       resultValueAddr = stackAddr.getAddress();
       auto resultAddr = subIGF.Builder.CreateBitCast(
           resultValueAddr,
@@ -1097,7 +1097,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
-        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, false, "arg.temp");
+        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
         auto addressPointer = stackAddr.getAddress().getAddress();
         fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
                                    fieldTy, false);

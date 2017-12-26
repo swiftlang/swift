@@ -15,7 +15,7 @@ protocol Clonable {
 // Partial apply of methods returning Self-derived types
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden @_T022partial_apply_protocol12testClonableyAA0E0_p1c_tF : $@convention(thin) (@in Clonable) -> ()
+// CHECK-LABEL: sil hidden @_T022partial_apply_protocol12testClonable1cyAA0E0_p_tF : $@convention(thin) (@in Clonable) -> ()
 func testClonable(c: Clonable) {
   // CHECK: [[THUNK_FN:%.*]] = function_ref @_T0xIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}})
@@ -97,7 +97,7 @@ func testClonable(c: Clonable) {
 // Make sure the thunk only has the context generic parameters if needed!
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden @_T022partial_apply_protocol28testClonableInGenericContextyAA0E0_p1c_x1ttlF : $@convention(thin) <T> (@in Clonable, @in T) -> ()
+// CHECK-LABEL: sil hidden @_T022partial_apply_protocol28testClonableInGenericContext1c1tyAA0E0_p_xtlF : $@convention(thin) <T> (@in Clonable, @in T) -> ()
 func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK_FN:%.*]] = function_ref @_T0xIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}})

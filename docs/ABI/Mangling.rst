@@ -175,9 +175,13 @@ Entities
   static ::= 'Z'
   curry-thunk ::= 'Tc'
 
+  label-list ::= empty-list            // represents complete absence of parameter labels
+  label-list ::= ('_' | identifier)*   // '_' is inserted as placeholder for empty label,
+                                       // since the number of labels should match the number of parameters
+
   // The leading type is the function type
-  entity-spec ::= type file-discriminator? 'fC'      // allocating constructor
-  entity-spec ::= type file-discriminator? 'fc'      // non-allocating constructor
+  entity-spec ::= label-list type file-discriminator? 'fC'      // allocating constructor
+  entity-spec ::= label-list type file-discriminator? 'fc'      // non-allocating constructor
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
@@ -189,11 +193,11 @@ Entities
   entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
-  entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
-  entity-spec ::= type file-discriminator? 'i' ACCESSOR                  // subscript
-  entity-spec ::= decl-name type 'v' ACCESSOR                            // variable
-  entity-spec ::= decl-name type 'fp'                // generic type parameter
-  entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
+  entity-spec ::= decl-name label-list function-signature generic-signature? 'F'    // function
+  entity-spec ::= label-list type file-discriminator? 'i' ACCESSOR                  // subscript
+  entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
+  entity-spec ::= decl-name type 'fp'                                               // generic type parameter
+  entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -351,7 +355,8 @@ Types
   function-signature ::= params-type params-type throws? // results and parameters
 
   params-type := type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
-                                             // with optional inout convention, shared convention
+                                             // with optional inout convention, shared convention. parameters don't have labels,
+                                             // they are mangled separately as part of the entity.
   params-type := empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types

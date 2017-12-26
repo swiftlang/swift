@@ -363,7 +363,7 @@ func improve(_ x: inout Int) {}
 func improveWizard(_ wizard: inout Wizard) {
   improve(&wizard.hocus)
 }
-// CHECK-LABEL: sil hidden @_T017materializeForSet13improveWizardyAA0E0VzF
+// CHECK-LABEL: sil hidden @_T017materializeForSet13improveWizardyyAA0E0VzF
 // CHECK:       [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Wizard
 // CHECK-NEXT:  [[TEMP:%.*]] = alloc_stack $Int
 //   Call the getter and materialize the result in the temporary.
@@ -375,7 +375,7 @@ func improveWizard(_ wizard: inout Wizard) {
 // CHECK-NEXT:  dealloc_stack [[WTEMP]]
 // CHECK-NEXT:  store [[T0]] to [trivial] [[TEMP]]
 //   Call improve.
-// CHECK:       [[IMPROVE:%.*]] = function_ref @_T017materializeForSet7improveySizF :
+// CHECK:       [[IMPROVE:%.*]] = function_ref @_T017materializeForSet7improveyySizF :
 // CHECK-NEXT:  apply [[IMPROVE]]([[TEMP]])
 // CHECK-NEXT:  [[T0:%.*]] = load [trivial] [[TEMP]]
 // CHECK:       [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivs
@@ -433,26 +433,26 @@ struct GenericSubscriptWitness : GenericSubscriptProtocol {
   subscript<T>(_: T) -> T { get { } set { } }
 }
 
-// CHECK-LABEL: sil private [transparent] @_T017materializeForSet23GenericSubscriptWitnessVxxcluimytfU_ : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () {
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet23GenericSubscriptWitnessVyxxcluimytfU_ : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () {
 // CHECK:       bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenericSubscriptWitness, %3 : $@thick GenericSubscriptWitness.Type):
 // CHECK:         [[BUFFER:%.*]] = project_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[INDICES:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
-// CHECK:         [[SETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluis : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
+// CHECK:         [[SETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVyxxcluis : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
 // CHECK-NEXT:    apply [[SETTER]]<T>([[INDICES]], [[BUFFER]], %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
 // CHECK-NEXT:    dealloc_value_buffer $*T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]] : $()
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet23GenericSubscriptWitnessVxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet23GenericSubscriptWitnessVyxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:      bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*T, %3 : $*GenericSubscriptWitness):
 // CHECK-NEXT:   [[BUFFER:%.*]] = alloc_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:   copy_addr %2 to [initialization] [[BUFFER]] : $*T
 // CHECK-NEXT:   [[VALUE:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
 // CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %3 : $*GenericSubscriptWitness
-// CHECK:        [[GETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluig : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
+// CHECK:        [[GETTER:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVyxxcluig : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
 // CHECK-NEXT:   apply [[GETTER]]<T>([[VALUE]], %2, [[SELF]]) : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
 // CHECK-NEXT:   [[VALUE_PTR:%.*]] = address_to_pointer [[VALUE]] : $*T to $Builtin.RawPointer
-// CHECK:        [[CALLBACK:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVxxcluimytfU_
+// CHECK:        [[CALLBACK:%.*]] = function_ref @_T017materializeForSet23GenericSubscriptWitnessVyxxcluimytfU_
 // CHECK-NEXT:   [[CALLBACK_PTR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () to $Builtin.RawPointer
 // CHECK-NEXT:   [[CALLBACK_OPTIONAL:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_PTR]] : $Builtin.RawPointer
 // CHECK-NEXT:   [[RESULT:%.*]] = tuple ([[VALUE_PTR]] : $Builtin.RawPointer, [[CALLBACK_OPTIONAL]] : $Optional<Builtin.RawPointer>)
@@ -480,11 +480,11 @@ struct InferredRequirementOnSubscript : InferredRequirementOnSubscriptProtocol {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluig : $@convention(method) <T where T : Magic> (Int, InferredRequirementOnSubscript) -> GenericTypeWithRequirement<T>
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVyAA015GenericTypeWithE0VyxGSicAA5MagicRzluig : $@convention(method) <T where T : Magic> (Int, InferredRequirementOnSubscript) -> GenericTypeWithRequirement<T>
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluis : $@convention(method) <T where T : Magic> (GenericTypeWithRequirement<T>, Int, @inout InferredRequirementOnSubscript) -> ()
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptVyAA015GenericTypeWithE0VyxGSicAA5MagicRzluis : $@convention(method) <T where T : Magic> (GenericTypeWithRequirement<T>, Int, @inout InferredRequirementOnSubscript) -> ()
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet30InferredRequirementOnSubscriptVAA015GenericTypeWithE0VyxGSicAA5MagicRzluim : $@convention(method) <T where T : Magic> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @inout InferredRequirementOnSubscript) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet30InferredRequirementOnSubscriptVyAA015GenericTypeWithE0VyxGSicAA5MagicRzluim : $@convention(method) <T where T : Magic> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @inout InferredRequirementOnSubscript) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 
 // Test for materializeForSet vs static properties of structs.
 
@@ -566,7 +566,7 @@ extension Panda {
 
 struct TuxedoPanda : Panda { }
 
-// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
   // FIXME: Useless re-abstractions
 
@@ -574,15 +574,15 @@ struct TuxedoPanda : Panda { }
 
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIegyd_A2CIegir_TR : $@convention(thin) (@in TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xyxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK: }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmTW
 
 // Call the getter:
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xyxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0
 
 // Result of calling the getter is re-abstracted to the maximally substituted type
 // by SILGenFunction::emitApply():
@@ -597,7 +597,7 @@ struct TuxedoPanda : Panda { }
 
 // The callback:
 
-  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+  // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xyxxcvmytfU_TW : $@convention(witness_method: Panda) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
 // CHECK: }
 
@@ -608,7 +608,7 @@ struct LazyStructProperty {
   lazy var cat: Int = 5
 }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet31inoutAccessOfLazyStructPropertyyAA0ghI0Vz1l_tF
+// CHECK-LABEL: sil hidden @_T017materializeForSet31inoutAccessOfLazyStructProperty1lyAA0ghI0Vz_tF
 // CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSivg
 // CHECK:   function_ref @_T017materializeForSet18LazyStructPropertyV3catSivs
 func inoutAccessOfLazyStructProperty(l: inout LazyStructProperty) {
@@ -623,7 +623,7 @@ class LazyClassProperty {
   lazy var cat: Int = 5
 }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet30inoutAccessOfLazyClassPropertyyAA0ghI0Cz1l_tF
+// CHECK-LABEL: sil hidden @_T017materializeForSet30inoutAccessOfLazyClassProperty1lyAA0ghI0Cz_tF
 // CHECK:    class_method {{.*}} : $LazyClassProperty, #LazyClassProperty.cat!materializeForSet.1
 func inoutAccessOfLazyClassProperty(l: inout LazyClassProperty) {
   increment(&l.cat)
@@ -635,7 +635,7 @@ final class LazyFinalClassProperty {
   lazy var cat: Int = 5
 }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet35inoutAccessOfLazyFinalClassPropertyyAA0ghiJ0Cz1l_tF
+// CHECK-LABEL: sil hidden @_T017materializeForSet35inoutAccessOfLazyFinalClassProperty1lyAA0ghiJ0Cz_tF
 // CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSivg
 // CHECK:    function_ref @_T017materializeForSet22LazyFinalClassPropertyC3catSivs
 func inoutAccessOfLazyFinalClassProperty(l: inout LazyFinalClassProperty) {

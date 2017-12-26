@@ -58,7 +58,7 @@
 // CHECK:   %swift.opaque* null,
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_T017objc_class_export3FooC6createACyFZ,
-// CHECK:   void (double, double, double, double, [[FOO]]*)* @_T017objc_class_export3FooC10drawInRectySC6NSRectV5dirty_tF
+// CHECK:   void (double, double, double, double, [[FOO]]*)* @_T017objc_class_export3FooC10drawInRect5dirtyySC6NSRectV_tF
 // CHECK: }>, section "__DATA,__objc_data, regular"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
@@ -82,9 +82,9 @@ struct BigStructWithNativeObjects {
 
   @objc func drawInRect(dirty dirty: NSRect) {
   }
-  // CHECK: define internal void @_T017objc_class_export3FooC10drawInRectySC6NSRectV5dirty_tFTo([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T017objc_class_export3FooC10drawInRect5dirtyySC6NSRectV_tFTo([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
-  // CHECK:   call swiftcc void @_T017objc_class_export3FooC10drawInRectySC6NSRectV5dirty_tF(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
+  // CHECK:   call swiftcc void @_T017objc_class_export3FooC10drawInRect5dirtyySC6NSRectV_tF(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
 
   @objc func bounds() -> NSRect {
@@ -98,19 +98,19 @@ struct BigStructWithNativeObjects {
   @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
-  // CHECK: define internal void @_T017objc_class_export3FooC20convertRectToBackingSC6NSRectVAF1r_tFTo([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T017objc_class_export3FooC20convertRectToBacking1rSC6NSRectVAG_tFTo([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
-  // CHECK:   call swiftcc { double, double, double, double } @_T017objc_class_export3FooC20convertRectToBackingSC6NSRectVAF1r_tF(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
+  // CHECK:   call swiftcc { double, double, double, double } @_T017objc_class_export3FooC20convertRectToBacking1rSC6NSRectVAG_tF(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
 
   func doStuffToSwiftSlice(f f: [Int]) {
   }
   // This function is not representable in Objective-C, so don't emit the objc entry point.
-  // CHECK-NOT: @_T017objc_class_export3FooC19doStuffToSwiftSliceySaySiG1f_tcAAFTo
+  // CHECK-NOT: @_T017objc_class_export3FooC19doStuffToSwiftSlice1fySaySiG_tcAAFTo
 
   func doStuffToBigSwiftStruct(f f: BigStructWithNativeObjects) {
   }
   // This function is not representable in Objective-C, so don't emit the objc entry point.
-  // CHECK-NOT: @_TToFC17objc_class_export3Foo23doStuffToBigSwiftStructfS_FT1fV17objc_class_export27BigStructWithNativeObjects_T_
+  // CHECK-NOT: @_TToFC17objc_class_export3Foo23doStuffToBigSwiftStruct1ffS_FTV17objc_class_export27BigStructWithNativeObjects_T_
 
   init() { }
 }

@@ -31,6 +31,9 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+namespace OptRemark {
+class Emitter;
+}
 
 /// A pair representing results of devirtualization.
 ///  - The first element is the value representing the result of the
@@ -62,17 +65,22 @@ void getAllSubclasses(ClassHierarchyAnalysis *CHA,
                       ClassHierarchyAnalysis::ClassList &Subs);
 
 DevirtualizationResult tryDevirtualizeApply(ApplySite AI,
-                                            ClassHierarchyAnalysis *CHA);
+                                            ClassHierarchyAnalysis *CHA,
+                                            OptRemark::Emitter *ORE = nullptr);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
-bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
+bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
+                                OptRemark::Emitter *ORE = nullptr);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
                                   MethodInst *MI);
 DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
-                                               SILValue ClassInstance);
+                                               SILValue ClassInstance,
+                                               OptRemark::Emitter *ORE);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
-                                                  SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI);
+                                                  SILValue ClassInstance,
+                                                  OptRemark::Emitter *ORE);
+DevirtualizationResult
+tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
 }
 
 #endif

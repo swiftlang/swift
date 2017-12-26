@@ -443,39 +443,47 @@ irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.
-DynamicAlloca irgen::emitDynamicAlloca(IRGenFunction &IGF, SILType T,
-                                       bool isInEntryBlock) {
+StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
+                                              const llvm::Twine &name) {
+  llvm::Value *size = emitLoadOfSize(*this, T);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), name);
+}
+
+StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
+                                              llvm::Value *arraySize,
+                                              Alignment align,
+                                              const llvm::Twine &name) {
   llvm::Value *stackRestorePoint = nullptr;
 
   // Save the stack pointer if we are not in the entry block (we could be
   // executed more than once).
+  bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
     auto *stackSaveFn = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::ID::stacksave);
+        &IGM.Module, llvm::Intrinsic::ID::stacksave);
 
-    stackRestorePoint =  IGF.Builder.CreateCall(stackSaveFn, {}, "spsave");
+    stackRestorePoint =  Builder.CreateCall(stackSaveFn, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
-  llvm::Value *size = emitLoadOfSize(IGF, T);
-  auto *alloca = IGF.Builder.CreateAlloca(IGF.IGM.Int8Ty, size, "alloca");
-  alloca->setAlignment(16);
+  auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
+  alloca->setAlignment(align.getValue());
+
   assert(!isInEntryBlock ||
-         IGF.getActiveDominancePoint().isUniversal() &&
+         getActiveDominancePoint().isUniversal() &&
              "Must be in entry block if we insert dynamic alloca's without "
              "stackrestores");
-  return {alloca, stackRestorePoint};
+  return {Address(alloca, align), stackRestorePoint};
 }
 
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
-void irgen::emitDeallocateDynamicAlloca(IRGenFunction &IGF,
-                                        StackAddress address) {
+void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   if (!address.needsSPRestore())
     return;
   auto *stackRestoreFn = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ID::stackrestore);
-  IGF.Builder.CreateCall(stackRestoreFn, address.getSavedSP());
+      &IGM.Module, llvm::Intrinsic::ID::stackrestore);
+  Builder.CreateCall(stackRestoreFn, address.getSavedSP());
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.

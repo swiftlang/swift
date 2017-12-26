@@ -13,21 +13,21 @@ func test1() {
 // CHECK: call swiftcc i1 @_T018metadata_dominance4condSbyF()
   if cond() {
 // CHECK: [[T0:%.*]] = call %swift.type* @_T0yycMa()
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     use_metadata(voidToVoid)
 // CHECK: call swiftcc i1 @_T018metadata_dominance4condSbyF()
 // CHECK-NOT: @_T0yycMa
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
 // CHECK-NOT: @_T0yycMa
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
       use_metadata(voidToVoid)
     }
   }
 // CHECK: [[T1:%.*]] = call %swift.type* @_T0yycMa()
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T1]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T1]])
   use_metadata(voidToVoid)
 }
 
@@ -37,17 +37,17 @@ func test2() {
   if cond() {
 // CHECK: call swiftcc i1 @_T018metadata_dominance4condSbyF()
 // CHECK: [[T0:%.*]] = call %swift.type* @_T0yycMa()
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
 // CHECK: [[T1:%.*]] = call %swift.type* @_T0yycMa()
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T1]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T1]])
       use_metadata(voidToVoid)
     }
   }
 // CHECK: [[T2:%.*]] = call %swift.type* @_T0yycMa()
-// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yxlF(%swift.opaque* {{.*}}, %swift.type* [[T2]])
+// CHECK: call swiftcc void @_T018metadata_dominance04use_A0yyxlF(%swift.opaque* {{.*}}, %swift.type* [[T2]])
   use_metadata(voidToVoid)
 }
 

@@ -21,7 +21,7 @@ class C<T> : P {
   }
 }
 
-// CHECK-LABEL: sil hidden [thunk] [always_inline] @_T023specialize_dynamic_self8usesCIntyAA1CCySiG1c_tF : $@convention(thin) (@owned C<Int>) -> () {
+// CHECK-LABEL: sil hidden [thunk] [always_inline] @_T023specialize_dynamic_self8usesCInt1cyAA1CCySiG_tF : $@convention(thin) (@owned C<Int>) -> () {
 // CHECK: function_ref @_T023specialize_dynamic_self1CC11returnsSelfACyxGXDyFSi_Tg5 : $@convention(method) (@guaranteed C<Int>) -> @owned C<Int>
 // CHECK: return
 func usesCInt(c: C<Int>) {

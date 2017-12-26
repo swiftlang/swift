@@ -120,7 +120,7 @@ SILValue SILGenFunction::emitClassMethodRef(SILLocation loc,
 
   // Not every override gets a dispatch thunk; find the least derived one
   // that does.
-  auto base = SGM.M.Types.getOverriddenVTableEntry(constant);
+  auto base = constant.getOverriddenVTableEntry();
 
   if (shouldUseDispatchThunk(base, &F, SGM.M)) {
     auto *thunkFn = SGM.getDispatchThunk(base, NotForDefinition);

@@ -62,7 +62,7 @@ enum InternalEither {
   case Right(ReferenceFast)
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience25functionWithResilientEnum010resilient_A06MediumOAEF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
 public func functionWithResilientEnum(_ m: Medium) -> Medium {
 
 // CHECK:      [[METADATA:%.*]] = call %swift.type* @_T014resilient_enum6MediumOMa()
@@ -78,7 +78,7 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
   return m
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience33functionWithIndirectResilientEnum010resilient_A00E8ApproachOAEF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
 public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> IndirectApproach {
 
 // CHECK:      [[METADATA:%.*]] = call %swift.type* @_T014resilient_enum16IndirectApproachOMa()
@@ -110,7 +110,7 @@ public func constructResilientEnumNoPayload() -> Medium {
   return Medium.Paper
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience29constructResilientEnumPayload010resilient_A06MediumO0G7_struct4SizeVF
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience29constructResilientEnumPayloady010resilient_A06MediumO0G7_struct4SizeVF
 public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK:      [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
@@ -141,7 +141,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
   return Medium.Postcard(s)
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T015enum_resilience19resilientSwitchTestSi0c1_A06MediumOF(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T015enum_resilience19resilientSwitchTestySi0c1_A06MediumOF(%swift.opaque* noalias nocapture)
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_T014resilient_enum6MediumOMa()
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
@@ -201,11 +201,11 @@ public func resilientSwitchTest(_ m: Medium) -> Int {
 
 public func reabstraction<T>(_ f: (Medium) -> T) {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience25resilientEnumPartialApplyySi0c1_A06MediumOcF(i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOcF(i8*, %swift.refcounted*)
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
-// CHECK:     call swiftcc void @_T015enum_resilience13reabstractionyx010resilient_A06MediumOclF(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @_T014resilient_enum6MediumOSiIgid_ACSiIgir_TRTA to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_T0SiN)
+// CHECK:     call swiftcc void @_T015enum_resilience13reabstractionyyx010resilient_A06MediumOclF(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @_T014resilient_enum6MediumOSiIgid_ACSiIgir_TRTA to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_T0SiN)
   reabstraction(f)
 
 // CHECK:     ret void
@@ -262,3 +262,4 @@ extension ResilientMultiPayloadGenericEnum {
 }
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
+// CHECK: call void @swift_initEnumMetadataMultiPayload(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 2, i8*** {{.*}})

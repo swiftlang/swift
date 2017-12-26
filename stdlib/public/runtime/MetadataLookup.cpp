@@ -262,7 +262,7 @@ _classByName(const llvm::StringRef typeName) {
 /// internal func _getTypeByName(_ name: UnsafePointer<UInt8>,
 ///                              _ nameLength: UInt)  -> Any.Type?
 #define _getTypeByName \
-  MANGLE_SYM(s14_getTypeByNameypXpSgSPys5UInt8VG_SutF)
+  MANGLE_SYM(s14_getTypeByNameyypXpSgSPys5UInt8VG_SutF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *
 _getTypeByName(const char *typeName, size_t typeNameLength) {

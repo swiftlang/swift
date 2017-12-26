@@ -24,7 +24,7 @@ func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
   markUsed(container.lazyVar)
 }
 
-// CHECK-LABEL: sil hidden @_T010multi_file25finalVarsAreDevirtualizedyAA18FinalPropertyClassCF
+// CHECK-LABEL: sil hidden @_T010multi_file25finalVarsAreDevirtualizedyyAA18FinalPropertyClassCF
 func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
   // CHECK: bb0([[ARG:%.*]] : @owned $FinalPropertyClass):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -37,7 +37,7 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
 }
 
 // rdar://18448869
-// CHECK-LABEL: sil hidden @_T010multi_file34finalVarsDontNeedMaterializeForSetyAA27ObservingPropertyFinalClassCF
+// CHECK-LABEL: sil hidden @_T010multi_file34finalVarsDontNeedMaterializeForSetyyAA27ObservingPropertyFinalClassCF
 func finalVarsDontNeedMaterializeForSet(_ obj: ObservingPropertyFinalClass) {
   obj.foo += 1
   // CHECK: function_ref @_T010multi_file27ObservingPropertyFinalClassC3fooSivg

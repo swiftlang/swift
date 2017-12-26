@@ -6,7 +6,7 @@
 
 // REQUIRES: CODEGENERATOR=ARM
 
-// CHECK: define hidden swiftcc %swift.type* [[GENERIC_TYPEOF:@_T017generic_metatypes0A6TypeofxmxlF]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
+// CHECK: define hidden swiftcc %swift.type* [[GENERIC_TYPEOF:@_T017generic_metatypes0A6TypeofyxmxlF]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]], i1 false)
   // CHECK: ret %swift.type* [[METATYPE]]
@@ -58,13 +58,13 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
 struct Zim : Bas {}
 class Zang : Bas {}
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes15metatypeErasureAA3Bas_pXpAA3ZimVmF() #0
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes15metatypeErasureyAA3Bas_pXpAA3ZimVmF() #0
 func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
   // CHECK: ret { %swift.type*, i8** } {{.*}} @_T017generic_metatypes3ZimVMf, {{.*}} @_T017generic_metatypes3ZimVAA3BasAAWP
   return z
 }
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes15metatypeErasureAA3Bas_pXpAA4ZangCmF(%swift.type*) #0
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF(%swift.type*) #0
 func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
   // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_T017generic_metatypes4ZangCAA3BasAAWP, i32 0, i32 0), 1

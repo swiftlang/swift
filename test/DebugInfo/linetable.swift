@@ -29,7 +29,7 @@ func main(_ x: Int64) -> Void
 // ASM-CHECK: .loc [[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc [[FILEID]] [[@LINE+1]] 5
-// CHECK-LABEL: define {{.*}} @_T09linetable4mainys5Int64VFyycfU_Tf2in_n({{.*}})
+// CHECK-LABEL: define {{.*}} @_T09linetable4mainyys5Int64VFyycfU_Tf2in_n({{.*}})
         {
             var result = my_class.do_something(x)
             markUsed(result)
@@ -49,7 +49,7 @@ func main(_ x: Int64) -> Void
 // ASM-CHECK: ret
 }
 
-// ASM-CHECK: {{^_?_T09linetable4mainys5Int64VFyycfU_Tf2in_n:}}
+// ASM-CHECK: {{^_?_T09linetable4mainyys5Int64VFyycfU_Tf2in_n:}}
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location (0 is ok, too).
 // ASM-CHECK: .loc [[FILEID]] {{0|34}} {{[0-9]+}} prologue_end

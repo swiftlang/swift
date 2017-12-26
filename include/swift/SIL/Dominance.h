@@ -52,6 +52,11 @@ public:
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
 
+  /// Does instruction A dominate instruction B?
+  bool dominates(SILInstruction *a, SILInstruction *b) {
+    return a == b || properlyDominates(a, b);
+  }
+
   /// Does value A properly dominate instruction B?
   bool properlyDominates(SILValue a, SILInstruction *b);
 
@@ -74,6 +79,7 @@ public:
   }
 
   using DominatorTreeBase::properlyDominates;
+  using DominatorTreeBase::dominates;
 
   bool isValid(SILFunction *F) const {
     return getNode(&F->front()) != nullptr;

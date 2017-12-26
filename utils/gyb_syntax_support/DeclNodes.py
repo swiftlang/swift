@@ -93,7 +93,7 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating',
                    ]),
-             Child('Detail', kind='TokenList'),
+             Child('Detail', kind='TokenList', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -110,6 +110,30 @@ DECL_NODES = [
          children=[
              Child('Colon', kind='ColonToken'),
              Child('InheritedTypeCollection', kind='InheritedTypeList'),
+         ]),
+
+    # class-declaration -> attributes? access-level-modifier?
+    #                      'class' class-name
+    #                      generic-parameter-clause?
+    #                      type-inheritance-clause?
+    #                      generic-where-clause?
+    #                     '{' class-members ''
+    # class-name -> identifier
+    Node('ClassDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ClassKeyword', kind='ClassToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
          ]),
 
     # struct-declaration -> attributes? access-level-modifier?
@@ -307,5 +331,61 @@ DECL_NODES = [
                       'FuncToken',
                    ]),
              Child('Path', kind='AccessPath'),
+         ]),
+
+    # (value)
+    Node('AccessorParameter', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Name', kind='IdentifierToken'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    Node('AccessorDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifier', kind='DeclModifier', is_optional=True),
+             Child('AccessorKind', kind='Token',
+                   text_choices=[
+                      'get', 'set', 'didSet', 'willSet',
+                   ]),
+             Child('Parameter', kind='AccessorParameter', is_optional=True),
+             Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
+
+    Node('AccessorBlock', kind="Syntax",
+         children=[
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('AccessorListOrStmtList', kind='Syntax',
+                   node_choices=[
+                      Child('Accessors', kind='AccessorList'),
+                      Child('Statements', kind='StmtList')]),
+             Child('RightBrace', kind='RightBraceToken'),
+         ]),
+
+    # Pattern: Type = Value { get {} },
+    Node('PatternBinding', kind="Syntax",
+         children=[
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
+             Child('Initializer', kind='InitializerClause', is_optional=True),
+             Child('Accesor', kind='AccessorBlock', is_optional=True),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('PatternBindingList', kind="SyntaxCollection",
+         element='PatternBinding'),
+
+    Node('VariableDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
+             Child('LetOrVarKeyword', kind='Token',
+                   token_choices=[
+                       'LetToken', 'VarToken',
+                   ]),
+             Child('Bindings', kind='PatternBindingList'),
          ]),
 ]

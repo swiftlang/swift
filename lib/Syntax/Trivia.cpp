@@ -55,6 +55,12 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   case TriviaKind::Newline:
     OS << "newline " << Count;
     break;
+  case TriviaKind::CarriageReturn:
+    OS << "carriage_return " << Count;
+    break;
+  case TriviaKind::CarriageReturnLineFeed:
+    OS << "carriage_return_line_feed " << Count;
+    break;
   case TriviaKind::LineComment:
     OS << "line_comment" << Text.str();
     break;
@@ -97,7 +103,11 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
     Pos.addText(Text.str());
     break;
   case TriviaKind::Newline:
-    Pos.addNewlines(Count);
+  case TriviaKind::CarriageReturn:
+    Pos.addNewlines(Count, 1);
+    break;
+  case TriviaKind::CarriageReturnLineFeed:
+    Pos.addNewlines(Count, 2);
     break;
   case TriviaKind::Space:
   case TriviaKind::Backtick:
@@ -106,6 +116,29 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   case TriviaKind::Formfeed:
     Pos.addColumns(Count);
     break;
+  }
+}
+
+bool TriviaPiece::trySquash(const TriviaPiece &Next) {
+  if (Kind != Next.Kind) { return false; }
+  
+  switch (Kind) {
+    case TriviaKind::Space:
+    case TriviaKind::Tab:
+    case TriviaKind::VerticalTab:
+    case TriviaKind::Formfeed:
+    case TriviaKind::Newline:
+    case TriviaKind::CarriageReturn:
+    case TriviaKind::CarriageReturnLineFeed:
+      Count += Next.Count;
+      return true;
+    case TriviaKind::LineComment:
+    case TriviaKind::BlockComment:
+    case TriviaKind::DocLineComment:
+    case TriviaKind::DocBlockComment:
+    case TriviaKind::GarbageText:
+    case TriviaKind::Backtick:
+      return false;
   }
 }
 
@@ -126,6 +159,14 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
   case TriviaKind::Newline:
     printRepeated(OS, '\n', Count);
     break;
+  case TriviaKind::CarriageReturn:
+    printRepeated(OS, '\r', Count);
+    break;
+  case TriviaKind::CarriageReturnLineFeed:
+    for (unsigned i = 0; i < Count; i++) {
+      OS << "\r\n";
+    }
+    break;
   case TriviaKind::LineComment:
   case TriviaKind::BlockComment:
   case TriviaKind::DocLineComment:
@@ -140,6 +181,17 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
 }
 
 #pragma mark - Trivia collection
+
+void Trivia::appendOrSquash(const TriviaPiece &Next) {
+  if (Pieces.size() > 0) {
+    TriviaPiece &last = Pieces.back();
+    if (last.trySquash(Next)) {
+      return;
+    }
+  }
+  
+  push_back(Next);
+}
 
 Trivia Trivia::appending(const Trivia &Other) const {
   auto NewPieces = Pieces;

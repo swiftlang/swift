@@ -57,6 +57,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
       return makeParserCodeCompletionResult<Expr>();
     if (pattern.isNull())
       return nullptr;
+    SyntaxContext->setCreateSyntax(SyntaxKind::UnresolvedPatternExpr);
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
@@ -833,6 +834,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
+  SyntaxParsingContext SuperCtxt(SyntaxContext, SyntaxContextKind::Expr);
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
   
@@ -841,6 +843,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                                          superLoc);
   bool ErrorOccurred = selfDecl == nullptr;
 
+  SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
   Expr *superRef = !ErrorOccurred
     ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
                                             /*Implicit=*/false))
@@ -868,6 +871,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
     if (!name)
       return nullptr;
 
+    SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
     return makeParserResult(
              new (Context) UnresolvedDotExpr(superRef, dotLoc, name, nameLoc,
                                              /*Implicit=*/false));
@@ -895,11 +899,12 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                         indexArgLabelLocs,
                                         rSquareLoc,
                                         trailingClosure,
-                                        SyntaxKind::Unknown);
+                                        SyntaxKind::FunctionCallArgumentList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
       return nullptr;
+    SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
     return makeParserResult(
       SubscriptExpr::create(Context, superRef, lSquareLoc, indexArgs,
                             indexArgLabels, indexArgLabelLocs, rSquareLoc,
@@ -1119,6 +1124,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         break;
       }
 
+      Tok.setKind(tok::period);
       consumeToken();
 
       // Handle "x.42" - a tuple index.
@@ -1211,8 +1217,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
           locArgs.push_back(ty);
-        Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
-            Result.get(), LAngleLoc, Context.AllocateCopy(locArgs), RAngleLoc));
+        Result = makeParserResult(UnresolvedSpecializeExpr::create(Context,
+                                  Result.get(), LAngleLoc, locArgs, RAngleLoc));
       }
 
       continue;
@@ -1221,6 +1227,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       continue;
     }
 
@@ -1245,7 +1252,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
           indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
-          SyntaxKind::Unknown);
+          SyntaxKind::FunctionCallArgumentList);
       if (status.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
       if (status.isError() || Result.isNull())
@@ -1254,6 +1261,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           Context, Result.get(), lSquareLoc, indexArgs, indexArgLabels,
           indexArgLabelLocs, rSquareLoc, trailingClosure, ConcreteDeclRef(),
           /*implicit=*/false));
+      SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
       continue;
     }
 
@@ -1267,6 +1275,12 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           isa<TupleExpr>(callee))
         break;
 
+      if (SyntaxContext->isEnabled()) {
+        // Add dummy blank argument list to the call expression syntax.
+        SyntaxContext->addSyntax(
+            SyntaxFactory::makeBlankFunctionCallArgumentList());
+      }
+
       ParserResult<Expr> closure =
           parseTrailingClosure(callee->getSourceRange());
       if (closure.isNull())
@@ -1277,6 +1291,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           ParserStatus(closure),
           CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
                            SourceLoc(), closure.get(), /*implicit=*/false));
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
       if (Result.hasCodeCompletion())
         return Result;
@@ -1292,6 +1307,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(
           new (Context) BindOptionalExpr(Result.get(), TokLoc, /*depth*/ 0));
+      SyntaxContext->createNodeInPlace(SyntaxKind::OptionalChainingExpr);
       hasBindOptional = true;
       continue;
     }
@@ -1300,6 +1316,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::exclaim_postfix)) {
       Result =
           makeParserResult(new (Context) ForceValueExpr(Result.get(), TokLoc));
+      SyntaxContext->createNodeInPlace(SyntaxKind::ForcedValueExpr);
       continue;
     }
 
@@ -1313,6 +1330,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Expr *oper = parseExprOperator();
       Result =
           makeParserResult(new (Context) PostfixUnaryExpr(oper, Result.get()));
+      SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }
 
@@ -1546,6 +1564,13 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
                      ? VarDecl::Specifier::Let
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
+      if (SyntaxContext->isEnabled()) {
+        PatternSyntax PatternNode =
+            SyntaxFactory::makeIdentifierPattern(SyntaxContext->popToken());
+        ExprSyntax ExprNode =
+            SyntaxFactory::makeUnresolvedPatternExpr(PatternNode);
+        SyntaxContext->addSyntax(ExprNode);
+      }
       Result = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
       break;
     }
@@ -1558,6 +1583,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       break;
     }
 
@@ -1598,6 +1624,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
   case tok::period:              //=.foo
   case tok::period_prefix: {     // .foo
+    Tok.setKind(tok::period_prefix);
     SourceLoc DotLoc = consumeToken();
     
     // Special case ".<integer_literal>" like ".4".  This isn't valid, but the
@@ -1657,6 +1684,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
                                     diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
+    SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitMemberExpr);
 
     // Check for a () suffix, which indicates a call when constructing
     // this member.  Note that this cannot be the start of a new line.
@@ -1677,6 +1705,7 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
       if (status.isError())
         return nullptr;
 
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       Result = makeParserResult(
                  status,
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
@@ -1691,10 +1720,17 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
 
     // Check for a trailing closure, if allowed.
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
+      if (SyntaxContext->isEnabled()) {
+        // Add dummy blank argument list to the call expression syntax.
+        SyntaxContext->addSyntax(
+            SyntaxFactory::makeBlankFunctionCallArgumentList());
+      }
+
       ParserResult<Expr> closure =
         parseTrailingClosure(NameLoc.getSourceRange());
       if (closure.isNull()) return nullptr;
 
+      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       // Handle .foo by just making an AST node.
       Result = makeParserResult(
                  ParserStatus(closure),
@@ -2207,9 +2243,8 @@ Expr *Parser::parseExprIdentifier() {
     SmallVector<TypeLoc, 8> locArgs;
     for (auto ty : args)
       locArgs.push_back(ty);
-    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
-                                               Context.AllocateCopy(locArgs),
-                                               RAngleLoc);
+    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, locArgs,
+                                         RAngleLoc);
   }
   return E;
 }
@@ -2780,8 +2815,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
   if (!captureList.empty())
-    result = new (Context) CaptureListExpr(Context.AllocateCopy(captureList),
-                                           closure);
+    result = CaptureListExpr::create(Context, captureList, closure);
 
   return makeParserResult(Status, result);
 }
@@ -3217,7 +3251,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
     return makeParserResult(
-                  DictionaryExpr::create(Context, LSquareLoc, {}, RSquareLoc));
+               DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
   }
 
   bool ParseDict;
@@ -3311,6 +3345,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
   // Each subexpression is a (key, value) tuple.
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
   SourceLoc RSquareLoc;
 
   // Function that adds a new key/value pair.
@@ -3349,12 +3384,17 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
+
+    if (Tok.is(tok::comma))
+      CommaLocs.push_back(Tok.getLoc());
+
     return ParserStatus(Key) | ParserStatus(Value);
   });
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status, DictionaryExpr::create(Context, LSquareLoc,
-                                                         SubExprs, RSquareLoc));
+                                                         SubExprs, CommaLocs,
+                                                         RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

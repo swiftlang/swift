@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances -typecheck
+// RUN: %target-typecheck-verify-swift
 
 func markUsed<T>(_ t: T) {}
 

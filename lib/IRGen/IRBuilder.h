@@ -31,10 +31,12 @@ class FunctionPointer;
 typedef llvm::IRBuilder<> IRBuilderBase;
 
 class IRBuilder : public IRBuilderBase {
+public:
   // Without this, it keeps resolving to llvm::IRBuilderBase because
   // of the injected class name.
   typedef irgen::IRBuilderBase IRBuilderBase;
 
+private:
   /// The block containing the insertion point when the insertion
   /// point was last cleared.  Used only for preserving block
   /// ordering.
@@ -161,6 +163,11 @@ public:
     return StableIP(*this);
   }
 
+  /// Don't create allocas this way; you'll get a dynamic alloca.
+  /// Use IGF::createAlloca or IGF::emitDynamicAlloca.
+  llvm::Value *CreateAlloca(llvm::Type *type, llvm::Value *arraySize,
+                            const llvm::Twine &name = "") = delete;
+
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
     llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
@@ -251,6 +258,17 @@ public:
                         size.getValue(),
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
+  }
+
+  using IRBuilderBase::CreateMemSet;
+  llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value, Size size) {
+    return CreateMemSet(dest.getAddress(), value, size.getValue(),
+                        dest.getAlignment().getValue());
+  }
+  llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value,
+                               llvm::Value *size) {
+    return CreateMemSet(dest.getAddress(), value, size,
+                        dest.getAlignment().getValue());
   }
   
   using IRBuilderBase::CreateLifetimeStart;

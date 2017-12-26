@@ -44,6 +44,8 @@ class LayoutScanner : public Base<Impl> {
   Optional<Size> AddressPoint;
 
 protected:
+  Optional<Size> DynamicOffsetBase;
+
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
 
@@ -52,7 +54,13 @@ public:
 
   void noteAddressPoint() { AddressPoint = this->NextOffset; }
   StoredOffset getNextOffset() const {
-    return StoredOffset(this->NextOffset - AddressPoint.getValue());
+    if (DynamicOffsetBase) {
+      return StoredOffset(this->NextOffset - *DynamicOffsetBase,
+                          StoredOffset::Dynamic);
+    }
+
+    return StoredOffset(this->NextOffset - *AddressPoint,
+                        StoredOffset::Static);
   }
 
   Size getAddressPoint() const {
@@ -126,18 +134,39 @@ void MetadataLayout::destroy() const {
 
 /******************************* NOMINAL TYPES ********************************/
 
+Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
+                                         StoredOffset offset) const {
+  assert(offset.isValid());
+
+  if (offset.isStatic())
+    return Offset(offset.getStaticOffset());
+
+  Address offsetBaseAddr(
+    IGF.IGM.getAddrOfClassMetadataBaseOffset(cast<ClassDecl>(getDecl()),
+                                             NotForDefinition),
+    IGF.IGM.getPointerAlignment());
+
+  // FIXME: Should this be an invariant load?
+  llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
+
+  auto relativeOffset = offset.getRelativeOffset().getValue();
+  if (relativeOffset != 0) {
+    offsetVal = IGF.Builder.CreateAdd(offsetVal,
+                                      llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                                             relativeOffset));
+  }
+
+  return Offset(offsetVal);
+}
+
 Size
 NominalMetadataLayout::getStaticGenericRequirementsOffset() const {
-  assert(GenericRequirements.isValid());
-  assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
   return GenericRequirements.getStaticOffset();
 }
 
 Offset
 NominalMetadataLayout::getGenericRequirementsOffset(IRGenFunction &IGF) const {
-  assert(GenericRequirements.isValid());
-  assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
-  return Offset(GenericRequirements.getStaticOffset());
+  return emitOffset(IGF, GenericRequirements);
 }
 
 static llvm::Value *emitLoadOfGenericRequirement(IRGenFunction &IGF,
@@ -203,14 +232,37 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
 /********************************** CLASSES ***********************************/
 
 ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
-    : NominalMetadataLayout(Kind::Class), NumImmediateMembers(0) {
+    : NominalMetadataLayout(Kind::Class, decl), NumImmediateMembers(0) {
 
   struct Scanner : LayoutScanner<Scanner, ClassMetadataScanner> {
     using super = LayoutScanner;
 
     ClassMetadataLayout &Layout;
+
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteResilientSuperclass() {
+      Layout.HasResilientSuperclass = true;
+    }
+
+    void noteStartOfImmediateMembers(ClassDecl *forClass) {
+      // If our superclass is resilient to us, or the class itself is resilient
+      // to us, we will access metadata members relative to a base offset.
+      if (forClass == Target) {
+        if (Layout.HasResilientSuperclass ||
+            (IGM.Context.LangOpts.EnableClassResilience &&
+             IGM.isResilient(forClass, ResilienceExpansion::Maximal))) {
+          assert(!DynamicOffsetBase);
+          DynamicOffsetBase = NextOffset;
+        }
+      }
+    }
+
+    void addClassSize() {
+      Layout.MetadataSize = getNextOffset();
+      super::addClassSize();
+    }
 
     void addInstanceSize() {
       Layout.InstanceSize = getNextOffset();
@@ -288,6 +340,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
   Scanner(IGM, decl, *this).layout();
 }
 
+Size ClassMetadataLayout::getMetadataSizeOffset() const {
+  assert(MetadataSize.isStatic());
+  return MetadataSize.getStaticOffset();
+}
+
 Size ClassMetadataLayout::getInstanceSizeOffset() const {
   assert(InstanceSize.isStatic());
   return InstanceSize.getStaticOffset();
@@ -301,11 +358,7 @@ Size ClassMetadataLayout::getInstanceAlignMaskOffset() const {
 ClassMetadataLayout::MethodInfo
 ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
   auto &stored = getStoredMethodInfo(method);
-
-  assert(stored.TheOffset.isStatic() &&
-         "resilient class metadata layout unsupported!");
-  auto offset = Offset(stored.TheOffset.getStaticOffset());
-
+  auto offset = emitOffset(IGF, stored.TheOffset);
   return MethodInfo(offset);
 }
 
@@ -317,26 +370,16 @@ Size ClassMetadataLayout::getStaticMethodOffset(SILDeclRef method) const{
   return stored.TheOffset.getStaticOffset();
 }
 
-Size
-ClassMetadataLayout::getStaticVTableOffset() const {
-  // TODO: if class is resilient, return the offset relative to the start
-  // of immediate class metadata
-  assert(VTableOffset.isStatic());
-  return VTableOffset.getStaticOffset();
-}
-
 Offset
 ClassMetadataLayout::getVTableOffset(IRGenFunction &IGF) const {
-  // TODO: implement resilient metadata layout
-  assert(VTableOffset.isStatic());
-  return Offset(VTableOffset.getStaticOffset());
+  return emitOffset(IGF, VTableOffset);
 }
 
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,
                                            VarDecl *field) const {
-  // TODO: implement resilient metadata layout
-  return Offset(getStaticFieldOffset(field));
+  return emitOffset(IGF, getStoredFieldOffset(field));
 }
+
 Size ClassMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
   auto &stored = getStoredFieldOffset(field);
   assert(stored.isStatic() && "resilient class metadata layout unsupported!");
@@ -344,18 +387,33 @@ Size ClassMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
 }
 
 Size
+ClassMetadataLayout::getRelativeGenericRequirementsOffset() const {
+  return GenericRequirements.getRelativeOffset();
+}
+
+Size
 ClassMetadataLayout::getStaticFieldOffsetVectorOffset() const {
-  // TODO: if class is resilient, return the offset relative to the start
-  // of immediate class metadata
-  assert(FieldOffsetVector.isStatic());
   return FieldOffsetVector.getStaticOffset();
+}
+
+Size
+ClassMetadataLayout::getRelativeFieldOffsetVectorOffset() const {
+  return FieldOffsetVector.getRelativeOffset();
+}
+
+Size
+ClassMetadataLayout::getStaticVTableOffset() const {
+  return VTableOffset.getStaticOffset();
+}
+
+Size
+ClassMetadataLayout::getRelativeVTableOffset() const {
+  return VTableOffset.getRelativeOffset();
 }
 
 Offset
 ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
-  // TODO: implement resilient metadata layout
-  assert(FieldOffsetVector.isStatic());
-  return Offset(FieldOffsetVector.getStaticOffset());
+  return emitOffset(IGF, FieldOffsetVector);
 }
 
 Size irgen::getClassFieldOffsetOffset(IRGenModule &IGM, ClassDecl *theClass,
@@ -376,8 +434,8 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
 
 Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
                                              llvm::Value *metadata,
-                                              ClassDecl *theClass,
-                                              VarDecl *field) {
+                                             ClassDecl *theClass,
+                                             VarDecl *field) {
   auto offset = IGF.IGM.getMetadataLayout(theClass).getFieldOffset(IGF, field);
   auto slot = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
                                       IGF.IGM.getPointerAlignment());
@@ -387,7 +445,7 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
-    : NominalMetadataLayout(Kind::Enum) {
+    : NominalMetadataLayout(Kind::Enum, decl) {
 
   struct Scanner : LayoutScanner<Scanner, EnumMetadataScanner> {
     using super = LayoutScanner;
@@ -424,7 +482,7 @@ EnumMetadataLayout::getPayloadSizeOffset() const {
 /********************************** STRUCTS ***********************************/
 
 StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
-    : NominalMetadataLayout(Kind::Struct) {
+    : NominalMetadataLayout(Kind::Struct, decl) {
 
   struct Scanner : LayoutScanner<Scanner, StructMetadataScanner> {
     using super = LayoutScanner;

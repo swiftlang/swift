@@ -4,8 +4,8 @@
 
 // CHECK: sil private @top_level_code
 // CHECK: sil public_external [serialized] @_T0s1XVABycfC{{.*}}
-// CHECK: sil public_external [serialized] @_T0s17the_thing_it_doesys1XV1x_tF{{.*}}
-// CHECK: sil shared_external [serializable] [noinline] @_T0s9the_thingyx1t_tlFs1XV_Tgq5{{.*}}
+// CHECK: sil public_external [serialized] @_T0s17the_thing_it_does1xys1XV_tF{{.*}}
+// CHECK: sil shared_external [serializable] [noinline] @_T0s9the_thing1tyx_tlFs1XV_Tgq5{{.*}}
 
 sil_stage canonical
 
@@ -24,7 +24,7 @@ bb0:
   %3 = apply %1(%2) : $@convention(method) (@thin X.Type) -> X  // user: %4
   store %3 to %0 : $*X                            // id: %4
   // function_ref Swift.the_thing_it_does (x : Swift.X) -> ()
-  %5 = function_ref @_T0s17the_thing_it_doesys1XV1x_tF : $@convention(thin) (X) -> () // user: %7
+  %5 = function_ref @_T0s17the_thing_it_does1xys1XV_tF : $@convention(thin) (X) -> () // user: %7
   %6 = load %0 : $*X                              // user: %7
   %7 = apply %5(%6) : $@convention(thin) (X) -> ()
   %8 = tuple ()                                   // user: %9
@@ -35,6 +35,6 @@ bb0:
 sil @_T0s1XVABycfC : $@convention(method) (@thin X.Type) -> X
 
 // Swift.the_thing_it_does (x : Swift.X) -> ()
-sil @_T0s17the_thing_it_doesys1XV1x_tF : $@convention(thin) (X) -> ()
+sil @_T0s17the_thing_it_does1xys1XV_tF : $@convention(thin) (X) -> ()
 
 

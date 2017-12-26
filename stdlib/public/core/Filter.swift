@@ -10,15 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An iterator over the elements traversed by some base iterator that also
-/// satisfy a given predicate.
+
+/// A sequence whose elements consist of the elements of some base
+/// sequence that also satisfy a given predicate.
 ///
-/// - Note: This is the associated `Iterator` of `LazyFilterSequence`
-/// and `LazyFilterCollection`.
+/// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
+///   is a `LazyFilterSequence`.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct LazyFilterIterator<
-  Base : IteratorProtocol
-> : IteratorProtocol, Sequence {
+public struct LazyFilterSequence<Base: Sequence> {
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _base: Base
+
+  /// The predicate used to determine which elements produced by
+  /// `base` are also produced by `self`.
+  @_versioned // FIXME(sil-serialize-all)
+  internal let _predicate: (Base.Element) -> Bool
+
+  /// Creates an instance consisting of the elements `x` of `base` for
+  /// which `isIncluded(x) == true`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public // @testable
+  init(_base base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
+    self._base = base
+    self._predicate = isIncluded
+  }
+}
+
+extension LazyFilterSequence {
+  /// An iterator over the elements traversed by some base iterator that also
+  /// satisfy a given predicate.
+  ///
+  /// - Note: This is the associated `Iterator` of `LazyFilterSequence`
+  /// and `LazyFilterCollection`.
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Iterator {
+    /// The underlying iterator whose elements are being filtered.
+    public var base: Base.Iterator { return _base }
+
+    @_versioned // FIXME(sil-serialize-all)
+    internal var _base: Base.Iterator
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _predicate: (Base.Element) -> Bool
+
+    /// Creates an instance that produces the elements `x` of `base`
+    /// for which `isIncluded(x) == true`.
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init(_base: Base.Iterator, _ isIncluded: @escaping (Base.Element) -> Bool) {
+      self._base = _base
+      self._predicate = isIncluded
+    }
+  }
+}
+
+extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
+  public typealias Element = Base.Element
+  
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -27,7 +74,7 @@ public struct LazyFilterIterator<
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
   @_inlineable // FIXME(sil-serialize-all)
-  public mutating func next() -> Base.Element? {
+  public mutating func next() -> Element? {
     while let n = _base.next() {
       if _predicate(n) {
         return n
@@ -35,86 +82,24 @@ public struct LazyFilterIterator<
     }
     return nil
   }
-
-  /// Creates an instance that produces the elements `x` of `base`
-  /// for which `isIncluded(x) == true`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(
-    _base: Base,
-    _ isIncluded: @escaping (Base.Element) -> Bool
-  ) {
-    self._base = _base
-    self._predicate = isIncluded
-  }
-
-  /// The underlying iterator whose elements are being filtered.
-  public var base: Base { return _base }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _base: Base
-
-  /// The predicate used to determine which elements produced by
-  /// `base` are also produced by `self`.
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _predicate: (Base.Element) -> Bool
 }
 
-/// A sequence whose elements consist of the elements of some base
-/// sequence that also satisfy a given predicate.
-///
-/// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
-///   is a `LazyFilterSequence`.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct LazyFilterSequence<Base : Sequence>
-  : LazySequenceProtocol {
-
+extension LazyFilterSequence: LazySequenceProtocol {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
-    return LazyFilterIterator(
-      _base: base.makeIterator(), _include)
+  public func makeIterator() -> Iterator {
+    return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
   @_inlineable
-  public func _customContainsEquatableElement(
-    _ element: Element
-  ) -> Bool? {
-    if !_include(element) {
-      return false
-    }
-    if let baseContains = base._customContainsEquatableElement(element) {
-      return baseContains
-    }
-    return nil
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
+    // optimization to check the element first matches the predicate
+    guard _predicate(element) else { return false }
+    return _base._customContainsEquatableElement(element)
   }
-
-  /// Creates an instance consisting of the elements `x` of `base` for
-  /// which `isIncluded(x) == true`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  init(
-    _base base: Base,
-    _ isIncluded: @escaping (Base.Element) -> Bool
-  ) {
-    self.base = base
-    self._include = isIncluded
-  }
-
-  /// The underlying sequence whose elements are being filtered
-  public let base: Base
-
-  /// The predicate used to determine which elements of `base` are
-  /// also elements of `self`.
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _include: (Base.Element) -> Bool
 }
-
-/// The `Index` used for subscripting a `LazyFilterCollection`.
-@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
-public typealias LazyFilterIndex<Base : Collection> = Base.Index
 
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
@@ -136,18 +121,16 @@ public struct LazyFilterCollection<Base : Collection> {
   /// satisfy `isIncluded`.
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
-  init(
-    _base: Base,
-    _ isIncluded: @escaping (Base.Element) -> Bool
-  ) {
+  init(_base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = isIncluded
   }
 }
 
-extension LazyFilterCollection : Sequence {
-  public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
+extension LazyFilterCollection : LazySequenceProtocol {
   public typealias Element = Base.Element
+  public typealias Iterator = LazyFilterSequence<Base>.Iterator
+  public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
 
   // Any estimate of the number of elements that pass `_predicate` requires
   // iterating the collection and evaluating each element, which can be costly,
@@ -157,8 +140,7 @@ extension LazyFilterCollection : Sequence {
   public var underestimatedCount: Int { return 0 }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func _copyToContiguousArray()
-    -> ContiguousArray<Base.Iterator.Element> {
+  public func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
 
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which evaluates `_predicate` for every element --
@@ -171,26 +153,18 @@ extension LazyFilterCollection : Sequence {
   ///
   /// - Complexity: O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
-    return LazyFilterIterator(
-      _base: _base.makeIterator(), _predicate)
+  public func makeIterator() -> Iterator {
+    return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
   @_inlineable
-  public func _customContainsEquatableElement(
-    _ element: Element
-  ) -> Bool? {
-    if !_predicate(element) {
-      return false
-    }
-    if let baseContains = _base._customContainsEquatableElement(element) {
-      return baseContains
-    }
-    return nil
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
+    guard _predicate(element) else { return false }
+    return _base._customContainsEquatableElement(element)
   }
 }
 
-extension LazyFilterCollection : LazyCollectionProtocol, Collection {
+extension LazyFilterCollection : LazyCollectionProtocol {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -245,9 +219,9 @@ extension LazyFilterCollection : LazyCollectionProtocol, Collection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
-      repeat {
-        _base.formIndex(&i, offsetBy: step)
-      } while i != _base.endIndex && !_predicate(_base[i])
+    repeat {
+      _base.formIndex(&i, offsetBy: step)
+    } while i != _base.endIndex && !_predicate(_base[i])
   }
 
   @inline(__always)
@@ -347,7 +321,7 @@ extension LazyFilterCollection : LazyCollectionProtocol, Collection {
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(position: Index) -> Base.Element {
+  public subscript(position: Index) -> Element {
     return _base[position]
   }
 
@@ -409,5 +383,10 @@ extension LazyCollectionProtocol {
   }
 }
 
+// @available(*, deprecated, renamed: "LazyFilterSequence.Iterator")
+public typealias LazyFilterIterator<T: Sequence> = LazyFilterSequence<T>.Iterator
+// @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
+public typealias LazyFilterIndex<Base: Collection> = Base.Index
 @available(*, deprecated, renamed: "LazyFilterCollection")
 public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection
+

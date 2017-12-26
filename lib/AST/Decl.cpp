@@ -758,9 +758,9 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
                        SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
   : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc) {
-  ImportDeclBits.NumPathElements = Path.size();
-  assert(ImportDeclBits.NumPathElements == Path.size() && "Truncation error");
-  ImportDeclBits.ImportKind = static_cast<unsigned>(K);
+  Bits.ImportDecl.NumPathElements = Path.size();
+  assert(Bits.ImportDecl.NumPathElements == Path.size() && "Truncation error");
+  Bits.ImportDecl.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
   std::uninitialized_copy(Path.begin(), Path.end(),
                           getTrailingObjects<AccessPathElement>());
@@ -838,9 +838,9 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
-  assert(!NominalTypeDeclBits.HasLazyConformances &&
+  assert(!Bits.NominalTypeDecl.HasLazyConformances &&
          "Already have lazy conformances");
-  NominalTypeDeclBits.HasLazyConformances = true;
+  Bits.NominalTypeDecl.HasLazyConformances = true;
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
@@ -849,8 +849,8 @@ void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
 
 std::pair<LazyMemberLoader *, uint64_t>
 NominalTypeDecl::takeConformanceLoaderSlow() {
-  assert(NominalTypeDeclBits.HasLazyConformances && "not lazy conformances");
-  NominalTypeDeclBits.HasLazyConformances = false;
+  assert(Bits.NominalTypeDecl.HasLazyConformances && "not lazy conformances");
+  Bits.NominalTypeDecl.HasLazyConformances = false;
   auto contextInfo =
     getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
   return { contextInfo->loader, contextInfo->allConformancesData };
@@ -868,9 +868,9 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     ExtendedType(extendedType),
     Inherited(inherited)
 {
-  ExtensionDeclBits.CheckedInheritanceClause = false;
-  ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
-  ExtensionDeclBits.HasLazyConformances = false;
+  Bits.ExtensionDecl.CheckedInheritanceClause = false;
+  Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
+  Bits.ExtensionDecl.HasLazyConformances = false;
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -897,9 +897,9 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                          uint64_t contextData) {
-  assert(!ExtensionDeclBits.HasLazyConformances && 
+  assert(!Bits.ExtensionDecl.HasLazyConformances && 
          "Already have lazy conformances");
-  ExtensionDeclBits.HasLazyConformances = true;
+  Bits.ExtensionDecl.HasLazyConformances = true;
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
@@ -908,8 +908,8 @@ void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
 
 std::pair<LazyMemberLoader *, uint64_t>
 ExtensionDecl::takeConformanceLoaderSlow() {
-  assert(ExtensionDeclBits.HasLazyConformances && "no conformance loader?");
-  ExtensionDeclBits.HasLazyConformances = false;
+  assert(Bits.ExtensionDecl.HasLazyConformances && "no conformance loader?");
+  Bits.ExtensionDecl.HasLazyConformances = false;
 
   auto contextInfo =
     getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
@@ -938,10 +938,10 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
     StaticLoc(StaticLoc), VarLoc(VarLoc) {
-  PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
-  PatternBindingDeclBits.StaticSpelling =
+  Bits.PatternBindingDecl.IsStatic = StaticLoc.isValid();
+  Bits.PatternBindingDecl.StaticSpelling =
        static_cast<unsigned>(StaticSpelling);
-  PatternBindingDeclBits.NumPatternEntries = NumPatternEntries;
+  Bits.PatternBindingDecl.NumPatternEntries = NumPatternEntries;
 }
 
 PatternBindingDecl *
@@ -2489,7 +2489,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
     TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {
-  TypeAliasDeclBits.IsCompatibilityAlias = false;
+  Bits.TypeAliasDecl.IsCompatibilityAlias = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -2564,10 +2564,10 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
                                            unsigned depth, unsigned index)
   : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
-  GenericTypeParamDeclBits.Depth = depth;
-  assert(GenericTypeParamDeclBits.Depth == depth && "Truncation");
-  GenericTypeParamDeclBits.Index = index;
-  assert(GenericTypeParamDeclBits.Index == index && "Truncation");
+  Bits.GenericTypeParamDecl.Depth = depth;
+  assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
+  Bits.GenericTypeParamDecl.Index = index;
+  assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setInterfaceType(MetatypeType::get(type, ctx));
@@ -2590,8 +2590,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {
 
-  AssociatedTypeDeclBits.ComputedOverridden = false;
-  AssociatedTypeDeclBits.HasOverridden = false;
+  Bits.AssociatedTypeDecl.ComputedOverridden = false;
+  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
@@ -2603,8 +2603,8 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
-  AssociatedTypeDeclBits.ComputedOverridden = false;
-  AssociatedTypeDeclBits.HasOverridden = false;
+  Bits.AssociatedTypeDecl.ComputedOverridden = false;
+  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2664,9 +2664,9 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
                     GenericParams),
     EnumLoc(EnumLoc)
 {
-  EnumDeclBits.Circularity
+  Bits.EnumDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  EnumDeclBits.HasAssociatedValues
+  Bits.EnumDecl.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
 }
 
@@ -2677,7 +2677,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                     GenericParams),
     StructLoc(StructLoc)
 {
-  StructDeclBits.HasUnreferenceableStorage = false;
+  Bits.StructDecl.HasUnreferenceableStorage = false;
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -2686,16 +2686,16 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
                     GenericParams),
     ClassLoc(ClassLoc) {
-  ClassDeclBits.Circularity
+  Bits.ClassDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  ClassDeclBits.RequiresStoredPropertyInits = 0;
-  ClassDeclBits.InheritsSuperclassInits
+  Bits.ClassDecl.RequiresStoredPropertyInits = 0;
+  Bits.ClassDecl.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
-  ClassDeclBits.RawForeignKind = 0;
-  ClassDeclBits.HasDestructorDecl = 0;
-  ClassDeclBits.ObjCKind = 0;
-  ClassDeclBits.HasMissingDesignatedInitializers = 0;
-  ClassDeclBits.HasMissingVTableEntries = 0;
+  Bits.ClassDecl.RawForeignKind = 0;
+  Bits.ClassDecl.HasDestructorDecl = 0;
+  Bits.ClassDecl.ObjCKind = 0;
+  Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
+  Bits.ClassDecl.HasMissingVTableEntries = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2752,12 +2752,12 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
   (void)mutableThis->lookupDirect(getASTContext().Id_init,
                                   /*ignoreNewExtensions*/true);
-  return ClassDeclBits.HasMissingDesignatedInitializers;
+  return Bits.ClassDecl.HasMissingDesignatedInitializers;
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
   (void)getMembers();
-  return ClassDeclBits.HasMissingVTableEntries;
+  return Bits.ClassDecl.HasMissingVTableEntries;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
@@ -2767,7 +2767,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Check whether we already have a cached answer.
   switch (static_cast<StoredInheritsSuperclassInits>(
-            ClassDeclBits.InheritsSuperclassInits)) {
+            Bits.ClassDecl.InheritsSuperclassInits)) {
   case StoredInheritsSuperclassInits::Unchecked:
     // Compute below.
     break;
@@ -2783,7 +2783,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   ClassDecl *superclassDecl;
   if (!getSuperclass() ||
       !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
-    ClassDeclBits.InheritsSuperclassInits
+    Bits.ClassDecl.InheritsSuperclassInits
       = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
     return false;
   }
@@ -2791,7 +2791,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   if (superclassDecl->hasMissingDesignatedInitializers()) {
-    ClassDeclBits.InheritsSuperclassInits
+    Bits.ClassDecl.InheritsSuperclassInits
       = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
     return false;
   }
@@ -2843,7 +2843,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
     // If this designated initializer wasn't overridden, we can't inherit.
     if (overriddenInits.count(ctor) == 0) {
-      ClassDeclBits.InheritsSuperclassInits
+      Bits.ClassDecl.InheritsSuperclassInits
         = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
       return false;
     }
@@ -2851,15 +2851,15 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // All of the direct superclass's designated initializers have been overridden
   // by the subclass. Initializers can be inherited.
-  ClassDeclBits.InheritsSuperclassInits
+  Bits.ClassDecl.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
   return true;
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
   // See if we've already computed this.
-  if (ClassDeclBits.ObjCKind)
-    return ObjCClassKind(ClassDeclBits.ObjCKind - 1);
+  if (Bits.ClassDecl.ObjCKind)
+    return ObjCClassKind(Bits.ClassDecl.ObjCKind - 1);
 
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
@@ -2896,7 +2896,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     kind = ObjCClassKind::ObjCWithSwiftRoot;
 
   // Save the result for later.
-  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCKind
+  const_cast<ClassDecl *>(this)->Bits.ClassDecl.ObjCKind
     = unsigned(kind) + 1;
   return kind;
 }
@@ -3023,7 +3023,7 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   // Check whether we already have a cached answer.
   switch (static_cast<AssociatedValueCheck>(
-            EnumDeclBits.HasAssociatedValues)) {
+            Bits.EnumDecl.HasAssociatedValues)) {
     case AssociatedValueCheck::Unchecked:
       // Compute below.
       break;
@@ -3036,12 +3036,12 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   }
   for (auto elt : getAllElements()) {
     if (elt->hasAssociatedValues()) {
-      const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
+      const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
         = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
       return false;
     }
   }
-  const_cast<EnumDecl*>(this)->EnumDeclBits.HasAssociatedValues
+  const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
   return true;
 }
@@ -3053,15 +3053,15 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),
       ProtocolLoc(ProtocolLoc), TrailingWhere(TrailingWhere) {
-  ProtocolDeclBits.RequiresClassValid = false;
-  ProtocolDeclBits.RequiresClass = false;
-  ProtocolDeclBits.ExistentialConformsToSelfValid = false;
-  ProtocolDeclBits.ExistentialConformsToSelf = false;
-  ProtocolDeclBits.Circularity
+  Bits.ProtocolDecl.RequiresClassValid = false;
+  Bits.ProtocolDecl.RequiresClass = false;
+  Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
+  Bits.ProtocolDecl.ExistentialConformsToSelf = false;
+  Bits.ProtocolDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  ProtocolDeclBits.NumRequirementsInSignature = 0;
-  ProtocolDeclBits.HasMissingRequirements = false;
-  ProtocolDeclBits.KnownProtocol = 0;
+  Bits.ProtocolDecl.NumRequirementsInSignature = 0;
+  Bits.ProtocolDecl.HasMissingRequirements = false;
+  Bits.ProtocolDecl.KnownProtocol = 0;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3161,11 +3161,11 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 
 bool ProtocolDecl::requiresClassSlow() {
   // Set this first to catch (invalid) circular inheritance.
-  ProtocolDeclBits.RequiresClassValid = true;
+  Bits.ProtocolDecl.RequiresClassValid = true;
 
   // Quick check: @objc protocols require a class.
   if (isObjC()) {
-    ProtocolDeclBits.RequiresClass = true;
+    Bits.ProtocolDecl.RequiresClass = true;
     return true;
   }
 
@@ -3173,30 +3173,30 @@ bool ProtocolDecl::requiresClassSlow() {
   // class-constrained existential.
   //
   // FIXME: Use the requirement signature if available.
-  ProtocolDeclBits.RequiresClass = false;
+  Bits.ProtocolDecl.RequiresClass = false;
   for (auto inherited : getInherited()) {
     auto type = inherited.getType();
     assert(type && "Should have type checked inheritance clause by now");
     if (type->isExistentialType()) {
       auto layout = type->getExistentialLayout();
       if (layout.requiresClass()) {
-        ProtocolDeclBits.RequiresClass = true;
+        Bits.ProtocolDecl.RequiresClass = true;
         return true;
       }
     }
   }
 
-  return ProtocolDeclBits.RequiresClass;
+  return Bits.ProtocolDecl.RequiresClass;
 }
 
 bool ProtocolDecl::existentialConformsToSelfSlow() {
   // Assume for now that the existential conforms to itself; this
   // prevents circularity issues.
-  ProtocolDeclBits.ExistentialConformsToSelfValid = true;
-  ProtocolDeclBits.ExistentialConformsToSelf = true;
+  Bits.ProtocolDecl.ExistentialConformsToSelfValid = true;
+  Bits.ProtocolDecl.ExistentialConformsToSelf = true;
 
   if (!isObjC()) {
-    ProtocolDeclBits.ExistentialConformsToSelf = false;
+    Bits.ProtocolDecl.ExistentialConformsToSelf = false;
     return false;
   }
 
@@ -3208,7 +3208,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
     if (auto vd = dyn_cast<ValueDecl>(member)) {
       if (!vd->isInstanceMember()) {
         // A protocol cannot conform to itself if it has static members.
-        ProtocolDeclBits.ExistentialConformsToSelf = false;
+        Bits.ProtocolDecl.ExistentialConformsToSelf = false;
         return false;
       }
     }
@@ -3218,7 +3218,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   // themselves.
   for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf()) {
-      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      Bits.ProtocolDecl.ExistentialConformsToSelf = false;
       return false;
     }
   }
@@ -3402,8 +3402,8 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
 bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   // Assume for now that the existential type is supported; this
   // prevents circularity issues.
-  ProtocolDeclBits.ExistentialTypeSupportedValid = true;
-  ProtocolDeclBits.ExistentialTypeSupported = true;
+  Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
+  Bits.ProtocolDecl.ExistentialTypeSupported = true;
 
   // ObjC protocols can always be existential.
   if (isObjC())
@@ -3426,7 +3426,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
     if (isa<AssociatedTypeDecl>(member)) {
       // An existential type cannot be used if the protocol has an
       // associated type.
-      ProtocolDeclBits.ExistentialTypeSupported = false;
+      Bits.ProtocolDecl.ExistentialTypeSupported = false;
       return false;
     }
 
@@ -3439,7 +3439,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
       }
 
       if (!isAvailableInExistential(valueMember)) {
-        ProtocolDeclBits.ExistentialTypeSupported = false;
+        Bits.ProtocolDecl.ExistentialTypeSupported = false;
         return false;
       }
     }
@@ -3449,7 +3449,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   // types themselves.
   for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialTypeSupported(resolver)) {
-      ProtocolDeclBits.ExistentialTypeSupported = false;
+      Bits.ProtocolDecl.ExistentialTypeSupported = false;
       return false;
     }
   }
@@ -3503,7 +3503,7 @@ void ProtocolDecl::computeRequirementSignature() {
     GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
-  ProtocolDeclBits.NumRequirementsInSignature =
+  Bits.ProtocolDecl.NumRequirementsInSignature =
     requirementSig->getRequirements().size();
 }
 
@@ -3511,10 +3511,10 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   assert(!RequirementSignature && "already computed requirement signature");
   if (requirements.empty()) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
-    ProtocolDeclBits.NumRequirementsInSignature = 0;
+    Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   } else {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
-    ProtocolDeclBits.NumRequirementsInSignature = requirements.size();
+    Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
 }
 
@@ -4166,8 +4166,8 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
-/// Return true if this stored property needs to be accessed with getters and
-/// setters for Objective-C.
+/// Return true if this stored property has a getter and
+/// setter that are accessible from Objective-C.
 bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
   if (auto override = getOverriddenDecl())
     return override->hasForeignGetterAndSetter();
@@ -4188,9 +4188,11 @@ bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
   // Imported accessors are foreign and only have objc entry points.
   if (hasClangNode())
     return true;
-  // Otherwise, we only dispatch by @objc if the declaration is dynamic or
-  // NSManaged.
-  return isDynamic() || getAttrs().hasAttribute<NSManagedAttr>();
+  // Otherwise, we only dispatch by @objc if the declaration is dynamic,
+  // NSManaged, or dispatched through an ObjC protocol.
+  return isDynamic()
+    || getAttrs().hasAttribute<NSManagedAttr>()
+    || (isa<ProtocolDecl>(getDeclContext()) && isProtocolRequirement());
 }
 
 
@@ -4300,8 +4302,8 @@ ParamDecl::ParamDecl(Specifier specifier,
   SpecifierLoc(specifierLoc) {
     assert(specifier != Specifier::Var &&
            "'var' cannot appear on parameters; you meant 'inout'");
-  ParamDeclBits.IsTypeLocImplicit = false;
-  ParamDeclBits.defaultArgumentKind =
+  Bits.ParamDecl.IsTypeLocImplicit = false;
+  Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
@@ -4318,8 +4320,8 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
     DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
-  ParamDeclBits.IsTypeLocImplicit = PD->ParamDeclBits.IsTypeLocImplicit;
-  ParamDeclBits.defaultArgumentKind = PD->ParamDeclBits.defaultArgumentKind;
+  Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
+  Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (!withTypes && typeLoc.getTypeRepr())
     typeLoc.setType(Type());
@@ -5095,10 +5097,10 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 {
   setParameterLists(SelfDecl, BodyParams);
   
-  ConstructorDeclBits.ComputedBodyInitKind = 0;
-  ConstructorDeclBits.HasStubImplementation = 0;
-  ConstructorDeclBits.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
-  ConstructorDeclBits.Failability = static_cast<unsigned>(Failability);
+  Bits.ConstructorDecl.ComputedBodyInitKind = 0;
+  Bits.ConstructorDecl.HasStubImplementation = 0;
+  Bits.ConstructorDecl.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
+  Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
@@ -5217,7 +5219,7 @@ bool EnumElementDecl::computeType() {
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
-  if (!EnumElementDeclBits.HasArgumentType)
+  if (!Bits.EnumElementDecl.HasArgumentType)
     return nullptr;
 
   auto interfaceType = getInterfaceType();
@@ -5290,9 +5292,9 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
     *init = nullptr;
 
   // If we already computed the result, return it.
-  if (ConstructorDeclBits.ComputedBodyInitKind) {
+  if (Bits.ConstructorDecl.ComputedBodyInitKind) {
     return static_cast<BodyInitKind>(
-             ConstructorDeclBits.ComputedBodyInitKind - 1);
+             Bits.ConstructorDecl.ComputedBodyInitKind - 1);
   }
 
 
@@ -5443,7 +5445,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // Cache the result if it is trustworthy.
   if (diags) {
     auto *mutableThis = const_cast<ConstructorDecl *>(this);
-    mutableThis->ConstructorDeclBits.ComputedBodyInitKind =
+    mutableThis->Bits.ConstructorDecl.ComputedBodyInitKind =
         static_cast<unsigned>(Kind) + 1;
     if (init)
       *init = finder.InitExpr;
@@ -5517,8 +5519,8 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
     AssignmentValueLoc(assignmentValueLoc),
     HigherThanLoc(higherThanLoc), LowerThanLoc(lowerThanLoc), Name(name),
     NumHigherThan(higherThan.size()), NumLowerThan(lowerThan.size()) {
-  PrecedenceGroupDeclBits.Associativity = unsigned(associativity);
-  PrecedenceGroupDeclBits.IsAssignment = isAssignment;
+  Bits.PrecedenceGroupDecl.Associativity = unsigned(associativity);
+  Bits.PrecedenceGroupDecl.IsAssignment = isAssignment;
   memcpy(getHigherThanBuffer(), higherThan.data(),
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),

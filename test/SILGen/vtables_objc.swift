@@ -20,7 +20,7 @@ class Hoozit : Gizmo {
   func incorrige() {}
 }
 
-// CHECK-LABEL: sil hidden @_T012vtables_objc10callHoozityAA0D0CF : $@convention(thin) (@owned Hoozit) -> ()
+// CHECK-LABEL: sil hidden @_T012vtables_objc10callHoozityyAA0D0CF : $@convention(thin) (@owned Hoozit) -> ()
 func callHoozit(_ h: Hoozit) {
   // CHECK: objc_method {{.*}} : $Hoozit, #Hoozit.frob!1.foreign
   h.frob()
@@ -42,7 +42,7 @@ class Wotsit : Hoozit {
   final override func frob() {}
 }
 
-// CHECK-LABEL: sil hidden @_T012vtables_objc10callWotsityAA0D0CF : $@convention(thin) (@owned Wotsit) -> ()
+// CHECK-LABEL: sil hidden @_T012vtables_objc10callWotsityyAA0D0CF : $@convention(thin) (@owned Wotsit) -> ()
 func callWotsit(_ w: Wotsit) {
   // CHECK: objc_method {{.*}} : $Wotsit, #Wotsit.funge!1.foreign
   w.funge()
@@ -59,7 +59,7 @@ func callWotsit(_ w: Wotsit) {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T012vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T012vtables_objc6HoozitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6HoozitCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6HoozitC7bellsOnSQyACGSi_tcfc
 // CHECK-NEXT:   #Hoozit.deinit!deallocator: _T012vtables_objc6HoozitCfD
 // CHECK-NEXT: }
 
@@ -67,7 +67,7 @@ func callWotsit(_ w: Wotsit) {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T012vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T012vtables_objc6WotsitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6WotsitCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6WotsitC7bellsOnSQyACGSi_tcfc
 // CHECK-NEXT:   #Wotsit.deinit!deallocator: _T012vtables_objc6WotsitCfD
 // CHECK-NEXT: }
 

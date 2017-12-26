@@ -18,10 +18,8 @@
 #ifndef SWIFT_SIL_SILVTABLEVISITOR_H
 #define SWIFT_SIL_SILVTABLEVISITOR_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/SIL/TypeLowering.h"
 
 namespace swift {
 
@@ -35,9 +33,10 @@ namespace swift {
 /// - addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef):
 ///   update vtable entry for baseRef to call derivedRef
 ///
+/// - addPlaceholder(MissingMemberDecl *);
+///   introduce an entry for a method that could not be deserialized
+///
 template <class T> class SILVTableVisitor {
-  Lowering::TypeConverter &Types;
-
   T &asDerived() { return *static_cast<T*>(this); }
 
   void maybeAddMethod(FuncDecl *fd) {
@@ -71,15 +70,13 @@ template <class T> class SILVTableVisitor {
     // Update any existing entries that it overrides.
     auto nextRef = declRef;
     while ((nextRef = nextRef.getNextOverriddenVTableEntry())) {
-      auto baseRef = Types.getOverriddenVTableEntry(nextRef);
+      auto baseRef = nextRef.getOverriddenVTableEntry();
       asDerived().addMethodOverride(baseRef, declRef);
       nextRef = baseRef;
     }
   }
 
 protected:
-  SILVTableVisitor(Lowering::TypeConverter &Types) : Types(Types) {}
-
   void addVTableEntries(ClassDecl *theClass) {
     // Imported classes do not have a vtable.
     if (!theClass->hasKnownSwiftImplementation())
