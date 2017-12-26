@@ -26,11 +26,17 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/Support/CommandLine.h"
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
 #define DEBUG_TYPE "tf-partition"
 using namespace swift;
 using namespace tf;
+
+static llvm::cl::opt<bool>
+TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
+              llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -1688,15 +1694,11 @@ SILFunction *TFFunctionPartition::run() {
   // nothing to do!
   if (markedBlocks.empty()) return nullptr;
 
-#if 0
-  llvm::errs() << "---- INPUT FUNCTION " << fn.getName() << " ----------\n";
-  fn.dump();
-  llvm::errs() << "---- END OF INPUT FUNCTION ----------\n";
-
-  tensorCodeBlocks.dump();
-  llvm::errs() << "---- END OF INPUT FUNCTION POST DOM ----------\n";
-#endif
-
+  if (TFDumpIntermediates) {
+    llvm::outs() << "---- INPUT FUNCTION " << fn.getName() << " ----------\n";
+    fn.print(llvm::outs());
+    llvm::outs() << "---- END OF INPUT FUNCTION ----------\n";
+  }
 
   // Create the builtin in the host program that kicks off the tensor program,
   // setting the argument values.
@@ -1818,13 +1820,12 @@ SILFunction *TFFunctionPartition::run() {
 /// Find the TensorCore declaration so we can synthesize types.
 /// FIXME: This should go away if/when TensorCore becomes a builtin type, or
 /// when we have a formal TensorFlow Swift library.
-static StructDecl *findTensorCoreDecl(SILFunction *F) {
+static StructDecl *findTensorCoreDecl(ModuleDecl *tensorFlowModule) {
   // Get the module that the function we're partitioning lives in.
-  auto *MD = F->getModule().getSwiftModule();
 
   SmallVector<ValueDecl *, 1> results;
-  MD->lookupValue({ }, MD->getASTContext().getIdentifier("TensorCore"),
-                  NLKind::UnqualifiedLookup, results);
+  auto name = tensorFlowModule->getASTContext().getIdentifier("TensorCore");
+  tensorFlowModule->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
 
   for (auto result : results)
     if (auto SD = dyn_cast<StructDecl>(result))
@@ -1840,20 +1841,22 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
-    // Ignore non-public functions.
-    SILFunction *F = getFunction();
-    if (F->getLinkage() != SILLinkage::Public)
-      return;
+    SILFunction *fn = getFunction();
+    auto &Ctx = fn->getASTContext();
 
-    // Don't transform the internals of the tensor library.
-    if (!F->getLocation().isInTopLevel() &&
-        isTensorLibraryInternal(F->getLocation(), F->getASTContext()))
+    // If the TensorFlow module hasn't been imported by the program, don't do
+    // anything.  This avoids impacting compile time for non-TensorFlow using
+    // Swift programs by doing extraneous analysis.
+    auto tfModule = Ctx.getLoadedModule(Ctx.getIdentifier("TensorFlow"));
+
+    // Ignore non-public functions.
+    if (fn->getLinkage() != SILLinkage::Public)
       return;
 
     // Make sure that the TensorCore type is findable.
     // TODO: TensorCore will eventually become a builtin type, and this will go
     // away.
-    auto tensorCore = findTensorCoreDecl(F);
+    auto tensorCore = findTensorCoreDecl(tfModule);
     if (!tensorCore) {
       llvm::errs() << " *** DIDN'T FIND TensorCore<> TYPE\n";
       return;
@@ -1867,7 +1870,7 @@ public:
     // delete it.
 
     // Try to partition the specified function.
-    auto *partitionedFn = TFFunctionPartition(*F, tensorCore, PM).run();
+    auto *partitionedFn = TFFunctionPartition(*fn, tensorCore, PM).run();
     if (!partitionedFn) return;
 
     // If we got something, we can process the tensor program further.
@@ -1879,16 +1882,18 @@ public:
     // and quit.  This allows writing regression tests for the tf-partition
     // pass in isolation.  This is pretty unconventional for a SIL pass, but
     // this is an unconventional pass!
-    if (isTest) {
-      llvm::outs() << "--- TFPartition Host Result: " << F->getName() << "\n";
-      F->print(llvm::outs());
+    if (isTest || TFDumpIntermediates) {
+      llvm::outs() << "--- TFPartition Host Result: " << fn->getName() << "\n";
+      fn->print(llvm::outs());
       llvm::outs() << "--- TFPartition Accelerator Result: "
                    << partitionedFn->getName() << "\n";
       partitionedFn->print(llvm::outs());
+    }
 
+    if (isTest) {
       // Finally, we're done.  Remove the partitioned function so it doesn't go
       // through the normal compiler flow.
-      partitionedFn->getModule().eraseFunction(F);
+      partitionedFn->getModule().eraseFunction(fn);
       return;
     }
 

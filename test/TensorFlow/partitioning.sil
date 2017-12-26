@@ -2,7 +2,7 @@
 
 import Builtin
 import Swift
-struct TensorCore<Element> {}
+import TensorFlow
 
 sil @_T018__tfop_Const__dc__Sf_Tg5 : $@convention(thin) (Swift.Float) -> @owned TensorCore<Swift.Float>
 sil @_T016__tfop_Add__tt__Sf_Tg5Tf4gg_n : $@convention(thin) (@guaranteed TensorCore<Swift.Float>, @guaranteed TensorCore<Swift.Float>) -> @owned TensorCore<Swift.Float>

@@ -36,6 +36,7 @@ public struct Tensor<Element : TensorElementProtocol> {
   let core : TensorCore<Element>
 
   @_versioned
+  @_inlineable
   internal init(_ c : TensorCore<Element>) {
     core = c
   }
