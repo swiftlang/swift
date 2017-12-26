@@ -23,9 +23,9 @@ func useD(_ d: D) {}
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[OFFSET]] : $*D
 // CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
+// CHECK:   destroy_value [[CLASS]]
 // CHECK:   [[FUNC:%.*]] = function_ref @_T06borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
-// CHECK:   destroy_value [[CLASS]]
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function '_T06borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
 func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {
