@@ -164,8 +164,7 @@ static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   }
 
   // If we are verifying all of the intermediate steps, add the verifier...
-  if (VerifyEach)
-    PM.add(createVerifierPass());
+  PM.add(createVerifierPass());
 }
 
 static void runSpecificPasses(StringRef Binary, llvm::Module *M,

@@ -1500,7 +1500,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
-  Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
+  Opts.VerifyAll |= true;
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);

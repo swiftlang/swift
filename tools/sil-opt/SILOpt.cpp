@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.VerifyAll = EnableSILVerifyAll;
+  SILOpts.VerifyAll = true;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
