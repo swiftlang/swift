@@ -186,7 +186,7 @@ static bool is64(const StructType *ty) {
 }
 
 static TF_DataType convertSwiftPrimitiveTypeToTF(Type ty) {
-  // Handle wrappers like Float, which come up in TensorCore<Float>
+  // Handle wrappers like Float, which come up in TensorHandle<Float>
   if (auto *s = ty->getAs<StructType>()) {
     // Make sure the type is defined inside the Swift module.
     auto context = s->getDecl()->getDeclContext()->getParentModule();
@@ -238,8 +238,8 @@ static TF_DataType convertSwiftPrimitiveTypeToTF(SILType ty) {
 
 TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
                                                    SILLocation loc) {
-  // Handle things like TensorCore<Float>.
-  if (auto elt = tf::isTensorCore(type.getSwiftRValueType())) {
+  // Handle things like TensorHandle<Float>.
+  if (auto elt = tf::isTensorHandle(type.getSwiftRValueType())) {
     if (auto ty = convertSwiftPrimitiveTypeToTF(elt))
       return ty;
   }
@@ -517,6 +517,7 @@ void tf::emitTensorFlowGraph(SILFunction *fn, StringRef fnName) {
   structure->print(llvm::outs());
   llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
 
+  // FIXME: Remove.
   return;
 
   // Right now we only support lowering graphs that are a single basic block.
