@@ -177,19 +177,14 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
                                    bool objc, bool canBeOnStack,
-                                   ArrayRef<SILType> ElementTypes,
-                                   ArrayRef<SILValue> AllOperands)
-    : AllocationInst(Kind, Loc, ObjectType), Operands(this, AllOperands) {
+                                   ArrayRef<SILType> ElementTypes)
+    : AllocationInst(Kind, Loc, ObjectType) {
   SILInstruction::Bits.AllocRefInstBase.ObjC = objc;
   SILInstruction::Bits.AllocRefInstBase.OnStack = canBeOnStack;
   SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
-  static_assert(IsTriviallyCopyable<SILType>::value,
-                "assuming SILType is trivially copyable");
+  assert(SILInstruction::Bits.AllocRefInstBase.NumTailTypes ==
+         ElementTypes.size() && "Truncation");
   assert(!objc || ElementTypes.size() == 0);
-  assert(AllOperands.size() >= ElementTypes.size());
-
-  memcpy(getTypeStorage(), ElementTypes.begin(),
-         sizeof(SILType) * ElementTypes.size());
 }
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
@@ -208,11 +203,9 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
   }
   collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
                                ObjectType.getSwiftRValueType());
-  void *Buffer = F.getModule().allocateInst(
-                      sizeof(AllocRefInst)
-                        + decltype(Operands)::getExtraSize(AllOperands.size())
-                        + sizeof(SILType) * ElementTypes.size(),
-                      alignof(AllocRefInst));
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
   return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack,
                                      ElementTypes, AllOperands);
 }
@@ -232,11 +225,9 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
     collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
                                  ElemType.getSwiftRValueType());
   }
-  void *Buffer = F.getModule().allocateInst(
-                      sizeof(AllocRefDynamicInst)
-                        + decltype(Operands)::getExtraSize(AllOperands.size())
-                        + sizeof(SILType) * ElementTypes.size(),
-                      alignof(AllocRefDynamicInst));
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefDynamicInst));
   return ::new (Buffer)
       AllocRefDynamicInst(DebugLoc, ty, objc, ElementTypes, AllOperands);
 }

@@ -198,13 +198,13 @@ protected:
     NumOperands : 32-NumAllocationInstBits,
     VarInfo : 32
   );
-  SWIFT_INLINE_BITFIELD_FULL(AllocRefInstBase, AllocationInst, 1+1+32,
+  IBWTO_BITFIELD(AllocRefInstBase, AllocationInst, 32-NumAllocationInstBits,
     ObjC : 1,
     OnStack : 1,
-    : NumPadBits,
-    // Number of tail-allocated arrays.
-    NumTailTypes : 32
+    NumTailTypes : 32-1-1-NumAllocationInstBits
   );
+  static_assert(32-1-1-NumAllocationInstBits >= 16, "Reconsider bitfield use?");
+
   UIWTDOB_BITFIELD(AllocValueBufferInst, AllocationInst, 0, : NumPadBits);
 
   // TODO: Sort the following in SILNodes.def order

@@ -1335,6 +1335,9 @@ public:
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
+///
+/// The first NumTailTypes operands are counts for the tail allocated
+/// elements, the remaining operands are opened archetype operands.
 class AllocRefInstBase : public AllocationInst {
 protected:
 
@@ -1342,19 +1345,11 @@ protected:
                    SILDebugLocation DebugLoc,
                    SILType ObjectType,
                    bool objc, bool canBeOnStack,
-                   ArrayRef<SILType> ElementTypes,
-                   ArrayRef<SILValue> AllOperands);
+                   ArrayRef<SILType> ElementTypes);
 
-  /// The first NumTailTypes operands are counts for the tail allocated
-  /// elements, the remaining operands are opened archetype operands.
-  TailAllocatedOperandList<0> Operands;
-
-  SILType *getTypeStorage() {
-    return reinterpret_cast<SILType*>(Operands.asArray().end());
-  }
-
+  SILType *getTypeStorage();
   const SILType *getTypeStorage() const {
-    return reinterpret_cast<const SILType*>(Operands.asArray().end());
+    return const_cast<AllocRefInstBase*>(this)->getTypeStorage();
   }
 
   unsigned getNumTailTypes() const {
@@ -1386,13 +1381,8 @@ public:
     return getAllOperands().slice(0, getNumTailTypes());
   }
 
-  ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
-  }
+  ArrayRef<Operand> getAllOperands() const;
+  MutableArrayRef<Operand> getAllOperands();
   
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
   bool isObjC() const {
@@ -1406,8 +1396,11 @@ public:
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
 class AllocRefInst final
-    : public InstructionBase<SILInstructionKind::AllocRefInst,
-                             AllocRefInstBase> {
+    : public InstructionBaseWithTrailingOperands<
+                                               SILInstructionKind::AllocRefInst,
+                                               AllocRefInst,
+                                               AllocRefInstBase, SILType> {
+  friend AllocRefInstBase;
   friend SILBuilder;
 
   AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
@@ -1415,10 +1408,11 @@ class AllocRefInst final
                bool objc, bool canBeOnStack,
                ArrayRef<SILType> ElementTypes,
                ArrayRef<SILValue> AllOperands)
-      : InstructionBase(DebugLoc, ObjectType, objc,
-                        canBeOnStack, ElementTypes, AllOperands) {
-    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
-                  "subclass has extra storage");
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
+                        objc, canBeOnStack, ElementTypes) {
+    assert(AllOperands.size() >= ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
   }
 
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
@@ -1445,8 +1439,11 @@ public:
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
 class AllocRefDynamicInst final
-    : public InstructionBase<SILInstructionKind::AllocRefDynamicInst,
-                             AllocRefInstBase> {
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::AllocRefDynamicInst,
+                                        AllocRefDynamicInst,
+                                        AllocRefInstBase, SILType> {
+  friend AllocRefInstBase;
   friend SILBuilder;
 
   AllocRefDynamicInst(SILDebugLocation DebugLoc,
@@ -1454,9 +1451,11 @@ class AllocRefDynamicInst final
                       bool objc,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
-      : InstructionBase(DebugLoc, ty, objc, false, ElementTypes, AllOperands) {
-    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
-                  "subclass has extra storage");
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
+                                            false, ElementTypes) {
+    assert(AllOperands.size() >= ElementTypes.size() + 1);
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
   }
 
   static AllocRefDynamicInst *
@@ -7717,6 +7716,33 @@ public:
 inline DestructureTupleInst *DestructureTupleResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();
   return cast<DestructureTupleInst>(Parent);
+}
+
+inline SILType *AllocRefInstBase::getTypeStorage() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getTrailingObjects<SILType>();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getTrailingObjects<SILType>();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline ArrayRef<Operand> AllocRefInstBase::getAllOperands() const {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline MutableArrayRef<Operand> AllocRefInstBase::getAllOperands() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
 }
 
 } // end swift namespace
