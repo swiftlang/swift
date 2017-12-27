@@ -343,3 +343,39 @@ const OutputPaths &FrontendInputsAndOutputs::supplementaryOutputPaths() const {
   assertMustNotBeMoreThanOnePrimaryInput();
   return firstInputProducingSupplementaryOutput().supplementaryOutputPaths();
 }
+
+bool FrontendInputsAndOutputs::hasDependenciesPath() const {
+  bool r = false;
+  forEachInputProducingOutput([&](const InputFile &inp) -> void {
+    r = !inp.supplementaryOutputPaths().DependenciesFilePath.empty() || r;
+  });
+  return r;
+}
+bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
+  bool r = false;
+  forEachInputProducingOutput([&](const InputFile &inp) -> void {
+    r = !inp.supplementaryOutputPaths().ObjCHeaderOutputPath.empty() || r;
+  });
+  return r;
+}
+bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
+  bool r = false;
+  forEachInputProducingOutput([&](const InputFile &inp) -> void {
+    r = !inp.supplementaryOutputPaths().LoadedModuleTracePath.empty() || r;
+  });
+  return r;
+}
+bool FrontendInputsAndOutputs::hasModuleOutputPath() const {
+  bool r = false;
+  forEachInputProducingOutput([&](const InputFile &inp) -> void {
+    r = !inp.supplementaryOutputPaths().ModuleOutputPath.empty() || r;
+  });
+  return r;
+}
+bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
+  bool r = false;
+  forEachInputProducingOutput([&](const InputFile &inp) -> void {
+    r = !inp.supplementaryOutputPaths().ModuleDocOutputPath.empty() || r;
+  });
+  return r;
+}

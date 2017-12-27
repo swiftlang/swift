@@ -205,6 +205,13 @@ private:
       ArrayRef<const OutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
+
+public:
+  bool hasDependenciesPath() const;
+  bool hasObjCHeaderOutputPath() const;
+  bool hasLoadedModuleTracePath() const;
+  bool hasModuleOutputPath() const;
+  bool hasModuleDocOutputPath() const;
 };
 
 } // namespace swift
