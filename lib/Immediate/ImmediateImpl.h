@@ -45,12 +45,10 @@ bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
 bool linkLLVMModules(llvm::Module *Module,
                      std::unique_ptr<llvm::Module> SubModule);
 bool IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
+    CompilerInstance &CI, llvm::Module &Module,
     llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
-    const SILOptions &SILOpts);
+    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
+    const SILOptions &SILOpts, std::string mainInputFilenameForDebugInfo);
 
 } // end namespace immediate
 } // end namespace swift

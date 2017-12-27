@@ -204,12 +204,10 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
+    CompilerInstance &CI, llvm::Module &Module,
     llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
-    const SILOptions &SILOpts) {
+    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
+    const SILOptions &SILOpts, std::string mainInputFilenameForDebugInfo) {
   swift::ModuleDecl *M = CI.getMainModule();
 
   // Perform autolinking.
@@ -251,8 +249,8 @@ bool swift::immediate::IRGenImportedModules(
     if (!ImportedModules.insert(import).second)
       continue;
 
-    std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
-                                                             CI.getSILOptions());
+    std::unique_ptr<SILModule> SILMod = performSILGeneration(
+        import, CI.getSILOptions(), mainInputFilenameForDebugInfo);
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
@@ -294,7 +292,8 @@ bool swift::immediate::IRGenImportedModules(
 }
 
 int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts,
+                          std::string mainInputFilenameForDebugInfo) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -346,8 +345,8 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
-  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
-                           IRGenOpts, SILOpts))
+  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns, IRGenOpts,
+                           SILOpts, mainInputFilenameForDebugInfo))
     return -1;
 
   llvm::PassManagerBuilder PMBuilder;

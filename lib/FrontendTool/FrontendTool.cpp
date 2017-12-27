@@ -819,12 +819,15 @@ static bool performCompile(CompilerInstance &Instance,
         // have a primary serialized input.
         for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
+            std::string filename = InputFile::
+                convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                    SASTF->getFilename());
             if (Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(
-                    InputFile::
-                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-                            SASTF->getFilename()))) {
+                    filename)) {
               assert(PSGIs.empty() && "Can only handle one primary AST input");
-              auto SM = performSILGeneration(*SASTF, SILOpts, None);
+              auto SM = performSILGeneration(
+                  *SASTF, SILOpts,
+                  Instance.mainInputFilenameForDebugInfo(filename), None);
               PSGIs.push_back(
                   PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
             }
@@ -835,7 +838,10 @@ static bool performCompile(CompilerInstance &Instance,
         // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
         // once for each such input.
         for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-          auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
+          auto SM = performSILGeneration(*PrimaryFile, SILOpts,
+                                         Instance.mainInputFilenameForDebugInfo(
+                                             PrimaryFile->getFilename()),
+                                         None);
           PSGIs.push_back(PostSILGenInputs{
               std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
         }
@@ -843,7 +849,9 @@ static bool performCompile(CompilerInstance &Instance,
     } else {
       // If we have no primary inputs we are in WMO mode and need to build a
       // SILModule for the entire module.
-      auto SM = performSILGeneration(mod, SILOpts, true);
+      auto SM = performSILGeneration(
+          mod, SILOpts, Instance.mainInputFilenameForDebugInfo(StringRef()),
+          true);
       PSGIs.push_back(PostSILGenInputs{
           std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
     }
@@ -1112,7 +1120,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     }
 
     ReturnValue =
-      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
+        RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
+                       Instance.mainInputFilenameForDebugInfo());
     return Context.hadError();
   }
 

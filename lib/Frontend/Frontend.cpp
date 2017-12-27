@@ -62,6 +62,7 @@ std::unique_ptr<SILModule> CompilerInstance::createSILModule() {
   // Assume WMO if a -primary-file option was not provided.
   return SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
+      mainInputFilenameForDebugInfo(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
@@ -229,6 +230,18 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
     return true;
   }
   return Invocation.getFrontendOptions().isCreatingSIL();
+}
+
+StringRef CompilerInvocation::mainInputFilenameForDebugInfo(
+    StringRef primaryFilename) const {
+  return !SILOpts.SILOutputFileNameForDebugging.empty()
+             ? StringRef(SILOpts.SILOutputFileNameForDebugging)
+             : !primaryFilename.empty()
+                   ? primaryFilename
+                   : getFrontendOptions().InputsAndOutputs.hasSingleInput()
+                         ? getFrontendOptions()
+                               .InputsAndOutputs.getFilenameOfFirstInput()
+                         : StringRef();
 }
 
 void CompilerInstance::performSema() {
@@ -683,3 +696,13 @@ void CompilerInstance::freeContextAndSIL() {
   clearPrimarySourceFilesAndBuffers();
 }
 
+StringRef CompilerInstance::mainInputFilenameForDebugInfo(
+    StringRef primaryFilename) const {
+  return Invocation.mainInputFilenameForDebugInfo(primaryFilename);
+}
+
+StringRef CompilerInstance::mainInputFilenameForDebugInfo() const {
+  const InputFile *pri =
+      Invocation.getFrontendOptions().InputsAndOutputs.getUniquePrimaryInput();
+  return mainInputFilenameForDebugInfo(pri ? pri->file() : StringRef());
+}
