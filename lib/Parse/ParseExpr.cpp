@@ -576,15 +576,14 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   if (startsWithSymbol(Tok, '.')) {
     llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.getPtrOrNull());
 
+    auto dotLoc = Tok.getLoc();
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
     // sense. This is all made more complicated by .?. being considered an
     // operator token, and a single one at that (which means
     // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
-    auto position = getParserPosition();
-    auto dotLoc = consumeStartingCharacterOfCurrentToken(tok::period);
-    if (Tok.is(tok::identifier))
-      backtrackToPosition(position);
+    if (Tok.getLength() != 1 || !peekToken().is(tok::identifier))
+      consumeStartingCharacterOfCurrentToken(tok::period);
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
     bool unusedHasBindOptional = false;
