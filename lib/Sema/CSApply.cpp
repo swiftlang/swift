@@ -589,7 +589,7 @@ namespace {
                   refExpr = fnConv->getSubExpr();
 
                 if (forceUnwrap)
-                  return forceUnwrapResult(refExpr, openedType);
+                  return forceUnwrapResult(refExpr);
 
                 return refExpr;
               }
@@ -639,7 +639,7 @@ namespace {
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       if (forceUnwrap)
-        return forceUnwrapResult(declRefExpr, openedType);
+        return forceUnwrapResult(declRefExpr);
 
       return declRefExpr;
     }
@@ -942,7 +942,7 @@ namespace {
         auto *DSBI = cs.cacheType(new (context)
                                   DotSyntaxBaseIgnoredExpr(base, dotLoc, ref, cs.getType(ref)));
         if (forceUnwrap)
-          return forceUnwrapResult(DSBI, openedType);
+          return forceUnwrapResult(DSBI);
         return DSBI;
       }
 
@@ -1065,7 +1065,7 @@ namespace {
         }
 
         if (forceUnwrap)
-          return forceUnwrapResult(ref, openedType);
+          return forceUnwrapResult(ref);
         return ref;
       }
 
@@ -1093,7 +1093,7 @@ namespace {
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
         if (forceUnwrap)
-          return forceUnwrapResult(result, openedType);
+          return forceUnwrapResult(result);
         return result;
       }
       
@@ -1115,7 +1115,7 @@ namespace {
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
         if (forceUnwrap)
-          ref = forceUnwrapResult(ref, openedType);
+          ref = forceUnwrapResult(ref);
         apply = new (context) ConstructorRefCallExpr(ref, base);
       } else if (!baseIsInstance && member->isInstanceMember()) {
         // Reference to an unbound instance method.
@@ -1125,7 +1125,7 @@ namespace {
         cs.cacheType(result);
         closeExistential(result, locator, /*force=*/openedExistential);
         if (forceUnwrap)
-          return forceUnwrapResult(result, openedType);
+          return forceUnwrapResult(result);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -1136,10 +1136,7 @@ namespace {
         }
       }
 
-      auto *resultApply = finishApply(apply, openedType, locator);
-      if (forceUnwrap)
-        return forceUnwrapResult(resultApply, openedType);
-      return resultApply;
+      return finishApply(apply, openedType, locator);
     }
     
     /// \brief Describes either a type or the name of a type to be resolved.
@@ -1405,24 +1402,9 @@ namespace {
                                                *selected, hasTrailingClosure,
                                                locator, isImplicit, semantics);
 
-      auto choice = selected->choice;
-
-      if (choice.getKind() ==
-          OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
-
-        if (choice.getDecl()
-                ->getAttrs()
-                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-          auto *disjunctionLocator =
-              cs.getConstraintLocator(locator.withPathElement(
-                  ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
-          if (solution.getDisjunctionChoice(disjunctionLocator)) {
-            return coerceImplicitlyUnwrappedOptionalToValue(
-                newSubscript,
-                cs.getType(newSubscript)->getAnyOptionalObjectType());
-          }
-        }
-      }
+      if (shouldForceUnwrapResult(cs.getConstraintLocator(locator)->getAnchor(),
+                                  selected->choice))
+        return forceUnwrapResult(newSubscript);
 
       return newSubscript;
     }
@@ -2426,8 +2408,8 @@ namespace {
       return solution.getDisjunctionChoice(choiceLocator);
     }
 
-    Expr *forceUnwrapResult(Expr *newExpr, Type openedType) {
-      auto ty = simplifyType(openedType);
+    Expr *forceUnwrapResult(Expr *newExpr) {
+      auto ty = simplifyType(cs.getType(newExpr));
 
       if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
         auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
@@ -7282,7 +7264,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     }
 
     if (unwrapResult)
-      return forceUnwrapResult(result, openedType);
+      return forceUnwrapResult(result);
 
     return result;
   }
