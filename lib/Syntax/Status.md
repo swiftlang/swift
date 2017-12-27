@@ -68,9 +68,9 @@
   * IfConfigDecl
   * PatternBindingDecl
   * VarDecl
+  * ExtensionDecl
 
 ### In-progress (UnknownDecl):
-  * ExtensionDecl (SR-6572)
 
 ### Not-started (UnknownDecl):
   * EnumCaseDecl
