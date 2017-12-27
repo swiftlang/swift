@@ -278,7 +278,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   while (Ptr >= ContentStart + 1) {
     char C = Ptr[-1];
     if (C == ' ' || C == '\t') {
-      Ptr--;
+      --Ptr;
       continue;
     }
     if (C == 0) {
@@ -286,11 +286,11 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
       // completion token.
       if (Ptr - 1 == CodeCompletionPtr)
         break;
-      Ptr--;
+      --Ptr;
       continue;
     }
     if (C == '\n' || C == '\r') {
-      Ptr--;
+      --Ptr;
       break;
     }
     break;
@@ -598,13 +598,13 @@ void Lexer::lexHash() {
 
   // NOTE: legacy punctuator.  Remove in the future.
   if (*CurPtr == ']') { // #]
-     CurPtr++;
+     ++CurPtr;
      return formToken(tok::r_square_lit, TokStart);
   }
   
   // Allow a hashbang #! line at the beginning of the file.
   if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
-    CurPtr--;
+    --CurPtr;
     if (BufferID != SourceMgr.getHashbangBufferID())
       diagnose(CurPtr, diag::lex_hashbang_not_allowed);
     skipHashbang(/*EatNewline=*/true);
@@ -1153,7 +1153,7 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
       continue;
     case '\r':
       if (*TmpPtr == '\n')
-        TmpPtr++;
+        ++TmpPtr;
       LLVM_FALLTHROUGH;
     case '\n':
       CurPtr = TmpPtr;
@@ -1423,7 +1423,7 @@ static StringRef getStringLiteralContent(const Token &Str) {
 static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
   size_t offset = 0;
   while (offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
-    offset++;
+    ++offset;
   }
   
   return offset;
@@ -1445,7 +1445,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       continue;
     case '\n':
     case '\r': {
-      start++;
+      ++start;
       auto startLoc = Lexer::getSourceLoc(start);
       auto string = StringRef(start, end - start);
 
@@ -1654,7 +1654,7 @@ void Lexer::lexStringLiteral() {
     // If this is the end of string, we are done.  If it is a normal character
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
-      CurPtr++;
+      ++CurPtr;
       if (wasErroneous)
         return formToken(tok::unknown, TokStart);
 
@@ -1890,7 +1890,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       bool stripNewline = IsEscapedNewline ||
         (IsFirstSegment && BytesPtr - 1 == Bytes.begin());
       if (CurChar == '\r' && *BytesPtr == '\n')
-        BytesPtr++;
+        ++BytesPtr;
       if (*BytesPtr != '\r' && *BytesPtr != '\n')
         BytesPtr += IndentToStrip;
       if (IsLastSegment && BytesPtr == Bytes.end())
@@ -1925,7 +1925,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case ' ': case '\t': case '\n': case '\r':
       if (maybeConsumeNewlineEscape(BytesPtr, -1)) {
         IsEscapedNewline = true;
-        BytesPtr--;
+        --BytesPtr;
       }
       continue;
 
@@ -2149,7 +2149,7 @@ Restart:
 
     // Otherwise, this is the real end of the buffer.  Put CurPtr back into
     // buffer bounds.
-    CurPtr--;
+    --CurPtr;
     // Return EOF.
     return formToken(tok::eof, TokStart);
 
