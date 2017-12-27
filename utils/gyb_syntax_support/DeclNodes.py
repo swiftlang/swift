@@ -371,7 +371,7 @@ DECL_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
              Child('Initializer', kind='InitializerClause', is_optional=True),
-             Child('Accesor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='AccessorBlock', is_optional=True),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
