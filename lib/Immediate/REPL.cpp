@@ -831,8 +831,10 @@ private:
     std::unique_ptr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
-                                 RC.CurIRGenElem);
+      sil = performSILGeneration(
+          REPLInputFile, CI.getSILOptions(),
+          CI.mainInputFilenameForDebugInfo(REPLInputFile.getFilename()),
+          RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
       runSILLoweringPasses(*sil);
@@ -893,9 +895,10 @@ private:
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
-    
+
     if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
-                             IRGenOpts, SILOpts))
+                             IRGenOpts, SILOpts,
+                             CI.mainInputFilenameForDebugInfo()))
       return false;
     
     llvm::Module *TempModule = NewModule.get();

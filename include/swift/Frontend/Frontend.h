@@ -293,6 +293,8 @@ public:
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
+
+  StringRef mainInputFilenameForDebugInfo(StringRef primaryFilename) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -545,6 +547,12 @@ private:
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+public:
+  StringRef mainInputFilenameForDebugInfo(StringRef primaryFilename) const;
+
+  /// Fails if >1 primary.
+  StringRef mainInputFilenameForDebugInfo() const;
 };
 
 } // namespace swift
