@@ -98,7 +98,7 @@ class ObjcClass {
 // OPT_DOT_FOOSTRUCT_SPACES: End completions
 
 // UN_OPT_NO_DOT_FOOSTRUCT: Begin completions
-// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT: End completions
 

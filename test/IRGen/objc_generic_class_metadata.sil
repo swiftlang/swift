@@ -56,12 +56,12 @@ entry:
   return undef : $()
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC5thingSQyACGSQySo8NSStringCG_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
+sil @$S27objc_generic_class_metadata8SubclassC5thingACSgSo8NSStringCSg_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
 entry(%0: $Optional<NSString>, %1: $Subclass):
   unreachable
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC13arrayOfThingsSQyACGSaySo8NSStringCG_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
+sil @$S27objc_generic_class_metadata8SubclassC13arrayOfThingsACSgSaySo8NSStringCG_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
 entry(%0: $NSArray, %1: $Subclass):
   unreachable
 }
@@ -71,7 +71,7 @@ entry(%0: $Subclass):
   unreachable
 }
 
-sil @$S27objc_generic_class_metadata8SubclassC7optionsSQyACGs10DictionaryVySo13GenericOptionaypGSg_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
+sil @$S27objc_generic_class_metadata8SubclassC7optionsACSgs10DictionaryVySo13GenericOptionaypGSg_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
 entry(%0: $Subclass, %1: $NSDictionary):
   unreachable
 }

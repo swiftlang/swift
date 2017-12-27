@@ -1792,7 +1792,7 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
 
   // Create an optional of the object type that can be implicitly
   // unwrapped which subsumes both behaviors.
-  return {ImplicitlyUnwrappedOptionalType::get(setterType), true};
+  return {OptionalType::get(setterType), true};
 }
 
 /// Add an AvailableAttr to the declaration for the given
@@ -4059,7 +4059,7 @@ namespace {
           nullability = translateNullability(*typeNullability);
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
-          resultTy = OptionalType::get(nullability, resultTy);
+          resultTy = OptionalType::get(resultTy);
           isIUO = nullability == OTK_ImplicitlyUnwrappedOptional;
         }
 
@@ -6101,8 +6101,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
-  if (failability)
-    resultTy = OptionalType::get(failability, resultTy);
+  if (failability != OTK_None)
+    resultTy = OptionalType::get(resultTy);
 
   type = FunctionType::get(oldFnType->getInput(), resultTy,
                            oldFnType->getExtInfo());

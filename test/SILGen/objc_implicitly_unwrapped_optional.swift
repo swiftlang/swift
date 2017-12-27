@@ -6,7 +6,7 @@ import Foundation
 
 class C : Hive {}
 
-// CHECK-LABEL: sil private @$S34objc_implicitly_unwrapped_optional1DC5coderACSo7NSCoderC_tcfcAA1CCADSQyAHGSQyAFG_tcfcTV
+// CHECK-LABEL: sil private @$S34objc_implicitly_unwrapped_optional1DC5coderACSo7NSCoderC_tcfcAA1CCAdHSgAFSg_tcfcTV
 // CHECK: bb0(%0 : $Optional<NSCoder>, %1 : $D):
 // CHECK:   [[THUNK:%.*]] = function_ref @$S34objc_implicitly_unwrapped_optional1DC5coderACSo7NSCoderC_tcfc
 // CHECK:   [[REF:%.*]] = apply [[THUNK]]

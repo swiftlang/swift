@@ -757,7 +757,7 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
   _ = a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{8-9=}}
   _ = a?.customMirror
 
-  _ = b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
+  _ = b?   // expected-error {{optional chain has no effect, expression already produces 'Int?'}}
   _ = b?.customMirror
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}

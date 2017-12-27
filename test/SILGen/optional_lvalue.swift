@@ -10,7 +10,7 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
 }
 
-// CHECK-LABEL: sil hidden @$S15optional_lvalue011assign_iuo_B0yySQySiGz_SitF
+// CHECK-LABEL: sil hidden @$S15optional_lvalue011assign_iuo_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
@@ -29,7 +29,7 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S15optional_lvalue011assign_iuo_B9_implicityySQyAA1SVGz_SitF
+// CHECK-LABEL: sil hidden @$S15optional_lvalue011assign_iuo_B9_implicityyAA1SVSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<S>
 // CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr [[WRITE]]
 // CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
