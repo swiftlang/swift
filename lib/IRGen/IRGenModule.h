@@ -980,7 +980,7 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              std::string mainInputFilenameForDebugInfo);
+              std::string mainInputFilenameForDebugInfo = "<lldb>");
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
