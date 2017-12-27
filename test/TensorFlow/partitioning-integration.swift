@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -tensorflow -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s | %FileCheck %s
 
 // TODO: Check diagnostics by enabling -verify mode.
 
