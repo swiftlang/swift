@@ -215,7 +215,7 @@ func tests() {
 	let _ : CFNewType = CFNewType.MyCFNewTypeValue
 	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnauditedButConst
 	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnaudited
-	  // expected-error@-1{{cannot convert value of type 'Unmanaged<CFString>!' to specified type 'CFNewType'}}
+	  // expected-error@-1{{cannot convert value of type 'Unmanaged<CFString>?' to specified type 'CFNewType'}}
 }
 
 func acceptSwiftNewtypeWrapper<T : _SwiftNewtypeWrapper>(_ t: T) { }
