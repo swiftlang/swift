@@ -875,7 +875,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
-      funcTy = OptionalType::get(ctor->getFailability(), funcTy);
+      funcTy = OptionalType::get(funcTy);
 
     // Set the IUO attribute on the decl if this was declared with !.
     if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {

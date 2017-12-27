@@ -43,7 +43,7 @@ func curry_bridged(_ x: CurryTest) -> (String?) -> String? {
 // CHECK: bb0([[ARG1:%.*]] : @owned $CurryTest):
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:\$SSo9CurryTestC7bridgedySQySSGADFTcTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:\$SSo9CurryTestC7bridgedySSSgADFTcTO]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[ARG1_COPY]])
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   destroy_value [[ARG1]]
@@ -52,7 +52,7 @@ func curry_bridged(_ x: CurryTest) -> (String?) -> String? {
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK_BAR_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_guaranteed (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ARG1:%.*]] : @owned $CurryTest):
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_2:\$SSo9CurryTestC7bridgedySQySSGADFTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_2:\$SSo9CurryTestC7bridgedySSSgADFTO]]
 // CHECK:   [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG1]])
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '[[THUNK_BAR_1]]'
@@ -104,7 +104,7 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer?
 // CHECK: bb0([[SELF:%.*]] : @owned $CurryTest):
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[BORROWED_SELF]]
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER:\$SSo9CurryTestC19returnsInnerPointerSQySvGyFTcTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER:\$SSo9CurryTestC19returnsInnerPointerSvSgyFTcTO]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[SELF_COPY]])
 // CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:   destroy_value [[SELF]]
@@ -112,7 +112,7 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer?
 // CHECK: } // end sil function '$S13objc_currying25curry_returnsInnerPointerySvSgycSo9CurryTestCF'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK_RETURNSINNERPOINTER]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_guaranteed () -> Optional<UnsafeMutableRawPointer>
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER_2:\$SSo9CurryTestC19returnsInnerPointerSQySvGyFTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER_2:\$SSo9CurryTestC19returnsInnerPointerSvSgyFTO]]
 // CHECK:   [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]](%0)
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '[[THUNK_RETURNSINNERPOINTER]]'
