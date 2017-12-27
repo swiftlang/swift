@@ -473,29 +473,32 @@ bool ArgsToFrontendOptionsConverter::
 
 bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     const {
-  if (Opts.InputsAndOutputs.countOfFilesProducingSupplementaryOutput() == 0)
-    return false;
-
-  if (Opts.hasUnusedDependenciesFilePath()) {
+  if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasDependenciesPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusedLoadedModuleTracePath()) {
+  if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusedModuleOutputPath()) {
+  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusedModuleDocOutputPath()) {
+  if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
+
   return false;
 }

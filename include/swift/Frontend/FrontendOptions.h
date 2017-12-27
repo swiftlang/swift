@@ -271,15 +271,10 @@ public:
 
 private:
 
-  bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath() const;
-  static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath() const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
 public:
