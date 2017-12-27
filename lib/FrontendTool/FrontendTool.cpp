@@ -1323,74 +1323,52 @@ silOptModeArgStr(OptimizationMode mode) {
   }
 }
 
-int swift::performFrontend(ArrayRef<const char *> Args,
-                           const char *Argv0, void *MainAddr,
-                           FrontendObserver *observer) {
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
+static std::unique_ptr<UnifiedStatsReporter>
+computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
+  const std::string &StatsOutputDir =
+      Invocation.getFrontendOptions().StatsOutputDir;
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
+  if (StatsOutputDir.empty())
+    return std::unique_ptr<UnifiedStatsReporter>();
 
-  PrintingDiagnosticConsumer PDC;
+  auto &FEOpts = Invocation.getFrontendOptions();
+  auto &LangOpts = Invocation.getLangOptions();
+  auto &SILOpts = Invocation.getSILOptions();
+  StringRef InputName =
+      FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
+  StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
+  StringRef OutFile = FEOpts.InputsAndOutputs.getSingleOutputFilename();
+  StringRef OutputType = llvm::sys::path::extension(OutFile);
+  std::string TripleName = LangOpts.Target.normalize();
+  auto Trace = Invocation.getFrontendOptions().TraceStats;
+  return llvm::make_unique<UnifiedStatsReporter>(
+      "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
+      OptType, StatsOutputDir, &SM, Trace);
+}
 
-  // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
-  // to route them through our usual textual diagnostics before crashing.
-  //
-  // Unfortunately it's not really safe to do anything else, since very
-  // low-level operations in LLVM can trigger fatal errors.
-  auto diagnoseFatalError = [&PDC](const std::string &reason, bool shouldCrash){
-    static const std::string *recursiveFatalError = nullptr;
-    if (recursiveFatalError) {
-      // Report the /original/ error through LLVM's default handler, not
-      // whatever we encountered.
-      llvm::remove_fatal_error_handler();
-      llvm::report_fatal_error(*recursiveFatalError, shouldCrash);
-    }
-    recursiveFatalError = &reason;
+static bool isDependencyTrackerNeeded(const CompilerInvocation &Invocation) {
+  return !Invocation.getFrontendOptions()
+              .InputsAndOutputs.getDependenciesFilePath()
+              .empty() ||
+         !Invocation.getFrontendOptions()
+              .InputsAndOutputs.getReferenceDependenciesFilePath()
+              .empty() ||
+         !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+         !Invocation.getFrontendOptions()
+              .InputsAndOutputs.getLoadedModuleTracePath()
+              .empty();
+}
 
-    SourceManager dummyMgr;
-
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
-                         "fatal error encountered during compilation; please "
-                           "file a bug report with your project and the crash "
-                           "log", {},
-                         DiagnosticInfo());
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo());
-    if (shouldCrash)
-      abort();
-  };
-  llvm::ScopedFatalErrorHandler handler([](void *rawCallback,
-                                           const std::string &reason,
-                                           bool shouldCrash) {
-    auto *callback = static_cast<decltype(&diagnoseFatalError)>(rawCallback);
-    (*callback)(reason, shouldCrash);
-  }, &diagnoseFatalError);
-
-  std::unique_ptr<CompilerInstance> Instance =
-    llvm::make_unique<CompilerInstance>();
-  Instance->addDiagnosticConsumer(&PDC);
-
-  struct FinishDiagProcessingCheckRAII {
-    bool CalledFinishDiagProcessing = false;
-    ~FinishDiagProcessingCheckRAII() {
-      assert(CalledFinishDiagProcessing && "returned from the function "
-        "without calling finishDiagProcessing");
-    }
-  } FinishDiagProcessingCheckRAII;
-
-  auto finishDiagProcessing = [&](int retValue) -> int {
-    FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing();
-    return retValue ? retValue : err;
-  };
-
+static Optional<int> configureInvocation(
+    CompilerInvocation &Invocation, DiagnosticEngine &Diags,
+    FrontendObserver *observer, ArrayRef<const char *> Args, const char *Argv0,
+    void *MainAddr,
+    llvm::function_ref<int(int retValue)> finishDiagProcessing) {
   if (Args.empty()) {
-    Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
+    Diags.diagnose(SourceLoc(), diag::error_no_frontend_args);
     return finishDiagProcessing(1);
   }
 
-  CompilerInvocation Invocation;
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
                                                                     MainAddr);
   Invocation.setMainExecutablePath(MainExecutablePath);
@@ -1399,7 +1377,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::sys::fs::current_path(workingDirectory);
 
   // Parse arguments.
-  if (Invocation.parseArgs(Args, Instance->getDiags(), workingDirectory)) {
+  if (Invocation.parseArgs(Args, Diags, workingDirectory)) {
     return finishDiagProcessing(1);
   }
 
@@ -1416,24 +1394,34 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       Invocation.getFrontendOptions().PrintHelpHidden) {
     unsigned IncludedFlagsBitmask = options::FrontendOption;
     unsigned ExcludedFlagsBitmask =
-      Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
-                                                        llvm::opt::HelpHidden;
+        Invocation.getFrontendOptions().PrintHelpHidden ? 0
+                                                        : llvm::opt::HelpHidden;
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask);
     return finishDiagProcessing(0);
   }
-
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::NoneAction) {
-    Instance->getDiags().diagnose(SourceLoc(),
-                                 diag::error_missing_frontend_action);
+    Diags.diagnose(SourceLoc(), diag::error_missing_frontend_action);
     return finishDiagProcessing(1);
   }
+  return None;
+}
+
+/// \return a value iff failed
+
+static std::tuple<Optional<int>, std::unique_ptr<DiagnosticConsumer>,
+                  std::unique_ptr<DiagnosticConsumer>>
+configureCompilerInstance(
+    CompilerInstance *Instance, CompilerInvocation &Invocation,
+    PrintingDiagnosticConsumer &PDC,
+    llvm::function_ref<int(int retValue)> finishDiagProcessing,
+    UnifiedStatsReporter *StatsReporter, DependencyTracker &depTracker) {
 
   // Because the serialized diagnostics consumer is initialized here,
-  // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
+  // diagnostics emitted within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
   // arguments are generated by the driver, not directly by a user. The driver
   // is responsible for emitting diagnostics for its own errors. See SR-2683
@@ -1453,10 +1441,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> FixitsConsumer;
   {
     const std::string &FixitsOutputPath =
-      Invocation.getFrontendOptions().FixitsOutputPath;
+        Invocation.getFrontendOptions().FixitsOutputPath;
     if (!FixitsOutputPath.empty()) {
-      FixitsConsumer.reset(new JSONFixitWriter(FixitsOutputPath,
-                                            Invocation.getDiagnosticOptions()));
+      FixitsConsumer.reset(new JSONFixitWriter(
+          FixitsOutputPath, Invocation.getDiagnosticOptions()));
       Instance->addDiagnosticConsumer(FixitsConsumer.get());
     }
   }
@@ -1471,72 +1459,53 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  const std::string &StatsOutputDir =
-      Invocation.getFrontendOptions().StatsOutputDir;
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
-  if (!StatsOutputDir.empty()) {
-    auto &FEOpts = Invocation.getFrontendOptions();
-    auto &LangOpts = Invocation.getLangOptions();
-    auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName =
-        FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
-    StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-    StringRef OutFile = FEOpts.InputsAndOutputs.getSingleOutputFilename();
-    StringRef OutputType = llvm::sys::path::extension(OutFile);
-    std::string TripleName = LangOpts.Target.normalize();
-    auto &SM = Instance->getSourceMgr();
-    auto Trace = Invocation.getFrontendOptions().TraceStats;
-    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
-                                                            FEOpts.ModuleName,
-                                                            InputName,
-                                                            TripleName,
-                                                            OutputType,
-                                                            OptType,
-                                                            StatsOutputDir,
-                                                            &SM,
-                                                            Trace);
-  }
-
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.getDependenciesFilePath()
-           .empty() ||
-      !Invocation.getFrontendOptions()
-           .InputsAndOutputs.getReferenceDependenciesFilePath()
-           .empty() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions()
-           .InputsAndOutputs.getLoadedModuleTracePath()
-           .empty()) {
+  if (isDependencyTrackerNeeded(Invocation))
     Instance->setDependencyTracker(&depTracker);
-  }
 
   if (Instance->setup(Invocation)) {
-    return finishDiagProcessing(1);
+    return std::make_tuple(finishDiagProcessing(1),
+                           std::move(SerializedConsumer),
+                           std::move(FixitsConsumer));
   }
 
   if (StatsReporter) {
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure
     // accumulated work on completion (mostly: TypeChecker).
-    Instance->getASTContext().Stats = StatsReporter.get();
+    Instance->getASTContext().Stats = StatsReporter;
   }
+  return std::make_tuple(None, std::move(SerializedConsumer),
+                         std::move(FixitsConsumer));
+}
 
-  // The compiler instance has been configured; notify our observer.
-  if (observer) {
-    observer->configuredCompiler(*Instance);
+static bool verifyAndDiagnose(CompilerInstance *Instance,
+                              const CompilerInvocation &Invocation) {
+  const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
+  bool HadError = verifyDiagnostics(
+      Instance->getSourceMgr(), Instance->getInputBufferIDs(),
+      diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+      diagOpts.VerifyIgnoreUnknown);
+
+  DiagnosticEngine &diags = Instance->getDiags();
+  if (diags.hasFatalErrorOccurred() &&
+      !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
+    diags.resetHadAnyError();
+    diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
+    return true;
   }
+  return HadError;
+}
 
-  int ReturnValue = 0;
-  bool HadError =
-    performCompile(*Instance, Invocation, Args, ReturnValue, observer,
-                   StatsReporter.get());
-
+static int handleResultOfCompilation(
+    bool HadError, CompilerInstance *Instance,
+    const CompilerInvocation &Invocation, int ReturnValue,
+    UnifiedStatsReporter *StatsReporter,
+    llvm::function_ref<int(int retValue)> finishDiagProcessing) {
   if (!HadError) {
     Mangle::printManglingStats();
   }
@@ -1545,27 +1514,115 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
-
-  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    HadError = verifyDiagnostics(
-        Instance->getSourceMgr(),
-        Instance->getInputBufferIDs(),
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown);
-
-    DiagnosticEngine &diags = Instance->getDiags();
-    if (diags.hasFatalErrorOccurred() &&
-        !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
-      diags.resetHadAnyError();
-      diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
-      HadError = true;
-    }
-  }
+  const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify)
+    HadError = verifyAndDiagnose(Instance, Invocation);
 
   auto r = finishDiagProcessing(HadError ? 1 : ReturnValue);
   if (StatsReporter)
     StatsReporter->noteCurrentProcessExitStatus(r);
   return r;
+}
+
+int swift::performFrontend(ArrayRef<const char *> Args, const char *Argv0,
+                           void *MainAddr, FrontendObserver *observer) {
+  llvm::InitializeAllTargets();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmPrinters();
+  llvm::InitializeAllAsmParsers();
+
+  PrintingDiagnosticConsumer PDC;
+
+  // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
+  // to route them through our usual textual diagnostics before crashing.
+  //
+  // Unfortunately it's not really safe to do anything else, since very
+  // low-level operations in LLVM can trigger fatal errors.
+  auto diagnoseFatalError = [&PDC](const std::string &reason,
+                                   bool shouldCrash) {
+    static const std::string *recursiveFatalError = nullptr;
+    if (recursiveFatalError) {
+      // Report the /original/ error through LLVM's default handler, not
+      // whatever we encountered.
+      llvm::remove_fatal_error_handler();
+      llvm::report_fatal_error(*recursiveFatalError, shouldCrash);
+    }
+    recursiveFatalError = &reason;
+
+    SourceManager dummyMgr;
+
+    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
+                         "fatal error encountered during compilation; please "
+                         "file a bug report with your project and the crash "
+                         "log",
+                         {}, DiagnosticInfo());
+    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
+                         {}, DiagnosticInfo());
+    if (shouldCrash)
+      abort();
+  };
+  llvm::ScopedFatalErrorHandler handler(
+      [](void *rawCallback, const std::string &reason, bool shouldCrash) {
+        auto *callback =
+            static_cast<decltype(&diagnoseFatalError)>(rawCallback);
+        (*callback)(reason, shouldCrash);
+      },
+      &diagnoseFatalError);
+
+  std::unique_ptr<CompilerInstance> Instance =
+      llvm::make_unique<CompilerInstance>();
+  Instance->addDiagnosticConsumer(&PDC);
+
+  struct FinishDiagProcessingCheckRAII {
+    bool CalledFinishDiagProcessing = false;
+    ~FinishDiagProcessingCheckRAII() {
+      assert(CalledFinishDiagProcessing &&
+             "returned from the function "
+             "without calling finishDiagProcessing");
+    }
+  } FinishDiagProcessingCheckRAII;
+
+  auto finishDiagProcessing = [&](int retValue) -> int {
+    FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
+    bool err = Instance->getDiags().finishProcessing();
+    return retValue ? retValue : err;
+  };
+
+  CompilerInvocation Invocation;
+
+  if (Optional<int> retVal =
+          configureInvocation(Invocation, Instance->getDiags(), observer, Args,
+                              Argv0, MainAddr, finishDiagProcessing)) {
+    return *retVal;
+  }
+
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter =
+      computeStatsReporter(Invocation, Instance->getSourceMgr());
+
+  DependencyTracker depTracker;
+
+  std::tuple<Optional<int>, std::unique_ptr<DiagnosticConsumer>,
+             std::unique_ptr<DiagnosticConsumer>>
+      resultSerializedConsumerFixitsConsumer =
+          configureCompilerInstance(Instance.get(), Invocation, PDC,
+                                    finishDiagProcessing, StatsReporter.get(),
+                                    depTracker);
+  if (auto retVal = std::get<0>(resultSerializedConsumerFixitsConsumer)) {
+    return *retVal;
+  }
+
+  // The compiler instance has been configured; notify our observer.
+  if (observer) {
+    observer->configuredCompiler(*Instance);
+  }
+
+  int ReturnValue = 0;
+  bool HadError = performCompile(*Instance, Invocation, Args, ReturnValue,
+                                 observer, StatsReporter.get());
+
+  return handleResultOfCompilation(HadError, Instance.get(), Invocation,
+                                   ReturnValue, StatsReporter.get(),
+                                   finishDiagProcessing);
 }
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
