@@ -241,7 +241,7 @@ namespace swift {
   /// SourceFile, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, SILOptions &options,
-                       StringRef mainInputFilenameForDebugInfo,
+                       StringRef mainInputFilenameForDebugInfo = "<lldb>",
                        Optional<unsigned> StartElem = None);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
