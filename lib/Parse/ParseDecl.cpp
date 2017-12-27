@@ -3882,9 +3882,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // attributes might not be appertaining to the accessor, but to the first
     // declaration inside the implicit getter, we need to save the parser
     // position and restore it later.
+    llvm::Optional<SyntaxParsingContext> BacktrackCtxt;
     ParserPosition BeginParserPosition;
-    if (Tok.is(tok::at_sign))
+    if (Tok.is(tok::at_sign)) {
       BeginParserPosition = getParserPosition();
+      BacktrackCtxt.emplace(SyntaxContext);
+      BacktrackCtxt->setTransparent();
+    }
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
@@ -3921,6 +3925,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       // that the diagnostics point to correct tokens.
       if (BeginParserPosition.isValid()) {
         backtrackToPosition(BeginParserPosition);
+        BacktrackCtxt->setDiscard();
+        BacktrackCtxt.reset();
         Attributes = DeclAttributes();
       }
       if (!IsFirstAccessor) {
@@ -3934,6 +3940,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
     }
+    if (BacktrackCtxt)
+      BacktrackCtxt.reset();
 
     // Set the contextual keyword kind properly.
     if (AccessorKeywordLoc.isValid()) {
