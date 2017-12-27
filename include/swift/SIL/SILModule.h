@@ -327,7 +327,7 @@ public:
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    StringRef MainInputFilenameForDebugInfo,
+                    StringRef MainInputFilenameForDebugInfo = "<lldb>",
                     bool WholeModule = false) {
     return std::unique_ptr<SILModule>(new SILModule(
         M, Options, M, WholeModule, MainInputFilenameForDebugInfo));
