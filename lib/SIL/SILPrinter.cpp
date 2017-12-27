@@ -104,6 +104,7 @@ public:
       DEF_COL(ID::SILUndef, RED)
       DEF_COL(ID::SILBasicBlock, GREEN)
       DEF_COL(ID::SSAValue, MAGENTA)
+      DEF_COL(ID::Null, YELLOW)
     }
     OS.resetColor();
     OS.changeColor(Color);
@@ -128,6 +129,7 @@ void SILPrintContext::ID::print(raw_ostream &OS) {
     return;
   case ID::SILBasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
+  case ID::Null: OS << "<<NULL OPERAND>>"; return;
   }
   OS << Number;
 }
@@ -509,10 +511,10 @@ public:
   }
 
   SILValuePrinterInfo getIDAndType(SILValue V) {
-    return {Ctx.getID(V), V->getType()};
+    return {Ctx.getID(V), V ? V->getType() : SILType()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
-    return {Ctx.getID(V), V->getType(), V.getOwnershipKind()};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -1081,7 +1083,11 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee()->getType();
+    *this << ") : ";
+    if (auto callee = AI->getCallee())
+      *this << callee->getType();
+    else
+      *this << "<<NULL CALLEE>>";
   }
 
   void visitApplyInst(ApplyInst *AI) {
@@ -2975,6 +2981,9 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
 }
 
 ID SILPrintContext::getID(const SILNode *node) {
+  if (node == nullptr)
+    return {ID::Null, ~0U};
+
   if (isa<SILUndef>(node))
     return {ID::SILUndef, 0};
   

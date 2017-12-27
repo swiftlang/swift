@@ -23,8 +23,8 @@
 // CHECK-native-SAME: %swift.opaque* null,
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 1,
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i64 {{1|2}},
+// CHECK-SAME:   i32 2,
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 24,
 // CHECK-SAME:   i16 7,
@@ -52,8 +52,8 @@
 // CHECK-native-SAME: %swift.opaque* null,
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 1,
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i64 {{1|2}},
+// CHECK-SAME:   i32 2,
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 24,
 // CHECK-SAME:   i16 7,
@@ -74,8 +74,8 @@
 // CHECK-native-SAME: %swift.opaque* null,
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 1,
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i64 {{1|2}},
+// CHECK-SAME:   i32 2,
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 24,
 // CHECK-SAME:   i16 7,
@@ -96,8 +96,8 @@
 // CHECK-native-SAME: %swift.opaque* null,
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 1,
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i64 {{1|2}},
+// CHECK-SAME:   i32 2,
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 24,
 // CHECK-SAME:   i16 7,
@@ -118,7 +118,7 @@
 // CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]], i64 7)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]
@@ -132,7 +132,7 @@
 // CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]], i64 6)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i64 10
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]

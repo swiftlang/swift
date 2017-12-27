@@ -24,31 +24,29 @@
   * ForceTryExpr
   * OptionalTryExpr
   * ClosureExpr
+  * FunctionCallExpr
+  * SubscriptExpr
+  * PostfixUnaryExpr
+  * ForcedValueExpr
+  * SuperRefExpr
+  * ImplicitMemberExpr
 
 ### In-progress (UnknownExpr):
   * InterpolatedStringLiteralExpr
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
-  * CallExpr
-  * UnresolvedDotExpr
   * InOutExpr
   * KeyPathExpr
   * KeyPathDotExpr
   * EditorPlaceholderExpr
 
 ### Not-started (UnknownExpr):
-  * SuperRefExpr
   * UnresolvedSpecializeExpr
   * DotSelfExpr
-  * SubscriptExpr
   * KeyPathApplicationExpr
   * CaptureListExpr
   * AutoClosureExpr
   * DynamicTypeExpr
-  * BindOptionalExpr
-  * OptionalEvaluationExpr
-  * ForceValueExpr
-  * PostfixUnaryExpr
   * ForcedCheckedCastExpr
   * ConditionalCheckedCastExpr
   * IsExpr
@@ -91,33 +89,34 @@
 ### Done:
   * BraceStmt
   * ReturnStmt
-
-### Not-started (UnknownStmt):
   * DeferStmt
-  * IfStmt
-  * GuardStmt
-  * WhileStmt
   * DoStmt
-  * DoCatchStmt
   * RepeatWhileStmt
-  * ForEachStmt
-  * SwitchStmt
-  * CaseStmt
-  * CatchStmt
   * BreakStmt
   * ContinueStmt
   * FallthroughStmt
-  * FailStmt
   * ThrowStmt
+  * IfStmt
+  * GuardStmt
+  * WhileStmt
+  * ForInStmt
+
+### Not-started (UnknownStmt):
+  * SwitchStmt
 
 ## Pattern
-### Not-started:
-  * ParenPattern
+### Done:
+  * IdentifierPattern
+  * WildcardPattern
   * TuplePattern
-  * NamedPattern
-  * AnyPattern
-  * TypedPattern
-  * VarPattern
+  * ExpressionPattern
+  * ValueBindingPattern
+  * IsTypePattern
+
+### Not-started:
+  * AsTypePattern
+  * OptionalPattern
+  * EnumCasePattern
 
 ## TypeRepr
 ### Done:

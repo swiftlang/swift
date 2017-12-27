@@ -258,7 +258,7 @@ namespace irgen {
   void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                        SILType T,
                                        llvm::Value *metadata,
-                                       llvm::Value *vwtable);
+                                       bool isVWTMutable);
 
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.

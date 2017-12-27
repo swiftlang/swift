@@ -1307,6 +1307,13 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         secondType = req.getSecondType();
       }
 
+      // Don't do further checking on error types.
+      if (firstType->hasError() || (secondType && secondType->hasError())) {
+        // Another requirement will fail later; just continue.
+        valid = false;
+        continue;
+      }
+
       bool requirementFailure = false;
       if (listener && !listener->shouldCheck(kind, firstType, secondType))
         continue;

@@ -34,6 +34,7 @@ class C {
     _ = bar2(a : bar2(a: 1, b: 2, c: 3), b: 2, c: 3)
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
+    _ = [:]
     _ = [1, 2, 3, 4]
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
@@ -63,6 +64,21 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+  }
+  
+  func superExpr() {
+    _ = super.foo
+    super.bar()
+    super[12] = 1
+    super.init()
+  }
+
+  func implictMember() {
+    _ = .foo
+    _ = .foo(x: 12)
+    _ = .foo { 12 }
+    _ = .foo[12]
+    _ = .foo.bar
   }
 }
 
@@ -164,31 +180,46 @@ func tryfoo() {
 }
 #else
 func closure() {
-  {[weak a,
+  _ = {[weak a,
     unowned(safe) self,
     b = 3,
     unowned(unsafe) c = foo().bar] in
   }
-  {[] in }
+  _ = {[] in }
 
-  { [] a, b, _ -> Int in
+  _ = { [] a, b, _ -> Int in
     return 2
   }
-  { [] (a: Int, b: Int, _: Int) -> Int in
+  _ = { [] (a: Int, b: Int, _: Int) -> Int in
     return 2
   }
-  { [] a, b, _ throws -> Int in
+  _ = { [] a, b, _ throws -> Int in
     return 2
   }
-  { [] (a: Int, _ b: Int) throws -> Int in
+  _ = { [] (a: Int, _ b: Int) throws -> Int in
     return 2
   }
-  { a, b in }
-  {}
-  { s1, s2 in s1 > s2 }
-  { $0 > $1 }
+  _ = { a, b in }
+  _ = {}
+  _ = { s1, s2 in s1 > s2 }
+  _ = { $0 > $1 }
 }
 #endif
+
+func postfix() {
+  foo()
+  foo() {}
+  foo {}
+  foo.bar()
+  foo.bar() {}
+  foo.bar {}
+  foo[]
+  foo[1]
+  foo[] {}
+  foo[1] {}
+  foo[1][2,x:3]
+  foo?++.bar!(baz)
+}
 
 #if blah
 #else
@@ -215,4 +246,69 @@ class C {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
+
+  func patternTests() {
+    for let (x, _) in foo {}
+    for var x: Int in foo {}
+  }
+}
+
+do {
+  switch foo {
+    case let a: break
+    case let a as Int: break
+    case let (a, b): break
+    case (let a, var b): break
+    case is Int: break
+    case let .bar(x): break
+    case MyEnum.foo: break
+    case let a as Int: break
+    case let a?: break
+  }
+}
+
+func statementTests() {
+  do {
+  } catch (var x, let y) {
+  } catch where false {
+  } catch let e where e.foo == bar {
+  } catch {
+  }
+  repeat { } while true
+  LABEL: repeat { } while false
+  LABEL: do {}
+  LABEL: switch foo {
+    case 1:
+      fallthrough
+    case 2:
+      break LABEL
+    case 3:
+      break
+  }
+
+  for a in b {
+    defer { () }
+    if c {
+      throw MyError()
+      continue
+    } else {
+      continue LABEL
+    }
+  }
+
+  if
+    foo,
+    let a = foo,
+    let b: Int = foo,
+    var c = foo,
+    case (let v, _) = foo,
+    case (let v, _): (Int, Int) = foo {
+  } else if foo {
+  } else {
+  }
+
+  guard let a = b else {}
+
+  for var i in foo where i.foo {}
+  for case is Int in foo {}
 }

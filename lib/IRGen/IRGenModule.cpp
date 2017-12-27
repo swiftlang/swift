@@ -132,9 +132,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
       TargetMachine(std::move(target)), silConv(irgen.SIL),
-      OutputFilename(OutputFilename), TargetInfo(SwiftTargetInfo::get(*this)),
-      DebugInfo(nullptr), ModuleHash(nullptr),
-      ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 

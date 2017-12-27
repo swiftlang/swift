@@ -894,9 +894,9 @@ public:
     case MetadataKind::ForeignClass: {
       auto namePtrAddress =
         Meta.getAddress() + TargetForeignClassMetadata<Runtime>::OffsetToName;
-      StoredPointer namePtr;
-      if (!Reader->readInteger(RemoteAddress(namePtrAddress), &namePtr) ||
-          namePtr == 0)
+      
+      StoredPointer namePtr = resolveRelativeOffset<int32_t>(namePtrAddress);
+      if (namePtr == 0)
         return BuiltType();
       std::string name;
       if (!Reader->readString(RemoteAddress(namePtr), name))

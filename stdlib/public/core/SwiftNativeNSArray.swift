@@ -262,6 +262,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 #else
 // Empty shim version for non-objc platforms.
 @_versioned
+@_fixed_layout
 internal class _SwiftNativeNSArrayWithContiguousStorage {
   @_inlineable
   @_versioned

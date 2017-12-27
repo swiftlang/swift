@@ -289,12 +289,13 @@ protected:
   );
 
   enum { NumAFTExtInfoBits = 7 };
-  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+10,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfo : NumAFTExtInfoBits,
 
-    NumParams : 10
+    : NumPadBits,
+    NumParams : 16
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
@@ -1037,7 +1038,7 @@ public:
 /// is produced when parsing types and when name binding type aliases, and is
 /// installed in declaration that use these erroneous types.  All uses of a
 /// declaration of invalid type should be ignored and not re-diagnosed.
-class ErrorType : public TypeBase {
+class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType,
@@ -5103,6 +5104,17 @@ inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<BoundGenericClassType>(this))
     return ty->getTrailingObjects<Type>();
   llvm_unreachable("Unhandled BoundGenericType!");
+}
+
+inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getParams();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
 }
   
 /// \brief If this is a method in a type or extension thereof, compute

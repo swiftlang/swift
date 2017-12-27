@@ -188,13 +188,21 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 
 /// Returns a new value that combines the two given hash values.
 ///
+/// Combining is performed using [a hash function][ref] described by T.C. Hoad
+/// and J. Zobel, which is also adopted in the Boost C++ libraries.
+///
 /// This function is used by synthesized implementations of `hashValue` to
 /// combine the hash values of individual `struct` fields and associated values
 /// of `enum`s. It is factored out into a standard library function so that the
 /// specific hashing logic can be refined without requiring major changes to the
 /// code that creates the synthesized AST nodes.
+///
+/// [ref]: http://goanna.cs.rmit.edu.au/~jz/fulltext/jasist-tch.pdf
 @_transparent
 public // @testable
-func _mixForSynthesizedHashValue(_ oldValue: Int, _ nextValue: Int) -> Int {
-  return 31 &* oldValue &+ nextValue
+func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
+  let magic = 0x9e3779b9 as UInt // Based on the golden ratio.
+  var x = UInt(bitPattern: firstValue)
+  x ^= UInt(bitPattern: secondValue) &+ magic &+ (x &<< 6) &+ (x &>> 2)
+  return Int(bitPattern: x)
 }

@@ -413,6 +413,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Is the current target using the Darwin pre-stable ABI's class marker bit?
+  bool UseDarwinPreStableABIBit = true;
+
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 

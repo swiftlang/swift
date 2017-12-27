@@ -26,8 +26,8 @@ sil @_T06vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-objc: %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK-objc: %swift.opaque* @_objc_empty_cache,
 // CHECK-objc: %swift.opaque* null,
-// CHECK-objc: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 1),
-// CHECK-objc: i32 3, i32 0, i32 16, i16 7, i16 0,
+// CHECK-objc: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 {{1|2}}),
+// CHECK-objc: i32 2, i32 0, i32 16, i16 7, i16 0,
 // CHECK-objc: i32 112, i32 16,
 // CHECK-objc: @_T06vtable1CCMn
 // CHECK-objc: [[C]]* (%swift.type*)* @_T06vtable1CCACycACmcfC,
@@ -42,7 +42,7 @@ sil @_T06vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-native: %swift.opaque* null,
 // CHECK-native: %swift.opaque* null,
 // CHECK-native: i64 1,
-// CHECK-native: i32 3, i32 0, i32 16, i16 7, i16 0,
+// CHECK-native: i32 2, i32 0, i32 16, i16 7, i16 0,
 // CHECK-native: i32 112, i32 16,
 // CHECK-native: @_T06vtable1CCMn
 // CHECK-native: [[C]]* (%swift.type*)* @_T06vtable1CCACycACmcfC,

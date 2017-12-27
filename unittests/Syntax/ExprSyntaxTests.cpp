@@ -401,7 +401,7 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
   auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
 
   auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                  ArgList, RightParen);
+                                                  ArgList, RightParen, None);
 
   {
     auto GottenExpression1 = Call.getCalledExpression();
@@ -413,8 +413,8 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
     ASSERT_EQ(OS.str().str(), "foo");
   }
 
-  ASSERT_EQ(LeftParen.getRaw(), Call.getLeftParen().getRaw());
-  ASSERT_EQ(RightParen.getRaw(), Call.getRightParen().getRaw());
+  ASSERT_EQ(LeftParen.getRaw(), Call.getLeftParen()->getRaw());
+  ASSERT_EQ(RightParen.getRaw(), Call.getRightParen()->getRaw());
 
   {
     auto GottenArgs1 = Call.getArgumentList();
@@ -436,7 +436,7 @@ TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
 
   {
     auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                    ArgList, RightParen);
+                                                    ArgList, RightParen, None);
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Call.print(OS);

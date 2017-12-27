@@ -157,7 +157,7 @@ public:
 
   void initializeMetadata(IRGenFunction &IGF,
                           llvm::Value *metadata,
-                          llvm::Value *vwtable,
+                          bool isVWTMutable,
                           SILType T) const override {
     // Resilient value types and archetypes always refer to an existing type.
     // A witness table should never be independently initialized for one.

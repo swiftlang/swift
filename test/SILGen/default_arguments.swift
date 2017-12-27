@@ -12,7 +12,7 @@
 // CHECK-LABEL: sil hidden @_T017default_arguments7defarg11i1d1sySi_SdSStFfA_ : $@convention(thin) () -> Int
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0Si22_builtinIntegerLiteralSiBi2048__tcfC
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0Si22_builtinIntegerLiteralSiBi{{[_0-9]*}}__tcfC
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
@@ -30,7 +30,7 @@ func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
 func testDefaultArg1() {
   // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
-  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_T0Sd20_builtinFloatLiteralSdBf80__tcfC
+  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_T0Sd20_builtinFloatLiteralSdBf{{[_0-9]*}}__tcfC
   // CHECK: [[FLOATVAL:%[0-9]+]] = apply [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
   // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{.*}}A_
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
@@ -47,7 +47,7 @@ func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 func testDefaultArg2() {
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_T0Si22_builtinIntegerLiteralSiBi2048__tcfC
+// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_T0Si22_builtinIntegerLiteralSiBi{{[_0-9]*}}__tcfC
 // CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK:  [[DFN:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{.*}}A0_ : $@convention(thin) () -> Double
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
