@@ -400,6 +400,7 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
   ASSERT_EQ((syntax::Trivia{{
+    syntax::TriviaPiece::garbageText("\xEF\xBB\xBF"),
     syntax::TriviaPiece::lineComment("// comment"),
     syntax::TriviaPiece::newlines(1)
   }}), LeadingTrivia);
@@ -440,6 +441,7 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
   ASSERT_EQ((syntax::Trivia{{
+    syntax::TriviaPiece::garbageText("\xEF\xBB\xBF"),
     syntax::TriviaPiece::lineComment("// comment"),
     syntax::TriviaPiece::newlines(1)
   }}), LeadingTrivia);
