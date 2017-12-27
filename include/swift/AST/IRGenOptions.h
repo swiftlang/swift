@@ -64,6 +64,9 @@ enum class IRGenEmbedMode : unsigned {
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
+  /// The name of the first input file, used by the debug info.
+  /// Now, only left here for lldb to use.
+  std::string MainInputFilename = "<lldb>";
   std::vector<std::string> IRGOutputFilenames;
   std::string ModuleName;
 
