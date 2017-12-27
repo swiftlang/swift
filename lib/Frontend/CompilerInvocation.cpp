@@ -811,17 +811,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  // TODO: investigate whether these should be removed, in favor of definitions
-  // in other classes.
-  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const InputFile *input =
-                 FrontendOpts.InputsAndOutputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->file();
-  } else if (FrontendOpts.InputsAndOutputs.hasSingleInput()) {
-    Opts.MainInputFilename =
-        FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
-  }
   Opts.IRGOutputFilenames = FrontendOpts.InputsAndOutputs.copyOutputFilenames();
   Opts.ModuleName = FrontendOpts.ModuleName;
 
