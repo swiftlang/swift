@@ -111,8 +111,6 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
 
   switch (Kind) {
   case SyntaxKind::SuperRefExpr:
-  case SyntaxKind::MemberAccessExpr:
-  case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::OptionalChainingExpr:
   case SyntaxKind::ForcedValueExpr:
   case SyntaxKind::PostfixUnaryExpr:
@@ -122,6 +120,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:
