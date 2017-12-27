@@ -1590,13 +1590,9 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::kw_Any: { // Any
-    auto SynResult = parseAnyType();
-    auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
-    if (SynResult.hasSyntax()) {
-      TypeExprSyntaxBuilder Builder;
-      Builder.useType(SynResult.getSyntax());
-      SyntaxContext->addSyntax(Builder.build());
-    }
+    SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::TypeExpr);
+    auto TyR = parseAnyType();
+    auto expr = new (Context) TypeExpr(TypeLoc(TyR.get()));
     Result = makeParserResult(expr);
     break;
   }

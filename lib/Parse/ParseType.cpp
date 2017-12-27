@@ -186,10 +186,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier: {
-    auto Result = parseTypeIdentifier();
-    if (Result.hasSyntax())
-      SyntaxContext->addSyntax(Result.getSyntax());
-    ty = Result.getASTResult();
+    ty = parseTypeIdentifier();
     break;
   }
   case tok::l_paren:
@@ -547,7 +544,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
+ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -557,7 +554,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
         CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeSyntaxCodeCompletionResult<TypeSyntax, IdentTypeRepr>();
+      return makeParserCodeCompletionResult<IdentTypeRepr>();
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -569,10 +566,10 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
 
     return nullptr;
   }
+  SyntaxParsingContext IdentTypeCtxt(SyntaxContext, SyntaxContextKind::Type);
 
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
-  llvm::Optional<TypeSyntax> SyntaxNode;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
@@ -604,27 +601,10 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
       else
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
       ComponentsR.push_back(CompT);
-
-      if (SyntaxContext->isEnabled()) {
-        if (SyntaxNode) {
-          MemberTypeIdentifierSyntaxBuilder Builder;
-          Builder.useBaseType(*SyntaxNode);
-          if (auto Args =
-                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
-            Builder.useGenericArgumentClause(*Args);
-          Builder.useName(SyntaxContext->popToken());
-          Builder.usePeriod(SyntaxContext->popToken());
-          SyntaxNode.emplace(Builder.build());
-        } else {
-          SimpleTypeIdentifierSyntaxBuilder Builder;
-          if (auto Args =
-                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
-            Builder.useGenericArgumentClause(*Args);
-          Builder.useName(SyntaxContext->popToken());
-          SyntaxNode.emplace(Builder.build());
-        }
-      }
     }
+    SyntaxContext->createNodeInPlace(ComponentsR.size() == 1
+                                         ? SyntaxKind::SimpleTypeIdentifier
+                                         : SyntaxKind::MemberTypeIdentifier);
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type'.
@@ -669,7 +649,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
     consumeToken(tok::code_complete);
   }
 
-  return makeSyntaxResult(Status, SyntaxNode, ITR);
+  return makeParserResult(Status, ITR);
 }
 
 /// parseTypeSimpleOrComposition
@@ -740,18 +720,13 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
 }
 
-SyntaxParserResult<TypeSyntax, CompositionTypeRepr>
+ParserResult<CompositionTypeRepr>
 Parser::parseAnyType() {
+  SyntaxParsingContext IdentTypeCtxt(SyntaxContext,
+                                     SyntaxKind::SimpleTypeIdentifier);
   auto Loc = consumeToken(tok::kw_Any);
   auto TyR = CompositionTypeRepr::createEmptyComposition(Context, Loc);
-  llvm::Optional<TypeSyntax> SyntaxNode;
-
-  if (SyntaxContext->isEnabled()) {
-    auto builder = SimpleTypeIdentifierSyntaxBuilder();
-    builder.useName(SyntaxContext->popToken());
-    SyntaxNode.emplace(builder.build());
-  }
-  return makeSyntaxResult(SyntaxNode, TyR);
+  return makeParserResult(TyR);
 }
 
 /// parseOldStyleProtocolComposition
@@ -779,10 +754,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   if (!IsEmpty) {
     do {
       // Parse the type-identifier.
-      auto Result = parseTypeIdentifier();
-      if (Result.hasSyntax())
-        SyntaxContext->addSyntax(Result.getSyntax());
-      ParserResult<TypeRepr> Protocol = Result.getASTResult();
+      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
       Status |= Protocol;
       if (auto *ident =
             dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
