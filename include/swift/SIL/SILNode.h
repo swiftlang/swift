@@ -123,10 +123,10 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
 
   // Special handling for UnaryInstructionWithTypeDependentOperandsBase
-  SWIFT_INLINE_BITFIELD(UIWTDOB, SILNode, 32,
+  SWIFT_INLINE_BITFIELD(IBWTO, SILNode, 32,
     // DO NOT allocate bits at the front!
-    // UIWTDOB is a template, and must allocate bits from back to front and
-    // update UIWTDOB_BITFIELD().
+    // IBWTO is a template, and must allocate bits from back to front and
+    // update IBWTO_BITFIELD().
 
     /*pad*/ : 32-NumSILNodeBits,
 
@@ -134,31 +134,37 @@ protected:
     // It is number of type dependent operands + 1.
     NumOperands : 32;
     template<SILInstructionKind Kind, typename, typename, typename...>
-    friend class UnaryInstructionWithTypeDependentOperandsBase
+    friend class InstructionBaseWithTrailingOperands
   );
 
-#define UIWTDOB_BITFIELD(T, U, C, ...) \
+#define IBWTO_BITFIELD(T, U, C, ...) \
   SWIFT_INLINE_BITFIELD_FULL(T, U, (C)+32, __VA_ARGS__)
+#define UIWTDOB_BITFIELD(T, U, C, ...) \
+  IBWTO_BITFIELD(T, U, (C), __VA_ARGS__)
 
   SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
   SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
 
-  SWIFT_INLINE_BITFIELD_FULL(StructInst, SingleValueInstruction, 32,
-    : NumPadBits,
-    NumOperands : 32
+  // Ensure that StructInst bitfield does not overflow.
+  IBWTO_BITFIELD(StructInst, SingleValueInstruction, 0, : NumPadBits);
+
+  // Ensure that TupleInst bitfield does not overflow.
+  IBWTO_BITFIELD(TupleInst, SingleValueInstruction, 0, : NumPadBits);
+
+  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumSubstitutions : 32-NumSingleValueInstructionBits
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleInst, SingleValueInstruction, 32,
-    : NumPadBits,
-    NumOperands : 32
+  IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumBaseElements : 32-NumSingleValueInstructionBits
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(BuiltinInst, SingleValueInstruction,
-                             64-NumSingleValueInstructionBits,
-    NumSubstitutions : 32-NumSingleValueInstructionBits,
-    NumOperands : 32
+  IBWTO_BITFIELD(SelectEnumInstBase, SingleValueInstruction, 1,
+    HasDefault : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
@@ -187,18 +193,22 @@ protected:
     OnStack : 1
   );
 
+  // Ensure that AllocBoxInst bitfield does not overflow.
+  IBWTO_BITFIELD(AllocBoxInst, AllocationInst, 0, : NumPadBits);
+  // Ensure that AllocExistentialBoxInst bitfield does not overflow.
+  IBWTO_BITFIELD(AllocExistentialBoxInst, AllocationInst, 0, : NumPadBits);
   SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
                              64-NumAllocationInstBits,
     NumOperands : 32-NumAllocationInstBits,
     VarInfo : 32
   );
-  SWIFT_INLINE_BITFIELD_FULL(AllocRefInstBase, AllocationInst, 1+1+32,
+  IBWTO_BITFIELD(AllocRefInstBase, AllocationInst, 32-NumAllocationInstBits,
     ObjC : 1,
     OnStack : 1,
-    : NumPadBits,
-    // Number of tail-allocated arrays.
-    NumTailTypes : 32
+    NumTailTypes : 32-1-1-NumAllocationInstBits
   );
+  static_assert(32-1-1-NumAllocationInstBits >= 16, "Reconsider bitfield use?");
+
   UIWTDOB_BITFIELD(AllocValueBufferInst, AllocationInst, 0, : NumPadBits);
 
   // TODO: Sort the following in SILNodes.def order
@@ -211,10 +221,14 @@ protected:
       atomicity : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(MetatypeInst, SingleValueInstruction, 32,
-      : NumPadBits,
-      NumOperands : 32
-  );
+  // Ensure that BindMemoryInst bitfield does not overflow.
+  IBWTO_BITFIELD(BindMemoryInst, NonValueInstruction, 0, : NumPadBits);
+
+  // Ensure that MarkFunctionEscapeInst bitfield does not overflow.
+  IBWTO_BITFIELD(MarkFunctionEscapeInst, NonValueInstruction, 0, : NumPadBits);
+
+  // Ensure that MetatypeInst bitfield does not overflow.
+  IBWTO_BITFIELD(MetatypeInst, SingleValueInstruction, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
     /// IsTakeOfSrc - True if ownership will be taken from the value at the
@@ -272,10 +286,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD_FULL(WitnessMethodInst, MethodInst, 32,
-    : NumPadBits,
-    NumOperands : 32
-  );
+  // Ensure that WitnessMethodInst bitfield does not overflow.
+  IBWTO_BITFIELD(WitnessMethodInst, MethodInst, 0, : NumPadBits);
   UIWTDOB_BITFIELD(ObjCMethodInst, MethodInst, 0, : NumPadBits);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
@@ -303,10 +315,15 @@ protected:
   UIWTDOB_BITFIELD(CheckedCastBranchInst, SingleValueInstruction, 0, : NumPadBits);
   UIWTDOB_BITFIELD(CheckedCastValueBranchInst, SingleValueInstruction, 0, : NumPadBits);
 
-  SWIFT_INLINE_BITFIELD_FULL(SwitchValueInst, TermInst, 1+32,
-    HasDefault : 1,
-    : NumPadBits,
-    NumCases : 32
+  // Ensure that BranchInst bitfield does not overflow.
+  IBWTO_BITFIELD(BranchInst, TermInst, 0, : NumPadBits);
+  // Ensure that YieldInst bitfield does not overflow.
+  IBWTO_BITFIELD(YieldInst, TermInst, 0, : NumPadBits);
+  IBWTO_BITFIELD(CondBranchInst, TermInst, 32-NumTermInstBits,
+    NumTrueArgs : 32-NumTermInstBits
+  );
+  IBWTO_BITFIELD(SwitchValueInst, TermInst, 1,
+    HasDefault : 1
   );
   SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
     HasDefault : 1,
@@ -326,7 +343,7 @@ protected:
     SWIFT_INLINE_BITS(SILNode);
     SWIFT_INLINE_BITS(SILArgument);
     SWIFT_INLINE_BITS(MultipleValueInstructionResult);
-    SWIFT_INLINE_BITS(UIWTDOB);
+    SWIFT_INLINE_BITS(IBWTO);
     SWIFT_INLINE_BITS(AllocStackInst);
     SWIFT_INLINE_BITS(AllocRefInstBase);
     SWIFT_INLINE_BITS(AllocValueBufferInst);
@@ -372,6 +389,9 @@ protected:
     SWIFT_INLINE_BITS(ConstStringLiteralInst);
     SWIFT_INLINE_BITS(StructInst);
     SWIFT_INLINE_BITS(TupleInst);
+    SWIFT_INLINE_BITS(ObjectInst);
+    SWIFT_INLINE_BITS(CondBranchInst);
+    SWIFT_INLINE_BITS(SelectEnumInstBase);
   } Bits;
 
 private:
