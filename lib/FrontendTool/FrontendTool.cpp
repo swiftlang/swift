@@ -1257,13 +1257,11 @@ static bool performCompileStepsPostSILGen(
 
   performSILOptimizations(Invocation, SM.get());
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // FIXME: These passes should always be enabled when tensorflow support is
-  // built into the compiler, the command line option should go away, and the
-  // passes themselves should check to see if TensorFlow module has been
-  // imported (if not, they should just early exit).
-  if (Invocation.getSILOptions().EnableTFPartition)
-    runSILTFPartitionPass(*SM);
+#ifdef SWIFT_ENABLE_TENSORFLOW
+  // FIXME: These passes should be moved to the mandatory pass pipeline that
+  // runs at -O0.  We need a proper deabstraction pass to do that though.
+  runSILTFPartitionPass(*SM);
+#endif
 
   if (observer)
     observer->performedSILOptimization(*SM);

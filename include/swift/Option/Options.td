@@ -414,10 +414,6 @@ def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
 
-// SWIFT_ENABLE_TENSORFLOW
-def tensorflow : Flag<["-"], "tensorflow">, Flags<[FrontendOption]>,
-  HelpText<"Compile code as a TensorFlow model">;
-
 // Optimization levels
 
 def O_Group : OptionGroup<"<optimization level options>">;

@@ -151,8 +151,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  inputArgs.AddLastArg(arguments, options::OPT_tensorflow);
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
   inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
