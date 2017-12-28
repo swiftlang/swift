@@ -62,7 +62,7 @@ Type tf::isTensorHandle(Type ty) {
 /// returns the op name and operand description and returns true.  If the
 /// function name doesn't correspond to an op, this returns false.
 static bool decodeTensorOpName(StringRef name, StringRef &opName,
-                               StringRef &operandInfo) {
+                               StringRef &typeInfo) {
   // Op functions are expected to be of the form:
   //  ...__tfop_<OPNAME>__<OPERANDDESC>__...
   // an example for the 'Add' op might be _T013__tfop_Add__Tf4gg_n
@@ -77,7 +77,7 @@ static bool decodeTensorOpName(StringRef name, StringRef &opName,
 
   pos = name.find("__");
   if (pos == StringRef::npos) return false;
-  operandInfo = name.substr(0, pos);
+  typeInfo = name.substr(0, pos);
   return true;
 }
 
@@ -105,10 +105,18 @@ LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
   if (isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v))
     return cast<LiteralInst>(v);
 
-  // The only form we handle now are a StructInst wrapping a literal.
+  // Handle the form where a StructInst is wrapping a literal (e.g. Int/Float).
   if (auto *SI = dyn_cast<StructInst>(v)) {
     auto SO = SI->getNumOperands() == 1 ? SI->getOperand(0) : 0;
     return SO ? getTensorConstantOperand(SO) : nullptr;
+  }
+
+  // Because we're often coming from generic code, we frequently get a constant
+  // passed by-address.  Check for an alloc_stack with a single store to it and
+  // consume the stored value.
+  if (auto *ASI = dyn_cast<AllocStackInst>(v)) {
+    if (auto *store = ASI->getSingleUserOfType<StoreInst>())
+      return getTensorConstantOperand(store->getSrc());
   }
 
   return nullptr;
@@ -118,33 +126,27 @@ LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
 /// Return true and fill in this struct if this is a tensor operation that
 /// should be partitioned out to run on the accelerator.
 bool TensorOpInfo::decode() {
-  // Tuple extracts of tensor op calls are considered to be themselves Tensor
+  // Tuple extracts of tensor ops are considered to be themselves Tensor
   // operations, since they are part of the core representation of nodes that
   // produce multiple results.
   if (auto *ti = dyn_cast<TupleExtractInst>(inst))
-    if (auto *ai = dyn_cast<ApplyInst>(ti->getOperand())) {
+    if (auto *ai = dyn_cast<BuiltinInst>(ti->getOperand())) {
       inst = ai;
       return decode();
     }
 
   StringRef mangledName;
 
-  // Tensor operations are either apply(fnref) instructions or they are builtin
-  // instructions.
-  if (auto *apply = dyn_cast<ApplyInst>(inst)) {
-    // Only handles direct calls.
-    auto *fn = dyn_cast<FunctionRefInst>(apply->getCallee());
-    if (!fn) return false;
-
-    mangledName = fn->getReferencedFunction()->getName();
-  } else if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+  // Tensor operations are builtin instructions.
+  if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
     mangledName = bi->getName().str();
   } else {
     return false;
   }
 
   // If the name is valid, it isn't an op.
-  if (!decodeTensorOpName(mangledName, opName, operandDescriptorStr))
+  StringRef typeDescriptorStr;
+  if (!decodeTensorOpName(mangledName, opName, typeDescriptorStr))
     return false;
 
   auto diagInvalid = [&](std::string problem) {
@@ -153,8 +155,29 @@ bool TensorOpInfo::decode() {
              operandDescriptorStr, problem);
   };
 
+  // The type descriptor has operand and result info separated by a colon.
+  auto colonLoc = typeDescriptorStr.find(':');
+  if (colonLoc == StringRef::npos) {
+    diagInvalid("no colon in type descriptor");
+    return false;
+  }
+
+  operandDescriptorStr = typeDescriptorStr.take_front(colonLoc);
+  resultDescriptorStr = typeDescriptorStr.drop_front(colonLoc+1);
+
+  if (operandDescriptorStr.empty()) {
+    diagInvalid("no type descriptor string found");
+    return false;
+  }
+
+  if (decodeTensorOperandInfo(operandDescriptorStr, operandDescriptors)) {
+    diagInvalid("unknown letter");
+    return false;
+  }
+
+
   // Validate that this instruction is ok.
-  unsigned nextOperand = isa<ApplyInst>(inst) ? 1 : 0;
+  unsigned nextOperand = 0;
   auto getNextOperand = [&]() -> SILValue {
     // If we ran out of operands, something is wrong.
     if (nextOperand >= inst->getNumOperands()) {
@@ -165,31 +188,25 @@ bool TensorOpInfo::decode() {
     return inst->getOperand(nextOperand++);
   };
 
-  if (operandDescriptorStr.empty()) {
-    diagInvalid("no operand descriptor string found");
-    return false;
-  }
-
-  if (decodeTensorOperandInfo(operandDescriptorStr, operandDescriptors)) {
-    diagInvalid("unknown letter");
-    return false;
-  }
-
   for (auto opInfo : operandDescriptors) {
     switch (opInfo) {
       case OpCommand::Tensor: {
         auto op = getNextOperand();
-        if (!op) return false;
-        if (!isTensorHandle(op->getType().getSwiftRValueType())) {
+        if (!op || !isTensorHandle(op->getType().getSwiftRValueType())) {
           diagInvalid("expected " +
                       llvm::utostr(nextOperand-2) + " to be a tensor");
           return false;
         }
         break;
       }
-      case OpCommand::AddDType:
-        // Could check that at least one input/result is a TensorHandle.
+      case OpCommand::AddDType: {
+        auto op = getNextOperand();
+        if (!op || !isa<MetatypeInst>(op)) {
+          diagInvalid("metatype expected for 'd' operand");
+          return false;
+        }
         break;
+      }
       case OpCommand::Constant: {
         // If this requires a constant value and doesn't have one (i.e., it's a
         // variable), then we handle this as valid, but as a non-TensorOp.  The
