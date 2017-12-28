@@ -271,6 +271,19 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
 }
 
+void Lexer::formEscapedIdentifierToken(const char *TokStart) {
+  assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
+  assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
+  assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    LeadingTrivia.push_back(TriviaPiece::backtick());
+    assert(TrailingTrivia.size() == 0 && "TrailingTrivia is empty here");
+    TrailingTrivia.push_back(TriviaPiece::backtick());
+  }
+  formToken(tok::identifier, TokStart);
+  NextToken.setEscapedIdentifier(true);
+}
+
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   const char *Ptr = getBufferPtrForSourceLoc(Loc);
   // Skip whitespace backwards until we hit a newline.  This is needed to
@@ -1770,8 +1783,7 @@ void Lexer::lexEscapedIdentifier() {
     // If we have the terminating "`", it's an escaped identifier.
     if (*CurPtr == '`') {
       ++CurPtr;
-      formToken(tok::identifier, Quote);
-      NextToken.setEscapedIdentifier(true);
+      formEscapedIdentifierToken(Quote);
       return;
     }
   }
@@ -1779,8 +1791,7 @@ void Lexer::lexEscapedIdentifier() {
   // Special case; allow '`$`'.
   if (Quote[1] == '$' && Quote[2] == '`') {
     CurPtr = Quote + 3;
-    formToken(tok::identifier, Quote);
-    NextToken.setEscapedIdentifier(true);
+    formEscapedIdentifierToken(Quote);
     return;
   }
 
