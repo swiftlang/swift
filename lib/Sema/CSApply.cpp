@@ -1130,6 +1130,9 @@ namespace {
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
+        if (forceUnwrap)
+          ref = forceUnwrapResult(ref);
+
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
