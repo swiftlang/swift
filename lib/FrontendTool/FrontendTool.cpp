@@ -764,25 +764,18 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
 static std::deque<PostSILGenInputs>
 generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   auto mod = Instance.getMainModule();
+  if (auto SM = Instance.takeSILModule()) {
+    std::deque<PostSILGenInputs> PSGIs;
+    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
+    return PSGIs;
+  }
+
   SILOptions &SILOpts = Invocation.getSILOptions();
   FrontendOptions &opts = Invocation.getFrontendOptions();
   auto fileIsSIB = [](const FileUnit *File) -> bool {
     auto SASTF = dyn_cast<SerializedASTFile>(File);
     return SASTF && SASTF->isSIB();
   };
-  // If we primary source files, build a separate SILModule for
-  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
-  // once for each such input.
-  std::deque<PostSILGenInputs> PSGIs;
-  assert(
-      !(opts.InputsAndOutputs.hasPrimaryInputs() && Instance.hasSILModule()) &&
-      "Do not expect to have both primary source inputs and a SILModule");
-
-  if (auto SM = Instance.takeSILModule()) {
-    std::deque<PostSILGenInputs> PSGIs;
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
-    return PSGIs;
-  }
 
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If we have no primary inputs we are in WMO mode and need to build a
@@ -795,7 +788,10 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
         std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
     return PSGIs;
   }
-
+  // If we primary source files, build a separate SILModule for
+  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
+  // once for each such input.
+  std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
     auto SM = performSILGeneration(
         *PrimaryFile, SILOpts,
