@@ -28,28 +28,28 @@ struct TensorCore<Element> {}
 sil private @testLoop : $@callee_owned (TensorCore<Float>) -> (TensorCore<Float>, TensorCore<Float>) {
 // %0                                             // users: %1, %1
 bb0(%0 : $TensorCore<Float>):
-  %1 = builtin "__tfop_Sub__tt__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %6, %6
+  %1 = builtin "__tfop_Sub__tt:t__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %6, %6
   %2 = integer_literal $Builtin.Int64, 0          // user: %3
-  %3 = builtin "__tfop_Const__dc__"(%2 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %10
+  %3 = builtin "__tfop_Const__dc:t__"(%2 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %10
   %4 = integer_literal $Builtin.Int64, 100        // user: %5
-  %5 = builtin "__tfop_Const__dc__"(%4 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %17
-  %6 = builtin "__tfop_Add__tt__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float> // users: %7, %7
-  %7 = builtin "__tfop_Add__tt__"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %10
+  %5 = builtin "__tfop_Const__dc:t__"(%4 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %17
+  %6 = builtin "__tfop_Add__tt:t__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float> // users: %7, %7
+  %7 = builtin "__tfop_Add__tt:t__"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %10
   %8 = integer_literal $Builtin.Int64, 1          // user: %9
-  %9 = builtin "__tfop_Const__dc__"(%8 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %16
+  %9 = builtin "__tfop_Const__dc:t__"(%8 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %16
   br bb2(%3 : $TensorCore<Builtin.Int64>, %7 : $TensorCore<Float>) // id: %10
 
 bb1:                                              // Preds: bb2
-  %11 = builtin "__tfop_Sub__tt__"(%20 : $TensorCore<Float>, %20 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
+  %11 = builtin "__tfop_Sub__tt:t__"(%20 : $TensorCore<Float>, %20 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
   %12 = tuple (%20 : $TensorCore<Float>, %11 : $TensorCore<Float>) // user: %13
   return %12 : $(TensorCore<Float>, TensorCore<Float>) // id: %13
 
 // %14                                            // user: %16
 // %15                                            // users: %18, %18
 bb2(%14 : $TensorCore<Builtin.Int64>, %15 : $TensorCore<Float>): // Preds: bb3 bb0
-  %16 = builtin "__tfop_Add__tt__"(%14 : $TensorCore<Builtin.Int64>, %9 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int64> // users: %23, %17
-  %17 = builtin "__tfop_Equal__tt__"(%16 : $TensorCore<Builtin.Int64>, %5 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int1> // user: %21
-  %18 = builtin "__tfop_Add__tt__"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %19
+  %16 = builtin "__tfop_Add__tt:t__"(%14 : $TensorCore<Builtin.Int64>, %9 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int64> // users: %23, %17
+  %17 = builtin "__tfop_Equal__tt:t<bool>__"(%16 : $TensorCore<Builtin.Int64>, %5 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int1> // user: %21
+  %18 = builtin "__tfop_Add__tt:t__"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %19
   %19 = builtin "tensorflowSend"<TensorCore<Float>>(%18 : $TensorCore<Float>) : $()
   %20 = builtin "tensorflowReceive"<TensorCore<Float>>() : $TensorCore<Float> // users: %12, %23, %11, %11
   %21 = builtin "tf_tensor_to_i1"(%17 : $TensorCore<Builtin.Int1>) : $Builtin.Int1 // user: %22
@@ -84,20 +84,20 @@ sil private @testIf : $@callee_owned (TensorCore<Float>, Builtin.Int1) -> Tensor
 // %0                                             // users: %2, %2
 // %1                                             // user: %4
 bb0(%0 : $TensorCore<Float>, %1 : $Builtin.Int1):
-  %2 = builtin "__tfop_Sub__tt__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %3, %5, %5
+  %2 = builtin "__tfop_Sub__tt:t__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %3, %5, %5
   cond_br %1, bb1, bb2                            // id: %4
 
 bb1:                                              // Preds: bb0
-  %5 = builtin "__tfop_Sub__tt__"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float> // user: %6
+  %5 = builtin "__tfop_Sub__tt:t__"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float> // user: %6
   br bb3(%5 : $TensorCore<Float>)                 // id: %6
 
 bb2:                                              // Preds: bb0
-  %7 = builtin "__tfop_Add__tt__"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float>
+  %7 = builtin "__tfop_Add__tt:t__"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float>
   br bb3(%7 : $TensorCore<Float>)                 // id: %8
 
 // %9                                             // users: %10, %11, %11
 bb3(%9 : $TensorCore<Float>):                     // Preds: bb2 bb1
-  %11 = builtin "__tfop_Sub__tt__"(%9 : $TensorCore<Float>, %9 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
+  %11 = builtin "__tfop_Sub__tt:t__"(%9 : $TensorCore<Float>, %9 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
   return %11 : $TensorCore<Float>                 // id: %12
 }
 
@@ -133,12 +133,12 @@ bb3(%9 : $TensorCore<Float>):                     // Preds: bb2 bb1
 sil private @testIfIf : $@callee_owned (TensorCore<Float>, TensorCore<Builtin.Int1>, TensorCore<Builtin.Int1>) -> TensorCore<Float> {
 // %0                                             // users: %1, %1
 bb0(%0 : $TensorCore<Float>, %3: $TensorCore<Builtin.Int1>, %7: $TensorCore<Builtin.Int1>):
-  %1 = builtin "__tfop_Sub__tt__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float>
+  %1 = builtin "__tfop_Sub__tt:t__"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float>
   %4 = builtin "tf_tensor_to_i1"(%3 : $TensorCore<Builtin.Int1>) : $Builtin.Int1
   cond_br %4, bb1, bb4                            // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = builtin "__tfop_Add__tt__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
+  %6 = builtin "__tfop_Add__tt:t__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
   %8 = builtin "tf_tensor_to_i1"(%7 : $TensorCore<Builtin.Int1>) : $Builtin.Int1 // user: %9
   cond_br %8, bb3, bb2                            // id: %9
 
@@ -146,15 +146,15 @@ bb2:                                              // Preds: bb1
   br bb5(%6 : $TensorCore<Float>)                 // id: %10
 
 bb3:                                              // Preds: bb1
-  %11 = builtin "__tfop_Add__tt__"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
+  %11 = builtin "__tfop_Add__tt:t__"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
   br bb5(%11 : $TensorCore<Float>)                // id: %12
 
 bb4:                                              // Preds: bb0
-  %13 = builtin "__tfop_Add__tt__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
+  %13 = builtin "__tfop_Add__tt:t__"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
   br bb5(%13 : $TensorCore<Float>)                // id: %14
 
 // %15                                            // users: %16, %17, %17
 bb5(%15 : $TensorCore<Float>):                    // Preds: bb4 bb2 bb3
-  %17 = builtin "__tfop_Sub__tt__"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %18
+  %17 = builtin "__tfop_Sub__tt:t__"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %18
   return %17 : $TensorCore<Float>                 // id: %18
 }
