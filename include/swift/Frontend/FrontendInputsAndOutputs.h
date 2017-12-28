@@ -54,6 +54,7 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+    IsBatchModeEnabled = other.IsBatchModeEnabled;
   }
 
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
@@ -61,6 +62,7 @@ public:
     for (InputFile input : other.AllFiles)
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+    IsBatchModeEnabled = other.IsBatchModeEnabled;
     return *this;
   }
 
@@ -212,8 +214,8 @@ private:
       ArrayRef<const OutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
-  
-  void enableBatchMode() { IsBatchModeEnabled = true; }
+
+  void setBatchModeEnabled(bool bme) { IsBatchModeEnabled = bme; }
 
 public:
   bool hasDependenciesPath() const;
