@@ -259,14 +259,6 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
-                             RecursiveTypeProperties::BitWidth,
-    /// Kind - The discriminator that indicates what subclass of type this is.
-    Kind : bitmax(NumTypeKindBits,8),
-
-    Properties : RecursiveTypeProperties::BitWidth
-  );
-
   /// Returns true if the given type is a sugared type.
   ///
   /// Only intended for use in compile-time assertions.
@@ -277,6 +269,18 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
+  enum { NumAFTExtInfoBits = 7 };
+  enum { NumSILExtInfoBits = 6 };
+  union { uint64_t OpaqueBits;
+
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
+                             RecursiveTypeProperties::BitWidth,
+    /// Kind - The discriminator that indicates what subclass of type this is.
+    Kind : bitmax(NumTypeKindBits,8),
+
+    Properties : RecursiveTypeProperties::BitWidth
+  );
+
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
     /// Whether there is an original type.
     HasOriginalType : 1
@@ -288,7 +292,6 @@ protected:
     Flags : NumFlagBits
   );
 
-  enum { NumAFTExtInfoBits = 7 };
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
@@ -318,7 +321,6 @@ protected:
     GraphIndex : 29
   );
 
-  enum { NumSILExtInfoBits = 6 };
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
     ExtInfo : NumSILExtInfoBits,
     CalleeConvention : 3,
@@ -367,20 +369,6 @@ protected:
     GenericArgCount : 32
   );
 
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(TypeBase);
-    SWIFT_INLINE_BITS(ErrorType);
-    SWIFT_INLINE_BITS(ParenType);
-    SWIFT_INLINE_BITS(AnyFunctionType);
-    SWIFT_INLINE_BITS(TypeVariableType);
-    SWIFT_INLINE_BITS(ArchetypeType);
-    SWIFT_INLINE_BITS(SILFunctionType);
-    SWIFT_INLINE_BITS(SILBoxType);
-    SWIFT_INLINE_BITS(AnyMetatypeType);
-    SWIFT_INLINE_BITS(ProtocolCompositionType);
-    SWIFT_INLINE_BITS(TupleType);
-    SWIFT_INLINE_BITS(BoundGenericType);
   } Bits;
 
 protected:

@@ -49,6 +49,9 @@ class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(TypeRepr, bitmax(NumTypeReprKindBits,8)+1+1,
     /// The subclass of TypeRepr that this is.
     Kind : bitmax(NumTypeReprKindBits,8),
@@ -71,11 +74,6 @@ class alignas(8) TypeRepr {
     NumElements : 16
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(TypeRepr);
-    SWIFT_INLINE_BITS(TupleTypeRepr);
   } Bits;
 
   TypeRepr(TypeReprKind K) {

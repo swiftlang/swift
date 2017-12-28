@@ -49,6 +49,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
   
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
     Kind : bitmax(NumPatternKindBits,8),
     isImplicit : 1,
@@ -64,12 +67,6 @@ class alignas(8) Pattern {
     IsPropagatedType : 1
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Pattern);
-    SWIFT_INLINE_BITS(TuplePattern);
-    SWIFT_INLINE_BITS(TypedPattern);
   } Bits;
 
   Pattern(PatternKind kind) {

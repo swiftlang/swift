@@ -236,6 +236,9 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
@@ -587,34 +590,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     NumberOfVTableEntries : 2
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Decl);
-    SWIFT_INLINE_BITS(PatternBindingDecl);
-    SWIFT_INLINE_BITS(EnumCaseDecl);
-    SWIFT_INLINE_BITS(ValueDecl);
-    SWIFT_INLINE_BITS(AbstractStorageDecl);
-    SWIFT_INLINE_BITS(AbstractFunctionDecl);
-    SWIFT_INLINE_BITS(VarDecl);
-    SWIFT_INLINE_BITS(ParamDecl);
-    SWIFT_INLINE_BITS(EnumElementDecl);
-    SWIFT_INLINE_BITS(FuncDecl);
-    SWIFT_INLINE_BITS(ConstructorDecl);
-    SWIFT_INLINE_BITS(TypeDecl);
-    SWIFT_INLINE_BITS(GenericTypeParamDecl);
-    SWIFT_INLINE_BITS(TypeAliasDecl);
-    SWIFT_INLINE_BITS(NominalTypeDecl);
-    SWIFT_INLINE_BITS(ProtocolDecl);
-    SWIFT_INLINE_BITS(ClassDecl);
-    SWIFT_INLINE_BITS(StructDecl);
-    SWIFT_INLINE_BITS(EnumDecl);
-    SWIFT_INLINE_BITS(AssociatedTypeDecl);
-    SWIFT_INLINE_BITS(PrecedenceGroupDecl);
-    SWIFT_INLINE_BITS(ImportDecl);
-    SWIFT_INLINE_BITS(ExtensionDecl);
-    SWIFT_INLINE_BITS(IfConfigDecl);
-    SWIFT_INLINE_BITS(MissingMemberDecl);
   } Bits;
 
   // Storage for the declaration attributes.
