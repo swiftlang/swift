@@ -284,6 +284,17 @@ EXPR_NODES = [
                    is_optional=True),
          ]),
 
+    # dot-self-expr -> expr '.' 'self'
+    Node('DotSelfExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('Dot', kind='Token',
+                   token_choices=[
+                       'PeriodToken', 'PrefixPeriodToken'
+                   ]),
+             Child('SelfKeyword', kind='SelfToken'),
+         ]),
+
     # is TypeName
     Node('IsExpr', kind='Expr',
          children=[

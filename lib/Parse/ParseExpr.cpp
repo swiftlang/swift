@@ -1156,6 +1156,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (Tok.is(tok::kw_self)) {
         Result = makeParserResult(
             new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
+        SyntaxContext->createNodeInPlace(SyntaxKind::DotSelfExpr);
         continue;
       }
 

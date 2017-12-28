@@ -220,7 +220,7 @@ func postfix() {
   foo[] {}
   foo[1] {}
   foo[1][2,x:3]
-  foo?++.bar!(baz)
+  foo?++.bar!(baz).self
 
   foo(x:y:)()
   _ = .foo(x:y:)
