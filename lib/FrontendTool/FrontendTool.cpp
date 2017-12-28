@@ -958,8 +958,8 @@ static bool performCompile(CompilerInstance &Instance,
 }
 
 static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
-                                         SILModule *SM,
-                                         ModuleDecl *MainModule) {
+                                         CompilerInstance &Instance,
+                                         SILModule *SM) {
   // We've been told to emit SIL after SILGen, so write it now.
   FrontendOptions &opts = Invocation.getFrontendOptions();
   if (opts.RequestedAction != FrontendOptions::ActionType::EmitSILGen)
@@ -967,7 +967,7 @@ static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
   // If we are asked to link all, link all.
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
     performSILLinking(SM, true);
-  return writeSIL(*SM, MainModule, opts.EmitVerboseSIL,
+  return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
                   opts.InputsAndOutputs.getSingleOutputFilename(),
                   opts.EmitSortedSIL);
 }
@@ -1219,7 +1219,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   }
 
   if (auto r =
-          emitSILAfterSILGen(Invocation, SM.get(), Instance.getMainModule()))
+          emitSILAfterSILGen(Invocation, Instance, SM.get()))
     return *r;
 
   if (auto r = emitSIBAfterSILGen(Invocation, Instance, SM.get(), MSF))
