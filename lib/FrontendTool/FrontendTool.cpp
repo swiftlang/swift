@@ -871,67 +871,65 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
-
-static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
-                                          CompilerInvocation &Invocation,
-                                          std::unique_ptr<SILModule> SM,
-                                          bool astGuaranteedToCorrespondToSIL,
-                                          ModuleOrSourceFile MSF,
-                                          bool moduleIsPublic,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer,
-                                          UnifiedStatsReporter *Stats) {
-
-  FrontendOptions opts = Invocation.getFrontendOptions();
-  FrontendOptions::ActionType Action = opts.RequestedAction;
-  ASTContext &Context = Instance.getASTContext();
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  bool shouldIndex = !opts.IndexStorePath.empty();
-
-  if (observer) {
-    observer->performedSILGeneration(*SM);
-  }
-  if (Stats) {
-    countStatsPostSILGen(*Stats, *SM);
-  }
-
+static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
+                                         SILModule *SM,
+                                         ModuleDecl *MainModule) {
   // We've been told to emit SIL after SILGen, so write it now.
-  if (Action == FrontendOptions::ActionType::EmitSILGen) {
-    // If we are asked to link all, link all.
-    if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-      performSILLinking(SM.get(), true);
-    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.InputsAndOutputs.getSingleOutputFilename(),
-                    opts.EmitSortedSIL);
-  }
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  if (opts.RequestedAction != FrontendOptions::ActionType::EmitSILGen)
+    return None;
+  // If we are asked to link all, link all.
+  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
+    performSILLinking(SM, true);
+  return writeSIL(*SM, MainModule, opts.EmitVerboseSIL,
+                  opts.InputsAndOutputs.getSingleOutputFilename(),
+                  opts.EmitSortedSIL);
+}
 
-  if (Action == FrontendOptions::ActionType::EmitSIBGen) {
-    // If we are asked to link all, link all.
-    if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-      performSILLinking(SM.get(), true);
-
-    if (!opts.InputsAndOutputs.getModuleOutputPath().empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath =
-          opts.InputsAndOutputs.getModuleOutputPath().c_str();
-      serializationOpts.SerializeAllSIL = true;
-      serializationOpts.IsSIB = true;
-
-      serialize(MSF, serializationOpts, SM.get());
-    }
+static bool serializeMSF(FrontendInputsAndOutputs &inputsAndOutputs,
+                         SILModule *SM, ASTContext &Context,
+                         ModuleOrSourceFile MSF) {
+  if (inputsAndOutputs.getModuleOutputPath().empty())
     return Context.hadError();
-  }
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = inputsAndOutputs.getModuleOutputPath().c_str();
+  serializationOpts.SerializeAllSIL = true;
+  serializationOpts.IsSIB = true;
+  serialize(MSF, serializationOpts, SM);
+  return Context.hadError();
+}
 
-  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
-      createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
-  if (OptRecordFile)
-    SM->setOptRecordStream(llvm::make_unique<llvm::yaml::Output>(
-                               *OptRecordFile, &Instance.getSourceMgr()),
-                           std::move(OptRecordFile));
+static Optional<bool> emitSIBAfterSILGen(CompilerInvocation &Invocation,
+                                         CompilerInstance &Instance,
+                                         SILModule *SM,
+                                         ModuleOrSourceFile MSF) {
+  if (Invocation.getFrontendOptions().RequestedAction !=
+      FrontendOptions::ActionType::EmitSIBGen)
+    return None;
+  // If we are asked to link all, link all.
+  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
+    performSILLinking(SM, true);
 
+  return serializeMSF(Invocation.getFrontendOptions().InputsAndOutputs, SM,
+                      Instance.getASTContext(), MSF);
+}
+
+static Optional<bool>
+emitSIBIFNeededAfterOptimizations(CompilerInvocation &Invocation, SILModule *SM,
+                                  ASTContext &Context, ModuleOrSourceFile MSF) {
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  return opts.RequestedAction != FrontendOptions::ActionType::EmitSIB
+             ? Optional<bool>()
+             : serializeMSF(opts.InputsAndOutputs, SM, Context, MSF);
+}
+
+/// Perform "stable" optimizations that are invariant across compiler versions.
+static bool performStableOptimizations(CompilerInvocation &Invocation,
+                                       SILModule *SM,
+                                       FrontendObserver *observer) {
   // Perform "stable" optimizations that are invariant across compiler versions.
-  if (Action == FrontendOptions::ActionType::MergeModules) {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::MergeModules) {
     // Don't run diagnostic passes at all.
   } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
     if (runSILDiagnosticPasses(*SM))
@@ -949,10 +947,207 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // Now if we are asked to link all, link all.
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM.get(), true);
+    performSILLinking(SM, true);
 
   if (Invocation.getSILOptions().MergePartialModules)
     SM->linkAllFromCurrentModule();
+  return false;
+}
+
+/// Perform SIL optimization passes if optimizations haven't been disabled.
+/// These may change across compiler versions.
+static void performAndTimeSILOptimization(CompilerInvocation &Invocation,
+                                          SILModule *SM) {
+  SharedTimer timer("SIL optimization");
+  if (Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::MergeModules ||
+      !Invocation.getSILOptions().shouldOptimize()) {
+    runSILPassesForOnone(*SM);
+    return;
+  }
+  runSILOptPreparePasses(*SM);
+
+  StringRef CustomPipelinePath =
+      Invocation.getSILOptions().ExternalPassPipelineFilename;
+  if (!CustomPipelinePath.empty()) {
+    runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
+  } else {
+    runSILOptimizationPasses(*SM);
+  }
+}
+
+/// Gather instruction counts if we are asked to do so.
+static void gatherInstructionCounts(SILModule *SM) {
+  if (SM->getOptions().PrintInstCounts)
+    performSILInstCount(&*SM);
+}
+
+/// Get the main source file's private discriminator and attach it to
+/// the compile unit's flags.
+static void setMSFPrivateDiscriminator(IRGenOptions &IRGenOpts,
+                                       ModuleOrSourceFile MSF) {
+  if (IRGenOpts.DebugInfoKind == IRGenDebugInfoKind::None ||
+      !MSF.is<SourceFile *>())
+    return;
+  Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
+  if (!PD.empty())
+    IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
+}
+
+static void writeObjCHeader(CompilerInvocation &Invocation,
+                            ModuleDecl *mainModule, bool moduleIsPublic) {
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  if (opts.InputsAndOutputs.getObjCHeaderOutputPath().empty())
+    return;
+  (void)printAsObjC(opts.InputsAndOutputs.getObjCHeaderOutputPath(), mainModule,
+                    opts.ImplicitObjCHeaderPath, moduleIsPublic);
+}
+
+static Optional<bool> emitModuleIfNeeded(SILModule *SM,
+                                         CompilerInvocation &Invocation,
+                                         CompilerInstance &Instance,
+                                         ModuleOrSourceFile MSF) {
+  const FrontendInputsAndOutputs &io =
+      Invocation.getFrontendOptions().InputsAndOutputs;
+  if (io.getModuleOutputPath().empty() && io.getModuleDocOutputPath().empty())
+    return None;
+
+  // Serialize the SILModule if it was not serialized yet.
+  if (!SM->isSerialized())
+    SM->serialize();
+  auto action = Invocation.getFrontendOptions().RequestedAction;
+  if (action != FrontendOptions::ActionType::MergeModules &&
+      action != FrontendOptions::ActionType::EmitModuleOnly)
+    return None;
+
+  if (Invocation.getFrontendOptions().IndexStorePath.empty())
+    return Instance.getASTContext().hadError();
+
+  return emitIndexData(MSF.dyn_cast<SourceFile *>(), Invocation, Instance) ||
+         Instance.getASTContext().hadError();
+}
+
+static bool setUpForAndRunImmediately(CompilerInvocation &Invocation,
+                                      CompilerInstance &Instance,
+                                      std::unique_ptr<SILModule> SM,
+                                      ModuleOrSourceFile MSF,
+                                      FrontendObserver *observer,
+                                      int &ReturnValue) {
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  IRGenOpts.UseJIT = true;
+  IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+  const ProcessCmdLine &CmdLine =
+      ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
+  Instance.setSILModule(std::move(SM));
+
+  if (observer) {
+    observer->aboutToRunImmediately(Instance);
+  }
+
+  ReturnValue =
+      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
+                     Instance.mainInputFilenameForDebugInfo());
+  return Instance.getASTContext().hadError();
+}
+
+static std::pair<std::unique_ptr<llvm::Module>, llvm::GlobalVariable *>
+generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
+           StringRef singleOutputFilename, ModuleOrSourceFile MSF) {
+  // FIXME: We shouldn't need to use the global context here, but
+  // something is persisting across calls to performIRGeneration.
+  auto &LLVMContext = getGlobalLLVMContext();
+  llvm::GlobalVariable *HashGlobal;
+  std::unique_ptr<llvm::Module> IRModule =
+      MSF.is<SourceFile *>()
+          ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
+                                std::move(SM), singleOutputFilename,
+                                LLVMContext, 0, &HashGlobal)
+          : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
+                                std::move(SM), singleOutputFilename,
+                                LLVMContext, &HashGlobal);
+
+  return make_pair(std::move(IRModule), HashGlobal);
+}
+
+static bool walkASTForIndexing(CompilerInvocation &Invocation,
+                               CompilerInstance &Instance,
+                               ModuleOrSourceFile MSF) {
+  return !Invocation.getFrontendOptions().IndexStorePath.empty() &&
+         emitIndexData(MSF.dyn_cast<SourceFile *>(), Invocation, Instance);
+}
+
+static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
+                                ModuleOrSourceFile MSF,
+                                bool astGuaranteedToCorrespondToSIL,
+                                llvm::Module &IRModule) {
+  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  switch (mode) {
+  case FrontendOptions::TBDValidationMode::None:
+    return false;
+  case FrontendOptions::TBDValidationMode::All:
+  case FrontendOptions::TBDValidationMode::MissingFromTBD: {
+    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()) ||
+        !astGuaranteedToCorrespondToSIL)
+      return false;
+
+    const auto &SILOpts = Invocation.getSILOptions();
+    const auto hasMultipleIGMs = SILOpts.hasMultipleIGMs();
+    bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
+    return MSF.is<SourceFile *>()
+               ? validateTBD(MSF.get<SourceFile *>(), IRModule, hasMultipleIGMs,
+                             allSymbols)
+               : validateTBD(MSF.get<ModuleDecl *>(), IRModule, hasMultipleIGMs,
+                             allSymbols);
+  }
+  }
+}
+
+static bool generateCode(CompilerInvocation &Invocation,
+                         CompilerInstance &Instance, llvm::Module *IRModule,
+                         llvm::GlobalVariable *HashGlobal,
+                         UnifiedStatsReporter *Stats);
+
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          bool astGuaranteedToCorrespondToSIL,
+                                          ModuleOrSourceFile MSF,
+                                          bool moduleIsPublic,
+                                          int &ReturnValue,
+                                          FrontendObserver *observer,
+                                          UnifiedStatsReporter *Stats) {
+
+  FrontendOptions opts = Invocation.getFrontendOptions();
+  FrontendOptions::ActionType Action = opts.RequestedAction;
+  ASTContext &Context = Instance.getASTContext();
+  SILOptions &SILOpts = Invocation.getSILOptions();
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+
+  if (observer) {
+    observer->performedSILGeneration(*SM);
+  }
+  if (Stats) {
+    countStatsPostSILGen(*Stats, *SM);
+  }
+
+  if (auto r =
+          emitSILAfterSILGen(Invocation, SM.get(), Instance.getMainModule()))
+    return *r;
+
+  if (auto r = emitSIBAfterSILGen(Invocation, Instance, SM.get(), MSF))
+    return *r;
+
+  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
+      createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
+  if (OptRecordFile)
+    SM->setOptRecordStream(llvm::make_unique<llvm::yaml::Output>(
+                               *OptRecordFile, &Instance.getSourceMgr()),
+                           std::move(OptRecordFile));
+
+  if (performStableOptimizations(Invocation, SM.get(), observer))
+    return true;
 
   {
     SharedTimer timer("SIL verification, pre-optimization");
@@ -1000,27 +1195,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // can be serialized at any moment, e.g. during the optimization pipeline.
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
-  // Perform SIL optimization passes if optimizations haven't been disabled.
-  // These may change across compiler versions.
-  {
-    SharedTimer timer("SIL optimization");
-    if (Action != FrontendOptions::ActionType::MergeModules &&
-        Invocation.getSILOptions().shouldOptimize()) {
-
-      runSILOptPreparePasses(*SM);
-
-      StringRef CustomPipelinePath =
-        Invocation.getSILOptions().ExternalPassPipelineFilename;
-      if (!CustomPipelinePath.empty()) {
-        runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
-      } else {
-        runSILOptimizationPasses(*SM);
-      }
-    } else {
-      runSILPassesForOnone(*SM);
-    }
-  }
-
+  performAndTimeSILOptimization(Invocation, SM.get());
   if (observer) {
     observer->performedSILOptimization(*SM);
   }
@@ -1033,54 +1208,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     SM->verify();
   }
 
-  // Gather instruction counts if we are asked to do so.
-  if (SM->getOptions().PrintInstCounts) {
-    performSILInstCount(&*SM);
-  }
+  gatherInstructionCounts(SM.get());
+  setMSFPrivateDiscriminator(IRGenOpts, MSF);
 
-  // Get the main source file's private discriminator and attach it to
-  // the compile unit's flags.
-  if (IRGenOpts.DebugInfoKind != IRGenDebugInfoKind::None &&
-      MSF.is<SourceFile*>()) {
-    Identifier PD = MSF.get<SourceFile*>()->getPrivateDiscriminator();
-    if (!PD.empty())
-      IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
-  }
+  writeObjCHeader(Invocation, Instance.getMainModule(), moduleIsPublic);
 
-  if (!opts.InputsAndOutputs.getObjCHeaderOutputPath().empty()) {
-    (void)printAsObjC(opts.InputsAndOutputs.getObjCHeaderOutputPath(),
-                      Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
-                      moduleIsPublic);
-  }
+  if (auto r = emitSIBIFNeededAfterOptimizations(Invocation, SM.get(),
+                                                 Instance.getASTContext(), MSF))
+    return *r;
 
-  if (Action == FrontendOptions::ActionType::EmitSIB) {
-    if (!opts.InputsAndOutputs.getModuleOutputPath().empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath =
-          opts.InputsAndOutputs.getModuleOutputPath().c_str();
-      serializationOpts.SerializeAllSIL = true;
-      serializationOpts.IsSIB = true;
-
-      serialize(MSF, serializationOpts, SM.get());
-    }
-    return Context.hadError();
-  }
-
-  if (!opts.InputsAndOutputs.getModuleOutputPath().empty() ||
-      !opts.InputsAndOutputs.getModuleDocOutputPath().empty()) {
-    // Serialize the SILModule if it was not serialized yet.
-    if (!SM.get()->isSerialized())
-      SM.get()->serialize();
-    if (Action == FrontendOptions::ActionType::MergeModules ||
-        Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      if (shouldIndex) {
-        if (emitIndexData(MSF.dyn_cast<SourceFile*>(),
-                          Invocation, Instance))
-          return true;
-      }
-      return Context.hadError();
-    }
-  }
+  if (auto r = emitModuleIfNeeded(SM.get(), Invocation, Instance, MSF))
+    return *r;
 
   assert(Action >= FrontendOptions::ActionType::EmitSIL &&
          "All actions not requiring SILPasses must have been handled!");
@@ -1106,48 +1244,19 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
-  if (Action == FrontendOptions::ActionType::Immediate) {
-    assert(!MSF.is<SourceFile*>() &&
-           "-i doesn't work in -primary-file mode");
-    IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
-    const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
-                                                   opts.ImmediateArgv.end());
-    Instance.setSILModule(std::move(SM));
+  if (Action == FrontendOptions::ActionType::Immediate)
+    return setUpForAndRunImmediately(Invocation, Instance, std::move(SM), MSF,
+                                     observer, ReturnValue);
 
-    if (observer) {
-      observer->aboutToRunImmediately(Instance);
-    }
-
-    ReturnValue =
-        RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
-                       Instance.mainInputFilenameForDebugInfo());
-    return Context.hadError();
-  }
-
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = getGlobalLLVMContext();
-  std::unique_ptr<llvm::Module> IRModule;
-  llvm::GlobalVariable *HashGlobal;
-  if (MSF.is<SourceFile*>()) {
-    IRModule =
-        performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(), std::move(SM),
-                            opts.InputsAndOutputs.getSingleOutputFilename(),
-                            LLVMContext, 0, &HashGlobal);
-  } else {
-    IRModule =
-        performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(), std::move(SM),
-                            opts.InputsAndOutputs.getSingleOutputFilename(),
-                            LLVMContext, &HashGlobal);
-  }
+  std::pair<std::unique_ptr<llvm::Module>, llvm::GlobalVariable *>
+      IRModuleAndHashGlobal =
+          generateIR(IRGenOpts, std::move(SM),
+                     opts.InputsAndOutputs.getSingleOutputFilename(), MSF);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
-  if (shouldIndex) {
-    if (emitIndexData(MSF.dyn_cast<SourceFile*>(), Invocation, Instance))
-      return true;
-  }
+  if (walkASTForIndexing(Invocation, Instance, MSF))
+    return true;
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
@@ -1155,54 +1264,39 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // If the AST Context has no errors but no IRModule is available,
   // parallelIRGen happened correctly, since parallel IRGen produces multiple
   // modules.
-  if (!IRModule) {
+  if (!std::get<0>(IRModuleAndHashGlobal)) {
     return HadError;
   }
 
-  bool allSymbols = false;
-  switch (opts.ValidateTBDAgainstIR) {
-  case FrontendOptions::TBDValidationMode::None:
-    break;
-  case FrontendOptions::TBDValidationMode::All:
-    allSymbols = true;
-    LLVM_FALLTHROUGH;
-  case FrontendOptions::TBDValidationMode::MissingFromTBD: {
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()) ||
-        !astGuaranteedToCorrespondToSIL)
-      break;
+  if (validateTBDIfNeeded(Invocation, MSF, astGuaranteedToCorrespondToSIL,
+                          *std::get<0>(IRModuleAndHashGlobal)))
+    return true;
 
-    const auto &SILOpts = Invocation.getSILOptions();
-    const auto hasMultipleIGMs = SILOpts.hasMultipleIGMs();
-    bool error;
-    if (MSF.is<SourceFile*>())
-      error = validateTBD(MSF.get<SourceFile*>(),
-                          *IRModule, hasMultipleIGMs,
-                          allSymbols);
-    else
-      error = validateTBD(MSF.get<ModuleDecl*>(),
-                          *IRModule, hasMultipleIGMs,
-                          allSymbols);
-    if (error)
-      return true;
+  return generateCode(Invocation, Instance,
+                      std::get<0>(IRModuleAndHashGlobal).get(),
+                      std::get<1>(IRModuleAndHashGlobal), Stats) ||
+         HadError;
+}
 
-    break;
-  }
-  }
-
-  std::unique_ptr<llvm::TargetMachine> TargetMachine =
-    createTargetMachine(IRGenOpts, Context);
+static bool generateCode(CompilerInvocation &Invocation,
+                         CompilerInstance &Instance, llvm::Module *IRModule,
+                         llvm::GlobalVariable *HashGlobal,
+                         UnifiedStatsReporter *Stats) {
+  std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
+      Invocation.getIRGenOptions(), Instance.getASTContext());
   version::Version EffectiveLanguageVersion =
-    Context.LangOpts.EffectiveLanguageVersion;
+      Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
   Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
-                     IRModule.get(), TargetMachine.get(),
+  return performLLVM(Invocation.getIRGenOptions(), &Instance.getDiags(),
+                     nullptr, HashGlobal, IRModule, TargetMachine.get(),
                      EffectiveLanguageVersion,
-                     opts.InputsAndOutputs.getSingleOutputFilename(), Stats) ||
-         HadError;
+                     Invocation.getFrontendOptions()
+                         .InputsAndOutputs.getSingleOutputFilename(),
+                     Stats);
 }
 
 static bool emitIndexData(SourceFile *PrimarySourceFile,
