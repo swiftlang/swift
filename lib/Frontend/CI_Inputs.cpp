@@ -189,11 +189,9 @@ bool CI_Inputs::setUpForInput(const InputFile &input,
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     setMainBufferID(*bufferID);
   }
-
-  if (input.isPrimary()) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
+  if (input.isPrimary())
     recordPrimaryInputBuffer(*bufferID);
-  }
+
   return false;
 }
 
