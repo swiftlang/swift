@@ -1309,7 +1309,6 @@ SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
-  unsigned numCases = DeclsAndValues.size();
   SmallVector<SILValue, 4> CaseValues;
   SmallVector<EnumElementDecl*, 4> CaseDecls;
   for (auto &pair : DeclsAndValues) {
