@@ -1,15 +1,13 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s | %FileCheck %s
-
-// TODO: Check diagnostics by enabling -verify mode.
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 
 import TensorFlow
 
 public func testTensor() {
-  var x = Tensor<Float>(oneD: 1.0, 2.0, 3.0)
+  var x = Tensor<Float>(oneD: 1.0, 2.0, 3.0)  // expected-warning {{value implicitly copied to accelerator, use .toDevice() to make transfer explicit}}
   x += x
-  x -= x
-  print(x)
-  var y = Tensor1D<Float>(1, 2, 3.0)
+  x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
+  print(x) // expected-note {{value used here}}
+  var y = Tensor1D<Float>(1, 2, 3.0).toDevice()
   y += y
   print(y)
 }
@@ -27,7 +25,8 @@ public func testTensor() {
 
 
 public func testScalar(f: Float) {
-  var x = Tensor<Float>(zeroD: f) + Tensor<Float>(zeroD: 1.0)
+  var x = Tensor<Float>(zeroD: f) +    // expected-warning {{value implicitly copied to accelerator}}
+          Tensor<Float>(zeroD: 1.0)
   x += x
   print(x)
 }
