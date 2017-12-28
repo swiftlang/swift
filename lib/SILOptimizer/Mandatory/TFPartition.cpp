@@ -596,8 +596,7 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
     .highlight(loc.getSourceRange());
 
-  // To minimize output, only print the line and column number for
-  // everything but the first instruction.
+  // If the use is at a different position, emit a note showing where it is.
   auto userLoc = getUserSourceLocation(user->getLoc(), user);
   if (loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
