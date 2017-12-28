@@ -340,7 +340,9 @@ const OutputPaths &FrontendInputsAndOutputs::supplementaryOutputPaths() const {
   static const OutputPaths empty;
   if (!hasInputs())
     return empty;
-  assertMustNotBeMoreThanOnePrimaryInput();
+
+  if (!isBatchModeEnabled())
+    assertMustNotBeMoreThanOnePrimaryInput();
   return firstInputProducingSupplementaryOutput().supplementaryOutputPaths();
 }
 
