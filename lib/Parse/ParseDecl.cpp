@@ -2416,9 +2416,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
       DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
       DeclResult = parseDeclImport(Flags, Attributes);
       break;
-    case tok::kw_extension:
+    case tok::kw_extension: {
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ExtensionDecl);
       DeclResult = parseDeclExtension(Flags, Attributes);
       break;
+    }
     case tok::kw_let:
     case tok::kw_var: {
       // Collect all modifiers into a modifier list.
@@ -3063,6 +3065,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
     LBLoc = PreviousLoc;

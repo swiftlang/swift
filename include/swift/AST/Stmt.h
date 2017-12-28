@@ -51,6 +51,9 @@ class alignas(8) Stmt {
   Stmt(const Stmt&) = delete;
   Stmt& operator=(const Stmt&) = delete;
 
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Stmt, bitmax(NumStmtKindBits,8) + 1,
     /// Kind - The subclass of Stmt that this is.
     Kind : bitmax(NumStmtKindBits,8),
@@ -81,14 +84,6 @@ class alignas(8) Stmt {
     CaseCount : 32
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Stmt);
-    SWIFT_INLINE_BITS(BraceStmt);
-    SWIFT_INLINE_BITS(DoCatchStmt);
-    SWIFT_INLINE_BITS(CaseStmt);
-    SWIFT_INLINE_BITS(SwitchStmt);
   } Bits;
 
   /// Return the given value for the 'implicit' flag if present, or if None,
