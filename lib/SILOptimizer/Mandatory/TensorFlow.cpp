@@ -24,27 +24,6 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-
-/// Return true if the specified source location is inside of the tensor
-/// library, which should be opaque to the user.
-///
-/// FIXME: This is a hack: eventually, these routines will be in their own
-/// module, and we'll just recognize them by what module they are in, just like
-/// how the swift stdlib is a well-known module for the compiler.
-static bool isTensorLibraryInternal(SILLocation loc, ASTContext &Ctx) {
-  if (loc.getSourceLoc().isInvalid())
-    return false;
-  auto str = Ctx.SourceMgr.getBufferIdentifierForLoc(loc.getSourceLoc());
-  if (str.contains("Sources/TensorOps.swift") ||
-      str.contains("Sources/Tensor.swift") ||
-      str.contains("Sources/RankedTensor.swift") ||
-      str.contains("Sources/TensorXD.swift") ||
-      str.contains("Sources/PythonGlue.swift"))
-    return true;
-
-  return false;
-}
-
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.
 Type tf::isTensorHandle(Type ty) {
@@ -254,17 +233,19 @@ SILLocation tf::getUserSourceLocation(SILLocation loc, SILNode *value) {
 SILDebugLocation tf::getUserSourceLocation(SILDebugLocation loc) {
   auto ds = loc.getScope();
 
+  // If this location hasn't been inlined at all, just keep it unmodified.
+  if (!ds->InlinedCallSite && loc.getLocation().getSourceLoc().isValid())
+    return loc;
+
   // Zip through inlined call site information that came from the
   // implementation guts of the tensor library.  We want to report the
   // message inside the user's code, not in the guts we inlined through.
   for (; auto ics = ds->InlinedCallSite; ds = ics) {
-    // If we reach the user code, or if the inlined call site is invalid,
-    // stop scanning.
-    if (ics->Loc.isNull())
-      break;
-
+    // If we found a valid inlined-into location, then we are good.
+    if (ds->Loc.getSourceLoc().isValid())
+      return SILDebugLocation(ds->Loc, ds);
     if (SILFunction *F = ds->getInlinedFunction()) {
-      if (!isTensorLibraryInternal(F->getLocation(), F->getASTContext()))
+      if (F->getLocation().getSourceLoc().isValid())
         break;
     }
   }
