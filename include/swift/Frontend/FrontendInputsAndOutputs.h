@@ -43,6 +43,9 @@ class FrontendInputsAndOutputs {
   /// both for importing and compiling.
   /// Only one set of outputs (one OutputFilename, one OutputPaths) is produced.
   bool IsSingleThreadedWMO = false;
+  
+  /// Punt where needed to enable batch mode experiments.
+  bool IsBatchModeEnabled = false;
 
 public:
   FrontendInputsAndOutputs() = default;
@@ -190,6 +193,10 @@ public:
   /// Return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
+  
+  
+  bool isBatchModeEnabled() const { return IsBatchModeEnabled; }
+
 
 public:
   void clearInputs();
@@ -205,6 +212,8 @@ private:
       ArrayRef<const OutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
+  
+  void enableBatchMode() { IsBatchModeEnabled = true; }
 
 public:
   bool hasDependenciesPath() const;
