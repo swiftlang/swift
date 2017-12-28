@@ -467,9 +467,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 }
 
 Parser::~Parser() {
-  if (Tok.is(tok::eof))
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-
   delete L;
   delete TokReceiver;
   delete SyntaxContext;
