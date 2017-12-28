@@ -122,6 +122,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::SimpleTypeIdentifier:
+  case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:
   case SyntaxKind::SubscriptExpr:
   case SyntaxKind::ExprList: {

@@ -576,15 +576,14 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   if (startsWithSymbol(Tok, '.')) {
     llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.getPtrOrNull());
 
+    auto dotLoc = Tok.getLoc();
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
     // sense. This is all made more complicated by .?. being considered an
     // operator token, and a single one at that (which means
     // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
-    auto position = getParserPosition();
-    auto dotLoc = consumeStartingCharacterOfCurrentToken(tok::period);
-    if (Tok.is(tok::identifier))
-      backtrackToPosition(position);
+    if (Tok.getLength() != 1 || !peekToken().is(tok::identifier))
+      consumeStartingCharacterOfCurrentToken(tok::period);
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
     bool unusedHasBindOptional = false;
@@ -1590,13 +1589,9 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::kw_Any: { // Any
-    auto SynResult = parseAnyType();
-    auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
-    if (SynResult.hasSyntax()) {
-      TypeExprSyntaxBuilder Builder;
-      Builder.useType(SynResult.getSyntax());
-      SyntaxContext->addSyntax(Builder.build());
-    }
+    SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::TypeExpr);
+    auto TyR = parseAnyType();
+    auto expr = new (Context) TypeExpr(TypeLoc(TyR.get()));
     Result = makeParserResult(expr);
     break;
   }
@@ -2089,6 +2084,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     return baseName;
   }
 
+  // TODO: Support compound name in libSyntax.
+
   // Try to parse a compound name.
   BacktrackingScope backtrack(*this);
 
@@ -2097,11 +2094,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
-    // The following code may backtrack; so we disable the syntax tree creation
-    // in this scope.
-    SyntaxParsingContext DisabledContext(SyntaxContext);
-    SyntaxContext->disable();
-
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {
       rparenLoc = consumeToken(tok::r_paren);
