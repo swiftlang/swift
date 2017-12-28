@@ -360,7 +360,8 @@ public:
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
       } else
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {});
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
+                             ArrayRef<SILValue>());
       SEI->eraseFromParent();
 
       // Split the edge from 'Dest' to 'ThreadedSuccessorBlock' it is now
@@ -2123,7 +2124,8 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
 
   TermInst *Term = BB->getTerminator();
   DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
-  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest, {});
+  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest,
+                                         ArrayRef<SILValue>());
   Term->eraseFromParent();
   addToWorklist(BB);
   addToWorklist(commonDest);
