@@ -496,6 +496,7 @@ private:
   }
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
+  void formEscapedIdentifierToken(const char *TokStart);
 
   /// Advance to the end of the line but leave the current buffer pointer
   /// at that newline character.
