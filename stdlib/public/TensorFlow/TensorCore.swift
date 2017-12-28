@@ -69,7 +69,7 @@ extension TensorHandle : CustomPlaygroundQuickLookable {
 // predictable names that are easy to match in the partitioner and then lower
 // into graphs.  Op functions that correspond to TensorFlow ops are expected to
 // be of the form:
-//   @inline(never) @_silgen_name("__tfop_<OPNAME>__<OPERANDINFO>__")
+//   @_silgen_name("__tfop_<OPNAME>__<OPERANDINFO>:<RESULTINFO>__")
 //
 // The <OPNAME> corresponds to the TensorFlow op name, e.g. Add or Const.  The
 // operand info is an encoding of the operands to the function with instructions
@@ -77,31 +77,31 @@ extension TensorHandle : CustomPlaygroundQuickLookable {
 // recognized so far:
 //
 //    t: the next operand is a TensorHandle, and is an "input" to the TF node.
-//    d: the dtype attribute must be added, corresponding to the last tensor
-//       operand we saw, or the result type of the function if first.
+//    d: the next operand is a metatype value, and is added as a 'dtype'
+//       attribute to the TF node. [TODO: Use param label to genericize name].
 //    c: the next operand is a standard library integer or FP type.  We should
-//       pass the value(s) as the 'value' attribute.
+//       pass the value(s) as the 'value' attribute.  [TODO: Use param label to
+//       genericize to names other than 'value'].
 //
 // The tf-compiler expects that all operands passed to the op function will be
-// described by the codes above.  The node created will have results equal to
-// the results of the function, currently they must all be TensorHandle results.
+// described by the codes above.  The codes for the results are currently:
+//
+//    t: the result is a TensorHandle<T>, where the T is the same type as one
+//       of the tensor input operands, or the type of the last dtype specified.
+//    t<type>: the result is a TensorHandle<T>, where T is written out manually
+//       using the same type names that TensorFlow ops use.
 //
 // Here are some example encodings:
-//   1) 'Add' is @_silgen_name("__tfop_Add__tt__").
-//   2) Literal0d form of 'Const' is @_silgen_name("__tfop_Const__dc__").
+//   1) 'Add' is @_silgen_name("__tfop_Add__tt:t__").
+//   2) Literal0d form of 'Const' is @_silgen_name("__tfop_Const__dc:t__").
 //
-
-// A simple wrapper to make the bodies of the op functions more concise.
-func opBody() -> Never {
-  Builtin.unreachable()
-}
 
 /// tfop_send marks the specified Tensor source as intentionally being on the
 /// host, and that the result Tensor is intended to be on the accelerator.  This
 /// enables warnings in the compiler partitioning algorithm about cases of
 /// unanticipated copies back and forth.
 @_versioned @inline(never)
-@_silgen_name("__tfop_send") // Special name, not a TF op!
+@_silgen_name("__tfop_send") // Magic name, not a TF op!
 func tfop_send<T>(_ c : TensorHandle<T>) -> TensorHandle<T> {
   return c
 }
@@ -111,20 +111,26 @@ func tfop_send<T>(_ c : TensorHandle<T>) -> TensorHandle<T> {
 /// enables warnings in the compiler partitioning algorithm about cases of
 /// unanticipated copies back and forth.
 @_versioned @inline(never)
-@_silgen_name("__tfop_receive") // Special name, not a TF op!
+@_silgen_name("__tfop_receive") // Magic name, not a TF op!
 func tfop_receive<T>(_ c : TensorHandle<T>) -> TensorHandle<T> {
   return c
 }
 
 @_versioned @inline(never) @_silgen_name("_tfop_rank")
-func tfop_rank<T>(_ c : TensorHandle<T>) -> Int { opBody() }
+func tfop_rank<T>(_ c : TensorHandle<T>) -> Int {
+  fatalError("implement me")
+}
 
 
 @_versioned @inline(never) @_silgen_name("_tfop_shape")
-func tfop_shape<T>(_ c : TensorHandle<T>) -> [Int] { opBody() }
+func tfop_shape<T>(_ c : TensorHandle<T>) -> [Int] {
+  fatalError("implement me")
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Const__dc__")
-func tfop_literal_0d<T>(_ value: T) -> TensorHandle<T> { opBody() }
+@_versioned @_inlineable
+func tfop_literal_0d<T>(_ value: T) -> TensorHandle<T> {
+  return #tfop("Const", "dc:t", T.self, value)
+}
 
 
 // FIXME: Teach the partitioner about this.  For now, this executes on the host.
@@ -229,14 +235,20 @@ func tfop_transpose<T>(_ value : TensorHandle<T>) -> TensorHandle<T> {
   fatalError("this should become an op")
 }
 
-@_versioned @inline(never) @_silgen_name("__tfop_Tanh__t__")
-func tfop_tanh<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
+@_versioned @_inlineable
+func tfop_tanh<T>(_ value : TensorHandle<T>) -> TensorHandle<T> {
+  return #tfop("Tanh", "t:t", value)
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Log__t__")
-func tfop_log<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
+@_versioned @_inlineable
+func tfop_log<T>(_ value : TensorHandle<T>) -> TensorHandle<T> {
+  return #tfop("Log", "t:t", value)
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Exp__t__")
-func tfop_exp<T>(_ value : TensorHandle<T>) -> TensorHandle<T> { opBody() }
+@_versioned @_inlineable
+func tfop_exp<T>(_ value : TensorHandle<T>) -> TensorHandle<T> {
+  return #tfop("Exp", "t:t", value)
+}
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_sum_")
@@ -296,21 +308,29 @@ func tfop_elt_convert<From, To>(_ c : TensorHandle<From>) -> TensorHandle<To> {
   fatalError("this should become an op")
 }
 
-@_versioned @inline(never) @_silgen_name("__tfop_Add__tt__")
+@_versioned @_inlineable
 func tfop_elt_add<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
-  -> TensorHandle<T> { opBody() }
+  -> TensorHandle<T> {
+  return #tfop("Add", "tt:t", lhs, rhs)
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Sub__tt__")
+@_versioned @_inlineable
 func tfop_elt_subtract<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
-  -> TensorHandle<T> { opBody() }
+  -> TensorHandle<T> {
+  return #tfop("Sub", "tt:t", lhs, rhs)
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Mul__tt__")
+@_versioned @_inlineable
 func tfop_elt_multiply<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
-  -> TensorHandle<T> { opBody() }
+  -> TensorHandle<T> {
+  return #tfop("Mul", "tt:t", lhs, rhs)
+}
 
-@_versioned @inline(never) @_silgen_name("__tfop_Div__tt__")
+@_versioned @_inlineable
 func tfop_elt_divide<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
-  -> TensorHandle<T> { opBody() }
+  -> TensorHandle<T> {
+  return #tfop("Div", "tt:t", lhs, rhs)
+}
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_elt_matmul")
@@ -319,9 +339,11 @@ func tfop_elt_matmul<T>(_ lhs : TensorHandle<T>,
   fatalError("this should become an op")
 }
 
-@_versioned @inline(never) @_silgen_name("__tfop_Less__tt__")
+@_versioned @_inlineable
 func tfop_elt_less<T>(_ lhs : TensorHandle<T>, _ rhs : TensorHandle<T>)
-  -> TensorHandle<Bool> { opBody() }
+  -> TensorHandle<Bool> {
+  return #tfop("Less", "tt:t<bool>", lhs, rhs)
+}
 
 /// FIXME: Bind this to a proper TensorFlow op.
 @_versioned @inline(never) @_silgen_name("_tfop_concat")

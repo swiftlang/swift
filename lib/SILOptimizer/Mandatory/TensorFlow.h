@@ -34,9 +34,8 @@ namespace tf {
     AddDType,   // 'd'
   };
 
-  /// Represent information about a TensorFlow operation as represented in SIL.
-  /// This handles both forms that these operations can be in: the one coming
-  /// from the parser using apply_inst/function_ref, and the builtin_inst form.
+  /// Represent information about a TensorFlow operation as represented in SIL
+  /// as Builtin instructions.
   struct TensorOpInfo {
     /// The instruction being analyzed.
     SILInstruction *inst;
@@ -44,8 +43,9 @@ namespace tf {
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
-    /// This is the string representation of the operand descriptors.
+    /// This is the string representation of the operand & result descriptors.
     StringRef operandDescriptorStr;
+    StringRef resultDescriptorStr;
 
     /// These are decoded descriptors for operands.
     SmallVector<OpCommand, 4> operandDescriptors;
