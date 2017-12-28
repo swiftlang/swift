@@ -188,9 +188,9 @@ Lexer::Lexer(const LangOptions &Options,
     .StartsWith("\xEF\xBB\xBF", 3)
     .Default(0);
 
-  // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
-  // on byte order), throw it away.
-  CurPtr = BufferStart + BOMLength;
+  // Keep information about existance of UTF-8 BOM for transparency source code
+  // editing with libSyntax.
+  CurPtr = BufferStart;
   ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
@@ -2036,7 +2036,20 @@ void Lexer::lexImpl() {
     LeadingTrivia.clear();
     TrailingTrivia.clear();
   }
-  NextToken.setAtStartOfLine(CurPtr == ContentStart);
+  if (CurPtr == BufferStart) {
+    if (BufferStart < ContentStart) {
+      size_t BOMLen = ContentStart - BufferStart;
+      assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
+      if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+        // Add UTF-8 BOM to LeadingTrivia.
+        LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
+      }
+      CurPtr += BOMLen;
+    }
+    NextToken.setAtStartOfLine(true);
+  } else {
+    NextToken.setAtStartOfLine(false);
+  }
 
   // Remember where we started so that we can find the comment range.
   LastCommentBlockStart = CurPtr;
