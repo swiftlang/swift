@@ -1142,6 +1142,13 @@ public:
     return static_cast<LiteralKind>(Bits.ObjectLiteralExpr.LitKind);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Return true if this object literal is the #tfop(...) op descriptor for
+  /// TensorFlow.
+  bool isTFOp() const {
+    return getLiteralKind() == LiteralKind::tfop;
+  }
+
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 

@@ -954,5 +954,24 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (FnId.str().startswith("__tfop")) {
+
+    // TFOp builtins are never actually used at runtime: they are always
+    // extracted out of the program to a TensorFlow graph.  However, they do
+    // make it here when building the TensorFlow module itself.  For those
+    // cases, we produce an unreachable instruction.  We can't easily do that
+    // directly, so we produce a store of undef -> undef.
+    IGF.Builder.CreateStore(llvm::UndefValue::get(IGF.IGM.Int8Ty),
+                            llvm::UndefValue::get(IGF.IGM.Int8PtrTy),
+                            Alignment());
+    (void)args.claimAll();
+    // Finally, we set up our explosion results full of undef values.
+    ExplosionSchema schema = IGF.getTypeInfo(resultType).getSchema();
+    for (auto &elt : schema)
+      out.add(llvm::UndefValue::get(elt.getScalarType()));
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

@@ -2948,7 +2948,28 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!E->isTFOp())
+    return visit(E->getSemanticExpr(), C);
+
+  auto tuple = cast<TupleExpr>(E->getArg());
+  auto opName = cast<StringLiteralExpr>(tuple->getElement(0))->getValue();
+  auto constraints = cast<StringLiteralExpr>(tuple->getElement(1))->getValue();
+
+  // If this is a tensorflow operation, we have a bit more work to do: we emit
+  // a builtin instruction with the operation name and the constraint characters
+  // name mangled into the basename.
+  std::string name =
+    "__tfop_" + opName.str() + "__" + constraints.str() + "__";
+
+  SmallVector<SILValue, 4> args;
+  for (auto &elt : tuple->getElements().drop_front(2)) {
+    args.push_back(visit(elt).getScalarValue().forward(SGF));
+  }
+  auto resultTy = SGF.getLoweredLoadableType(E->getType());
+  auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
+                                 resultTy, {}, args);
+  return RValue(SGF, E, ManagedValue::forUnmanaged(res));
 }
 
 RValue RValueEmitter::

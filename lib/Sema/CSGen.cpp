@@ -1235,6 +1235,10 @@ namespace {
       if (expr->getType() && !expr->getType()->hasTypeVariable())
         return expr->getType();
 
+      // SWIFT_ENABLE_TENSORFLOW
+      if (expr->isTFOp())
+        return visitTFOpExpr(expr);
+
       auto &tc = CS.getTypeChecker();
       auto protocol = tc.getLiteralProtocol(expr);
       if (!protocol) {
@@ -1276,6 +1280,153 @@ namespace {
         result = OptionalType::get(result);
 
       return result;
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // #tfop is type checked and SILGen'd differently than the rest of the
+    // literals.  We really should use a completely separate AST node (rather
+    // that repurposing ObjectLiteralExpr) but that would be a substantially
+    // more invasive patch that we don't want to keep out of tree.
+    Type visitTFOpExpr(ObjectLiteralExpr *expr) {
+      assert(expr->isTFOp() && "Unexpected expression");
+      auto &tc = CS.getTypeChecker();
+      auto *tt = dyn_cast<TupleExpr>(expr->getArg());
+      if (!tt || tt->getNumElements() < 2) {
+        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                    "#tfop() takes two string literals and a list of operands");
+        return nullptr;
+      }
+
+      // Check that we have two string literals.
+      auto opname = dyn_cast<StringLiteralExpr>(tt->getElement(0));
+      auto constraints = dyn_cast<StringLiteralExpr>(tt->getElement(1));
+      if (!opname || !constraints) {
+        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                    "#tfop() takes two string literals and a list of operands");
+        return nullptr;
+      }
+
+      // The TensorFlow module defines the "TensorHandle" type, which is the
+      // representation of a tensor value.  If we can't find it, then we reject
+      // uses of #tfop.
+      auto tensorHandle = tc.Context.getTensorHandleDecl();
+      if (!tensorHandle) {
+        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                "#tfop() may only be used in a module that imports TensorFlow");
+        return nullptr;
+      }
+
+      auto constraintStr = constraints->getValue();
+      auto colonLoc = constraintStr.find(':');
+      if (colonLoc == StringRef::npos) {
+        tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
+                    "constraint string must have a ':' to indicate results");
+        return nullptr;
+      }
+
+      SmallVector<TupleTypeElt, 4> argTypes;
+
+      // The first two operands should type check as strings.
+      auto stringType = tc.Context.getStringDecl()->getDeclaredType();
+      argTypes.push_back(TupleTypeElt(stringType));
+      argTypes.push_back(TupleTypeElt(stringType));
+
+      Type lastMetaTypeElementType;
+      Type lastTensorType;
+      auto locator = CS.getConstraintLocator(expr);
+
+      // Loop over all of the argument constraints, building the expected list
+      // of parameter types.
+      for (auto ch : constraintStr.take_front(colonLoc)) {
+        switch (ch) {
+        case 't': {   // TensorHandle<T> with an unbound T.
+          Type openedType =
+            CS.openUnboundGenericType(tensorHandle->getDeclaredType(), locator);
+          argTypes.push_back(TupleTypeElt(openedType));
+          lastTensorType = openedType;
+          break;
+        }
+        case 'c': {   // Constant integer or fp value.
+          auto ty = CS.createTypeVariable(locator, 0);
+          argTypes.push_back(TupleTypeElt(ty));
+          break;
+        }
+        case 'd': {   // value = Metatype<T>
+          auto baseTy = CS.createTypeVariable(locator, 0);
+          argTypes.push_back(TupleTypeElt(MetatypeType::get(baseTy)));
+          lastMetaTypeElementType = baseTy;
+          break;
+        }
+        default:
+          // TODO: Point to the exact character in question using
+          // getAdvancedLocOrInvalid.
+          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
+                      "unknown constraint character: " + std::string(1, ch));
+          return nullptr;
+        }
+      }
+
+      // Now that we know what all of the arguments are supposed to be, add a
+      // constraint to the constraint system to check this for us.
+      auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
+      CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
+                       CS.getType(expr->getArg()), desiredArgTypes,
+                       CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+
+      // FIXME: Apply type constraints to the input operands to check the
+      // constraint string.  Until we implement this, people can just implement
+      // perfect constraints. :-)
+
+      // Otherwise, we need to determine the types of the results, so we parse
+      // the constraints string.
+      SmallVector<TupleTypeElt, 2> resultTypes;
+      auto resultConstraints = constraintStr.drop_front(colonLoc+1);
+      while (!resultConstraints.empty()) {
+        char ch = resultConstraints.front();
+        resultConstraints = resultConstraints.drop_front();
+        switch (ch) {
+        case 't':
+          // If the result type is explicit, parse it.
+          // FIXME: Generalize this.
+          if (resultConstraints.startswith("<bool>")) {
+            resultConstraints = resultConstraints.drop_front(strlen("<bool>"));
+            auto boolType = tc.Context.getBoolDecl()->getDeclaredType();
+            auto resolved = BoundGenericType::get(tensorHandle, nullptr,
+                                                  {boolType});
+            resultTypes.push_back(TupleTypeElt(resolved));
+            continue;
+          }
+
+          // We need to have either a tensor input, a metatype value.
+          if (!lastTensorType) {
+            if (!lastMetaTypeElementType) {
+              tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
+                          "no way to infer result element type");
+              return nullptr;
+            }
+
+            lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
+                                                   {lastMetaTypeElementType});
+          }
+          resultTypes.push_back(TupleTypeElt(lastTensorType));
+          break;
+        default:
+          // TODO: Point to the exact character in question.
+          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
+                      "unknown constraint character: " + std::string(1, ch));
+          return nullptr;
+        }
+      }
+
+      // Map the list of result types into a single result type for the op.
+      switch (resultTypes.size()) {
+      case 1:
+        return resultTypes[0].getRawType();
+      case 0:
+        return tc.Context.TheEmptyTupleType;
+      default:
+        return TupleType::get(resultTypes, tc.Context);
+      }
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

@@ -135,6 +135,10 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The TensorFlow.TensorHandle<T> decl.
+  ClassDecl *TensorHandleDecl = nullptr;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -713,6 +717,28 @@ CanType ASTContext::getAnyObjectType() const {
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));
   return Impl.AnyObjectType;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+ClassDecl *ASTContext::getTensorHandleDecl() const {
+  if (Impl.TensorHandleDecl)
+    return Impl.TensorHandleDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(getIdentifier("TensorFlow"));
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({ }, getIdentifier("TensorHandle"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return Impl.TensorHandleDecl = CD;
+  return nullptr;
 }
 
 CanType ASTContext::getNeverType() const {

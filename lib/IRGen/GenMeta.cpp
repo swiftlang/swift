@@ -5893,6 +5893,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::ExpressibleByTensorFlowOp:
   case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:

@@ -758,11 +758,6 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   if (mark != Marking::Move) {
     auto operandRange = inst.getAllOperands();
 
-    // Don't specifically mark the first operand to an apply instruction:
-    // it is a function_ref, which we handle specially as part of the op.
-    if (isa<ApplyInst>(inst))
-      operandRange = operandRange.drop_front();
-
     // Overflow-checking integer ops have a "should check" bit as their last
     // parameter, we don't remap it, so don't mark it.
     if (isOverflowCheckingIntegerOp(&inst)) {
@@ -784,17 +779,16 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   bool isTensor = tfopInfo.decode();
   assert(isTensor && "Expected a tensor op"); (void)isTensor;
 
-  unsigned nextOperand = 1; // skip the function ref.
+  unsigned nextOperand = 0;
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
-    case OpCommand::AddDType:
-      break;  // No operand corresponds to this.
     case OpCommand::Tensor:
       // Tensor operands are recursively marked.
       markValue(inst.getOperand(nextOperand++));
       break;
+    case OpCommand::AddDType:
     case OpCommand::Constant:
-      // No need to mark this operand.
+      // No need to mark these operands.
       ++nextOperand;
       break;
     }
@@ -1098,8 +1092,7 @@ public:
     return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
   }
 
-
-  void visitApplyInst(ApplyInst *inst);
+  void visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo);
   void visitBuiltinInst(BuiltinInst *inst);
   void visitLiteralInst(LiteralInst *inst);
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
@@ -1199,20 +1192,20 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 }
 
 
-// We know that all apply instructions that get moved over are due to Tensor
-// ops.  Transform them into builtin' instructions, which have the benefit of
-// eliminating the function_ref instruction.
-void PartitionCloner::visitApplyInst(ApplyInst *inst) {
-  TensorOpInfo tfopInfo(*inst);
-  bool isTensor = tfopInfo.decode();
-  assert(isTensor && "Expected a tensor op"); (void)isTensor;
-
+// Transform ops builtin instructions to the one we need in the tensor program.
+void PartitionCloner::visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo) {
   auto &B = getBuilder();
-  auto &ctx = B.getASTContext();
   SmallVector<SILValue, 4> args;
   auto loc = remapLocation(inst->getLoc());
 
-  unsigned nextOperand = 1; // skip the function ref.
+  auto cloneSingleInst = [&](SILInstruction *inst) -> SILInstruction* {
+    auto ourInst = inst->clone();
+    ourInst->setDebugLocation(B.getSILDebugLocation(loc));
+    B.getInsertionBB()->push_back(ourInst);
+    return ourInst;
+  };
+
+  unsigned nextOperand = 0;
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
     case OpCommand::Tensor:
@@ -1221,28 +1214,32 @@ void PartitionCloner::visitApplyInst(ApplyInst *inst) {
       break;
     case OpCommand::Constant: {
       auto cst = tfopInfo.getTensorConstantOperand(nextOperand++);
-      auto ourCst = cst->clone();
-      ourCst->setDebugLocation(B.getSILDebugLocation(loc));
-      B.getInsertionBB()->push_back(ourCst);
-      args.push_back(SILValue(ourCst));
+      args.push_back(cloneSingleInst(cst)->getResults()[0]);
       break;
     }
-    case OpCommand::AddDType:
-      break;  // This only affects GraphGen.
+    case OpCommand::AddDType: {
+      auto metatype = cast<MetatypeInst>(inst->getOperand(nextOperand++));
+      args.push_back(cloneSingleInst(metatype)->getResults()[0]);
+      break;
+    }
     }
   }
 
-  auto name = ctx.getIdentifier("__tfop_" + tfopInfo.opName.str() + "__" +
-                                tfopInfo.operandDescriptorStr.str() + "__");
-  auto result =
-    B.createBuiltin(loc, name, inst->getType(), /*substitutionlist*/{}, args);
+  auto result = B.createBuiltin(loc, inst->getName(), inst->getType(),
+                                /*substitutionlist*/{}, args);
   ValueMap[inst] = result;
 }
 
 // If we're copying over a builtin instruction, it is due to a scalar operation
 // that corresponds to an LLVM IR instruction.
 void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
-  // This should correspond to an op.
+  // Check to see if this is an op.
+  TensorOpInfo tfopInfo(*inst);
+  if (tfopInfo.decode())
+    return visitOpInst(inst, tfopInfo);
+
+  // Otherwise, this is some other builtin we're partitioning, like an LLVM IR
+  // instruction.
   auto opName = getPartitionedScalarOpName(inst);
   assert(!opName.empty() && "Should correspond to an op");
   auto &B = getBuilder();
@@ -1775,11 +1772,11 @@ SILFunction *TFFunctionPartition::run() {
   llvm::errs() << "---- INPUT FUNCTION RESULT ----------\n";
   fn.dump();
   llvm::errs() << "---- END OF INPUT FUNCTION RESULT ----------\n";
-#endif
 
   llvm::errs() << "---- PARTITIONING RESULT FUNCTION ----------\n";
   newFn->dump();
   llvm::errs() << "---- END OF PARTITIONING RESULT ----------\n";
+#endif
   return newFn;
 }
 
@@ -1787,18 +1784,6 @@ SILFunction *TFFunctionPartition::run() {
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
-
-/// Find the TensorHandle declaration so we can synthesize types.
-static ClassDecl *findTensorHandleDecl(ModuleDecl *tensorFlowModule) {
-  SmallVector<ValueDecl *, 1> results;
-  auto name = tensorFlowModule->getASTContext().getIdentifier("TensorHandle");
-  tensorFlowModule->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
-
-  for (auto result : results)
-    if (auto SD = dyn_cast<ClassDecl>(result))
-      return SD;
-  return nullptr;
-}
 
 namespace {
 class TFPartition : public SILFunctionTransform {
@@ -1818,13 +1803,15 @@ public:
     if (!tfModule)
       return;
 
-    // Ignore non-public functions.
-    if (fn->getLinkage() != SILLinkage::Public)
+    // If we're building the TensorFlow module itself, don't do anything.
+    if (fn->getModule().getSwiftModule() == tfModule)
       return;
 
     // Make sure that the TensorHandle type is findable.
-    auto tensorHandle = findTensorHandleDecl(tfModule);
+    auto tensorHandle = Ctx.getTensorHandleDecl();
     if (!tensorHandle) {
+      // FIXME: Turn this into an diagnostic error complaining the TF module is
+      // broken.
       llvm::errs() << " *** DIDN'T FIND TensorHandle<> TYPE\n";
       return;
     }
@@ -1855,6 +1842,8 @@ public:
       llvm::outs() << "--- TFPartition Accelerator Result: "
                    << partitionedFn->getName() << "\n";
       partitionedFn->print(llvm::outs());
+      llvm::outs() << "----\n";
+      llvm::outs().flush();
     }
 
     if (isTest) {

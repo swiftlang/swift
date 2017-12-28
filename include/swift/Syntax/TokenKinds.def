@@ -293,6 +293,8 @@ POUND_CONFIG(available)
 POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
 POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
 POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
+// SWIFT_ENABLE_TENSORFLOW
+POUND_OBJECT_LITERAL(tfop, "tfop",  ExpressibleByTensorFlowOp)
 
 POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
 POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)

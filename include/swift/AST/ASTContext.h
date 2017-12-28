@@ -417,6 +417,11 @@ public:
   /// Retrieve the type Swift.AnyObject.
   CanType getAnyObjectType() const;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
+  /// been imported.  Otherwise, this returns null.
+  ClassDecl *getTensorHandleDecl() const;
+
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
