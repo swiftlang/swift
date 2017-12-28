@@ -467,7 +467,6 @@ enum class Marking {
 class TFFunctionPartition {
 public:
   SILFunction &fn;
-  ClassDecl *tensorHandleType;
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -526,10 +525,8 @@ public:
   /// extracted function.
   SmallVector<SILValue, 4> resultValues;
 public:
-  TFFunctionPartition(SILFunction &Fn, ClassDecl *tensorHandleType,
-                      SILPassManager *PM)
+  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM)
     : fn(Fn),
-      tensorHandleType(tensorHandleType),
       DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
       tensorCodeBlocks(Fn) {
   }
@@ -590,17 +587,20 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
         return false;
       }
 
+  auto &ctx = fn.getModule().getASTContext();
+
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value.getLoc(), value);
 
   // Emit the warning.
-  diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-           diag::tf_value_implicitly_copied_to_host)
-  .highlight(loc.getSourceRange());
+  diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
+    .highlight(loc.getSourceRange());
 
+  // To minimize output, only print the line and column number for
+  // everything but the first instruction.
   auto userLoc = getUserSourceLocation(user->getLoc(), user);
   if (loc.getSourceLoc() != userLoc.getSourceLoc()) {
-    diagnose(fn.getModule().getASTContext(), userLoc.getSourceLoc(),
+    diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
     .highlight(userLoc.getSourceRange());
   }
@@ -1085,8 +1085,9 @@ public:
     if (!isValidTensorFlowElementType(Ty.getSwiftRValueType()))
       return Ty;
 
+    auto decl = getBuilder().getASTContext().getTensorHandleDecl();
     auto tensorType =
-      BoundGenericClassType::get(FP.tensorHandleType, /*parent*/Type(),
+      BoundGenericClassType::get(decl, /*parent*/Type(),
                                  Ty.getSwiftRValueType());
 
     return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
@@ -1807,15 +1808,6 @@ public:
     if (fn->getModule().getSwiftModule() == tfModule)
       return;
 
-    // Make sure that the TensorHandle type is findable.
-    auto tensorHandle = Ctx.getTensorHandleDecl();
-    if (!tensorHandle) {
-      // FIXME: Turn this into an diagnostic error complaining the TF module is
-      // broken.
-      llvm::errs() << " *** DIDN'T FIND TensorHandle<> TYPE\n";
-      return;
-    }
-
     // TODO: When we get into autodiff, we'll probably want to put the autodiff
     // code into a separate SILModule so the rest of the SIL optimizer pipeline
     // isn't affected (we can also just reuse existing function names that way
@@ -1824,7 +1816,7 @@ public:
     // delete it.
 
     // Try to partition the specified function.
-    auto *partitionedFn = TFFunctionPartition(*fn, tensorHandle, PM).run();
+    auto *partitionedFn = TFFunctionPartition(*fn, PM).run();
     if (!partitionedFn) return;
 
     // If we got something, we can process the tensor program further.

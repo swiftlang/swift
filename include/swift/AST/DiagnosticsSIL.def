@@ -238,7 +238,7 @@ WARNING(tf_value_implicitly_copied_to_accel, none,
         "transfer explicit",
         ())
 WARNING(tf_value_implicitly_copied_to_host, none,
-        "value implicitly copied back to the host, use .toHost() to make "
+        "value implicitly copied to the host, use .toHost() to make "
         "transfer explicit",
         ())
 NOTE(tf_value_implicitly_copied_to_host_computed_used_here, none,

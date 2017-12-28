@@ -1443,8 +1443,13 @@ BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ProjectTailElems)
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *BI) {
   // SWIFT_ENABLE_TENSORFLOW
-  if (BI->getName().str().startswith("__tfop"))
-    return { true, UseLifetimeConstraint::MustBeLive };
+  if (BI->getName().str().startswith("__tfop")) {
+    // TF op builtins consume non-trivial values.
+    if (isAddressOrTrivialType())
+      return { true, UseLifetimeConstraint::MustBeLive };
+
+    return { true, UseLifetimeConstraint::MustBeInvalidated };
+  }
 
   return OwnershipCompatibilityBuiltinUseChecker(*this).check(BI);
 }
