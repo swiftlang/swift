@@ -3581,7 +3581,7 @@ public:
     }
 
     bool needsParens =
-      !isa<ParenType>(inputType.getPointer()) &&
+      !inputType->hasParenSugar() &&
       !inputType->is<TupleType>();
 
     if (needsParens)
@@ -3620,7 +3620,7 @@ public:
     Printer << " ";
 
     bool needsParens =
-      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->hasParenSugar() &&
       !T->getInput()->is<TupleType>();
 
     if (needsParens)

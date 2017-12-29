@@ -1028,7 +1028,7 @@ static Type
 getCanonicalInputType(AnyFunctionType *funcType,
                       llvm::function_ref<CanType(Type)> getCanonicalType) {
   auto origInputType = funcType->getInput();
-  bool isParen = isa<ParenType>(origInputType.getPointer());
+  bool isParen = origInputType->hasParenSugar();
   Type inputType = getCanonicalType(origInputType);
 
   if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
