@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -120,8 +121,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
-                     IRGenModule &IGM, llvm::Module &M, SourceFile *SF,
-                     std::string mainInputFilenameForDebugInfo);
+                     IRGenModule &IGM, llvm::Module &M,
+                     StringRef MainOutputFilenameForDebugInfo);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
@@ -1457,16 +1458,16 @@ private:
   }
 };
 
-IRGenDebugInfoImpl::IRGenDebugInfoImpl(
-    const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-    llvm::Module &M, SourceFile *SF, std::string mainInputFilenameForDebugInfo)
+IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
+                                       ClangImporter &CI, IRGenModule &IGM,
+                                       llvm::Module &M,
+                                       StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M), IGM(IGM),
       MetadataTypeDecl(nullptr), InternalType(nullptr), LastDebugLoc({}),
       LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
-  StringRef SourceFileName =
-      SF ? SF->getFilename() : StringRef(mainInputFilenameForDebugInfo);
+  StringRef SourceFileName = MainOutputFilenameForDebugInfo;
   llvm::SmallString<256> AbsMainFile;
   if (SourceFileName.empty())
     AbsMainFile = "<unknown>";
@@ -2044,10 +2045,9 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-    llvm::Module &M, SourceFile *SF,
-    std::string mainInputFilenameForDebugInfo) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF,
-                                mainInputFilenameForDebugInfo);
+    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
+  return new IRGenDebugInfoImpl(Opts, CI, IGM, M,
+                                MainOutputFilenameForDebugInfo);
 }
 
 

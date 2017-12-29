@@ -114,6 +114,9 @@ public:
   // Outputs
 
   unsigned countOfFilesProducingOutput() const;
+  bool hasFilesProducingOutput() const {
+    return countOfFilesProducingOutput() != 0;
+  }
 
   const InputFile &firstInputProducingOutput() const;
   const InputFile &lastInputProducingOutput() const;
@@ -138,6 +141,7 @@ public:
   StringRef getNameOfUniquePrimaryInputFile() const;
 
   bool isFilePrimary(StringRef file);
+  const InputFile &getPrimaryInputNamed(StringRef) const;
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
@@ -182,6 +186,8 @@ public:
   
   bool isBatchModeEnabled() const { return IsBatchModeEnabled; }
 
+  PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
+  PrimarySpecificPaths getPSPsForPrimary(StringRef) const;
 
 public:
   void clearInputs();

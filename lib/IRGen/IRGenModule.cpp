@@ -15,26 +15,28 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
+#include "clang/Frontend/CodeGenOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
-#include "clang/Frontend/CodeGenOptions.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -42,7 +44,6 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
@@ -124,15 +125,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName, StringRef OutputFilename,
-                         std::string mainInputFilenameForDebugInfo)
+                         StringRef ModuleName, StringRef OutputFilename)
+    : IRGenModule(irgen, std::move(target), SF, LLVMContext, ModuleName,
+                  PrimarySpecificPaths::lldbStub(OutputFilename)) {}
+
+IRGenModule::IRGenModule(IRGenerator &irgen,
+                         std::unique_ptr<llvm::TargetMachine> &&target,
+                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         StringRef ModuleName, PrimarySpecificPaths PSPs)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
-      OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL), PSPs(PSPs),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
@@ -403,7 +409,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
-        IRGen.Opts, *CI, *this, Module, SF, mainInputFilenameForDebugInfo);
+        IRGen.Opts, *CI, *this, Module, PSPs.MainInputFilenameForDebugInfo);
 
   initClangTypeConverter();
 

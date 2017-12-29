@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
            "performSema() should not create a SILModule.");
     CI.setSILModule(
         SILModule::createEmptyModule(CI.getMainModule(), CI.getSILOptions(),
-                                     CI.mainInputFilenameForDebugInfo()));
+                                     CI.getPSPsForAtMostOnePrimary()));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

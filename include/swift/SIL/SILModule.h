@@ -23,6 +23,7 @@
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Notifications.h"
@@ -242,7 +243,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule, StringRef mainInputFilenameForDebugInfo);
+            bool wholeModule, PrimarySpecificPaths PSPs);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -254,7 +255,7 @@ private:
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 
-  std::string MainInputFilenameForDebugInfo;
+  PrimarySpecificPaths PSPs;
 
 public:
   ~SILModule();
@@ -319,18 +320,18 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options,
-               StringRef mainInputFilenameForDebugInfo, FileUnit *sf = nullptr,
-               Optional<unsigned> startElem = None, bool isWholeModule = false);
+  constructSIL(ModuleDecl *M, SILOptions &Options, PrimarySpecificPaths PSPs,
+               FileUnit *sf = nullptr, Optional<unsigned> startElem = None,
+               bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    StringRef MainInputFilenameForDebugInfo = "<lldb>",
-                    bool WholeModule = false) {
-    return std::unique_ptr<SILModule>(new SILModule(
-        M, Options, M, WholeModule, MainInputFilenameForDebugInfo));
+  static std::unique_ptr<SILModule> createEmptyModule(
+      ModuleDecl *M, SILOptions &Options,
+      PrimarySpecificPaths PSPs = PrimarySpecificPaths::lldbStub(),
+      bool WholeModule = false) {
+    return std::unique_ptr<SILModule>(
+        new SILModule(M, Options, M, WholeModule, PSPs));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -714,9 +715,7 @@ public:
     return ! getOptions().AssumeSingleThreaded;
   }
 
-  StringRef getMainInputFilenameForDebugInfo() const {
-    return MainInputFilenameForDebugInfo;
-  }
+  PrimarySpecificPaths getPSPs() const { return PSPs; }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

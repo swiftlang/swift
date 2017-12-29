@@ -15,6 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
@@ -268,6 +269,9 @@ public:
     return InputKind == InputFileKind::IFK_Swift &&
            InputsAndOutputs.hasSingleInput();
   }
+
+  PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
+  PrimarySpecificPaths getPSPsForPrimary(StringRef) const;
 
 private:
 
