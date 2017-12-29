@@ -5616,7 +5616,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(TL.getType().getPointer()))
+      if (TL.getType()->hasParenSugar())
         return;
 
       TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -5685,7 +5685,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(resultTy.getPointer()))
+      if (resultTy->hasParenSugar())
         return;
 
       TC.diagnose(resultTL.getSourceRange().Start,
