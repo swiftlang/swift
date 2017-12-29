@@ -13,8 +13,8 @@
 
 #include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/OutputPaths.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 #include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
@@ -458,7 +458,8 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
 }
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
-  Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
+  Optional<std::pair<std::vector<std::string>,
+                     std::vector<const SupplementaryOutputPaths>>>
       outs = ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
                                             Opts.InputsAndOutputs, Diags)
                  .convert();

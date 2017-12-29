@@ -12,8 +12,8 @@
 
 #include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/OutputPaths.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 #include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Frontend/Frontend.h"
@@ -29,20 +29,21 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
-Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
+Optional<std::pair<std::vector<std::string>,
+                   std::vector<const SupplementaryOutputPaths>>>
 ArgsToFrontendOutputsConverter::convert() {
   const auto requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
 
   if (!FrontendOptions::doesActionProduceOutput(requestedAction))
     return std::make_pair(std::vector<std::string>(),
-                          std::vector<const OutputPaths>());
+                          std::vector<const SupplementaryOutputPaths>());
 
   Optional<std::vector<std::string>> outputFiles =
       OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
   if (!outputFiles)
     return None;
-  Optional<std::vector<const OutputPaths>> outputPaths =
+  Optional<std::vector<const SupplementaryOutputPaths>> outputPaths =
       OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
                           ModuleName)
           .computeOutputPaths();
@@ -203,24 +204,27 @@ OutputPathsComputer::OutputPathsComputer(
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
-Optional<std::vector<const OutputPaths>>
+Optional<std::vector<const SupplementaryOutputPaths>>
 OutputPathsComputer::computeOutputPaths() const {
-  std::vector<const OutputPaths> outputs;
+  std::vector<const SupplementaryOutputPaths> outputs;
   bool hadError = false;
   unsigned i = 0;
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> void {
-        Optional<OutputPaths> outputPaths = computeOutputPathsForOneInput(
-            OutputFiles[i], SupplementaryFilenamesFromFilelists[i], input);
+        Optional<SupplementaryOutputPaths> outputPaths =
+            computeOutputPathsForOneInput(
+                OutputFiles[i], SupplementaryFilenamesFromFilelists[i], input);
         i++;
         if (!outputPaths)
           hadError = true;
         outputs.push_back(*outputPaths);
       });
-  return hadError ? None : Optional<std::vector<const OutputPaths>>(outputs);
+  return hadError
+             ? None
+             : Optional<std::vector<const SupplementaryOutputPaths>>(outputs);
 }
 
-std::vector<OutputPaths>
+std::vector<SupplementaryOutputPaths>
 OutputPathsComputer::getSupplementaryFilenamesFromFilelists(
     const ArgList &args, DiagnosticEngine &diags, const unsigned inputCount) {
 
@@ -241,13 +245,13 @@ OutputPathsComputer::getSupplementaryFilenamesFromFilelists(
   auto TBD = readSupplementaryOutputFileList(
       args, diags, options::OPT_TBD_filelist, inputCount);
 
-  std::vector<OutputPaths> result;
+  std::vector<SupplementaryOutputPaths> result;
 
   for (unsigned i = 0; i < inputCount; ++i) {
-    result.push_back(
-        OutputPaths(i, objCHeaderOutput, moduleOutput, moduleDocOutput,
-                    dependenciesFile, referenceDependenciesFile,
-                    serializedDiagnostics, loadedModuleTrace, TBD));
+    result.push_back(SupplementaryOutputPaths(
+        i, objCHeaderOutput, moduleOutput, moduleDocOutput, dependenciesFile,
+        referenceDependenciesFile, serializedDiagnostics, loadedModuleTrace,
+        TBD));
   }
   return result;
 }
@@ -266,8 +270,9 @@ OutputPathsComputer::readSupplementaryOutputFileList(const ArgList &args,
   return r;
 }
 
-Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
-    StringRef outputFile, const OutputPaths &pathsFromFilelists,
+Optional<SupplementaryOutputPaths>
+OutputPathsComputer::computeOutputPathsForOneInput(
+    StringRef outputFile, const SupplementaryOutputPaths &pathsFromFilelists,
     const InputFile &input) const {
   StringRef implicitBasis = deriveImplicitBasis(outputFile, input);
 
@@ -332,10 +337,10 @@ Optional<OutputPaths> OutputPathsComputer::computeOutputPathsForOneInput(
   if (!moduleOutputPath)
     return None;
 
-  return OutputPaths(*objCHeaderOutputPath, *moduleOutputPath,
-                     *moduleDocOutputPath, *dependenciesFilePath,
-                     *referenceDependenciesFilePath, *serializedDiagnosticsPath,
-                     *loadedModuleTracePath, *tbdPath);
+  return SupplementaryOutputPaths(
+      *objCHeaderOutputPath, *moduleOutputPath, *moduleDocOutputPath,
+      *dependenciesFilePath, *referenceDependenciesFilePath,
+      *serializedDiagnosticsPath, *loadedModuleTracePath, *tbdPath);
 }
 
 StringRef

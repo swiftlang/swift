@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace swift {
-struct OutputPaths {
+struct SupplementaryOutputPaths {
   /// The path to which we should emit an Objective-C header for the module.
   std::string ObjCHeaderOutputPath;
 
@@ -41,11 +41,14 @@ struct OutputPaths {
   /// The path to which we should output a TBD file.
   std::string TBDPath;
 
-  OutputPaths(std::string objCHeaderOutputPath, std::string moduleOutputPath,
-              std::string moduleDocOutputPath, std::string dependenciesFilePath,
-              std::string referenceDependenciesFilePath,
-              std::string serializedDiagnosticsPath,
-              std::string loadedModuleTracePath, std::string tbdPath)
+  SupplementaryOutputPaths(std::string objCHeaderOutputPath,
+                           std::string moduleOutputPath,
+                           std::string moduleDocOutputPath,
+                           std::string dependenciesFilePath,
+                           std::string referenceDependenciesFilePath,
+                           std::string serializedDiagnosticsPath,
+                           std::string loadedModuleTracePath,
+                           std::string tbdPath)
       : ObjCHeaderOutputPath(objCHeaderOutputPath),
         ModuleOutputPath(moduleOutputPath),
         ModuleDocOutputPath(moduleDocOutputPath),
@@ -54,14 +57,15 @@ struct OutputPaths {
         SerializedDiagnosticsPath(serializedDiagnosticsPath),
         LoadedModuleTracePath(loadedModuleTracePath), TBDPath(tbdPath) {}
 
-  OutputPaths(unsigned i, Optional<std::vector<std::string>> &objCHeaderOutputs,
-              Optional<std::vector<std::string>> &moduleOutput,
-              Optional<std::vector<std::string>> &moduleDocOutputs,
-              Optional<std::vector<std::string>> &dependenciesFiles,
-              Optional<std::vector<std::string>> &referenceDependenciesFiles,
-              Optional<std::vector<std::string>> &serializedDiagnostics,
-              Optional<std::vector<std::string>> &loadedModuleTrace,
-              Optional<std::vector<std::string>> &TBDs)
+  SupplementaryOutputPaths(
+      unsigned i, Optional<std::vector<std::string>> &objCHeaderOutputs,
+      Optional<std::vector<std::string>> &moduleOutput,
+      Optional<std::vector<std::string>> &moduleDocOutputs,
+      Optional<std::vector<std::string>> &dependenciesFiles,
+      Optional<std::vector<std::string>> &referenceDependenciesFiles,
+      Optional<std::vector<std::string>> &serializedDiagnostics,
+      Optional<std::vector<std::string>> &loadedModuleTrace,
+      Optional<std::vector<std::string>> &TBDs)
       : ObjCHeaderOutputPath(ith(objCHeaderOutputs, i)),
         ModuleOutputPath(ith(moduleOutput, i)),
         ModuleDocOutputPath(ith(moduleDocOutputs, i)),
@@ -71,8 +75,8 @@ struct OutputPaths {
         LoadedModuleTracePath(ith(loadedModuleTrace, i)),
         TBDPath(ith(TBDs, i)) {}
 
-  OutputPaths() = default;
-  OutputPaths(const OutputPaths &) = default;
+  SupplementaryOutputPaths() = default;
+  SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
 private:
   static std::string ith(Optional<std::vector<std::string>> &names,

@@ -16,7 +16,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Basic/OutputPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -181,7 +181,7 @@ public:
   const std::string &getLoadedModuleTracePath() const;
   const std::string &getTBDPath() const;
 
-  const OutputPaths &supplementaryOutputPaths() const;
+  const SupplementaryOutputPaths &supplementaryOutputPaths() const;
 
   // Queries
 
@@ -211,7 +211,7 @@ private:
   friend class ArgsToFrontendOptionsConverter;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
-      ArrayRef<const OutputPaths> supplementaryOutputs);
+      ArrayRef<const SupplementaryOutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 

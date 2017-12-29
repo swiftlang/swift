@@ -16,7 +16,7 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/OutputPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "llvm/Option/ArgList.h"
@@ -44,7 +44,8 @@ public:
                                  DiagnosticEngine &diags)
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
-  Optional<std::pair<std::vector<std::string>, std::vector<const OutputPaths>>>
+  Optional<std::pair<std::vector<std::string>,
+                     std::vector<const SupplementaryOutputPaths>>>
   convert();
 
   static std::vector<std::string>
@@ -112,28 +113,31 @@ class OutputPathsComputer {
   ArrayRef<std::string> OutputFiles;
   StringRef ModuleName;
 
-  std::vector<OutputPaths> SupplementaryFilenamesFromFilelists;
+  std::vector<SupplementaryOutputPaths> SupplementaryFilenamesFromFilelists;
   const FrontendOptions::ActionType RequestedAction;
 
 public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
                       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  Optional<std::vector<const OutputPaths>> computeOutputPaths() const;
+  Optional<std::vector<const SupplementaryOutputPaths>>
+  computeOutputPaths() const;
 
 private:
-  static std::vector<OutputPaths> getSupplementaryFilenamesFromFilelists(
-      const ArgList &args, DiagnosticEngine &diags, unsigned inputCount);
+  static std::vector<SupplementaryOutputPaths>
+  getSupplementaryFilenamesFromFilelists(const ArgList &args,
+                                         DiagnosticEngine &diags,
+                                         unsigned inputCount);
 
   static Optional<std::vector<std::string>>
   readSupplementaryOutputFileList(const ArgList &args, DiagnosticEngine &diags,
                                   swift::options::ID id,
                                   unsigned requiredCount);
 
-  Optional<OutputPaths>
-  computeOutputPathsForOneInput(StringRef outputFilename,
-                                const OutputPaths &pathsFromFilelists,
-                                const InputFile &) const;
+  Optional<SupplementaryOutputPaths> computeOutputPathsForOneInput(
+      StringRef outputFilename,
+      const SupplementaryOutputPaths &pathsFromFilelists,
+      const InputFile &) const;
 
   StringRef deriveImplicitBasis(StringRef outputFilename,
                                 const InputFile &) const;
