@@ -111,11 +111,12 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
                    filelistBufferOrError.getError().message());
     return true;
   }
+  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
   for (auto file :
-       llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
+       llvm::make_range(llvm::line_iterator(*BuffersToKeepAlive.back()),
                         llvm::line_iterator()))
     fn(file);
-  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
+
   return false;
 }
 
