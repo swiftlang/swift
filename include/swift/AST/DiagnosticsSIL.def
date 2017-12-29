@@ -229,9 +229,6 @@ ERROR(tfop_incorrect_definition, none,
       (StringRef))
 ERROR(tf_lowering_error, none,
       "internal error generating TensorFlow graph:\n%0", (StringRef))
-ERROR(tf_lowering_file_error, none,
-      "could not open %0 to write TensorFlow graph to", (StringRef))
-
 
 WARNING(tf_value_implicitly_copied_to_accel, none,
         "value implicitly copied to accelerator, use .toDevice() to make "
