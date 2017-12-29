@@ -6,14 +6,16 @@ public func testTensor() {
   var x = Tensor<Float>(oneD: 1.0, 2.0, 3.0)  // expected-warning {{value implicitly copied to accelerator, use .toDevice() to make transfer explicit}}
   x += x
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
+  // GraphGen doesn't support sends yet: expected-error @-1 {{internal error generating TensorFlow graph}}
+
   print(x) // expected-note {{value used here}}
   var y = Tensor1D<Float>(1, 2, 3.0).toDevice()
   y += y
   print(y)
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: _T04main10testTensoryyF
-// CHECK:  sil private @_T04main10testTensoryyF.tf_partition : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
+// CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
 // CHECK-NEXT:   %1 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   %2 = builtin "__tfop_Sub__tt:t__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
@@ -21,6 +23,14 @@ public func testTensor() {
 // CHECK-NEXT:   %4 = builtin "tensorflowReceive_0"<TensorHandle<Float>>() : $TensorHandle<Float>
 // CHECK-NEXT:   %5 = builtin "__tfop_Add__tt:t__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %5 : $TensorHandle<Float>
+
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
+// CHECK: sil @{{.*}}testTensor{{.*}} : $@convention(thin) () -> () {
+
+// Graph lowering fails on testTensor because it requires send and receive instructions.
+// CHECK: string_literal utf8 ""
+// CHECK-NEXT:  integer_literal $Builtin.Word, 0
 
 
 
@@ -41,4 +51,14 @@ public func testScalar(f: Float) {
 // CHECK-NEXT:   %5 = builtin "__tfop_Add__tt:t__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %5 : $TensorHandle<Float>
 // CHECK-NEXT: }
+
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testScalar{{.*}}
+// CHECK: sil @{{.*}}testScalar{{.*}} : $@convention(thin) (Float) -> () {
+
+// Graph lowering succeeds on this function
+// CHECK: string_literal utf8 "{{.....}}
+// CHECK-NEXT:  integer_literal $Builtin.Word, {{[1-9]}}
+
+
 
