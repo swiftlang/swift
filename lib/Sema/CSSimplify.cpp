@@ -1965,8 +1965,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // For non-argument tuples, we can do the same conversion but not
       // to a tuple with varargs.
       if (!type1->is<LValueType>() &&
-          ((tuple2->getNumElements() == 1 &&
-            !tuple2->getElement(0).isVararg()) ||
+          (tuple2->hasParenSema(/*allowName*/true) ||
            (kind >= ConstraintKind::Conversion &&
             tuple2->getElementForScalarInit() >= 0 &&
             (isArgumentTupleConversion ||

@@ -685,7 +685,7 @@ Type TypeBase::getWithoutParens() {
 Type TypeBase::getWithoutImmediateLabel() {
   Type Ty = this;
   if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       Ty = tupleTy->getElementType(0);
   }
   return Ty;
@@ -870,7 +870,7 @@ Type TypeBase::getRValueInstanceType() {
   
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       type = tupleTy->getElementType(0);
   }
   
