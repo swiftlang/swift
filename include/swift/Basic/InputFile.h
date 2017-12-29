@@ -8,7 +8,7 @@
 #ifndef InputFile_h
 #define InputFile_h
 
-#include "swift/Basic/OutputPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <string>
@@ -40,7 +40,7 @@ class InputFile {
 
   /// The supplementary outputs associated with this input:
   /// Temporarily keep in the first output-producing input.
-  OutputPaths SupplementaryOutputPaths;
+  SupplementaryOutputPaths SupplementaryPaths;
 
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
@@ -48,7 +48,7 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer),
-        SupplementaryOutputPaths(OutputPaths()) {
+        SupplementaryPaths(SupplementaryOutputPaths()) {
     assert(name.begin() != Filename.c_str());
     assert(!name.empty() && "Empty strings signify no inputs in other places");
   }
@@ -70,18 +70,18 @@ public:
     OutputFilename = outputFilename;
   }
 
-  const OutputPaths &supplementaryOutputPaths() const {
-    return SupplementaryOutputPaths;
+  const SupplementaryOutputPaths &supplementaryOutputs() const {
+    return SupplementaryPaths;
   }
 
-  void setSupplementaryOutputPaths(const OutputPaths &outs) {
-    SupplementaryOutputPaths = outs;
+  void setSupplementaryOutputs(const SupplementaryOutputPaths &outs) {
+    SupplementaryPaths = outs;
   }
 
-  void setOutputFileNameAndSupplementaryOutputPaths(StringRef outputFilename,
-                                                    const OutputPaths &outs) {
+  void setOutputFileNameAndSupplementaryOutputPaths(
+      StringRef outputFilename, const SupplementaryOutputPaths &outs) {
     setOutputFilename(outputFilename);
-    setSupplementaryOutputPaths(outs);
+    setSupplementaryOutputs(outs);
   }
 };
 } // namespace swift
