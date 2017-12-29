@@ -77,10 +77,6 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  if (Tok.isEscapedIdentifier()) {
-    LeadingTrivia.push_back(TriviaPiece::backtick());
-    TrailingTrivia.push_front(TriviaPiece::backtick());
-  }
   addRawSyntax(RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
                                     SourcePresence::Present, LeadingTrivia,
                                     TrailingTrivia));
