@@ -26,16 +26,11 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/ADT/DepthFirstIterator.h"
-#include "llvm/Support/CommandLine.h"
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
 #define DEBUG_TYPE "tf-partition"
 using namespace swift;
 using namespace tf;
-
-static llvm::cl::opt<bool>
-TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
-              llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
 
 
 template<typename...T, typename...U>
@@ -531,8 +526,18 @@ public:
       tensorCodeBlocks(Fn) {
   }
 
-  SILFunction *run();
+  bool markFunction();
 
+  struct PartitionedTensorProgram {
+    SILFunction *fn;  // The function representing the tensor program.
+
+    // These are placeholder instructions inserted during partitioning to
+    // represent the tensor program itself.  These will be replaced when the
+    // tensor function is lowered to a TF graph.
+    StringLiteralInst *programPlaceholder;
+    IntegerLiteralInst *programLengthPlaceholder;
+  };
+  PartitionedTensorProgram partition();
 
   void diagnoseCopyInIfNotSend(SILValue value);
   bool diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user);
@@ -542,7 +547,6 @@ private:
   void markInstruction(SILInstruction &inst, Marking mark);
   void markArgument(SILArgument *arg);
   void markValue(SILValue value);
-  void markFunction();
 };
 } // end anonymous namespace
 
@@ -929,7 +933,7 @@ findNCAOfTensorOps(ArrayRef<SILInstruction*> tensorOps,
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
-void TFFunctionPartition::markFunction() {
+bool TFFunctionPartition::markFunction() {
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
@@ -945,7 +949,7 @@ void TFFunctionPartition::markFunction() {
 
   // If there is nothing to do, don't touch this function.
   if (tensorOps.empty())
-    return;
+    return false;
 
   // Compute the blocksReachingTensorCode set.
   tensorCodeBlocks.compute(tensorOps);
@@ -1019,6 +1023,8 @@ void TFFunctionPartition::markFunction() {
         }
       }
   }
+
+  return true;
 }
 
 
@@ -1327,8 +1333,8 @@ static void createSend(SILBuilder &B, SILLocation loc,
 
   // tensorflowSend has type <T> (T) -> ()
   B.createBuiltin(loc, name, voidTy,
-                   Substitution(value->getType().getSwiftRValueType(), {}),
-                   {value});
+                  Substitution(value->getType().getSwiftRValueType(), {}),
+                  {value});
 }
 
 /// Insert a send of values from the specified instruction result(s) to the
@@ -1339,15 +1345,16 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   SILBuilder BH(++SILBasicBlock::iterator(&inst)); // Builder for host.
   auto BA = getBuilder();        // Builder for accelerator.
 
+  auto loc = getUserSourceLocation(inst.getDebugLocation()).getLocation();
+
   for (auto result : inst.getResults()) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
-      createReceive(BA, inst.getLoc(), remapType(result->getType()),
-                    nextSendID);
+      createReceive(BA, loc, remapType(result->getType()), nextSendID);
 
     // Create the send in the host code.
-    createSend(BH, inst.getLoc(), result, nextSendID);
+    createSend(BH, loc, result, nextSendID);
     nextSendID++;
   }
 }
@@ -1379,13 +1386,16 @@ void PartitionCloner::insertReceive(SILValue value) {
     FP.diagnoseCopyOutIfNotReceive(value, use->getUser());
   }
 
+  auto loc = value.getLoc();
+  if (auto *inst = value->getDefiningInstruction())
+    loc = getUserSourceLocation(inst->getDebugLocation()).getLocation();
+
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createSend(BA, value.getLoc(), remapValue(value), nextSendID);
+  createSend(BA, loc, remapValue(value), nextSendID);
 
   // Create the receive in the host code.
-  auto newVal = createReceive(BH, value.getLoc(), value->getType(),
-                              nextSendID);
+  auto newVal = createReceive(BH, loc, value->getType(), nextSendID);
   value->replaceAllUsesWith(newVal);
   nextSendID++;
 }
@@ -1609,41 +1619,6 @@ void PartitionCloner::finalizeOriginal() {
 }
 
 
-// Our partitioning can leave around lots of unconditional branches between
-// blocks that formerly had control edges.  Go through and merge those to make
-// later passes simpler.
-static void contractUncondBranches(SILFunction *fn) {
-  // Iterate carefully to avoid invalidating iterators: we mutate the block list
-  // while we walk it.
-  for (auto bbi = fn->begin(), e = fn->end(); bbi != e; ) {
-    auto *bb = &*bbi;
-    ++bbi;  // Increment the iterator in case we do no transformation.
-
-    if (auto succ = bb->getSingleSuccessorBlock()) {
-      if (succ != bb && succ->getSinglePredecessorBlock()) {
-        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
-          // If there are any BB arguments in the destination, replace them with
-          // the branch operands, since they must dominate the dest block.
-          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-            assert(succ->getArgument(i) != BI->getArg(i) &&
-                   "Cloned code regions are always reachable");
-            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-          }
-
-          // Zap BI and move all of the instructions from DestBB into this one.
-          BI->eraseFromParent();
-          bb->spliceAtEnd(succ);
-          succ->eraseFromParent();
-
-          // Revisit this node: we have new successor(s) and may need to
-          // contract them as well.  Also, bbi may be invalidated at this point.
-          bbi = SILFunction::iterator(bb);
-        }
-      }
-    }
-  }
-}
-
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
 /// the standard "Aggressive Dead Code Elimination" (ADCE) optimization which is
 /// implemented using post-dominance frontiers and control dependence
@@ -1654,42 +1629,44 @@ static void contractUncondBranches(SILFunction *fn) {
 /// This returns null if there is no tensor work to extract, or a function that
 /// has been generated if there is.
 ///
-SILFunction *TFFunctionPartition::run() {
-  // Mark the tensor operations that we need to move to the accelerator.
-  markFunction();
+auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
+  assert(!markedBlocks.empty() &&
+         "Shouldn't run on functions with no tensor ops");
 
-  // If no blocks are marked, then there are no tensor ops in it, so there is
-  // nothing to do!
-  if (markedBlocks.empty()) return nullptr;
+  auto &ctx = fn.getASTContext();
+  auto loc = fn.getLocation();
 
-  if (TFDumpIntermediates) {
-    llvm::outs() << "---- INPUT FUNCTION " << fn.getName() << " ----------\n";
-    fn.print(llvm::outs());
-    llvm::outs() << "---- END OF INPUT FUNCTION ----------\n";
-  }
+  // Create a string literal to hold the  serialized protobuf for the tensor
+  // program.  We haven't actually created that yet, so we create a placeholder
+  // and RAUW it later.
+  SILBuilder B(tensorStartPoint);
+  auto programPlaceholder =
+    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
+  auto programLengthPlaceholder =
+    B.createIntegerLiteral(loc, SILType::getBuiltinWordType(ctx), 0);
+
+  // TODO: The actual function will probably want an UnsafeRawPointer+Int.
+
+  // The first two arguments are the program, the rest of the arguments are the
+  // parameters passed in.
+  SmallVector<SILValue, 4> startArgs;
+  startArgs.append({ programPlaceholder, programLengthPlaceholder });
+  startArgs.append(tensorFnArguments.begin(), tensorFnArguments.end());
 
   // Create the builtin in the host program that kicks off the tensor program,
   // setting the argument values.
-  SILBuilder B(tensorStartPoint);
   B.createBuiltin(fn.getLocation(),
                   fn.getASTContext().getIdentifier("tensorFlow_start"),
                   fn.getModule().Types.getEmptyTupleType(),
-                  /*no substitutions*/{}, tensorFnArguments);
+                  /*no substitutions*/{}, startArgs);
 
   // Create the builtin in the host program that rendezvous with the tensor
   // program and returns the results.
-  SILType resultType;
-  if (resultValues.size() == 0)
-    resultType = fn.getModule().Types.getEmptyTupleType();
-  else if (resultValues.size() == 1)
-    resultType = resultValues[0]->getType();
-  else {
-    SmallVector<TupleTypeElt, 4> resultTypes;
-    for (auto r : resultValues)
-      resultTypes.push_back({r->getType().getSwiftRValueType()});
-    auto tuple = TupleType::get(resultTypes, fn.getASTContext());
-    resultType = SILType::getPrimitiveObjectType(tuple->getCanonicalType());
-  }
+  SmallVector<TupleTypeElt, 4> resultTypes;
+  for (auto r : resultValues)
+    resultTypes.push_back({r->getType().getSwiftRValueType()});
+  auto tuple = TupleType::get(resultTypes, fn.getASTContext());
+    auto resultType =SILType::getPrimitiveObjectType(tuple->getCanonicalType());
 
   B.setInsertionPoint(tensorEndPoint);
   auto resultInst = B.createBuiltin(fn.getLocation(),
@@ -1763,27 +1740,50 @@ SILFunction *TFFunctionPartition::run() {
     PC.finalizeOriginal();
   }
 
-  // Our partitioning can leave around lots of unconditional branches between
-  // blocks that formerly had control edges.  Go through and merge those to make
-  // later passes simpler.
-  contractUncondBranches(newFn);
-
-#if 0
-  llvm::errs() << "---- INPUT FUNCTION RESULT ----------\n";
-  fn.dump();
-  llvm::errs() << "---- END OF INPUT FUNCTION RESULT ----------\n";
-
-  llvm::errs() << "---- PARTITIONING RESULT FUNCTION ----------\n";
-  newFn->dump();
-  llvm::errs() << "---- END OF PARTITIONING RESULT ----------\n";
-#endif
-  return newFn;
+  return { newFn, programPlaceholder, programLengthPlaceholder };
 }
 
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
+
+
+// Our partitioning can leave around lots of unconditional branches between
+// blocks that formerly had control edges.  Go through and merge those to make
+// later passes simpler.
+static void contractUncondBranches(SILFunction *fn) {
+  // Iterate carefully to avoid invalidating iterators: we mutate the block list
+  // while we walk it.
+  for (auto bbi = fn->begin(), e = fn->end(); bbi != e; ) {
+    auto *bb = &*bbi;
+    ++bbi;  // Increment the iterator in case we do no transformation.
+
+    if (auto succ = bb->getSingleSuccessorBlock()) {
+      if (succ != bb && succ->getSinglePredecessorBlock()) {
+        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
+          // If there are any BB arguments in the destination, replace them with
+          // the branch operands, since they must dominate the dest block.
+          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+            assert(succ->getArgument(i) != BI->getArg(i) &&
+                   "Cloned code regions are always reachable");
+            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
+          }
+
+          // Zap BI and move all of the instructions from DestBB into this one.
+          BI->eraseFromParent();
+          bb->spliceAtEnd(succ);
+          succ->eraseFromParent();
+
+          // Revisit this node: we have new successor(s) and may need to
+          // contract them as well.  Also, bbi may be invalidated at this point.
+          bbi = SILFunction::iterator(bb);
+        }
+      }
+    }
+  }
+}
+
 
 namespace {
 class TFPartition : public SILFunctionTransform {
@@ -1794,12 +1794,12 @@ public:
   /// The entry point to the transformation.
   void run() override {
     SILFunction *fn = getFunction();
-    auto &Ctx = fn->getASTContext();
+    auto &ctx = fn->getASTContext();
 
     // If the TensorFlow module hasn't been imported by the program, don't do
     // anything.  This avoids impacting compile time for non-TensorFlow using
     // Swift programs by doing extraneous analysis.
-    auto tfModule = Ctx.getLoadedModule(Ctx.getIdentifier("TensorFlow"));
+    auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
     if (!tfModule)
       return;
 
@@ -1814,49 +1814,84 @@ public:
     // partitioned function in the current module, emit it to a graph, then
     // delete it.
 
-    // Try to partition the specified function.
-    auto *partitionedFn = TFFunctionPartition(*fn, PM).run();
-    if (!partitionedFn) return;
+    TFFunctionPartition partitioner(*fn, PM);
+    if (!partitioner.markFunction())
+      return; // No tensor ops found in the function.
 
-    // If we got something, we can process the tensor program further.
+    if (shouldDumpIntermediates()) {
+      llvm::outs() << "---- INPUT FUNCTION " << fn->getName() <<" ----------\n";
+      fn->print(llvm::outs());
+      llvm::outs() << "---- END OF INPUT FUNCTION ----------\n";
+    }
 
+    // Actually do the partitioning transformation, splitting out a new SIL
+    // function for the tensor program body.
+    auto tensorProgram = partitioner.partition();
+
+#ifndef NDEBUG
     // Verify that the generated function is ok.
-    partitionedFn->verify();
+    tensorProgram.fn->verify();
+#endif
+
+    // Our partitioning can leave around lots of unconditional branches between
+    // blocks that formerly had control edges.  Go through and merge those to make
+    // later passes simpler.
+    contractUncondBranches(tensorProgram.fn);
+
+    if (isTest || shouldDumpIntermediates()) {
+      llvm::outs() << "--- TFPartition Accelerator Result: "
+                   << tensorProgram.fn->getName() << "\n";
+      tensorProgram.fn->print(llvm::outs());
+      llvm::outs() << "----\n";
+    }
 
     // If this is called from sil-opt, we currently just print out the results
     // and quit.  This allows writing regression tests for the tf-partition
     // pass in isolation.  This is pretty unconventional for a SIL pass, but
     // this is an unconventional pass!
-    if (isTest || TFDumpIntermediates) {
+    if (isTest) {
       llvm::outs() << "--- TFPartition Host Result: " << fn->getName() << "\n";
       fn->print(llvm::outs());
-      llvm::outs() << "--- TFPartition Accelerator Result: "
-                   << partitionedFn->getName() << "\n";
-      partitionedFn->print(llvm::outs());
-      llvm::outs() << "----\n";
+      llvm::outs() << "---\n";
       llvm::outs().flush();
-    }
 
-    if (isTest) {
       // Finally, we're done.  Remove the partitioned function so it doesn't go
       // through the normal compiler flow.
-      partitionedFn->getModule().eraseFunction(partitionedFn);
+      tensorProgram.fn->getModule().eraseFunction(tensorProgram.fn);
       return;
     }
 
 
-    // TODO: Once the partitioned function is in its own SIL module, we'll set
-    // up a PassManager here, and the other TF subsystems will become passes.
-    // This will enable us to write testcases with sil-opt.
+    // Next translate it to a graph and emit it as a global symbol.
+    auto bytes = lowerTFGraph(tensorProgram.fn);
 
-    // TODO: Implement autodiff.
+    // Now that we know what the tensor program actually is, we can replace the
+    // placeholder instructions for the data + length with the actual bits we
+    // want to use.
+    {
+      SILBuilder B(tensorProgram.programPlaceholder);
+      auto data = B.createStringLiteral(fn->getLocation(),
+                                        StringRef(bytes.data(), bytes.size()),
+                                        StringLiteralInst::Encoding::UTF8);
+      auto len = B.createIntegerLiteral(fn->getLocation(),
+                                        SILType::getBuiltinWordType(ctx),
+                                        bytes.size());
+      tensorProgram.programPlaceholder->replaceAllUsesWith(data);
+      tensorProgram.programPlaceholder->eraseFromParent();
+      tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
+      tensorProgram.programLengthPlaceholder->eraseFromParent();
+    }
 
-    // Next translate it to a graph.
-    emitTensorFlowGraph(partitionedFn, partitionedFn->getName().str());
+    if (shouldDumpIntermediates()) {
+      llvm::outs() << "--- TFPartition Host Result: " << fn->getName() << "\n";
+      fn->print(llvm::outs());
+      llvm::outs() << "---\n";
+      llvm::outs().flush();
+    }
 
     // Finally, we're done.  Remove the partitioned function so it doesn't go
     // through the normal compiler flow.
-    partitionedFn->getModule().eraseFunction(partitionedFn);
+    tensorProgram.fn->getModule().eraseFunction(tensorProgram.fn);
   }
 };
 

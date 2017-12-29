@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/ADT/StringExtras.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Support/CommandLine.h"
 using namespace swift;
 using namespace tf;
 
@@ -23,6 +24,17 @@ static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
+
+static llvm::cl::opt<bool>
+TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
+                    llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+
+/// This returns true if we should dump out intermediate results to standard
+/// out.  This is used for integration unit tests.
+bool tf::shouldDumpIntermediates() {
+  return TFDumpIntermediates;
+}
+
 
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.

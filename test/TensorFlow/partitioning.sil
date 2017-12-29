@@ -10,17 +10,19 @@ sil @_T016__tfop_Add__tt__Sf_Tg5Tf4gg_n : $@convention(thin) (@guaranteed Tensor
 // Test that a single constant can be partitioned out, the most basic
 // case possible.
 
-// CHECK-LABEL: --- TFPartition Host Result: simple_test
-// CHECK-NOT: = apply
-// CHECK:   builtin "tensorFlow_start"() : $()
-// CHECK-NEXT: builtin "tensorFlow_done"() : $TensorHandle<Float>
-// CHECK-NOT: = apply
 // CHECK-LABEL: -- TFPartition Accelerator Result: simple_test
 // CHECK: bb0:
 // CHECK-NEXT: %0 = metatype $@thick Float.Type
 // CHECK-NEXT: %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
 // CHECK-NEXT: %2 = builtin "__tfop_Const__dc:t__"(%0 : $@thick Float.Type, %1 : $Builtin.FPIEEE32) : $TensorHandle<Float>
 // CHECK-NEXT: return %2 : $TensorHandle<Float>
+// CHECK-NEXT: }
+
+// CHECK-LABEL: --- TFPartition Host Result: simple_test
+// CHECK-NOT: = apply
+// CHECK:   builtin "tensorFlow_start"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.Word) : $()
+// CHECK-NEXT: builtin "tensorFlow_done"() : $TensorHandle<Float>
+// CHECK-NOT: = apply
 sil @simple_test : $@convention(thin) () -> TensorHandle<Swift.Float> {
 bb0:
   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1.0
