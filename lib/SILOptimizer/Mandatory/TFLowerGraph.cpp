@@ -171,8 +171,8 @@ std::string TFGraphLowering::getUniqueOpName(SILDebugLocation loc) {
       if (fnName.endswith(".tf_partition"))
         fnName = fnName.drop_back(strlen(".tf_partition"));
 
-      name += ","+fnName.str()+":"+llvm::utostr(lineCol.first);
-      name += ":"+llvm::utostr(lineCol.second);
+      name += "."+fnName.str()+"."+llvm::utostr(lineCol.first);
+      name += "."+llvm::utostr(lineCol.second);
     }
   }
 
@@ -183,8 +183,8 @@ std::string TFGraphLowering::getUniqueOpName(SILDebugLocation loc) {
       auto sourceLoc = loc.getLocation().getSourceLoc();
       auto lineCol = SM.getLineAndColumn(sourceLoc);
       auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
-      name += ","+bufferID.str()+":"+llvm::utostr(lineCol.first);
-      name += ":"+llvm::utostr(lineCol.second);
+      name += "."+bufferID.str()+"."+llvm::utostr(lineCol.first);
+      name += "."+llvm::utostr(lineCol.second);
     }
 
   // If we've already used this name, rename it to make it unique.
@@ -276,7 +276,7 @@ std::vector<char> TFGraphLowering::lowerGraph() {
 
   auto *fn =
     TF_GraphToFunction(graph, "the_function" /*fixed name, known by runtime*/,
-                       /*append_hash_to_fn_name,*/1,
+                       /*append_hash_to_fn_name,*/0,
                        // We don't pass in an explicit operation list, just have
                        // TF_GraphToFunction take everything in the graph.
                        /*num_opers*/-1, /*opers*/nullptr,
