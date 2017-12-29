@@ -1097,7 +1097,7 @@ static ArrayRef<Identifier> getArgumentLabelsFromArgument(
 
   // Otherwise, use the type information.
   auto type = getType(arg);
-  if (isa<ParenType>(type.getPointer())) {
+  if (type->hasParenSugar()) {
     scratch.clear();
     scratch.push_back(Identifier());
     return scratch;    

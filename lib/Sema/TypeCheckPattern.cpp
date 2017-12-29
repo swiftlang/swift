@@ -1599,7 +1599,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // with a single underlying TupleType. In that case, check if
   // the closure argument is also one to avoid the tuple splat
   // from happening.
-  if (!hadError && isa<ParenType>(paramListType.getPointer())) {
+  if (!hadError && paramListType->hasParenSugar()) {
     auto underlyingTy = cast<ParenType>(paramListType.getPointer())
       ->getUnderlyingType();
     

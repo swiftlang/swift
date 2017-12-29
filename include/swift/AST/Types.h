@@ -480,6 +480,9 @@ public:
   /// Is this the 'Any' type?
   bool isAny();
 
+  /// Does the type have outer parenthesis?
+  bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
+
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
   ///
