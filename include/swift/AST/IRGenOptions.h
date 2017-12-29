@@ -65,8 +65,9 @@ enum class IRGenEmbedMode : unsigned {
 class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
-  std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
+  /// Now, only left here for lldb to use.
+  std::string MainInputFilename = "<lldb>";
+  std::vector<std::string> IRGOutputFilenames;
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -190,10 +191,14 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
+  StringRef getSingleIRGOutputFilename() const {
+    if (IRGOutputFilenames.size() >= 1)
+      return IRGOutputFilenames.back();
     return StringRef();
+  }
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  StringRef getSingleOutputFilename() const {
+    return getSingleIRGOutputFilename();
   }
 
   // Get a hash of all options which influence the llvm compilation but are not

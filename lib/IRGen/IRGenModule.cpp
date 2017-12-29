@@ -124,7 +124,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName, StringRef OutputFilename)
+                         StringRef ModuleName, StringRef OutputFilename,
+                         std::string mainInputFilenameForDebugInfo)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
@@ -401,8 +402,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
-    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module, SF);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
+        IRGen.Opts, *CI, *this, Module, SF, mainInputFilenameForDebugInfo);
 
   initClangTypeConverter();
 

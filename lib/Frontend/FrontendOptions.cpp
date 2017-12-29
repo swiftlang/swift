@@ -27,85 +27,7 @@
 using namespace swift;
 using namespace llvm::opt;
 
-bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (hasSingleInput()) {
-    StringRef Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-           llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
-  }
-  return false;
-}
 
-bool FrontendInputs::shouldTreatAsSIL() const {
-  if (hasSingleInput()) {
-    // If we have exactly one input filename, and its extension is "sil",
-    // treat the input as SIL.
-    StringRef Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  }
-  // If we have one primary input and it's a filename with extension "sil",
-  // treat the input as SIL.
-  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
-  if (silPrimaryCount == 0)
-    return false;
-  if (silPrimaryCount == primaryInputCount()) {
-    // Not clear what to do someday with multiple primaries
-    assertMustNotBeMoreThanOnePrimaryInput();
-    return true;
-  }
-  llvm_unreachable("Either all primaries or none must end with .sil");
-}
-
-unsigned
-FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
-  return count_if(
-      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
-        StringRef filename = AllFiles[elem.second].file();
-        return llvm::sys::path::extension(filename).endswith(extension);
-      });
-}
-
-bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                                  bool isREPLRequested,
-                                  bool isNoneRequested) const {
-  if (isREPLRequested) {
-    if (hasInputs()) {
-      diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
-      return true;
-    }
-  } else if (treatAsSIL) {
-    if (isWholeModule()) {
-      if (inputCount() != 1) {
-        diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-        return true;
-      }
-    } else {
-      assertMustNotBeMoreThanOnePrimaryInput();
-      // If we have the SIL as our primary input, we can waive the one file
-      // requirement as long as all the other inputs are SIBs.
-      if (!areAllNonPrimariesSIB()) {
-        diags.diagnose(SourceLoc(),
-                       diag::error_mode_requires_one_sil_multi_sib);
-        return true;
-      }
-    }
-  } else if (!isNoneRequested && !hasInputs()) {
-    diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-    return true;
-  }
-  return false;
-}
-
-bool FrontendInputs::areAllNonPrimariesSIB() const {
-  for (const InputFile &input : getAllFiles()) {
-    if (input.isPrimary())
-      continue;
-    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
@@ -178,39 +100,31 @@ void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const std::string &OutputFileName : OutputFilenames) {
-      fn(OutputFileName);
-    }
+    InputsAndOutputs.forEachOutputFilename(fn);
   }
-  const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
+  const std::string outputs[] = {InputsAndOutputs.getModuleOutputPath(),
+                                 InputsAndOutputs.getModuleDocOutputPath(),
+                                 InputsAndOutputs.getObjCHeaderOutputPath()};
+  for (const std::string next : outputs) {
+    if (!next.empty())
+      fn(next);
   }
 }
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (hasNamedOutputFile())
+  if (InputsAndOutputs.hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
-    return getSingleOutputFilename();
+    return InputsAndOutputs.getSingleOutputFilename();
 
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  const auto input = Inputs.getUniquePrimaryInput();
+  const auto input = InputsAndOutputs.getUniquePrimaryInput();
   return input ? llvm::sys::path::filename(input->file())
                : StringRef(ModuleName);
 }
 
-bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() &&
-         llvm::sys::fs::is_directory(getSingleOutputFilename());
-}
 
 const char *
 FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
@@ -266,11 +180,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
-         !canActionEmitDependencies(RequestedAction);
-}
-
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -302,11 +211,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
-}
-
-bool FrontendOptions::canActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -335,11 +240,6 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
-         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -371,14 +271,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
-}
-
-bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {
