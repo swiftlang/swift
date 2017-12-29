@@ -267,7 +267,7 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
 
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     ArrayRef<std::string> outputFiles,
-    ArrayRef<const OutputPaths> supplementaryOutputs) {
+    ArrayRef<const SupplementaryOutputPaths> supplementaryOutputs) {
   assert(countOfFilesProducingOutput() == outputFiles.size());
   assert(countOfFilesProducingSupplementaryOutput() ==
          supplementaryOutputs.size());
@@ -284,7 +284,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
   } else {
     for (auto i : indices(AllFiles))
       AllFiles[i].setOutputFilename(outputFiles[i]);
-    AllFiles[0].setSupplementaryOutputPaths(supplementaryOutputs[0]);
+    AllFiles[0].setSupplementaryOutputs(supplementaryOutputs[0]);
   }
 }
 
@@ -336,48 +336,49 @@ const std::string &FrontendInputsAndOutputs::getTBDPath() const {
   return supplementaryOutputPaths().TBDPath;
 }
 
-const OutputPaths &FrontendInputsAndOutputs::supplementaryOutputPaths() const {
-  static const OutputPaths empty;
+const SupplementaryOutputPaths &
+FrontendInputsAndOutputs::supplementaryOutputPaths() const {
+  static const SupplementaryOutputPaths empty;
   if (!hasInputs())
     return empty;
 
   if (!isBatchModeEnabled())
     assertMustNotBeMoreThanOnePrimaryInput();
-  return firstInputProducingSupplementaryOutput().supplementaryOutputPaths();
+  return firstInputProducingSupplementaryOutput().supplementaryOutputs();
 }
 
 bool FrontendInputsAndOutputs::hasDependenciesPath() const {
   bool r = false;
   forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputPaths().DependenciesFilePath.empty() || r;
+    r = !inp.supplementaryOutputs().DependenciesFilePath.empty() || r;
   });
   return r;
 }
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   bool r = false;
   forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputPaths().ObjCHeaderOutputPath.empty() || r;
+    r = !inp.supplementaryOutputs().ObjCHeaderOutputPath.empty() || r;
   });
   return r;
 }
 bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
   bool r = false;
   forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputPaths().LoadedModuleTracePath.empty() || r;
+    r = !inp.supplementaryOutputs().LoadedModuleTracePath.empty() || r;
   });
   return r;
 }
 bool FrontendInputsAndOutputs::hasModuleOutputPath() const {
   bool r = false;
   forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputPaths().ModuleOutputPath.empty() || r;
+    r = !inp.supplementaryOutputs().ModuleOutputPath.empty() || r;
   });
   return r;
 }
 bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
   bool r = false;
   forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputPaths().ModuleDocOutputPath.empty() || r;
+    r = !inp.supplementaryOutputs().ModuleDocOutputPath.empty() || r;
   });
   return r;
 }
