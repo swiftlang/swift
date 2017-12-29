@@ -25,6 +25,7 @@
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -86,6 +87,7 @@ namespace swift {
   class SILFunction;
   class IRGenOptions;
   class NormalProtocolConformance;
+  class PrimarySpecificPaths;
   class ProtocolConformance;
   class ProtocolCompositionType;
   struct SILDeclRef;
@@ -400,8 +402,8 @@ public:
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
   SILModuleConventions silConv;
 
-  llvm::SmallString<128> OutputFilename;
-  
+  PrimarySpecificPaths PSPs;
+
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -982,8 +984,15 @@ public:
   /// doing multi-threaded whole-module compilation. Otherwise it is null.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
-              StringRef ModuleName, StringRef OutputFilename,
-              std::string mainInputFilenameForDebugInfo = "<lldb>");
+              StringRef ModuleName, PrimarySpecificPaths PSPs);
+
+  /// The constructor.
+  ///
+  /// This one is just a stub for lldb.
+  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
+              SourceFile *SF, llvm::LLVMContext &LLVMContext,
+              StringRef ModuleName, StringRef OutputFilename);
+
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

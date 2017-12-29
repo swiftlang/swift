@@ -25,8 +25,6 @@ class IRGenerator;
 class IRGenModule;
 
 /// Create an IRGen module.
-/// mainInputFilenameForDebugInfo is the name of the principal input file, used
-/// by the debug info.
 std::pair<IRGenerator *, IRGenModule *>
 createIRGenModule(SILModule *SILMod, llvm::LLVMContext &LLVMContext);
 

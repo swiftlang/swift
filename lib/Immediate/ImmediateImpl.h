@@ -16,6 +16,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -48,7 +49,7 @@ bool IRGenImportedModules(
     CompilerInstance &CI, llvm::Module &Module,
     llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
     SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
-    const SILOptions &SILOpts, std::string mainInputFilenameForDebugInfo);
+    const SILOptions &SILOpts);
 
 } // end namespace immediate
 } // end namespace swift

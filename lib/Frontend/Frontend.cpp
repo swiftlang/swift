@@ -54,6 +54,14 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
+PrimarySpecificPaths CompilerInvocation::getPSPsForAtMostOnePrimary() const {
+  return getFrontendOptions().getPSPsForAtMostOnePrimary();
+}
+PrimarySpecificPaths
+CompilerInvocation::getPSPsForPrimary(StringRef filename) const {
+  return getFrontendOptions().getPSPsForPrimary(filename);
+}
+
 std::unique_ptr<SILModule> CompilerInstance::createSILModule() {
   assert(!getInputSourceCodeBufferIDs().empty());
   assert(getInputSourceCodeBufferIDs().size() == 1);
@@ -61,8 +69,7 @@ std::unique_ptr<SILModule> CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.
   return SILModule::createEmptyModule(
-      getMainModule(), Invocation.getSILOptions(),
-      mainInputFilenameForDebugInfo(),
+      getMainModule(), Invocation.getSILOptions(), getPSPsForAtMostOnePrimary(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
@@ -230,18 +237,6 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
     return true;
   }
   return Invocation.getFrontendOptions().isCreatingSIL();
-}
-
-StringRef CompilerInvocation::mainInputFilenameForDebugInfo(
-    StringRef primaryFilename) const {
-  return !SILOpts.SILOutputFileNameForDebugging.empty()
-             ? StringRef(SILOpts.SILOutputFileNameForDebugging)
-             : !primaryFilename.empty()
-                   ? primaryFilename
-                   : getFrontendOptions().InputsAndOutputs.hasSingleInput()
-                         ? getFrontendOptions()
-                               .InputsAndOutputs.getFilenameOfFirstInput()
-                         : StringRef();
 }
 
 void CompilerInstance::performSema() {
@@ -662,7 +657,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
-
     bool Done;
     do {
       // Parser may stop at some erroneous constructions like #else, #endif
@@ -697,13 +691,13 @@ void CompilerInstance::freeContext() {
 
 void CompilerInstance::freeSIL() { TheSILModule.reset(); }
 
-StringRef CompilerInstance::mainInputFilenameForDebugInfo(
-    StringRef primaryFilename) const {
-  return Invocation.mainInputFilenameForDebugInfo(primaryFilename);
+PrimarySpecificPaths CompilerInstance::getPSPsForWMO() const {
+  return getPSPsForAtMostOnePrimary();
 }
-
-StringRef CompilerInstance::mainInputFilenameForDebugInfo() const {
-  const InputFile *pri =
-      Invocation.getFrontendOptions().InputsAndOutputs.getUniquePrimaryInput();
-  return mainInputFilenameForDebugInfo(pri ? pri->file() : StringRef());
+PrimarySpecificPaths CompilerInstance::getPSPsForAtMostOnePrimary() const {
+  return Invocation.getPSPsForAtMostOnePrimary();
+}
+PrimarySpecificPaths
+CompilerInstance::getPSPsForPrimary(StringRef filename) const {
+  return Invocation.getPSPsForPrimary(filename);
 }

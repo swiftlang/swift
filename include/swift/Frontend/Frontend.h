@@ -294,7 +294,8 @@ public:
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 
-  StringRef mainInputFilenameForDebugInfo(StringRef primaryFilename) const;
+  PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
+  PrimarySpecificPaths getPSPsForPrimary(StringRef filename) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -552,10 +553,9 @@ private:
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
 public:
-  StringRef mainInputFilenameForDebugInfo(StringRef primaryFilename) const;
-
-  /// Fails if >1 primary.
-  StringRef mainInputFilenameForDebugInfo() const;
+  PrimarySpecificPaths getPSPsForWMO() const;
+  PrimarySpecificPaths getPSPsForPrimary(StringRef filename) const;
+  PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
 };
 
 } // namespace swift
