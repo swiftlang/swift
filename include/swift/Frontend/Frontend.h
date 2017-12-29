@@ -39,6 +39,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -53,7 +54,7 @@ class SerializedModuleLoader;
 ///   - options for all stages of translation,
 ///   - information about the build environment,
 ///   - information about the job being performed, and
-///   - lists of inputs.
+///   - lists of inputsAndOutputs.
 ///
 /// A CompilerInvocation can be built from a frontend command line
 /// using parseArgs.  It can then be used to build a CompilerInstance,
@@ -173,13 +174,6 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.SerializedDiagnosticsPath = Path;
-  }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.SerializedDiagnosticsPath;
-  }
-
   LangOptions &getLangOptions() {
     return LangOpts;
   }
@@ -244,7 +238,7 @@ public:
 
 
   StringRef getOutputFilename() const {
-    return FrontendOpts.getSingleOutputFilename();
+    return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
@@ -336,14 +330,31 @@ class CompilerInstance {
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
 
-  /// PrimaryBufferID corresponds to PrimaryInput.
-  unsigned PrimaryBufferID = NO_SUCH_BUFFER;
-  bool isWholeModuleCompilation() { return PrimaryBufferID == NO_SUCH_BUFFER; }
+  /// Identifies the set of input buffers in the SourceManager that are
+  /// considered primaries.
+  llvm::SetVector<unsigned> PrimaryBufferIDs;
 
-  SourceFile *PrimarySourceFile = nullptr;
+  /// Identifies the set of SourceFiles that are considered primaries. An
+  /// invariant is that any SourceFile in this set with an associated
+  /// buffer will also have its buffer ID in PrimaryBufferIDs.
+  llvm::SetVector<SourceFile*> PrimarySourceFiles;
+
+  /// Return whether there is an entry in PrimaryInputs for buffer \BufID.
+  bool isPrimaryInput(unsigned BufID) const {
+    return PrimaryBufferIDs.count(BufID) != 0;
+  }
+
+  /// Record in PrimaryBufferIDs the fact that \BufID is a primary.
+  /// If \BufID is already in the set, do nothing.
+  void recordPrimaryInputBuffer(unsigned BufID);
+
+  /// Record in PrimarySourceFiles the fact that \SF is a primary, and
+  /// call recordPrimaryInputBuffer on \SF's buffer (if it exists).
+  void recordPrimarySourceFile(SourceFile *SF);
+
+  bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
 
   void createSILModule();
-  void setPrimarySourceFile(SourceFile *SF);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
@@ -371,7 +382,7 @@ public:
   }
 
   void setReferencedNameTracker(ReferencedNameTracker *tracker) {
-    assert(!PrimarySourceFile && "must be called before performSema()");
+    assert(PrimarySourceFiles.empty() && "must be called before performSema()");
     NameTracker = tracker;
   }
   ReferencedNameTracker *getReferencedNameTracker() {
@@ -413,9 +424,36 @@ public:
     return Invocation.getFrontendOptions().EnableSourceImport;
   }
 
+  /// Gets the set of SourceFiles which are the primary inputsAndOutputs for
+  /// this CompilerInstance.
+  const llvm::SetVector<SourceFile*> &getPrimarySourceFiles() {
+    return PrimarySourceFiles;
+  }
+
+  /// Gets the Primary Source File if one exists, otherwise the main
+  /// module. If multiple Primary Source Files exist, fails with an
+  /// assertion.
+  ModuleOrSourceFile getPrimarySourceFileOrMainModule() {
+    if (PrimarySourceFiles.empty())
+      return getMainModule();
+    else
+      return getPrimarySourceFile();
+  }
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
-  /// \returns the primary SourceFile, or nullptr if there is no primary input
-  SourceFile *getPrimarySourceFile() { return PrimarySourceFile; }
+  /// \returns the primary SourceFile, or nullptr if there is no primary input;
+  /// if there are _multiple_ primary inputsAndOutputs, fails with an assertion.
+  ///
+  /// FIXME: This should be removed eventually, once there are no longer any
+  /// codepaths that rely on a single primary file.
+  SourceFile *getPrimarySourceFile() {
+    if (PrimarySourceFiles.empty()) {
+      return nullptr;
+    } else {
+      assert(PrimarySourceFiles.size() == 1);
+      return *PrimarySourceFiles.begin();
+    }
+  }
 
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
