@@ -780,9 +780,8 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If we have no primary inputs we are in WMO mode and need to build a
     // SILModule for the entire module.
-    auto SM = performSILGeneration(
-        mod, SILOpts, Instance.mainInputFilenameForDebugInfo(StringRef()),
-        true);
+    auto SM =
+        performSILGeneration(mod, SILOpts, Instance.getPSPsForWMO(), true);
     std::deque<PostSILGenInputs> PSGIs;
     PSGIs.push_back(PostSILGenInputs{
         std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod});
@@ -795,8 +794,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
     auto SM = performSILGeneration(
         *PrimaryFile, SILOpts,
-        Instance.mainInputFilenameForDebugInfo(PrimaryFile->getFilename()),
-        None);
+        Instance.getPSPsForPrimary(PrimaryFile->getFilename()), None);
     PSGIs.push_back(
         PostSILGenInputs{std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
   }
@@ -814,8 +812,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
               filename)) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
         auto SM = performSILGeneration(
-            *SASTF, SILOpts, Instance.mainInputFilenameForDebugInfo(filename),
-            None);
+            *SASTF, SILOpts, Instance.getPSPsForPrimary(filename), None);
         PSGIs.push_back(
             PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
       }
@@ -1128,14 +1125,13 @@ static bool setUpForAndRunImmediately(CompilerInvocation &Invocation,
   }
 
   ReturnValue =
-      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
-                     Instance.mainInputFilenameForDebugInfo());
+      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
 }
 
 static std::pair<std::unique_ptr<llvm::Module>, llvm::GlobalVariable *>
 generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
-           StringRef singleOutputFilename, ModuleOrSourceFile MSF) {
+           StringRef OutputFilename, ModuleOrSourceFile MSF) {
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
@@ -1143,11 +1139,11 @@ generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
   std::unique_ptr<llvm::Module> IRModule =
       MSF.is<SourceFile *>()
           ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
-                                std::move(SM), singleOutputFilename,
-                                LLVMContext, 0, &HashGlobal)
+                                std::move(SM), OutputFilename, LLVMContext, 0,
+                                &HashGlobal)
           : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
-                                std::move(SM), singleOutputFilename,
-                                LLVMContext, &HashGlobal);
+                                std::move(SM), OutputFilename, LLVMContext,
+                                &HashGlobal);
 
   return make_pair(std::move(IRModule), HashGlobal);
 }
@@ -1186,7 +1182,8 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
 }
 
 static bool generateCode(CompilerInvocation &Invocation,
-                         CompilerInstance &Instance, llvm::Module *IRModule,
+                         CompilerInstance &Instance, std::string OutputFilename,
+                         llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal,
                          UnifiedStatsReporter *Stats, bool isOKToFreeContext);
 
@@ -1326,10 +1323,10 @@ static bool performCompileStepsPostSILGen(
     return setUpForAndRunImmediately(Invocation, Instance, std::move(SM), MSF,
                                      observer, ReturnValue);
 
+  std::string OutputFilename = SM.get()->getPSPs().OutputFilename;
   std::pair<std::unique_ptr<llvm::Module>, llvm::GlobalVariable *>
       IRModuleAndHashGlobal =
-          generateIR(IRGenOpts, std::move(SM),
-                     opts.InputsAndOutputs.getSingleOutputFilename(), MSF);
+          generateIR(IRGenOpts, std::move(SM), OutputFilename, MSF);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
@@ -1350,14 +1347,16 @@ static bool performCompileStepsPostSILGen(
                           *std::get<0>(IRModuleAndHashGlobal)))
     return true;
 
-  return generateCode(
-             Invocation, Instance, std::get<0>(IRModuleAndHashGlobal).get(),
-             std::get<1>(IRModuleAndHashGlobal), Stats, isOKToFreeContext) ||
+  return generateCode(Invocation, Instance, OutputFilename,
+                      std::get<0>(IRModuleAndHashGlobal).get(),
+                      std::get<1>(IRModuleAndHashGlobal), Stats,
+                      isOKToFreeContext) ||
          HadError;
 }
 
 static bool generateCode(CompilerInvocation &Invocation,
-                         CompilerInstance &Instance, llvm::Module *IRModule,
+                         CompilerInstance &Instance, std::string OutputFilename,
+                         llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal,
                          UnifiedStatsReporter *Stats, bool isOKToFreeContext) {
   std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
@@ -1373,10 +1372,7 @@ static bool generateCode(CompilerInvocation &Invocation,
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(Invocation.getIRGenOptions(), &Instance.getDiags(),
                      nullptr, HashGlobal, IRModule, TargetMachine.get(),
-                     EffectiveLanguageVersion,
-                     Invocation.getFrontendOptions()
-                         .InputsAndOutputs.getSingleOutputFilename(),
-                     Stats);
+                     EffectiveLanguageVersion, OutputFilename, Stats);
 }
 
 static bool emitIndexData(SourceFile *PrimarySourceFile,

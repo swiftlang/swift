@@ -372,3 +372,12 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
     return true;
   }
 }
+
+PrimarySpecificPaths FrontendOptions::getPSPsForAtMostOnePrimary() const {
+  return InputsAndOutputs.getPSPsForAtMostOnePrimary();
+}
+
+PrimarySpecificPaths
+FrontendOptions::getPSPsForPrimary(StringRef filename) const {
+  return InputsAndOutputs.getPSPsForPrimary(filename);
+}

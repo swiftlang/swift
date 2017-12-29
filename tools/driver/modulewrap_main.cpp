@@ -176,9 +176,9 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(
-      M, SILOpts, Instance.mainInputFilenameForDebugInfo());
-  createSwiftModuleObjectFile(
-      *SM, (*ErrOrBuf)->getBuffer(), Invocation.getOutputFilename(),
-      Instance.mainInputFilenameForDebugInfo(StringRef()));
+      M, SILOpts, Instance.getPSPsForAtMostOnePrimary());
+  createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),
+                              Invocation.getOutputFilename(),
+                              Instance.getPSPsForAtMostOnePrimary());
   return 0;
 }

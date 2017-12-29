@@ -11,21 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-module"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SILModule.h"
+#include "Linker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Substitution.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/Strings.h"
-#include "Linker.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
@@ -86,13 +87,11 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
                      const DeclContext *associatedDC, bool wholeModule,
-                     StringRef mainInputFilenameForDebugInfo)
+                     PrimarySpecificPaths PSPs)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
       wholeModule(wholeModule), Options(Options), serialized(false),
-      SerializeSILAction(),
-      MainInputFilenameForDebugInfo(mainInputFilenameForDebugInfo),
-      Types(*this) {}
+      SerializeSILAction(), PSPs(PSPs), Types(*this) {}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.

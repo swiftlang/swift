@@ -388,3 +388,24 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
   });
   return r;
 }
+
+PrimarySpecificPaths
+FrontendInputsAndOutputs::getPSPsForAtMostOnePrimary() const {
+  return PrimarySpecificPaths(
+      getSingleOutputFilename(), supplementaryOutputPaths(),
+      hasFilesProducingOutput() ? firstInputProducingOutput().file()
+                                : StringRef());
+}
+
+PrimarySpecificPaths
+FrontendInputsAndOutputs::getPSPsForPrimary(StringRef filename) const {
+  return getPrimaryInputNamed(filename).getPSPs();
+}
+
+const InputFile &
+FrontendInputsAndOutputs::getPrimaryInputNamed(StringRef filename) const {
+  auto where = PrimaryInputs.find(filename);
+  if (where == PrimaryInputs.end())
+    llvm_unreachable("filename must be a primary");
+  return AllFiles[where->second];
+}

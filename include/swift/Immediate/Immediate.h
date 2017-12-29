@@ -36,8 +36,7 @@ namespace swift {
   ///
   /// \return the result returned from main(), if execution succeeded
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                     IRGenOptions &IRGenOpts, const SILOptions &SILOpts,
-                     std::string mainInputFilenameForDebugInfo);
+                     IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
   void runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                bool ParseStdlib);

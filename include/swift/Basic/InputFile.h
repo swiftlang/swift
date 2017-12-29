@@ -8,6 +8,7 @@
 #ifndef InputFile_h
 #define InputFile_h
 
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -82,6 +83,11 @@ public:
       StringRef outputFilename, const SupplementaryOutputPaths &outs) {
     setOutputFilename(outputFilename);
     setSupplementaryOutputs(outs);
+  }
+
+  PrimarySpecificPaths getPSPs() const {
+    return PrimarySpecificPaths(outputFilename(), supplementaryOutputs(),
+                                file());
   }
 };
 } // namespace swift
