@@ -22,6 +22,10 @@
 
 namespace swift {
 namespace tf {
+  /// This returns true if we should dump out intermediate results to standard
+  /// out.  This is used for integration unit tests.
+  bool shouldDumpIntermediates();
+
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
   Type isTensorHandle(Type ty);
@@ -76,8 +80,9 @@ namespace tf {
   SILLocation getUserSourceLocation(SILLocation loc, SILNode *value);
 
   /// Lower the specified SIL function (which was formed by the partitioner)
-  /// into a TensorFlow graph, and write it to disk.
-  void emitTensorFlowGraph(SILFunction *F, StringRef fnName);
+  /// into a TensorFlow graph, and encode into a vector of bytes.
+  ///
+  std::vector<char> lowerTFGraph(SILFunction *fn);
 
   /// Return true if the specified type is a valid tensor element type.  For
   /// example, int128 and pointers are not.

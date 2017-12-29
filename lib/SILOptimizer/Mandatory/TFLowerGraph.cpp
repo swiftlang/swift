@@ -61,7 +61,7 @@ public:
   void lowerArguments();
   void lowerBlock(SILBasicBlock &BB);
 
-  void writeFile(StringRef filename);
+  std::vector<char> lowerGraph();
 
   ~TFGraphLowering() {
     TF_DeleteStatus(status);
@@ -91,6 +91,9 @@ private:  // Helpers to create TensorFlow graph nodes.
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
 
 public:  // Lowering functionality.
+
+  /// Return the TensorFlow operand for the specified value.  Note that this can
+  /// return a null value if an error occurred lowering the operand in question.
   TF_Output getOperandValue(SILValue v) {
     // apply_inst's can produce multiple values, and we support tuple_extract
     // instructions that access them.  Check to see if this is referring to a
@@ -105,17 +108,28 @@ public:  // Lowering functionality.
     }
 
     auto it = valueMapping.find({v, idx});
-    assert(it != valueMapping.end() && "Expected value not lowered?");
+    if (it == valueMapping.end()) {
+      assert(errorOcccurred && "Expected value not lowered?");
+      return {nullptr, 0};
+    }
+
     return it->second;
   }
 
   // These get special handling, they are only used as operands to tfops.
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {}
   void visitFloatLiteralInst(FloatLiteralInst *inst) {}
+  void visitMetatypeInst(MetatypeInst *inst) {}
 
   void visitBuiltinInst(BuiltinInst *inst);
-  void visitBuiltinTFSendInst(BuiltinInst *inst);
-  void visitBuiltinTFReceiveInst(BuiltinInst *inst);
+  void visitBuiltinTFSendInst(BuiltinInst *inst) {
+    internalError(inst->getLoc(),
+                  "GraphGen cannot lower a 'send' to the host yet");
+  }
+  void visitBuiltinTFReceiveInst(BuiltinInst *inst) {
+    internalError(inst->getLoc(),
+                  "GraphGen cannot lower a 'receive' from the host yet");
+  }
   void visitTFOpInst(BuiltinInst *inst);
   void visitTupleInst(TupleInst *inst);
   void visitTupleExtractInst(TupleExtractInst *inst);
@@ -124,9 +138,9 @@ public:  // Lowering functionality.
   // visitSILInstruction is the bottom level of the instruction visitor, where
   // unhandled instructions bottom out in.
   void visitSILInstruction(SILInstruction *inst) {
+    internalError(inst->getLoc(), "GraphGen cannot lower this instruction yet");
     llvm::errs() << "Unhandled SIL instruction in TFGraphLowering:\n";
     inst->dump();
-    exit(1);
   }
 };
 }
@@ -252,43 +266,38 @@ TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
   return TF_DataType(-1);
 }
 
-void TFGraphLowering::writeFile(StringRef filename) {
-  // Don't emit the file if an error occurred.
-  if (errorOcccurred) return;
+
+/// Lower the graph that we've generated so far into a serialized binary
+/// protobuf encoded into a TF_Buffer.  If we've detected an tensorflow error
+/// and emitted a diagnostic, this returns an empty vector.
+std::vector<char> TFGraphLowering::lowerGraph() {
+  // If an error already occurred, don't go further.
+  if (errorOcccurred) return {};
 
   auto *fn =
-  TF_GraphToFunction(graph, filename.str().c_str(),
-                     /*append_hash_to_fn_name,*/1,
-                     // We don't pass in an explicit operation list, just have
-                     // TF_GraphToFunction take everything in the graph.
-                     /*num_opers*/-1, /*opers*/nullptr,
-                     /*numinputs*/inputs.size(), /*inputs*/inputs.data(),
-                     /*noutputs*/outputs.size(), /*outputs*/outputs.data(),
-                     /*outputnames*/nullptr, /*functionoptions*/nullptr,
-                     "", status);
-  if (checkStatus(SILFn->getLocation())) return;
-
+    TF_GraphToFunction(graph, "the_function" /*fixed name, known by runtime*/,
+                       /*append_hash_to_fn_name,*/1,
+                       // We don't pass in an explicit operation list, just have
+                       // TF_GraphToFunction take everything in the graph.
+                       /*num_opers*/-1, /*opers*/nullptr,
+                       /*numinputs*/inputs.size(), /*inputs*/inputs.data(),
+                       /*noutputs*/outputs.size(), /*outputs*/outputs.data(),
+                       /*outputnames*/nullptr, /*functionoptions*/nullptr,
+                       "", status);
+  if (checkStatus(SILFn->getLocation())) return {};
   SWIFT_DEFER { TF_DeleteFunction(fn); };
 
-  // Now that we have a function, convert that into a serialized protobuf.
+  // Create a buffer to hold the result.
   auto buffer = TF_NewBuffer();
   SWIFT_DEFER { TF_DeleteBuffer(buffer); };
 
+  // Now that we have a function and the buffer, convert that into a serialized
+  // protobuf.
   TF_FunctionToFunctionDef(fn, buffer, status);
-  if (checkStatus(SILFn->getLocation())) return;
+  if (checkStatus(SILFn->getLocation())) return {};
 
-  // Now that we have a serialized protobuf, write it to disk.
-  std::error_code err;
-  llvm::raw_fd_ostream of(filename.str()+".pb", err,
-                          llvm::sys::fs::OpenFlags::F_None);
-  if (err) {
-    diagnose(SILFn->getASTContext(), SILFn->getLocation().getSourceLoc(),
-             diag::tf_lowering_file_error, filename.str()+".pb");
-    return;
-  }
-
-  of.write((const char*)buffer->data, buffer->length);
-  of.close();
+  auto bufPtr = (const char*)buffer->data;
+  return std::vector<char>(bufPtr, bufPtr + buffer->length);
 }
 
 
@@ -321,17 +330,6 @@ static TF_Tensor *convertConstantToTensor(LiteralInst *LI, TF_DataType dtype) {
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
 
-void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
-  // Right now we just drop tensorflowSend_N on the floor.
-  assert(inst->getNumOperands() == 1 && "Should send exactly one value");
-}
-
-void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
-  assert(0 && "GraphGen cannot lower a receive instruction from the host");
-  //valueMapping[{inst, 0}] = TF_Output{pi, 0};
-  abort();
-}
-
 void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
   if (inst->getName().str().startswith("tensorflowReceive_"))
     return visitBuiltinTFReceiveInst(inst);
@@ -357,30 +355,23 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   auto *op = TF_NewOperation(graph, tfopInfo.opName.str().c_str(),
                              opLocString.c_str());
 
-  SILValue lastTensorOperand;
-
-  // This gets the dtype of the last tensor operand (or the operation as a
-  // whole).
-  auto getDType = [&]() -> TF_DataType {
-    auto type = lastTensorOperand ? lastTensorOperand->getType()
-                                  : inst->getType();
-    return getTensorFlowDataType(type, inst->getLoc());
-  };
-
-
   // Each function argument for the op is a parameter that is passed in.
   unsigned nextOperand = 0;
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
-    case OpCommand::Tensor:
-      lastTensorOperand = inst->getOperand(nextOperand++);
-      TF_AddInput(op, getOperandValue(lastTensorOperand));
+    case OpCommand::Tensor: {
+      auto opValue = getOperandValue(inst->getOperand(nextOperand++));
+      if (!opValue.oper) return;  // Error occurred.
+      TF_AddInput(op, opValue);
       break;
+    }
     case OpCommand::Constant: {
       auto lit = tfopInfo.getTensorConstantOperand(nextOperand++);
 
+      auto dtype = getTensorFlowDataType(lit->getType(), inst->getLoc());
+
       // Set the tensor as the 'value' attribute on the graph node.
-      auto tensor = convertConstantToTensor(lit, getDType());
+      auto tensor = convertConstantToTensor(lit, dtype);
       TF_SetAttrTensor(op, "value", tensor, status);
       TF_DeleteTensor(tensor);
 
@@ -389,9 +380,10 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
 
     case OpCommand::AddDType: {
-      // This command adds the dtype of the last tensor operand (or the
-      // operation as a whole) as the dtype attribute.
-      TF_SetAttrType(op, "dtype", getDType());
+      // This command adds the dtype of the metatype  the dtype attribute.
+      auto mt = cast<MetatypeInst>(inst->getOperand(nextOperand++));
+      auto type = mt->getType().getMetatypeInstanceType(SILFn->getModule());
+      TF_SetAttrType(op, "dtype", getTensorFlowDataType(type, inst->getLoc()));
       break;
     }
     }
@@ -445,7 +437,6 @@ void TFGraphLowering::visitTupleExtractInst(TupleExtractInst *inst) {
   // tuple_extracts only exist as part of the handling for multi-result
   // tensor operations.  This is handled as part of the 'getOperandValue'
   // implementation.
-  assert((getOperandValue(inst), 1) && "Invalid tuple extract");
 }
 
 
@@ -455,10 +446,15 @@ void TFGraphLowering::visitReturnInst(ReturnInst *inst) {
   // The return is either using a single value or a tuple of values.  These
   // become the results of the graph.
   if (auto *ti = dyn_cast<TupleInst>(inst->getOperand())) {
-    for (auto &operand : ti->getAllOperands())
-      outputs.push_back(getOperandValue(operand.get()));
+    for (auto &operand : ti->getAllOperands()) {
+      auto result = getOperandValue(operand.get());
+      if (!result.oper) return; // Error occurred.
+      outputs.push_back(result);
+    }
   } else {
-    outputs.push_back(getOperandValue(inst->getOperand()));
+    auto result = getOperandValue(inst->getOperand());
+    if (!result.oper) return; // Error occurred.
+    outputs.push_back(result);
   }
 }
 
@@ -500,8 +496,9 @@ void TFGraphLowering::lowerBlock(SILBasicBlock &BB) {
 
 
 /// Lower the specified SIL function (which was formed by the partitioner)
-/// into a TensorFlow graph, and write it to disk.
-void tf::emitTensorFlowGraph(SILFunction *fn, StringRef fnName) {
+/// into a TensorFlow graph, and encode into a vector of bytes.
+///
+std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -512,17 +509,11 @@ void tf::emitTensorFlowGraph(SILFunction *fn, StringRef fnName) {
   // single-entry-single-exit regions.
   auto structure = canonicalizeCFGForXLA(fn);
 
-
-  llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
-  structure->print(llvm::outs());
-  llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
-
-  // FIXME: Remove.
-  return;
-
-  // Right now we only support lowering graphs that are a single basic block.
-  assert(fn->getBlocks().size() == 1 &&
-         "TFLowerGraph can only handle single basic block programs");
+  if (shouldDumpIntermediates()) {
+    llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
+    structure->print(llvm::outs());
+    llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
+  }
 
   // TensorFlow likes to print out lots of informational messages to the
   // console, which are just noise.  This is apparently controlled through
@@ -530,8 +521,16 @@ void tf::emitTensorFlowGraph(SILFunction *fn, StringRef fnName) {
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
   TFGraphLowering graphGen(fn);
+
+  // Right now we only support lowering graphs that are a single basic block.
+  if (fn->getBlocks().size() != 1) {
+    graphGen.internalError(fn->getLocation(),
+             "TFLowerGraph can only handle single basic block programs");
+    return {};
+  }
+
   graphGen.lowerArguments();
   graphGen.lowerBlock(*fn->getBlocks().begin());
-  graphGen.writeFile(fnName);
+  return graphGen.lowerGraph();
 #endif
 }
