@@ -208,10 +208,6 @@ struct OverloadSignature {
   /// The full name of the declaration.
   DeclName Name;
 
-  /// The interface type of the declaration, when relevant to the
-  /// overload signature.
-  CanType InterfaceType;
-
   /// The kind of unary operator.
   UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
 
@@ -226,7 +222,8 @@ struct OverloadSignature {
 };
 
 /// Determine whether two overload signatures conflict.
-bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
+bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
@@ -2303,8 +2300,12 @@ public:
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
 
-  /// Compute the overload signature for this declaration.
+  /// Compute the untyped overload signature for this declaration.
   OverloadSignature getOverloadSignature() const;
+
+  /// Retrieve the type used to describe this entity for the purposes of
+  /// overload resolution.
+  CanType getOverloadSignatureType() const;
 
   /// Returns true if the decl requires Objective-C interop.
   ///
