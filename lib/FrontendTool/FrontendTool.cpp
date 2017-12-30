@@ -574,7 +574,10 @@ static bool compileLLVMIr(CompilerInvocation &Invocation,
   IRGenOpts.OutputKind =
       getOutputKind(Invocation.getFrontendOptions().RequestedAction);
 
-  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
+  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(),
+                     Invocation.getFrontendOptions()
+                         .InputsAndOutputs.getSingleOutputFilename(),
+                     Stats);
 }
 
 static Optional<bool> performParseOrSema(CompilerInstance &Instance,
