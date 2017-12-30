@@ -66,12 +66,12 @@ protected:
     Warned : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+32,
     /// Whether this tuple has '...' and its position.
     HasEllipsis : 1,
     : NumPadBits,
     /// The number of elements contained.
-    NumElements : 16
+    NumElements : 32
   );
 
   } Bits;

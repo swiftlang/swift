@@ -410,12 +410,12 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                              SourceRange Parens,
                              SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), Parens(Parens) {
+  Bits.TupleTypeRepr.HasEllipsis = Ellipsis.isValid();
+  Bits.TupleTypeRepr.NumElements = Elements.size();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
                           getTrailingObjects<TupleTypeReprElement>());
-  Bits.TupleTypeRepr.HasEllipsis = Ellipsis.isValid();
-  Bits.TupleTypeRepr.NumElements = Elements.size();
 
   // Set ellipsis location and index.
   if (Ellipsis.isValid()) {
