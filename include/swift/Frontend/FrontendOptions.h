@@ -273,6 +273,8 @@ public:
   PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
   PrimarySpecificPaths getPSPsForPrimary(StringRef) const;
 
+  bool hasDependencyTrackerPath() const;
+
 private:
 
   static bool canActionEmitDependencies(ActionType);
