@@ -439,9 +439,8 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-        !Opts.InputsAndOutputs.getModuleOutputPath().empty();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
+                                    Opts.InputsAndOutputs.hasModuleOutputPath();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
