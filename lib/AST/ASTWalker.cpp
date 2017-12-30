@@ -1634,7 +1634,7 @@ bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
 }
 
 bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-  for (auto comp : T->Components) {
+  for (auto comp : T->getComponents()) {
     if (doIt(comp))
       return true;
   }

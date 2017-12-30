@@ -595,8 +595,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 
       ComponentIdentTypeRepr *CompT;
       if (!GenericArgs.empty())
-        CompT = new (Context) GenericIdentTypeRepr(Loc, Name,
-                                             Context.AllocateCopy(GenericArgs),
+        CompT = GenericIdentTypeRepr::create(Context, Loc, Name, GenericArgs,
                                              SourceRange(LAngle, RAngle));
       else
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
