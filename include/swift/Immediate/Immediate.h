@@ -32,7 +32,6 @@ namespace swift {
   // supports LLVM containers.
   using ProcessCmdLine = std::vector<std::string>;
   
-
   /// Attempt to run the script identified by the given compiler instance.
   ///
   /// \return the result returned from main(), if execution succeeded

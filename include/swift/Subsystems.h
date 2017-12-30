@@ -19,11 +19,12 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
@@ -232,15 +233,17 @@ namespace swift {
   /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, SILOptions &options,
+                       const PrimarySpecificPaths psPaths,
                        bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
   /// SourceFile, and any optimizations should take that into account.
-  std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None);
+  std::unique_ptr<SILModule> performSILGeneration(
+      FileUnit &SF, SILOptions &options,
+      const PrimarySpecificPaths psPaths = PrimarySpecificPaths::lldbStub(),
+      Optional<unsigned> StartElem = None);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -279,12 +282,13 @@ namespace swift {
 
   /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
-                                   StringRef OutputPath);
+                                   StringRef ModuleName,
+                                   const PrimarySpecificPaths PSPs);
 
   /// Turn the given LLVM module into native code and return true on error.
-  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                   llvm::Module *Module,
-                   UnifiedStatsReporter *Stats=nullptr);
+  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
+                   StringRef OutputFilename,
+                   UnifiedStatsReporter *Stats = nullptr);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
