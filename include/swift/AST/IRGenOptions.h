@@ -191,14 +191,13 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleIRGOutputFilename() const {
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  /// FIXME: dmu Should go away in favor of
+  /// Instance.getFrontendOptions().InputsAndOutputs.getSingleOutputFilename.
+  StringRef getSingleOutputFilename() const {
     if (IRGOutputFilenames.size() >= 1)
       return IRGOutputFilenames.back();
     return StringRef();
-  }
-  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
-  StringRef getSingleOutputFilename() const {
-    return getSingleIRGOutputFilename();
   }
 
   // Get a hash of all options which influence the llvm compilation but are not

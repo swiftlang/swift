@@ -286,9 +286,9 @@ namespace swift {
                                    const PrimarySpecificPaths PSPs);
 
   /// Turn the given LLVM module into native code and return true on error.
-  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                   llvm::Module *Module,
-                   UnifiedStatsReporter *Stats=nullptr);
+  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
+                   StringRef OutputFilename,
+                   UnifiedStatsReporter *Stats = nullptr);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
