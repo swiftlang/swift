@@ -1246,7 +1246,7 @@ static bool performCompileStepsPostSILGen(
     const SupplementaryOutputPaths &outs =
         SM.get()->getPSPs().SupplementaryOutputs;
 
-    if (!outs.ModuleOutputPath.empty())
+    if (outs.ModuleOutputPath.empty())
       return;
 
     SerializationOptions serializationOpts;
