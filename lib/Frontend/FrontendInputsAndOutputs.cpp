@@ -383,6 +383,13 @@ bool FrontendInputsAndOutputs::hasDependenciesPath() const {
                return !inp.supplementaryOutputs().DependenciesFilePath.empty();
              });
 }
+bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
+  return nullptr != findAnyInputProducingSupplementaryOutput(
+                        [&](const InputFile &inp) -> bool {
+                          return !inp.supplementaryOutputs()
+                                      .ReferenceDependenciesFilePath.empty();
+                        });
+}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return nullptr !=
          findAnyInputProducingSupplementaryOutput(
@@ -410,6 +417,11 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
              [&](const InputFile &inp) -> bool {
                return !inp.supplementaryOutputs().ModuleDocOutputPath.empty();
              });
+}
+
+bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
+  return hasDependenciesPath() || hasReferenceDependenciesPath() ||
+         hasLoadedModuleTracePath();
 }
 
 PrimarySpecificPaths

@@ -213,10 +213,13 @@ private:
 
 public:
   bool hasDependenciesPath() const;
+  bool hasReferenceDependenciesPath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+
+  bool hasDependencyTrackerPath() const;
 };
 
 } // namespace swift

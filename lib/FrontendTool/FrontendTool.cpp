@@ -1520,16 +1520,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
 }
 
 static bool isDependencyTrackerNeeded(const CompilerInvocation &Invocation) {
-  return !Invocation.getFrontendOptions()
-              .InputsAndOutputs.getDependenciesFilePath()
-              .empty() ||
-         !Invocation.getFrontendOptions()
-              .InputsAndOutputs.getReferenceDependenciesFilePath()
-              .empty() ||
-         !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-         !Invocation.getFrontendOptions()
-              .InputsAndOutputs.getLoadedModuleTracePath()
-              .empty();
+  return Invocation.getFrontendOptions().hasDependencyTrackerPath();
 }
 
 static Optional<int> configureInvocation(
