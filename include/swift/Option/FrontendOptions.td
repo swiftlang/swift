@@ -472,7 +472,7 @@ def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
 def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
     HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
     
-def enable_batch_mode: Flag<["-"], "enable-batch-mode">,
-    HelpText<"Enable experimental batch mode">;
+def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
+    HelpText<"Bypass checks for batch-mode errors.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

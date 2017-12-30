@@ -54,8 +54,8 @@ bool ArgsToFrontendInputsConverter::convert() {
   // Must be set before we iterate over inputsAndOutputs needing outputs.
   InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
 
-  InputsAndOutputs.setBatchModeEnabled(
-      Args.hasArg(options::OPT_enable_batch_mode));
+  InputsAndOutputs.setBypassBatchModeChecks(
+      Args.hasArg(options::OPT_bypass_batch_mode_checks));
 
   return false;
 }
