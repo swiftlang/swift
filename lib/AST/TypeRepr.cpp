@@ -137,11 +137,12 @@ TypeRepr *CloneVisitor::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
   // Clone the generic arguments.
-  auto genericArgs = Ctx.Allocate<TypeRepr*>(T->getGenericArgs().size());
-  for (unsigned argI : indices(genericArgs)) {
-    genericArgs[argI] = visit(T->getGenericArgs()[argI]);
+  SmallVector<TypeRepr*, 8> genericArgs;
+  genericArgs.reserve(T->getGenericArgs().size());
+  for (auto &arg : T->getGenericArgs()) {
+    genericArgs.push_back(visit(arg));
   }
-  return new (Ctx) GenericIdentTypeRepr(T->getIdLoc(), T->getIdentifier(),
+  return GenericIdentTypeRepr::create(Ctx, T->getIdLoc(), T->getIdentifier(),
                                         genericArgs, T->getAngleBrackets());
 }
 
@@ -442,6 +443,16 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
                                           SourceRange Parens) {
   return create(C, {}, Parens,
       /*Ellipsis=*/SourceLoc(), /*EllipsisIdx=*/0);
+}
+
+GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
+                                                   SourceLoc Loc,
+                                                   Identifier Id,
+                                                ArrayRef<TypeRepr*> GenericArgs,
+                                                   SourceRange AngleBrackets) {
+  auto size = totalSizeToAlloc<TypeRepr*>(GenericArgs.size());
+  auto mem = C.Allocate(size, alignof(GenericIdentTypeRepr));
+  return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,

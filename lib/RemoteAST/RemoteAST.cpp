@@ -197,10 +197,12 @@ public:
 
     // Make a generic type repr that's been resolved to this decl.
     TypeReprList genericArgReprs(args);
-    GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
-                                     genericArgReprs.getList(), SourceRange());
+    auto genericRepr = GenericIdentTypeRepr::create(Ctx, SourceLoc(),
+                                                    decl->getName(),
+                                                    genericArgReprs.getList(),
+                                                    SourceRange());
     // FIXME
-    genericRepr.setValue(decl, nullptr);
+    genericRepr->setValue(decl, nullptr);
 
     Type genericType;
 
@@ -217,21 +219,21 @@ public:
 
       struct GenericRepr {
         TypeReprList GenericArgs;
-        GenericIdentTypeRepr Ident;
+        GenericIdentTypeRepr *Ident;
 
-        GenericRepr(BoundGenericType *type)
+        GenericRepr(const ASTContext &Ctx, BoundGenericType *type)
           : GenericArgs(type->getGenericArgs()),
-            Ident(SourceLoc(), type->getDecl()->getName(),
-                  GenericArgs.getList(), SourceRange()) {
+            Ident(GenericIdentTypeRepr::create(Ctx, SourceLoc(),
+                                               type->getDecl()->getName(),
+                                               GenericArgs.getList(),
+                                               SourceRange())) {
           // FIXME
-          Ident.setValue(type->getDecl(), nullptr);
+          Ident->setValue(type->getDecl(), nullptr);
         }
 
         // SmallVector::emplace_back will never need to call this because
         // we reserve the right size, but it does try statically.
-        GenericRepr(const GenericRepr &other)
-          : GenericArgs({}),
-            Ident(SourceLoc(), Identifier(), {}, SourceRange()) {
+        GenericRepr(const GenericRepr &other) : GenericArgs({}), Ident(nullptr) {
           llvm_unreachable("should not be called dynamically");
         }
       };
@@ -248,8 +250,8 @@ public:
       for (size_t i = ancestry.size(); i != 0; --i) {
         Type p = ancestry[i - 1];
         if (auto boundGeneric = p->getAs<BoundGenericType>()) {
-          genericComponents.emplace_back(boundGeneric);
-          componentReprs.push_back(&genericComponents.back().Ident);
+          genericComponents.emplace_back(Ctx, boundGeneric);
+          componentReprs.push_back(genericComponents.back().Ident);
         } else {
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
@@ -259,12 +261,12 @@ public:
           componentReprs.push_back(&simpleComponents.back());
         }
       }
-      componentReprs.push_back(&genericRepr);
+      componentReprs.push_back(genericRepr);
 
       CompoundIdentTypeRepr compoundRepr(componentReprs);
       genericType = checkTypeRepr(&compoundRepr);
     } else {
-      genericType = checkTypeRepr(&genericRepr);
+      genericType = checkTypeRepr(genericRepr);
     }
 
     // If type-checking failed, we've failed.
