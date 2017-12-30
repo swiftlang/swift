@@ -434,7 +434,14 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
+      OptionalTypeKind optionalKind = OTK_None;
+      Type itfType = param->getInterfaceType();
+      if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        itfType = itfType->getAnyOptionalObjectType();
+        assert(itfType);
+        optionalKind = OTK_ImplicitlyUnwrappedOptional;
+      }
+      print(itfType, optionalKind, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -544,6 +551,10 @@ private:
         OptionalTypeKind optionalKind;
         (void)func->getResultInterfaceType()
             ->getAnyOptionalObjectType(optionalKind);
+        if (func->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          assert(optionalKind != OTK_None);
+          optionalKind = OTK_ImplicitlyUnwrappedOptional;
+        }
         printNullability(optionalKind,
                          NullabilityPrintKind::ContextSensitive);
       }
@@ -554,6 +565,11 @@ private:
       os << "IBAction";
     } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
       os << "NSUInteger";
+    } else if (AFD->getAttrs()
+                   .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+      auto objTy = resultTy->getAnyOptionalObjectType();
+      assert(objTy);
+      print(objTy, OTK_ImplicitlyUnwrappedOptional);
     } else {
       print(resultTy, OTK_None);
     }
@@ -704,8 +720,15 @@ private:
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
-    visitPart(resultTy, OTK_None);
-    
+    OptionalTypeKind optionalKind = OTK_None;
+    Type objTy = resultTy;
+    if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+      objTy = resultTy->getAnyOptionalObjectType();
+      assert(objTy);
+      optionalKind = OTK_ImplicitlyUnwrappedOptional;
+    }
+    visitPart(objTy, optionalKind);
+
     assert(FD->getAttrs().hasAttribute<CDeclAttr>()
            && "not a cdecl function");
     
@@ -716,10 +739,17 @@ private:
     if (params->size()) {
       interleave(*params,
                  [&](const ParamDecl *param) {
-                   print(param->getInterfaceType(), OTK_None, param->getName(),
+                   OptionalTypeKind optionalKind = OTK_None;
+                   Type objTy = param->getInterfaceType();
+                   if (FD->getAttrs()
+                           .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+                     objTy = objTy->getAnyOptionalObjectType();
+                     assert(objTy);
+                   }
+                   print(objTy, optionalKind, param->getName(),
                          IsFunctionParam);
                  },
-                 [&]{ os << ", "; });
+                 [&] { os << ", "; });
     } else {
       os << "void";
     }
@@ -1005,6 +1035,12 @@ private:
       OptionalTypeKind optionalType;
       if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
+
+      if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        assert(optionalType != OTK_None);
+        optionalType = OTK_ImplicitlyUnwrappedOptional;
+      }
+
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
         if (nominal == ctx.getArrayDecl() ||
@@ -1076,7 +1112,19 @@ private:
       if (hasReservedName)
         os << "_";
     } else {
-      print(ty, OTK_None, objCName);
+      OptionalTypeKind optionalType = OTK_None;
+      Type objTy = ty;
+
+      if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        if (auto referenceTy = ty->getAs<ReferenceStorageType>())
+          objTy = referenceTy->getReferentType();
+
+        objTy = objTy->getAnyOptionalObjectType();
+        assert(objTy);
+        optionalType = OTK_ImplicitlyUnwrappedOptional;
+      }
+
+      print(objTy, optionalType, objCName);
     }
 
     printSwift3ObjCDeprecatedInference(VD);
