@@ -189,6 +189,12 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
          "have not implemented >1 primary input yet");
 }
 
+void FrontendInputsAndOutputs::
+    assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled() const {
+  if (!isBatchModeEnabled())
+    assertMustNotBeMoreThanOnePrimaryInput();
+}
+
 unsigned FrontendInputsAndOutputs::countOfFilesProducingOutput() const {
   return isSingleThreadedWMO()
              ? 1
@@ -297,6 +303,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
 /// Gets the name of the specified output filename.
 /// If multiple files are specified, the last one is returned.
 StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled();
   return hasInputs() ? StringRef(lastInputProducingOutput().outputFilename())
                      : StringRef();
 }
@@ -348,8 +355,7 @@ FrontendInputsAndOutputs::supplementaryOutputPaths() const {
   if (!hasInputs())
     return empty;
 
-  if (!isBatchModeEnabled())
-    assertMustNotBeMoreThanOnePrimaryInput();
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled();
   return firstInputProducingSupplementaryOutput().supplementaryOutputs();
 }
 
