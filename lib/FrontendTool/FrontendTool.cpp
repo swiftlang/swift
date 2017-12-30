@@ -970,10 +970,12 @@ static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
 static bool serializeMSF(FrontendInputsAndOutputs &inputsAndOutputs,
                          SILModule *SM, ASTContext &Context,
                          ModuleOrSourceFile MSF) {
-  if (!inputsAndOutputs.hasModuleOutputPath())
+  const std::string &moduleOutputPath =
+      SM->getPSPs().SupplementaryOutputs.ModuleOutputPath;
+  if (moduleOutputPath.empty())
     return Context.hadError();
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = inputsAndOutputs.getModuleOutputPath().c_str();
+  serializationOpts.OutputPath = moduleOutputPath.c_str();
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
   serialize(MSF, serializationOpts, SM);
@@ -1314,11 +1316,11 @@ static bool performCompileStepsPostSILGen(
   assert(Action >= FrontendOptions::ActionType::EmitSIL &&
          "All actions not requiring SILPasses must have been handled!");
 
+  const std::string OutputFilename = SM.get()->getPSPs().OutputFilename;
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL) {
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.InputsAndOutputs.getSingleOutputFilename(),
-                    opts.EmitSortedSIL);
+                    OutputFilename, opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
@@ -1339,7 +1341,6 @@ static bool performCompileStepsPostSILGen(
     return setUpForAndRunImmediately(Invocation, Instance, std::move(SM), MSF,
                                      observer, ReturnValue);
 
-  std::string OutputFilename = SM.get()->getPSPs().OutputFilename;
   std::pair<std::unique_ptr<llvm::Module>, llvm::GlobalVariable *>
       IRModuleAndHashGlobal =
           generateIR(IRGenOpts, std::move(SM), OutputFilename, MSF);
