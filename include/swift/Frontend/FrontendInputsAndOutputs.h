@@ -218,6 +218,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
 };
