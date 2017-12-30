@@ -125,6 +125,10 @@ public:
   void forEachInputProducingOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
 
+  /// Does not find the FIRST primary, but searches in unspecified order.
+  const InputFile *findAnyInputProducingSupplementaryOutput(
+      llvm::function_ref<bool(const InputFile &)>) const;
+
   unsigned countOfFilesProducingSupplementaryOutput() const;
 
   const InputFile &firstInputProducingSupplementaryOutput() const;
