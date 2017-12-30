@@ -110,6 +110,7 @@ public:
 
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
+  void assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled() const;
 
   // Outputs
 
