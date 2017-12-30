@@ -16,6 +16,14 @@ case none
 case some(T)
 }
 
+func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
+                                    _filenameLength: Builtin.Word,
+                                    _filenameIsASCII: Builtin.Int1,
+                                    _line: Builtin.Word) {
+  // This would usually contain an assert, but we don't need one since we are
+  // just emitting SILGen.
+}
+
 class Klass {
   init() {}
 }
@@ -99,3 +107,4 @@ struct ReabstractionThunkTest : Protocol {
     processInput(input)
   }
 }
+
