@@ -60,8 +60,8 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
 unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     const char *extension) const {
   return count_if(
-      PrimaryInputs, [&](const std::pair<StringRef, unsigned> &elem) -> bool {
-        StringRef filename = AllFiles[elem.second].file();
+      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
+        StringRef filename = elem.getKey();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
@@ -111,12 +111,18 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
 
 const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
   assert(!PrimaryInputs.empty());
-  return AllFiles[PrimaryInputs.front().second];
+  for (const auto &f : AllFiles)
+    if (f.isPrimary())
+      return f;
+  llvm_unreachable("no first primary?!");
 }
 
 const InputFile &FrontendInputsAndOutputs::lastPrimaryInput() const {
   assert(!PrimaryInputs.empty());
-  return AllFiles[PrimaryInputs.back().second];
+  for (const auto &f : reversed(AllFiles))
+    if (f.isPrimary())
+      return f;
+  llvm_unreachable("no last primary?!");
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
@@ -168,12 +174,9 @@ void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
 
 void FrontendInputsAndOutputs::addInput(const InputFile &input) {
   AllFiles.push_back(input);
-  if (input.isPrimary()) {
-    // Take care to push a reference to the string in the InputFile stored in
-    // AllFiles, NOT in the input parameter.
+  if (input.isPrimary())
     PrimaryInputs.insert(
         std::make_pair(AllFiles.back().file(), AllFiles.size() - 1));
-  }
 }
 
 void FrontendInputsAndOutputs::clearInputs() {
@@ -240,8 +243,9 @@ void FrontendInputsAndOutputs::forEachInput(
 
 void FrontendInputsAndOutputs::forEachPrimaryInput(
     llvm::function_ref<void(const InputFile &)> fn) const {
-  for (const auto p : PrimaryInputs)
-    fn(AllFiles[p.second]);
+  for (auto &f : AllFiles)
+    if (f.isPrimary())
+      fn(f);
 }
 
 bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
@@ -273,10 +277,12 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
          supplementaryOutputs.size());
   if (hasPrimaryInputs()) {
     unsigned i = 0;
-    for (auto p : PrimaryInputs) {
-      AllFiles[p.second].setOutputFileNameAndSupplementaryOutputPaths(
-          outputFiles[i], supplementaryOutputs[i]);
-      ++i;
+    for (auto &f : AllFiles) {
+      if (f.isPrimary()) {
+        f.setOutputFileNameAndSupplementaryOutputPaths(outputFiles[i],
+                                                       supplementaryOutputs[i]);
+        ++i;
+      }
     }
   } else if (isSingleThreadedWMO()) {
     AllFiles[0].setOutputFileNameAndSupplementaryOutputPaths(
