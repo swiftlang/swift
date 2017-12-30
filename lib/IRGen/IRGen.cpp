@@ -1137,7 +1137,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module,
+                        llvm::Module *Module, StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
@@ -1145,10 +1145,9 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
     return true;
 
   embedBitcode(Module, Opts);
-  // This routine is never used in batch mode.
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleIRGOutputFilename(), Stats))
+                    OutputFilename, Stats))
     return true;
   return false;
 }
