@@ -18,7 +18,7 @@
 #include "swift/Basic/InputFile.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -36,8 +36,7 @@ class FrontendInputsAndOutputs {
 
   std::vector<InputFile> AllFiles;
 
-  typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
-  InputFileMap PrimaryInputs;
+  llvm::StringMap<unsigned> PrimaryInputs;
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
@@ -49,22 +48,6 @@ class FrontendInputsAndOutputs {
 
 public:
   FrontendInputsAndOutputs() = default;
-
-  FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
-    for (InputFile input : other.AllFiles)
-      addInput(input);
-    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    IsBatchModeEnabled = other.IsBatchModeEnabled;
-  }
-
-  FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
-    clearInputs();
-    for (InputFile input : other.AllFiles)
-      addInput(input);
-    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    IsBatchModeEnabled = other.IsBatchModeEnabled;
-    return *this;
-  }
 
   // WMO routines:
 
