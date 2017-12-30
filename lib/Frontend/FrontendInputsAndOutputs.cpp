@@ -223,6 +223,9 @@ void FrontendInputsAndOutputs::forEachInputProducingOutput(
 const InputFile *
 FrontendInputsAndOutputs::findAnyInputProducingSupplementaryOutput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
+  if (!hasInputs())
+    return nullptr;
+
   if (!hasPrimaryInputs())
     return fn(AllFiles[0]) ? &AllFiles[0] : nullptr;
 
@@ -355,9 +358,11 @@ FrontendInputsAndOutputs::getReferenceDependenciesFilePath() const {
 const std::string &
 FrontendInputsAndOutputs::getSerializedDiagnosticsPath() const {
   // FIXME: This won't be right in batch mode.
-  return firstInputProducingSupplementaryOutput()
-      .supplementaryOutputs()
-      .SerializedDiagnosticsPath;
+  static const std::string empty;
+  return !hasInputs() ? empty
+                      : firstInputProducingSupplementaryOutput()
+                            .supplementaryOutputs()
+                            .SerializedDiagnosticsPath;
 }
 const std::string &FrontendInputsAndOutputs::getLoadedModuleTracePath() const {
   return supplementaryOutputPaths().LoadedModuleTracePath;
@@ -382,6 +387,13 @@ bool FrontendInputsAndOutputs::hasDependenciesPath() const {
              [&](const InputFile &inp) -> bool {
                return !inp.supplementaryOutputs().DependenciesFilePath.empty();
              });
+}
+bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
+  return nullptr != findAnyInputProducingSupplementaryOutput(
+                        [&](const InputFile &inp) -> bool {
+                          return !inp.supplementaryOutputs()
+                                      .ReferenceDependenciesFilePath.empty();
+                        });
 }
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return nullptr !=
@@ -410,6 +422,11 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
              [&](const InputFile &inp) -> bool {
                return !inp.supplementaryOutputs().ModuleDocOutputPath.empty();
              });
+}
+
+bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
+  return hasDependenciesPath() || hasReferenceDependenciesPath() ||
+         hasLoadedModuleTracePath();
 }
 
 PrimarySpecificPaths
