@@ -340,7 +340,10 @@ FrontendInputsAndOutputs::getReferenceDependenciesFilePath() const {
 }
 const std::string &
 FrontendInputsAndOutputs::getSerializedDiagnosticsPath() const {
-  return supplementaryOutputPaths().SerializedDiagnosticsPath;
+  // FIXME: This won't be right in batch mode.
+  return firstInputProducingSupplementaryOutput()
+      .supplementaryOutputs()
+      .SerializedDiagnosticsPath;
 }
 const std::string &FrontendInputsAndOutputs::getLoadedModuleTracePath() const {
   return supplementaryOutputPaths().LoadedModuleTracePath;
