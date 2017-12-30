@@ -263,8 +263,8 @@ public:
       }
       componentReprs.push_back(genericRepr);
 
-      CompoundIdentTypeRepr compoundRepr(componentReprs);
-      genericType = checkTypeRepr(&compoundRepr);
+      auto compoundRepr = CompoundIdentTypeRepr::create(Ctx, componentReprs);
+      genericType = checkTypeRepr(compoundRepr);
     } else {
       genericType = checkTypeRepr(genericRepr);
     }

@@ -148,11 +148,12 @@ TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
   // Clone the components.
-  auto components = Ctx.Allocate<ComponentIdentTypeRepr*>(T->Components.size());
-  for (unsigned I : indices(components)) {
-    components[I] = cast<ComponentIdentTypeRepr>(visit(T->Components[I]));
+  SmallVector<ComponentIdentTypeRepr*, 8> components;
+  components.reserve(T->getComponents().size());
+  for (auto &component : T->getComponents()) {
+    components.push_back(cast<ComponentIdentTypeRepr>(visit(component)));
   }
-  return new (Ctx) CompoundIdentTypeRepr(components);
+  return CompoundIdentTypeRepr::create(Ctx, components);
 }
 
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -326,7 +327,7 @@ IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
   if (Components.size() == 1)
     return Components.front();
 
-  return new (C) CompoundIdentTypeRepr(C.AllocateCopy(Components));
+  return CompoundIdentTypeRepr::create(C, Components);
 }
 
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
@@ -357,8 +358,8 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
-  printTypeRepr(Components.front(), Printer, Opts);
-  for (auto C : Components.slice(1)) {
+  printTypeRepr(getComponents().front(), Printer, Opts);
+  for (auto C : getComponents().slice(1)) {
     Printer << ".";
     printTypeRepr(C, Printer, Opts);
   }
@@ -453,6 +454,13 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   auto size = totalSizeToAlloc<TypeRepr*>(GenericArgs.size());
   auto mem = C.Allocate(size, alignof(GenericIdentTypeRepr));
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
+}
+
+CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(const ASTContext &C,
+                                 ArrayRef<ComponentIdentTypeRepr*> Components) {
+  auto size = totalSizeToAlloc<ComponentIdentTypeRepr*>(Components.size());
+  auto mem = C.Allocate(size, alignof(CompoundIdentTypeRepr));
+  return new (mem) CompoundIdentTypeRepr(Components);
 }
 
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
