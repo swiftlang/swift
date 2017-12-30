@@ -1090,8 +1090,6 @@ static Optional<bool> emitModuleIfNeeded(SILModule *SM,
                                          CompilerInvocation &Invocation,
                                          CompilerInstance &Instance,
                                          ModuleOrSourceFile MSF) {
-  const FrontendInputsAndOutputs &io =
-      Invocation.getFrontendOptions().InputsAndOutputs;
   const SupplementaryOutputPaths &outs = SM->getPSPs().SupplementaryOutputs;
 
   if (outs.ModuleOutputPath.empty() && outs.ModuleDocOutputPath.empty())
