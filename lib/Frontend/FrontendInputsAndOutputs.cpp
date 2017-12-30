@@ -423,6 +423,12 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
                return !inp.supplementaryOutputs().ModuleDocOutputPath.empty();
              });
 }
+bool FrontendInputsAndOutputs::hasTBDPath() const {
+  return nullptr != findAnyInputProducingSupplementaryOutput(
+                        [&](const InputFile &inp) -> bool {
+                          return !inp.supplementaryOutputs().TBDPath.empty();
+                        });
+}
 
 bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
   return hasDependenciesPath() || hasReferenceDependenciesPath() ||

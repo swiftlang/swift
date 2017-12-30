@@ -739,7 +739,7 @@ static void emitReferenceDependencies(CompilerInvocation &Invocation,
 static bool finishTypecheck(CompilerInvocation &Invocation,
                             CompilerInstance &Instance, bool moduleIsPublic) {
   FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (!opts.InputsAndOutputs.getObjCHeaderOutputPath().empty())
+  if (opts.InputsAndOutputs.hasObjCHeaderOutputPath())
     return printAsObjC(opts.InputsAndOutputs.getObjCHeaderOutputPath(),
                        Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
                        moduleIsPublic);
@@ -752,7 +752,7 @@ static bool finishTypecheck(CompilerInvocation &Invocation,
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (Invocation.getFrontendOptions().InputsAndOutputs.getTBDPath().empty())
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
     return false;
   auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
@@ -861,7 +861,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   ReferencedNameTracker nameTracker;
   bool shouldTrackReferences =
-      !opts.InputsAndOutputs.getReferenceDependenciesFilePath().empty();
+      opts.InputsAndOutputs.hasReferenceDependenciesPath();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -899,14 +899,14 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.InputsAndOutputs.getDependenciesFilePath().empty())
+  if (opts.InputsAndOutputs.hasDependenciesPath())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
   if (shouldTrackReferences)
     emitReferenceDependencies(Invocation, Instance);
 
-  if (!opts.InputsAndOutputs.getLoadedModuleTracePath().empty())
+  if (opts.InputsAndOutputs.hasLoadedModuleTracePath())
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
                                 opts);
 
@@ -970,7 +970,7 @@ static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
 static bool serializeMSF(FrontendInputsAndOutputs &inputsAndOutputs,
                          SILModule *SM, ASTContext &Context,
                          ModuleOrSourceFile MSF) {
-  if (inputsAndOutputs.getModuleOutputPath().empty())
+  if (!inputsAndOutputs.hasModuleOutputPath())
     return Context.hadError();
   SerializationOptions serializationOpts;
   serializationOpts.OutputPath = inputsAndOutputs.getModuleOutputPath().c_str();
@@ -1076,9 +1076,11 @@ static void setMSFPrivateDiscriminator(IRGenOptions &IRGenOpts,
 }
 
 static void writeObjCHeader(CompilerInvocation &Invocation,
-                            ModuleDecl *mainModule, bool moduleIsPublic) {
+                            ModuleDecl *mainModule, bool moduleIsPublic,
+                            PrimarySpecificPaths PSPs) {
   FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (opts.InputsAndOutputs.getObjCHeaderOutputPath().empty())
+  StringRef outputPath = PSPs.SupplementaryOutputs.ObjCHeaderOutputPath;
+  if (outputPath.empty())
     return;
   (void)printAsObjC(opts.InputsAndOutputs.getObjCHeaderOutputPath(), mainModule,
                     opts.ImplicitObjCHeaderPath, moduleIsPublic);
@@ -1289,7 +1291,8 @@ static bool performCompileStepsPostSILGen(
   gatherInstructionCounts(SM.get());
   setMSFPrivateDiscriminator(IRGenOpts, MSF);
 
-  writeObjCHeader(Invocation, Instance.getMainModule(), moduleIsPublic);
+  writeObjCHeader(Invocation, Instance.getMainModule(), moduleIsPublic,
+                  SM.get()->getPSPs());
 
   if (auto r = emitSIBIFNeededAfterOptimizations(Invocation, SM.get(),
                                                  Instance.getASTContext(), MSF))
