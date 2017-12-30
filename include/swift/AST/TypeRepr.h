@@ -87,6 +87,11 @@ protected:
     NumComponents : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
+    : NumPadBits,
+    NumTypes : 32
+  );
+
   } Bits;
 
   TypeRepr(TypeReprKind K) {
@@ -779,24 +784,30 @@ private:
 /// \code
 ///   Foo & Bar
 /// \endcode
-class CompositionTypeRepr : public TypeRepr {
-  ArrayRef<TypeRepr *> Types;
+class CompositionTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
+  friend TrailingObjects;
   SourceLoc FirstTypeLoc;
   SourceRange CompositionRange;
 
-public:
   CompositionTypeRepr(ArrayRef<TypeRepr *> Types,
                       SourceLoc FirstTypeLoc,
                       SourceRange CompositionRange)
-    : TypeRepr(TypeReprKind::Composition), Types(Types),
-    FirstTypeLoc(FirstTypeLoc), CompositionRange(CompositionRange) {
+      : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
+        CompositionRange(CompositionRange) {
+    Bits.CompositionTypeRepr.NumTypes = Types.size();
+    std::uninitialized_copy(Types.begin(), Types.end(),
+                            getTrailingObjects<TypeRepr*>());
   }
 
-  ArrayRef<TypeRepr *> getTypes() const { return Types; }
+public:
+  ArrayRef<TypeRepr *> getTypes() const {
+    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+  }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
-  static CompositionTypeRepr *create(ASTContext &C,
+  static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
                                      SourceRange CompositionRange);

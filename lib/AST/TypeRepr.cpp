@@ -198,14 +198,14 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitCompositionTypeRepr(CompositionTypeRepr *T) {
   // Clone the protocols.
-  auto types = Ctx.Allocate<TypeRepr*>(T->getTypes().size());
-  for (unsigned argI : indices(types)) {
-    types[argI] = cast<TypeRepr>(visit(T->getTypes()[argI]));
+  SmallVector<TypeRepr*, 8> types;
+  types.reserve(T->getTypes().size());
+  for (auto &type : T->getTypes()) {
+    types.push_back(cast<TypeRepr>(visit(type)));
   }
 
-  return new (Ctx) CompositionTypeRepr(types,
-                                       T->getStartLoc(),
-                                       T->getCompositionRange());
+  return CompositionTypeRepr::create(Ctx, types, T->getStartLoc(),
+                                     T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -525,21 +525,21 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ")";
 }
 
-CompositionTypeRepr *
-CompositionTypeRepr::create(ASTContext &C,
-                            ArrayRef<TypeRepr *> Types,
-                            SourceLoc FirstTypeLoc,
-                            SourceRange CompositionRange) {
-  return new (C) CompositionTypeRepr(C.AllocateCopy(Types),
-                                     FirstTypeLoc, CompositionRange);
+CompositionTypeRepr *CompositionTypeRepr::create(const ASTContext &C,
+                                                 ArrayRef<TypeRepr *> Types,
+                                                 SourceLoc FirstTypeLoc,
+                                                 SourceRange CompositionRange) {
+  auto size = totalSizeToAlloc<TypeRepr*>(Types.size());
+  auto mem = C.Allocate(size, alignof(CompositionTypeRepr));
+  return new (mem) CompositionTypeRepr(Types, FirstTypeLoc, CompositionRange);
 }
 
 void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
-  if (Types.empty()) {
+  if (getTypes().empty()) {
     Printer << "Any";
   } else {
-    interleave(Types, [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts); },
+    interleave(getTypes(), [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts);},
                [&] { Printer << " & "; });
   }
 }
