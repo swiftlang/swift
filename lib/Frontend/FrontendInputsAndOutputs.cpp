@@ -220,6 +220,23 @@ void FrontendInputsAndOutputs::forEachInputProducingOutput(
       : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
+const InputFile *
+FrontendInputsAndOutputs::findAnyInputProducingSupplementaryOutput(
+    llvm::function_ref<bool(const InputFile &)> fn) const {
+  if (!hasInputs())
+    return nullptr;
+
+  if (!hasPrimaryInputs())
+    return fn(AllFiles[0]) ? &AllFiles[0] : nullptr;
+
+  for (auto &p : PrimaryInputs) {
+    const auto &f = AllFiles[p.second];
+    if (fn(f))
+      return &f;
+  }
+  return nullptr;
+}
+
 unsigned
 FrontendInputsAndOutputs::countOfFilesProducingSupplementaryOutput() const {
   return isWholeModule()
@@ -341,9 +358,11 @@ FrontendInputsAndOutputs::getReferenceDependenciesFilePath() const {
 const std::string &
 FrontendInputsAndOutputs::getSerializedDiagnosticsPath() const {
   // FIXME: This won't be right in batch mode.
-  return firstInputProducingSupplementaryOutput()
-      .supplementaryOutputs()
-      .SerializedDiagnosticsPath;
+  static const std::string empty;
+  return !hasInputs() ? empty
+                      : firstInputProducingSupplementaryOutput()
+                            .supplementaryOutputs()
+                            .SerializedDiagnosticsPath;
 }
 const std::string &FrontendInputsAndOutputs::getLoadedModuleTracePath() const {
   return supplementaryOutputPaths().LoadedModuleTracePath;
@@ -363,39 +382,51 @@ FrontendInputsAndOutputs::supplementaryOutputPaths() const {
 }
 
 bool FrontendInputsAndOutputs::hasDependenciesPath() const {
-  bool r = false;
-  forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputs().DependenciesFilePath.empty() || r;
-  });
-  return r;
+  return nullptr !=
+         findAnyInputProducingSupplementaryOutput(
+             [&](const InputFile &inp) -> bool {
+               return !inp.supplementaryOutputs().DependenciesFilePath.empty();
+             });
+}
+bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
+  return nullptr != findAnyInputProducingSupplementaryOutput(
+                        [&](const InputFile &inp) -> bool {
+                          return !inp.supplementaryOutputs()
+                                      .ReferenceDependenciesFilePath.empty();
+                        });
 }
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
-  bool r = false;
-  forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputs().ObjCHeaderOutputPath.empty() || r;
-  });
-  return r;
+  return nullptr !=
+         findAnyInputProducingSupplementaryOutput(
+             [&](const InputFile &inp) -> bool {
+               return !inp.supplementaryOutputs().ObjCHeaderOutputPath.empty();
+             });
 }
 bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
-  bool r = false;
-  forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputs().LoadedModuleTracePath.empty() || r;
-  });
-  return r;
+  return nullptr !=
+         findAnyInputProducingSupplementaryOutput(
+             [&](const InputFile &inp) -> bool {
+               return !inp.supplementaryOutputs().LoadedModuleTracePath.empty();
+             });
 }
 bool FrontendInputsAndOutputs::hasModuleOutputPath() const {
-  bool r = false;
-  forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputs().ModuleOutputPath.empty() || r;
-  });
-  return r;
+  return nullptr !=
+         findAnyInputProducingSupplementaryOutput(
+             [&](const InputFile &inp) -> bool {
+               return !inp.supplementaryOutputs().ModuleOutputPath.empty();
+             });
 }
 bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
-  bool r = false;
-  forEachInputProducingOutput([&](const InputFile &inp) -> void {
-    r = !inp.supplementaryOutputs().ModuleDocOutputPath.empty() || r;
-  });
-  return r;
+  return nullptr !=
+         findAnyInputProducingSupplementaryOutput(
+             [&](const InputFile &inp) -> bool {
+               return !inp.supplementaryOutputs().ModuleDocOutputPath.empty();
+             });
+}
+
+bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
+  return hasDependenciesPath() || hasReferenceDependenciesPath() ||
+         hasLoadedModuleTracePath();
 }
 
 PrimarySpecificPaths

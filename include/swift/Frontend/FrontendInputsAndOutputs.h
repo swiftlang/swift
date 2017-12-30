@@ -125,6 +125,10 @@ public:
   void forEachInputProducingOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
 
+  /// Does not find the FIRST primary, but searches in unspecified order.
+  const InputFile *findAnyInputProducingSupplementaryOutput(
+      llvm::function_ref<bool(const InputFile &)>) const;
+
   unsigned countOfFilesProducingSupplementaryOutput() const;
 
   const InputFile &firstInputProducingSupplementaryOutput() const;
@@ -209,10 +213,13 @@ private:
 
 public:
   bool hasDependenciesPath() const;
+  bool hasReferenceDependenciesPath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+
+  bool hasDependencyTrackerPath() const;
 };
 
 } // namespace swift

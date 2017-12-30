@@ -381,3 +381,7 @@ PrimarySpecificPaths
 FrontendOptions::getPSPsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPSPsForPrimary(filename);
 }
+
+bool FrontendOptions::hasDependencyTrackerPath() const {
+  return !IndexStorePath.empty() || InputsAndOutputs.hasDependencyTrackerPath();
+}
