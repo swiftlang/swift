@@ -44,7 +44,7 @@ class FrontendInputsAndOutputs {
   bool IsSingleThreadedWMO = false;
   
   /// Punt where needed to enable batch mode experiments.
-  bool IsBatchModeEnabled = false;
+  bool AreBatchModeChecksBypassed = false;
 
 public:
   FrontendInputsAndOutputs() = default;
@@ -187,9 +187,8 @@ public:
   /// Return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
-  
-  
-  bool isBatchModeEnabled() const { return IsBatchModeEnabled; }
+
+  bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
 
   PrimarySpecificPaths getPSPsForAtMostOnePrimary() const;
   PrimarySpecificPaths getPSPsForPrimary(StringRef) const;
@@ -209,7 +208,7 @@ private:
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 
-  void setBatchModeEnabled(bool bme) { IsBatchModeEnabled = bme; }
+  void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
 
 public:
   bool hasDependenciesPath() const;

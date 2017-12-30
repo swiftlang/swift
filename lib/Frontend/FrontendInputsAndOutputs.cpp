@@ -191,7 +191,7 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
 
 void FrontendInputsAndOutputs::
     assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled() const {
-  if (!isBatchModeEnabled())
+  if (!areBatchModeChecksBypassed())
     assertMustNotBeMoreThanOnePrimaryInput();
 }
 
