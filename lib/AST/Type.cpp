@@ -1045,7 +1045,7 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-void TypeBase::computeCanonicalType() {
+CanType TypeBase::computeCanonicalType() {
   assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
   TypeBase *Result = nullptr;
@@ -1223,6 +1223,7 @@ void TypeBase::computeCanonicalType() {
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
+  return CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {

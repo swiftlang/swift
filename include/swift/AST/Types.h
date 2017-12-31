@@ -400,7 +400,7 @@ public:
   bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
 
 private:
-  void computeCanonicalType();
+  CanType computeCanonicalType();
 
 public:
   /// getCanonicalType - Return the canonical version of this type, which has
@@ -408,9 +408,9 @@ public:
   CanType getCanonicalType() {
     if (isCanonical())
       return CanType(this);
-    if (!hasCanonicalTypeComputed())
-      computeCanonicalType();
-    return CanType(CanonicalType.get<TypeBase*>());
+    if (hasCanonicalTypeComputed())
+      return CanType(CanonicalType.get<TypeBase*>());
+    return computeCanonicalType();
   }
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
