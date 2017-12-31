@@ -235,7 +235,7 @@ internal func _digitASCII(
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-internal func _integerToString<T: FixedWidthInteger>(
+internal func _integerToString<T : FixedWidthInteger>(
   _ value: T, radix: Int, uppercase: Bool
 ) -> String {
   if value == 0 {
@@ -310,8 +310,11 @@ extension String {
     // FIXME(integers): support a more general BinaryInteger protocol
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     if T.bitWidth <= 64 {
-      self = _int64ToString(
-        Int64(value), radix: Int64(radix), uppercase: uppercase)
+      self = T.isSigned
+        ? _int64ToString(
+          Int64(value), radix: Int64(radix), uppercase: uppercase)
+        : _uint64ToString(
+          UInt64(value), radix: Int64(radix), uppercase: uppercase)
     } else {
       self = _integerToString(value, radix: radix, uppercase: uppercase)
     }
