@@ -3017,14 +3017,19 @@ namespace {
         = cs.getType(unwrappedSubExpr)->getAnyOptionalObjectType(calledOTK);
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
       if (calledOTK != OTK_None && inCtor->getFailability() == OTK_None) {
-        bool isError = (calledOTK == OTK_Optional);
+        bool isChaining;
+        auto *otherCtorRef = expr->getCalledConstructor(isChaining);
+        ConstructorDecl *ctor = otherCtorRef->getDecl();
+        assert(ctor);
+
+        // If the initializer we're calling is not declared as
+        // checked, it's an error.
+        bool isError =
+            !ctor->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 
         // If we're suppressing diagnostics, just fail.
         if (isError && SuppressDiagnostics)
           return nullptr;
-
-        bool isChaining;
-        auto *otherCtorRef = expr->getCalledConstructor(isChaining);
 
         auto &tc = cs.getTypeChecker();
         auto &ctx = tc.Context;
@@ -3042,7 +3047,6 @@ namespace {
           } else {
             // Give the user the option of adding '!' or making the enclosing
             // initializer failable.
-            ConstructorDecl *ctor = otherCtorRef->getDecl();
             tc.diagnose(otherCtorRef->getLoc(),
                         diag::delegate_chain_nonoptional_to_optional,
                         isChaining, ctor->getFullName());
