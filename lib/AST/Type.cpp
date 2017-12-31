@@ -108,17 +108,10 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
-  if (auto nominalTy = dyn_cast<NominalType>(*this))
-    return (GenericTypeDecl*)nominalTy->getDecl();
-  
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return (GenericTypeDecl*)boundTy->getDecl();
-  
-  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
-    return unboundTy->getDecl();
+  if (auto Ty = dyn_cast<AnyGenericType>(*this))
+    return Ty->getDecl();
   return nullptr;
 }
-
 
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
