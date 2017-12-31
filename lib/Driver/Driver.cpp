@@ -1065,6 +1065,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.CompilerMode = OutputInfo::Mode::StandardCompile;
     if (Args.hasArg(options::OPT_whole_module_optimization))
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+    if (Args.hasArg(options::OPT_batch_mode))
+      OI.CompilerMode = OutputInfo::Mode::BatchModeCompile;
     OI.CompilerOutputType = types::TY_Object;
   }
 
@@ -1352,28 +1354,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile: {
 
-    // If the user is importing a textual (.h) bridging header and we're in
-    // standard-compile (non-WMO) mode, we take the opportunity to precompile
-    // the header into a temporary PCH, and replace the import argument with the
-    // PCH in the subsequent frontend jobs.
-    JobAction *PCH = nullptr;
-    if (Args.hasFlag(options::OPT_enable_bridging_pch,
-                     options::OPT_disable_bridging_pch,
-                     true)) {
-      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
-        StringRef Value = A->getValue();
-        auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == types::TY_ObjCHeader) {
-          auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
-          StringRef PersistentPCHDir;
-          if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
-            PersistentPCHDir = A->getValue();
-          }
-          PCH = C.createAction<GeneratePCHJobAction>(HeaderInput,
-                                                     PersistentPCHDir);
-        }
-      }
-    }
+    JobAction *PCH = buildPrecompileAction(TC, C);
 
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
@@ -1467,6 +1448,11 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         llvm_unreachable("these types should never be inferred");
       }
     }
+    break;
+  }
+  case OutputInfo::Mode::BatchModeCompile: {
+    buildBatchModeAction(TC, OI, OutOfDateMap, C)
+        .split(AllModuleInputs, AllLinkerInputs);
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -1625,6 +1611,267 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       TopLevelActions.push_back(MergeModuleAction);
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
   }
+}
+
+Driver::ModuleAndLinkerInputs
+Driver::buildBatchModeAction(const ToolChain &TC, const OutputInfo &OI,
+                             const InputInfoMap *OutOfDateMap,
+                             Compilation &C) const {
+
+  std::vector<InputPair> SwiftInputs, SILSIBInputs, ModuleInputs, ObjectInputs;
+  if (segregateInputs(C, SwiftInputs, SILSIBInputs, ModuleInputs, ObjectInputs))
+    return ModuleAndLinkerInputs();
+
+  JobAction *PCH = SwiftInputs.empty() && SILSIBInputs.empty()
+                       ? nullptr
+                       : buildPrecompileAction(TC, C);
+
+  ModuleAndLinkerInputs allInputsResult;
+  allInputsResult
+      .append(buildBatchModeSwiftInputActions(SwiftInputs, OI, OutOfDateMap, C,
+                                              PCH))
+      .append(buildBatchModeSILSIBInputActions(SILSIBInputs, OI, OutOfDateMap,
+                                               C, PCH))
+      .append(buildBatchModeModuleInputActions(ModuleInputs, OI, C))
+      .append(buildBatchModeObjectInputActions(ObjectInputs, OI, C));
+
+  return buildBatchModeBackEndActions(allInputsResult, OI, C);
+}
+
+Driver::ModuleAndLinkerInputs Driver::buildBatchModeSwiftInputActions(
+    const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+    const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const {
+  std::vector<std::vector<InputPair>> batches =
+      separateInputsIntoBatches(Inputs, C);
+
+  ModuleAndLinkerInputs r;
+  for (auto &batch : batches)
+    r.append(
+        buildBatchModeInputActionsForOneBatch(batch, OI, OutOfDateMap, C, PCH));
+  return r;
+}
+
+std::vector<std::vector<InputPair>>
+Driver::separateInputsIntoBatches(const std::vector<InputPair> &Inputs,
+                                  Compilation &C) const {
+  const unsigned N = C.getNumberOfParallelCommands();
+  assert(N != 0);
+  std::vector<std::vector<InputPair>> batches;
+  for (unsigned i = 0; i < N; ++i)
+    batches.push_back(std::vector<InputPair>());
+  for (auto i : indices(Inputs))
+    batches[i % N].push_back(Inputs[i]);
+  return batches;
+}
+
+Driver::ModuleAndLinkerInputs Driver::buildBatchModeInputActionsForOneBatch(
+    const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+    const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const {
+  ModuleAndLinkerInputs r;
+  // xxx stolen from SingleCompilation case
+  // xxx FIXME dmu: what to do about input map and incrementality??? and the
+  // HandledHere?
+  if (Inputs.empty())
+    return r;
+  const bool isEmbeddingBitcode =
+      C.getArgs().hasArg(options::OPT_embed_bitcode);
+  if (isEmbeddingBitcode) {
+    // Make sure we can handle the inputs.
+    bool HandledHere = true;
+    for (const InputPair &Input : Inputs) {
+      types::ID InputType = Input.first;
+      if (!types::isPartOfSwiftCompilation(InputType)) {
+
+        HandledHere = false;
+        break;
+      }
+    }
+    if (!HandledHere)
+      llvm_unreachable("Not sure this can happen, because of seggregation pass "
+                       "& don't know what to do if it does.");
+  }
+  // Create a single CompileJobAction for all of the driver's inputs.
+  auto *CA = C.createAction<CompileJobAction>(OI.CompilerOutputType);
+  for (const InputPair &Input : Inputs) {
+    types::ID InputType = Input.first;
+    const Arg *InputArg = Input.second;
+
+    CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
+  }
+  r.LinkerInputs.push_back(CA);
+  (isEmbeddingBitcode ? r.BackendInputs : r.ModuleInputs).push_back(CA);
+  return r;
+}
+
+Driver::ModuleAndLinkerInputs Driver::buildBatchModeBackEndActions(
+    ModuleAndLinkerInputs &Inputs, const OutputInfo &OI, Compilation &C) const {
+  // We need a backend job for each output file
+  // of the compilation.
+  ModuleAndLinkerInputs r = Inputs.withoutBackEnd();
+
+  for (auto i : indices(Inputs.BackendInputs)) {
+    auto *BJA = C.createAction<BackendJobAction>(Inputs.BackendInputs[i],
+                                                 OI.CompilerOutputType, i);
+    r.LinkerInputs.push_back(BJA);
+  }
+  return r;
+}
+
+Driver::ModuleAndLinkerInputs Driver::buildBatchModeSILSIBInputActions(
+    const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+    const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const {
+  ModuleAndLinkerInputs r;
+  // FIX ME: factor with normal compation?
+  for (const InputPair &Input : Inputs) {
+    assert(types::isPartOfSwiftCompilation(Input.first));
+
+    CompileJobAction::InputInfo previousBuildState = {
+        CompileJobAction::InputInfo::NeedsCascadingBuild,
+        llvm::sys::TimePoint<>::min()};
+    if (OutOfDateMap)
+      previousBuildState = OutOfDateMap->lookup(Input.second);
+
+    Action *inputAction =
+        C.createAction<InputAction>(*Input.second, Input.first);
+    Action *compileAction = C.createAction<CompileJobAction>(
+        inputAction, types::TY_LLVM_BC, previousBuildState);
+    if (PCH)
+      cast<JobAction>(compileAction)->addInput(PCH);
+    r.ModuleInputs.push_back(compileAction);
+    const Action *backendAction = C.createAction<BackendJobAction>(
+        compileAction, OI.CompilerOutputType, 0);
+    r.LinkerInputs.push_back(backendAction);
+  }
+  return r;
+}
+Driver::ModuleAndLinkerInputs
+Driver::buildBatchModeModuleInputActions(const std::vector<InputPair> &Inputs,
+                                         const OutputInfo &OI,
+                                         Compilation &C) const {
+  ModuleAndLinkerInputs r;
+  for (const InputPair &Input : Inputs) {
+    Action *inputAction =
+        C.createAction<InputAction>(*Input.second, Input.first);
+    if (OI.ShouldGenerateModule && !OI.shouldLink()) {
+      // When generating a .swiftmodule as a top-level output (as opposed
+      // to, for example, linking an image), treat .swiftmodule files as
+      // inputs to a MergeModule action.
+      r.ModuleInputs.push_back(inputAction);
+      return r;
+    }
+    if (OI.shouldLink()) {
+      // Otherwise, if linking, pass .swiftmodule files as inputs to the
+      // linker, so that their debug info is available.
+      r.LinkerInputs.push_back(inputAction);
+      return r;
+    }
+    Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
+                   Input.second->getValue());
+  }
+  return r;
+}
+Driver::ModuleAndLinkerInputs
+Driver::buildBatchModeObjectInputActions(const std::vector<InputPair> &Inputs,
+                                         const OutputInfo &OI,
+                                         Compilation &C) const {
+  ModuleAndLinkerInputs r;
+  for (const InputPair &Input : Inputs) {
+    if (OI.shouldLink()) {
+      Action *inputAction =
+          C.createAction<InputAction>(*Input.second, Input.first);
+      r.LinkerInputs.push_back(inputAction);
+    } else
+      Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
+                     Input.second->getValue());
+  }
+  return r;
+}
+
+bool Driver::segregateInputs(Compilation &C, std::vector<InputPair> SwiftInputs,
+                             std::vector<InputPair> SILSIBInputs,
+                             std::vector<InputPair> ModuleInputs,
+                             std::vector<InputPair> ObjectInputs) const {
+  for (const InputPair &Input : C.getInputFiles()) {
+    switch (Input.first) {
+    case types::TY_Swift:
+      assert(types::isPartOfSwiftCompilation(Input.first));
+      SwiftInputs.push_back(Input);
+      break;
+
+    case types::TY_SIL:
+    case types::TY_SIB:
+      assert(types::isPartOfSwiftCompilation(Input.first));
+      SILSIBInputs.push_back(Input);
+      break;
+
+    case types::TY_SwiftModuleFile:
+    case types::TY_SwiftModuleDocFile:
+      ModuleInputs.push_back(Input);
+      break;
+
+    case types::TY_AutolinkFile:
+    case types::TY_Object:
+      // Object inputs are only okay if linking.
+      ObjectInputs.push_back(Input);
+      break;
+
+    case types::TY_Image:
+    case types::TY_dSYM:
+    case types::TY_Dependencies:
+    case types::TY_Assembly:
+    case types::TY_LLVM_IR:
+    case types::TY_LLVM_BC:
+    case types::TY_SerializedDiagnostics:
+    case types::TY_ObjCHeader:
+    case types::TY_ClangModuleFile:
+    case types::TY_SwiftDeps:
+    case types::TY_Remapping:
+    case types::TY_IndexData:
+    case types::TY_PCH:
+    case types::TY_ImportedModules:
+    case types::TY_TBD:
+    case types::TY_ModuleTrace:
+    case types::TY_OptRecord:
+      // We could in theory handle assembly or LLVM input, but let's not.
+      // FIXME: What about LTO?
+      Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
+                     Input.second->getValue());
+      return true;
+    case types::TY_RawSIB:
+    case types::TY_RawSIL:
+    case types::TY_Nothing:
+    case types::TY_INVALID:
+      llvm_unreachable("these types should never be inferred");
+    }
+  }
+  return false;
+}
+
+JobAction *Driver::buildPrecompileAction(const ToolChain &TC,
+                                         Compilation &C) const {
+  const DerivedArgList &Args = C.getArgs();
+  // If the user is importing a textual (.h) bridging header and we're in
+  // standard-compile (non-WMO) mode, we take the opportunity to precompile
+  // the header into a temporary PCH, and replace the import argument with the
+  // PCH in the subsequent frontend jobs.
+  JobAction *PCH = nullptr;
+  if (Args.hasFlag(options::OPT_enable_bridging_pch,
+                   options::OPT_disable_bridging_pch, true)) {
+    if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+      StringRef Value = A->getValue();
+      auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+      if (Ty == types::TY_ObjCHeader) {
+        auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
+        StringRef PersistentPCHDir;
+        if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
+          PersistentPCHDir = A->getValue();
+        }
+        PCH =
+            C.createAction<GeneratePCHJobAction>(HeaderInput, PersistentPCHDir);
+      }
+    }
+  }
+  return PCH;
 }
 
 bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
@@ -2032,6 +2279,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     if (isa<CompileJobAction>(JA)) {
       if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
         OutputMap = OFM->getOutputMapForSingleOutput();
+      } else if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+        assert(false && "driver buildJobsForAction 2043"); // xxx
       } else {
         OutputMap = OFM->getOutputMapForInput(BaseInput);
       }
@@ -2056,7 +2305,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
                                      C.getArgs(), AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
-      Output->addPrimaryOutput(OutputFile, Input);
+      Output->addPrimaryOutput(OutputFile, Input); // xxx
     };
     // Add an output file for each input action.
     for (const Action *A : InputActions) {
