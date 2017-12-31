@@ -22,9 +22,8 @@ func get<T>() -> T
 public func testArray() {
   let array: [Int] = get()
   takesConstRawPointer(array)
-  // CHECK: [[OWNER:%.+]] = unchecked_ref_cast
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]] : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
   // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
@@ -38,9 +37,8 @@ public func testArray() {
 public func testArrayToOptional() {
   let array: [Int] = get()
   takesOptConstRawPointer(array)
-  // CHECK: [[OWNER:%.+]] = unchecked_ref_cast
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]] : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
@@ -117,7 +115,8 @@ public func arrayLiteralPromotion() {
   takesConstRawPointer([41,42,43,44])
   
   // Stack allocate the array.
-  // CHECK: alloc_ref [stack] [tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
+  // TODO: When stdlib checks are enabled, this becomes heap allocated... :-(
+  // CHECK: alloc_ref {{.*}}[tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
   
   // Store the elements.
   // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 41
