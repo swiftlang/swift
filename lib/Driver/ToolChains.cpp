@@ -102,6 +102,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -211,6 +212,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   const char *FrontendModeOption = nullptr;
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     switch (context.Output.getPrimaryOutputType()) {
     case types::TY_Object:
@@ -329,6 +331,15 @@ ToolChain::constructInvocation(const CompileJobAction &job,
         }
       }
     }
+    break;
+  }
+  case OutputInfo::Mode::BatchModeCompile: {
+    // FIXME: do non-filelists? dmu
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getAllSourcesPath());
+    Arguments.push_back("-primary-filelist");
+    // xxx Arguments.push_back(context.getAllPrimariesPath());
+    assert(false && "driver constructInvocaiton 342"); // xxx
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -555,6 +566,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   const char *FrontendModeOption = nullptr;
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     switch (context.Output.getPrimaryOutputType()) {
     case types::TY_Object:
@@ -624,6 +636,10 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     const Job *Cmd = context.Inputs.front();
     Arguments.push_back(
       Cmd->getOutput().getPrimaryOutputFilename().c_str());
+    break;
+  }
+  case OutputInfo::Mode::BatchModeCompile: {
+    assert(false && "driver constructInvocation 642"); // xxx //xxx
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -1259,6 +1275,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
     addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile,
                     "-add_ast_path");
+  else if (context.OI.CompilerMode == OutputInfo::Mode::BatchModeCompile)
+    assert(false && "driver constructInvocation 1279"); // xxx //xxx
   else
     addPrimaryInputsOfType(Arguments, context.Inputs,
                            types::TY_SwiftModuleFile, "-add_ast_path");

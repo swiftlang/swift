@@ -619,6 +619,10 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def batch_mode : Flag<["-"], "batch-mode">,
+Flags<[FrontendOption, NoInteractiveOption]>,
+HelpText<"Try batch mode">;
+
 def wmo : Flag<["-"], "wmo">, Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
@@ -706,5 +710,6 @@ def index_store_path : Separate<["-"], "index-store-path">,
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
+
 
 include "FrontendOptions.td"

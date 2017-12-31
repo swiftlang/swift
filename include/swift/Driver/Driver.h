@@ -63,6 +63,9 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
+    /// A compilation using the new batch mode.
+    BatchModeCompile,
+
     /// Invoke the REPL
     REPL,
 
@@ -289,6 +292,62 @@ private:
   /// \param Args The arguments passed to the driver (excluding the path to the
   /// driver)
   void parseDriverKind(ArrayRef<const char *> Args);
+
+  struct ModuleAndLinkerInputs {
+    std::vector<const Action *> ModuleInputs;
+    std::vector<const Action *> LinkerInputs;
+    std::vector<const Action *> BackendInputs;
+
+    void split(SmallVectorImpl<const Action *> &moduleInputs,
+               SmallVectorImpl<const Action *> &linkerInputs) const {
+      for (const auto *a : ModuleInputs)
+        moduleInputs.push_back(a);
+      for (const auto *a : LinkerInputs)
+        linkerInputs.push_back(a);
+    }
+    ModuleAndLinkerInputs &append(ModuleAndLinkerInputs &&other) {
+      for (const auto *a : other.ModuleInputs)
+        ModuleInputs.push_back(a);
+      for (const auto *a : other.LinkerInputs)
+        LinkerInputs.push_back(a);
+      return *this;
+    }
+    ModuleAndLinkerInputs withoutBackEnd() {
+      return {ModuleInputs, LinkerInputs, std::vector<const Action *>()};
+    }
+  };
+
+  ModuleAndLinkerInputs buildBatchModeAction(const ToolChain &TC,
+                                             const OutputInfo &OI,
+                                             const InputInfoMap *OutOfDateMap,
+                                             Compilation &C) const;
+  JobAction *buildPrecompileAction(const ToolChain &TC, Compilation &C) const;
+
+  bool segregateInputs(Compilation &C, std::vector<InputPair> SwiftInputs,
+                       std::vector<InputPair> SILSIBInputs,
+                       std::vector<InputPair> ModuleInputs,
+                       std::vector<InputPair> ObjectInputs) const;
+  ModuleAndLinkerInputs buildBatchModeSwiftInputActions(
+      const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+      const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const;
+  ModuleAndLinkerInputs buildBatchModeSILSIBInputActions(
+      const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+      const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const;
+  ModuleAndLinkerInputs
+  buildBatchModeModuleInputActions(const std::vector<InputPair> &Inputs,
+                                   const OutputInfo &OI, Compilation &C) const;
+  ModuleAndLinkerInputs
+  buildBatchModeObjectInputActions(const std::vector<InputPair> &Inputs,
+                                   const OutputInfo &OI, Compilation &C) const;
+  std::vector<std::vector<InputPair>>
+  separateInputsIntoBatches(const std::vector<InputPair> &Inputs,
+                            Compilation &C) const;
+  ModuleAndLinkerInputs buildBatchModeInputActionsForOneBatch(
+      const std::vector<InputPair> &Inputs, const OutputInfo &OI,
+      const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const;
+  ModuleAndLinkerInputs buildBatchModeBackEndActions(ModuleAndLinkerInputs &,
+                                                     const OutputInfo &OI,
+                                                     Compilation &C) const;
 };
 
 } // end namespace driver
