@@ -23,6 +23,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS")
+endif()
+
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
