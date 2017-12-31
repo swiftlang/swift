@@ -195,6 +195,11 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
+static llvm::cl::opt<bool>
+EnableGuaranteedNormalArguments(
+    "enable-guaranteed-normal-arguments", llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc("Assume that the input module was compiled with -enable-guaranteed-normal-arguments enabled"));
+
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
 /// will emit a diagnostic.
@@ -315,6 +320,8 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
+  SILOpts.EnableGuaranteedNormalArguments =
+    EnableGuaranteedNormalArguments;
 
   if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
