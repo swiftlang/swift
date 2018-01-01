@@ -94,6 +94,8 @@ public:
   void inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
 
 private:
+  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
+
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 

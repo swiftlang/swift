@@ -1,0 +1,81 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining -enable-sil-ownership | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class C {
+  var i = 0
+}
+
+sil [transparent] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Int {
+bb(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.i
+  %2 = load [trivial] %1 : $*Int
+  return %2 : $Int
+}
+
+// CHECK-LABEL: sil @callerWithOwned : $@convention(thin) (@owned C) -> Int {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
+// CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Int
+// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   destroy_value %0 : $C
+// CHECK:   return [[VAL]] : $Int
+// CHECK-LABEL: } // end sil function 'callerWithOwned'
+sil @callerWithOwned : $@convention(thin) (@owned C) -> Int {
+bb(%0 : @owned $C):
+  %fn = function_ref @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Int
+  %call = apply %fn(%0) : $@convention(thin) (@guaranteed C) -> Int
+  destroy_value %0 : $C
+  return %call : $Int
+}
+
+struct MyError : Error {}
+
+sil [transparent] @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Int, @error Error) {
+bb(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.i
+  %2 = load [trivial] %1 : $*Int
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct_extract %2 : $Int, #Int._value
+  %5 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %5, bb1, bb2
+
+bb1:
+  %6 = alloc_existential_box $Error, $MyError
+  throw %6 : $Error
+
+bb2:
+  return %2 : $Int
+}
+
+// CHECK-LABEL: sil @callerWithThrow : $@convention(thin) (@owned C) -> (Int, @error Error) {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
+// CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Int
+// CHECK: bb{{.*}}([[RET:%.*]] : @trivial $Int):
+// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   destroy_value %0 : $C
+// CHECK:   return [[RET]] : $Int
+// CHECK: bb{{.*}}([[ERR:%.*]] : @owned $Error):
+// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   destroy_value %0 : $C
+// CHECK:   throw [[ERR]] : $Error
+// CHECK-LABEL: } // end sil function 'callerWithThrow'
+sil @callerWithThrow : $@convention(thin) (@owned C) -> (Int, @error Error) {
+bb(%0 : @owned $C):
+  %fn = function_ref @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Int, @error Error)
+  try_apply %fn(%0) : $@convention(thin) (@guaranteed C) -> (Int, @error Error), normal bb1, error bb2
+
+bb1(%4 : @trivial $Int):
+  destroy_value %0 : $C
+  return %4 : $Int
+
+bb2(%5 : @owned $Error):
+  destroy_value %0 : $C
+  throw %5 : $Error
+}

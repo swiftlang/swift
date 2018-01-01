@@ -86,21 +86,30 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   auto IBI = std::next(SILFunction::iterator(AI.getParent()));
   InsertBeforeBB = IBI != F.end() ? &*IBI : nullptr;
 
-  // Clear argument map and map ApplyInst arguments to the arguments of the
-  // callee's entry block.
-  ValueMap.clear();
-  assert(CalleeEntryBB->args_size() == Args.size() &&
-         "Unexpected number of arguments to entry block of function?");
-  auto BAI = CalleeEntryBB->args_begin();
-  for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
-    ValueMap.insert(std::make_pair(*BAI, *AI));
-
   BBMap.clear();
   // Do not allow the entry block to be cloned again
   SILBasicBlock::iterator InsertPoint =
-    SILBasicBlock::iterator(AI.getInstruction());
+      SILBasicBlock::iterator(AI.getInstruction());
   BBMap.insert(std::make_pair(CalleeEntryBB, AI.getParent()));
   getBuilder().setInsertionPoint(InsertPoint);
+
+  // Clear argument map and map ApplyInst arguments to the arguments of the
+  // callee's entry block.
+  ValueMap.clear();
+  assert(CalleeFunction->getArguments().size() == Args.size()
+         && "Unexpected number of callee arguments.");
+  auto calleeConv = CalleeFunction->getConventions();
+  for (unsigned argIdx = 0, endIdx = Args.size(); argIdx < endIdx; ++argIdx) {
+    SILValue callArg = Args[argIdx];
+    // Insert begin/end borrow for guaranteed arguments.
+    if (argIdx >= calleeConv.getSILArgIndexOfFirstParam()
+        && calleeConv.getParamInfoForSILArg(argIdx).isGuaranteed()) {
+      callArg = borrowFunctionArgument(callArg, AI);
+    }
+    auto *calleeArg = CalleeFunction->getArgument(argIdx);
+    ValueMap.insert(std::make_pair(calleeArg, callArg));
+  }
+
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
   visitSILBasicBlock(CalleeEntryBB);
@@ -177,6 +186,26 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // but remaps basic blocks and values.
     visit(BI->first->getTerminator());
   }
+}
+
+SILValue SILInliner::borrowFunctionArgument(SILValue callArg,
+                                            FullApplySite AI) {
+  if (!AI.getFunction()->hasQualifiedOwnership()
+      || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
+    return callArg;
+  }
+  auto *borrow = getBuilder().createBeginBorrow(AI.getLoc(), callArg);
+  if (auto tryAI = dyn_cast<TryApplyInst>(AI)) {
+    SILBuilder returnBuilder(tryAI->getNormalBB()->begin());
+    returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
+
+    SILBuilder throwBuilder(tryAI->getErrorBB()->begin());
+    throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
+  } else {
+    SILBuilder returnBuilder(std::next(AI.getInstruction()->getIterator()));
+    returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
+  }
+  return borrow;
 }
 
 void SILInliner::visitDebugValueInst(DebugValueInst *Inst) {
