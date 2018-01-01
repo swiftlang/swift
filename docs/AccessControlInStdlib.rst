@@ -16,6 +16,10 @@ and is compiled in "non-resilient" mode with inlining into user code; thus, all
 stdlib symbols are considered ABI and stdlib clients should be recompiled after
 *any* change to the stdlib.
 
+.. warning:: This document has not been updated for SE-0025 and SE-0117.
+  (These proposals modify the access level of ``private`` and add 
+  ``fileprivate`` and ``open``.)
+
 `public`
 ========
 
