@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -O -sil-verify-all -emit-sil  %s | %FileCheck %s
-// EQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
 
