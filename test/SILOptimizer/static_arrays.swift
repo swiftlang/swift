@@ -159,3 +159,33 @@ print(gg!)
 print(overwriteLiteral(0))
 // CHECK-OUTPUT-NEXT: [1, 0, 3]
 print(overwriteLiteral(1))
+
+
+
+
+
+
+public class SwiftClass {}
+
+@inline(never)
+func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
+  print(ptr, len)  // Use the arguments somehow so they don't get removed.
+}
+
+// This should be a single basic block, and the array should end up being stack
+// allocated.
+//
+// CHECK-LABEL: sil @{{.*}}passArrayOfClasses
+// CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
+// CHECK-NOT: bb1(
+// CHECK: alloc_ref [stack] [tail_elems $SwiftClass *
+// CHECK-NOT: bb1(
+// CHECK:   return
+public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
+  let arr = [a, b, c]
+  takeUnsafePointer(ptr: arr, len: arr.count)
+}
+
+
+
+

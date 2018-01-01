@@ -127,6 +127,7 @@ public:
   OPERANDALIAS_MEMBEHAVIOR_INST(DeinitExistentialAddrInst)
   OPERANDALIAS_MEMBEHAVIOR_INST(DeallocStackInst)
   OPERANDALIAS_MEMBEHAVIOR_INST(FixLifetimeInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(ClassifyBridgeObjectInst)
 #undef OPERANDALIAS_MEMBEHAVIOR_INST
 
   // Override simple behaviors where MayHaveSideEffects is too general and

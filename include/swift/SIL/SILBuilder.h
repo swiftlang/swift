@@ -1507,6 +1507,8 @@ public:
       return;
     createFixLifetime(Loc, Operand);
   }
+  ClassifyBridgeObjectInst *createClassifyBridgeObject(SILLocation Loc,
+                                                       SILValue value);
   MarkDependenceInst *createMarkDependence(SILLocation Loc, SILValue value,
                                            SILValue base) {
     return insert(new (getModule()) MarkDependenceInst(

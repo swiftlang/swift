@@ -103,6 +103,17 @@ SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
                                    ResultTy, getFunction(), OpenedArchetypes));
 }
 
+ClassifyBridgeObjectInst *
+SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
+  auto &ctx = getASTContext();
+  Type int1Ty = BuiltinIntegerType::get(1, ctx);
+  Type resultTy = TupleType::get({ int1Ty, int1Ty }, ctx);
+  auto ty = SILType::getPrimitiveObjectType(resultTy->getCanonicalType());
+  return insert(new (getModule())
+                ClassifyBridgeObjectInst(getSILDebugLocation(Loc), value, ty));
+}
+
+
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
 SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
