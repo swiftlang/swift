@@ -36,9 +36,6 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   assert(canInlineFunction(AI) &&
          "Asked to inline function that is unable to be inlined?!");
 
-  // Setup the callee function.
-  CalleeFunction = &Original;
-
   SILFunction &F = getBuilder().getFunction();
   assert(AI.getFunction() && AI.getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
