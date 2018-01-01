@@ -1097,7 +1097,7 @@ visitFullApply(FullApplySite apply) {
     return {true, UseLifetimeConstraint::MustBeLive};
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    return visitApplyParameter(ValueOwnershipKind::Any,
                                UseLifetimeConstraint::MustBeLive);
   // The following conventions should take address types.
   case ParameterConvention::Indirect_Inout:
