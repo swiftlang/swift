@@ -1464,7 +1464,7 @@ visitInitExistentialRefInst(InitExistentialRefInst *IER) {
       // in place, because we need the result type of "%c" but the operand list
       // of "%a", and the number of dependent types could disagree.
       return Builder.createInitExistentialRef(IER->getLoc(), IER->getType(),
-                                              IER2->getFormalConcreteType(),
+                                              IER->getFormalConcreteType(),
                                               IER2->getOperand(),
                                               IER->getConformances());
       
