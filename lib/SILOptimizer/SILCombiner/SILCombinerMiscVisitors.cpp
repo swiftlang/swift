@@ -1437,40 +1437,16 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *MDI) {
       eraseInstFromFunction(*ier);
     return MDI;
   }
-  
-  return nullptr;
-}
 
-
-SILInstruction *SILCombiner::
-visitInitExistentialRefInst(InitExistentialRefInst *IER) {
-  // Arrays in particular end up with chains of init/open existential refs,
-  // which convert back and forth between a class reference and an existential
-  // reference e.g. like this:
-  //
-  // %a = init_existential_ref %x : $_ContiguousArrayStorageBase :
-  //                                $_ContiguousArrayStorageBase, $_NSArrayCore
-  // %b = open_existential_ref %a : $_NSArrayCore to
-  //                                $@opened("EA85...") _NSArrayCore
-  //
-  // %c = init_existential_ref %b : $@opened("EA85...") _NSArrayCore :
-  //                                $@opened("EA85...") _NSArrayCore, $AnyObject
-  // we can simplify this by having %c initialize itself from the %x reference
-  // directly.
-  if (auto *ORE = dyn_cast<OpenExistentialRefInst>(IER->getOperand())) {
-    if (auto *IER2 = dyn_cast<InitExistentialRefInst>(ORE->getOperand())) {
-      
-      // We create a new instruction, instead of modifying the existing one
-      // in place, because we need the result type of "%c" but the operand list
-      // of "%a", and the number of dependent types could disagree.
-      return Builder.createInitExistentialRef(IER->getLoc(), IER->getType(),
-                                              IER->getFormalConcreteType(),
-                                              IER2->getOperand(),
-                                              IER->getConformances());
-      
-    }
+  // Conversions from a class to AnyObject also happen a lot, we can just depend
+  // on the class reference.
+  if (auto oeri = dyn_cast<OpenExistentialRefInst>(MDI->getBase())) {
+    MDI->setBase(oeri->getOperand());
+    if (oeri->use_empty())
+      eraseInstFromFunction(*oeri);
+    return MDI;
   }
-  
+
   return nullptr;
 }
 
