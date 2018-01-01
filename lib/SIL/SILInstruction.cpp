@@ -765,6 +765,9 @@ namespace {
     bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
       return true;
     }
+    bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
+      return true;
+    }
     bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
       return true;
     }

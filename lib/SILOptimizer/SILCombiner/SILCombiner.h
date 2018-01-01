@@ -211,6 +211,7 @@ public:
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
+  SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *visitUnconditionalCheckedCastInst(
                     UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
@@ -242,6 +243,8 @@ public:
   SILInstruction *visitEnumInst(EnumInst *EI);
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
+  SILInstruction *visitInitExistentialRefInst(InitExistentialRefInst *IER);
+  SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
 
   /// Instruction visitor helpers.
