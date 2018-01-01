@@ -5426,6 +5426,12 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
       Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
   (void)resultType->getAnyOptionalObjectType(initOptionality);
 
+  // Update the failability appropriately based on the imported method type.
+  if (isIUO) {
+    assert(initOptionality != OTK_None);
+    initOptionality = OTK_ImplicitlyUnwrappedOptional;
+  }
+
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
       initOptionality, /*FailabilityLoc=*/SourceLoc(),
@@ -5443,8 +5449,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
-  Impl.recordForceUnwrapForDecl(result, initOptionality ==
-                                            OTK_ImplicitlyUnwrappedOptional);
+  Impl.recordForceUnwrapForDecl(result, isIUO);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5952,6 +5957,12 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   auto oldFnType = type->castTo<AnyFunctionType>();
   OptionalTypeKind failability;
   (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
+
+  // Update the failability appropriately based on the imported method type.
+  if (isIUO) {
+    assert(failability != OTK_None);
+    failability = OTK_ImplicitlyUnwrappedOptional;
+  }
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
