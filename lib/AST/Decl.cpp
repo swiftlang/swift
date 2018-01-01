@@ -1654,16 +1654,26 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 }
 
 bool swift::conflicting(const OverloadSignature& sig1,
-                        const OverloadSignature& sig2) {
+                        const OverloadSignature& sig2,
+                        bool skipProtocolExtensionCheck) {
   // A member of a protocol extension never conflicts with a member of a
   // protocol.
-  if (sig1.InProtocolExtension != sig2.InProtocolExtension)
+  if (!skipProtocolExtensionCheck &&
+      sig1.InProtocolExtension != sig2.InProtocolExtension)
     return false;
 
   // If the base names are different, they can't conflict.
   if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
     return false;
-  
+
+  // If one is an operator and the other is not, they can't conflict.
+  if (sig1.UnaryOperator != sig2.UnaryOperator)
+    return false;
+
+  // If one is an instance and the other is not, they can't conflict.
+  if (sig1.IsInstanceMember != sig2.IsInstanceMember)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -1671,10 +1681,7 @@ bool swift::conflicting(const OverloadSignature& sig1,
              (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
   }
   
-  return sig1.Name == sig2.Name &&
-         sig1.InterfaceType == sig2.InterfaceType &&
-         sig1.UnaryOperator == sig2.UnaryOperator &&
-         sig1.IsInstanceMember == sig2.IsInstanceMember;
+  return sig1.Name == sig2.Name;
 }
 
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
@@ -1791,63 +1798,68 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.Name = getFullName();
   signature.InProtocolExtension
     = getDeclContext()->getAsProtocolExtensionContext();
+  signature.IsInstanceMember = isInstanceMember();
+  signature.IsProperty = isa<VarDecl>(this);
 
-  // Functions, initializers, and de-initializers include their
-  // interface types in their signatures as well as whether they are
-  // instance members.
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
-    signature.InterfaceType =
-        mapSignatureFunctionType(
-            getASTContext(), getInterfaceType(),
-            /*topLevelFunction=*/true,
-            /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
-            /*isInitializer=*/isa<ConstructorDecl>(afd),
-             afd->getNumParameterLists())->getCanonicalType();
-
-    signature.IsInstanceMember = isInstanceMember();
-    // Unary operators also include prefix/postfix.
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      if (func->isUnaryOperator()) {
-        signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
-      }
-    }
-  } else if (isa<SubscriptDecl>(this)) {
-    signature.InterfaceType = getInterfaceType()->getCanonicalType();
-
-    // If the subscript occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
-      if (auto genericSig = ext->getGenericSignature()) {
-        if (auto funcTy = signature.InterfaceType->getAs<AnyFunctionType>()) {
-          signature.InterfaceType
-            = GenericFunctionType::get(genericSig,
-                                       funcTy->getParams(),
-                                       funcTy->getResult(),
-                                       funcTy->getExtInfo())
-                ->getCanonicalType();
-        }
-      }
-    }
-  } else if (isa<VarDecl>(this)) {
-    signature.IsProperty = true;
-    signature.IsInstanceMember = isInstanceMember();
-
-    // If the property occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
-      if (auto genericSig = ext->getGenericSignature()) {
-        ASTContext &ctx = getASTContext();
-        signature.InterfaceType
-          = GenericFunctionType::get(genericSig,
-                                     TupleType::getEmpty(ctx),
-                                     TupleType::getEmpty(ctx),
-                                     AnyFunctionType::ExtInfo())
-              ->getCanonicalType();
-      }
+  if (auto func = dyn_cast<FuncDecl>(this)) {
+    if (func->isUnaryOperator()) {
+      signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
   }
 
   return signature;
+}
+
+CanType ValueDecl::getOverloadSignatureType() const {
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
+    return mapSignatureFunctionType(
+                           getASTContext(), getInterfaceType(),
+                           /*topLevelFunction=*/true,
+                           /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
+                           /*isInitializer=*/isa<ConstructorDecl>(afd),
+                           afd->getNumParameterLists())->getCanonicalType();
+  }
+
+  if (isa<SubscriptDecl>(this)) {
+    CanType interfaceType = getInterfaceType()->getCanonicalType();
+
+    // If the subscript declaration occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+    if (!ext) return interfaceType;
+
+    auto genericSig = ext->getGenericSignature();
+    if (!genericSig) return interfaceType;
+
+    if (auto funcTy = interfaceType->getAs<AnyFunctionType>()) {
+      return GenericFunctionType::get(genericSig,
+                                      funcTy->getParams(),
+                                      funcTy->getResult(),
+                                      funcTy->getExtInfo())
+              ->getCanonicalType();
+    }
+
+    return interfaceType;
+  }
+
+  if (isa<VarDecl>(this)) {
+    // If the variable declaration occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+    if (!ext) return CanType();
+
+    auto genericSig = ext->getGenericSignature();
+    if (!genericSig) return CanType();
+
+    ASTContext &ctx = getASTContext();
+    return GenericFunctionType::get(genericSig,
+                                    TupleType::getEmpty(ctx),
+                                    TupleType::getEmpty(ctx),
+                                    AnyFunctionType::ExtInfo())
+             ->getCanonicalType();
+  }
+
+  return CanType();
 }
 
 void ValueDecl::setIsObjC(bool Value) {
