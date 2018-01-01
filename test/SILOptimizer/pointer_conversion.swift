@@ -116,7 +116,7 @@ public func arrayLiteralPromotion() {
   
   // Stack allocate the array.
   // TODO: When stdlib checks are enabled, this becomes heap allocated... :-(
-  // CHECK: alloc_ref [stack] [tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
+  // CHECK: alloc_ref {{.*}} [tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
   
   // Store the elements.
   // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 41
