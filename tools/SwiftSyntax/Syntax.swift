@@ -148,7 +148,7 @@ extension Syntax: Hashable {
   }
   /// Use reference value as the hashValue for this Syntax
   public var hashValue: Int {
-    return ObjectIdentifier(self).hashValue
+    return ObjectIdentifier(data).hashValue
   }
 }
 
