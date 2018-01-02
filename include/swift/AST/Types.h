@@ -446,7 +446,9 @@ public:
   template <typename T>
   T *getAs() {
     static_assert(!isSugaredType<T>(), "getAs desugars types");
-    return dyn_cast<T>(getDesugaredType());
+    auto Ty = getDesugaredType();
+    SWIFT_ASSUME(Ty != nullptr);
+    return dyn_cast<T>(Ty);
   }
 
   template <typename T>
