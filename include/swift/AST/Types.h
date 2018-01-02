@@ -3943,40 +3943,69 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
 
-/// A type with a special syntax that is always sugar for a library type.
+/// A type with a special syntax that is always sugar for a library type. The
+/// library type may have multiple base types. For unary syntax sugar, see
+/// UnarySyntaxSugarType.
 ///
-/// The prime examples are arrays ([T] -> Array<T>) and
-/// optionals (T? -> Optional<T>).
+/// The prime examples are:
+/// Arrays: [T] -> Array<T>
+/// Optionals: T? -> Optional<T>
+/// Dictionaries: [K : V]  -> Dictionary<K, V>
 class SyntaxSugarType : public TypeBase {
-  Type Base;
   llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
+
+  Type getImplementationTypeSlow();
 
 protected:
   // Syntax sugar types are never canonical.
-  SyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
-                  RecursiveTypeProperties properties)
-    : TypeBase(K, nullptr, properties), Base(base), ImplOrContext(&ctx) {}
+  SyntaxSugarType(TypeKind K, const ASTContext &ctx,
+                     RecursiveTypeProperties properties)
+    : TypeBase(K, nullptr, properties), ImplOrContext(&ctx) {}
 
 public:
-  Type getBaseType() const {
-    return Base;
-  }
-
   TypeBase *getSinglyDesugaredType();
 
-  Type getImplementationType();
+  Type getImplementationType() {
+    if (ImplOrContext.is<Type>())
+      return ImplOrContext.get<Type>();
+    return getImplementationTypeSlow();
+  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SyntaxSugarType &&
            T->getKind() <= TypeKind::Last_SyntaxSugarType;
   }
 };
+
+/// A type with a special syntax that is always sugar for a library type that
+/// wraps a single other type.
+///
+/// The prime examples are arrays ([T] -> Array<T>) and
+/// optionals (T? -> Optional<T>).
+class UnarySyntaxSugarType : public SyntaxSugarType {
+  Type Base;
+
+protected:
+  UnarySyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
+                       RecursiveTypeProperties properties)
+    : SyntaxSugarType(K, ctx, properties), Base(base) {}
+
+public:
+  Type getBaseType() const {
+    return Base;
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_UnarySyntaxSugarType &&
+           T->getKind() <= TypeKind::Last_UnarySyntaxSugarType;
+  }
+};
   
 /// The type [T], which is always sugar for a library type.
-class ArraySliceType : public SyntaxSugarType {
+class ArraySliceType : public UnarySyntaxSugarType {
   ArraySliceType(const ASTContext &ctx, Type base,
                  RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::ArraySlice, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::ArraySlice, ctx, base, properties) {}
 
 public:
   /// Return a uniqued array slice type with the specified base type.
@@ -3988,10 +4017,10 @@ public:
 };
 
 /// The type T?, which is always sugar for a library type.
-class OptionalType : public SyntaxSugarType {
+class OptionalType : public UnarySyntaxSugarType {
   OptionalType(const ASTContext &ctx,Type base,
                RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::Optional, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::Optional, ctx, base, properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
@@ -4014,10 +4043,11 @@ public:
 };
 
 /// The type T!, which is always sugar for a library type.
-class ImplicitlyUnwrappedOptionalType : public SyntaxSugarType {
+class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
   ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
+                           properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
@@ -4035,17 +4065,16 @@ public:
 /// \code
 /// var dict: [String : Int] = ["hello" : 0, "world" : 1]
 /// \endcode
-class DictionaryType : public TypeBase {
+class DictionaryType : public SyntaxSugarType {
   Type Key;
   Type Value;
-  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
 
 protected:
   // Syntax sugar types are never canonical.
   DictionaryType(const ASTContext &ctx, Type key, Type value,
                  RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Dictionary, nullptr, properties), 
-      Key(key), Value(value), ImplOrContext(&ctx) {}
+    : SyntaxSugarType(TypeKind::Dictionary, ctx, properties), 
+      Key(key), Value(value) {}
 
 public:
   /// Return a uniqued dictionary type with the specified key and value types.
@@ -4053,10 +4082,6 @@ public:
 
   Type getKeyType() const { return Key; }
   Type getValueType() const { return Value; }
-
-  TypeBase *getSinglyDesugaredType();
-
-  Type getImplementationType();
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Dictionary;
