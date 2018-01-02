@@ -2385,13 +2385,13 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift2_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift2_protocol_conformances";
+    sectionName = "swift5_protocol_conformances";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2prtc$B";
+    sectionName = ".sw5prtc$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "

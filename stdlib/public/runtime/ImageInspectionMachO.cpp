@@ -31,7 +31,7 @@ using namespace swift;
 namespace {
 /// The Mach-O section name for the section containing protocol conformances.
 /// This lives within SEG_TEXT.
-constexpr const char ProtocolConformancesSection[] = "__swift2_proto";
+constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeMetadataRecordSection[] = "__swift2_types";
@@ -46,7 +46,7 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   using mach_header_platform = mach_header;
 #endif
   
-  // Look for a __swift2_proto section.
+  // Look for a __swift5_proto section.
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),

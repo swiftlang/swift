@@ -41,7 +41,7 @@ void swift::initializeProtocolConformanceLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
     const swift::MetadataSections::Range &conformances =
-        sections->swift2_protocol_conformances;
+        sections->swift5_protocol_conformances;
     if (conformances.length)
       addImageProtocolConformanceBlockCallback(reinterpret_cast<void *>(conformances.start),
                                                conformances.length);
@@ -74,7 +74,7 @@ void swift_addNewDSOImage(const void *addr) {
 
   record(sections);
 
-  const auto &protocol_conformances = sections->swift2_protocol_conformances;
+  const auto &protocol_conformances = sections->swift5_protocol_conformances;
   const void *conformances =
       reinterpret_cast<void *>(protocol_conformances.start);
   if (protocol_conformances.length)
