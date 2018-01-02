@@ -22,7 +22,7 @@ public class Syntax: CustomStringConvertible {
 
   /// The root of the tree this node is currently in.
   internal let _root: SyntaxData
-  
+
   /// The data backing this node.
   /// - note: This is unowned, because the reference to the root data keeps it
   ///         alive. This means there is an implicit relationship -- the data
@@ -69,7 +69,7 @@ public class Syntax: CustomStringConvertible {
   public var isExpr: Bool {
     return raw.kind.isExpr
   }
-  
+
   /// Whether or not this node represents a Declaration.
   public var isDecl: Bool {
     return raw.kind.isDecl
@@ -105,7 +105,7 @@ public class Syntax: CustomStringConvertible {
   public var root: Syntax {
     return Syntax.make(root: _root,  data: _root)
   }
-  
+
   /// The sequence of indices that correspond to child nodes that are not
   /// missing.
   ///
@@ -141,10 +141,14 @@ extension Syntax: TextOutputStreamable {
   }
 }
 
-extension Syntax: Equatable {
+extension Syntax: Hashable {
   /// Determines if two nodes are equal to each other.
   public static func ==(lhs: Syntax, rhs: Syntax) -> Bool {
-    return lhs.data === rhs.data
+    return lhs.hashValue == rhs.hashValue
+  }
+  /// Use reference value as the hashValue for this Syntax
+  public var hashValue: Int {
+    return ObjectIdentifier(data).hashValue
   }
 }
 
