@@ -14,11 +14,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CTensorFlow
+
+// The C type is TF_TensorHandle*
+public typealias CTensorHandle = OpaquePointer?
+
 // This corresponds to the TensorHandle class in TF eager C API.
 public class AnyTensorHandle {
-  // TODO(hongm): replace this dummy impl with something like
-  // UnsafePointer<TF_TensorHandle>
   // FIXME: Implement in terms of a TensorFlow TensorHandle, using the C API.
+  // TODO(hongm): Assess whether to avoid wrapping an optional here.
+  public let cTensorHandle: CTensorHandle
+
+  public init(cTensorHandle: CTensorHandle) {
+    self.cTensorHandle = cTensorHandle
+  }
+
+  deinit {
+    TFE_DeleteTensorHandle(cTensorHandle)
+  }
 }
 
 /// TensorHandle<T> is the type used by "ops" and the #tfop() syntax
@@ -46,8 +59,3 @@ extension TensorHandle : CustomPlaygroundQuickLookable {
   }
 }
 #endif
-
-
-
-
-
