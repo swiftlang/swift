@@ -4617,6 +4617,19 @@ pointer_to_thin_function
 
 TODO
 
+classify_bridge_object
+``````````````````````
+::
+
+  sil-instruction ::= 'classify_bridge_object' sil-operand
+
+  %1 = classify_bridge_object %0 : $Builtin.BridgeObject
+  // %1 will be of type (Builtin.Int1, Builtin.Int1)
+
+Decodes the bit representation of the specified ``Builtin.BridgeObject`` value,
+returning two bits: the first indicates whether the object is an Objective-C
+object, the second indicates whether it is an Objective-C tagged pointer value.
+
 ref_to_bridge_object
 ````````````````````
 ::
