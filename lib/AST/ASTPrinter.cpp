@@ -3381,8 +3381,6 @@ public:
 
     if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
       T = sugarType->getImplementationType();
-    else if (auto dictType = dyn_cast<DictionaryType>(T.getPointer()))
-      T = dictType->getImplementationType();
 
     TypePrinter(Printer, innerOptions).visit(T);
   }
