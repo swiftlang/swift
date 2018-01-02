@@ -2472,8 +2472,7 @@ namespace {
       B.addInt32(VTableOffset / IGM.getPointerSize());
       B.addInt32(VTableSize);
 
-      if (doesClassMetadataRequireDynamicInitialization(IGM, Target))
-        addVTableEntries(Target);
+      addVTableEntries(Target);
 
       // TODO: Emit reflection metadata for virtual methods
     }
