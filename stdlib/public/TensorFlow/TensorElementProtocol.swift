@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 public protocol TensorElementProtocol {
 }
 

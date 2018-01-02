@@ -1,4 +1,4 @@
-//===-- TensorCore.swift --------------------------------------*- swift -*-===//
+//===-- TensorHandle.swift ------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,16 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TensorHandle type and the primitive Tensor "op"
-// functions, in a simple and predictable style that can be mapped onto
-// TensorFlow ops.
+// This file defines the TensorHandle and AnyTensorHandle types.
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
-public class TensorHandle<T: TensorElementProtocol> {
+// This corresponds to the TensorHandle class in TF eager C API.
+public class AnyTensorHandle {
+  // TODO(hongm): replace this dummy impl with something like
+  // UnsafePointer<TF_TensorHandle>
   // FIXME: Implement in terms of a TensorFlow TensorHandle, using the C API.
+}
+
+/// TensorHandle<T> is the type used by "ops" and the #tfop() syntax
+/// specifically.  It includes an element type, which the tf-compiler internals
+/// depend on to know what the dtype of params are when they are extracted out
+/// into a tensor program.
+public class TensorHandle<T: TensorElementProtocol> : AnyTensorHandle {
 }
 
 // For "print", REPL, and Playgrounds integeration, we'll eventually want to
