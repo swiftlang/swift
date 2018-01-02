@@ -2338,6 +2338,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.create##ID(InstLoc, Val, atomicity);                         \
   } break;
 
+    UNARY_INSTRUCTION(ClassifyBridgeObject)
     UNARY_INSTRUCTION(FixLifetime)
     UNARY_INSTRUCTION(EndLifetime)
     UNARY_INSTRUCTION(CopyBlock)

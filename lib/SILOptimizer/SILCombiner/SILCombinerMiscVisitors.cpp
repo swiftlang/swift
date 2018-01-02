@@ -1451,3 +1451,22 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *MDI) {
 }
 
 
+SILInstruction *SILCombiner::
+visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
+  auto *URC = dyn_cast<UncheckedRefCastInst>(CBOI->getOperand());
+  if (!URC)
+    return nullptr;
+
+  auto type = URC->getOperand()->getType().getSwiftRValueType();
+  if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
+    if (!cd->isObjC()) {
+      auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
+      SILValue zero = Builder.createIntegerLiteral(CBOI->getLoc(),
+                                                   int1Ty, 0);
+      return Builder.createTuple(CBOI->getLoc(), { zero, zero });
+    }
+  }
+
+  return nullptr;
+}
+

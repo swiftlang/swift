@@ -4061,6 +4061,18 @@ public:
 };
 
 /// Extract the heap object reference from a BridgeObject.
+class ClassifyBridgeObjectInst
+  : public UnaryInstructionBase<SILInstructionKind::ClassifyBridgeObjectInst,
+                                SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  ClassifyBridgeObjectInst(SILDebugLocation DebugLoc, SILValue Operand,
+                           SILType Ty)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+};
+
+/// Extract the heap object reference from a BridgeObject.
 class BridgeObjectToRefInst
   : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
                                 ConversionInst>

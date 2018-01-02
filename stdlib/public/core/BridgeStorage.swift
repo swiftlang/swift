@@ -89,8 +89,9 @@ struct _BridgeStorage<
   public // @testable
   var isNative: Bool {
     @inline(__always) get {
-      return (_bitPattern(rawValue) &
-              (_objCTaggedPointerBits | _objectPointerIsObjCBit)) == 0
+      let result = Builtin.classifyBridgeObject(rawValue)
+      return !Bool(Builtin.or_Int1(result.isObjCObject,
+                                   result.isObjCTaggedPointer))
     }
   }
   
@@ -160,7 +161,7 @@ struct _BridgeStorage<
   @_versioned // FIXME(sil-serialize-all)
   internal var _isTagged: Bool {
     @inline(__always) get {
-      return (_bitPattern(rawValue) & _objCTaggedPointerBits) != 0
+      return Bool(Builtin.classifyBridgeObject(rawValue).isObjCTaggedPointer)
     }
   }
 

@@ -351,6 +351,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, MayRead, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
 
+  SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,

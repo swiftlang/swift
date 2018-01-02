@@ -302,6 +302,20 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   return nullptr;
 }
 
+
+SILInstruction *
+SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
+  // Fold noop casts through Builtin.BridgeObject.
+  // (bridge_object_to_ref (unchecked-ref-cast x BridgeObject) y)
+  //  -> (unchecked-ref-cast x y)
+  if (auto URC = dyn_cast<UncheckedRefCastInst>(BORI->getOperand()))
+    return Builder.createUncheckedRefCast(BORI->getLoc(), URC->getOperand(),
+                                          BORI->getType());
+  return nullptr;
+}
+
+
+
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   SILType SrcTy = URCI->getSrc()->getType();
