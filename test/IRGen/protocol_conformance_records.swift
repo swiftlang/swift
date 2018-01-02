@@ -93,9 +93,9 @@ public protocol Spoon { }
 // -- nominal type descriptor
 // CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVMn
 // -- witness table accessor
-// CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
-// -- flags 0x04: unique nominal type descriptor + conditional accessor
-// CHECK-SAME:           i32 36
+// CHECK-SAME:           i32 add{{.*}}@_T028protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa{{.*}}i32 2),
+// -- flags 0x04: unique nominal type descriptor
+// CHECK-SAME:           i32 4
 // CHECK-SAME:         }
 extension NativeGenericType : Spoon where T: Spoon {
   public func runce() {}

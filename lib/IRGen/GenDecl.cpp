@@ -2340,11 +2340,11 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     // Figure out what kind of witness table we have.
     auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
+    ProtocolConformanceReferenceKind conformanceKind;
     if (!isResilient(conformance->getProtocol(),
                      ResilienceExpansion::Maximal) &&
         conformance->getConditionalRequirements().empty()) {
-      flags = flags.withConformanceKind(
-          ProtocolConformanceReferenceKind::WitnessTable);
+      conformanceKind = ProtocolConformanceReferenceKind::WitnessTable;
 
       // If the conformance is in this object's table, then the witness table
       // should also be in this object file, so we can always directly reference
@@ -2352,11 +2352,11 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
       witnessTableVar = getAddrOfWitnessTable(conformance);
     } else {
       if (conformance->getConditionalRequirements().empty()) {
-        flags = flags.withConformanceKind(
-            ProtocolConformanceReferenceKind::WitnessTableAccessor);
+        conformanceKind =
+          ProtocolConformanceReferenceKind::WitnessTableAccessor;
       } else {
-        flags = flags.withConformanceKind(
-            ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor);
+        conformanceKind =
+          ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor;
       }
 
       witnessTableVar = getAddrOfWitnessTableAccessFunction(
@@ -2364,9 +2364,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     }
 
     // Relative reference to the witness table.
-    auto witnessTableRef =
-      ConstantReference(witnessTableVar, ConstantReference::Direct);
-    record.addRelativeAddress(witnessTableRef);
+    record.addTaggedRelativeOffset(RelativeAddressTy, witnessTableVar,
+                                   static_cast<unsigned>(conformanceKind));
 
     // Flags.
     record.addInt(Int32Ty, flags.getValue());

@@ -417,21 +417,23 @@ section, which is scanned by the Swift runtime when needed (e.g., in response to
 a `swift_conformsToProtocol()` query). Each protocol conformance record
 contains:
 
-- The `protocol descriptor`_ describing the protocol of the conformance.
-- A reference to the metadata for the **conforming type**, whose form is
+- The `protocol descriptor`_ describing the protocol of the conformance,
+  represented as an indirect 32-bit offset relative to the field.
+- A reference to the metadata for the **conforming type**, represented as
+  an indirect 32-bit offset relative to the field, whose form is
   determined by the **protocol conformance flags** described below.
 - The **witness table field** that provides access to the witness table
-  describing the conformance itself; the form of this field is determined by the
-  **protocol conformance flags** described below.
-- The **protocol conformance flags** is a 32-bit field comprised of:
-
-  * **Bits 0-3** contain the type metadata record kind, which indicates how
-    the **conforming type** field is encoded.
-  * **Bits 4-5** contain the kind of witness table. The value can be one of:
-
+  describing the conformance itself; the form of this field is determined by
+  the lower two bits, and can be one of:
     0. The **witness table field** is a reference to a witness table.
     1. The **witness table field** is a reference to a **witness table
        accessor** function for an unconditional conformance.
     2. The **witness table field** is a reference to a **witness table
        accessor** function for a conditional conformance.
+    3. Reserved for future use.
+  All references are direct 32-bit offsets relative to the field.
+- The **protocol conformance flags** is a 32-bit field comprised of:
+
+  * **Bits 0-3** contain the type metadata record kind, which indicates how
+    the **conforming type** field is encoded.
 

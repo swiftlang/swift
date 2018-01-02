@@ -253,13 +253,6 @@ public:
 
 // Protocol conformance discriminant
 struct ProtocolConformanceFlags : public TypeMetadataRecordFlags {
-private:
-  enum : int_type {
-    ConformanceKindMask = 0x00000030U,
-    ConformanceKindShift = 4,
-  };
-
-public:
   constexpr ProtocolConformanceFlags() : TypeMetadataRecordFlags(0) {}
   constexpr ProtocolConformanceFlags(int_type Data) : TypeMetadataRecordFlags(Data) {}
 
@@ -267,15 +260,6 @@ public:
                                         TypeMetadataRecordKind ptk) const {
     return ProtocolConformanceFlags(
                      (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
-  }
-  constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
-    return ProtocolConformanceReferenceKind((Data & ConformanceKindMask)
-                                     >> ConformanceKindShift);
-  }
-  constexpr ProtocolConformanceFlags withConformanceKind(
-                                  ProtocolConformanceReferenceKind pck) const {
-    return ProtocolConformanceFlags(
-       (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
   }
 };
 

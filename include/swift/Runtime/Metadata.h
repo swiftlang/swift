@@ -2555,11 +2555,15 @@ private:
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<const WitnessTable> WitnessTable;
+    RelativeDirectPointerIntPair<const WitnessTable,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type.
-    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
+    RelativeDirectPointerIntPair<WitnessTableAccessorFn,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTableAccessor;
   };
   
   /// Flags describing the protocol conformance.
@@ -2569,7 +2573,7 @@ public:
   const ProtocolDescriptor *getProtocol() const {
     return Protocol;
   }
-  
+
   ProtocolConformanceFlags getFlags() const {
     return Flags;
   }
@@ -2577,8 +2581,9 @@ public:
   TypeMetadataRecordKind getTypeKind() const {
     return Flags.getTypeKind();
   }
+
   ProtocolConformanceReferenceKind getConformanceKind() const {
-    return Flags.getConformanceKind();
+    return WitnessTable.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
@@ -2658,7 +2663,7 @@ public:
   
   /// Get the directly-referenced static witness table.
   const swift::WitnessTable *getStaticWitnessTable() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
         
@@ -2669,11 +2674,11 @@ public:
     case ProtocolConformanceReferenceKind::Reserved:
       break;
     }
-    return WitnessTable;
+    return WitnessTable.getPointer();
   }
   
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
     case ProtocolConformanceReferenceKind::Reserved:
@@ -2682,7 +2687,7 @@ public:
     case ProtocolConformanceReferenceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
-    return WitnessTableAccessor;
+    return WitnessTableAccessor.getPointer();
   }
   
   /// Get the canonical metadata for the type referenced by this record, or

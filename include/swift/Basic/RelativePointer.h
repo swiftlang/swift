@@ -398,9 +398,6 @@ class RelativeDirectPointerIntPair {
     = delete;
 
   static Offset getMask() {
-    static_assert(alignof(PointeeTy) >= alignof(Offset),
-                 "pointee alignment must be at least as strict as offset type");
-
     return alignof(Offset) - 1;
   }
 
