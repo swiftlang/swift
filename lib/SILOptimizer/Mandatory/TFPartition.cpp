@@ -462,6 +462,7 @@ enum class Marking {
 class TFFunctionPartition {
 public:
   SILFunction &fn;
+  ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -520,8 +521,9 @@ public:
   /// extracted function.
   SmallVector<SILValue, 4> resultValues;
 public:
-  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM)
-    : fn(Fn),
+  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
+                      ModuleDecl &tensorFlowModule)
+    : fn(Fn), tensorFlowModule(tensorFlowModule),
       DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
       tensorCodeBlocks(Fn) {
   }
@@ -536,6 +538,10 @@ public:
     // tensor function is lowered to a TF graph.
     StringLiteralInst *programPlaceholder;
     IntegerLiteralInst *programLengthPlaceholder;
+
+    // This is the "TensorFlow.TensorProgram" object returned by the
+    // 'startProgram' runtime API entrypoint.
+    SILValue theTensorProgram;
   };
   PartitionedTensorProgram partition();
 
@@ -543,10 +549,14 @@ public:
   bool diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user);
 
 private:
+  // Marking.
   void markBlock(SILBasicBlock *BB);
   void markInstruction(SILInstruction &inst, Marking mark);
   void markArgument(SILArgument *arg);
   void markValue(SILValue value);
+
+  // Rewriting the host function.
+  PartitionedTensorProgram createTensorProgramStart();
 };
 } // end anonymous namespace
 
@@ -1618,6 +1628,168 @@ void PartitionCloner::finalizeOriginal() {
   }
 }
 
+/// Wrap a value in a simple struct wrapper, these are common in the standard
+/// library.
+static SILValue wrapInStruct(SILValue v, NominalTypeDecl *decl, SILBuilder &B,
+                             SILLocation loc) {
+  auto type = decl->getDeclaredInterfaceType()->getCanonicalType();
+  auto silType = SILType::getPrimitiveObjectType(type);
+  return B.createStruct(loc, silType, v);
+}
+
+/// Create a value of 'Swift.Int' type holding the specified value.  It is a bit
+/// trickier to create than some types because its contents are target platform
+/// specific: Builtin.Int32 or Builtin.Int64.
+static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
+                               IntegerLiteralInst **ILI = nullptr) {
+  // Int should have one field, a Builtin.Int32/64.
+  auto intDecl = B.getASTContext().getIntDecl();
+  auto intFieldType = (*intDecl->getStoredProperties().begin())->getType();
+  auto intFieldSILType =
+    SILType::getPrimitiveObjectType(intFieldType->getCanonicalType());
+
+  auto literal = B.createIntegerLiteral(loc, intFieldSILType, 0);
+
+  // If the caller wanted the integer_literal instruction, return it too.
+  if (ILI) *ILI = literal;
+
+  return wrapInStruct(literal, intDecl, B, loc);
+}
+
+
+/// Rewrite the host program, inserting a call to _TFCStartTensorProgram at the
+/// start point of the tensor function, passing in the tensor program itself,
+/// input tensor arguments etc.
+auto TFFunctionPartition::
+createTensorProgramStart() -> PartitionedTensorProgram {
+  auto &ctx = fn.getASTContext();
+  auto loc = fn.getLocation();
+
+  // We are going to create a call to this function to kick off the tensor
+  // program:
+  //
+  // @_silgen_name("_swift_tfc_StartTensorProgram")
+  // public func startTensorProgram(_ programBytes: UnsafeRawPointer,
+  //                                _ programSize: Int,
+  //                                _ inputs: UnsafePointer<AnyTensorHandle>,
+  //                                _ numInputs: Int) -> TensorProgram {...}
+  auto startProgramFn =
+    fn.getModule().findFunction("_swift_tfc_StartTensorProgram",
+                                SILLinkage::PublicExternal);
+  if (!startProgramFn) {
+    diagnose(ctx, fn.getLocation().getSourceLoc(),
+             diag::tf_internal_error,
+             "'_swift_tfc_StartTensorProgram' not found in TensorFlow module");
+    return { nullptr, nullptr, nullptr, SILValue()};
+  }
+
+  SILBuilder B(tensorStartPoint);
+
+  // Create a string literal to hold the  serialized protobuf for the tensor
+  // program.  We haven't actually created that yet, so we create a placeholder
+  // and RAUW it later.
+  auto programPlaceholder =
+    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
+  auto program = wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(),
+                              B, loc);
+
+  // Pass a length of zero for now, it will be filled in later.
+  IntegerLiteralInst *programLengthPlaceholder = nullptr;
+  auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
+
+  // We pass the list of N tensor arguments as an pointer + length of
+  // AnyTensorHandle values, i.e.:
+  //   (..., _ inputs: UnsafePointer<AnyTensorHandle>, _ numInputs: Int)
+  // to get this, we create an N-ary tuple on the stack and pass the address of
+  // the first element.
+  auto anyTensorHandleTy = ctx.getAnyTensorHandleDecl()->getDeclaredType();
+  auto anyTensorHandleSILTy =
+    SILType::getPrimitiveObjectType(anyTensorHandleTy->getCanonicalType());
+
+  // Note that the allocation becomes a scalar value when it has one value.
+  SmallVector<TupleTypeElt, 8> tupleEltTypes(tensorFnArguments.size(),
+                                             TupleTypeElt(anyTensorHandleTy));
+  auto tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
+  // %0 = alloc_stack $(AnyTensorHandle, AnyTensorHandle)
+  auto stackAlloc =
+    B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
+
+  // Emit a store into the tuple for each parameter.  We are transfering
+  // ownership of the parameters into the tuple (which we release en-mass when
+  // we're done with it) so we don't do a retain of each TensorHandle here.
+  for (size_t i = 0, numArgs = tensorFnArguments.size(); i != numArgs; ++i) {
+    auto upcast = B.createUpcast(loc, tensorFnArguments[i],
+                                 anyTensorHandleSILTy);
+    SILValue eltAddr = stackAlloc;
+    if (numArgs >= 2)
+      eltAddr = B.createTupleElementAddr(loc, stackAlloc, i,
+                                         anyTensorHandleSILTy.getAddressType());
+
+    auto ownershipQualifier =
+      fn.hasQualifiedOwnership() ? StoreOwnershipQualifier::Init :
+                                   StoreOwnershipQualifier::Unqualified;
+    B.createStore(loc, upcast, eltAddr, ownershipQualifier);
+  }
+
+  // Ok, now we have our array on the stack.  Start a read access, and get the
+  // address of the first element as an UnsafePointer<AnyTensorHandle>.
+  // %1 = begin_access [read] [static] %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
+                                    SILAccessEnforcement::Static);
+
+  // %2 = tuple_element_addr %1 : $*(AnyTensorHandle, AnyTensorHandle), 0
+  SILValue firstPtr = access;
+  if (tensorFnArguments.size() >= 2)
+    firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
+                                        anyTensorHandleSILTy.getAddressType());
+  // %3 = address_to_pointer %2 : $*AnyTensorHandle to $Builtin.RawPointer
+  firstPtr = B.createAddressToPointer(loc, firstPtr,
+                                      SILType::getRawPointerType(ctx));
+
+  // %4 = struct $UnsafePointer<AnyTensorHandle>(%3 : $Builtin.RawPointer)
+  auto unsafePointerType =
+    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
+                          anyTensorHandleTy);
+  auto unsafePointerSILType =
+    SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
+  firstPtr = B.createStruct(loc, unsafePointerSILType, firstPtr);
+
+  auto numTensorArguments = createIntValue(tensorFnArguments.size(), B, loc);
+
+  // The first two arguments are the program, the rest of the arguments are the
+  // parameters passed in.
+  SILValue startArgs[4] = {
+    program, programLength, firstPtr, numTensorArguments
+  };
+
+  // Now that we have our argument list, create a call.
+  auto startProgramFnRef = B.createFunctionRef(loc, startProgramFn);
+
+
+  // Create the builtin in the host program that kicks off the tensor program,
+  // setting the argument values.
+  auto tensorProgram =
+    B.createApply(loc, startProgramFnRef, /*no substitutions*/{}, startArgs,
+                  /*isNonThrowing*/false);
+
+  // Finish our read access, destroy the tuple (releasing all the input tensors)
+  // and free the stack memory.
+
+  // end_access %1 : $*(AnyTensorHandle, AnyTensorHandle)
+  B.createEndAccess(loc, access, /*aborted*/false);
+  // destroy_addr %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  B.emitDestroyAddr(loc, stackAlloc);
+  // dealloc_stack %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  B.createDeallocStack(loc, stackAlloc);
+
+  return {
+    nullptr,  // New function hasn't been created yet.
+    programPlaceholder,
+    programLengthPlaceholder,
+    tensorProgram
+  };
+}
+
 
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
 /// the standard "Aggressive Dead Code Elimination" (ADCE) optimization which is
@@ -1633,32 +1805,11 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   assert(!markedBlocks.empty() &&
          "Shouldn't run on functions with no tensor ops");
 
-  auto &ctx = fn.getASTContext();
-  auto loc = fn.getLocation();
+  auto result = createTensorProgramStart();
 
-  // Create a string literal to hold the  serialized protobuf for the tensor
-  // program.  We haven't actually created that yet, so we create a placeholder
-  // and RAUW it later.
-  SILBuilder B(tensorStartPoint);
-  auto programPlaceholder =
-    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
-  auto programLengthPlaceholder =
-    B.createIntegerLiteral(loc, SILType::getBuiltinWordType(ctx), 0);
-
-  // TODO: The actual function will probably want an UnsafeRawPointer+Int.
-
-  // The first two arguments are the program, the rest of the arguments are the
-  // parameters passed in.
-  SmallVector<SILValue, 4> startArgs;
-  startArgs.append({ programPlaceholder, programLengthPlaceholder });
-  startArgs.append(tensorFnArguments.begin(), tensorFnArguments.end());
-
-  // Create the builtin in the host program that kicks off the tensor program,
-  // setting the argument values.
-  B.createBuiltin(fn.getLocation(),
-                  fn.getASTContext().getIdentifier("tensorFlow_start"),
-                  fn.getModule().Types.getEmptyTupleType(),
-                  /*no substitutions*/{}, startArgs);
+  // If the TensorFlow module is malformed, bail out without breaking the code.
+  if (!result.theTensorProgram)
+    return result;
 
   // Create the builtin in the host program that rendezvous with the tensor
   // program and returns the results.
@@ -1668,7 +1819,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   auto tuple = TupleType::get(resultTypes, fn.getASTContext());
     auto resultType =SILType::getPrimitiveObjectType(tuple->getCanonicalType());
 
-  B.setInsertionPoint(tensorEndPoint);
+  SILBuilder B(tensorEndPoint);
   auto resultInst = B.createBuiltin(fn.getLocation(),
                             fn.getASTContext().getIdentifier("tensorFlow_done"),
                                     resultType, /*no substitutions*/{},
@@ -1740,7 +1891,8 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
     PC.finalizeOriginal();
   }
 
-  return { newFn, programPlaceholder, programLengthPlaceholder };
+  result.fn = newFn;
+  return result;
 }
 
 
@@ -1814,7 +1966,7 @@ public:
     // partitioned function in the current module, emit it to a graph, then
     // delete it.
 
-    TFFunctionPartition partitioner(*fn, PM);
+    TFFunctionPartition partitioner(*fn, PM, *tfModule);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
 
@@ -1827,6 +1979,10 @@ public:
     // Actually do the partitioning transformation, splitting out a new SIL
     // function for the tensor program body.
     auto tensorProgram = partitioner.partition();
+
+    // If the TensorFlow module is malformed, exit without breaking the SIL.
+    if (!tensorProgram.fn)
+      return;
 
 #ifndef NDEBUG
     // Verify that the generated function is ok.
@@ -1874,7 +2030,7 @@ public:
                                         StringRef(bytes.data(), bytes.size()),
                                         StringLiteralInst::Encoding::UTF8);
       auto len = B.createIntegerLiteral(fn->getLocation(),
-                                        SILType::getBuiltinWordType(ctx),
+                              tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();

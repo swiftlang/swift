@@ -142,7 +142,7 @@ bool TensorOpInfo::decode() {
 
   auto diagInvalid = [&](std::string problem) {
     diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
-             diag::tfop_incorrect_silname_operandinfo,
+             diag::tfop_incorrect_operandinfo,
              operandDescriptorStr, problem);
   };
 
