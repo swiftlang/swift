@@ -1521,10 +1521,11 @@ computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
   auto &FEOpts = Invocation.getFrontendOptions();
   auto &LangOpts = Invocation.getLangOptions();
   auto &SILOpts = Invocation.getSILOptions();
-  StringRef InputName =
-      FEOpts.InputsAndOutputs.getNameOfUniquePrimaryInputFile();
+  std::string InputName =
+      FEOpts.InputsAndOutputs.getCombinedNamesOfPrimaryInputFiles();
   StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-  StringRef OutFile = FEOpts.InputsAndOutputs.getSingleOutputFilename();
+  StringRef OutFile =
+      FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();
   auto Trace = Invocation.getFrontendOptions().TraceStats;

@@ -159,6 +159,16 @@ StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
   return input == nullptr ? StringRef() : input->file();
 }
 
+std::string
+FrontendInputsAndOutputs::getCombinedNamesOfPrimaryInputFiles() const {
+  std::string r;
+  forEachPrimaryInput([&](const InputFile &f) -> void {
+    r += f.file();
+    r += "_";
+  });
+  return r;
+}
+
 bool FrontendInputsAndOutputs::isFilePrimary(StringRef file) {
   return PrimaryInputs.count(file) != 0;
 }

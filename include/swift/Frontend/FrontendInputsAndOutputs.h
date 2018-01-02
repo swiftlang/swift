@@ -145,6 +145,9 @@ public:
   /// there isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const;
 
+  /// Combines all primaries for stats reporter
+  std::string getCombinedNamesOfPrimaryInputFiles() const;
+
   bool isFilePrimary(StringRef file);
   const InputFile &getPrimaryInputNamed(StringRef) const;
 
