@@ -102,9 +102,9 @@ TEST_F(LexerTriviaTest, TriviaHashbangAfterBOM) {
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  // FIXME: This should include UTF8-BOM as a GarbargeText trivia.
   ASSERT_EQ(LeadingTrivia,
-            (Trivia{{TriviaPiece::garbageText("#!/bin/swift"),
+            (Trivia{{TriviaPiece::garbageText("\xEF\xBB\xBF"),
+                     TriviaPiece::garbageText("#!/bin/swift"),
                      TriviaPiece::newlines(1)}}));
 }
 

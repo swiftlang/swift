@@ -899,6 +899,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // Compare this signature against the signature of other
   // declarations with the same name.
   OverloadSignature currentSig = current->getOverloadSignature();
+  CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
@@ -912,6 +913,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+      continue;
+
+    // Check whether the overload signatures conflict (ignoring the type for
+    // now).
+    auto otherSig = other->getOverloadSignature();
+    if (!conflicting(currentSig, otherSig))
       continue;
 
     // Validate the declaration.
@@ -946,8 +953,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       break;
     }
 
+    // Get the overload signature type.
+    CanType otherSigType = other->getOverloadSignatureType();
+
     // If there is another conflict, complain.
-    if (conflicting(currentSig, other->getOverloadSignature())) {
+    if (currentSigType == otherSigType ||
+        currentSig.Name.isCompoundName() != otherSig.Name.isCompoundName()) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
       if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
@@ -5616,7 +5627,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(TL.getType().getPointer()))
+      if (TL.getType()->hasParenSugar())
         return;
 
       TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -5685,7 +5696,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(resultTy.getPointer()))
+      if (resultTy->hasParenSugar())
         return;
 
       TC.diagnose(resultTL.getSourceRange().Start,

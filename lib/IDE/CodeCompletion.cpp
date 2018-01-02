@@ -1633,7 +1633,7 @@ private:
     Type In = AFT->getInput();
     if (!In)
       return;
-    if (isa<ParenType>(In.getPointer())) {
+    if (In->hasParenSugar()) {
       FoundFunctionsWithoutFirstKeyword = true;
       return;
     }
@@ -3696,7 +3696,7 @@ public:
     }
 
     void unboxType(Type T) {
-      if (isa<ParenType>(T.getPointer())) {
+      if (T->hasParenSugar()) {
         unboxType(T->getDesugaredType());
       } else if (T->is<TupleType>()) {
         for (auto Ele : T->getAs<TupleType>()->getElements()) {

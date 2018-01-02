@@ -1171,7 +1171,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
-          if (!isa<ParenType>(func1Input.getPointer()))
+          if (!func1Input->hasParenSugar())
             func2Input = paren2->getUnderlyingType();
         }
       }
@@ -1562,8 +1562,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
     // If the types are obviously equivalent, we're done.
-    if (isa<ParenType>(type1.getPointer()) ==
-          isa<ParenType>(type2.getPointer()) &&
+    if (type1->hasParenSugar() == type2->hasParenSugar() &&
         type1->isEqual(type2))
       return SolutionKind::Solved;
   } else {
@@ -1747,8 +1746,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (isArgumentTupleMatch &&
       !isSwiftVersion3) {
     if (!typeVar1 && !typeVar2) {
-      if (isa<ParenType>(type1.getPointer()) !=
-          isa<ParenType>(type2.getPointer())) {
+      if (type1->hasParenSugar() != type2->hasParenSugar()) {
         return SolutionKind::Error;
       }
     }
@@ -1965,8 +1963,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // For non-argument tuples, we can do the same conversion but not
       // to a tuple with varargs.
       if (!type1->is<LValueType>() &&
-          ((tuple2->getNumElements() == 1 &&
-            !tuple2->getElement(0).isVararg()) ||
+          (tuple2->hasParenSema(/*allowName*/true) ||
            (kind >= ConstraintKind::Conversion &&
             tuple2->getElementForScalarInit() >= 0 &&
             (isArgumentTupleConversion ||

@@ -311,4 +311,22 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
 
   for <ValueBindingPattern>var <IdentifierPattern>i </IdentifierPattern></ValueBindingPattern>in <IdentifierExpr>foo </IdentifierExpr><WhereClause>where <MemberAccessExpr><IdentifierExpr>i</IdentifierExpr>.foo </MemberAccessExpr></WhereClause><CodeBlock>{}</CodeBlock></ForInStmt><ForInStmt>
   for case <IsTypePattern>is <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></IsTypePattern>in <IdentifierExpr>foo </IdentifierExpr><CodeBlock>{}</CodeBlock></ForInStmt>
-}</CodeBlock></FunctionDecl>
+}</CodeBlock></FunctionDecl><ExtensionDecl>
+
+// MARK: - ExtensionDecl
+
+extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><MemberDeclBlock>{<VariableDecl>
+  var <PatternBinding><IdentifierPattern>s</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<ReturnStmt>
+    return <IntegerLiteralExpr>42</IntegerLiteralExpr></ReturnStmt>
+  }</AccessorBlock></PatternBinding></VariableDecl>
+}</MemberDeclBlock></ExtensionDecl><ExtensionDecl><Attribute>
+
+@available(*, unavailable)</Attribute><DeclModifier>
+fileprivate </DeclModifier>extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl><ExtensionDecl>
+
+extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>extProtocol </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl><ExtensionDecl>
+
+extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><GenericWhereClause>where <SameTypeRequirement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>== <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><SimpleTypeIdentifier>B</SimpleTypeIdentifier>: <SimpleTypeIdentifier>Numeric </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl><ExtensionDecl>
+
+extension <MemberTypeIdentifier><MemberTypeIdentifier><SimpleTypeIdentifier>ext</SimpleTypeIdentifier>.a</MemberTypeIdentifier>.b </MemberTypeIdentifier><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl>
+

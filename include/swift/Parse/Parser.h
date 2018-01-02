@@ -925,9 +925,9 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
-  SyntaxParserResult<syntax::TypeSyntax, CompositionTypeRepr> parseAnyType();
+  ParserResult<CompositionTypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          const TypeAttributes &attrs,
                                          Optional<Scope> &GenericsScope);

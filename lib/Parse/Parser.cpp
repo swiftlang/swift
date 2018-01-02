@@ -286,10 +286,6 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
   Trivia LeadingTrivia, TrailingTrivia;
   do {
     L.lex(Tok, LeadingTrivia, TrailingTrivia);
-    if (Tok.isEscapedIdentifier()) {
-      LeadingTrivia.push_back(TriviaPiece::backtick());
-      TrailingTrivia.push_front(TriviaPiece::backtick());
-    }
     auto ThisToken = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
                                       SourcePresence::Present, LeadingTrivia,
                                       TrailingTrivia);
@@ -467,9 +463,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 }
 
 Parser::~Parser() {
-  if (Tok.is(tok::eof))
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-
   delete L;
   delete TokReceiver;
   delete SyntaxContext;

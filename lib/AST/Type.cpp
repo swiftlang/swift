@@ -685,7 +685,7 @@ Type TypeBase::getWithoutParens() {
 Type TypeBase::getWithoutImmediateLabel() {
   Type Ty = this;
   if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       Ty = tupleTy->getElementType(0);
   }
   return Ty;
@@ -870,7 +870,7 @@ Type TypeBase::getRValueInstanceType() {
   
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       type = tupleTy->getElementType(0);
   }
   
@@ -1028,7 +1028,7 @@ static Type
 getCanonicalInputType(AnyFunctionType *funcType,
                       llvm::function_ref<CanType(Type)> getCanonicalType) {
   auto origInputType = funcType->getInput();
-  bool isParen = isa<ParenType>(origInputType.getPointer());
+  bool isParen = origInputType->hasParenSugar();
   Type inputType = getCanonicalType(origInputType);
 
   if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
@@ -1045,7 +1045,7 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-void TypeBase::computeCanonicalType() {
+CanType TypeBase::computeCanonicalType() {
   assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
   TypeBase *Result = nullptr;
@@ -1223,6 +1223,7 @@ void TypeBase::computeCanonicalType() {
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
+  return CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
