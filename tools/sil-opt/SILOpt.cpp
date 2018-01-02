@@ -122,6 +122,9 @@ static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
 
+static llvm::cl::list<std::string>
+ExtraClangArgs("Xcc", llvm::cl::desc("Extra flags to pass to Clang."));
+
 static llvm::cl::opt<std::string>
 SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
@@ -310,6 +313,7 @@ int main(int argc, char **argv) {
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getClangImporterOptions().ExtraArgs = ExtraClangArgs;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;

@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CTensorFlow
+
 // TODO(hongm): replace the dummy impl below with a real one.
 public class TensorProgram {
   let inputTensors: [AnyTensorHandle]
@@ -39,6 +41,11 @@ public func _TFCStartTensorProgram(
   _ inputTensors: UnsafePointer<AnyTensorHandle>,
   _ numInputTensors: Int
 ) -> TensorProgram {
+  // This place holder call confirms we are able to call the TF C APIs.
+  // It is currently working for swift/src/swift/test/TensorFlowRuntime:tf_main,
+  // but not swift/src/swift/test/TensorFlowRuntime/RunTime.swift.test.
+  let s /*TF_Status**/ = TF_NewStatus()
+
   // The compiler wants to pass us the input tensors as an
   // unsafepointer + length, but we can transform that into an Array or any
   // other type if that is convenient.
