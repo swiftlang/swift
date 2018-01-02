@@ -323,10 +323,10 @@ private:
                                              Compilation &C) const;
   JobAction *buildPrecompileAction(const ToolChain &TC, Compilation &C) const;
 
-  bool segregateInputs(Compilation &C, std::vector<InputPair> SwiftInputs,
-                       std::vector<InputPair> SILSIBInputs,
-                       std::vector<InputPair> ModuleInputs,
-                       std::vector<InputPair> ObjectInputs) const;
+  bool segregateInputs(Compilation &C, std::vector<InputPair> &SwiftInputs,
+                       std::vector<InputPair> &SILSIBInputs,
+                       std::vector<InputPair> &ModuleInputs,
+                       std::vector<InputPair> &ObjectInputs) const;
   ModuleAndLinkerInputs buildBatchModeSwiftInputActions(
       const std::vector<InputPair> &Inputs, const OutputInfo &OI,
       const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const;

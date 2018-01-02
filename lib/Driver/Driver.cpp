@@ -1787,10 +1787,11 @@ Driver::buildBatchModeObjectInputActions(const std::vector<InputPair> &Inputs,
   return r;
 }
 
-bool Driver::segregateInputs(Compilation &C, std::vector<InputPair> SwiftInputs,
-                             std::vector<InputPair> SILSIBInputs,
-                             std::vector<InputPair> ModuleInputs,
-                             std::vector<InputPair> ObjectInputs) const {
+bool Driver::segregateInputs(Compilation &C,
+                             std::vector<InputPair> &SwiftInputs,
+                             std::vector<InputPair> &SILSIBInputs,
+                             std::vector<InputPair> &ModuleInputs,
+                             std::vector<InputPair> &ObjectInputs) const {
   for (const InputPair &Input : C.getInputFiles()) {
     switch (Input.first) {
     case types::TY_Swift:
