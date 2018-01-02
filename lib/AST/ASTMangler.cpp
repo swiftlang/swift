@@ -734,9 +734,8 @@ void ASTMangler::appendType(Type type) {
       return appendSugaredType<ParenType>(type);
     case TypeKind::ArraySlice: /* fallthrough */
     case TypeKind::Optional:
-      return appendSugaredType<SyntaxSugarType>(type);
     case TypeKind::Dictionary:
-      return appendSugaredType<DictionaryType>(type);
+      return appendSugaredType<SyntaxSugarType>(type);
 
     case TypeKind::ImplicitlyUnwrappedOptional: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
