@@ -54,8 +54,12 @@ swift::createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRetain(Loc, Ptr, B.getDefaultAtomicity());
+  if (Ptr->getType().isReferenceCounted(B.getModule())) {
+    if (Ptr->getType().is<UnownedStorageType>())
+      return B.createUnownedRetain(Loc, Ptr, B.getDefaultAtomicity());
+    else
+      return B.createStrongRetain(Loc, Ptr, B.getDefaultAtomicity());
+  }
 
   // Otherwise, create the retain_value.
   return B.createRetainValue(Loc, Ptr, B.getDefaultAtomicity());
@@ -74,8 +78,12 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
   auto Loc = RegularLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr, B.getDefaultAtomicity());
+  if (Ptr->getType().isReferenceCounted(B.getModule())) {
+    if (Ptr->getType().is<UnownedStorageType>())
+      return B.createUnownedRelease(Loc, Ptr, B.getDefaultAtomicity());
+    else
+      return B.createStrongRelease(Loc, Ptr, B.getDefaultAtomicity());
+  }
 
   // Otherwise create a release value.
   return B.createReleaseValue(Loc, Ptr, B.getDefaultAtomicity());

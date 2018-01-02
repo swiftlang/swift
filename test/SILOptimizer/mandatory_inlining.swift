@@ -160,3 +160,17 @@ func invoke(_ c: C) {
   _ = class_constrained_generic(c)
   // CHECK: return
 }
+
+// Make sure we don't crash.
+@_transparent
+public func mydo(_ what: @autoclosure () -> ()) {
+  what()
+}
+public class A {
+  public func bar() {}
+  public func foo(_ act: (@escaping () ->()) -> ()) {
+    act { [unowned self] in
+      mydo( self.bar() )
+    }
+  }
+}
