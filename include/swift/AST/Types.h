@@ -446,7 +446,9 @@ public:
   template <typename T>
   T *getAs() {
     static_assert(!isSugaredType<T>(), "getAs desugars types");
-    return dyn_cast<T>(getDesugaredType());
+    auto Ty = getDesugaredType();
+    SWIFT_ASSUME(Ty != nullptr);
+    return dyn_cast<T>(Ty);
   }
 
   template <typename T>
@@ -1024,6 +1026,76 @@ public:
                      AllocationArena arena, unsigned alignment = 8);
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
+
+/// AnyGenericType - This abstract class helps types ensure that fields
+/// exist at the same offset in memory to improve code generation of the
+/// compiler itself.
+class AnyGenericType : public TypeBase {
+  friend class NominalOrBoundGenericNominalType;
+
+  /// TheDecl - This is the TypeDecl which declares the given type. It
+  /// specifies the name and other useful information about this type.
+  union {
+    GenericTypeDecl *GenDecl;
+    NominalTypeDecl *NomDecl;
+  };
+
+  /// \brief The type of the parent, in which this type is nested.
+  Type Parent;
+
+  template <typename... Args>
+  AnyGenericType(NominalTypeDecl *TheDecl, Type Parent, Args &&...args)
+    : TypeBase(std::forward<Args>(args)...), NomDecl(TheDecl), Parent(Parent) {}
+
+protected:
+  template <typename... Args>
+  AnyGenericType(GenericTypeDecl *TheDecl, Type Parent, Args &&...args)
+    : TypeBase(std::forward<Args>(args)...), GenDecl(TheDecl), Parent(Parent) {}
+
+public:
+
+  /// \brief Returns the declaration that declares this type.
+  GenericTypeDecl *getDecl() const { return GenDecl; }
+
+  /// \brief Returns the type of the parent of this type. This will
+  /// be null for top-level types or local types, and for non-generic types
+  /// will simply be the same as the declared type of the declaration context
+  /// of TheDecl. For types nested within generic types, however, this will
+  /// involve \c BoundGenericType nodes that provide context for the nested
+  /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
+  /// represented as a NominalType with Dictionary<String, Int> as its parent
+  /// type.
+  Type getParent() const { return Parent; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyGenericType &&
+           T->getKind() <= TypeKind::Last_AnyGenericType;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(AnyGenericType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+END_CAN_TYPE_WRAPPER(AnyGenericType, Type)
+
+/// NominalOrBoundGenericNominal - This abstract class helps types ensure that
+/// fields exist at the same offset in memory to improve code generation of the
+/// compiler itself.
+class NominalOrBoundGenericNominalType : public AnyGenericType {
+public:
+  template <typename... Args>
+  NominalOrBoundGenericNominalType(Args &&...args)
+    : AnyGenericType(std::forward<Args>(args)...) {}
+
+  /// \brief Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const { return NomDecl; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_NominalOrBoundGenericNominalType &&
+           T->getKind() <= TypeKind::Last_NominalOrBoundGenericNominalType;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
 /// ErrorType - This represents a type that was erroneously constructed.  This
 /// is produced when parsing types and when name binding type aliases, and is
@@ -1679,36 +1751,18 @@ END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic type where the type arguments have
 /// not yet been resolved.
-class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  GenericTypeDecl *TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
-
+class UnboundGenericType : public AnyGenericType,
+    public llvm::FoldingSetNode {
 private:
   UnboundGenericType(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C,
                      RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::UnboundGeneric,
-               (!Parent || Parent->isCanonical())? &C : nullptr,
-               properties | RecursiveTypeProperties::HasUnboundGeneric),
-      TheDecl(TheDecl), Parent(Parent) { }
+    : AnyGenericType(TheDecl, Parent, TypeKind::UnboundGeneric,
+                     (!Parent || Parent->isCanonical()) ? &C : nullptr,
+                     properties | RecursiveTypeProperties::HasUnboundGeneric) {}
 
 public:
   static UnboundGenericType* get(GenericTypeDecl *TheDecl, Type Parent,
                                  const ASTContext &C);
-
-  /// \brief Returns the declaration that declares this type.
-  GenericTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the bound type Dictionary<String, Int>.Inner would be
-  /// represented as an UnboundGenericType with Dictionary<String, Int> as its
-  /// parent type.
-  Type getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
@@ -1721,20 +1775,15 @@ public:
     return T->getKind() == TypeKind::UnboundGeneric;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
-END_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnboundGenericType, AnyGenericType)
 
 inline CanType getAsCanType(const Type &type) { return CanType(type); }
 typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
 
 /// BoundGenericType - An abstract class for applying a generic type to the
 /// given type arguments.
-class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  NominalTypeDecl *TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
+class BoundGenericType : public NominalOrBoundGenericNominalType,
+    public llvm::FoldingSetNode {
   
   /// Retrieve the intrusive pointer storage from the subtype
   const Type *getTrailingObjectsPointer() const;
@@ -1752,26 +1801,13 @@ public:
   static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
                                ArrayRef<Type> GenericArgs);
 
-  /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the bound type Dictionary<String, Int>.Inner<Int> would be
-  /// represented as a BoundGenericType with Dictionary<String, Int> as its
-  /// parent type.
-  Type getParent() const { return Parent; }
-
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const {
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, getGenericArgs());
+    Profile(ID, getDecl(), getParent(), getGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -1782,12 +1818,11 @@ public:
            T->getKind() <= TypeKind::Last_BoundGenericType;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
   CanTypeArrayRef getGenericArgs() const {
     return CanTypeArrayRef(getPointer()->getGenericArgs());
   }
-END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
+END_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
 
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
@@ -1895,36 +1930,16 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericType)
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
 /// different names. Nominal types are always canonical.
-class NominalType : public TypeBase {
-  /// TheDecl - This is the TypeDecl which declares the given type. It
-  /// specifies the name and other useful information about this type.
-  NominalTypeDecl * const TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
+class NominalType : public NominalOrBoundGenericNominalType {
 
 protected:
   NominalType(TypeKind K, const ASTContext *C, NominalTypeDecl *TheDecl,
               Type Parent, RecursiveTypeProperties properties)
-    : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
-               properties),
-      TheDecl(TheDecl), Parent(Parent) { }
+    : NominalOrBoundGenericNominalType(TheDecl, Parent, K,
+               (!Parent || Parent->isCanonical())? C : nullptr, properties) {}
 
 public:
   static NominalType *get(NominalTypeDecl *D, Type Parent, const ASTContext &C);
-
-  /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
-  /// represented as a NominalType with Dictionary<String, Int> as its parent
-  /// type.
-  Type getParent() const { return Parent; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1932,9 +1947,7 @@ public:
            T->getKind() <= TypeKind::Last_NominalType;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(NominalType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
-END_CAN_TYPE_WRAPPER(NominalType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
 class EnumType : public NominalType, public llvm::FoldingSetNode {
@@ -4964,12 +4977,8 @@ inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
 }
 
 inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
-  if (auto nomTy = dyn_cast<NominalType>(*this))
-    return nomTy->getDecl();
-
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return boundTy->getDecl();
-  
+  if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
+    return Ty->getDecl();
   return nullptr;
 }
 
@@ -4978,13 +4987,7 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
-  if (auto classType = getAs<NominalType>()) {
-    return classType->getParent();
-  } else if (auto unboundType = getAs<UnboundGenericType>()) {
-    return unboundType->getParent();
-  } else {
-    return castTo<BoundGenericType>()->getParent();
-  }
+  return castTo<AnyGenericType>()->getParent();
 }
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
@@ -5053,11 +5056,7 @@ inline CanType CanType::getWithoutSpecifierTypeImpl(CanType type) {
 }
 
 inline CanType CanType::getNominalParent() const {
-  if (auto classType = dyn_cast<NominalType>(*this)) {
-    return classType.getParent();
-  } else {
-    return cast<BoundGenericType>(*this).getParent();
-  }
+  return cast<NominalOrBoundGenericNominalType>(*this).getParent();
 }
   
 inline Type TupleTypeElt::getVarargBaseTy() const {
