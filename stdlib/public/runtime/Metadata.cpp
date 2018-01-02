@@ -170,19 +170,19 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
          metadataSize - pattern->TemplateSize);
 
   // Okay, move to the address point.
-  bytes += pattern->AddressPoint;
-  ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
+  ClassMetadata *metadata =
+      reinterpret_cast<ClassMetadata *>(bytes + pattern->AddressPoint);
+  auto patternBytes =
+    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+    pattern->AddressPoint;
+  auto patternMetadata = reinterpret_cast<const ClassMetadata*>(patternBytes);
   assert(metadata->isTypeMetadata());
 
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
   // Adjust the relative reference to the nominal type descriptor.
   if (!metadata->isArtificialSubclass()) {
-    auto patternBytes =
-      reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
-      pattern->AddressPoint;
-    metadata->setDescription(
-        reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
+    metadata->setDescription(patternMetadata->getDescription());
   }
 
   // The pattern might have private prefix matter prior to the start
