@@ -334,12 +334,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     break;
   }
   case OutputInfo::Mode::BatchModeCompile: {
-    // FIXME: do non-filelists? dmu
-    Arguments.push_back("-filelist");
-    Arguments.push_back(context.getAllSourcesPath());
-    Arguments.push_back("-primary-filelist");
-    // xxx Arguments.push_back(context.getAllPrimariesPath());
-    assert(false && "driver constructInvocaiton 342"); // xxx
+    constructInvocationForBatchModeCompilation(Arguments, context);
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -518,6 +513,44 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   return II;
 }
 
+void ToolChain::constructInvocationForBatchModeCompilation(
+    ArgStringList &Arguments, const JobContext &context) const {
+
+  if (true || context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getAllSourcesPath());
+  } else {
+    // FIXME dmu
+    llvm_unreachable("Have not impelemented command-line non-primaries for "
+                     "batch-mode yet"); // xxx
+  }
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.InputActions.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-primary-filelist");
+    // FIXME dmu
+    llvm_unreachable(
+        "Have not implemented primary filelist in driver yet"); // xxx
+  } else {
+    for (const Action *A : context.InputActions) {
+      const auto *IA = cast<InputAction>(A);
+      Arguments.push_back("-primary-file");
+      Arguments.push_back(IA->getInputArg().getValue());
+    }
+  }
+
+  // FIXME dmu: next bit blindly-copied from StandardCompile case
+  // Forward migrator flags.
+  if (auto DataPath =
+          context.Args.getLastArg(options::OPT_api_diff_data_file)) {
+    Arguments.push_back("-api-diff-data-file");
+    Arguments.push_back(DataPath->getValue());
+  }
+  if (context.Args.hasArg(options::OPT_dump_usr)) {
+    Arguments.push_back("-dump-usr");
+  }
+}
+
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const InterpretJobAction &job,
                                const JobContext &context) const {
@@ -639,7 +672,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     break;
   }
   case OutputInfo::Mode::BatchModeCompile: {
-    assert(false && "driver constructInvocation 642"); // xxx //xxx
+    assert(false && "driver constructInvocation 642"); // xxx
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -1275,8 +1308,6 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
     addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile,
                     "-add_ast_path");
-  else if (context.OI.CompilerMode == OutputInfo::Mode::BatchModeCompile)
-    assert(false && "driver constructInvocation 1279"); // xxx //xxx
   else
     addPrimaryInputsOfType(Arguments, context.Inputs,
                            types::TY_SwiftModuleFile, "-add_ast_path");
