@@ -193,7 +193,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // constrained extensions, so use the overload signature's
     // type. This is layering a partial fix upon a total hack.
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-      signature = asd->getOverloadSignature().InterfaceType;
+      signature = asd->getOverloadSignatureType();
 
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
