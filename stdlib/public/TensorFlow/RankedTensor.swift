@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// RankedTensor - This is the common protocol shared between the Tensor[12345]D
 /// types defined below, defining their common basic API.  This allows reuse
 /// of the implementation logic for these types (which just wrap Tensor anyway)
