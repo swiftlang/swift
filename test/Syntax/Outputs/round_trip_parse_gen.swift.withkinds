@@ -218,7 +218,11 @@ func postfix<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   foo</IdentifierExpr>[] <ClosureExpr>{}</ClosureExpr></SubscriptExpr><SubscriptExpr><IdentifierExpr>
   foo</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>] <ClosureExpr>{}</ClosureExpr></SubscriptExpr><SubscriptExpr><SubscriptExpr><IdentifierExpr>
   foo</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr>[<FunctionCallArgument><IntegerLiteralExpr>2</IntegerLiteralExpr>,</FunctionCallArgument><FunctionCallArgument>x:<IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr><FunctionCallExpr><ForcedValueExpr><MemberAccessExpr><PostfixUnaryExpr><OptionalChainingExpr><IdentifierExpr>
-  foo</IdentifierExpr>?</OptionalChainingExpr>++</PostfixUnaryExpr>.bar</MemberAccessExpr>!</ForcedValueExpr>(<FunctionCallArgument><IdentifierExpr>baz</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>
+  foo</IdentifierExpr>?</OptionalChainingExpr>++</PostfixUnaryExpr>.bar</MemberAccessExpr>!</ForcedValueExpr>(<FunctionCallArgument><IdentifierExpr>baz</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
+
+  foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></IdentifierExpr>()</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ImplicitMemberExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></ImplicitMemberExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr></SequenceExpr>
 }</CodeBlock></FunctionDecl><IfConfigDecl>
 
 #if <IdentifierExpr>blah</IdentifierExpr><ElseDirectiveClause>

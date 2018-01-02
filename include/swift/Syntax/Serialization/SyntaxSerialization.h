@@ -142,6 +142,7 @@ struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
     switch (value.Kind) {
+      case tok::contextual_keyword:
       case tok::integer_literal:
       case tok::floating_literal:
       case tok::string_literal:

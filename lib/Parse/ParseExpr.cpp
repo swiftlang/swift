@@ -2064,12 +2064,16 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     return baseName;
   }
 
+
   // If the next token is a ')' then we have a 0-arg compound name. This is
   // explicitly differentiated from "simple" (non-compound) name in DeclName.
   // Unfortunately only some places in the grammar are ok with accepting this
   // kind of name; in other places it's ambiguous with trailing calls.
   if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
+    SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
     consumeToken(tok::l_paren);
+    if (SyntaxContext->isEnabled())
+      SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList());
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -2084,26 +2088,21 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     return baseName;
   }
 
-  // TODO: Support compound name in libSyntax.
-
   // Try to parse a compound name.
+  SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
   BacktrackingScope backtrack(*this);
 
   SmallVector<Identifier, 2> argumentLabels;
   SmallVector<SourceLoc, 2> argumentLabelLocs;
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
-  while (true) {
-    // Terminate at ')'.
-    if (Tok.is(tok::r_paren)) {
-      rparenLoc = consumeToken(tok::r_paren);
-      break;
-    }
+  while (Tok.isNot(tok::r_paren)) {
+    SyntaxParsingContext ArgCtxt(SyntaxContext, SyntaxKind::DeclNameArgument);
 
     // If we see a ':', the user forgot the '_';
     if (Tok.is(tok::colon)) {
       diagnose(Tok, diag::empty_arg_label_underscore)
-        .fixItInsert(Tok.getLoc(), "_");
+          .fixItInsert(Tok.getLoc(), "_");
       argumentLabels.push_back(Identifier());
       argumentLabelLocs.push_back(consumeToken(tok::colon));
     }
@@ -2120,14 +2119,18 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
     loc = DeclNameLoc(baseNameLoc);
+    ArgsCtxt.setDiscard();
     return baseName;
   }
+  // We have a compound name. Cancel backtracking and build that name.
+  backtrack.cancelBacktrack();
+
+  ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
+  rparenLoc = consumeToken(tok::r_paren);
 
   assert(!argumentLabels.empty() && "Logic above should prevent this");
   assert(argumentLabels.size() == argumentLabelLocs.size());
 
-  // We have a compound name. Cancel backtracking and build that name.
-  backtrack.cancelBacktrack();
   loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
                     rparenLoc);
   return DeclName(Context, baseName, argumentLabels);
