@@ -234,8 +234,8 @@ protected:
 
   /// Materialize this component into a temporary and return the temporary's
   /// address.
-  ManagedValue materializeIntoTemp(SILGenFunction &SGF, SILLocation loc,
-                                   ManagedValue base) &&;
+  ManagedValue materializeIntoTemporary(SILGenFunction &SGF, SILLocation loc,
+                                        ManagedValue base) &&;
 
 public:
   /// Clone the path component onto the heap.

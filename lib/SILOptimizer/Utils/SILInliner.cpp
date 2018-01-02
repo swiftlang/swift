@@ -195,7 +195,7 @@ SILValue SILInliner::borrowFunctionArgument(SILValue callArg,
     return callArg;
   }
   auto *borrow = getBuilder().createBeginBorrow(AI.getLoc(), callArg);
-  if (auto tryAI = dyn_cast<TryApplyInst>(AI)) {
+  if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
     SILBuilder returnBuilder(tryAI->getNormalBB()->begin());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
 

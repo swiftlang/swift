@@ -55,7 +55,7 @@ private:
   Optional<SILLocation> Loc;
   const SILDebugScope *CallSiteScope = nullptr;
   SILFunction *CalleeFunction = nullptr;
-  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *>
+  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
   CloneCollector::CallbackType Callback;
 
