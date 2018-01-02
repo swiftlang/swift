@@ -221,8 +221,10 @@ NOTE(designated_init_c_struct_fix,none,
 
 // SWIFT_ENABLE_TENSORFLOW
 // TensorFlow Support Diagnostics.
-ERROR(tfop_incorrect_silname_operandinfo, none,
-      "tfop _silgen_name type descriptor %0: %1",
+ERROR(tf_internal_error, none,
+      "internal error: %0", (StringRef))
+ERROR(tfop_incorrect_operandinfo, none,
+      "tfop type descriptor %0: %1",
       (StringRef, StringRef))
 ERROR(tfop_incorrect_definition, none,
       "tfop function doesn't align with TensorFlow op definition:\n%0",
