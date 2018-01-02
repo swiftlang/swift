@@ -1013,6 +1013,7 @@ public:
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *i);
+  void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *i);
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *i);
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
 
@@ -4521,6 +4522,33 @@ void IRGenSILFunction::visitRefToBridgeObjectInst(
   setLoweredExplosion(i, resultEx);
 }
 
+void IRGenSILFunction::
+visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *i) {
+  Explosion boEx = getLoweredExplosion(i->getOperand());
+  llvm::Value *bridgeVal = boEx.claimNext();
+  bridgeVal = Builder.CreatePtrToInt(bridgeVal, IGM.SizeTy);
+
+  // This returns two bits, the first of which is "is Objective-C object", the
+  // second is "is Objective-C Tagged Pointer".  Each of these bits is computed
+  // by checking to see if some other bits are non-zero in the BridgeObject.
+  auto bitsNonZero = [&](const SpareBitVector &bits) -> llvm::Value* {
+    // If this target doesn't have the specified field, just produce false.
+    if (!bits.any())
+      return Builder.getInt1(0);
+
+    llvm::Value *bitsValue =
+      Builder.CreateAnd(bridgeVal, Builder.getInt(bits.asAPInt()));
+    return
+      Builder.CreateICmpNE(bitsValue, llvm::ConstantInt::get(IGM.SizeTy, 0));
+  };
+
+  Explosion wordEx;
+  wordEx.add(bitsNonZero(IGM.TargetInfo.IsObjCPointerBit));
+  wordEx.add(bitsNonZero(IGM.TargetInfo.ObjCPointerReservedBits));
+  setLoweredExplosion(i, wordEx);
+}
+
+
 void IRGenSILFunction::visitBridgeObjectToRefInst(
                                               swift::BridgeObjectToRefInst *i) {
   Explosion boEx = getLoweredExplosion(i->getConverted());
@@ -4542,7 +4570,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
       (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
     APInt maskValue = IGM.TargetInfo.ObjCPointerReservedBits.asAPInt();
-    llvm::Value *mask = llvm::ConstantInt::get(IGM.getLLVMContext(), maskValue);
+    llvm::Value *mask = Builder.getInt(maskValue);
     llvm::Value *reserved = Builder.CreateAnd(boBits, mask);
     llvm::Value *cond = Builder.CreateICmpEQ(reserved,
                                          llvm::ConstantInt::get(IGM.SizeTy, 0));
