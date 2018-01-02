@@ -30,9 +30,16 @@ public func testTensor() {
 
 // Graph lowering fails on testTensor because it requires send and receive instructions.
 // CHECK: string_literal utf8 ""
-// CHECK-NEXT:  integer_literal $Builtin.Word, 0
+// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
+// CHECK-NOT: = apply
 
-
+// We're passing one TensorHandle in.
+// CHECK: [[ALLOC:%.*]] = alloc_stack $AnyTensorHandle
+// CHECK: upcast
+// CHECK: begin_access [read] [static] [[ALLOC]] : $*AnyTensorHandle
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
+// CHECK: builtin "tensorFlow_done"()
 
 public func testScalar(f: Float) {
   var x = Tensor<Float>(zeroD: f) +    // expected-warning {{value implicitly copied to accelerator}}
@@ -58,7 +65,7 @@ public func testScalar(f: Float) {
 
 // Graph lowering succeeds on this function
 // CHECK: string_literal utf8 "{{.....}}
-// CHECK-NEXT:  integer_literal $Builtin.Word, {{[1-9]}}
+// CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
 
 
 
