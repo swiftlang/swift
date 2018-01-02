@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// Concrete type for one dimensional Tensors.
 public struct Tensor1D<T : TensorElementProtocol> : RankedTensor {
   public var underlyingTensor: Tensor<T>

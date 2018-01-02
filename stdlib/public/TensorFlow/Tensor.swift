@@ -22,8 +22,6 @@
 // really gross, and will get better one way or the other, through compiler
 // changes.
 
-import Swift
-
 // Python PEP 465 makes a compelling argument that matrix multiplication should
 // not be spelled with the standard * operator, so we need a new one.  We'll use
 // the operator, though it is defensible to use a variety of other ones as well.

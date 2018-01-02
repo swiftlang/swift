@@ -1,4 +1,4 @@
-//===-- CompilerRunTime.swift ---------------------------------*- swift -*-===//
+//===-- CompilerRuntime.swift ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,10 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO(hongm): Rename to CompilerRuntime.swift.
-
-import Swift
-
 // TODO(hongm): replace the dummy impl below with a real one.
 public class TensorProgram {
   let inputTensors: [AnyTensorHandle]
@@ -25,16 +21,6 @@ public class TensorProgram {
 
   init(_ input: [AnyTensorHandle]) {
       inputTensors = input
-  }
-}
-
-// This corresponds to the TensorHandle class in TF eager C API.
-public class AnyTensorHandle {
-  // TODO(hongm): replace this dummy impl with something like
-  // UnsafePointer<TF_TensorHandle>
-  public let value: Int
-  public init(_ v: Int) {
-      value = v
   }
 }
 
@@ -50,9 +36,15 @@ public class AnyTensorHandle {
 public func _TFCStartTensorProgram(
   _ bytes: UnsafeRawPointer,
   _ size: Int,
-  _ inputTensors: AnyTensorHandle...
+  _ inputTensors: UnsafePointer<AnyTensorHandle>,
+  _ numInputTensors: Int
 ) -> TensorProgram {
-  let program = TensorProgram(inputTensors)
+  // The compiler wants to pass us the input tensors as an
+  // unsafepointer + length, but we can transform that into an Array or any
+  // other type if that is convenient.
+  let inputTensorArray = Array(UnsafeBufferPointer(start: inputTensors,
+                                                   count: numInputTensors))
+  let program = TensorProgram(inputTensorArray)
   return program
 }
 
