@@ -1319,47 +1319,46 @@ TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
   return getImplementationType().getPointer();
 }
 
-Type SyntaxSugarType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
+Type SyntaxSugarType::getImplementationTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
   auto &ctx = *ImplOrContext.get<const ASTContext *>();
   NominalTypeDecl *implDecl;
 
-  if (isa<ArraySliceType>(this)) {
+  // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
+  // we could handle the entire switch statement via macros.
+  switch (getKind()) {
+#define TYPE(Id, Parent) \
+  case TypeKind::Id: llvm_unreachable("non-sugared type?");
+#define SUGARED_TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::NameAlias:
+  case TypeKind::Paren:
+    llvm_unreachable("typealiases and parens are sugar, but not syntax sugar");
+  case TypeKind::ArraySlice:
     implDecl = ctx.getArrayDecl();
-    assert(implDecl && "Array type has not been set yet");
-  } else if (isa<OptionalType>(this)) {
+    break;
+  case TypeKind::Optional:
     implDecl = ctx.getOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
-  } else if (isa<ImplicitlyUnwrappedOptionalType>(this)) {
+    break;
+  case TypeKind::ImplicitlyUnwrappedOptional:
     implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
+    break;
+  case TypeKind::Dictionary:
+    implDecl = ctx.getDictionaryDecl();
+    break;
+  }
+  assert(implDecl && "Type has not been set yet");
+
+  if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
+    ImplOrContext = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
+  } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
+    ImplOrContext = BoundGenericType::get(implDecl, Type(),
+                                      { Ty->getKeyType(), Ty->getValueType() });
   } else {
-    llvm_unreachable("Unhandled syntax sugar type");
+    llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
 
   // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
-  return ImplOrContext.get<Type>();
-}
-
-TypeBase *DictionaryType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type DictionaryType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
-  // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
-  NominalTypeDecl *implDecl = ctx.getDictionaryDecl();
-  assert(implDecl && "Dictionary type has not been set yet");
-
-  // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), { Key, Value });
   return ImplOrContext.get<Type>();
 }
 
