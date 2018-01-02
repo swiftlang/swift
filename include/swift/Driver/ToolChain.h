@@ -148,6 +148,10 @@ protected:
   /// This method is invoked by findProgramRelativeToSwift().
   virtual std::string findProgramRelativeToSwiftImpl(StringRef name) const;
 
+private:
+  virtual void constructInvocationForBatchModeCompilation(
+      llvm::opt::ArgStringList &Arguments, const JobContext &context) const;
+
 public:
   virtual ~ToolChain() = default;
 
