@@ -2281,7 +2281,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
         OutputMap = OFM->getOutputMapForSingleOutput();
       } else if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
-        assert(false && "driver buildJobsForAction 2043"); // xxx
+        OutputMap = OFM->getOutputMapForSingleOutput();
       } else {
         OutputMap = OFM->getOutputMapForInput(BaseInput);
       }
