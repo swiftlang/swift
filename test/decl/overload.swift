@@ -261,6 +261,9 @@ func inout2(x: inout Int) { }
 func optional(x: Int?) { } // expected-note{{previously declared}}
 func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
 
+func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
+func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)'}}
+
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
 
