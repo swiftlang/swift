@@ -220,6 +220,8 @@ enum class ProtocolConformanceReferenceKind : unsigned {
   /// table whose conformance is conditional on additional requirements that
   /// must first be evaluated and then provided to the accessor function.
   ConditionalWitnessTableAccessor,
+  /// Reserved for future use.
+  Reserved,
 };
 
 // Type metadata record discriminant

@@ -90,6 +90,9 @@ template<> void ProtocolConformanceRecord::dump() const {
       printf("conditional witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
+    case ProtocolConformanceReferenceKind::Reserved:
+      printf("reserved witness table kind\n");
+      break;
   }
 }
 #endif
@@ -165,6 +168,9 @@ const {
             typeName.c_str(), demangledProtocolName.c_str());
     return nullptr;
   }
+
+  case ProtocolConformanceReferenceKind::Reserved:
+    return nullptr;
   }
 
   swift_runtime_unreachable(
@@ -591,6 +597,11 @@ swift::swift_conformsToProtocol(const Metadata * const type,
           C.cacheSuccess(type, P, record.getWitnessTable(type));
           break;
 
+        case ProtocolConformanceReferenceKind::Reserved:
+          // Always fail, because we cannot interpret a future conformance
+          // kind.
+          C.cacheFailure(metadata, P);
+          break;
         }
       }
     }

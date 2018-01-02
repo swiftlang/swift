@@ -2665,6 +2665,9 @@ public:
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
+
+    case ProtocolConformanceReferenceKind::Reserved:
+      break;
     }
     return WitnessTable;
   }
@@ -2673,6 +2676,7 @@ public:
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::Reserved:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTable:
