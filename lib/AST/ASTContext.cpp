@@ -3243,9 +3243,8 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    ArrayRef<Type> genericArgs,
                                    const ASTContext *context,
                                    RecursiveTypeProperties properties)
-  : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent)
-{
+    : NominalOrBoundGenericNominalType(theDecl, parent, theKind, context,
+                                       properties) {
   Bits.BoundGenericType.GenericArgCount = genericArgs.size();
   // Subtypes are required to provide storage for the generic arguments
   std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
