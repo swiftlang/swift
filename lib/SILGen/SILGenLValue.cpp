@@ -218,9 +218,8 @@ public:
 };
 
 /// Materialize this component into a temporary.
-ManagedValue LogicalPathComponent::materializeIntoTemp(SILGenFunction &SGF,
-                                                       SILLocation loc,
-                                                       ManagedValue base) && {
+ManagedValue LogicalPathComponent::materializeIntoTemporary(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
   const TypeLowering &RValueTL = SGF.getTypeLowering(getTypeOfRValue());
   TemporaryInitializationPtr tempInit;
   RValue rvalue;
@@ -255,7 +254,7 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
                                                    ManagedValue base,
                                                    AccessKind kind) && {
   if (kind == AccessKind::Read)
-    return std::move(*this).materializeIntoTemp(SGF, loc, base);
+    return std::move(*this).materializeIntoTemporary(SGF, loc, base);
 
   // AccessKind is Write or ReadWrite. We need to emit a get and set.
   assert(SGF.InFormalEvaluationScope &&
@@ -265,7 +264,7 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
   // writeback.
   auto clonedComponent = clone(SGF, loc);
 
-  ManagedValue temp = std::move(*this).materializeIntoTemp(SGF, loc, base);
+  ManagedValue temp = std::move(*this).materializeIntoTemporary(SGF, loc, base);
 
   // Push a writeback for the temporary.
   pushWriteback(SGF, loc, std::move(clonedComponent), base,
