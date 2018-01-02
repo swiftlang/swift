@@ -1,0 +1,4 @@
+module CTensorFlow {
+  header "tensorflow/c/c_api.h"
+  header "tensorflow/c/eager/c_api.h"
+}
