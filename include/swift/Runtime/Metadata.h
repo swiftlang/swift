@@ -2910,34 +2910,6 @@ swift_getThinFunctionTypeMetadata3(const void *arg0,
                                    const void *arg2,
                                    const Metadata *resultMetadata);
 
-/// \brief Fetch a uniqued metadata for a C function type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata(size_t numArguments,
-                               const void * argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata1(const void *arg0,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata2(const void *arg0,
-                                const void *arg1,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata3(const void *arg0,
-                                const void *arg1,
-                                const void *arg2,
-                                const Metadata *resultMetadata);
-
 #if SWIFT_OBJC_INTEROP
 SWIFT_RUNTIME_EXPORT
 void
