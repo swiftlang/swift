@@ -4,7 +4,7 @@ func arch<F>(_ f: F) {}
 
 // CHECK: define hidden swiftcc void @_T017function_metadata9test_archyyF()
 func test_arch() {
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD:i(32|64)]] 0, %swift.type** null, i32* null, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_T0ytN, i32 0, i32 1))
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 0, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_T0ytN, i32 0, i32 1))
   arch( {() -> () in } )
 
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(32|64)]] 1, %swift.type* @_T0SiN, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_T0ytN, i32 0, i32 1)) {{#[0-9]+}}

@@ -771,6 +771,13 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
               TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
+//                                          const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata0, swift_getFunctionTypeMetadata0, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getFunctionTypeMetadata1(unsigned long flags,
 //                                          const Metadata *arg0,
 //                                          const Metadata *resultMetadata);

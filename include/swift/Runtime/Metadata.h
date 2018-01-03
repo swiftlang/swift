@@ -2836,6 +2836,11 @@ swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
+                               const Metadata *result);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
                                const Metadata *arg0,
                                const Metadata *result);

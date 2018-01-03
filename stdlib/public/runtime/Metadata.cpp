@@ -404,6 +404,14 @@ public:
 static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
 
 const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
+                                      const Metadata *result) {
+  assert(flags.getNumParameters() == 0
+         && "wrong number of arguments in function metadata flags?!");
+  return swift_getFunctionTypeMetadata(flags, nullptr, nullptr, result);
+}
+
+const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
                                       const Metadata *arg0,
                                       const Metadata *result) {

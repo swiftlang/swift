@@ -795,6 +795,9 @@ namespace {
         arguments.push_back(result);
 
         switch (params.size()) {
+        case 0:
+          return IGF.IGM.getGetFunctionMetadata0Fn();
+
         case 1:
           return hasFlags ? IGF.IGM.getGetFunctionMetadata1WithFlagsFn()
                           : IGF.IGM.getGetFunctionMetadata1Fn();
@@ -819,6 +822,7 @@ namespace {
       };
 
       switch (numParams) {
+      case 0:
       case 1:
       case 2:
       case 3: {
