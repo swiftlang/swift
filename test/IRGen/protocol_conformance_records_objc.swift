@@ -31,12 +31,12 @@ extension NSRect: Runcible {
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
-// -- class object (TODO should be class ref variable)
-// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
+// -- class object reference
+// CHECK:           @"OBJC_CLASS_REF_$_Gizmo"
 // -- witness table
 // CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
-// CHECK:           i32 1
+// -- flags 0x03: indirect class metadata
+// CHECK:           i32 3
 // CHECK:         }
 extension Gizmo: Runcible {
   public func runce() {}

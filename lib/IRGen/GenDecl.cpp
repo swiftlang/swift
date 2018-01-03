@@ -1354,6 +1354,8 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
+    return false;
+
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -2215,18 +2217,21 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     } else {
-      // TODO: We should indirectly reference classes. For now directly
-      // reference the class object, which is totally wrong for ObjC interop.
-
-      typeKind = TypeMetadataRecordKind::UniqueDirectClass;
-      if (hasKnownSwiftMetadata(IGM, clas))
+      if (hasKnownSwiftMetadata(IGM, clas)) {
+        typeKind = TypeMetadataRecordKind::UniqueDirectClass;
         entity = LinkEntity::forTypeMetadata(
                          conformingType,
                          TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ false);
-      else
-        entity = LinkEntity::forObjCClass(clas);
-      defaultTy = IGM.TypeMetadataStructTy;
+        defaultTy = IGM.TypeMetadataStructTy;
+      } else {
+        // Form the class reference.
+        (void)IGM.getAddrOfObjCClassRef(clas);
+
+        typeKind = TypeMetadataRecordKind::UniqueIndirectClass;
+        entity = LinkEntity::forObjCClassRef(clas);
+        defaultTy = IGM.TypeMetadataPtrTy;
+      }
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     }
   } else {

@@ -2543,12 +2543,12 @@ private:
     
     /// An indirect reference to the metadata.
     RelativeIndirectablePointer<const TargetClassMetadata<Runtime> *>
-    IndirectClass;
+      IndirectClass;
     
     /// The nominal type descriptor for a resilient or generic type which has
     /// instances that conform to the protocol.
     RelativeIndirectablePointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+      TypeDescriptor;
   };
   
   
