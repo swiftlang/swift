@@ -989,43 +989,52 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       // warning that these overloads are deprecated and will no
       // longer be supported in the future.
       if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        auto diagnosed = false;
-        auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-        auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-        if (currFnTy && otherFnTy) {
-          ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-          ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
+        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
+          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
+          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
+          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
+            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
+            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
+          }
 
-          if (currParams.size() == otherParams.size()) {
-            for (unsigned i : indices(currParams)) {
-              if (currParams[i].isInOut() && otherParams[i].isInOut()) {
-                auto currParamTy = currParams[i]
-                                       .getType()
-                                       ->getAs<InOutType>()
-                                       ->getObjectType();
-                auto otherParamTy = otherParams[i]
-                                        .getType()
-                                        ->getAs<InOutType>()
-                                        ->getObjectType();
-                OptionalTypeKind currOTK;
-                OptionalTypeKind otherOTK;
-                (void)currParamTy->getAnyOptionalObjectType(currOTK);
-                (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
-                if (currOTK != OTK_None && otherOTK != OTK_None &&
-                    currOTK != otherOTK) {
-                  tc.diagnose(current, diag::deprecated_redecl_by_optionality,
-                              current->getFullName(), currParamTy,
-                              otherParamTy);
-                  tc.diagnose(other, diag::invalid_redecl_prev,
-                              other->getFullName());
-                  diagnosed = true;
-                  break;
+          if (currFnTy && otherFnTy) {
+            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
+            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
+
+            if (currParams.size() == otherParams.size()) {
+              auto diagnosed = false;
+              for (unsigned i : indices(currParams)) {
+                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
+                  auto currParamTy = currParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  auto otherParamTy = otherParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  OptionalTypeKind currOTK;
+                  OptionalTypeKind otherOTK;
+                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
+                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
+                  if (currOTK != OTK_None && otherOTK != OTK_None &&
+                      currOTK != otherOTK) {
+                    tc.diagnose(current, diag::deprecated_redecl_by_optionality,
+                                current->getFullName(), currParamTy,
+                                otherParamTy);
+                    tc.diagnose(other, diag::invalid_redecl_prev,
+                                other->getFullName());
+                    tc.diagnose(current,
+                                diag::deprecated_redecl_by_optionality_note);
+                    diagnosed = true;
+                    break;
+                  }
                 }
               }
-            }
 
-            if (diagnosed)
-              break;
+              if (diagnosed)
+                break;
+            }
           }
         }
       }
