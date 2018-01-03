@@ -2192,6 +2192,17 @@ struct TypeEntityInfo {
   ProtocolConformanceFlags flags;
   LinkEntity entity;
   llvm::Type *defaultTy, *defaultPtrTy;
+
+  /// Adjust the flags once we know whether the reference to this entity
+  /// will be indirect.
+  void adjustForKnownRef(ConstantReference &ref) {
+    if (ref.isIndirect() &&
+        flags.getTypeKind()
+          == TypeMetadataRecordKind::DirectNominalTypeDescriptor) {
+      flags = flags.withTypeKind(
+                TypeMetadataRecordKind::IndirectNominalTypeDescriptor);
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -2206,7 +2217,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
   if (doesConformanceReferenceNominalTypeDescriptor(IGM, conformingType)) {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
-    typeKind = TypeMetadataRecordKind::UniqueNominalTypeDescriptor;
+    typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
     defaultTy = IGM.NominalTypeDescriptorTy;
     defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
@@ -2307,23 +2318,29 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
     emitAssociatedTypeMetadataRecord(conformance);
 
-    // Relative reference to the nominal type descriptor.
+    // Relative reference to the protocol descriptor.
     auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     record.addRelativeAddress(descriptorRef);
 
-    // Relative reference to the type entity info.
-    auto typeEntity = getTypeEntityInfo(*this,
-                                    conformance->getType()->getCanonicalType());
+    // Relative reference to the type entity info, with the type reference
+    // kind mangled in the lower bits.
+    auto typeEntity =
+      getTypeEntityInfo(*this, conformance->getType()->getCanonicalType());
+
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
       typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
-    record.addRelativeAddress(typeRef);
+    typeEntity.adjustForKnownRef(typeRef);
+    record.addTaggedRelativeOffset(RelativeAddressTy,
+                                   typeRef.getValue(),
+                                   typeEntity.flags.getValue());
 
     // Figure out what kind of witness table we have.
     auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
     ProtocolConformanceReferenceKind conformanceKind;
+
     if (!isResilient(conformance->getProtocol(),
                      ResilienceExpansion::Maximal) &&
         conformance->getConditionalRequirements().empty()) {

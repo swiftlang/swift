@@ -16,8 +16,8 @@ public protocol Runcible {
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeValueTypeVMn
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeValueTypeVAA8RuncibleAAWP
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         },
 public struct NativeValueType: Runcible {
   public func runce() {}
@@ -30,8 +30,8 @@ public struct NativeValueType: Runcible {
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCMn
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         },
 public class NativeClassType: Runcible {
   public func runce() {}
@@ -44,8 +44,8 @@ public class NativeClassType: Runcible {
 // CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVMn
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAWP
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         },
 public struct NativeGenericType<T>: Runcible {
   public func runce() {}
@@ -58,8 +58,8 @@ public struct NativeGenericType<T>: Runcible {
 // CHECK-SAME:           @got._T0SiMn
 // -- witness table
 // CHECK-SAME:           @_T0Si28protocol_conformance_records8RuncibleAAWP
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         }
 extension Int: Runcible {
   public func runce() {}
@@ -74,8 +74,8 @@ extension Int: Runcible {
 // CHECK-SAME:           @got._T016resilient_struct4SizeVMn
 // -- witness table
 // CHECK-SAME:           @_T016resilient_struct4SizeV28protocol_conformance_records8RuncibleADWP
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         }
 
 extension Size: Runcible {
@@ -93,8 +93,8 @@ public protocol Spoon { }
 // CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVMn
 // -- witness table accessor
 // CHECK-SAME:           i32 add{{.*}}@_T028protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa{{.*}}i32 2),
-// -- flags 0x04: unique nominal type descriptor
-// CHECK-SAME:           i32 4
+// -- flags 0x00: direct nominal type descriptor
+// CHECK-SAME:           i32 0
 // CHECK-SAME:         }
 extension NativeGenericType : Spoon where T: Spoon {
   public func runce() {}

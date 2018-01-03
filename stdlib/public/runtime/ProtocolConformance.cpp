@@ -61,7 +61,8 @@ template<> void ProtocolConformanceRecord::dump() const {
              class_getName(*getIndirectClass()));
       break;
       
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       printf("unique nominal type descriptor %s", symbolName(getNominalTypeDescriptor()));
       break;
   }
@@ -107,7 +108,8 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
       return getMetadataForClass(ClassMetadata);
     return nullptr;
       
-  case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+  case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
     return nullptr;
   }
 
@@ -548,8 +550,9 @@ swift::swift_conformsToProtocol(const Metadata * const type,
       // An accessor function might still be necessary even if the witness table
       // can be shared.
       } else if (record.getTypeKind()
-                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor) {
-
+                   == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
+                 record.getTypeKind()
+                  == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
         auto R = record.getNominalTypeDescriptor();
         auto P = record.getProtocol();
 
