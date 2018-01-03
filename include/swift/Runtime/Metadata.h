@@ -728,6 +728,7 @@ template <typename Runtime> struct TargetGenericMetadata;
 template <typename Runtime> struct TargetClassMetadata;
 template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
+template <typename Runtime> struct TargetValueMetadata;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -903,7 +904,7 @@ public:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return static_cast<const TargetStructMetadata<Runtime> *>(this)
+      return static_cast<const TargetValueMetadata<Runtime> *>(this)
           ->Description;
     case MetadataKind::ForeignClass:
     case MetadataKind::Opaque:
@@ -2532,56 +2533,47 @@ private:
   // Some description of the type that is resolvable at runtime.
   union {
     /// A direct reference to the metadata.
-    RelativeDirectPointer<const TargetMetadata<Runtime>> DirectType;
+    RelativeDirectPointerIntPair<const TargetMetadata<Runtime>,
+                                 TypeMetadataRecordKind> DirectType;
 
     /// The nominal type descriptor for a resilient or generic type.
-    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      TypeDescriptor;
   };
 
-  /// Flags describing the type metadata record.
-  TypeMetadataRecordFlags Flags;
-  
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeKind();
+    return DirectType.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
       break;
         
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectObjCClass:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
-    return this->DirectType;
+    return this->DirectType.getPointer();
   }
 
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not generic metadata pattern");
     }
     
-    return this->TypeDescriptor;
+    return this->TypeDescriptor.getPointer();
   }
 
   /// Get the canonical metadata for the type referenced by this record, or
@@ -2604,154 +2596,139 @@ public:
 
 private:
   /// The protocol being conformed to.
-  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
+  ///
+  /// The remaining low bit is reserved for future use.
+  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
+    Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
-    /// A direct reference to the metadata.
-    ///
-    /// Depending on the conformance kind, this may not be usable
-    /// metadata without being first processed by the runtime.
-    RelativeIndirectablePointer<TargetMetadata<Runtime>> DirectType;
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+
+    /// A direct reference to the metadata, which must be uniqued before
+    /// being used.
+    RelativeDirectPointerIntPair<TargetMetadata<Runtime>,
+                                 TypeMetadataRecordKind> NonuniqueDirectType;
     
     /// An indirect reference to the metadata.
-    RelativeIndirectablePointer<const TargetClassMetadata<Runtime> *>
-    IndirectClass;
-    
-    /// The nominal type descriptor for a resilient or generic type which has
-    /// instances that conform to the protocol.
-    RelativeIndirectablePointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+    ///
+    /// Only valid when the \c IndirectClassOrDirectType value is
+    // \c IsIndirectClass.
+    RelativeDirectPointerIntPair<const TargetClassMetadata<Runtime> *,
+                                 TypeMetadataRecordKind> IndirectObjCClass;
   };
   
   
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<const WitnessTable> WitnessTable;
+    RelativeDirectPointerIntPair<const WitnessTable,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type.
-    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
+    RelativeDirectPointerIntPair<WitnessTableAccessorFn,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTableAccessor;
   };
-  
-  /// Flags describing the protocol conformance.
-  ProtocolConformanceFlags Flags;
+
+  /// Reserved word.
+  unsigned Reserved;
   
 public:
   const ProtocolDescriptor *getProtocol() const {
-    return Protocol;
+    return Protocol.getPointer();
   }
-  
-  ProtocolConformanceFlags getFlags() const {
-    return Flags;
-  }
-  
+
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeKind();
+    return DirectNominalTypeDescriptor.getInt();
   }
+
   ProtocolConformanceReferenceKind getConformanceKind() const {
-    return Flags.getConformanceKind();
+    return WitnessTable.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectObjCClass:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
-    return DirectType;
+    return NonuniqueDirectType.getPointer();
   }
   
-  // FIXME: This shouldn't exist
-  const TargetClassMetadata<Runtime> *getDirectClass() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-    case TypeMetadataRecordKind::UniqueDirectClass:
+  const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::IndirectObjCClass:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      assert(false && "not direct class object");
-    }
-
-    const TargetMetadata<Runtime> *metadata = DirectType;
-    return static_cast<const TargetClassMetadata<Runtime>*>(metadata);
-    
-  }
-  
-  const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not indirect class object");
     }
     
-    return IndirectClass;
+    return IndirectObjCClass.getPointer();
   }
   
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+      return *IndirectNominalTypeDescriptor.getPointer();
+
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     
-    return TypeDescriptor;
+    return nullptr;
   }
   
   /// Get the directly-referenced static witness table.
   const swift::WitnessTable *getStaticWitnessTable() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
+
+    case ProtocolConformanceReferenceKind::Reserved:
+      break;
     }
-    return WitnessTable;
+    return WitnessTable.getPointer();
   }
   
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::Reserved:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
-    return WitnessTableAccessor;
+    return WitnessTableAccessor.getPointer();
   }
   
   /// Get the canonical metadata for the type referenced by this record, or

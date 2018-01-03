@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -2331,13 +2332,6 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
                                                        CanType conformingType) {
   NominalTypeDecl *nom = conformingType->getAnyNominal();
-  auto *clas = dyn_cast<ClassDecl>(nom);
-  if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
-    return true;
-
-  if (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))
-    return true;
-
-  return false;
+  return !isa<ClangModuleUnit>(nom->getModuleScopeContext());
 }
 
