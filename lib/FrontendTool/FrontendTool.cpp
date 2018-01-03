@@ -752,16 +752,24 @@ static bool finishTypecheck(CompilerInvocation &Invocation,
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
-    return false;
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
-                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+  bool hadError = false;
+  Invocation.getFrontendOptions()
+      .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+          [&](const InputFile &input) -> void {
+            StringRef TBDPath = input.supplementaryOutputs().TBDPath;
+            if (TBDPath.empty())
+              return;
+            auto installName =
+                Invocation.getFrontendOptions().TBDInstallName.empty()
+                    ? "lib" + Invocation.getModuleName().str() + ".dylib"
+                    : Invocation.getFrontendOptions().TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(),
-                  Invocation.getFrontendOptions().InputsAndOutputs.getTBDPath(),
-                  installName);
+            hadError = writeTBD(Instance.getMainModule(),
+                                Invocation.getSILOptions().hasMultipleIGMs(),
+                                TBDPath, installName) ||
+                       hadError;
+          });
+  return hadError;
 }
 
 static std::deque<PostSILGenInputs>
