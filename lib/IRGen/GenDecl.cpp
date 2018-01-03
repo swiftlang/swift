@@ -2218,7 +2218,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
       defaultPtrTy = IGM.TypeMetadataPtrTy;
     } else {
       if (hasKnownSwiftMetadata(IGM, clas)) {
-        typeKind = TypeMetadataRecordKind::UniqueDirectClass;
+        typeKind = TypeMetadataRecordKind::UniqueDirectType;
         entity = LinkEntity::forTypeMetadata(
                          conformingType,
                          TypeMetadataAddress::AddressPoint,

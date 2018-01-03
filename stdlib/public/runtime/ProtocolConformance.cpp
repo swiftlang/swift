@@ -62,10 +62,6 @@ template<> void ProtocolConformanceRecord::dump() const {
         printf("<structural type>");
       }
       break;
-    case TypeMetadataRecordKind::UniqueDirectClass:
-      printf("unique direct class %s",
-             class_getName(getDirectClass()));
-      break;
     case TypeMetadataRecordKind::UniqueIndirectClass:
       printf("unique indirect class %s",
              class_getName(*getIndirectClass()));
@@ -117,13 +113,6 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
     if (auto *ClassMetadata = *getIndirectClass())
-      return getMetadataForClass(ClassMetadata);
-    return nullptr;
-      
-  case TypeMetadataRecordKind::UniqueDirectClass:
-    // The class may be ObjC, in which case we need to instantiate its Swift
-    // metadata.
-    if (auto *ClassMetadata = getDirectClass())
       return getMetadataForClass(ClassMetadata);
     return nullptr;
       

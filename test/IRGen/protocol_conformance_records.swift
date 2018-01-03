@@ -23,15 +23,14 @@ public struct NativeValueType: Runcible {
   public func runce() {}
 }
 
-// -- TODO class refs should be indirected through their ref variable
 // CHECK-SAME:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
-// -- class object (TODO should be class ref variable)
+// -- class metadata
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCMf
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP
-// -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
+// -- flags 0x01: unique direct metadata
 // CHECK-SAME:           i32 1
 // CHECK-SAME:         },
 public class NativeClassType: Runcible {
@@ -75,7 +74,7 @@ extension Int: Runcible {
 // CHECK-SAME:           @got._T016resilient_struct4SizeVN
 // -- witness table
 // CHECK-SAME:           @_T016resilient_struct4SizeV28protocol_conformance_records8RuncibleADWP
-// -- flags 0x04: unique direct metadata
+// -- flags 0x01: unique direct metadata
 // CHECK-SAME:           i32 1
 // CHECK-SAME:         }
 

@@ -2481,7 +2481,6 @@ public:
 
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
       break;
         
     case TypeMetadataRecordKind::UniqueIndirectClass:
@@ -2501,7 +2500,6 @@ public:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
@@ -2595,33 +2593,12 @@ public:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
     return DirectType;
-  }
-  
-  // FIXME: This shouldn't exist
-  const TargetClassMetadata<Runtime> *getDirectClass() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-    case TypeMetadataRecordKind::UniqueDirectClass:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      assert(false && "not direct class object");
-    }
-
-    const TargetMetadata<Runtime> *metadata = DirectType;
-    return static_cast<const TargetClassMetadata<Runtime>*>(metadata);
-    
   }
   
   const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
@@ -2633,7 +2610,6 @@ public:
       break;
         
     case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not indirect class object");
@@ -2651,7 +2627,6 @@ public:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:

@@ -192,21 +192,13 @@ enum class TypeMetadataRecordKind : unsigned {
   /// metadata.
   ///
   /// On platforms without ObjC interop, this indirection isn't necessary,
-  /// and classes could be emitted as UniqueDirectType.
+  /// and classes are emitted as UniqueDirectType.
   UniqueIndirectClass,
   
   /// The conformance is for a generic or resilient type.
   /// getNominalTypeDescriptor() points to the nominal type descriptor shared
   /// by all metadata instantiations of this type.
   UniqueNominalTypeDescriptor,
-  
-  /// The conformance is for a nongeneric class type.
-  /// getDirectType() points to the unique class object.
-  ///
-  /// FIXME: This shouldn't exist. On ObjC interop platforms, class references
-  /// must be indirected (using UniqueIndirectClass). On non-ObjC interop
-  /// platforms, the class object always is the type metadata.
-  UniqueDirectClass = 0xF,
 };
 
 /// Kinds of reference to protocol conformance.
