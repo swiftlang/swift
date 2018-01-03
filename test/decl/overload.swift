@@ -262,7 +262,9 @@ func optional(x: Int?) { } // expected-note{{previously declared}}
 func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
 
 func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)'}}
+// expected-note@-1 {{previously declared}}
+func optionalInOut(x: inout Int!) { } // expected-warning{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+// expected-warning@-1 {{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
