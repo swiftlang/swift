@@ -865,8 +865,7 @@ static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
     ModuleOrSourceFile MSF, bool moduleIsPublic, int &ReturnValue,
-    FrontendObserver *observer, UnifiedStatsReporter *Stats,
-    bool isOKToFreeContext);
+    FrontendObserver *observer, UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -973,7 +972,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (performCompileStepsPostSILGen(
             Instance, Invocation, std::move(PSGI.TheSILModule),
             PSGI.astGuaranteedToCorrespondToSIL, PSGI.ModuleOrPrimarySourceFile,
-            moduleIsPublic, ReturnValue, observer, Stats, PSGIs.empty()))
+            moduleIsPublic, ReturnValue, observer, Stats))
       return true;
   }
   return false;
@@ -1218,7 +1217,7 @@ static bool generateCode(CompilerInvocation &Invocation,
                          CompilerInstance &Instance, std::string OutputFilename,
                          llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal,
-                         UnifiedStatsReporter *Stats, bool isOKToFreeContext);
+                         UnifiedStatsReporter *Stats);
 
 static SerializationOptions
 computeSerializationOptions(const CompilerInvocation &Invocation,
@@ -1253,8 +1252,7 @@ static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
     ModuleOrSourceFile MSF, bool moduleIsPublic, int &ReturnValue,
-    FrontendObserver *observer, UnifiedStatsReporter *Stats,
-    bool isOKToFreeContext) {
+    FrontendObserver *observer, UnifiedStatsReporter *Stats) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1392,8 +1390,7 @@ static bool performCompileStepsPostSILGen(
 
   return generateCode(Invocation, Instance, OutputFilename,
                       std::get<0>(IRModuleAndHashGlobal).get(),
-                      std::get<1>(IRModuleAndHashGlobal), Stats,
-                      isOKToFreeContext) ||
+                      std::get<1>(IRModuleAndHashGlobal), Stats) ||
          HadError;
 }
 
@@ -1401,7 +1398,7 @@ static bool generateCode(CompilerInvocation &Invocation,
                          CompilerInstance &Instance, std::string OutputFilename,
                          llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal,
-                         UnifiedStatsReporter *Stats, bool isOKToFreeContext) {
+                         UnifiedStatsReporter *Stats) {
   std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
       Invocation.getIRGenOptions(), Instance.getASTContext());
   version::Version EffectiveLanguageVersion =
@@ -1409,7 +1406,11 @@ static bool generateCode(CompilerInvocation &Invocation,
 
   // Free up some compiler resources now that we have an IRModule.
   Instance.freeSIL();
-  if (isOKToFreeContext)
+  // Need to keep this around for the next primary if > 1.
+  // OTOH, don't bother to free it after the last one, even though it would OK
+  // because that won't reduce peak heap usage, since the others have already
+  // been compiled with it still around.
+  if (Invocation.getFrontendOptions().InputsAndOutputs.primaryInputCount() < 2)
     Instance.freeContext();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
