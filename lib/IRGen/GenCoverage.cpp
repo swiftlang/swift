@@ -43,6 +43,15 @@ void IRGenModule::emitCoverageMapping() {
   if (Mappings.empty())
     return;
 
+  assert(std::all_of(Mappings.begin(), Mappings.end(),
+                     [](const SILCoverageMap &M) {
+                       // TODO: We should use this check defensively s.t we
+                       // never emit malformed coverage data, instead of just
+                       // using it as a debugging tool.
+                       return M.hasSymtabEntry();
+                     }) &&
+         "Missing symtab entry for coverage mapping");
+
   std::vector<StringRef> Files;
   for (const auto &M : Mappings)
     if (std::find(Files.begin(), Files.end(), M.getFile()) == Files.end())
