@@ -39,15 +39,18 @@ public final class TensorProgram {
   // output tensors, we may need to extend this API to pass in a
   // outputTensorCount.
   @_versioned
-  init(_ bytes: UnsafeRawPointer, _ size: Int,
-       _ inputTensorPtr: UnsafePointer<AnyTensorHandle>,
-       _ inputTensorCount: Int) {
+  init(programByteAddress: UnsafeRawPointer,
+       programByteCount: Int,
+       tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
+       tensorArgumentCount: Int) {
     inputTensors =
-      Array(UnsafeBufferPointer(start: inputTensorPtr, count: inputTensorCount))
+      Array(UnsafeBufferPointer(start: tensorArgumentAddress,
+                                count: tensorArgumentCount))
 
     let s = TF_NewStatus()
 
-    let tfFunc = TF_FunctionImportFunctionDef(bytes, size, s)
+    let tfFunc = TF_FunctionImportFunctionDef(programByteAddress,
+                                              programByteCount, s)
     checkOk(s)
 
     // Now we start the graph computation.
@@ -121,12 +124,15 @@ public final class TensorProgram {
 @_inlineable
 @_silgen_name("_swift_tfc_StartTensorProgram")
 public func _TFCStartTensorProgram(
-  _ bytes: UnsafeRawPointer,
-  _ size: Int,
-  _ inputTensorPtr: UnsafePointer<AnyTensorHandle>,
-  _ inputTensorCount: Int
+  _ programByteAddress: UnsafeRawPointer,
+  _ programByteCount: Int,
+  _ tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
+  _ tensorArgumentCount: Int
 ) -> TensorProgram {
-  return TensorProgram(bytes, size, inputTensorPtr, inputTensorCount)
+  return TensorProgram(programByteAddress: programByteAddress,
+                       programByteCount: programByteCount,
+                       tensorArgumentAddress: tensorArgumentAddress,
+                       tensorArgumentCount: tensorArgumentCount)
 }
 
 // Terminate the computation as given by 'program', and clean up the state.
