@@ -2189,7 +2189,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
 
 namespace {
 struct TypeEntityInfo {
-  ProtocolConformanceFlags flags;
+  TypeMetadataRecordKind typeKind;
   LinkEntity entity;
   llvm::Type *defaultTy, *defaultPtrTy;
 
@@ -2197,11 +2197,8 @@ struct TypeEntityInfo {
   /// will be indirect.
   void adjustForKnownRef(ConstantReference &ref) {
     if (ref.isIndirect() &&
-        flags.getTypeKind()
-          == TypeMetadataRecordKind::DirectNominalTypeDescriptor) {
-      flags = flags.withTypeKind(
-                TypeMetadataRecordKind::IndirectNominalTypeDescriptor);
-    }
+        typeKind == TypeMetadataRecordKind::DirectNominalTypeDescriptor)
+      typeKind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
   }
 };
 } // end anonymous namespace
@@ -2243,9 +2240,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     defaultPtrTy = IGM.TypeMetadataPtrTy;
   }
 
-  auto flags = ProtocolConformanceFlags().withTypeKind(typeKind);
-
-  return {flags, *entity, defaultTy, defaultPtrTy};
+  return {typeKind, *entity, defaultTy, defaultPtrTy};
 }
 
 /// Form an LLVM constant for the relative distance between a reference
@@ -2334,10 +2329,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     typeEntity.adjustForKnownRef(typeRef);
     record.addTaggedRelativeOffset(RelativeAddressTy,
                                    typeRef.getValue(),
-                                   typeEntity.flags.getValue());
+                                   static_cast<unsigned>(typeEntity.typeKind));
 
     // Figure out what kind of witness table we have.
-    auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
     ProtocolConformanceReferenceKind conformanceKind;
 
@@ -2367,8 +2361,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     record.addTaggedRelativeOffset(RelativeAddressTy, witnessTableVar,
                                    static_cast<unsigned>(conformanceKind));
 
-    // Flags.
-    record.addInt(Int32Ty, flags.getValue());
+    // Reserved.
+    record.addInt(Int32Ty, 0);
 
     record.finishAndAddTo(recordsArray);
   }
@@ -2377,7 +2371,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   // resolve relocations relative to it.
 
   auto var = recordsArray.finishAndCreateGlobal("\x01l_protocol_conformances",
-                                                getPointerAlignment(),
+                                                Alignment(4),
                                                 /*isConstant*/ true,
                                           llvm::GlobalValue::PrivateLinkage);
 
@@ -2447,7 +2441,8 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     unsigned arrayIdx = elts.size();
     llvm::Constant *recordFields[] = {
       emitRelativeReference(typeRef, var, { arrayIdx, 0 }),
-      llvm::ConstantInt::get(Int32Ty, typeEntity.flags.getValue()),
+      llvm::ConstantInt::get(Int32Ty,
+                             static_cast<unsigned>(typeEntity.typeKind)),
     };
 
     auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy,

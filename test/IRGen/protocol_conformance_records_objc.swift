@@ -23,8 +23,9 @@ public protocol Runcible {
 // CHECK:           i32 2
 // -- witness table
 // CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x02: nonunique type metadata
-// CHECK:           i32 2 },
+// -- reserved
+// CHECK:           i32 0
+// CHECK:         },
 extension NSRect: Runcible {
   public func runce() {}
 }
@@ -38,8 +39,8 @@ extension NSRect: Runcible {
 // CHECK:           i32 3
 // -- witness table
 // CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x03: indirect class object
-// CHECK:           i32 3
+// -- reserved
+// CHECK:           i32 0
 // CHECK:         }
 extension Gizmo: Runcible {
   public func runce() {}

@@ -2566,9 +2566,9 @@ private:
                                  ProtocolConformanceReferenceKind>
       WitnessTableAccessor;
   };
-  
-  /// Flags describing the protocol conformance.
-  ProtocolConformanceFlags UnusedFlags;
+
+  /// Reserved word.
+  unsigned Reserved;
   
 public:
   const ProtocolDescriptor *getProtocol() const {
