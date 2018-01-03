@@ -174,15 +174,14 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 
 static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   DependencyTracker &depTracker,
-                                  const FrontendOptions &opts) {
+                                  const FrontendOptions &opts,
+                                  StringRef loadedModuleTracePath) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.InputsAndOutputs.getLoadedModuleTracePath(), EC,
-                           llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        opts.InputsAndOutputs.getLoadedModuleTracePath(),
-                        EC.message());
+                        loadedModuleTracePath, EC.message());
     out.clear_error();
     return true;
   }
@@ -234,7 +233,19 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
 
   return true;
 }
-
+static bool emitLoadedModuleTrace(ASTContext &ctxt,
+                                  DependencyTracker &depTracker,
+                                  const FrontendOptions &opts) {
+  bool hadError = false;
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &f) -> void {
+        StringRef p = f.supplementaryOutputs().LoadedModuleTracePath;
+        if (!p.empty())
+          hadError =
+              emitLoadedModuleTrace(ctxt, depTracker, opts, p) || hadError;
+      });
+  return hadError;
+}
 
 /// Gets an output stream for the provided output filename, or diagnoses to the
 /// provided AST Context and returns null if there was an error getting the
@@ -916,9 +927,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     emitReferenceDependencies(Invocation, Instance);
 
-  if (opts.InputsAndOutputs.hasLoadedModuleTracePath())
-    (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
-                                opts);
+  (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(), opts);
 
   bool shouldIndex = !opts.IndexStorePath.empty();
 
