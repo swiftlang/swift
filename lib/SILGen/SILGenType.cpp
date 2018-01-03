@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -855,7 +856,6 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
-    ProfilerRAII Profiler(SGM, fd);
     SGM.emitFunction(fd);
     // FIXME: Default implementations in protocols.
     if (SGM.requiresObjCMethodEntryPoint(fd) &&
@@ -863,7 +863,6 @@ public:
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
-    ProfilerRAII Profiler(SGM, cd);
     SGM.emitConstructor(cd);
 
     if (SGM.requiresObjCMethodEntryPoint(cd) &&
@@ -872,7 +871,6 @@ public:
   }
   void visitDestructorDecl(DestructorDecl *dd) {
     assert(isa<ClassDecl>(theType) && "destructor in a non-class type");
-    ProfilerRAII Profiler(SGM, dd);
     SGM.emitDestructor(cast<ClassDecl>(theType), dd);
   }
 
@@ -955,13 +953,11 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
-    ProfilerRAII Profiler(SGM, fd);
     SGM.emitFunction(fd);
     if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
-    ProfilerRAII Profiler(SGM, cd);
     SGM.emitConstructor(cd);
     if (SGM.requiresObjCMethodEntryPoint(cd))
       SGM.emitObjCConstructorThunk(cd);
