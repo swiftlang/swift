@@ -123,9 +123,10 @@ OutputFilesComputer::computeOutputFiles() const {
   InputsAndOutputs.forEachInputProducingOutput(
       [&](const InputFile &input) -> void {
 
-        StringRef outputArg = OutputFileArguments.empty()
-                                  ? StringRef()
-                                  : StringRef(OutputFileArguments[i]);
+        StringRef outputArg = i < OutputFileArguments.size()
+                                  ? StringRef(OutputFileArguments[i])
+                                  : StringRef();
+
         ++i;
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
         if (!outputFile) {
