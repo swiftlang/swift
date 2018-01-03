@@ -2227,7 +2227,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     // Form the class reference.
     (void)IGM.getAddrOfObjCClassRef(clas);
 
-    typeKind = TypeMetadataRecordKind::UniqueIndirectClass;
+    typeKind = TypeMetadataRecordKind::IndirectObjCClass;
     entity = LinkEntity::forObjCClassRef(clas);
     defaultTy = IGM.TypeMetadataPtrTy;
     defaultPtrTy = IGM.TypeMetadataPtrTy;

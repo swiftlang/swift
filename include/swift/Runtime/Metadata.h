@@ -2479,7 +2479,7 @@ public:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
@@ -2494,7 +2494,7 @@ public:
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
         
-    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not generic metadata pattern");
@@ -2530,25 +2530,27 @@ private:
   
   // Some description of the type that conforms to the protocol.
   union {
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+
     /// A direct reference to the metadata, which must be uniqued before
     /// being used.
-    ///
-    /// Only valid when the \c IndirectClassOrDirectType value is
-    // \c IsDirectType.
     RelativeDirectPointerIntPair<TargetMetadata<Runtime>,
-                                 TypeMetadataRecordKind> DirectType;
+                                 TypeMetadataRecordKind> NonuniqueDirectType;
     
     /// An indirect reference to the metadata.
     ///
     /// Only valid when the \c IndirectClassOrDirectType value is
     // \c IsIndirectClass.
     RelativeDirectPointerIntPair<const TargetClassMetadata<Runtime> *,
-                                 TypeMetadataRecordKind> IndirectClass;
-    
-    /// The nominal type descriptor for a resilient or generic type which has
-    /// instances that conform to the protocol.
-    RelativeIndirectablePointerIntPair<TargetNominalTypeDescriptor<Runtime>,
-                                       /*always clear=*/bool> TypeDescriptor;
+                                 TypeMetadataRecordKind> IndirectObjCClass;
   };
   
   
@@ -2575,7 +2577,7 @@ public:
   }
 
   TypeMetadataRecordKind getTypeKind() const {
-    return DirectType.getInt();
+    return DirectNominalTypeDescriptor.getInt();
   }
 
   ProtocolConformanceReferenceKind getConformanceKind() const {
@@ -2587,18 +2589,18 @@ public:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
-    return DirectType.getPointer();
+    return NonuniqueDirectType.getPointer();
   }
   
-  const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
+  const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
     switch (getTypeKind()) {
-    case TypeMetadataRecordKind::UniqueIndirectClass:
+    case TypeMetadataRecordKind::IndirectObjCClass:
       break;
         
     case TypeMetadataRecordKind::NonuniqueDirectType:
@@ -2607,22 +2609,24 @@ public:
       assert(false && "not indirect class object");
     }
     
-    return IndirectClass.getPointer();
+    return IndirectObjCClass.getPointer();
   }
   
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      return DirectNominalTypeDescriptor.getPointer();
+
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueIndirectClass:
+      return *IndirectNominalTypeDescriptor.getPointer();
+
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     
-    return TypeDescriptor.getPointer();
+    return nullptr;
   }
   
   /// Get the directly-referenced static witness table.

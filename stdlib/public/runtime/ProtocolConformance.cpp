@@ -56,9 +56,9 @@ template<> void ProtocolConformanceRecord::dump() const {
         printf("<structural type>");
       }
       break;
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      printf("unique indirect class %s",
-             class_getName(*getIndirectClass()));
+    case TypeMetadataRecordKind::IndirectObjCClass:
+      printf("indirect Objective-C class %s",
+             class_getName(*getIndirectObjCClass()));
       break;
       
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
@@ -100,11 +100,11 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
         static_cast<const ForeignTypeMetadata *>(getDirectType());
     return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
   }
-  case TypeMetadataRecordKind::UniqueIndirectClass:
+  case TypeMetadataRecordKind::IndirectObjCClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
-    if (auto *ClassMetadata = *getIndirectClass())
+    if (auto *ClassMetadata = *getIndirectObjCClass())
       return getMetadataForClass(ClassMetadata);
     return nullptr;
       
