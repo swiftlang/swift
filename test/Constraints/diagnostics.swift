@@ -936,9 +936,6 @@ func SR_6272_a() {
   enum Foo: Int {
     case bar
   }
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{3-3=Float(}} {{19-19=)}}
-  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
-  Foo.bar.rawValue * Float(0)
 
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-41=}} {{42-43=}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
@@ -947,14 +944,15 @@ func SR_6272_a() {
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{18-18=Float(}} {{34-34=)}}
   // expected-note@+1 {{expected an argument list of type '(Float, Float)'}}
   let _: Float = Foo.bar.rawValue * Float(0)
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{none}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  Foo.bar.rawValue * Float(0)
 }
 
 func SR_6272_b() {
   let lhs = Float(3)
   let rhs = Int(0)
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{9-9=Float(}} {{12-12=)}}
-  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
-  lhs * rhs
 
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{24-24=Float(}} {{27-27=)}}
   // expected-note@+1 {{expected an argument list of type '(Float, Float)'}}
@@ -963,6 +961,10 @@ func SR_6272_b() {
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{16-16=Int(}} {{19-19=)}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
   let _: Int = lhs * rhs
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{none}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  lhs * rhs
 }
 
 func SR_6272_c() {
@@ -985,15 +987,15 @@ struct SR_6272_D: ExpressibleByIntegerLiteral {
 func SR_6272_d() {
   let x: Float = 1.0
 
-  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{50-50=Int(}} {{51-51=)}}
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
   // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + x
 
-  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Double'}} {{50-50=Int(}} {{54-54=)}}
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Double'}} {{none}}
   // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Double, Double)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + 42.0
 
-  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{50-50=Int(}} {{51-51=)}}
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
   // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + x + 1.0
 }
