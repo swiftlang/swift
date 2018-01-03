@@ -992,6 +992,35 @@ public:
     swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
+  /// Read the offset of the generic parameters of a class from the nominal
+  /// type descriptor. If the class has a resilient superclass, we also
+  /// have to read the superclass size and add that to the offset.
+  ///
+  /// The offset is in units of words, from the start of the class's
+  /// metadata.
+  std::pair<bool, uint32_t>
+  readGenericArgsOffset(MetadataRef metadata,
+                        NominalTypeDescriptorRef descriptor) {
+    if (metadata->getKind() == MetadataKind::Class) {
+      auto *classMetadata = cast<TargetClassMetadata<Runtime>>(metadata);
+      if (classMetadata->SuperClass) {
+        auto superMetadata = readMetadata(classMetadata->SuperClass);
+        if (!superMetadata)
+          return std::make_pair(false, 0);
+
+        auto result =
+          descriptor->GenericParams.getOffset(
+            classMetadata,
+            cast<TargetClassMetadata<Runtime>>(superMetadata));
+
+        return std::make_pair(true, result);
+      }
+    }
+
+    auto result = descriptor->GenericParams.getOffset();
+    return std::make_pair(true, result);
+  }
+
   /// Read a single generic type argument from a bound generic type
   /// metadata.
   std::pair<bool, StoredPointer>
@@ -1010,11 +1039,14 @@ public:
       return std::make_pair(false, 0);
 
     auto numGenericParams = descriptor->GenericParams.NumPrimaryParams;
-    auto offsetToGenericArgs =
-      sizeof(StoredPointer) * (descriptor->GenericParams.Offset);
+    auto offsetToGenericArgs = readGenericArgsOffset(Meta, descriptor);
+    if (!offsetToGenericArgs.first)
+      return std::make_pair(false, 0);
+
     auto addressOfGenericArgAddress =
-      Meta.getAddress() + offsetToGenericArgs +
-      index * sizeof(StoredPointer);
+      (Meta.getAddress() +
+       offsetToGenericArgs.second * sizeof(StoredPointer) +
+       index * sizeof(StoredPointer));
 
     if (index >= numGenericParams)
       return std::make_pair(false, 0);
@@ -1357,10 +1389,13 @@ private:
     std::vector<BuiltType> substitutions;
 
     auto numGenericParams = descriptor->GenericParams.NumPrimaryParams;
-    auto offsetToGenericArgs =
-      sizeof(StoredPointer) * (descriptor->GenericParams.Offset);
+    auto offsetToGenericArgs = readGenericArgsOffset(metadata, descriptor);
+    if (!offsetToGenericArgs.first)
+      return {};
+
     auto addressOfGenericArgAddress =
-      metadata.getAddress() + offsetToGenericArgs;
+      (metadata.getAddress() + sizeof(StoredPointer) *
+       offsetToGenericArgs.second);
 
     using ArgIndex = decltype(descriptor->GenericParams.NumPrimaryParams);
     for (ArgIndex i = 0; i < numGenericParams;

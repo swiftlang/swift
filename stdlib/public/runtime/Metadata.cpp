@@ -1448,7 +1448,8 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->VTableOffset + i] = description->getMethod(i);
+        classWords[vtable->getVTableOffset(theClass) + i]
+          = description->getMethod(i);
       }
     }
   }
@@ -1470,23 +1471,23 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
 
     // Copy the generic requirements.
     if (genericParams.hasGenericRequirements()) {
-      unsigned numParamWords = genericParams.NumGenericRequirements;
-      memcpy(classWords + genericParams.Offset,
-             superWords + genericParams.Offset,
-             numParamWords * sizeof(uintptr_t));
+      memcpy(classWords + genericParams.getOffset(ancestor),
+             superWords + genericParams.getOffset(ancestor),
+             genericParams.NumGenericRequirements * sizeof(uintptr_t));
     }
 
     // Copy the vtable entries.
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
-      memcpy(classWords + vtable->VTableOffset,
-             superWords + vtable->VTableOffset,
+      memcpy(classWords + vtable->getVTableOffset(ancestor),
+             superWords + vtable->getVTableOffset(ancestor),
              vtable->VTableSize * sizeof(uintptr_t));
     }
 
     // Copy the field offsets.
     if (description->Class.hasFieldOffsetVector()) {
-      unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
+      unsigned fieldOffsetVector =
+        description->Class.getFieldOffsetVectorOffset(ancestor);
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
              description->Class.NumFields * sizeof(uintptr_t));

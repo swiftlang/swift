@@ -39,6 +39,7 @@
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+#include "llvm/Support/Casting.h"
 
 namespace swift {
 
@@ -1029,13 +1030,22 @@ struct GenericContextDescriptor {
 };
 
 /// Header for a generic parameter descriptor.
-struct GenericParameterDescriptorHeader {
+template<typename Runtime>
+struct TargetGenericParameterDescriptorHeader {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using ClassMetadata = TargetClassMetadata<Runtime>;
+
+private:
   /// The offset to the first generic argument from the start of
-  /// metadata record.
+  /// metadata record, in words.
   ///
   /// This is meaningful if NumGenericRequirements is nonzero.
+  ///
+  /// If this class has a resilient superclass, this offset is relative to the
+  /// size of the resilient superclass metadata. Otherwise, it is absolute.
   uint32_t Offset;
 
+public:
   /// The amount of generic requirement data in the metadata record, in
   /// words, excluding the lexical parent type.  A value of zero means
   /// there is no generic requirement data.
@@ -1055,6 +1065,30 @@ struct GenericParameterDescriptorHeader {
 
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
+
+  /// This is factored in a silly way because remote mirrors cannot directly
+  /// dereference the SuperClass field of class metadata.
+  uint32_t getOffset(const ClassMetadata *classMetadata,
+                     const ClassMetadata *superMetadata) const {
+    if (Flags.hasResilientSuperclass())
+      return superMetadata->getSizeInWords() + Offset;
+
+    return Offset;
+  }
+
+  uint32_t getOffset() const {
+    assert(!Flags.hasResilientSuperclass());
+    return Offset;
+  }
+
+  uint32_t getOffset(const TargetMetadata<Runtime> *metadata) const {
+    if (auto *classMetadata = llvm::dyn_cast<ClassMetadata>(metadata))
+      if (auto *superclass = classMetadata->SuperClass)
+        if (auto *superMetadata = llvm::dyn_cast<ClassMetadata>(superclass))
+          return getOffset(classMetadata, superMetadata);
+
+    return getOffset();
+  }
 
   /// True if the nominal type has generic requirements other than its
   /// parent metadata.
@@ -1080,14 +1114,31 @@ struct TargetMethodDescriptor {
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
-struct VTableDescriptorHeader {
-  /// The offset of the vtable for this class in its metadata, if any.
+template <typename Runtime>
+struct TargetVTableDescriptorHeader {
+  using StoredPointer = typename Runtime::StoredPointer;
+
+private:
+  /// The offset of the vtable for this class in its metadata, if any,
+  /// in words.
+  ///
+  /// If this class has a resilient superclass, this offset is relative to the
+  /// size of the resilient superclass metadata. Otherwise, it is absolute.
   uint32_t VTableOffset;
+
+public:
   /// The number of vtable entries. This is the number of MethodDescriptor
   /// records following the vtable header in the class's nominal type
   /// descriptor, which is equal to the number of words this subclass's vtable
   /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
+
+  uint32_t getVTableOffset(const TargetClassMetadata<Runtime> *metadata) const {
+    const auto *description = metadata->getDescription();
+    if (description->GenericParams.Flags.hasResilientSuperclass())
+      return metadata->SuperClass->getSizeInWords() + VTableOffset;
+    return VTableOffset;
+  }
 };
 
 template<typename Runtime> struct TargetNominalTypeDescriptor;
@@ -1096,7 +1147,7 @@ template<typename Runtime>
 using TargetNominalTypeDescriptorTrailingObjects
   = swift::ABI::TrailingObjects<TargetNominalTypeDescriptor<Runtime>,
         GenericContextDescriptor,
-        VTableDescriptorHeader,
+        TargetVTableDescriptorHeader<Runtime>,
         TargetMethodDescriptor<Runtime>>;
 
 /// Common information about all nominal types. For generic types, this
@@ -1116,6 +1167,9 @@ private:
 public:
   using StoredPointer = typename Runtime::StoredPointer;
   using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+  using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
+  using GenericParameterDescriptorHeader = TargetGenericParameterDescriptorHeader<Runtime>;
+  using ClassMetadata = TargetClassMetadata<Runtime>;
   
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
@@ -1127,19 +1181,22 @@ public:
       /// The number of stored properties in the class, not including its
       /// superclasses. If there is a field offset vector, this is its length.
       uint32_t NumFields;
+
+    private:
       /// The offset of the field offset vector for this class's stored
-      /// properties in its metadata, if any. 0 means there is no field offset
+      /// properties in its metadata, in words. 0 means there is no field offset
       /// vector.
       ///
-      /// To deal with resilient superclasses correctly, this will
-      /// eventually need to be relative to the start of this class's
-      /// metadata area.
+      /// If this class has a resilient superclass, this offset is relative to
+      /// the size of the resilient superclass metadata. Otherwise, it is
+      /// absolute.
       uint32_t FieldOffsetVectorOffset;
-      
+
+    public:
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
-      
+
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
@@ -1148,7 +1205,16 @@ public:
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }      
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
+
+      unsigned getFieldOffsetVectorOffset(const ClassMetadata *metadata) const {
+        const auto *description = metadata->getDescription();
+
+        if (description->GenericParams.Flags.hasResilientSuperclass())
+          return metadata->SuperClass->getSizeInWords() + FieldOffsetVectorOffset;
+
+        return FieldOffsetVectorOffset;
+      }
     } Class;
     
     /// Information about struct types.
@@ -1503,7 +1569,7 @@ public:
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
     assert(isTypeMetadata());
-    auto offset = getDescription()->Class.FieldOffsetVectorOffset;
+    auto offset = getDescription()->Class.getFieldOffsetVectorOffset(this);
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
@@ -1518,6 +1584,13 @@ public:
       return nullptr;
     
     return getter(this);
+  }
+
+  uint32_t getSizeInWords() const {
+    assert(isTypeMetadata());
+    uint32_t size = getClassSize() - getClassAddressPoint();
+    assert(size % sizeof(StoredPointer) == 0);
+    return size / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1768,7 +1841,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
 
     auto asWords = reinterpret_cast<
       ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return (asWords + Description->GenericParams.Offset);
+    return (asWords + Description->GenericParams.getOffset(this));
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
