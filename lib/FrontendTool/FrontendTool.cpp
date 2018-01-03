@@ -973,8 +973,7 @@ static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
     performSILLinking(SM, true);
   return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                  opts.InputsAndOutputs.getSingleOutputFilename(),
-                  opts.EmitSortedSIL);
+                  SM->getPSPs().OutputFilename, opts.EmitSortedSIL);
 }
 
 static bool serializeMSF(FrontendInputsAndOutputs &inputsAndOutputs,
