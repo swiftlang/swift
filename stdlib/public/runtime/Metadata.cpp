@@ -188,6 +188,7 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   // The pattern might have private prefix matter prior to the start
   // of metadata.
   assert(metadata->getClassAddressPoint() <= pattern->AddressPoint);
+  metadata->setClassSize(metadataSize);
 
   return metadata;
 }
@@ -1539,6 +1540,8 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
 
     rawNewClass += self->getClassAddressPoint();
     auto *newClass = (ClassMetadata *) rawNewClass;
+    newClass->setClassSize(metadataSize);
+
     assert(newClass->isTypeMetadata());
 
     return newClass;
