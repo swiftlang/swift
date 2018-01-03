@@ -351,7 +351,7 @@ namespace llvm {
     static nodes_iterator nodes_end(GraphType F) {
       return nodes_iterator(F->nodes.end());
     }
-                              
+
     static unsigned size(GraphType F) { return F->nodes.size(); }
   };
 
@@ -1649,7 +1649,7 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
   auto intFieldSILType =
     SILType::getPrimitiveObjectType(intFieldType->getCanonicalType());
 
-  auto literal = B.createIntegerLiteral(loc, intFieldSILType, 0);
+  auto literal = B.createIntegerLiteral(loc, intFieldSILType, value);
 
   // If the caller wanted the integer_literal instruction, return it too.
   if (ILI) *ILI = literal;
