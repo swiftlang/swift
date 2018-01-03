@@ -133,6 +133,7 @@ set(SWIFT_BENCH_MODULES
     single-source/TypeFlood
     single-source/UTF8Decode
     single-source/Walsh
+    single-source/WordCount
     single-source/XorLoop
 )
 
