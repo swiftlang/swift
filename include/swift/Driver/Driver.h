@@ -345,9 +345,6 @@ private:
   ModuleAndLinkerInputs buildBatchModeInputActionsForOneBatch(
       const std::vector<InputPair> &Inputs, const OutputInfo &OI,
       const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const;
-  ModuleAndLinkerInputs buildBatchModeBackEndActions(ModuleAndLinkerInputs &,
-                                                     const OutputInfo &OI,
-                                                     Compilation &C) const;
 };
 
 } // end namespace driver

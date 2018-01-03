@@ -671,13 +671,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
       Cmd->getOutput().getPrimaryOutputFilename().c_str());
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile: {
-    assert(false && "driver constructInvocation 642"); // xxx
-    //J: one backend process per file, tricker, input index thing
-    // subsume the other case, N std compile jobs
-    // this whole function will be up at where we create actions
-    break;
-  }
+
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");

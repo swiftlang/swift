@@ -1627,15 +1627,13 @@ Driver::buildBatchModeAction(const ToolChain &TC, const OutputInfo &OI,
                        : buildPrecompileAction(TC, C);
 
   ModuleAndLinkerInputs allInputsResult;
-  allInputsResult
+  return allInputsResult
       .append(buildBatchModeSwiftInputActions(SwiftInputs, OI, OutOfDateMap, C,
                                               PCH))
       .append(buildBatchModeSILSIBInputActions(SILSIBInputs, OI, OutOfDateMap,
                                                C, PCH))
       .append(buildBatchModeModuleInputActions(ModuleInputs, OI, C))
       .append(buildBatchModeObjectInputActions(ObjectInputs, OI, C));
-
-  return buildBatchModeBackEndActions(allInputsResult, OI, C);
 }
 
 Driver::ModuleAndLinkerInputs Driver::buildBatchModeSwiftInputActions(
@@ -1668,28 +1666,24 @@ Driver::ModuleAndLinkerInputs Driver::buildBatchModeInputActionsForOneBatch(
     const std::vector<InputPair> &Inputs, const OutputInfo &OI,
     const InputInfoMap *OutOfDateMap, Compilation &C, JobAction *PCH) const {
   ModuleAndLinkerInputs r;
-  // xxx stolen from SingleCompilation case
-  // xxx FIXME dmu: what to do about input map and incrementality??? and the
-  // HandledHere?
+  // FIXME dmu: what to do about input map and incrementality???
   if (Inputs.empty())
     return r;
   const bool isEmbeddingBitcode =
       C.getArgs().hasArg(options::OPT_embed_bitcode);
+  bool needBackendJob = false;
   if (isEmbeddingBitcode) {
     // Make sure we can handle the inputs.
-    bool HandledHere = true;
+    needBackendJob = true;
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       if (!types::isPartOfSwiftCompilation(InputType)) {
-
-        HandledHere = false;
+        needBackendJob = false;
         break;
       }
     }
-    if (!HandledHere)
-      llvm_unreachable("Not sure this can happen, because of seggregation pass "
-                       "& don't know what to do if it does.");
   }
+
   // Create a single CompileJobAction for all of the driver's inputs.
   auto *CA = C.createAction<CompileJobAction>(OI.CompilerOutputType);
   for (const InputPair &Input : Inputs) {
@@ -1699,19 +1693,12 @@ Driver::ModuleAndLinkerInputs Driver::buildBatchModeInputActionsForOneBatch(
     CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
   }
   r.LinkerInputs.push_back(CA);
-  (isEmbeddingBitcode ? r.BackendInputs : r.ModuleInputs).push_back(CA);
-  return r;
-}
-
-Driver::ModuleAndLinkerInputs Driver::buildBatchModeBackEndActions(
-    ModuleAndLinkerInputs &Inputs, const OutputInfo &OI, Compilation &C) const {
-  // We need a backend job for each output file
-  // of the compilation.
-  ModuleAndLinkerInputs r = Inputs.withoutBackEnd();
-
-  for (auto i : indices(Inputs.BackendInputs)) {
-    auto *BJA = C.createAction<BackendJobAction>(Inputs.BackendInputs[i],
-                                                 OI.CompilerOutputType, i);
+  if (!needBackendJob) {
+    r.ModuleInputs.push_back(CA);
+    return r;
+  }
+  for (auto i : indices(Inputs)) {
+    auto *BJA = C.createAction<BackendJobAction>(CA, OI.CompilerOutputType, i);
     r.LinkerInputs.push_back(BJA);
   }
   return r;
@@ -2294,10 +2281,13 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   llvm::SmallString<128> Buf;
   StringRef OutputFile;
 
-  if (OI.isMultiThreading() && isa<CompileJobAction>(JA) &&
-      types::isAfterLLVM(JA->getType())) {
+  if ((OI.isMultiThreading() ||
+       OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) &&
+      isa<CompileJobAction>(JA) && types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
+    // Batch mode compilation: A single frontend command produces multiple
+    // outputfes: one for each primary input.
     auto OutputFunc = [&](StringRef Input) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
@@ -2306,7 +2296,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
                                      C.getArgs(), AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
-      Output->addPrimaryOutput(OutputFile, Input); // xxx
+      Output->addPrimaryOutput(OutputFile, Input);
     };
     // Add an output file for each input action.
     for (const Action *A : InputActions) {
