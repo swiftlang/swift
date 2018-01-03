@@ -673,6 +673,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
   case OutputInfo::Mode::BatchModeCompile: {
     assert(false && "driver constructInvocation 642"); // xxx
+    //J: one backend process per file, tricker, input index thing
+    // subsume the other case, N std compile jobs
+    // this whole function will be up at where we create actions
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
