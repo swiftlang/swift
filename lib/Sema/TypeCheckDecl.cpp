@@ -899,6 +899,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // Compare this signature against the signature of other
   // declarations with the same name.
   OverloadSignature currentSig = current->getOverloadSignature();
+  CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
@@ -912,6 +913,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+      continue;
+
+    // Check whether the overload signatures conflict (ignoring the type for
+    // now).
+    auto otherSig = other->getOverloadSignature();
+    if (!conflicting(currentSig, otherSig))
       continue;
 
     // Validate the declaration.
@@ -946,8 +953,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       break;
     }
 
+    // Get the overload signature type.
+    CanType otherSigType = other->getOverloadSignatureType();
+
     // If there is another conflict, complain.
-    if (conflicting(currentSig, other->getOverloadSignature())) {
+    if (currentSigType == otherSigType ||
+        currentSig.Name.isCompoundName() != otherSig.Name.isCompoundName()) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
       if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
@@ -969,6 +980,63 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
             other->getDeclContext()->getModuleScopeContext());
         if (otherFile && otherFile->isSIB())
           continue;
+      }
+
+      // Signatures are the same, but interface types are not. We must
+      // have a type that we've massaged as part of signature
+      // interface type generation. If it's a result of remapping a
+      // function parameter from 'inout T!' to 'inout T?', emit a
+      // warning that these overloads are deprecated and will no
+      // longer be supported in the future.
+      if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
+        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
+          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
+          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
+          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
+            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
+            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
+          }
+
+          if (currFnTy && otherFnTy) {
+            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
+            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
+
+            if (currParams.size() == otherParams.size()) {
+              auto diagnosed = false;
+              for (unsigned i : indices(currParams)) {
+                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
+                  auto currParamTy = currParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  auto otherParamTy = otherParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  OptionalTypeKind currOTK;
+                  OptionalTypeKind otherOTK;
+                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
+                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
+                  if (currOTK != OTK_None && otherOTK != OTK_None &&
+                      currOTK != otherOTK) {
+                    tc.diagnose(current, diag::deprecated_redecl_by_optionality,
+                                current->getFullName(), currParamTy,
+                                otherParamTy);
+                    tc.diagnose(other, diag::invalid_redecl_prev,
+                                other->getFullName());
+                    tc.diagnose(current,
+                                diag::deprecated_redecl_by_optionality_note);
+                    diagnosed = true;
+                    break;
+                  }
+                }
+              }
+
+              if (diagnosed)
+                break;
+            }
+          }
+        }
       }
 
       // If the conflicting declarations have non-overlapping availability and,
@@ -5618,7 +5686,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(TL.getType().getPointer()))
+      if (TL.getType()->hasParenSugar())
         return;
 
       TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -5687,7 +5755,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(resultTy.getPointer()))
+      if (resultTy->hasParenSugar())
         return;
 
       TC.diagnose(resultTL.getSourceRange().Start,

@@ -37,8 +37,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
@@ -52,8 +51,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs
@@ -71,8 +69,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
 
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call secondNextCLSID from class-constrained protocol ext
   // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
@@ -96,8 +93,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
@@ -111,8 +107,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs

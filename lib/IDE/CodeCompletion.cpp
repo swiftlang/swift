@@ -1546,9 +1546,14 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
     OneArg = (NonDefault == 0);
   }
 
-  if (OneArg)
-    if (auto Fn = funcType->getParams().back().getType()->getAs<AnyFunctionType>())
-      return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+  if (OneArg) {
+    auto param = funcType->getParams().back();
+    if (!param.isAutoClosure()) {
+      if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
+        return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+      }
+    }
+  }
 
   return false;
 }
@@ -1633,7 +1638,7 @@ private:
     Type In = AFT->getInput();
     if (!In)
       return;
-    if (isa<ParenType>(In.getPointer())) {
+    if (In->hasParenSugar()) {
       FoundFunctionsWithoutFirstKeyword = true;
       return;
     }
@@ -3696,7 +3701,7 @@ public:
     }
 
     void unboxType(Type T) {
-      if (isa<ParenType>(T.getPointer())) {
+      if (T->hasParenSugar()) {
         unboxType(T->getDesugaredType());
       } else if (T->is<TupleType>()) {
         for (auto Ele : T->getAs<TupleType>()->getElements()) {

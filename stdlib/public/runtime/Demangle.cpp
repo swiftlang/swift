@@ -166,7 +166,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   auto typeBytes = reinterpret_cast<const char *>(type);
   auto genericArgs = reinterpret_cast<const Metadata * const *>(
-               typeBytes + sizeof(void*) * description->GenericParams.Offset);
+      typeBytes + sizeof(void*) * description->GenericParams.getOffset(type));
 
   return _applyGenericArguments(genericArgs, description, node,
                                 description->GenericParams.NestingDepth,

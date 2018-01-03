@@ -130,6 +130,9 @@ class alignas(8) Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
 
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+2+1,
     /// The subclass of Expr that this is.
     Kind : bitmax(NumExprKindBits,8),
@@ -363,41 +366,6 @@ class alignas(8) Expr {
     NumElements : 32
   );
 
-protected:
-  union {
-    SWIFT_INLINE_BITS(Expr);
-    SWIFT_INLINE_BITS(NumberLiteralExpr);
-    SWIFT_INLINE_BITS(StringLiteralExpr);
-    SWIFT_INLINE_BITS(DeclRefExpr);
-    SWIFT_INLINE_BITS(UnresolvedDeclRefExpr);
-    SWIFT_INLINE_BITS(TupleExpr);
-    SWIFT_INLINE_BITS(TupleElementExpr);
-    SWIFT_INLINE_BITS(MemberRefExpr);
-    SWIFT_INLINE_BITS(UnresolvedDotExpr);
-    SWIFT_INLINE_BITS(SubscriptExpr);
-    SWIFT_INLINE_BITS(DynamicSubscriptExpr);
-    SWIFT_INLINE_BITS(UnresolvedMemberExpr);
-    SWIFT_INLINE_BITS(OverloadSetRefExpr);
-    SWIFT_INLINE_BITS(BooleanLiteralExpr);
-    SWIFT_INLINE_BITS(MagicIdentifierLiteralExpr);
-    SWIFT_INLINE_BITS(ObjectLiteralExpr);
-    SWIFT_INLINE_BITS(AbstractClosureExpr);
-    SWIFT_INLINE_BITS(ClosureExpr);
-    SWIFT_INLINE_BITS(BindOptionalExpr);
-    SWIFT_INLINE_BITS(ApplyExpr);
-    SWIFT_INLINE_BITS(CallExpr);
-    SWIFT_INLINE_BITS(CheckedCastExpr);
-    SWIFT_INLINE_BITS(TupleShuffleExpr);
-    SWIFT_INLINE_BITS(InOutToPointerExpr);
-    SWIFT_INLINE_BITS(ArrayToPointerExpr);
-    SWIFT_INLINE_BITS(ObjCSelectorExpr);
-    SWIFT_INLINE_BITS(KeyPathExpr);
-    SWIFT_INLINE_BITS(ParenExpr);
-    SWIFT_INLINE_BITS(SequenceExpr);
-    SWIFT_INLINE_BITS(CollectionExpr);
-    SWIFT_INLINE_BITS(ErasureExpr);
-    SWIFT_INLINE_BITS(UnresolvedSpecializeExpr);
-    SWIFT_INLINE_BITS(CaptureListExpr);
   } Bits;
 
 private:
@@ -410,6 +378,7 @@ private:
  
 protected:
   Expr(ExprKind Kind, bool Implicit, Type Ty = Type()) : Ty(Ty) {
+    Bits.OpaqueBits = 0;
     Bits.Expr.Kind = unsigned(Kind);
     Bits.Expr.Implicit = Implicit;
     Bits.Expr.LValueAccessKind = 0;

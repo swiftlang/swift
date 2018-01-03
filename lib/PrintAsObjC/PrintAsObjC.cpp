@@ -1872,11 +1872,6 @@ private:
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDictionaryType(DictionaryType *DT, 
-                           Optional<OptionalTypeKind> optionalKind) {
-    visitPart(DT->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitDynamicSelfType(DynamicSelfType *DST, 
                             Optional<OptionalTypeKind> optionalKind) {
     printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
@@ -2007,10 +2002,6 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitSyntaxSugarType(SyntaxSugarType *sugar) {
     visit(sugar->getSinglyDesugaredType());
-  }
-
-  void visitDictionaryType(DictionaryType *DT) {
-    visit(DT->getSinglyDesugaredType());
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {

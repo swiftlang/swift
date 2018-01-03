@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILVALUE_H
 
 #include "swift/Basic/Range.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -412,7 +413,6 @@ private:
   friend class ValueBaseUseIterator;
   friend class ValueUseIterator;
   template <unsigned N> friend class FixedOperandList;
-  template <unsigned N> friend class TailAllocatedOperandList;
   friend class TrailingOperandsList;
 };
 
@@ -420,64 +420,10 @@ private:
 ///
 /// The intent is that this should basically act exactly like
 /// ArrayRef except projecting away the Operand-ness.
-class OperandValueArrayRef {
-  ArrayRef<Operand> Operands;
-public:
-  explicit OperandValueArrayRef(ArrayRef<Operand> operands)
-    : Operands(operands) {}
-
-  /// A simple iterator adapter.
-  class iterator : public std::iterator<std::forward_iterator_tag,
-                                        SILValue, ptrdiff_t> {
-    const Operand *Ptr;
-  public:
-    iterator() = default;
-    iterator(const Operand *ptr) : Ptr(ptr) {}
-    SILValue operator*() const { assert(Ptr); return Ptr->get(); }
-    SILValue operator->() const { return operator*(); }
-    iterator &operator++() { ++Ptr; return *this; }
-    iterator operator++(int) { iterator copy = *this; ++Ptr; return copy; }
-
-    friend bool operator==(iterator lhs, iterator rhs) {
-      return lhs.Ptr == rhs.Ptr;
-    }
-    friend bool operator!=(iterator lhs, iterator rhs) {
-      return lhs.Ptr != rhs.Ptr;
-    }
-  };
-
-  iterator begin() const { return iterator(Operands.begin()); }
-  iterator end() const { return iterator(Operands.end()); }
-  size_t size() const { return Operands.size(); }
-  bool empty() const { return Operands.empty(); }
-
-  SILValue front() const { return Operands.front().get(); }
-  SILValue back() const { return Operands.back().get(); }
-
-  SILValue operator[](unsigned i) const { return Operands[i].get(); }
-  OperandValueArrayRef slice(unsigned begin, unsigned length) const {
-    return OperandValueArrayRef(Operands.slice(begin, length));
-  }
-  OperandValueArrayRef slice(unsigned begin) const {
-    return OperandValueArrayRef(Operands.slice(begin));
-  }
-  OperandValueArrayRef drop_back() const {
-    return OperandValueArrayRef(Operands.drop_back());
-  }
-
-  bool operator==(const OperandValueArrayRef RHS) const {
-    if (size() != RHS.size())
-      return false;
-    for (auto L = begin(), LE = end(), R = RHS.begin(); L != LE; ++L, ++R)
-      if (*L != *R)
-        return false;
-    return true;
-  }
-
-  bool operator!=(const OperandValueArrayRef RHS) const {
-    return !(*this == RHS);
-  }
-};
+inline SILValue getSILValueType(const Operand &op) {
+  return op.get();
+}
+typedef ArrayRefView<Operand,SILValue,getSILValueType> OperandValueArrayRef;
 
 /// An iterator over all uses of a ValueBase.
 class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
@@ -584,176 +530,6 @@ public:
   OperandValueArrayRef asValueArray() const {
     return OperandValueArrayRef(asArray());
   }
-
-  /// Indexes into the full list of operands.
-  Operand &operator[](unsigned i) { return asArray()[i]; }
-  const Operand &operator[](unsigned i) const { return asArray()[i]; }
-};
-
-/// An operator list with a fixed number of known operands
-/// (possibly zero) and a dynamically-determined set of extra
-/// operands (also possibly zero).  The number of dynamic operands
-/// is permanently set at initialization time.
-///
-/// 'N' is the number of static operands.
-///
-/// This class assumes that a number of bytes of extra storage have
-/// been allocated immediately after it.  This means that this class
-/// must always be the final data member in a class.
-template <unsigned N> class TailAllocatedOperandList {
-  unsigned NumExtra;
-  Operand Buffer[N];
-
-  TailAllocatedOperandList(const TailAllocatedOperandList &) = delete;
-  TailAllocatedOperandList &operator=(const TailAllocatedOperandList &) =delete;
-
-public:
-  /// Given the number of dynamic operands required, returns the
-  /// number of bytes of extra storage to allocate.
-  static size_t getExtraSize(unsigned numExtra) {
-    return sizeof(Operand) * numExtra;
-  }
-
-  /// Initialize this operand list.
-  ///
-  /// The dynamic operands are actually out of order: logically they
-  /// will placed after the fixed operands, not before them.  But
-  /// the variadic arguments have to come last.
-  template <class... T>
-  TailAllocatedOperandList(SILInstruction *user,
-                           ArrayRef<SILValue> dynamicArgs,
-                           T&&... fixedArgs)
-      : NumExtra(dynamicArgs.size()),
-        Buffer{ { user, std::forward<T>(fixedArgs) }... } {
-    static_assert(sizeof...(fixedArgs) == N, "wrong number of initializers");
-
-    Operand *dynamicSlot = Buffer + N;
-    for (auto value : dynamicArgs) {
-      new (dynamicSlot++) Operand(user, value);
-    }
-  }
-
-  /// Initialize this operand list.
-  ///
-  /// The dynamic operands are actually out of order: logically they
-  /// will placed after the fixed operands, not before them.  But
-  /// the variadic arguments have to come last.
-  template <class... T>
-  TailAllocatedOperandList(SILInstruction *user,
-                           ArrayRef<SILValue> dynamicArgs,
-                           ArrayRef<SILValue> additionalDynamicArgs,
-                           T&&... fixedArgs)
-      : NumExtra(dynamicArgs.size() + additionalDynamicArgs.size()),
-        Buffer{ { user, std::forward<T>(fixedArgs) }... } {
-    static_assert(sizeof...(fixedArgs) == N, "wrong number of initializers");
-
-    Operand *dynamicSlot = Buffer + N;
-    for (auto value : dynamicArgs) {
-      new (dynamicSlot++) Operand(user, value);
-    }
-
-    for (auto value : additionalDynamicArgs) {
-      new (dynamicSlot++) Operand(user, value);
-    }
- }
-
-
-  ~TailAllocatedOperandList() {
-    for (auto &op : getDynamicAsArray()) {
-      op.~Operand();
-    }
-  }
-
-  /// Returns the full list of operands.
-  MutableArrayRef<Operand> asArray() {
-    return MutableArrayRef<Operand>(Buffer, N+NumExtra);
-  }
-  ArrayRef<Operand> asArray() const {
-    return ArrayRef<Operand>(Buffer, N+NumExtra);
-  }
-
-  /// Returns the full list of operand values.
-  OperandValueArrayRef asValueArray() const {
-    return OperandValueArrayRef(asArray());
-  }
-
-  /// Returns the list of the dynamic operands.
-  MutableArrayRef<Operand> getDynamicAsArray() {
-    return MutableArrayRef<Operand>(Buffer+N, NumExtra);
-  }
-  ArrayRef<Operand> getDynamicAsArray() const {
-    return ArrayRef<Operand>(Buffer+N, NumExtra);
-  }
-
-  /// Returns the list of the dynamic operand values.
-  OperandValueArrayRef getDynamicValuesAsArray() const {
-    return OperandValueArrayRef(getDynamicAsArray());
-  }
-
-  unsigned size() const { return N+NumExtra; }
-
-  /// Indexes into the full list of operands.
-  Operand &operator[](unsigned i) { return asArray()[i]; }
-  const Operand &operator[](unsigned i) const { return asArray()[i]; }
-};
-
-/// A specialization of TailAllocatedOperandList for zero static operands.
-template<> class TailAllocatedOperandList<0> {
-  unsigned NumExtra;
-  union { // suppress value semantics
-    Operand Buffer[1];
-  };
-
-  TailAllocatedOperandList(const TailAllocatedOperandList &) = delete;
-  TailAllocatedOperandList &operator=(const TailAllocatedOperandList &) =delete;
-
-public:
-  static size_t getExtraSize(unsigned numExtra) {
-    return sizeof(Operand) * (numExtra > 0 ? numExtra - 1 : 0);
-  }
-
-  TailAllocatedOperandList(SILInstruction *user, ArrayRef<SILValue> dynamicArgs)
-      : NumExtra(dynamicArgs.size()) {
-
-    Operand *dynamicSlot = Buffer;
-    for (auto value : dynamicArgs) {
-      new (dynamicSlot++) Operand(user, value);
-    }
-  }
-
-  ~TailAllocatedOperandList() {
-    for (auto &op : getDynamicAsArray()) {
-      op.~Operand();
-    }
-  }
-
-  /// Returns the full list of operands.
-  MutableArrayRef<Operand> asArray() {
-    return MutableArrayRef<Operand>(Buffer, NumExtra);
-  }
-  ArrayRef<Operand> asArray() const {
-    return ArrayRef<Operand>(Buffer, NumExtra);
-  }
-
-  /// Returns the full list of operand values.
-  OperandValueArrayRef asValueArray() const {
-    return OperandValueArrayRef(asArray());
-  }
-
-  /// Returns the list of the dynamic operands.
-  MutableArrayRef<Operand> getDynamicAsArray() {
-    return MutableArrayRef<Operand>(Buffer, NumExtra);
-  }
-  ArrayRef<Operand> getDynamicAsArray() const {
-    return ArrayRef<Operand>(Buffer, NumExtra);
-  }
-
-  /// Returns the list of the dynamic operand values.
-  OperandValueArrayRef getDynamicValuesAsArray() const {
-    return OperandValueArrayRef(getDynamicAsArray());
-  }
-
-  unsigned size() const { return NumExtra; }
 
   /// Indexes into the full list of operands.
   Operand &operator[](unsigned i) { return asArray()[i]; }

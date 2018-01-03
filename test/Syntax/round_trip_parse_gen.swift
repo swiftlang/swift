@@ -219,6 +219,10 @@ func postfix() {
   foo[1] {}
   foo[1][2,x:3]
   foo?++.bar!(baz)
+
+  foo(x:y:)()
+  _ = .foo(x:y:)
+  _ = x.foo(x:y:)
 }
 
 #if blah
@@ -312,3 +316,21 @@ func statementTests() {
   for var i in foo where i.foo {}
   for case is Int in foo {}
 }
+
+// MARK: - ExtensionDecl
+
+extension ext {
+  var s: Int {
+    return 42
+  }
+}
+
+@available(*, unavailable)
+fileprivate extension ext {}
+
+extension ext : extProtocol {}
+
+extension ext where A == Int, B: Numeric {}
+
+extension ext.a.b {}
+

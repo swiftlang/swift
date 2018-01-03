@@ -2478,8 +2478,7 @@ namespace {
       B.addInt32(VTableOffset / IGM.getPointerSize());
       B.addInt32(VTableSize);
 
-      if (doesClassMetadataRequireDynamicInitialization(IGM, Target))
-        addVTableEntries(Target);
+      addVTableEntries(Target);
 
       // TODO: Emit reflection metadata for virtual methods
     }
@@ -3530,11 +3529,20 @@ namespace {
           IGF.Builder.CreateBitCast(superMetadata, IGF.IGM.Int8PtrTy),
           IGM.getPointerAlignment());
 
-      Address slot = IGF.Builder.CreateConstByteArrayGEP(
+      Address sizeSlot = IGF.Builder.CreateConstByteArrayGEP(
           metadataAsBytes,
           layout.getMetadataSizeOffset());
-      slot = IGF.Builder.CreateBitCast(slot, IGM.Int32Ty->getPointerTo());
-      llvm::Value *size = IGF.Builder.CreateLoad(slot);
+      sizeSlot = IGF.Builder.CreateBitCast(sizeSlot, IGM.Int32Ty->getPointerTo());
+      llvm::Value *size = IGF.Builder.CreateLoad(sizeSlot);
+
+      Address addressPointSlot = IGF.Builder.CreateConstByteArrayGEP(
+          metadataAsBytes,
+          layout.getMetadataAddressPointOffset());
+      addressPointSlot = IGF.Builder.CreateBitCast(addressPointSlot, IGM.Int32Ty->getPointerTo());
+      llvm::Value *addressPoint = IGF.Builder.CreateLoad(addressPointSlot);
+
+      size = IGF.Builder.CreateSub(size, addressPoint);
+
       if (IGM.SizeTy != IGM.Int32Ty)
         size = IGF.Builder.CreateZExt(size, IGM.SizeTy);
 

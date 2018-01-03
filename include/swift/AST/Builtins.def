@@ -238,6 +238,13 @@ BUILTIN_SIL_OPERATION(CastBitPatternFromBridgeObject,
                       "castBitPatternFromBridgeObject",
                       Special)
 
+/// ClassifyBridgeObject has type:
+///      (Builtin.BridgeObject) -> (Builtin.Int1, Builtin.Int1).
+/// It interprets the bits mangled into a bridge object, returning whether it is
+/// an Objective-C object or tagged pointer representation.
+BUILTIN_SIL_OPERATION(ClassifyBridgeObject, "classifyBridgeObject", Special)
+
+
 /// BridgeToRawPointer has type (T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 

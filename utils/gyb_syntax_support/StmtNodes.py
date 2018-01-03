@@ -170,7 +170,7 @@ STMT_NODES = [
     Node('CodeBlock', kind='Syntax',
          children=[
              Child('OpenBrace', kind='LeftBraceToken'),
-             Child('Statments', kind='StmtList'),
+             Child('Statements', kind='StmtList'),
              Child('CloseBrace', kind='RightBraceToken'),
          ]),
 

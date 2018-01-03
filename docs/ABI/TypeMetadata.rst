@@ -417,21 +417,24 @@ section, which is scanned by the Swift runtime when needed (e.g., in response to
 a `swift_conformsToProtocol()` query). Each protocol conformance record
 contains:
 
-- The `protocol descriptor`_ describing the protocol of the conformance.
-- A reference to the metadata for the **conforming type**, whose form is
-  determined by the **protocol conformance flags** described below.
+- The `protocol descriptor`_ describing the protocol of the conformance,
+  represented as an (possibly indirect) 32-bit offset relative to the field.
+  The low bit indicates whether it is an indirect offset; the second lowest
+  bit is reserved for future use.
+- A reference to the **conforming type**, represented as a 32-bit offset
+  relative to the field. The lower two bits indicate how the conforming
+  type is represented:
+    0. A direct reference to a nominal type descriptor.
+    1. An indirect reference to a nominal type descriptor.
+    2. A reference to nonunique, foreign type metadata.
+    3. A reference to a pointer to an Objective-C class object.
 - The **witness table field** that provides access to the witness table
-  describing the conformance itself; the form of this field is determined by the
-  **protocol conformance flags** described below.
-- The **protocol conformance flags** is a 32-bit field comprised of:
-
-  * **Bits 0-3** contain the type metadata record kind, which indicates how
-    the **conforming type** field is encoded.
-  * **Bits 4-5** contain the kind of witness table. The value can be one of:
-
+  describing the conformance itself, represented as a direct 32-bit relative
+  offset. The lower two bits indicate how the witness table is represented:
     0. The **witness table field** is a reference to a witness table.
     1. The **witness table field** is a reference to a **witness table
        accessor** function for an unconditional conformance.
     2. The **witness table field** is a reference to a **witness table
        accessor** function for a conditional conformance.
-
+    3. Reserved for future use.
+- A 32-bit value reserved for future use.

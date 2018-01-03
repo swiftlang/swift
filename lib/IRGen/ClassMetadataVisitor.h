@@ -93,8 +93,7 @@ private:
     // Visit the superclass first.
     if (Type superclass = type->getSuperclass()) {
       auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-      if (IGM.Context.LangOpts.EnableClassResilience &&
-          IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
         // Just note that we have a resilient superclass and move on.
         //
         // Runtime metadata instantiation needs to slide our entries down

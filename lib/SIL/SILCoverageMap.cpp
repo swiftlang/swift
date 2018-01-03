@@ -44,7 +44,7 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
 }
 
 SILCoverageMap::SILCoverageMap(uint64_t Hash, bool External)
-    : External(External), Hash(Hash) {}
+    : External(External), Hash(Hash), HasSymtabEntry(false) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 

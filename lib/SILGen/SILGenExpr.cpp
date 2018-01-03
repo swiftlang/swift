@@ -2202,14 +2202,14 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
   ProfileCounter trueCount = ProfileCounter();
   ProfileCounter falseCount = ProfileCounter();
-  auto parent = SGF.SGM.getPGOParent(E);
+  auto parent = SGF.getPGOParent(E);
   if (parent) {
     auto &Node = parent.getValue();
     auto *NodeS = Node.get<Stmt *>();
     if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
-      trueCount = SGF.SGM.loadProfilerCount(IS->getThenStmt());
+      trueCount = SGF.loadProfilerCount(IS->getThenStmt());
       if (auto *ElseStmt = IS->getElseStmt()) {
-        falseCount = SGF.SGM.loadProfilerCount(ElseStmt);
+        falseCount = SGF.loadProfilerCount(ElseStmt);
       }
     }
   }
@@ -2686,7 +2686,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     //
     // FIXME: Remove this eventually.
     if (I->canSplitIntoTupleElements() &&
-        !(isa<ParenType>(E->getType().getPointer()) &&
+        !(E->getType()->hasParenSugar() &&
           SGF.getASTContext().isSwiftVersion3())) {
       emitTupleShuffleExprInto(*this, E, I);
       return RValue::forInContext();
@@ -2709,7 +2709,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   // that case.
   //
   // FIXME: Remove this eventually.
-  if (isa<ParenType>(E->getType().getPointer()) &&
+  if (E->getType()->hasParenSugar() &&
       SGF.getASTContext().isSwiftVersion3()) {
     assert(E->getElementMapping().size() == 1);
     auto shuffleIndex = E->getElementMapping()[0];
@@ -4420,8 +4420,8 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
-  auto NumTrueTaken = SGF.SGM.loadProfilerCount(E->getThenExpr());
-  auto NumFalseTaken = SGF.SGM.loadProfilerCount(E->getElseExpr());
+  auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
+  auto NumFalseTaken = SGF.loadProfilerCount(E->getElseExpr());
 
   if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     // If the result is loadable, emit each branch and forward its result

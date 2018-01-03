@@ -3,7 +3,7 @@
 
 // CHECK-NOT: _TMnCSo
 
-// CHECK: @"\01l_protocol_conformances" = {{.*}} @"got.OBJC_CLASS_$_Thingy"
+// CHECK: @"\01l_protocol_conformances" = {{.*}} @"OBJC_CLASS_REF_$_Thingy"
 
 // CHECK-NOT: _TMnCSo
 

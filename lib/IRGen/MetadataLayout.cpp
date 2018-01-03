@@ -251,8 +251,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       // to us, we will access metadata members relative to a base offset.
       if (forClass == Target) {
         if (Layout.HasResilientSuperclass ||
-            (IGM.Context.LangOpts.EnableClassResilience &&
-             IGM.isResilient(forClass, ResilienceExpansion::Maximal))) {
+            IGM.isResilient(forClass, ResilienceExpansion::Maximal)) {
           assert(!DynamicOffsetBase);
           DynamicOffsetBase = NextOffset;
         }
@@ -262,6 +261,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addClassSize() {
       Layout.MetadataSize = getNextOffset();
       super::addClassSize();
+    }
+
+    void addClassAddressPoint() {
+      Layout.MetadataAddressPoint = getNextOffset();
+      super::addClassAddressPoint();
     }
 
     void addInstanceSize() {
@@ -343,6 +347,11 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 Size ClassMetadataLayout::getMetadataSizeOffset() const {
   assert(MetadataSize.isStatic());
   return MetadataSize.getStaticOffset();
+}
+
+Size ClassMetadataLayout::getMetadataAddressPointOffset() const {
+  assert(MetadataAddressPoint.isStatic());
+  return MetadataAddressPoint.getStaticOffset();
 }
 
 Size ClassMetadataLayout::getInstanceSizeOffset() const {
