@@ -354,6 +354,17 @@ EXPR_NODES = [
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
+    Node('UnresolvedDeclRefExpr', kind='Expr',
+         children=[
+             Child("Name", kind='Token'),
+         ]),
+
+    Node('UnresolvedDotExpr', kind='Expr',
+         children=[
+             Child("Dot", kind='PrefixPeriodToken'),
+             Child("Name", kind='Token'),
+         ]),
+
     # unresolved-pattern-expr -> pattern
     Node('UnresolvedPatternExpr', kind='Expr',
          children=[
