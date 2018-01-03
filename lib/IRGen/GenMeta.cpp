@@ -799,16 +799,13 @@ namespace {
           return IGF.IGM.getGetFunctionMetadata0Fn();
 
         case 1:
-          return hasFlags ? IGF.IGM.getGetFunctionMetadata1WithFlagsFn()
-                          : IGF.IGM.getGetFunctionMetadata1Fn();
+          return IGF.IGM.getGetFunctionMetadata1Fn();
 
         case 2:
-          return hasFlags ? IGF.IGM.getGetFunctionMetadata2WithFlagsFn()
-                          : IGF.IGM.getGetFunctionMetadata2Fn();
+          return IGF.IGM.getGetFunctionMetadata2Fn();
 
         case 3:
-          return hasFlags ? IGF.IGM.getGetFunctionMetadata3WithFlagsFn()
-                          : IGF.IGM.getGetFunctionMetadata3Fn();
+          return IGF.IGM.getGetFunctionMetadata3Fn();
 
         default:
           llvm_unreachable("supports only 1/2/3 parameter functions");
@@ -826,11 +823,17 @@ namespace {
       case 1:
       case 2:
       case 3: {
-        llvm::SmallVector<llvm::Value *, 8> arguments;
-        auto *metadataFn = constructSimpleCall(arguments);
-        auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
-        call->setDoesNotThrow();
-        return setLocal(CanType(type), call);
+        if (!hasFlags) {
+          llvm::SmallVector<llvm::Value *, 8> arguments;
+          auto *metadataFn = constructSimpleCall(arguments);
+          auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
+          call->setDoesNotThrow();
+          return setLocal(CanType(type), call);
+        }
+
+        // If function type has parameter flags, let's emit
+        // the most general function to retrieve them.
+        LLVM_FALLTHROUGH;
       }
 
       default:

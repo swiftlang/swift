@@ -2847,26 +2847,10 @@ swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *result);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                const Metadata *arg0,
                                const Metadata *arg1,
                                const Metadata *result);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *arg1,
-                                        ParameterFlags flags1,
-                                        const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
@@ -2874,17 +2858,6 @@ const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 const Metadata *arg0,
                                                 const Metadata *arg1,
                                                 const Metadata *arg2,
-                                                const Metadata *result);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
-                                                FunctionTypeFlags flags,
-                                                const Metadata *arg0,
-                                                ParameterFlags flags0,
-                                                const Metadata *arg1,
-                                                ParameterFlags flags1,
-                                                const Metadata *arg2,
-                                                ParameterFlags flags2,
                                                 const Metadata *result);
 
 #if SWIFT_OBJC_INTEROP

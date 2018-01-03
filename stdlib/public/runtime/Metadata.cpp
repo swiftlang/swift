@@ -422,21 +422,6 @@ swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
 }
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 1
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0 };
-  const uint32_t parameterFlags[] = { flags0.getIntValue() };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
-}
-
-const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const Metadata *arg0,
                                       const Metadata *arg1,
@@ -445,26 +430,6 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *arg1,
-                                               ParameterFlags flags1,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 2
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0, arg1 };
-  const uint32_t parameterFlags[] = {
-    flags0.getIntValue(),
-    flags1.getIntValue()
-  };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
 }
 
 const FunctionTypeMetadata *
@@ -477,29 +442,6 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1, arg2 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *arg1,
-                                               ParameterFlags flags1,
-                                               const Metadata *arg2,
-                                               ParameterFlags flags2,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 3
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0, arg1, arg2 };
-  const uint32_t parameterFlags[] = {
-    flags0.getIntValue(),
-    flags1.getIntValue(),
-    flags2.getIntValue()
-  };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
 }
 
 const FunctionTypeMetadata *
