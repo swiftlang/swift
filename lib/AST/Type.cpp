@@ -1249,56 +1249,22 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Func(this).getPointer();
 }
 
-TypeBase *TypeBase::getDesugaredType() {
-  switch (getKind()) {
-#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
+#define TYPE(Id, Parent)
+#define SUGARED_TYPE(Id, Parent) \
+  static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
-  case TypeKind::Tuple:
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::LValue:
-  case TypeKind::InOut:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Metatype:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::Protocol:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
-  case TypeKind::DynamicSelf:
-    // None of these types have sugar at the outer level.
-    return this;
-#define SUGARED_TYPE(ID, PARENT) \
-  case TypeKind::ID: \
-    return cast<ID##Type>(this)->getSinglyDesugaredType()->getDesugaredType();
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-  }
 
-  llvm_unreachable("Unknown type kind");
+TypeBase *TypeBase::getDesugaredType() {
+  if (!isa<SugarType>(this))
+    return this;
+  return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
 }
 
 ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
                      ParameterTypeFlags flags)
-  : TypeBase(TypeKind::Paren, nullptr, properties),
-    UnderlyingType(flags.isInOut()
-                     ? InOutType::get(baseType)
-                     : baseType) {
+  : SugarType(TypeKind::Paren,
+              flags.isInOut() ? InOutType::get(baseType) : baseType,
+              properties) {
   Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
@@ -1307,21 +1273,9 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
 }
 
 
-TypeBase *ParenType::getSinglyDesugaredType() {
-  return getUnderlyingType().getPointer();
-}
-
-TypeBase *NameAliasType::getSinglyDesugaredType() {
-  return getDecl()->getUnderlyingTypeLoc().getType().getPointer();
-}
-
-TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type SyntaxSugarType::getImplementationTypeSlow() {
+Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
+  auto &ctx = *Context;
   NominalTypeDecl *implDecl;
 
   // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
@@ -1331,9 +1285,13 @@ Type SyntaxSugarType::getImplementationTypeSlow() {
   case TypeKind::Id: llvm_unreachable("non-sugared type?");
 #define SUGARED_TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::NameAlias:
   case TypeKind::Paren:
-    llvm_unreachable("typealiases and parens are sugar, but not syntax sugar");
+    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
+  case TypeKind::NameAlias:
+    Bits.SugarType.HasCachedType = true;
+    UnderlyingType = cast<NameAliasType>(this)->getDecl()
+                                ->getUnderlyingTypeLoc().getType().getPointer();
+    return UnderlyingType;
   case TypeKind::ArraySlice:
     implDecl = ctx.getArrayDecl();
     break;
@@ -1349,17 +1307,18 @@ Type SyntaxSugarType::getImplementationTypeSlow() {
   }
   assert(implDecl && "Type has not been set yet");
 
+  Bits.SugarType.HasCachedType = true;
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
-    ImplOrContext = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
+    UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
   } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
-    ImplOrContext = BoundGenericType::get(implDecl, Type(),
+    UnderlyingType = BoundGenericType::get(implDecl, Type(),
                                       { Ty->getKeyType(), Ty->getValueType() });
   } else {
     llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
 
   // Record the implementation type.
-  return ImplOrContext.get<Type>();
+  return UnderlyingType;
 }
 
 unsigned GenericTypeParamType::getDepth() const {
