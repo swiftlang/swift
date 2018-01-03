@@ -4901,6 +4901,7 @@ namespace {
 
     void layout() {
       super::layout();
+      asImpl().addNominalTypeDescriptor();
       asImpl().addSuperClass();
       asImpl().addReservedWord();
       asImpl().addReservedWord();
@@ -5051,6 +5052,11 @@ namespace {
 
     void addMetadataFlags() {
       B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
+    }
+
+    void addNominalTypeDescriptor() {
+      auto descriptor = ClassNominalTypeDescriptorBuilder(this->IGM, Target).emit();
+      B.add(descriptor);
     }
 
     void addSuperClass() {

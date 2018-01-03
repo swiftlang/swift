@@ -729,6 +729,7 @@ template <typename Runtime> struct TargetClassMetadata;
 template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
 template <typename Runtime> struct TargetValueMetadata;
+template <typename Runtime> struct TargetForeignClassMetadata;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -907,6 +908,8 @@ public:
       return static_cast<const TargetValueMetadata<Runtime> *>(this)
           ->Description;
     case MetadataKind::ForeignClass:
+      return static_cast<const TargetForeignClassMetadata<Runtime> *>(this)
+          ->Description;
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
@@ -1812,9 +1815,12 @@ struct TargetForeignClassMetadata
   : public TargetForeignTypeMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
 
+  /// An out-of-line description of the type.
+  const TargetNominalTypeDescriptor<Runtime> *Description;
+
   /// The superclass of the foreign class, if any.
   ConstTargetMetadataPointer<Runtime, swift::TargetForeignClassMetadata>
-  SuperClass;
+    SuperClass;
 
   /// Reserved space.  For now, these should be zero-initialized.
   StoredPointer Reserved[3];
