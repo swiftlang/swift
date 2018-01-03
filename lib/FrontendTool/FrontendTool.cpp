@@ -795,9 +795,11 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // once for each such input.
   std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performSILGeneration(
-        *PrimaryFile, SILOpts,
-        Instance.getPSPsForPrimary(PrimaryFile->getFilename()), None);
+    std::string filename =
+        InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+            PrimaryFile->getFilename());
+    auto SM = performSILGeneration(*PrimaryFile, SILOpts,
+                                   Instance.getPSPsForPrimary(filename), None);
     PSGIs.push_back(
         PostSILGenInputs{std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
   }
