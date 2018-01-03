@@ -117,7 +117,7 @@ ERROR(error_mode_cannot_emit_module_doc,none,
   "this mode does not support emitting module documentation files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
-  "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+"ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"

@@ -223,6 +223,13 @@ public:
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
+
+  /// Given the name of an input which produces output,
+  /// find the InputFile for it.
+  /// If the compiler has a buffer for a primary input which
+  /// was not present in the invocation, as happens with sil-ide-test for
+  /// completion, there won't be an input file to find and nullptr is returned.
+  const InputFile *getInputProducingOutput(StringRef) const;
 };
 
 } // namespace swift

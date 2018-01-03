@@ -77,7 +77,14 @@ std::unique_ptr<SILModule> CompilerInstance::createSILModule() {
 void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
   addPrimarySourceFile(SF);
-  SF->setReferencedNameTracker(NameTracker);
+  const InputFile *input =
+      Invocation.getFrontendOptions().InputsAndOutputs.getInputProducingOutput(
+          SF->getFilename());
+  StringRef referenceDependenciesFilePath =
+      input ? StringRef(
+                  input->supplementaryOutputs().ReferenceDependenciesFilePath)
+            : StringRef();
+  SF->createReferencedNameTracker(referenceDependenciesFilePath);
   if (SF->getBufferID().hasValue())
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
