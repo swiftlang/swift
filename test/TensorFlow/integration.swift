@@ -67,5 +67,9 @@ public func testScalar(f: Float) {
 // CHECK: string_literal utf8 "{{.....}}
 // CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
 
-
-
+// StartTensorProgram is called with one input tensor
+// CHECK: [[TENSORS:%.*]] = struct $UnsafePointer<AnyTensorHandle> ({{%.*}} : $Builtin.RawPointer)
+// CHECK-NEXT: [[TENSOR_COUNT:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT: [[TENSOR_COUNT_STRUCT:%.*]] = struct $Int ([[TENSOR_COUNT]] : $Builtin.Int64)
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK-NEXT: apply [[STARTFN]]({{%.*}}, {{%.*}}, [[TENSORS]], [[TENSOR_COUNT_STRUCT]])
