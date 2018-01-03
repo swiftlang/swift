@@ -2352,6 +2352,9 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     auto foreignCandidate
       = getAddrOfForeignTypeMetadataCandidate(entity.getType());
     (void)foreignCandidate;
+  } else if (entity.isObjCClassRef()) {
+    (void)getAddrOfObjCClassRef(
+                  const_cast<ClassDecl *>(cast<ClassDecl>(entity.getDecl())));
   } else {
     getAddrOfLLVMVariable(entity, alignment, ConstantInit(),
                           defaultType, DebugTypeInfo());
@@ -2442,7 +2445,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     typeKind = TypeMetadataRecordKind::IndirectObjCClass;
     defaultTy = IGM.TypeMetadataPtrTy;
     defaultPtrTy = IGM.TypeMetadataPtrTy;
-    entity = LinkEntity::forObjCClass(clas);
+    entity = LinkEntity::forObjCClassRef(clas);
   } else {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
