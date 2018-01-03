@@ -476,10 +476,12 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
     C.NumDependencies = D->getDependencies().size();
   }
 
-  if (auto *R = Instance.getReferencedNameTracker()) {
-    C.NumReferencedTopLevelNames = R->getTopLevelNames().size();
-    C.NumReferencedDynamicNames = R->getDynamicLookupNames().size();
-    C.NumReferencedMemberNames = R->getUsedMembers().size();
+  for (auto SF : Instance.getPrimarySourceFiles()) {
+    if (auto *R = SF->getReferencedNameTracker()) {
+      C.NumReferencedTopLevelNames = R->getTopLevelNames().size();
+      C.NumReferencedDynamicNames = R->getDynamicLookupNames().size();
+      C.NumReferencedMemberNames = R->getUsedMembers().size();
+    }
   }
 
   if (!Instance.getPrimarySourceFiles().empty()) {
@@ -752,9 +754,13 @@ static Optional<bool> dumpAST(CompilerInvocation &Invocation,
 
 static void emitReferenceDependencies(CompilerInvocation &Invocation,
                                       CompilerInstance &Instance) {
-  if (Instance.getPrimarySourceFiles().empty())
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasReferenceDependenciesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
+    return;
+  }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                               *Instance.getDependencyTracker(),
@@ -829,11 +835,9 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // once for each such input.
   std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    std::string filename =
-        InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-            PrimaryFile->getFilename());
-    auto SM = performSILGeneration(*PrimaryFile, SILOpts,
-                                   Instance.getPSPsForPrimary(filename), None);
+    auto SM = performSILGeneration(
+        *PrimaryFile, SILOpts,
+        Instance.getPSPsForPrimary(PrimaryFile->getFilename()), None);
     PSGIs.push_back(
         PostSILGenInputs{std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
   }
@@ -843,19 +847,16 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // If we have primary inputs but no primary _source files_, we might
   // have a primary serialized input.
   for (FileUnit *fileUnit : mod->getFiles()) {
-    if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
-      std::string filename = InputFile::
-          convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-              SASTF->getFilename());
+    if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(
-              filename)) {
+              SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
         auto SM = performSILGeneration(
-            *SASTF, SILOpts, Instance.getPSPsForPrimary(filename), None);
+            *SASTF, SILOpts, Instance.getPSPsForPrimary(SASTF->getFilename()),
+            None);
         PSGIs.push_back(
             PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod});
       }
-    }
   }
   return PSGIs;
 }
@@ -895,12 +896,6 @@ static bool performCompile(CompilerInstance &Instance,
       return compileLLVMIr(Invocation, Instance, Stats);
   }
 
-  ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences =
-      opts.InputsAndOutputs.hasReferenceDependenciesPath();
-  if (shouldTrackReferences)
-    Instance.setReferencedNameTracker(&nameTracker);
-
   if (auto r = performParseOrSema(Instance, Action))
     return *r;
 
@@ -938,8 +933,7 @@ static bool performCompile(CompilerInstance &Instance,
   (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                              opts);
 
-  if (shouldTrackReferences)
-    emitReferenceDependencies(Invocation, Instance);
+  emitReferenceDependencies(Invocation, Instance);
 
   (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(), opts);
 

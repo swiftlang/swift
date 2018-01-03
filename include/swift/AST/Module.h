@@ -22,18 +22,19 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
@@ -813,7 +814,7 @@ private:
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
-  ReferencedNameTracker *ReferencedNames = nullptr;
+  Optional<ReferencedNameTracker> ReferencedNames;
 
   /// The class in this file marked \@NS/UIApplicationMain.
   ClassDecl *MainClass = nullptr;
@@ -967,13 +968,10 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  ReferencedNameTracker *getReferencedNameTracker() const {
-    return ReferencedNames;
+  ReferencedNameTracker *getReferencedNameTracker() {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
-  void setReferencedNameTracker(ReferencedNameTracker *Tracker) {
-    assert(!ReferencedNames && "This file already has a name tracker.");
-    ReferencedNames = Tracker;
-  }
+  void createReferencedNameTracker(StringRef);
 
   /// \brief The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.

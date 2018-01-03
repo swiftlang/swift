@@ -312,7 +312,6 @@ class CompilerInstance {
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
-  ReferencedNameTracker *NameTracker = nullptr;
 
   SerializedModuleLoader *SML = nullptr;
 
@@ -392,15 +391,6 @@ public:
   }
   DependencyTracker *getDependencyTracker() {
     return DepTracker;
-  }
-
-  void setReferencedNameTracker(ReferencedNameTracker *tracker) {
-    assert(!Inputs.hasPrimarySourceFiles() &&
-           "must be called before performSema()");
-    NameTracker = tracker;
-  }
-  ReferencedNameTracker *getReferencedNameTracker() {
-    return NameTracker;
   }
 
   /// Set the SIL module for this compilation instance.

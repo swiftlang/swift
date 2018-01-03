@@ -21,6 +21,15 @@ namespace swift {
 class NominalTypeDecl;
 
 class ReferencedNameTracker {
+  StringRef ReferenceDependenciesFilePath;
+
+public:
+  ReferencedNameTracker(StringRef referenceDependenciesFilePath)
+      : ReferenceDependenciesFilePath(referenceDependenciesFilePath) {}
+  StringRef getReferenceDependenciesFilePath() {
+    return ReferenceDependenciesFilePath;
+  }
+
 #define TRACKED_SET(KIND, NAME) \
 private: \
   llvm::DenseMap<KIND, bool> NAME##s; \

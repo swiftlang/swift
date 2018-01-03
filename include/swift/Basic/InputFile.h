@@ -48,7 +48,9 @@ public:
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer),
+      : Filename(
+            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
+        IsPrimary(isPrimary), Buffer(buffer),
         SupplementaryPaths(SupplementaryOutputPaths()) {
     assert(name.begin() != Filename.c_str());
     assert(!name.empty() && "Empty strings signify no inputs in other places");

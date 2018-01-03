@@ -170,7 +170,10 @@ FrontendInputsAndOutputs::getCombinedNamesOfPrimaryInputFiles() const {
 }
 
 bool FrontendInputsAndOutputs::isFilePrimary(StringRef file) {
-  return PrimaryInputs.count(file) != 0;
+  return PrimaryInputs.count(
+             InputFile::
+                 convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                     file)) != 0;
 }
 
 void FrontendInputsAndOutputs::addInputFile(StringRef file,
@@ -460,8 +463,28 @@ FrontendInputsAndOutputs::getPSPsForPrimary(StringRef filename) const {
 
 const InputFile &
 FrontendInputsAndOutputs::getPrimaryInputNamed(StringRef filename) const {
-  auto where = PrimaryInputs.find(filename);
+  auto where = PrimaryInputs.find(
+      InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+          filename));
   if (where == PrimaryInputs.end())
     llvm_unreachable("filename must be a primary");
   return AllFiles[where->second];
+}
+
+const InputFile *
+FrontendInputsAndOutputs::getInputProducingOutput(StringRef name) const {
+  if (hasPrimaryInputs())
+    return &getPrimaryInputNamed(name);
+  std::string fn =
+      InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+          name);
+  if (isSingleThreadedWMO()) {
+    assert(fn == AllFiles[0].file());
+    return &AllFiles[0];
+  }
+  // FIXME: dmu (slow)
+  for (const InputFile &f : AllFiles)
+    if (fn == f.file())
+      return &f;
+  return nullptr;
 }
