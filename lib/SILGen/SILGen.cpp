@@ -975,10 +975,12 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding,
                                                      unsigned pbdEntry) {
   ASTContext &C = M.getASTContext();
-  Type initType = FunctionType::get(
-                    TupleType::getEmpty(C), TupleType::getEmpty(C),
-                    FunctionType::ExtInfo()
-                      .withRepresentation(FunctionType::Representation::Thin));
+  auto *onceBuiltin =
+      cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
+  auto blockParam = onceBuiltin->getParameterLists()[0]->get(1);
+  auto *type = blockParam->getType()->castTo<FunctionType>();
+  Type initType = FunctionType::get(TupleType::getEmpty(C),
+                                    TupleType::getEmpty(C), type->getExtInfo());
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =

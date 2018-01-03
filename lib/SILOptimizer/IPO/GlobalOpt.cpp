@@ -321,8 +321,8 @@ static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
 
   auto Callee = BI->getOperand(1);
   assert(Callee->getType().castTo<SILFunctionType>()->getRepresentation()
-           == SILFunctionTypeRepresentation::Thin &&
-         "Expected thin function representation!");
+           == SILFunctionTypeRepresentation::CFunctionPointer &&
+         "Expected C function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
     return FR->getReferencedFunction();
