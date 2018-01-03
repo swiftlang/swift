@@ -245,9 +245,9 @@ extension BidirectionalCollection where SubSequence == Self {
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+    _precondition(count >= n,
       "Can't remove more items from a collection than it contains")
-    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    self = self[startIndex..<index(endIndex, offsetBy: -n)]
   }
 }
 
@@ -275,7 +275,7 @@ extension BidirectionalCollection {
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
       endIndex,
-      offsetBy: numericCast(-n),
+      offsetBy: -n,
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }
@@ -305,7 +305,7 @@ extension BidirectionalCollection {
       "Can't take a suffix of negative length from a collection")
     let start = index(
       endIndex,
-      offsetBy: numericCast(-maxLength),
+      offsetBy: -maxLength,
       limitedBy: startIndex) ?? startIndex
     return self[start..<endIndex]
   }
