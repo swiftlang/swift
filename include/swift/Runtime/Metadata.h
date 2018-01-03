@@ -2939,34 +2939,6 @@ swift_getCFunctionTypeMetadata3(const void *arg0,
                                 const Metadata *resultMetadata);
 
 #if SWIFT_OBJC_INTEROP
-/// \brief Fetch a uniqued metadata for a block type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata(size_t numArguments,
-                           const void *argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata1(const void *arg0,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata2(const void *arg0,
-                            const void *arg1,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata3(const void *arg0,
-                            const void *arg1,
-                            const void *arg2,
-                            const Metadata *resultMetadata);
-
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
