@@ -533,14 +533,15 @@ public:
   struct PartitionedTensorProgram {
     SILFunction *fn;  // The function representing the tensor program.
 
-    // These are placeholder instructions inserted during partitioning to
-    // represent the tensor program itself.  These will be replaced when the
-    // tensor function is lowered to a TF graph.
+    /// These are placeholder instructions inserted during partitioning to
+    /// represent the tensor program itself.  These will be replaced when the
+    /// tensor function is lowered to a TF graph.
     StringLiteralInst *programPlaceholder;
     IntegerLiteralInst *programLengthPlaceholder;
 
-    // This is the "TensorFlow.TensorProgram" object returned by the
-    // 'startProgram' runtime API entrypoint.
+    /// This is the "TensorFlow.TensorProgram" object returned by the
+    /// 'startProgram' runtime API entrypoint.  This is returned as null if the
+    /// tensorflow module is invalid and no transformation has been made.
     SILValue theTensorProgram;
   };
   PartitionedTensorProgram partition();
@@ -1697,7 +1698,7 @@ createTensorProgramStart() -> PartitionedTensorProgram {
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
 
-  // We pass the list of N tensor arguments as an pointer + length of
+  // We pass the list of N tensor arguments as a pointer + length of
   // AnyTensorHandle values, i.e.:
   //   (..., _ inputs: UnsafePointer<AnyTensorHandle>, _ numInputs: Int)
   // to get this, we create an N-ary tuple on the stack and pass the address of
@@ -1980,7 +1981,8 @@ public:
     // function for the tensor program body.
     auto tensorProgram = partitioner.partition();
 
-    // If the TensorFlow module is malformed, exit without breaking the SIL.
+    // If the TensorFlow module is malformed, exit without breaking the SIL:
+    // an error has already been emitted.
     if (!tensorProgram.fn)
       return;
 
