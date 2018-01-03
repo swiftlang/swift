@@ -97,14 +97,17 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 }
 
 void FrontendOptions::forAllOutputPaths(
-    std::function<void(const std::string &)> fn) const {
+    const InputFile &input, std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    InputsAndOutputs.forEachOutputFilename(fn);
+    if (InputsAndOutputs.isWholeModule())
+      InputsAndOutputs.forEachOutputFilename(fn);
+    else
+      fn(input.outputFilename());
   }
-  const std::string outputs[] = {InputsAndOutputs.getModuleOutputPath(),
-                                 InputsAndOutputs.getModuleDocOutputPath(),
-                                 InputsAndOutputs.getObjCHeaderOutputPath()};
+  const SupplementaryOutputPaths &s = input.supplementaryOutputs();
+  const std::string outputs[] = {s.ModuleOutputPath, s.ModuleDocOutputPath,
+                                 s.ObjCHeaderOutputPath};
   for (const std::string next : outputs) {
     if (!next.empty())
       fn(next);
