@@ -100,15 +100,19 @@ static std::string displayName(StringRef MainExecutablePath) {
 /// Emits a Make-style dependencies file.
 static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  DependencyTracker &depTracker,
-                                 const FrontendOptions &opts) {
+                                 const FrontendOptions &opts,
+                                 const InputFile &input) {
+  StringRef dependenciesFilePath =
+      input.supplementaryOutputs().DependenciesFilePath;
+  if (dependenciesFilePath.empty())
+    return false;
+
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.InputsAndOutputs.getDependenciesFilePath(), EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.InputsAndOutputs.getDependenciesFilePath(),
-                   EC.message());
+                   dependenciesFilePath, EC.message());
     out.clear_error();
     return true;
   }
@@ -135,7 +139,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
-  opts.forAllOutputPaths([&](StringRef targetName) {
+  opts.forAllOutputPaths(input, [&](StringRef targetName) {
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
@@ -150,6 +154,17 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   });
 
   return false;
+}
+
+static bool emitMakeDependencies(DiagnosticEngine &diags,
+                                 DependencyTracker &depTracker,
+                                 const FrontendOptions &opts) {
+  bool hadError = false;
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &f) -> void {
+        hadError = emitMakeDependencies(diags, depTracker, opts, f) || hadError;
+      });
+  return hadError;
 }
 
 namespace {
@@ -920,9 +935,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (opts.InputsAndOutputs.hasDependenciesPath())
-    (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
-                               opts);
+  (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
+                             opts);
 
   if (shouldTrackReferences)
     emitReferenceDependencies(Invocation, Instance);

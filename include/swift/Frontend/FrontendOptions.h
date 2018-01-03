@@ -39,7 +39,8 @@ public:
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
+  void forAllOutputPaths(const InputFile &input,
+                         std::function<void(const std::string &)> fn) const;
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
