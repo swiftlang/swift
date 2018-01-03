@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -enable-class-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -enable-class-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -enable-class-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+
+// CHECK: %swift.type = type { [[INT:i32|i64]] }
 
 sil_stage canonical
 
@@ -51,10 +53,13 @@ bb0(%0 : $ChildToResilientParent):
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T05super22ChildToResilientParentC6methodyyF(%T5super22ChildToResilientParentC* swiftself)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class22ResilientOutsideParentC*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[VTABLE_SLOT]]
+// CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{20|40}}
+// CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
+// CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
+// CHECK: [[VTABLE_SLOT:%.*]] = bitcast i8* [[VTABLE_ADDR]] to void (%T15resilient_class22ResilientOutsideParentC*)**
+// CHECK: [[FN_PTR:%.*]] = load void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // static super.ChildToResilientParent.classMethod () -> ()
@@ -70,10 +75,13 @@ bb0(%0 : $@thick ChildToResilientParent.Type):
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T05super22ChildToResilientParentC11classMethodyyFZ(%swift.type* swiftself)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @_T015resilient_class22ResilientOutsideParentCMa()
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{24|48}}
+// CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
+// CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
+// CHECK: [[VTABLE_SLOT:%.*]] = bitcast i8* [[VTABLE_ADDR]] to void (%swift.type*)**
+// CHECK: [[FN_PTR:%.*]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
 // CHECK: call swiftcc void
 
 // resilient_class.OutsideParent.method () -> ()
@@ -97,10 +105,10 @@ bb0(%0 : $ChildToFixedParent):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T05super18ChildToFixedParentC6methodyyF(%T5super18ChildToFixedParentC* swiftself)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class13OutsideParentC*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[VTABLE_SLOT]]
+// CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
+// CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class13OutsideParentC*)**
+// CHECK: [[VTABLE_SLOT:%.*]] = getelementptr inbounds void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
+// CHECK: [[FN_PTR:%.*]] = load void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[VTABLE_SLOT]]
 // CHECK: call swiftcc void
 
 // static super.ChildToFixedParent.classMethod () -> ()
@@ -117,10 +125,10 @@ bb0(%0 : $@thick ChildToFixedParent.Type):
 
 // ChildToFixedParent is in our resilience domain - load super metadata directly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T05super18ChildToFixedParentC11classMethodyyFZ(%swift.type* swiftself)
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// CHECK: [[SUPER_METADATA:%.*]] = call %swift.type* @_T015resilient_class13OutsideParentCMa()
+// CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// CHECK: [[VTABLE_SLOT:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// CHECK: [[FN_PTR:%.*]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
 // CHECK: call swiftcc void
 
 // ext.super.resilient_class.ResilientOutsideChild.callSuperMethod () -> ()
@@ -139,13 +147,16 @@ bb0(%0 : $ResilientOutsideChild):
 
 // Extending a resilient class - load super metadata indirectly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015resilient_class21ResilientOutsideChildC5superE15callSuperMethodyyF(%T15resilient_class21ResilientOutsideChildC* swiftself)
-// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
-// CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class22ResilientOutsideParentC*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[VTABLE_SLOT]]
+// CHECK: [[METADATA:%.*]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
+// CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// CHECK: [[SUPER_METADATA:%.*]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{20|40}}
+// CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
+// CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
+// CHECK: [[VTABLE_SLOT:%.*]] = bitcast i8* [[VTABLE_ADDR]] to void (%T15resilient_class22ResilientOutsideParentC*)*
+// CHECK: [[FN_PTR:%.*]] = load void (%T15resilient_class22ResilientOutsideParentC*)*, void (%T15resilient_class22ResilientOutsideParentC*)** [[VTABLE_SLOT]]
 // CHECK: call void
 
 // static ext.super.resilient_class.ResilientOutsideChild.callSuperClassMethod () -> ()
@@ -162,13 +173,16 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 
 // Extending a resilient class - load super metadata indirectly.
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyyFZ(%swift.type* swiftself)
-// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
-// CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
-// CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// CHECK: [[METADATA:%.*]] = call %swift.type* @_T015resilient_class21ResilientOutsideChildCMa()
+// CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// CHECK: [[SUPER_METADATA:%.*]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK: [[VTABLE_OFFSET:%.*]] = add [[INT]] [[BASE]], {{24|48}}
+// CHECK: [[SUPER_ADDR:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to i8*
+// CHECK: [[VTABLE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SUPER_ADDR]], [[INT]] [[VTABLE_OFFSET]]
+// CHECK: [[VTABLE_SLOT:%.*]] = bitcast i8* [[VTABLE_ADDR]] to void (%swift.type*)**
+// CHECK: [[FN_PTR:%.*]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
 // CHECK: call swiftcc void
 
 sil_vtable ChildToResilientParent {
@@ -202,10 +216,10 @@ sil_vtable Derived {
 }
 
 // CHECK-LABEL: define{{.*}} @test_super_method_of_generic_base
-// CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_T05super4BaseCyAA3StrVGMa()
-// CHECK: [[BASEMETADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to void (%T5super4BaseC*)**
-// CHECK: [[GEP:%[0-9]+]] = getelementptr inbounds void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[BASEMETADATA]]
-// CHECK: [[SUPERMT:%[0-9]+]] = load void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[GEP]]
+// CHECK: [[METADATA:%.*]] = call %swift.type* @_T05super4BaseCyAA3StrVGMa()
+// CHECK: [[BASEMETADATA:%.*]] = bitcast %swift.type* [[METADATA]] to void (%T5super4BaseC*)**
+// CHECK: [[GEP:%.*]] = getelementptr inbounds void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[BASEMETADATA]]
+// CHECK: [[SUPERMT:%.*]] = load void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[GEP]]
 // CHECK: ret void
 sil @test_super_method_of_generic_base : $@convention(method) (@guaranteed Derived) -> () {
 bb0(%0 : $Derived):
