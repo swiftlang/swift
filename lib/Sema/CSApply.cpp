@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -6459,10 +6460,28 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Coercions to function type.
   if (auto toFunc = toType->getAs<FunctionType>()) {
+    // Default argument generator must return escaping functions. Therefore, we
+    // leave an explicit escape to noescape cast here such that SILGen can skip
+    // the cast and emit a code for the escaping function.
+    bool isInDefaultArgumentContext = false;
+    if (auto initalizerCtx = dyn_cast<Initializer>(cs.DC))
+      isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
+                                    InitializerKind::DefaultArgument);
+    auto toEI = toFunc->getExtInfo();
     // Coercion to an autoclosure type produces an implicit closure.
     // FIXME: The type checker is more lenient, and allows @autoclosures to
     // be subtypes of non-@autoclosures, which is bogus.
     if (toFunc->isAutoClosure()) {
+      // The function type without @noescape if we are in the default argument
+      // context.
+      auto newToFuncType = toFunc;
+
+      // Remove the noescape attribute so that we can apply a separate function
+      // conversion instruction if we are in a default argument context.
+      if (isInDefaultArgumentContext && toEI.isNoEscape())
+        newToFuncType = toFunc->withExtInfo(toEI.withNoEscape(false))
+                            ->castTo<FunctionType>();
+
       // Convert the value to the expected result type of the function.
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
@@ -6470,12 +6489,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // We'll set discriminator values on all the autoclosures in a
       // later pass.
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto closure = cs.cacheType(
-          new (tc.Context) AutoClosureExpr(expr, toType, discriminator, dc));
+      auto closure = cs.cacheType(new (tc.Context) AutoClosureExpr(
+          expr, newToFuncType, discriminator, dc));
       closure->setParameterList(ParameterList::createEmpty(tc.Context));
 
       // Compute the capture list, now that we have analyzed the expression.
       tc.ClosuresWithUncomputedCaptures.push_back(closure);
+
+      // Apply the noescape conversion.
+      if (!newToFuncType->isEqual(toFunc)) {
+        assert(isInDefaultArgumentContext);
+        assert(newToFuncType
+                   ->withExtInfo(newToFuncType->getExtInfo().withNoEscape(true))
+                   ->isEqual(toFunc));
+        return cs.cacheType(new (tc.Context)
+                                FunctionConversionExpr(closure, toFunc));
+      }
 
       return closure;
     }
@@ -6485,17 +6514,33 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
+      auto fromEI = fromFunc->getExtInfo();
       if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        auto newFromFunc = FunctionType::get(fromFunc->getInput(),
+        auto newFromFuncType = FunctionType::get(fromFunc->getInput(),
                                              fromFunc->getResult(),
                                              fromEI.withNoEscape());
-        if (applyTypeToClosureExpr(cs, expr, newFromFunc)) {
-          fromFunc = newFromFunc;
+        if (!isInDefaultArgumentContext &&
+            applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+          fromFunc = newFromFuncType;
           // Propagating the 'no escape' bit might have satisfied the entire
           // conversion.  If so, we're done, otherwise keep converting.
           if (fromFunc->isEqual(toType))
             return expr;
+        } else if (isInDefaultArgumentContext) {
+          // First apply the conversion *without* noescape attribute.
+          if (!newFromFuncType->isEqual(toType)) {
+            auto escapingToFuncTy =
+                toFunc->withExtInfo(toEI.withNoEscape(false));
+            maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+            expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
+                expr, escapingToFuncTy));
+          }
+          // Apply an explict function conversion *only* for the escape to
+          // noescape conversion. This conversion will be stripped by the
+          // default argument generator. (We can't return a @noescape function)
+          auto newExpr = cs.cacheType(new (tc.Context)
+                                          FunctionConversionExpr(expr, toFunc));
+          return newExpr;
         }
       }
 

@@ -1738,6 +1738,14 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   // that have been made fully concrete.
   CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
 
+  // Remove @noescape from function return types. A @noescape
+  // function return type is a contradiction.
+  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    canResultTy =
+        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
+  }
+
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
