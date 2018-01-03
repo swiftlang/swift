@@ -454,13 +454,7 @@ extension DoubleWidth : FixedWidthInteger {
       lhs = 0
       return
     }
-    
-    // Shift is exactly the bit width of `Base`.
-    if rhs._storage.low == Base.bitWidth {
-      lhs = DoubleWidth((High(truncatingIfNeeded: lhs._storage.low), 0))
-      return
-    }
-    
+
     lhs &<<= rhs
   }
   
@@ -478,48 +472,48 @@ extension DoubleWidth : FixedWidthInteger {
       lhs = lhs < (0 as DoubleWidth) ? ~0 : 0
       return
     }
-    
-    // Shift is exactly the bit width of `Base`.
-    if rhs._storage.low == Base.bitWidth {
-      lhs = DoubleWidth((
-        lhs < (0 as DoubleWidth) ? ~0 : 0,
-        Low(truncatingIfNeeded: lhs._storage.high)))
-      return
-    }
 
     lhs &>>= rhs
   }
   
   @_inlineable // FIXME(sil-serialize-all)
   public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    // We need to use smart shifts since rhs can be greater than Base.bitWidth.
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth &- 1)
 
-    // If Base.bitWidth >= 4, then rhs == High(rhs._storage.low).
-    lhs._storage.high <<= High(rhs._storage.low)
+    guard rhs._storage.low < Base.bitWidth else {
+      lhs._storage.high = High(
+        truncatingIfNeeded: lhs._storage.low &<<
+          (rhs._storage.low &- Low(Base.bitWidth)))
+      lhs._storage.low = 0
+      return
+    }
 
-    let lowInHigh = Base.bitWidth > rhs._storage.low
-      ? lhs._storage.low >> (Low(Base.bitWidth) &- rhs._storage.low)
-      : lhs._storage.low << (rhs._storage.low &- Low(Base.bitWidth))
-    lhs._storage.high |= High(truncatingIfNeeded: lowInHigh)
-
-    lhs._storage.low <<= rhs._storage.low
+    guard rhs._storage.low != (0 as Low) else { return }
+    lhs._storage.high &<<= High(rhs._storage.low)
+    lhs._storage.high |= High(
+      truncatingIfNeeded: lhs._storage.low &>>
+        (Low(Base.bitWidth) &- rhs._storage.low))
+    lhs._storage.low &<<= rhs._storage.low
   }
   
   @_inlineable // FIXME(sil-serialize-all)
   public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    // We need to use smart shifts since rhs can be greater than Base.bitWidth.
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth &- 1)
 
-    lhs._storage.low >>= rhs._storage.low
+    guard rhs._storage.low < Base.bitWidth else {
+      lhs._storage.low = Low(
+        truncatingIfNeeded: lhs._storage.high &>>
+          High(rhs._storage.low &- Low(Base.bitWidth)))
+      lhs._storage.high = lhs._storage.high < (0 as High) ? ~0 : 0
+      return
+    }
 
-    // If Base.bitWidth >= 4, then rhs == High(rhs._storage.low).
-    let highInLow = Base.bitWidth > rhs._storage.low
-      ? lhs._storage.high << (High(Base.bitWidth) &- High(rhs._storage.low))
-      : lhs._storage.high >> (High(rhs._storage.low) &- High(Base.bitWidth))
-    lhs._storage.low |= Low(truncatingIfNeeded: highInLow)
-
-    lhs._storage.high >>= High(rhs._storage.low)
+    guard rhs._storage.low != (0 as Low) else { return }
+    lhs._storage.low &>>= rhs._storage.low
+    lhs._storage.low |= Low(
+      truncatingIfNeeded: lhs._storage.high &<<
+        High(Low(Base.bitWidth) &- rhs._storage.low))
+    lhs._storage.high &>>= High(rhs._storage.low)
   }
   
 %{
