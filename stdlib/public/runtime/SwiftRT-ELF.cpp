@@ -25,7 +25,7 @@
 
 extern "C" {
 DECLARE_SWIFT_SECTION(swift5_protocol_conformances)
-DECLARE_SWIFT_SECTION(swift2_type_metadata)
+DECLARE_SWIFT_SECTION(swift5_type_metadata)
 
 DECLARE_SWIFT_SECTION(swift3_typeref)
 DECLARE_SWIFT_SECTION(swift3_reflstr)
@@ -53,7 +53,7 @@ static void swift_image_constructor() {
       nullptr,
 
       SWIFT_SECTION_RANGE(swift5_protocol_conformances),
-      SWIFT_SECTION_RANGE(swift2_type_metadata),
+      SWIFT_SECTION_RANGE(swift5_type_metadata),
 
       SWIFT_SECTION_RANGE(swift3_typeref),
       SWIFT_SECTION_RANGE(swift3_reflstr),

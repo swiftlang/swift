@@ -2401,13 +2401,13 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift2_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift2_type_metadata";
+    sectionName = "swift5_type_metadata";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2tymd$B";
+    sectionName = ".sw5tymd$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
@@ -2437,14 +2437,19 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     auto typeEntity = getTypeEntityInfo(*this, type);
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
             typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
+    typeEntity.adjustForKnownRef(typeRef);
 
+    // Form the relative address, with the type refernce kind in the low bits.
     unsigned arrayIdx = elts.size();
-    llvm::Constant *recordFields[] = {
-      emitRelativeReference(typeRef, var, { arrayIdx, 0 }),
-      llvm::ConstantInt::get(Int32Ty,
-                             static_cast<unsigned>(typeEntity.typeKind)),
-    };
+    llvm::Constant *relativeAddr =
+      emitDirectRelativeReference(typeRef.getValue(), var, { arrayIdx, 0 });
+    unsigned lowBits = static_cast<unsigned>(typeEntity.typeKind);
+    if (lowBits != 0) {
+      relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
+                       llvm::ConstantInt::get(RelativeAddressTy, lowBits));
+    }
 
+    llvm::Constant *recordFields[] = { relativeAddr };
     auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy,
                                             recordFields);
     elts.push_back(record);
@@ -2454,7 +2459,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   var->setInitializer(initializer);
   var->setSection(sectionName);
-  var->setAlignment(getPointerAlignment().getValue());
+  var->setAlignment(4);
   addUsedGlobal(var);
   return var;
 }

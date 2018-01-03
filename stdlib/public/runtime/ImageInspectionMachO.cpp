@@ -34,7 +34,7 @@ namespace {
 constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeMetadataRecordSection[] = "__swift2_types";
+constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
 
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>

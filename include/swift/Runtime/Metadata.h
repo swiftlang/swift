@@ -2460,23 +2460,22 @@ private:
   // Some description of the type that is resolvable at runtime.
   union {
     /// A direct reference to the metadata.
-    RelativeDirectPointer<const TargetMetadata<Runtime>> DirectType;
+    RelativeDirectPointerIntPair<const TargetMetadata<Runtime>,
+                                 TypeMetadataRecordKind> DirectType;
 
     /// The nominal type descriptor for a resilient or generic type.
-    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
       TypeDescriptor;
   };
 
-  /// Flags describing the type metadata record.
-  TypeMetadataRecordFlags Flags;
-  
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeKind();
+    return DirectType.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
-    switch (Flags.getTypeKind()) {
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
@@ -2486,12 +2485,12 @@ public:
       assert(false && "not direct type metadata");
     }
 
-    return this->DirectType;
+    return this->DirectType.getPointer();
   }
 
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
-    switch (Flags.getTypeKind()) {
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
         
@@ -2501,7 +2500,7 @@ public:
       assert(false && "not generic metadata pattern");
     }
     
-    return this->TypeDescriptor;
+    return this->TypeDescriptor.getPointer();
   }
 
   /// Get the canonical metadata for the type referenced by this record, or
