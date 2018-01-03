@@ -19,6 +19,7 @@
 
 #include "DebugTypeInfo.h"
 #include "IRGenFunction.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 
 namespace llvm {
 class DIBuilder;
@@ -45,10 +46,10 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// \c llvm::DebugLoc.
 class IRGenDebugInfo {
 public:
-  static IRGenDebugInfo *createIRGenDebugInfo(const IRGenOptions &Opts,
-                                              ClangImporter &CI,
-                                              IRGenModule &IGM, llvm::Module &M,
-                                              SourceFile *SF);
+  static IRGenDebugInfo *
+  createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
+                       IRGenModule &IGM, llvm::Module &M,
+                       StringRef MainOutputFilenameForDebugInfo);
   virtual ~IRGenDebugInfo();
 
   /// Finalize the llvm::DIBuilder owned by this object.

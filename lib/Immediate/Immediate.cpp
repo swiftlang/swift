@@ -18,26 +18,28 @@
 #define DEBUG_TYPE "swift-immediate"
 #include "swift/Immediate/Immediate.h"
 #include "ImmediateImpl.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMContext.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Support/Path.h"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -204,11 +206,9 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
+    CompilerInstance &CI, llvm::Module &Module,
     llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
+    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
     const SILOptions &SILOpts) {
   swift::ModuleDecl *M = CI.getMainModule();
 
@@ -251,8 +251,8 @@ bool swift::immediate::IRGenImportedModules(
     if (!ImportedModules.insert(import).second)
       continue;
 
-    std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
-                                                             CI.getSILOptions());
+    std::unique_ptr<SILModule> SILMod = performSILGeneration(
+        import, CI.getSILOptions(), CI.getPSPsForAtMostOnePrimary());
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
@@ -346,8 +346,8 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
-  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
-                           IRGenOpts, SILOpts))
+  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns, IRGenOpts,
+                           SILOpts))
     return -1;
 
   llvm::PassManagerBuilder PMBuilder;

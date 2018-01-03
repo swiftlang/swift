@@ -65,8 +65,9 @@ enum class IRGenEmbedMode : unsigned {
 class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
-  std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
+  /// Now, only left here for lldb to use.
+  std::string MainInputFilename = "<lldb>";
+  std::vector<std::string> IRGOutputFilenames;
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -190,9 +191,12 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  /// FIXME: dmu Should go away in favor of
+  /// Instance.getFrontendOptions().InputsAndOutputs.getSingleOutputFilename.
   StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
+    if (IRGOutputFilenames.size() >= 1)
+      return IRGOutputFilenames.back();
     return StringRef();
   }
 

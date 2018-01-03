@@ -160,6 +160,8 @@ ERROR(error_cannot_have_input_files_with_file_list,none,
 ERROR(error_cannot_have_primary_files_with_primary_file_list,none,
 "cannot have primary input files with primary file list", ())
 
+ERROR(error_cannot_have_filelist_and_argument,none, "cannot have supplementary file list and argument", ())
+
 ERROR(error_duplicate_input_file,none,
 "duplicate input file '%0'", (StringRef))
 

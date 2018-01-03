@@ -832,6 +832,7 @@ private:
     
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
+                                 CI.getPSPsForAtMostOnePrimary(),
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
@@ -893,7 +894,7 @@ private:
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
-    
+
     if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
                              IRGenOpts, SILOpts))
       return false;
@@ -965,7 +966,7 @@ public:
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
-    IRGenOpts.OutputFilenames.clear();
+    IRGenOpts.IRGOutputFilenames.clear();
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;

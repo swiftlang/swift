@@ -102,6 +102,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -211,6 +212,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   const char *FrontendModeOption = nullptr;
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     switch (context.Output.getPrimaryOutputType()) {
     case types::TY_Object:
@@ -329,6 +331,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
         }
       }
     }
+    break;
+  }
+  case OutputInfo::Mode::BatchModeCompile: {
+    constructInvocationForBatchModeCompilation(Arguments, context);
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
@@ -507,6 +513,44 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   return II;
 }
 
+void ToolChain::constructInvocationForBatchModeCompilation(
+    ArgStringList &Arguments, const JobContext &context) const {
+
+  if (true || context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getAllSourcesPath());
+  } else {
+    // FIXME dmu
+    llvm_unreachable("Have not impelemented command-line non-primaries for "
+                     "batch-mode yet"); // xxx
+  }
+  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.InputActions.size() > TOO_MANY_FILES) {
+    Arguments.push_back("-primary-filelist");
+    // FIXME dmu
+    llvm_unreachable(
+        "Have not implemented primary filelist in driver yet"); // xxx
+  } else {
+    for (const Action *A : context.InputActions) {
+      const auto *IA = cast<InputAction>(A);
+      Arguments.push_back("-primary-file");
+      Arguments.push_back(IA->getInputArg().getValue());
+    }
+  }
+
+  // FIXME dmu: next bit blindly-copied from StandardCompile case
+  // Forward migrator flags.
+  if (auto DataPath =
+          context.Args.getLastArg(options::OPT_api_diff_data_file)) {
+    Arguments.push_back("-api-diff-data-file");
+    Arguments.push_back(DataPath->getValue());
+  }
+  if (context.Args.hasArg(options::OPT_dump_usr)) {
+    Arguments.push_back("-dump-usr");
+  }
+}
+
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const InterpretJobAction &job,
                                const JobContext &context) const {
@@ -555,6 +599,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   const char *FrontendModeOption = nullptr;
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     switch (context.Output.getPrimaryOutputType()) {
     case types::TY_Object:
@@ -626,6 +671,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
       Cmd->getOutput().getPrimaryOutputFilename().c_str());
     break;
   }
+
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile: {
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
