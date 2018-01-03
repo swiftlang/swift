@@ -309,6 +309,8 @@ public:
 class CompilerInstance {
   CompilerInvocation Invocation;
   std::unique_ptr<ASTContext> Context;
+  
+  /// Used when parsing SIL input, which isn't done in batch mode.
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
