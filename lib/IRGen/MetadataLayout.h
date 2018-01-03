@@ -170,6 +170,7 @@ private:
   bool HasResilientSuperclass = false;
 
   StoredOffset MetadataSize;
+  StoredOffset MetadataAddressPoint;
 
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
@@ -217,6 +218,8 @@ public:
   }
 
   Size getMetadataSizeOffset() const;
+
+  Size getMetadataAddressPointOffset() const;
 
   Size getInstanceSizeOffset() const;
 
