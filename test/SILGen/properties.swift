@@ -627,7 +627,7 @@ func force_global_observing_property_setter() {
 }
 
 // The property is initialized with "zero".
-// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(c) () -> () {
 // CHECK: bb0:
 // CHECK-NEXT: alloc_global @_T010properties25global_observing_propertySiv
 // CHECK-NEXT: %1 = global_addr @_T010properties25global_observing_propertySivp : $*Int
