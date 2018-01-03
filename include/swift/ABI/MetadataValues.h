@@ -173,18 +173,10 @@ enum : unsigned {
   
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeMetadataRecordKind : unsigned {
-  /// The conformance is universal and might apply to any type.
-  /// getDirectType() is nil.
-  Universal,
-
-  /// The conformance is for a nongeneric native struct or enum type.
-  /// getDirectType() points to the canonical metadata for the type.
-  UniqueDirectType,
-  
   /// The conformance is for a nongeneric foreign struct or enum type.
   /// getDirectType() points to a nonunique metadata record for the type, which
   /// needs to be uniqued by the runtime.
-  NonuniqueDirectType,
+  NonuniqueDirectType = 0x02,
   
   /// The conformance is for a nongeneric class type.
   /// getIndirectClass() points to a variable that contains the pointer to the
@@ -193,12 +185,12 @@ enum class TypeMetadataRecordKind : unsigned {
   ///
   /// On platforms without ObjC interop, this indirection isn't necessary,
   /// and classes are emitted as UniqueDirectType.
-  UniqueIndirectClass,
+  UniqueIndirectClass = 0x03,
   
   /// The conformance is for a generic or resilient type.
   /// getNominalTypeDescriptor() points to the nominal type descriptor shared
   /// by all metadata instantiations of this type.
-  UniqueNominalTypeDescriptor,
+  UniqueNominalTypeDescriptor = 0x04,
 };
 
 /// Kinds of reference to protocol conformance.

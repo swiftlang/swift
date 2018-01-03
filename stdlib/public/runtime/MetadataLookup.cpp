@@ -128,8 +128,6 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 template<>
 const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::UniqueDirectType:
-    return getDirectType();
   case TypeMetadataRecordKind::NonuniqueDirectType: {
     const ForeignTypeMetadata *FMD =
         static_cast<const ForeignTypeMetadata *>(getDirectType());

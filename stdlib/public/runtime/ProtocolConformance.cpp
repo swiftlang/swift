@@ -48,14 +48,8 @@ template<> void ProtocolConformanceRecord::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      printf("universal");
-      break;
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-      printf("%s direct type ",
-             kind == TypeMetadataRecordKind::UniqueDirectType
-             ? "unique" : "nonunique");
+      printf("direct type nonunique ");
       if (const auto *ntd = getDirectType()->getNominalTypeDescriptor()) {
         printf("%s", ntd->Name.get());
       } else {
@@ -99,9 +93,6 @@ template<> void ProtocolConformanceRecord::dump() const {
 template <>
 const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::UniqueDirectType:
-    // Already unique.
-    return getDirectType();
   case TypeMetadataRecordKind::NonuniqueDirectType: {
     // Ask the runtime for the unique metadata record we've canonized.
     const ForeignTypeMetadata *FMD =
@@ -117,8 +108,6 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
     return nullptr;
       
   case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-  case TypeMetadataRecordKind::Universal:
-    // The record does not apply to a single type.
     return nullptr;
   }
 

@@ -2464,7 +2464,7 @@ private:
 
     /// The nominal type descriptor for a resilient or generic type.
     RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+      TypeDescriptor;
   };
 
   /// Flags describing the type metadata record.
@@ -2477,10 +2477,6 @@ public:
   
   const TargetMetadata<Runtime> *getDirectType() const {
     switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
@@ -2495,14 +2491,10 @@ public:
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
@@ -2587,10 +2579,6 @@ public:
   
   const TargetMetadata<Runtime> *getDirectType() const {
     switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
@@ -2604,13 +2592,9 @@ public:
   
   const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
     switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
     case TypeMetadataRecordKind::UniqueIndirectClass:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not indirect class object");
@@ -2622,14 +2606,10 @@ public:
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }

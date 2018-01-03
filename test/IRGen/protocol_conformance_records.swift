@@ -13,11 +13,11 @@ public protocol Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE:@_T028protocol_conformance_records8RuncibleMp]]
 // -- type metadata
-// CHECK-SAME:           @_T028protocol_conformance_records15NativeValueTypeVMf
+// CHECK-SAME:           @_T028protocol_conformance_records15NativeValueTypeVMn
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeValueTypeVAA8RuncibleAAWP
-// -- flags 0x01: unique direct metadata
-// CHECK-SAME:           i32 1
+// -- flags 0x04: unique nominal type descriptor
+// CHECK-SAME:           i32 4
 // CHECK-SAME:         },
 public struct NativeValueType: Runcible {
   public func runce() {}
@@ -27,11 +27,11 @@ public struct NativeValueType: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- class metadata
-// CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCMf
+// CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCMn
 // -- witness table
 // CHECK-SAME:           @_T028protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP
-// -- flags 0x01: unique direct metadata
-// CHECK-SAME:           i32 1
+// -- flags 0x04: unique nominal type descriptor
+// CHECK-SAME:           i32 4
 // CHECK-SAME:         },
 public class NativeClassType: Runcible {
   public func runce() {}
@@ -55,11 +55,11 @@ public struct NativeGenericType<T>: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- type metadata
-// CHECK-SAME:           @got._T0SiN
+// CHECK-SAME:           @got._T0SiMn
 // -- witness table
 // CHECK-SAME:           @_T0Si28protocol_conformance_records8RuncibleAAWP
-// -- flags 0x01: unique direct metadata
-// CHECK-SAME:           i32 1
+// -- flags 0x04: unique nominal type descriptor
+// CHECK-SAME:           i32 4
 // CHECK-SAME:         }
 extension Int: Runcible {
   public func runce() {}
@@ -71,11 +71,11 @@ extension Int: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- nominal type descriptor
-// CHECK-SAME:           @got._T016resilient_struct4SizeVN
+// CHECK-SAME:           @got._T016resilient_struct4SizeVMn
 // -- witness table
 // CHECK-SAME:           @_T016resilient_struct4SizeV28protocol_conformance_records8RuncibleADWP
-// -- flags 0x01: unique direct metadata
-// CHECK-SAME:           i32 1
+// -- flags 0x04: unique nominal type descriptor
+// CHECK-SAME:           i32 4
 // CHECK-SAME:         }
 
 extension Size: Runcible {

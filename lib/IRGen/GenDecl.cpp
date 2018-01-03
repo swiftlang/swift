@@ -2210,48 +2210,26 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     entity = LinkEntity::forNominalTypeDescriptor(nom);
     defaultTy = IGM.NominalTypeDescriptorTy;
     defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
-  } else if (clas) {
-    if (clas->isForeign()) {
-      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-      entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    } else {
-      if (hasKnownSwiftMetadata(IGM, clas)) {
-        typeKind = TypeMetadataRecordKind::UniqueDirectType;
-        entity = LinkEntity::forTypeMetadata(
-                         conformingType,
-                         TypeMetadataAddress::AddressPoint,
-                         /*isPattern*/ false);
-        defaultTy = IGM.TypeMetadataStructTy;
-      } else {
-        // Form the class reference.
-        (void)IGM.getAddrOfObjCClassRef(clas);
+  } else if (clas && !clas->isForeign()) {
+    // A reference to an Objective-C class object.
+    assert(clas->isObjC() && "Must have an Objective-C class here");
+    assert(!hasKnownSwiftMetadata(IGM, clas) &&
+           "Should use nominal type descriptor");
 
-        typeKind = TypeMetadataRecordKind::UniqueIndirectClass;
-        entity = LinkEntity::forObjCClassRef(clas);
-        defaultTy = IGM.TypeMetadataPtrTy;
-      }
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    }
+    // Form the class reference.
+    (void)IGM.getAddrOfObjCClassRef(clas);
+
+    typeKind = TypeMetadataRecordKind::UniqueIndirectClass;
+    entity = LinkEntity::forObjCClassRef(clas);
+    defaultTy = IGM.TypeMetadataPtrTy;
+    defaultPtrTy = IGM.TypeMetadataPtrTy;
   } else {
     // Metadata for Clang types should be uniqued like foreign classes.
-    if (isa<ClangModuleUnit>(nom->getModuleScopeContext())) {
-      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-      entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    } else {
-      // We can reference the canonical metadata for native value types
-      // directly.
-      typeKind = TypeMetadataRecordKind::UniqueDirectType;
-      entity = LinkEntity::forTypeMetadata(
-                       conformingType,
-                       TypeMetadataAddress::AddressPoint,
-                       /*isPattern*/ false);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    }
+    assert(isa<ClangModuleUnit>(nom->getModuleScopeContext()));
+    typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
+    entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
+    defaultTy = IGM.TypeMetadataStructTy;
+    defaultPtrTy = IGM.TypeMetadataPtrTy;
   }
 
   auto flags = ProtocolConformanceFlags().withTypeKind(typeKind);
