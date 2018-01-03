@@ -7,7 +7,7 @@
 // CHECK: @_T012lazy_globals1ySivp = hidden global %TSi zeroinitializer, align 8
 // CHECK: @_T012lazy_globals1zSivp = hidden global %TSi zeroinitializer, align 8
 
-// CHECK: define internal swiftcc void @globalinit_[[T]]_func0() {{.*}} {
+// CHECK: define internal void @globalinit_[[T]]_func0() {{.*}} {
 // CHECK: entry:
 // CHECK:   store i64 1, i64* getelementptr inbounds (%TSi, %TSi* @_T012lazy_globals1xSivp, i32 0, i32 0), align 8
 // CHECK:   store i64 2, i64* getelementptr inbounds (%TSi, %TSi* @_T012lazy_globals1ySivp, i32 0, i32 0), align 8
