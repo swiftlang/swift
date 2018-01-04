@@ -22,16 +22,16 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/Coverage/CoverageMapping.h"
 
 namespace llvm {
 namespace coverage {
 struct CounterExpression;
 struct Counter;
-} // namespace coverage
-} // namespace llvm
+}
+}
 
 namespace swift {
 
@@ -133,7 +133,7 @@ public:
   void dump() const;
 };
 
-} // namespace swift
+} // end swift namespace
 
 namespace llvm {
 
@@ -142,8 +142,8 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_traits<::swift::SILCoverageMap>
-    : public ilist_default_traits<::swift::SILCoverageMap> {
+struct ilist_traits<::swift::SILCoverageMap> :
+public ilist_default_traits<::swift::SILCoverageMap> {
   typedef ::swift::SILCoverageMap SILCoverageMap;
 
 public:
@@ -153,6 +153,6 @@ private:
   void createNode(const SILCoverageMap &);
 };
 
-} // namespace llvm
+} // end llvm namespace
 
 #endif // SWIFT_SIL_SILCOVERAGEMAP_H
