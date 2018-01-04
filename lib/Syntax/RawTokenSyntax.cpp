@@ -79,6 +79,9 @@ void RawTokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   case tok::string_quote:
     OS << "string_quote";
     break;
+  case tok::multiline_string_quote:
+    OS << "multiline_string_quote";
+    break;
   case tok::string_segment:
     OS << "string_segment";
     break;
