@@ -651,10 +651,9 @@ public:
 
   /// \brief Generate the coverage counter mapping regions from collected
   /// source regions.
-  SILCoverageMap *
-  emitSourceRegions(SILModule &M, StringRef Name, bool External, uint64_t Hash,
-                    llvm::DenseMap<ASTNode, unsigned> &CounterIndices,
-                    StringRef Filename) {
+  SILCoverageMap *emitSourceRegions(
+      SILModule &M, StringRef Name, StringRef PGOFuncName, uint64_t Hash,
+      llvm::DenseMap<ASTNode, unsigned> &CounterIndices, StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
 
@@ -671,7 +670,7 @@ public:
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
                            Region.getCounter().expand(Builder, CounterIndices));
     }
-    return SILCoverageMap::create(M, Filename, Name, External, Hash, Regions,
+    return SILCoverageMap::create(M, Filename, Name, PGOFuncName, Hash, Regions,
                                   Builder.getExpressions());
   }
 
@@ -898,11 +897,9 @@ void SILProfiler::assignRegionCounters() {
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM);
     walkForProfiling(Root, Coverage);
-    CovMap = Coverage.emitSourceRegions(
-        M, CurrentFuncName,
-        !llvm::GlobalValue::isLocalLinkage(
-            getEquivalentPGOLinkage(CurrentFuncLinkage)),
-        PGOFuncHash, RegionCounterMap, CurrentFileName);
+    CovMap =
+        Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
+                                   RegionCounterMap, CurrentFileName);
   }
 
   if (llvm::IndexedInstrProfReader *IPR = M.getPGOReader()) {

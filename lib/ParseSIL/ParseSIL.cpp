@@ -5924,7 +5924,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
   return None;
 }
 
-/// decl-sil-coverage-map ::= 'sil_coverage_map' CoveredName CoverageHash
+/// decl-sil-coverage-map ::= 'sil_coverage_map' CoveredName PGOFuncName CoverageHash
 ///                           decl-sil-coverage-body
 /// decl-sil-coverage-body:
 ///   '{' sil-coverage-entry* '}'
@@ -5951,6 +5951,14 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
   if (State.parseSILIdentifier(FuncName, FuncLoc,
                                diag::expected_sil_value_name))
     return true;
+
+  // Parse the PGO func name.
+  if (!P.Tok.is(tok::string_literal)) {
+    P.diagnose(P.Tok, diag::sil_coverage_expected_quote);
+    return true;
+  }
+  StringRef PGOFuncName = P.Tok.getText().drop_front().drop_back();
+  P.consumeToken();
 
   SILFunction *Func = M.lookUpFunction(FuncName.str());
   if (!Func) {
@@ -6008,9 +6016,8 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
                        LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(M, Filename.str(), FuncName.str(),
-                           Func->isPossiblyUsedExternally(), Hash, Regions,
-                           Builder.getExpressions());
+    SILCoverageMap::create(M, Filename.str(), FuncName.str(), PGOFuncName.str(),
+                           Hash, Regions, Builder.getExpressions());
   return false;
 }
 
