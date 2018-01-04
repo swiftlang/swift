@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILProfiler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILProfiler.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ProfileData/Coverage/CoverageMapping.h"
@@ -52,8 +52,8 @@ static void walkFunctionForProfiling(AbstractFunctionDecl *Root,
 
   // We treat class initializers as part of the constructor for profiling.
   if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
-    auto *NominalType = CD->getDeclContext()
-        ->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *NominalType =
+        CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     for (auto *Member : NominalType->getMembers()) {
       // Find pattern binding declarations that have initializers.
       if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
@@ -160,8 +160,7 @@ class CounterExpr {
     assert(K == Kind::Node && "only valid for Node");
   }
 
-  CounterExpr(Kind K, const CounterExpr &LHS)
-      : K(K), LHS(&LHS) {
+  CounterExpr(Kind K, const CounterExpr &LHS) : K(K), LHS(&LHS) {
     assert((K == Kind::Ref) && "only valid for Ref");
   }
 
@@ -281,9 +280,9 @@ struct PGOMapping : public ASTWalker {
 
   PGOMapping(llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
              llvm::Expected<llvm::InstrProfRecord> &LoadedCounts,
-             llvm::DenseMap<ASTNode, ASTNode> &PGORegionCondToParentMap)
+             llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
       : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
-        LoadedCounts(LoadedCounts), CondToParentMap(PGORegionCondToParentMap) {}
+        LoadedCounts(LoadedCounts), CondToParentMap(RegionCondToParentMap) {}
 
   unsigned getParentCounter() const {
     if (Parent.isNull())
@@ -575,7 +574,6 @@ private:
     if (ControlFlowAdjust)
       Count = &createCounter(CounterExpr::Sub(*Count, *ControlFlowAdjust));
 
-    //RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
     RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
   }
 
@@ -766,7 +764,7 @@ public:
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       assert(RepeatWhileStack.back() == RWS && "Malformed repeat-while stack");
-      (void) RWS;
+      (void)RWS;
       RepeatWhileStack.pop_back();
 
     } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
@@ -845,7 +843,6 @@ public:
 
     return E;
   }
-
 };
 
 } // end anonymous namespace
@@ -896,7 +893,7 @@ void SILProfiler::assignRegionCounters() {
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
-  FunctionHash = 0x0;
+  PGOFuncHash = 0x0;
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM);
@@ -905,11 +902,11 @@ void SILProfiler::assignRegionCounters() {
         M, CurrentFuncName,
         !llvm::GlobalValue::isLocalLinkage(
             getEquivalentPGOLinkage(CurrentFuncLinkage)),
-        FunctionHash, RegionCounterMap, CurrentFileName);
+        PGOFuncHash, RegionCounterMap, CurrentFileName);
   }
 
   if (llvm::IndexedInstrProfReader *IPR = M.getPGOReader()) {
-    auto LoadedCounts = IPR->getInstrProfRecord(PGOFuncName, FunctionHash);
+    auto LoadedCounts = IPR->getInstrProfRecord(PGOFuncName, PGOFuncHash);
     if (auto E = LoadedCounts.takeError()) {
       llvm::handleAllErrors(std::move(E), [](const llvm::InstrProfError &Err) {
         Err.log(llvm::dbgs());
@@ -918,8 +915,8 @@ void SILProfiler::assignRegionCounters() {
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
-    PGOMapping pgoMapper(PGORegionLoadedCounterMap, LoadedCounts,
-                         PGORegionCondToParentMap);
+    PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts,
+                         RegionCondToParentMap);
     walkForProfiling(Root, pgoMapper);
   }
 }
@@ -928,8 +925,8 @@ ProfileCounter SILProfiler::getExecutionCount(ASTNode Node) {
   if (!Node || !M.getPGOReader() || !hasRegionCounters()) {
     return ProfileCounter();
   }
-  auto it = PGORegionLoadedCounterMap.find(Node);
-  if (it == PGORegionLoadedCounterMap.end()) {
+  auto it = RegionLoadedCounterMap.find(Node);
+  if (it == RegionLoadedCounterMap.end()) {
     return ProfileCounter();
   }
   return it->getSecond();
@@ -939,8 +936,8 @@ Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
   if (!Node || !M.getPGOReader() || !hasRegionCounters()) {
     return None;
   }
-  auto it = PGORegionCondToParentMap.find(Node);
-  if (it == PGORegionCondToParentMap.end()) {
+  auto it = RegionCondToParentMap.find(Node);
+  if (it == RegionCondToParentMap.end()) {
     return None;
   }
   return it->getSecond();

@@ -22,6 +22,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/SILAllocated.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -45,15 +46,15 @@ private:
 
   std::string PGOFuncName;
 
-  uint64_t FunctionHash = 0;
+  uint64_t PGOFuncHash = 0;
 
   unsigned NumRegionCounters = 0;
 
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
 
-  llvm::DenseMap<ASTNode, ProfileCounter> PGORegionLoadedCounterMap;
+  llvm::DenseMap<ASTNode, ProfileCounter> RegionLoadedCounterMap;
 
-  llvm::DenseMap<ASTNode, ASTNode> PGORegionCondToParentMap;
+  llvm::DenseMap<ASTNode, ASTNode> RegionCondToParentMap;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
@@ -78,7 +79,7 @@ public:
   StringRef getPGOFuncName() const { return PGOFuncName; }
 
   /// Get the function hash.
-  uint64_t getPGOFuncHash() const { return FunctionHash; }
+  uint64_t getPGOFuncHash() const { return PGOFuncHash; }
 
   /// Get the number of region counters.
   unsigned getNumRegionCounters() const { return NumRegionCounters; }
