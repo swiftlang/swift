@@ -111,7 +111,8 @@ enum class SyntaxStructureKind : uint8_t {
   ArrayExpression,
   DictionaryExpression,
   ObjectLiteralExpression,
-  TupleExpression
+  TupleExpression,
+  ClosureExpression
 };
 
 enum class SyntaxStructureElementKind : uint8_t {
