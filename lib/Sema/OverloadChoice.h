@@ -53,6 +53,10 @@ enum class OverloadChoiceKind : int {
   /// \brief The overload choice selects a particular declaration that
   /// was found by unwrapping an optional context type.
   DeclViaUnwrappedOptional,
+  /// \brief The overload choice selects a declaration that is
+  /// implicitly unwrapped only when needed in order to successfully
+  /// type check an expression.
+  DeclForImplicitlyUnwrappedOptional,
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
@@ -74,11 +78,14 @@ class OverloadChoice {
     IsDeclViaUnwrappedOptional = 0x02,
     /// Indicates that this declaration was dynamic, turning a
     /// "Decl" kind into "DeclViaDynamic" kind.
-    IsDeclViaDynamic = 0x03
+    IsDeclViaDynamic = 0x03,
+    /// Indicates that this declaration is of an Optional that is
+    /// implicitly unwrapped.
+    IsDeclForImplicitlyUnwrappedOptional = 0x04,
   };
 
   /// \brief The base type to be used when referencing the declaration
-  /// along with the two bits above.
+  /// along with the three bits above.
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndDeclKind;
 
   /// We mash together OverloadChoiceKind with tuple indices into a single
@@ -120,6 +127,7 @@ public:
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::DeclViaBridge &&
            kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
+           kind != OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional &&
            "wrong constructor for decl");
   }
 
@@ -174,6 +182,20 @@ public:
     return result;
   }
 
+  /// Retrieve an overload choice for a declaration that can be
+  /// implicitly unwrapped if needed in order to type check an
+  /// expression.
+  static OverloadChoice
+  getDeclForImplicitlyUnwrappedOptional(Type base, ValueDecl *value,
+                                        FunctionRefKind functionRefKind) {
+    OverloadChoice result;
+    result.BaseAndDeclKind.setPointer(base);
+    result.BaseAndDeclKind.setInt(IsDeclForImplicitlyUnwrappedOptional);
+    result.DeclOrKind = value;
+    result.TheFunctionRefKind = functionRefKind;
+    return result;
+  }
+
   /// \brief Retrieve the base type used to refer to the declaration.
   Type getBaseType() const {
     return BaseAndDeclKind.getPointer();
@@ -187,6 +209,8 @@ public:
       case IsDeclViaDynamic: return OverloadChoiceKind::DeclViaDynamic;
       case IsDeclViaUnwrappedOptional:
         return OverloadChoiceKind::DeclViaUnwrappedOptional;
+      case IsDeclForImplicitlyUnwrappedOptional:
+        return OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional;
       default: return OverloadChoiceKind::Decl;
       }
     }

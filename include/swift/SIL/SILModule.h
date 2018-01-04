@@ -453,6 +453,20 @@ public:
   using coverage_map_const_iterator = CoverageMapListType::const_iterator;
   CoverageMapListType &getCoverageMapList() { return coverageMaps; }
   const CoverageMapListType &getCoverageMapList() const { return coverageMaps; }
+  coverage_map_iterator coverage_map_begin() { return coverageMaps.begin(); }
+  coverage_map_iterator coverage_map_end() { return coverageMaps.end(); }
+  coverage_map_const_iterator coverage_map_begin() const {
+    return coverageMaps.begin();
+  }
+  coverage_map_const_iterator coverage_map_end() const {
+    return coverageMaps.end();
+  }
+  iterator_range<coverage_map_iterator> getCoverageMaps() {
+    return {coverageMaps.begin(), coverageMaps.end()};
+  }
+  iterator_range<coverage_map_const_iterator> getCoverageMaps() const {
+    return {coverageMaps.begin(), coverageMaps.end()};
+  }
 
   llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
