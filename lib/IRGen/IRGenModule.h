@@ -110,6 +110,7 @@ namespace irgen {
   class EnumMetadataLayout;
   class ExplosionSchema;
   class FixedTypeInfo;
+  class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
   class HeapLayout;
@@ -667,10 +668,12 @@ public:
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
-  NominalMetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  MetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  NominalMetadataLayout &getNominalMetadataLayout(NominalTypeDecl *decl);
   StructMetadataLayout &getMetadataLayout(StructDecl *decl);
-  ClassMetadataLayout &getMetadataLayout(ClassDecl *decl);
+  ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
+  ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
 private:
   TypeConverter &Types;
