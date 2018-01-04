@@ -160,8 +160,6 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
   B.createDeallocRef(loc, selfForDealloc, false);
 
-  emitProfilerIncrement(dd->getBody());
-
   // Return.
   B.createReturn(loc, emitEmptyTuple(loc));
 }
