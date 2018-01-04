@@ -677,6 +677,8 @@ ERROR(sil_coverage_invalid_counter, none,
       "expected counter expression, id, or 'zero'", ())
 ERROR(sil_coverage_expected_rparen, none,
       "expected ')' to end counter expression", ())
+ERROR(sil_coverage_expected_quote, none,
+      "expected quotes surrounding PGO function name", ())
 ERROR(sil_coverage_invalid_operator, none,
       "expected '+' or '-'", ())
 

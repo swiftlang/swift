@@ -101,18 +101,11 @@ void IRGenModule::emitCoverageMapping() {
                                             M->getExpressions(), Regions);
     W.write(OS);
 
-    std::string NameValue = llvm::getPGOFuncName(
-        M->getName(),
-        M->isPossiblyUsedExternally() ? llvm::GlobalValue::ExternalLinkage
-                                     : llvm::GlobalValue::PrivateLinkage,
-        M->getFile());
-    llvm::createPGOFuncNameVar(
-        *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
-
     CurrentSize = OS.str().size();
     unsigned MappingLen = CurrentSize - PrevSize;
     StringRef CoverageMapping(OS.str().c_str() + PrevSize, MappingLen);
 
+    StringRef NameValue = M->getPGOFuncName();
     uint64_t FuncHash = M->getHash();
 
     // Create a record for this function.
