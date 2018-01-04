@@ -274,78 +274,68 @@ func testOverloadAmbiguity() {
   overloadOnSomeDefaultArgsOnly3(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly3(_:x:a:)'}}
 }
 
-func overloadMismatch(a: () -> Void) -> Bool { return true} // expected-note 2 {{found this candidate}}
-func overloadMismatch(x: Int = 0, a: () -> Void) -> Int { return 0 } // expected-note 2 {{found this candidate}}
+func overloadMismatch(a: () -> Void) -> Bool { return true}
+func overloadMismatch(x: Int = 0, a: () -> Void) -> Int { return 0 }
 
 func overloadMismatchLabel(a: () -> Void) -> Bool { return true}
 func overloadMismatchLabel(x: Int = 0, b: () -> Void) -> Int { return 0 }
 
-func overloadMismatchArgs(_: Int, a: () -> Void) -> Bool { return true} // expected-note {{found this candidate}}
-func overloadMismatchArgs(_: Int, x: Int = 0, a: () -> Void) -> Int { return 0 } // expected-note {{found this candidate}}
+func overloadMismatchArgs(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchArgs(_: Int, x: Int = 0, a: () -> Void) -> Int { return 0 }
 
 func overloadMismatchArgsLabel(_: Int, a: () -> Void) -> Bool { return true}
 func overloadMismatchArgsLabel(_: Int, x: Int = 0, b: () -> Void) -> Int { return 0 }
 
-func overloadMismatchMultiArgs(_: Int, a: () -> Void) -> Bool { return true} // expected-note {{found this candidate}}
-func overloadMismatchMultiArgs(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 } // expected-note {{found this candidate}}
+func overloadMismatchMultiArgs(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgs(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 }
 
 func overloadMismatchMultiArgsLabel(_: Int, a: () -> Void) -> Bool { return true}
 func overloadMismatchMultiArgsLabel(_: Int, x: Int = 0, y: Int = 1, b: () -> Void) -> Int { return 0 }
 
-func overloadMismatchMultiArgs2(_: Int, z: Int = 0, a: () -> Void) -> Bool { return true} // expected-note {{found this candidate}}
-func overloadMismatchMultiArgs2(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 } // expected-note {{found this candidate}}
+func overloadMismatchMultiArgs2(_: Int, z: Int = 0, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgs2(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 }
 
 func overloadMismatchMultiArgs2Label(_: Int, z: Int = 0, a: () -> Void) -> Bool { return true}
 func overloadMismatchMultiArgs2Label(_: Int, x: Int = 0, y: Int = 1, b: () -> Void) -> Int { return 0 }
 
 func testOverloadDefaultArgs() {
-  let a = overloadMismatch {} // expected-error {{ambiguous use of 'overloadMismatch'}}
-  _ = a as String
-  let b = overloadMismatch() {} // expected-error {{ambiguous use of 'overloadMismatch'}}
-  _ = b as String
+  let a = overloadMismatch {}
+  _ = a as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
+  let b = overloadMismatch() {}
+  _ = b as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let c = overloadMismatchLabel {} // expected-error {{ambiguous use of 'overloadMismatchLabel'}}
-  // expected-note@-1 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchLabel(a:)'}} {{32-33=(a: }} {{35-35=)}}
-  // expected-note@-2 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchLabel(x:b:)'}} {{32-33=(b: }} {{35-35=)}}
-  _ = c as String
-  let d = overloadMismatchLabel() {} // expected-error {{ambiguous use of 'overloadMismatchLabel'}}
-  // expected-note@-1 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchLabel(a:)'}} {{33-35=a: }} {{37-37=)}}
-  // expected-note@-2 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchLabel(x:b:)'}} {{33-35=b: }} {{37-37=)}}
-  _ = d as String
+  let c = overloadMismatchLabel {}
+  _ = c as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
+  let d = overloadMismatchLabel() {}
+  _ = d as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let e = overloadMismatchArgs(0) {} // expected-error {{ambiguous use of 'overloadMismatchArgs'}}
-  _ = e as String
+  let e = overloadMismatchArgs(0) {}
+  _ = e as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let f = overloadMismatchArgsLabel(0) {} // expected-error {{ambiguous use of 'overloadMismatchArgsLabel'}}
-  // expected-note@-1 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchArgsLabel(_:a:)'}} {{38-40=, a: }} {{42-42=)}}
-  // expected-note@-2 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchArgsLabel(_:x:b:)'}} {{38-40=, b: }} {{42-42=)}}
-  _ = f as String
+  let f = overloadMismatchArgsLabel(0) {}
+  _ = f as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let g = overloadMismatchMultiArgs(0) {} // expected-error {{ambiguous use of 'overloadMismatchMultiArgs'}}
-  _ = g as String
+  let g = overloadMismatchMultiArgs(0) {}
+  _ = g as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let h = overloadMismatchMultiArgsLabel(0) {} // expected-error {{ambiguous use of 'overloadMismatchMultiArgsLabel'}}
-  // expected-note@-1 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchMultiArgsLabel(_:a:)'}} {{43-45=, a: }} {{47-47=)}}
-  // expected-note@-2 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchMultiArgsLabel(_:x:y:b:)'}} {{43-45=, b: }} {{47-47=)}}
-  _ = h as String
+  let h = overloadMismatchMultiArgsLabel(0) {}
+  _ = h as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let i = overloadMismatchMultiArgs2(0) {} // expected-error {{ambiguous use of 'overloadMismatchMultiArgs2'}}
-  _ = i as String
+  let i = overloadMismatchMultiArgs2(0) {}
+  _ = i as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let j = overloadMismatchMultiArgs2Label(0) {} // expected-error {{ambiguous use of 'overloadMismatchMultiArgs2Label'}}
-  // expected-note@-1 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchMultiArgs2Label(_:z:a:)'}} {{44-46=, a: }} {{48-48=)}}
-  // expected-note@-2 {{use an explicit argument label instead of a trailing closure to call 'overloadMismatchMultiArgs2Label(_:x:y:b:)'}} {{44-46=, b: }} {{48-48=)}}
-  _ = j as String
+  let j = overloadMismatchMultiArgs2Label(0) {}
+  _ = j as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 }
 
 func variadic(_: (() -> Void)...) {}
 func variadicLabel(closures: (() -> Void)...) {}
 
-func variadicOverloadMismatch(_: (() -> Void)...) -> Bool { return true } // expected-note 2 {{found this candidate}}
-func variadicOverloadMismatch(x: Int = 0, _: (() -> Void)...) -> Int { return 0 } // expected-note 2 {{found this candidate}}
+func variadicOverloadMismatch(_: (() -> Void)...) -> Bool { return true }
+func variadicOverloadMismatch(x: Int = 0, _: (() -> Void)...) -> Int { return 0 }
 
-func variadicOverloadMismatchLabel(a: (() -> Void)...) -> Bool { return true } // expected-note 2 {{found this candidate}}
-func variadicOverloadMismatchLabel(x: Int = 0, b: (() -> Void)...) -> Int { return 0 } // expected-note 2 {{found this candidate}}
+func variadicOverloadMismatchLabel(a: (() -> Void)...) -> Bool { return true }
+func variadicOverloadMismatchLabel(x: Int = 0, b: (() -> Void)...) -> Int { return 0 }
 
 func variadicAndNonOverload(_: (() -> Void)) -> Bool { return false }
 func variadicAndNonOverload(_: (() -> Void)...) -> Int { return 0 }
@@ -362,15 +352,15 @@ func testVariadic() {
   variadicLabel() {}
   variadicLabel(closures: {}) {} // expected-error {{extra argument 'closures' in call}}
 
-  let a1 = variadicOverloadMismatch {} // expected-error {{ambiguous use of 'variadicOverloadMismatch'}}
-  _ = a1 as String
-  let a2 = variadicOverloadMismatch() {} // expected-error {{ambiguous use of 'variadicOverloadMismatch'}}
-  _ = a2 as String
+  let a1 = variadicOverloadMismatch {}
+  _ = a1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
+  let a2 = variadicOverloadMismatch() {}
+  _ = a2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
-  let b1 = variadicOverloadMismatchLabel {} // expected-error {{ambiguous use of 'variadicOverloadMismatchLabel'}}
-  _ = b1 as String
-  let b2 = variadicOverloadMismatchLabel() {} // expected-error {{ambiguous use of 'variadicOverloadMismatchLabel'}}
-  _ = b2 as String
+  let b1 = variadicOverloadMismatchLabel {}
+  _ = b1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
+  let b2 = variadicOverloadMismatchLabel() {}
+  _ = b2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String' in coercion}}
 
   let c1 = variadicAndNonOverloadLabel {}
   _ = c1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
