@@ -2498,7 +2498,7 @@ namespace {
     createTypeVariableAndDisjunctionForIUOCoercion(Type toType,
                                                    ConstraintLocator *locator) {
       auto implicitUnwrapLocator = CS.getConstraintLocator(
-          locator, ConstraintLocator::ImplicitlyUnwrappedCoercionResult);
+          locator, ConstraintLocator::ImplicitlyUnwrappedValue);
       auto typeVar =
           CS.createTypeVariable(implicitUnwrapLocator, /*options=*/0);
       CS.buildDisjunctionForImplicitlyUnwrappedOptional(typeVar, toType,
