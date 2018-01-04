@@ -27,7 +27,6 @@ add_swift_library(swiftSIL STATIC
   SILModule.cpp
   SILOpenedArchetypesTracker.cpp
   SILPrinter.cpp
-  SILProfiler.cpp
   SILSuccessor.cpp
   SILType.cpp
   SILValue.cpp

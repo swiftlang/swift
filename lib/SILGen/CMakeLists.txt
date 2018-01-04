@@ -27,6 +27,7 @@ add_swift_library(swiftSILGen STATIC
   SILGenMaterializeForSet.cpp
   SILGenPattern.cpp
   SILGenPoly.cpp
+  SILGenProfiling.cpp
   SILGenProlog.cpp
   SILGenStmt.cpp
   SILGenThunk.cpp
