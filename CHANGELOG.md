@@ -6828,4 +6828,10 @@ Swift 1.0
 [SE-0184]: <https://github.com/apple/swift-evolution/blob/master/proposals/0184-unsafe-pointers-add-missing.md>
 [SE-0185]: <https://github.com/apple/swift-evolution/blob/master/proposals/0185-synthesize-equatable-hashable.md>
 [SE-0186]: <https://github.com/apple/swift-evolution/blob/master/proposals/0186-remove-ownership-keyword-support-in-protocols.md>
+[SE-0187]: <https://github.com/apple/swift-evolution/blob/master/proposals/0187-introduce-filtermap.md>
 [SE-0188]: <https://github.com/apple/swift-evolution/blob/master/proposals/0188-stdlib-index-types-hashable.md>
+[SE-0189]: <https://github.com/apple/swift-evolution/blob/master/proposals/0189-restrict-cross-module-struct-initializers.md>
+[SE-0190]: <https://github.com/apple/swift-evolution/blob/master/proposals/0190-target-environment-platform-condition.md>
+[SE-0191]: <https://github.com/apple/swift-evolution/blob/master/proposals/0191-eliminate-indexdistance.md>
+[SE-0192]: <https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md>
+[SE-0193]: <https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md>
