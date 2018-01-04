@@ -119,8 +119,8 @@ func <#test1#> () {
 let myArray = [<#item1#>, <#item2#>]
 
 // CHECK: <ffunc>func <name>test1()</name> {
-// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>, <arg><brace>{}</brace></arg>)</call>
-// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>) <arg><brace>{}</brace></arg></call>
+// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>, <arg><closure><brace>{}</brace></closure></arg>)</call>
+// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>) <arg><closure><brace>{}</brace></closure></arg></call>
 // CHECK: }</ffunc>
 func test1() {
   dispatch_async(dispatch_get_main_queue(), {})
@@ -149,8 +149,8 @@ enum Rawness : Int {
   case Two = 2, Three = 3
 }
 
-// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: <type>() throws -> ()</type></param>)</name> rethrows {}</ffunc>
-func rethrowFunc(_ f: () throws -> ()) rethrows {}
+// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: <type>() throws -> ()</type> = <closure><brace>{}</brace></closure></param>)</name> rethrows {}</ffunc>
+func rethrowFunc(_ f: () throws -> () = {}) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
@@ -179,7 +179,7 @@ class NestedPoundIf{
 class A {
   func foo(_ i : Int, animations: () -> ()) {}
   func perform() {foo(5, animations: {})}
-// CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <brace>{}</brace></arg>)</call>}</ifunc>
+// CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <closure><brace>{}</brace></closure></arg>)</call>}</ifunc>
 }
 
 // CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
@@ -250,3 +250,9 @@ struct Tuples {
   }
 }
 
+completion(a: 1) { (x: Int, y: Int) -> Int in
+  return x + y
+}
+// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Int</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
+// CHECK:    return x + y
+// CHECK: }</closure></arg></call>
