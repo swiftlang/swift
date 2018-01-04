@@ -36,7 +36,7 @@ class SILProfiler : public SILAllocated<SILProfiler> {
 private:
   SILModule &M;
 
-  Decl *Root;
+  ASTNode Root;
 
   bool EmitCoverageMapping;
 
@@ -58,11 +58,11 @@ private:
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
-  SILProfiler(SILModule &M, Decl *D, bool EmitCoverageMapping)
-      : M(M), Root(D), EmitCoverageMapping(EmitCoverageMapping) {}
+  SILProfiler(SILModule &M, ASTNode Root, bool EmitCoverageMapping)
+      : M(M), Root(Root), EmitCoverageMapping(EmitCoverageMapping) {}
 
 public:
-  static SILProfiler *create(SILModule &M, Decl *D);
+  static SILProfiler *create(SILModule &M, ASTNode N);
 
   /// Check if the function is set up for profiling.
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
