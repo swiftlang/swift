@@ -914,7 +914,6 @@ if(SWIFT_ENABLE_PROFILE_GENERATION OR SWIFT_ENABLE_IR_PROFILE_GENERATION)
   file(TO_NATIVE_PATH
     "${SWIFT_PROFILE_OUTPUT_DIR}/${SWIFT_PROFILE_FILE_PATTERN}"
     SWIFT_PROFILE_FILE_PATTERN)
-  endif()
 endif()
 
 # Enables profile generation for the current diretory and all subsequent
