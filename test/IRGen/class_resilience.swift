@@ -128,6 +128,10 @@ public class ClassWithIndirectResilientEnum {
 
 public class ResilientChild : ResilientOutsideParent {
   public var field: Int32 = 0
+
+  public override func getValue() -> Int {
+    return 1
+  }
 }
 
 // Superclass is resilient, but the class is fixed-layout.
@@ -387,7 +391,32 @@ extension ResilientGenericOutsideParent {
 // CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
 
 // Relocate metadata if necessary...
-// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
+
+// Initialize field offset vector...
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @_T016class_resilience14ResilientChildCMo
+// CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{12|24}}
+
+// CHECK:              call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
+
+// Initialize constructor vtable override...
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{16|32}}
+// CHECK:              [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
+// CHECK:              [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
+// CHECK:              [[VTABLE_ENTRY_TMP:%.*]] = bitcast i8* [[VTABLE_ENTRY_ADDR]] to i8**
+// CHECK:              store i8* bitcast (%T16class_resilience14ResilientChildC* (%T16class_resilience14ResilientChildC*)* @_T016class_resilience14ResilientChildCACycfc to i8*), i8** [[VTABLE_ENTRY_TMP]]
+
+// Initialize getValue() vtable override...
+// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* @_T015resilient_class22ResilientOutsideParentCMo
+// CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{28|56}}
+// CHECK:              [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
+// CHECK:              [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
+// CHECK:              [[VTABLE_ENTRY_TMP:%.*]] = bitcast i8* [[VTABLE_ENTRY_ADDR]] to i8**
+// CHECK:              store i8* bitcast ([[INT]] (%T16class_resilience14ResilientChildC*)* @_T016class_resilience14ResilientChildC8getValueSiyF to i8*), i8** [[VTABLE_ENTRY_TMP]]
+
+// Store the completed metadata in the cache variable...
+// CHECK:              store atomic %swift.type* [[METADATA]], %swift.type** @_T016class_resilience14ResilientChildCML release
 
 // CHECK:              ret void
 

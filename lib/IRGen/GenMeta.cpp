@@ -3101,10 +3101,6 @@ namespace {
     void emitInitializeMethodOverrides(IRGenFunction &IGF,
                                        llvm::Value *metadata) {}
 
-    void noteResilientSuperclass() {
-      llvm_unreachable("Should not have a resilient base class here");
-    }
-
     void addGenericArgument(CanType argTy, ClassDecl *forClass) {
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
@@ -3122,13 +3118,6 @@ namespace {
     IRGenModule &IGM;
     SILVTable *VTable;
 
-    struct MethodOverride {
-      Size Offset;
-      SILFunction *Method;
-    };
-
-    SmallVector<MethodOverride, 4> Overrides;
-
   public:
     ResilientClassMemberBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &builder,
@@ -3142,51 +3131,33 @@ namespace {
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {}
 
-    void addMethod(SILDeclRef fn) {
-      // Find the vtable entry.
-      assert(VTable && "no vtable?!");
-      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
-
-      // If the class is resilient or generic, the runtime will construct the
-      // vtable for us. All we need to do is fix up overrides of superclass
-      // methods.
-      if (entry && entry->TheKind == SILVTable::Entry::Kind::Override) {
-        auto fn = entry->Method;
-        auto *classDecl = cast<ClassDecl>(fn.getDecl()->getDeclContext());
-        auto &layout = IGM.getMetadataLayout(classDecl);
-
-        auto offset = layout.getStaticMethodOffset(fn);
-
-        // Record the override so that we can fill it in later.
-        Overrides.push_back({offset, entry->Implementation});
-      }
-    }
+    void addMethod(SILDeclRef fn) {}
 
     // Update vtable entries for method overrides. The runtime copies in
     // the vtable from the superclass for us; we have to install method
     // overrides ourselves.
     void emitInitializeMethodOverrides(IRGenFunction &IGF,
                                        llvm::Value *metadata) {
-      if (Overrides.empty())
-        return;
+      for (auto &entry : VTable->getEntries()) {
+        if (entry.TheKind != SILVTable::Entry::Kind::Override)
+          continue;
 
-      Address metadataWords(
-          IGF.Builder.CreateBitCast(metadata, IGM.Int8PtrPtrTy),
-          IGM.getPointerAlignment());
+        auto fn = entry.Method;
 
-      for (auto Override : Overrides) {
-        auto *implFn = IGM.getAddrOfSILFunction(Override.Method,
+        auto *classDecl = cast<ClassDecl>(fn.getDecl()->getDeclContext());
+        auto &layout = IGM.getMetadataLayout(classDecl);
+
+        auto offset = layout.getMethodInfo(IGF, fn).getOffset();
+
+        auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                            IGM.Int8PtrTy,
+                                            IGM.getPointerAlignment());
+
+        auto *implFn = IGM.getAddrOfSILFunction(entry.Implementation,
                                                 NotForDefinition);
-
-        auto dest = createPointerSizedGEP(IGF, metadataWords,
-                                          Override.Offset);
         auto *value = IGF.Builder.CreateBitCast(implFn, IGM.Int8PtrTy);
-        IGF.Builder.CreateStore(value, dest);
+        IGF.Builder.CreateStore(value, slot);
       }
-    }
-
-    void noteResilientSuperclass() {
-      // FIXME
     }
 
     void addGenericArgument(CanType argTy, ClassDecl *forClass) {}

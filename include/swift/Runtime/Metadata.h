@@ -1037,13 +1037,14 @@ struct TargetGenericParameterDescriptorHeader {
   using ClassMetadata = TargetClassMetadata<Runtime>;
 
 private:
-  /// The offset to the first generic argument from the start of
+  /// The offset to the first generic argument from the address point of
   /// metadata record, in words.
   ///
   /// This is meaningful if NumGenericRequirements is nonzero.
   ///
   /// If this class has a resilient superclass, this offset is relative to the
-  /// size of the resilient superclass metadata. Otherwise, it is absolute.
+  /// the start of the immediate class's metadata. Otherwise, it is relative
+  /// to the metadata address point.
   uint32_t Offset;
 
 public:
@@ -1077,16 +1078,22 @@ public:
     return Offset;
   }
 
+  /// Return the offset of the start of generic arguments in the nominal
+  /// type's metadata. This method should only be used with value type
+  /// metadata and class metadata with a non-resilient superclass.
   uint32_t getOffset() const {
     assert(!Flags.hasResilientSuperclass());
     return Offset;
   }
 
+  /// Return the offset of the start of generic arguments in the nominal
+  /// type's metadata.
   uint32_t getOffset(const TargetMetadata<Runtime> *metadata) const {
-    if (auto *classMetadata = llvm::dyn_cast<ClassMetadata>(metadata))
-      if (auto *superclass = classMetadata->SuperClass)
-        if (auto *superMetadata = llvm::dyn_cast<ClassMetadata>(superclass))
-          return getOffset(classMetadata, superMetadata);
+    if (Flags.hasResilientSuperclass()) {
+      auto *classMetadata = llvm::cast<ClassMetadata>(metadata);
+      auto *superMetadata = llvm::cast<ClassMetadata>(classMetadata->SuperClass);
+      return getOffset(classMetadata, superMetadata);
+    }
 
     return getOffset();
   }
@@ -1124,7 +1131,8 @@ private:
   /// in words.
   ///
   /// If this class has a resilient superclass, this offset is relative to the
-  /// size of the resilient superclass metadata. Otherwise, it is absolute.
+  /// the start of the immediate class's metadata. Otherwise, it is relative
+  /// to the metadata address point.
   uint32_t VTableOffset;
 
 public:

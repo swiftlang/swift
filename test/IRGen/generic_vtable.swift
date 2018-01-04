@@ -121,11 +121,12 @@ public class Concrete : Derived<Int> {
 
 // -- method override for 'm2()'
 // CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 11
+// CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 11
 // CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedC2m2yyF to i8*), i8** [[VTABLE0]], align 8
 
 // -- method override for 'init()'
-// CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 12
+// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+// CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedCACyxGycfc to i8*), i8** [[VTABLE1]], align 8
 
 // CHECK: ret %swift.type* [[METADATA]]

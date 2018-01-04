@@ -208,9 +208,6 @@ ResilientClassTestSuite.test("ResilientOutsideParent") {
 }
 
 
-// FIXME: needs indirect metadata access
-
-#if false
 // Concrete subclass of resilient class
 
 public class ChildOfResilientOutsideParent : ResilientOutsideParent {
@@ -261,8 +258,17 @@ ResilientClassTestSuite.test("ChildOfResilientOutsideParentWithResilientStoredPr
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
 }
-#endif
 
+class ChildWithMethodOverride : ResilientOutsideParent {
+  override func getValue() -> Int {
+    return 1
+  }
+}
+
+ResilientClassTestSuite.test("ChildWithMethodOverride") {
+  let c = ChildWithMethodOverride()
+  expectEqual(c.getValue(), 1)
+}
 
 ResilientClassTestSuite.test("TypeByName") {
   expectTrue(_typeByName("main.ClassWithResilientProperty")

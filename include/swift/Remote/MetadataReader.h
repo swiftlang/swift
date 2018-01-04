@@ -1001,8 +1001,7 @@ public:
   std::pair<bool, uint32_t>
   readGenericArgsOffset(MetadataRef metadata,
                         NominalTypeDescriptorRef descriptor) {
-    if (metadata->getKind() == MetadataKind::Class) {
-      auto *classMetadata = cast<TargetClassMetadata<Runtime>>(metadata);
+    if (auto *classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)) {
       if (classMetadata->SuperClass) {
         auto superMetadata = readMetadata(classMetadata->SuperClass);
         if (!superMetadata)
