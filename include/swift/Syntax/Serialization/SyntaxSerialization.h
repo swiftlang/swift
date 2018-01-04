@@ -155,7 +155,6 @@ struct ObjectTraits<TokenDescription> {
       case tok::oper_prefix:
       case tok::dollarident:
       case tok::comment:
-      case tok::string_quote:
       case tok::string_segment:
         out.mapRequired("text", value.Text);
         break;
