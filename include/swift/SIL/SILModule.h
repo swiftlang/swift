@@ -471,7 +471,7 @@ public:
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
- SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
     return GlobalVariableMap.lookup(name);
   }
 
@@ -711,6 +711,8 @@ public:
     return ! getOptions().AssumeSingleThreaded;
   }
 };
+
+bool isDeclVisibleExternally(const ValueDecl *decl, const SILModule *module);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);

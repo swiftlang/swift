@@ -115,3 +115,18 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
 }
+
+bool swift::isDeclVisibleExternally(const ValueDecl *decl, const SILModule *module) {
+  AccessLevel access = decl->getEffectiveAccess();
+  switch (access) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+    return false;
+  case AccessLevel::Internal:
+    return !module->isWholeModule();
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    return true;
+  }
+  llvm_unreachable("Unhandled access level in switch");
+}

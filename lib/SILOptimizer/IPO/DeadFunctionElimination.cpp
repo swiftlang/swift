@@ -407,22 +407,7 @@ protected:
 
   /// Retrieve the visibility information from the AST.
   bool isVisibleExternally(const ValueDecl *decl) {
-    AccessLevel access = decl->getEffectiveAccess();
-    SILLinkage linkage;
-    switch (access) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      linkage = SILLinkage::Private;
-      break;
-    case AccessLevel::Internal:
-      linkage = SILLinkage::Hidden;
-      break;
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      linkage = SILLinkage::Public;
-      break;
-    }
-    if (isPossiblyUsedExternally(linkage, Module->isWholeModule()))
+    if (isDeclVisibleExternally(decl, Module))
       return true;
 
     // If a vtable or witness table (method) is only visible in another module

@@ -127,25 +127,6 @@ class GlobalPropertyOpt {
     }
     return false;
   }
-
-  bool isVisibleExternally(VarDecl *decl) {
-    AccessLevel access = decl->getEffectiveAccess();
-    SILLinkage linkage;
-    switch (access) {
-      case AccessLevel::Private:
-      case AccessLevel::FilePrivate:
-        linkage = SILLinkage::Private;
-        break;
-      case AccessLevel::Internal:
-        linkage = SILLinkage::Hidden;
-        break;
-      case AccessLevel::Public:
-      case AccessLevel::Open:
-        linkage = SILLinkage::Public;
-        break;
-    }
-    return isPossiblyUsedExternally(linkage, M.isWholeModule());
-  }
   
   static bool canAddressEscape(SILValue V, bool acceptStore);
 
@@ -154,7 +135,7 @@ class GlobalPropertyOpt {
     Entry * &entry = FieldEntries[Field];
     if (!entry) {
       entry = new (EntryAllocator.Allocate()) Entry(SILValue(), Field);
-      if (isVisibleExternally(Field))
+      if (isDeclVisibleExternally(Field, &M))
         setAddressEscapes(entry);
     }
     return entry;
