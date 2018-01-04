@@ -30,9 +30,9 @@
   * ForcedValueExpr
   * SuperRefExpr
   * ImplicitMemberExpr
+  * InterpolatedStringLiteralExpr
 
 ### In-progress (UnknownExpr):
-  * InterpolatedStringLiteralExpr
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
   * InOutExpr

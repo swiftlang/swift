@@ -1172,6 +1172,10 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
+  ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
+                                   SmallVectorImpl<Expr*> &Exprs,
+                                   Token EntireTok);
+
   /// Parse an argument label `identifier ':'`, if it exists.
   ///
   /// \param name The parsed name of the label (empty if it doesn't exist, or is

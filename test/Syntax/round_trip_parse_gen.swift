@@ -65,7 +65,7 @@ class C {
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
   }
-  
+
   func superExpr() {
     _ = super.foo
     super.bar()
@@ -334,3 +334,11 @@ extension ext where A == Int, B: Numeric {}
 
 extension ext.a.b {}
 
+func foo() {
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = """
+  abc \( foo() + bar() )
+  de \(3 + 3 + "abc \(foo()) def")
+  fg
+  """
+}
