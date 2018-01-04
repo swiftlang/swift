@@ -250,6 +250,8 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       // If our superclass is resilient to us, or the class itself is resilient
       // to us, we will access metadata members relative to a base offset.
       if (forClass == Target) {
+        Layout.StartOfImmediateMembers = getNextOffset();
+
         if (Layout.HasResilientSuperclass ||
             IGM.isResilient(forClass, ResilienceExpansion::Maximal)) {
           assert(!DynamicOffsetBase);
