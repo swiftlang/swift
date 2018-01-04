@@ -308,6 +308,10 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
     // Don't use importFullName() here, we want to ignore the swift_name
     // and swift_private attributes.
     StringRef enumNameStr = decl->getName();
+    if (enumNameStr.empty())
+      enumNameStr = decl->getTypedefNameForAnonDecl()->getName();
+    assert(!enumNameStr.empty() && "should have been classified as Constants");
+
     StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix, enumNameStr);
     size_t delta = commonPrefix.size() - checkPrefix.size();
 
