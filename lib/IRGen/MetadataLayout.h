@@ -177,6 +177,8 @@ public:
 private:
   bool HasResilientSuperclass = false;
 
+  StoredOffset StartOfImmediateMembers;
+
   StoredOffset MetadataSize;
   StoredOffset MetadataAddressPoint;
 
@@ -269,6 +271,12 @@ public:
   Size getRelativeVTableOffset() const;
 
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
+
+  /// If the start of the immediate members is statically known, this
+  /// method will return it. Otherwise, it will assert.
+  Size getStartOfImmediateMembers() const {
+    return StartOfImmediateMembers.getStaticOffset();
+  }
 
   /// The number of members to add after superclass metadata. The size of
   /// this metadata is the superclass size plus the number of immediate

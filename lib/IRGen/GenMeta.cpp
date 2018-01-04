@@ -2952,11 +2952,6 @@ namespace {
       return B.getNextOffsetFromGlobal() - TemplateHeaderSize;
     }
 
-    /// Ignore the destructor and value witness table.
-    Size getNextOffsetFromAddressPoint() const {
-      return getNextOffsetFromTemplateHeader() - AddressPoint;
-    }
-
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
       FillOps.push_back({type, None});
@@ -3209,7 +3204,6 @@ namespace {
 
   public:
     void noteResilientSuperclass() {
-      // FIXME: Perform sliding
       HasResilientSuperclass = true;
     }
 
@@ -3239,8 +3233,10 @@ namespace {
 
         // Otherwise, we know the offset at compile time, even if our
         // clients do not, so just emit a constant.
-        auto value = asImpl().getNextOffsetFromAddressPoint().getValue();
-        auto *init = llvm::ConstantInt::get(IGM.SizeTy, value);
+        auto &layout = IGM.getMetadataLayout(theClass);
+
+        auto value = layout.getStartOfImmediateMembers();
+        auto *init = llvm::ConstantInt::get(IGM.SizeTy, value.getValue());
 
         offsetVar->setInitializer(init);
         offsetVar->setConstant(true);
@@ -3518,13 +3514,15 @@ namespace {
       Address sizeSlot = IGF.Builder.CreateConstByteArrayGEP(
           metadataAsBytes,
           layout.getMetadataSizeOffset());
-      sizeSlot = IGF.Builder.CreateBitCast(sizeSlot, IGM.Int32Ty->getPointerTo());
+      sizeSlot = IGF.Builder.CreateBitCast(sizeSlot,
+                                           IGM.Int32Ty->getPointerTo());
       llvm::Value *size = IGF.Builder.CreateLoad(sizeSlot);
 
       Address addressPointSlot = IGF.Builder.CreateConstByteArrayGEP(
           metadataAsBytes,
           layout.getMetadataAddressPointOffset());
-      addressPointSlot = IGF.Builder.CreateBitCast(addressPointSlot, IGM.Int32Ty->getPointerTo());
+      addressPointSlot = IGF.Builder.CreateBitCast(addressPointSlot,
+                                                   IGM.Int32Ty->getPointerTo());
       llvm::Value *addressPoint = IGF.Builder.CreateLoad(addressPointSlot);
 
       size = IGF.Builder.CreateSub(size, addressPoint);
@@ -3666,10 +3664,6 @@ namespace {
     void noteAddressPoint() {
       super::noteAddressPoint();
       AddressPoint = B.getNextOffsetFromGlobal();
-    }
-
-    Size getNextOffsetFromAddressPoint() const {
-      return B.getNextOffsetFromGlobal() - AddressPoint;
     }
 
     void addSuperClass() {
