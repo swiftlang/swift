@@ -4177,36 +4177,6 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
-/// Return true if this stored property has a getter and
-/// setter that are accessible from Objective-C.
-bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
-  if (auto override = getOverriddenDecl())
-    return override->hasForeignGetterAndSetter();
-
-  if (!isObjC())
-    return false;
-
-  return true;
-}
-
-bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
-  if (isFinal())
-    return false;
-  if (hasAccessorFunctions() && getGetter()->isImportAsMember())
-    return true;
-  if (!hasForeignGetterAndSetter())
-    return false;
-  // Imported accessors are foreign and only have objc entry points.
-  if (hasClangNode())
-    return true;
-  // Otherwise, we only dispatch by @objc if the declaration is dynamic,
-  // NSManaged, or dispatched through an ObjC protocol.
-  return isDynamic()
-    || getAttrs().hasAttribute<NSManagedAttr>()
-    || (isa<ProtocolDecl>(getDeclContext()) && isProtocolRequirement());
-}
-
-
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();
   if (name.empty())
