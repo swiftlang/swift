@@ -108,6 +108,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
     single-source/ReversedCollections
+    single-source/RomanNumbers
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
