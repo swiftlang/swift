@@ -2367,7 +2367,7 @@ extension FixedWidthInteger {
   ) -> (value: Self?, exact: Bool) {
     guard _fastPath(!source.isZero) else { return (0, true) }
     guard _fastPath(source.isFinite) else { return (nil, false) }
-    guard Self.isSigned || source > 0 else { return (nil, false) }
+    guard Self.isSigned || source > -1 else { return (nil, false) }
     let exponent = source.exponent
     if _slowPath(Self.bitWidth <= exponent) { return (nil, false) }
     let minBitWidth = source.significandWidth
@@ -2405,7 +2405,7 @@ extension FixedWidthInteger {
   /// zero, a runtime error may occur.
   ///
   ///     let z = UInt(-21.5)
-  ///     // Error: ...the result would be less than UInt.min
+  ///     // Error: ...outside the representable range
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
@@ -2417,8 +2417,7 @@ extension FixedWidthInteger {
     guard let value = Self._convert(from: source).value else {
       fatalError("""
         \(T.self) value cannot be converted to \(Self.self) because it is \
-        infinite or NaN, or because the result would be greater than \
-        \(Self.self).max or less than \(Self.self).min
+        outside the representable range
         """)
     }
     self = value

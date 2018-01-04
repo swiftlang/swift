@@ -59,6 +59,10 @@
 
 // CHECK: @_T016class_resilience16MyResilientChildCMo = {{(protected )?}}constant [[INT]] {{60|96}}
 
+// CHECK: @_T016class_resilience24MyResilientGenericParentCMo = {{(protected )?}}constant [[INT]] {{52|80}}
+
+// CHECK: @_T016class_resilience24MyResilientConcreteChildCMo = {{(protected )?}}constant [[INT]] {{64|104}}
+
 import resilient_class
 import resilient_struct
 import resilient_enum
@@ -163,6 +167,23 @@ public class MyResilientChild : MyResilientParent {
   public let field: Int32 = 0
 }
 
+
+public class MyResilientGenericParent<T> {
+  public let t: T
+
+  public init(t: T) {
+    self.t = t
+  }
+}
+
+public class MyResilientConcreteChild : MyResilientGenericParent<Int> {
+  public let x: Int
+
+  public init(x: Int) {
+    self.x = x
+    super.init(t: x)
+  }
+}
 
 extension ResilientGenericOutsideParent {
   public func genericExtensionMethod() -> A.Type {

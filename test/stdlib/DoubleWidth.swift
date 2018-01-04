@@ -161,6 +161,21 @@ dwTests.test("inits") {
   _ = DWU16(UInt32.max)
 }
 
+dwTests.test("Magnitude") {
+  typealias DWU16 = DoubleWidth<UInt8>
+  typealias DWI16 = DoubleWidth<Int8>
+
+  expectTrue(DWU16.min.magnitude == UInt16.min.magnitude)
+  expectTrue((42 as DWU16).magnitude == (42 as UInt16).magnitude)
+  expectTrue(DWU16.max.magnitude == UInt16.max.magnitude)
+
+  expectTrue(DWI16.min.magnitude == Int16.min.magnitude)
+  expectTrue((-42 as DWI16).magnitude == (-42 as Int16).magnitude)
+  expectTrue(DWI16().magnitude == Int16(0).magnitude) // See SR-6602.
+  expectTrue((42 as DWI16).magnitude == (42 as Int16).magnitude)
+  expectTrue(DWI16.max.magnitude == Int16.max.magnitude)
+}
+
 dwTests.test("TwoWords") {
   typealias DW = DoubleWidth<Int>
 
@@ -208,6 +223,14 @@ dwTests.test("Remainder/DividingBy0") {
   }
   expectCrashLater()
   _ = f(42, 0)
+}
+
+dwTests.test("RemainderReportingOverflow/DividingByMinusOne") {
+  func f(_ x: Int256, _ y: Int256) -> Int256 {
+    return x.remainderReportingOverflow(dividingBy: y).partialValue
+  }
+  expectEqual(f(.max, -1), 0)
+  expectEqual(f(.min, -1), 0)
 }
 
 dwTests.test("Division/By0") {
