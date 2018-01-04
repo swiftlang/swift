@@ -296,7 +296,7 @@ func rdar20029786(_ ns: NSString?) {
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
 
-  var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{20-20=(}}{{31-31=) as String}}
+  var s4: String = ns ?? "str" // expected-error{{cannot convert value of type 'NSString' to specified type 'String'}}
   var s5: String = (ns ?? "str") as String // fixed version
 }
 
@@ -321,11 +321,11 @@ func force_cast_fixit(_ a : [NSString]) -> [NSString] {
 
 // <rdar://problem/21244068> QoI: IUO prevents specific diagnostic + fixit about non-implicitly converted bridge types
 func rdar21244068(_ n: NSString!) -> String {
-  return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
+  return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
 }
 
 func forceBridgeDiag(_ obj: BridgedClass!) -> BridgedStruct {
-  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
+  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
 }
 
 struct KnownUnbridged {}

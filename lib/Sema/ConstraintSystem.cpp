@@ -1403,7 +1403,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      OverloadChoice choice,
                                                      Type &refType,
                                                      Type &openedFullType) {
-  assert(choice.getKind() == OverloadChoiceKind::Decl);
+  assert(choice.getKind() == OverloadChoiceKind::Decl
+         || choice.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional);
   
   switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
@@ -1514,6 +1515,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type openedFullType;
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
     // If we refer to a top-level decl with special type-checking semantics,
     // handle it now.
     if (resolveOverloadForDeclWithSpecialTypeCheckingSemantics(
@@ -1661,9 +1663,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
-
   // Note that we have resolved this overload.
   resolvedOverloadSets
     = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
@@ -1672,6 +1671,20 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               openedFullType,
                                               refType};
+
+  // Update the locator if this is an implicitly unwrapped
+  // value. Processing the bind constraint will generate a new
+  // disjunction constraint that attempts the Optional and if that
+  // doesn't succeed, the underlying type.
+  if (choice.getKind() ==
+      OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
+    locator = getConstraintLocator(locator,
+                                   ConstraintLocator::ImplicitlyUnwrappedValue);
+  }
+
+  // Add the type binding constraint.
+  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)

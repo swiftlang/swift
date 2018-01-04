@@ -1691,21 +1691,23 @@ static std::pair<Type, ParamDecl *> decomposeSubscriptSetter(FuncDecl *setter) {
 ///
 /// \returns the type to be used for the subscript, or a null type
 /// if the types cannot be rectified.
-static Type rectifySubscriptTypes(Type getterType, Type setterType,
-                                  bool canUpdateType) {
+static std::pair<Type, bool> rectifySubscriptTypes(Type getterType,
+                                                   bool getterIsIUO,
+                                                   Type setterType,
+                                                   bool canUpdateType) {
   // If the caller couldn't provide a setter type, there is
   // nothing to rectify.
   if (!setterType)
-    return nullptr;
+    return {nullptr, false};
 
   // Trivial case: same type in both cases.
   if (getterType->isEqual(setterType))
-    return getterType;
+    return {getterType, getterIsIUO};
 
   // The getter/setter types are different. If we cannot update
   // the type, we have to fail.
   if (!canUpdateType)
-    return nullptr;
+    return {nullptr, false};
 
   // Unwrap one level of optionality from each.
   if (Type getterObjectType = getterType->getAnyOptionalObjectType())
@@ -1717,11 +1719,11 @@ static Type rectifySubscriptTypes(Type getterType, Type setterType,
   // FIXME: We could produce the greatest common supertype of the
   // two types.
   if (!getterType->isEqual(setterType))
-    return nullptr;
+    return {nullptr, false};
 
-  // Create an implicitly-unwrapped optional of the object type,
-  // which subsumes both behaviors.
-  return ImplicitlyUnwrappedOptionalType::get(setterType);
+  // Create an optional of the object type that can be implicitly
+  // unwrapped which subsumes both behaviors.
+  return {ImplicitlyUnwrappedOptionalType::get(setterType), true};
 }
 
 /// Add an AvailableAttr to the declaration for the given
@@ -2445,11 +2447,9 @@ namespace {
         // type. That matches how we want to use them in most cases. All other
         // types should be imported in a non-bridged way.
         clang::QualType ClangType = Decl->getUnderlyingType();
-        SwiftType = Impl.importType(ClangType,
-                                    ImportTypeKind::Typedef,
-                                    isInSystemModule(DC),
-                                    getTypedefBridgeability(ClangType),
-                                    OTK_Optional);
+        SwiftType = Impl.importTypeIgnoreForceUnwrap(
+            ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
+            getTypedefBridgeability(ClangType), OTK_Optional);
       }
 
       if (!SwiftType)
@@ -2551,10 +2551,9 @@ namespace {
 
       case EnumKind::Unknown: {
         // Compute the underlying type of the enumeration.
-        auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum,
-                                              isInSystemModule(dc),
-                                              Bridgeability::None);
+        auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
+            decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
+            Bridgeability::None);
         if (!underlyingType)
           return nullptr;
 
@@ -2586,7 +2585,7 @@ namespace {
           return nativeDecl;
 
         // Compute the underlying type.
-        auto underlyingType = Impl.importType(
+        auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
             decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
             Bridgeability::None);
         if (!underlyingType)
@@ -3207,10 +3206,9 @@ namespace {
 
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
-        auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
-                                    ImportTypeKind::Value,
-                                    isInSystemModule(dc),
-                                    Bridgeability::None);
+        auto type = Impl.importTypeIgnoreForceUnwrap(
+            clangContext.getTagDeclType(clangEnum), ImportTypeKind::Value,
+            isInSystemModule(dc), Bridgeability::None);
         if (!type)
           return nullptr;
         // FIXME: Importing the type will recursively revisit this same
@@ -3244,11 +3242,9 @@ namespace {
           return nullptr;
 
         // Import the enumeration type.
-        auto enumType = Impl.importType(
-                          Impl.getClangASTContext().getTagDeclType(clangEnum),
-                          ImportTypeKind::Value,
-                          isInSystemModule(dc),
-                          Bridgeability::None);
+        auto enumType = Impl.importTypeIgnoreForceUnwrap(
+            Impl.getClangASTContext().getTagDeclType(clangEnum),
+            ImportTypeKind::Value, isInSystemModule(dc), Bridgeability::None);
         if (!enumType)
           return nullptr;
 
@@ -3306,10 +3302,11 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(),
-                                  ImportTypeKind::Variable,
-                                  isInSystemModule(dc),
-                                  Bridgeability::None);
+      Type type;
+      bool isIUO;
+      std::tie(type, isIUO) =
+          Impl.importType(decl->getType(), ImportTypeKind::Variable,
+                          isInSystemModule(dc), Bridgeability::None);
       if (!type)
         return nullptr;
 
@@ -3322,6 +3319,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -3424,13 +3422,11 @@ namespace {
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       ParameterList *bodyParams = nullptr;
-      Type type = Impl.importFunctionType(dc,
-                                          decl,
-                                          { decl->param_begin(),
-                                            decl->param_size() },
-                                          decl->isVariadic(),
-                                          isInSystemModule(dc),
-                                          name, bodyParams);
+      Type type;
+      bool isIUO;
+      std::tie(type, isIUO) = Impl.importFunctionType(
+          dc, decl, {decl->param_begin(), decl->param_size()},
+          decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
       if (!type)
         return nullptr;
 
@@ -3456,6 +3452,7 @@ namespace {
 
       result->setInterfaceType(type);
       result->setValidationStarted();
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccess(AccessLevel::Public);
@@ -3530,10 +3527,11 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(),
-                                  ImportTypeKind::RecordField,
-                                  isInSystemModule(dc),
-                                  Bridgeability::None);
+      Type type;
+      bool isIUO;
+      std::tie(type, isIUO) =
+          Impl.importType(decl->getType(), ImportTypeKind::RecordField,
+                          isInSystemModule(dc), Bridgeability::None);
       if (!type)
         return nullptr;
 
@@ -3545,6 +3543,7 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3600,11 +3599,13 @@ namespace {
 
       // Note that we deliberately don't bridge most globals because we want to
       // preserve pointer identity.
-      Type type = Impl.importType(declType,
-                                  (isAudited ? ImportTypeKind::AuditedVariable
-                                   : ImportTypeKind::Variable),
-                                  isInSystemModule(dc),
-                                  Bridgeability::None);
+      Type type;
+      bool isIUO;
+      std::tie(type, isIUO) =
+          Impl.importType(declType,
+                          (isAudited ? ImportTypeKind::AuditedVariable
+                                     : ImportTypeKind::Variable),
+                          isInSystemModule(dc), Bridgeability::None);
 
       if (!type)
         return nullptr;
@@ -3626,6 +3627,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // If imported as member, the member should be final.
       if (dc->getAsClassOrClassExtensionContext())
@@ -3858,6 +3860,7 @@ namespace {
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       Type type;
+      bool isIUO;
 
       // If we have a property accessor, find the corresponding property
       // declaration.
@@ -3878,14 +3881,14 @@ namespace {
         if (prop->getGetterMethodDecl() != decl &&
             prop->getSetterMethodDecl() != decl)
           return nullptr;
-        type = Impl.importAccessorMethodType(dc, prop, decl,
-                                             isInSystemModule(dc), importedName,
-                                             &bodyParams.back());
+        std::tie(type, isIUO) =
+            Impl.importAccessorMethodType(dc, prop, decl, isInSystemModule(dc),
+                                          importedName, &bodyParams.back());
       } else {
-        type = Impl.importMethodType(dc, decl, decl->parameters(),
-                                     decl->isVariadic(), isInSystemModule(dc),
-                                     &bodyParams.back(), importedName,
-                                     errorConvention, kind);
+        std::tie(type, isIUO) = Impl.importMethodType(
+            dc, decl, decl->parameters(), decl->isVariadic(),
+            isInSystemModule(dc), &bodyParams.back(), importedName,
+            errorConvention, kind);
       }
       if (!type)
         return nullptr;
@@ -3919,6 +3922,8 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
+        assert(!dc->getSelfInterfaceType()->getAnyOptionalObjectType());
+        isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
         if (auto typeNullability = decl->getReturnType()->getNullability(
@@ -3928,6 +3933,7 @@ namespace {
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
           resultTy = OptionalType::get(nullability, resultTy);
+          isIUO = nullability == OTK_ImplicitlyUnwrappedOptional;
         }
 
         // Update the method type with the new result type.
@@ -3946,6 +3952,8 @@ namespace {
       result->setInterfaceType(interfaceType);
       result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
       result->setValidationStarted();
+
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4490,10 +4498,9 @@ namespace {
           decl->getSuperClassType()->stripObjCKindOfTypeAndQuals(clangCtx);
         clangSuperclassType =
           clangCtx.getObjCObjectPointerType(clangSuperclassType);
-        superclassType = Impl.importType(clangSuperclassType,
-                                         ImportTypeKind::Abstract,
-                                         isInSystemModule(dc),
-                                         Bridgeability::None);
+        superclassType = Impl.importTypeIgnoreForceUnwrap(
+            clangSuperclassType, ImportTypeKind::Abstract, isInSystemModule(dc),
+            Bridgeability::None);
         if (superclassType) {
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
@@ -4675,7 +4682,10 @@ namespace {
         }
       }
 
-      Type type = Impl.importPropertyType(decl, isInSystemModule(dc));
+      Type type;
+      bool isIUO;
+      std::tie(type, isIUO) =
+          Impl.importPropertyType(decl, isInSystemModule(dc));
       if (!type)
         return nullptr;
 
@@ -4709,6 +4719,7 @@ namespace {
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      Impl.recordForceUnwrapForDecl(result, isIUO);
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -5104,7 +5115,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   structDecl->setCheckedInheritanceClause();
 
   // Import the type of the underlying storage
-  auto storedUnderlyingType = Impl.importType(
+  auto storedUnderlyingType = Impl.importTypeIgnoreForceUnwrap(
       decl->getUnderlyingType(), ImportTypeKind::Value, isInSystemModule(dc),
       Bridgeability::None, OTK_None);
 
@@ -5125,7 +5136,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   }
 
   // Find a bridged type, which may be different
-  auto computedPropertyUnderlyingType = Impl.importType(
+  auto computedPropertyUnderlyingType = Impl.importTypeIgnoreForceUnwrap(
       decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
       Bridgeability::Full, OTK_None);
   if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
@@ -5337,7 +5348,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   ASTContext &ctx = Impl.SwiftContext;
 
   // Compute the underlying type.
-  auto underlyingType = Impl.importType(
+  auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
       decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
       Bridgeability::None);
   if (!underlyingType)
@@ -5409,9 +5420,17 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                          /*isInOut=*/selfIsInOut);
 
   OptionalTypeKind initOptionality;
-  auto resultType = Impl.importFunctionReturnType(dc, decl,
-                                                  allowNSUIntegerAsInt);
+  Type resultType;
+  bool isIUO;
+  std::tie(resultType, isIUO) =
+      Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
   (void)resultType->getAnyOptionalObjectType(initOptionality);
+
+  // Update the failability appropriately based on the imported method type.
+  if (isIUO) {
+    assert(initOptionality != OTK_None);
+    initOptionality = OTK_ImplicitlyUnwrappedOptional;
+  }
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
@@ -5430,6 +5449,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
+  Impl.recordForceUnwrapForDecl(result, isIUO);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5497,8 +5517,10 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   bodyParams.push_back(getNonSelfParamList(
       dc, decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
 
-  auto swiftResultTy = Impl.importFunctionReturnType(dc, decl,
-                                                     allowNSUIntegerAsInt);
+  Type swiftResultTy;
+  bool isIUO;
+  std::tie(swiftResultTy, isIUO) =
+      Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
   auto fnType =
       ParameterList::getFullInterfaceType(swiftResultTy, bodyParams, C);
 
@@ -5526,6 +5548,9 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
     result->setStatic();
     result->setImportAsStaticMember();
   }
+
+  Impl.recordForceUnwrapForDecl(result, isIUO);
+
   assert(selfIdx ? result->getSelfIndex() == *selfIdx
                  : result->isImportAsStaticMember());
 
@@ -5658,7 +5683,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
   // Compute the property type.
   bool isFromSystemModule = isInSystemModule(dc);
-  Type swiftPropertyType = Impl.importType(
+  Type swiftPropertyType;
+  bool isIUO;
+  std::tie(swiftPropertyType, isIUO) = Impl.importType(
       propertyType, ImportTypeKind::Property,
       Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
       Bridgeability::Full, OTK_ImplicitlyUnwrappedOptional);
@@ -5670,6 +5697,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
+  Impl.recordForceUnwrapForDecl(property, isIUO);
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -5687,6 +5715,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       importFunctionDecl(getter, getterName, None, property));
   if (!swiftGetter)
     return nullptr;
+
   Impl.importAttributes(getter, swiftGetter);
   Impl.ImportedDecls[{getter, getVersion()}] = swiftGetter;
   if (swift3GetterName)
@@ -5699,6 +5728,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
         importFunctionDecl(setter, setterName, None, property));
     if (!swiftSetter)
       return nullptr;
+
     Impl.importAttributes(setter, swiftSetter);
     Impl.ImportedDecls[{setter, getVersion()}] = swiftSetter;
     if (swift3SetterName)
@@ -5915,10 +5945,11 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
   bodyParams.push_back(nullptr);
-  auto type = Impl.importMethodType(
-      dc, objcMethod, args, variadic, isInSystemModule(dc),
-      &bodyParams.back(), importedName, errorConvention,
-      SpecialMethodKind::Constructor);
+  Type type;
+  bool isIUO;
+  std::tie(type, isIUO) = Impl.importMethodType(
+      dc, objcMethod, args, variadic, isInSystemModule(dc), &bodyParams.back(),
+      importedName, errorConvention, SpecialMethodKind::Constructor);
   if (!type)
     return nullptr;
 
@@ -5926,6 +5957,12 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   auto oldFnType = type->castTo<AnyFunctionType>();
   OptionalTypeKind failability;
   (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
+
+  // Update the failability appropriately based on the imported method type.
+  if (isIUO) {
+    assert(failability != OTK_None);
+    failability = OTK_ImplicitlyUnwrappedOptional;
+  }
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
@@ -6045,6 +6082,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   result->setInitializerInterfaceType(interfaceInitType);
   result->setInterfaceType(interfaceAllocType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
+  Impl.recordForceUnwrapForDecl(result, isIUO);
 
   if (implicit)
     result->setImplicit();
@@ -6334,6 +6373,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // If we have a setter, rectify it with the getter.
   ParamDecl *setterIndex;
   bool getterAndSetterInSameType = false;
+  bool isIUO =
+      getter->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   if (setter) {
     // Whether there is an existing read-only subscript for which
     // we have now found a setter.
@@ -6355,9 +6396,12 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     Type setterElementTy;
     std::tie(setterElementTy, setterIndex) = decomposeSubscriptSetter(setter);
 
-    // Rectify the setter element type with the getter's element type.
-    Type newElementTy = rectifySubscriptTypes(elementTy, setterElementTy,
-                                              canUpdateSubscriptType);
+    // Rectify the setter element type with the getter's element type,
+    // and determine if the result is an implicitly unwrapped optional
+    // type.
+    Type newElementTy;
+    std::tie(newElementTy, isIUO) = rectifySubscriptTypes(
+        elementTy, isIUO, setterElementTy, canUpdateSubscriptType);
     if (!newElementTy)
       return decl == getter ? existingSubscript : nullptr;
 
@@ -6448,6 +6492,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   else
     fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
+
+  Impl.recordForceUnwrapForDecl(subscript, isIUO);
 
   addObjCAttribute(subscript, None);
 
@@ -6583,10 +6629,9 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       if (clangBound->getInterfaceDecl()) {
         auto unqualifiedClangBound =
             clangBound->stripObjCKindOfTypeAndQuals(Impl.getClangASTContext());
-        Type superclassType =
-            Impl.importType(clang::QualType(unqualifiedClangBound, 0),
-                            ImportTypeKind::Abstract, false,
-                            Bridgeability::None);
+        Type superclassType = Impl.importTypeIgnoreForceUnwrap(
+            clang::QualType(unqualifiedClangBound, 0), ImportTypeKind::Abstract,
+            false, Bridgeability::None);
         if (!superclassType) {
           return None;
         }

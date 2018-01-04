@@ -447,6 +447,8 @@ namespace {
     RValue visitCovariantReturnConversionExpr(
              CovariantReturnConversionExpr *E,
              SGFContext C);
+    RValue visitImplicitlyUnwrappedFunctionConversionExpr(
+        ImplicitlyUnwrappedFunctionConversionExpr *E, SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, SGFContext C);
     RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
@@ -2089,6 +2091,13 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   ManagedValue result = SGF.B.createUncheckedRefCast(e, original, resultType);
 
   return RValue(SGF, e, result);
+}
+
+RValue RValueEmitter::visitImplicitlyUnwrappedFunctionConversionExpr(
+    ImplicitlyUnwrappedFunctionConversionExpr *e, SGFContext C) {
+  // These are generated for short term use in the type checker.
+  llvm_unreachable(
+      "We should not see ImplicitlyUnwrappedFunctionConversionExpr here");
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {

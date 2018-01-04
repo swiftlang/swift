@@ -4414,6 +4414,13 @@ public:
       synthesizeSetterForMutableAddressedStorage(SD, TC);
     }
 
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     TC.checkDeclAttributes(SD);
   }
 
@@ -4914,14 +4921,6 @@ public:
     return cast<VarDecl>(accessor)->getTypeLoc();
   }
 
-  static bool functionHasImplicitlyUnwrappedResult(FuncDecl *FD) {
-    if (FD->isAccessor() && !FD->isGetter())
-      return false;
-
-    auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
-    return TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional;
-  }
-
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
     TC.checkForForbiddenPrefix(FD);
 
@@ -4945,10 +4944,13 @@ public:
       return true;
     }
 
-    if (functionHasImplicitlyUnwrappedResult(FD)) {
-      auto &C = FD->getASTContext();
-      FD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    if (!FD->isAccessor() || FD->isGetter()) {
+      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
+      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+        auto &C = FD->getASTContext();
+        FD->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      }
     }
 
     return false;
@@ -5621,12 +5623,10 @@ public:
   }
 
   static bool
-  diagnoseMismatchedOptionals(TypeChecker &TC,
-                              const ValueDecl *member,
-                              const ParameterList *params,
-                              TypeLoc resultTL,
+  diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
+                              const ParameterList *params, TypeLoc resultTL,
                               const ValueDecl *parentMember,
-                              Type owningTy,
+                              const ParameterList *parentParams, Type owningTy,
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
@@ -5636,15 +5636,18 @@ public:
       parentTy = parentTy->getResult()->castTo<FunctionType>();
 
     // Check the parameter types.
-    auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
+    auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
       Type paramTy = decl->getType();
+      Type parentParamTy = parentDecl->getType();
+
       if (!paramTy || !parentParamTy)
         return;
 
       OptionalTypeKind paramOTK;
       (void)paramTy->getAnyOptionalObjectType(paramOTK);
       if (paramOTK == OTK_Optional)
-        return;
+        if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+          return;
 
       OptionalTypeKind parentOTK;
       (void)parentParamTy->getAnyOptionalObjectType(parentOTK);
@@ -5662,6 +5665,10 @@ public:
             return;
           break;
         case OTK_Optional:
+          if (parentDecl->getAttrs()
+                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+            if (!treatIUOResultAsError)
+              return;
           break;
         }
 
@@ -5705,17 +5712,11 @@ public:
         .fixItInsertAfter(TL.getSourceRange().End, ")");
     };
 
-    auto parentInput = parentTy->getInput();
-    
-    if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
-      // FIXME: If we ever allow argument reordering, this is incorrect.
-      ArrayRef<ParamDecl*> sharedParams = params->getArray();
-      sharedParams = sharedParams.slice(0, parentTupleInput->getNumElements());
-      for_each(sharedParams, parentTupleInput->getElementTypes(), checkParam);
-    } else {
-      // Otherwise, the parent has a single parameter with no label.
-      checkParam(params->get(0), parentInput);
-    }
+    // FIXME: If we ever allow argument reordering, this is incorrect.
+    ArrayRef<ParamDecl *> sharedParams = params->getArray();
+    ArrayRef<ParamDecl *> sharedParentParams = parentParams->getArray();
+    assert(sharedParams.size() == sharedParentParams.size());
+    for_each(sharedParams, sharedParentParams, checkParam);
 
     if (!resultTL.getTypeRepr())
       return emittedError;
@@ -6330,11 +6331,10 @@ public:
         TypeLoc resultTL;
         if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
           resultTL = methodAsFunc->getBodyResultTypeLoc();
-        emittedMatchError |=
-            diagnoseMismatchedOptionals(TC, method,
-                                        method->getParameterList(1), resultTL,
-                                        matchDecl, owningTy,
-                                        mayHaveMismatchedOptionals);
+        emittedMatchError |= diagnoseMismatchedOptionals(
+            TC, method, method->getParameterList(1), resultTL, matchDecl,
+            cast<AbstractFunctionDecl>(matchDecl)->getParameterList(1),
+            owningTy, mayHaveMismatchedOptionals);
       }
     } else if (auto subscript =
                  dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
@@ -6357,12 +6357,11 @@ public:
         emittedMatchError = true;
 
       } else if (mayHaveMismatchedOptionals) {
-        emittedMatchError |=
-            diagnoseMismatchedOptionals(TC, subscript,
-                                        subscript->getIndices(),
-                                        subscript->getElementTypeLoc(),
-                                        matchDecl, owningTy,
-                                        mayHaveMismatchedOptionals);
+        emittedMatchError |= diagnoseMismatchedOptionals(
+            TC, subscript, subscript->getIndices(),
+            subscript->getElementTypeLoc(), matchDecl,
+            cast<SubscriptDecl>(matchDecl)->getIndices(), owningTy,
+            mayHaveMismatchedOptionals);
       }
     } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
       auto propertyTy = property->getInterfaceType();
@@ -7270,6 +7269,12 @@ public:
     }
 
     inferDynamic(TC.Context, CD);
+
+    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto &C = CD->getASTContext();
+      CD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
 
     TC.checkDeclAttributes(CD);
   }

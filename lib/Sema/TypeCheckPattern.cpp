@@ -680,6 +680,8 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   TP->setType(TL.getType());
 
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
+
   // Track whether the decl in this typed pattern should be
   // implicitly unwrapped as needed during expression type checking.
   if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
@@ -729,12 +731,15 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                 elementOptions, &resolver);
   }
 
+  auto *TR = TL.getTypeRepr();
+  if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TR))
+    TR = STR->getBase();
+
   // If this is declared with '!' indicating that it is an Optional
   // that we should implicitly unwrap if doing so is required to type
   // check, then add an attribute to the decl.
-  if (elementOptions.contains(TypeResolutionFlags::AllowIUO)
-      && TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
-      TypeReprKind::ImplicitlyUnwrappedOptional) {
+  if (elementOptions.contains(TypeResolutionFlags::AllowIUO) && TR &&
+      TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
     auto &C = DC->getASTContext();
     decl->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));

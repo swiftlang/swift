@@ -1943,11 +1943,12 @@ bool ConstraintSystem::solveSimplified(
       auto *lastChoice = lastSolvedChoice->first.getConstraint();
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
+      bool hasFixes = score.Data[SK_Fix] > 0;
 
-      // Attempt to short-circuit disjunction only if
-      // score indicates that there are no unavailable
-      // overload choices present in the solution.
-      if (!hasUnavailableOverloads &&
+      // Attempt to short-circuit disjunction only if score indicates
+      // that there are no unavailable overload choices present in the
+      // solution, and the solution does not involve fixes.
+      if (!hasUnavailableOverloads && !hasFixes &&
           shortCircuitDisjunctionAt(&currentChoice, lastChoice,
                                     getASTContext()))
         break;
