@@ -133,6 +133,19 @@ public:
                                       refCount);
   }
 
+  void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const override {
+    auto canType = T.getSwiftRValueType();
+    if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
+      return;
+    }
+    auto *metadata = IGF.emitTypeMetadataRef(canType);
+    assert(metadata && "Expected Type Metadata Ref");
+    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  }
+
   ReferenceCounting getReferenceCounting() const {
     return RefCount;
   }
