@@ -691,17 +691,6 @@ def create_argument_parser():
            help='run tests located in specific directories and/or files '
                 '(implies --test and/or --validation-test)')
 
-    option(['-B', '--benchmark'], store_true,
-           help='run the Swift Benchmark Suite after building')
-    option('--benchmark-num-o-iterations', store_int,
-           default=3,
-           help='if the Swift Benchmark Suite is run after building, run N '
-                'iterations with -O')
-    option('--benchmark-num-onone-iterations', store_int,
-           default=3,
-           help='if the Swift Benchmark Suite is run after building, run N '
-                'iterations with -Onone')
-
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
@@ -773,12 +762,6 @@ def create_argument_parser():
 
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
-
-    option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
-           help='skip building Swift Benchmark Suite')
-
-    option('--build-external-benchmarks', toggle_true,
-           help='skip building Swift Benchmark Suite')
 
     # -------------------------------------------------------------------------
     in_group('Skip testing specified targets')
@@ -869,6 +852,36 @@ def create_argument_parser():
                 'products will be deployed. If running host tests, specify '
                 'the "{}" directory.'.format(
                     android.adb.commands.DEVICE_TEMP_DIR))
+
+    # -------------------------------------------------------------------------
+    in_group('Benchmark Suite')
+
+    option(['-B', '--benchmark'],
+           store_true(['build_benchmarks', 'test_benchmarks']),
+           help='build and test the Swift benchmark suite')
+
+    set_defaults(build_benchmarks=False)
+    with mutually_exclusive_group():
+        option('--build-benchmarks', toggle_true,
+               help='build the Swift benchmark suite')
+
+        # NOTE: Deprecated with the addition of --build-benchmarks
+        option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
+               help='skip building the Swift benchmark suite (Deprecated, '
+                    'please use --build-benchmarks instead)')
+
+    option('--test-benchmarks', toggle_true,
+           help='test the Swift benchmark suite')
+
+    option('--build-external-benchmarks', toggle_true,
+           help='build the external Swift benchmark suite')
+
+    option('--benchmark-num-o-iterations', store_int,
+           default=3,
+           help='number of iterations to run with -O')
+    option('--benchmark-num-onone-iterations', store_int,
+           default=3,
+           help='number of iterations to run with -Onone')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

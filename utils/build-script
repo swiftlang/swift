@@ -570,11 +570,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-cmark",
                           "--skip-build-llvm",
                           "--skip-build-swift"]
-        if not args.build_benchmarks:
-            impl_args += ["--skip-build-benchmarks"]
-        # Currently we do not build external benchmarks by default.
-        if args.build_external_benchmarks:
-            impl_args += ["--skip-build-external-benchmarks=0"]
         if not args.build_foundation:
             impl_args += ["--skip-build-foundation"]
         if not args.build_xctest:
@@ -670,8 +665,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--validation-test"]
         if args.long_test:
             impl_args += ["--long-test"]
-        if not args.benchmark:
-            impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
@@ -758,6 +751,16 @@ class BuildScriptInvocation(object):
                 "--coverage-db=%s" %
                 os.path.abspath(args.coverage_db)
             ]
+
+        # Benchmark Suite
+        if args.build_benchmarks:
+            impl_args += ['--build-benchmarks']
+        if args.test_benchmarks:
+            impl_args += ['--test-benchmarks']
+
+        # NOTE: Currently we do not build external benchmarks by default
+        if args.build_external_benchmarks:
+            impl_args += ['--skip-build-external-benchmarks=0']
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
@@ -889,7 +892,9 @@ class BuildScriptInvocation(object):
                     self.args.test or self.args.long_test):
                 print("Running Swift tests for: {}".format(
                     " ".join(config.swift_test_run_targets)))
-            if config.swift_benchmark_run_targets and self.args.benchmark:
+            if config.swift_benchmark_run_targets and \
+                    self.args.build_benchmarks and \
+                    self.args.test_benchmarks:
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
