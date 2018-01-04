@@ -34,15 +34,14 @@ public final class TensorProgram {
   // Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
   // and 'size', start the computation, and return a state object as a unique
   // identifier for that computation.
-  //
-  // For now we only support programs that output 1 tensor. To support multiple
-  // output tensors, we may need to extend this API to pass in a
-  // outputTensorCount.
   @_versioned
   init(programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
        tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
-       tensorArgumentCount: Int) {
+       tensorArgumentCount: Int,
+       // TODO(clattner): resultCount should go away when the runtime is
+       // implemented with an async design.
+       resultCount: Int) {
     inputTensors =
       Array(UnsafeBufferPointer(start: tensorArgumentAddress,
                                 count: tensorArgumentCount))
@@ -72,11 +71,12 @@ public final class TensorProgram {
       checkOk(s)
     }
 
-    var retValCount: CInt = 1
-    var retVals = [CTensorHandle](repeating: nil, count: Int(retValCount))
+    var retVals = [CTensorHandle](repeating: nil, count: resultCount)
+    var retValCount = CInt(resultCount)
     TFE_Execute(op, &retVals, &retValCount, s)
     checkOk(s)
-    precondition(retValCount == 1)
+    assert(Int(retValCount) == resultCount,
+           "internal compiler error, result count mismatch!")
     TFE_DeleteOp(op)
 
     let outputTensors = retVals.map(AnyTensorHandle.init)
@@ -95,8 +95,8 @@ public final class TensorProgram {
   func terminate() {
   }
 
-  // Wait for completion the computation as given by 'program', and returns output
-  // handles.
+  // Wait for completion the computation as given by 'program', and returns
+  // output handles.
   //
   // TODO(hongm): add real logic, including handling input/output and errors.
   @_versioned
@@ -127,12 +127,16 @@ public func _TFCStartTensorProgram(
   _ programByteAddress: UnsafeRawPointer,
   _ programByteCount: Int,
   _ tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
-  _ tensorArgumentCount: Int
+  _ tensorArgumentCount: Int,
+  // TODO(clattner): resultCount should go away when the runtime is implemented
+  // with an async design.
+  _ resultCount: Int
 ) -> TensorProgram {
   return TensorProgram(programByteAddress: programByteAddress,
                        programByteCount: programByteCount,
                        tensorArgumentAddress: tensorArgumentAddress,
-                       tensorArgumentCount: tensorArgumentCount)
+                       tensorArgumentCount: tensorArgumentCount,
+                       resultCount: resultCount)
 }
 
 // Terminate the computation as given by 'program', and clean up the state.
@@ -143,15 +147,27 @@ public func _TFCTerminateTensorProgram(_ program: TensorProgram) {
   program.terminate()
 }
 
-// Wait for completion the computation as given by 'program', and returns output
-// handles.
-//
+/// Wait for completion the computation as given by 'program', and returns
+/// results.
+///
+/// NOTE: The result address as passed in is pointing to uninitialized memory,
+/// this must initialize the memory, transfering ownership of the tensor handles
+/// to the caller.
+///
 @_inlineable
 @_silgen_name("_swift_tfc_FinishTensorProgram")
 public func _TFCFinishTensorProgram(
-  _ program: TensorProgram
-  ) -> [AnyTensorHandle] {
-  return program.finish()
+  _ program: TensorProgram,
+  _ tensorResultAddress: UnsafeMutablePointer<AnyTensorHandle>,
+  _ tensorResultCount: Int) {
+
+  let results = program.finish()
+  assert(results.count == tensorResultCount,
+         "internal compiler error: result count mismatch!")
+
+  let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
+                                                count: tensorResultCount)
+  resultBuffer.initialize(from: results)
 }
 
 
