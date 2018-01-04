@@ -1260,34 +1260,25 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  auto nominal = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) return false;
+  if (storage->isDynamic())
+    return true;
 
-  switch (nominal->getKind()) {
-#define DECL(ID, BASE) case DeclKind::ID:
-#define NOMINAL_TYPE_DECL(ID, BASE)
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type!");
+  // Imported declarations behave like they are dynamic, even if they're
+  // not marked as such explicitly.
+  if (storage->isObjC() && storage->hasClangNode())
+    return true;
 
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-    return false;
-
-  case DeclKind::Protocol:
-    return !storage->getDeclContext()->isExtensionContext();
-
-  case DeclKind::Class:
-    // Final properties can always be direct, even in classes.
-    if (storage->isFinal())
+  if (auto *classDecl = dyn_cast<ClassDecl>(storage->getDeclContext())) {
+    if (storage->isFinal() || classDecl->isFinal())
       return false;
-    // Extension properties are statically dispatched, unless they're @objc.
-    if (storage->getDeclContext()->isExtensionContext()
-        && !storage->isObjC())
-      return false;
+
     return true;
   }
-  llvm_unreachable("bad DeclKind");
+
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+    return true;
+
+  return false;
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
