@@ -287,9 +287,10 @@ public:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
-                       bool alwaysSetModuleToMain, bool bePrimary,
-                       serialization::ExtendedValidationInfo &extendedInfo);
+  setUpInputAndOutputForSILTool(
+      StringRef inputFilename, StringRef OutputFilename,
+      StringRef moduleNameArg, bool alwaysSetModuleToMain, bool bePrimary,
+      serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }

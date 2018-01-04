@@ -47,11 +47,13 @@ public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
+            llvm::MemoryBuffer *buffer = nullptr,
+            StringRef outputFilename = StringRef())
       : Filename(
             convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
         IsPrimary(isPrimary), Buffer(buffer),
-        SupplementaryPaths(SupplementaryOutputPaths()) {
+        SupplementaryPaths(SupplementaryOutputPaths()),
+        OutputFilename(outputFilename) {
     assert(name.begin() != Filename.c_str());
     assert(!name.empty() && "Empty strings signify no inputs in other places");
   }

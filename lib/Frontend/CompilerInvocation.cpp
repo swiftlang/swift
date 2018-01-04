@@ -1042,8 +1042,8 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-CompilerInvocation::setUpInputForSILTool(
-    StringRef inputFilename, StringRef moduleNameArg,
+CompilerInvocation::setUpInputAndOutputForSILTool(
+    StringRef inputFilename, StringRef OutputFilename, StringRef moduleNameArg,
     bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
@@ -1055,8 +1055,8 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
+  getFrontendOptions().InputsAndOutputs.addInput(InputFile(
+      inputFilename, bePrimary, fileBufOrErr.get().get(), OutputFilename));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);
