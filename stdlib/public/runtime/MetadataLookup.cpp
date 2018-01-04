@@ -124,20 +124,6 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
-// copied from ProtocolConformanceRecord::getCanonicalTypeMetadata()
-template<>
-const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
-  switch (getTypeKind()) {
-  case TypeMetadataRecordKind::NonuniqueDirectType: {
-    const ForeignTypeMetadata *FMD =
-        static_cast<const ForeignTypeMetadata *>(getDirectType());
-    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
-  }
-  default:
-    return nullptr;
-  }
-}
-
 // returns the type metadata for the type named by typeNode
 const Metadata *
 swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
@@ -171,9 +157,7 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
+      if (auto ntd = record.getNominalTypeDescriptor())
         foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
 
       if (foundMetadata != nullptr)

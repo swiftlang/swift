@@ -181,10 +181,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// The conformance is for a foreign type described by its type metadata.
-  /// getDirectType() points to a nonunique metadata record for the type, which
-  /// needs to be uniqued by the runtime.
-  NonuniqueDirectType = 0x02,
+  /// Reserved for future use.
+  Reserved = 0x02,
   
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.

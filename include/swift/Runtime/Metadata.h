@@ -2551,55 +2551,32 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 template <typename Runtime>
 struct TargetTypeMetadataRecord {
 private:
-  // Some description of the type that is resolvable at runtime.
-  union {
-    /// A direct reference to the metadata.
-    RelativeDirectPointerIntPair<const TargetMetadata<Runtime>,
-                                 TypeMetadataRecordKind> DirectType;
-
-    /// The nominal type descriptor for a resilient or generic type.
-    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
-      TypeDescriptor;
-  };
+  /// The nominal type descriptor.
+  RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                               TypeMetadataRecordKind>
+    TypeDescriptor;
 
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return DirectType.getInt();
+    return TypeDescriptor.getInt();
   }
   
-  const TargetMetadata<Runtime> *getDirectType() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      break;
-        
-    case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not direct type metadata");
-    }
-
-    return this->DirectType.getPointer();
-  }
-
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
-        
+
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not generic metadata pattern");
     }
     
     return this->TypeDescriptor.getPointer();
   }
-
-  /// Get the canonical metadata for the type referenced by this record, or
-  /// return null if the record references a generic or universal type.
-  const TargetMetadata<Runtime> *getCanonicalTypeMetadata() const;
 };
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
 
@@ -2634,11 +2611,6 @@ private:
                                  TypeMetadataRecordKind>
       IndirectNominalTypeDescriptor;
 
-    /// A direct reference to the metadata, which must be uniqued before
-    /// being used.
-    RelativeDirectPointerIntPair<TargetMetadata<Runtime>,
-                                 TypeMetadataRecordKind> NonuniqueDirectType;
-    
     /// An indirect reference to the metadata.
     ///
     /// Only valid when the \c IndirectClassOrDirectType value is
@@ -2678,26 +2650,14 @@ public:
     return WitnessTable.getInt();
   }
   
-  const TargetMetadata<Runtime> *getDirectType() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      break;
-        
-    case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not direct type metadata");
-    }
-
-    return NonuniqueDirectType.getPointer();
-  }
-  
   const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::IndirectObjCClass:
       break;
         
-    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not indirect class object");
@@ -2709,6 +2669,9 @@ public:
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (getTypeKind()) {
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
@@ -2716,7 +2679,6 @@ public:
       return *IndirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     

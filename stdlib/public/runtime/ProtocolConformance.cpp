@@ -48,13 +48,8 @@ template<> void ProtocolConformanceRecord::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      printf("direct type nonunique ");
-      if (const auto *ntd = getDirectType()->getNominalTypeDescriptor()) {
-        printf("%s", ntd->Name.get());
-      } else {
-        printf("<structural type>");
-      }
+    case TypeMetadataRecordKind::Reserved:
+      printf("unknown (reserved)");
       break;
     case TypeMetadataRecordKind::IndirectObjCClass:
       printf("indirect Objective-C class %s",
@@ -94,12 +89,8 @@ template<> void ProtocolConformanceRecord::dump() const {
 template <>
 const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::NonuniqueDirectType: {
-    // Ask the runtime for the unique metadata record we've canonized.
-    const ForeignTypeMetadata *FMD =
-        static_cast<const ForeignTypeMetadata *>(getDirectType());
-    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
-  }
+  case TypeMetadataRecordKind::Reserved:
+    return nullptr;
   case TypeMetadataRecordKind::IndirectObjCClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check

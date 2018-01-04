@@ -440,7 +440,7 @@ contains:
 
     0. A direct reference to a nominal type descriptor.
     1. An indirect reference to a nominal type descriptor.
-    2. A reference to nonunique, foreign type metadata.
+    2. Reserved for future use.
     3. A reference to a pointer to an Objective-C class object.
 
 - The **witness table field** that provides access to the witness table
