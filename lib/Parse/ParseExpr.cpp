@@ -2000,11 +2000,15 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // We are now sure this is a string interpolation expression.
   LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
-  StringRef Quote = Tok.IsMultilineString() ? "\"\"\"" : "\"";
+  StringRef Quote;
+  tok QuoteKind;
+  std::tie(Quote, QuoteKind) = Tok.IsMultilineString() ?
+    std::make_tuple("\"\"\"", tok::multiline_string_quote) :
+    std::make_tuple("\"", tok::string_quote);
 
   // Make unknown tokens to represent the open and close quote.
-  Token OpenQuote(tok::string_quote, Quote);
-  Token CloseQuote(tok::string_quote, Quote);
+  Token OpenQuote(QuoteKind, Quote);
+  Token CloseQuote(QuoteKind, Quote);
   Trivia EmptyTrivia;
   Trivia EntireTrailingTrivia = TrailingTrivia;
 

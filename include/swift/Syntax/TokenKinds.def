@@ -288,6 +288,7 @@ MISC(comment)
 MISC(string_interpolation_anchor)
 MISC(contextual_keyword)
 MISC(string_quote)
+MISC(multiline_string_quote)
 MISC(string_segment)
 
 #undef KEYWORD

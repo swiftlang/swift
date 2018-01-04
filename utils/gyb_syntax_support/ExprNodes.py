@@ -430,8 +430,16 @@ EXPR_NODES = [
     # e.g. "abc \(foo()) def"
     Node('StringInterpolationExpr', kind='Expr',
          children=[
-             Child('OpenQuote', kind='StringQuoteToken'),
+             Child('OpenQuote', kind='Token',
+                   token_choices=[
+                       'StringQuoteToken',
+                       'MultilineStringQuoteToken',
+                   ]),
              Child('Segments', kind='StringInterpolationSegments'),
-             Child('CloseQuote', kind='StringQuoteToken'),
+             Child('CloseQuote', kind='Token',
+                   token_choices=[
+                       'StringQuoteToken',
+                       'MultilineStringQuoteToken',
+                   ]),
          ]),
 ]
