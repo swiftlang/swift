@@ -273,6 +273,19 @@ parameter vector contains witness tables for those protocols, as if laid out::
     AnsibleWitnessTable *U_Ansible;
   };
 
+Foreign Class Metadata
+~~~~~~~~~~~~~~~~~~~~~~
+
+Foreign class metadata describes "foreign" class types, which support Swift
+reference counting but are otherwise opaque to the Swift runtime.
+
+- The `nominal type descriptor`_ for the most-derived class type is stored at
+  **offset 0**.
+- The **super pointer** pointing to the metadata record for the superclass is
+  stored at **offset 1**. If the class is a root class, it is null.
+- Three **pointer-sized fields**, starting at **offset 2**, are reserved for
+  future use.
+
 Nominal Type Descriptor
 ~~~~~~~~~~~~~~~~~~~~~~~
 
