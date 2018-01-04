@@ -28,11 +28,9 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
-    # FIXME: Enforce the requirement that the members can only be
-    # StringSegment or ExpressionSegment
     Node('StringInterpolationSegments', kind='SyntaxCollection',
-         element='Syntax',
-         element_name='Segment'),
+         element='Syntax', element_name='Segment',
+         element_choices=['StringSegment', 'ExpressionSegment']),
 
     # The try operator.
     # try foo()
