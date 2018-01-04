@@ -1117,6 +1117,86 @@ checkWitness(AccessScope requiredAccessScope,
   return CheckKind::Success;
 }
 
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the DynamicMemberLookupProtocol
+/// requirement.
+bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                     DeclContext *DC,
+                                                     TypeChecker &TC) {
+  // The only thing that we care about is that the index list has exactly one
+  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+  auto indices = decl->getIndices();
+  
+  auto EBSL =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  
+  return indices->size() == 1 &&
+         !indices->get(0)->isVariadic() &&
+         TC.conformsToProtocol(indices->get(0)->getType(),
+                               EBSL, DC, ConformanceCheckOptions());
+}
+
+
+/// DynamicMemberLookupProtocol is a special protocol with a requirement that
+/// cannot be declared in pure Swift.  It needs a member declared like this:
+///
+/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
+///   (dynamicMember name: KeywordType) -> LookupValue { get }
+///
+/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
+/// manually check the requirements here.
+///
+static bool
+checkDynamicMemberLookupProtocolConformance(TypeChecker &TC,
+                                      NormalProtocolConformance *conformance) {
+  Type type = conformance->getType();
+  SourceLoc complainLoc = conformance->getLoc();
+  auto *proto = conformance->getProtocol();
+  auto &context = TC.Context;
+  auto *DC = conformance->getDeclContext();
+  
+  
+  // For policy reasons (to reduce opportunities for abuse), we do not allow
+  // retroactive conformance to DynamicMemberLookupProtocol.  This means that
+  // extension decls are not allowed to add conformance to this protocol.
+  if (DC->isExtensionContext())
+    TC.diagnose(conformance->getLoc(),
+                diag::invalid_retroactive_conformance_dmlp, type);
+  
+  // Lookup our subscript.
+  auto subscriptName =
+    DeclName(context, DeclBaseName::createSubscript(),
+             context.getIdentifier("dynamicMember"));
+  
+  auto lookupOptions = defaultMemberTypeLookupOptions;
+  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+  
+  // Lookup the implementations of our subscript.
+  auto candidates = TC.lookupMember(DC, type, subscriptName, lookupOptions);
+  
+  // If we have none, then there is no conformance.
+  if (candidates.empty()) {
+    TC.diagnose(complainLoc, diag::type_does_not_conform,
+                type, proto->getDeclaredType());
+    return true;
+  }
+
+  // If none of the ones we find are acceptable, then reject one.
+  auto oneCandidate = candidates.front();
+  candidates.filter([&](LookupResultEntry entry)->bool {
+    auto decl = cast<SubscriptDecl>(entry.getValueDecl());
+    return isAcceptableDynamicMemberLookupSubscript(decl, DC, TC);
+  });
+  
+  if (!candidates.empty())
+    return false;
+  
+  TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
+              diag::type_invalid_conformance_dmlp, type);
+  return true;
+}
+
+
 # pragma mark Witness resolution
 
 /// This is a wrapper of multiple instances of ConformanceChecker to allow us
@@ -1328,6 +1408,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     conformance->setInvalid();
     return conformance;
   }
+  
+  // If this is the DynamicMemberLookupProtocol, manually check its requirement.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DynamicMemberLookupProtocol))
+    if (checkDynamicMemberLookupProtocolConformance(TC, conformance))
+      return conformance;
 
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
