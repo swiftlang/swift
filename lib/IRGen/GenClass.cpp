@@ -2328,10 +2328,3 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
   auto &layout = selfTI.getClassLayout(IGM, selfType);
   return layout.MetadataRequiresDynamicInitialization;
 }
-
-bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
-                                                       CanType conformingType) {
-  NominalTypeDecl *nom = conformingType->getAnyNominal();
-  return !isa<ClangModuleUnit>(nom->getModuleScopeContext());
-}
-
