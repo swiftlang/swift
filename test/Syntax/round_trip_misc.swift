@@ -28,3 +28,15 @@ typealias c = @foobar(a) () -> Void
 let d = \.foo
 let e = \.[1]
 let f = \.?.bar
+
+// selectors.
+#selector(Int.g)
+#selector(Int.h(_:))
+#selector(i(_:))
+#selector(getter: j)
+#selector(getter: .k)
+#selector(getter: Int.l)
+#selector(setter: Int.m)
+
+// overload references.
+let n = Int.o(_:)
