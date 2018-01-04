@@ -213,7 +213,7 @@ sil_global private @globalinit_token0 : $Builtin.Word
 sil_global @MyConst : $Int32
 
 // globalinit_func0
-sil private @globalinit_func0 : $@convention(thin) () -> () {
+sil private @globalinit_func0 : $@convention(c) () -> () {
 bb0:
   %0 = global_addr @MyConst : $*Int32               // user: %3
   %1 = integer_literal $Builtin.Int32, 0           // user: %2
@@ -229,8 +229,8 @@ bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word // user: %2
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer // user: %5
   // function_ref globalinit_func0
-  %3 = function_ref @globalinit_func0 : $@convention(thin) () -> () // user: %4
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
+  %3 = function_ref @globalinit_func0 : $@convention(c) () -> () // user: %4
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
   %6 = global_addr @MyConst : $*Int32               // user: %7
   %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer // user: %8
   return %7 : $Builtin.RawPointer                 // id: %8

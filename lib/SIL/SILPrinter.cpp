@@ -1762,7 +1762,9 @@ public:
   void visitEndLifetimeInst(EndLifetimeInst *ELI) {
     *this << getIDAndType(ELI->getOperand());
   }
-
+  void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
+    *this << getIDAndType(CBOI->getOperand());
+  }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());

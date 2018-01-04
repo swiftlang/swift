@@ -39,6 +39,7 @@
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+#include "llvm/Support/Casting.h"
 
 namespace swift {
 
@@ -727,6 +728,8 @@ template <typename Runtime> struct TargetGenericMetadata;
 template <typename Runtime> struct TargetClassMetadata;
 template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
+template <typename Runtime> struct TargetValueMetadata;
+template <typename Runtime> struct TargetForeignClassMetadata;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -902,9 +905,11 @@ public:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return static_cast<const TargetStructMetadata<Runtime> *>(this)
+      return static_cast<const TargetValueMetadata<Runtime> *>(this)
           ->Description;
     case MetadataKind::ForeignClass:
+      return static_cast<const TargetForeignClassMetadata<Runtime> *>(this)
+          ->Description;
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
@@ -1029,13 +1034,23 @@ struct GenericContextDescriptor {
 };
 
 /// Header for a generic parameter descriptor.
-struct GenericParameterDescriptorHeader {
-  /// The offset to the first generic argument from the start of
-  /// metadata record.
+template<typename Runtime>
+struct TargetGenericParameterDescriptorHeader {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using ClassMetadata = TargetClassMetadata<Runtime>;
+
+private:
+  /// The offset to the first generic argument from the address point of
+  /// metadata record, in words.
   ///
   /// This is meaningful if NumGenericRequirements is nonzero.
+  ///
+  /// If this class has a resilient superclass, this offset is relative to the
+  /// the start of the immediate class's metadata. Otherwise, it is relative
+  /// to the metadata address point.
   uint32_t Offset;
 
+public:
   /// The amount of generic requirement data in the metadata record, in
   /// words, excluding the lexical parent type.  A value of zero means
   /// there is no generic requirement data.
@@ -1055,6 +1070,36 @@ struct GenericParameterDescriptorHeader {
 
   /// Flags for this generic parameter descriptor.
   GenericParameterDescriptorFlags Flags;
+
+  /// This is factored in a silly way because remote mirrors cannot directly
+  /// dereference the SuperClass field of class metadata.
+  uint32_t getOffset(const ClassMetadata *classMetadata,
+                     const ClassMetadata *superMetadata) const {
+    if (Flags.hasResilientSuperclass())
+      return superMetadata->getSizeInWords() + Offset;
+
+    return Offset;
+  }
+
+  /// Return the offset of the start of generic arguments in the nominal
+  /// type's metadata. This method should only be used with value type
+  /// metadata and class metadata with a non-resilient superclass.
+  uint32_t getOffset() const {
+    assert(!Flags.hasResilientSuperclass());
+    return Offset;
+  }
+
+  /// Return the offset of the start of generic arguments in the nominal
+  /// type's metadata.
+  uint32_t getOffset(const TargetMetadata<Runtime> *metadata) const {
+    if (Flags.hasResilientSuperclass()) {
+      auto *classMetadata = llvm::cast<ClassMetadata>(metadata);
+      auto *superMetadata = llvm::cast<ClassMetadata>(classMetadata->SuperClass);
+      return getOffset(classMetadata, superMetadata);
+    }
+
+    return getOffset();
+  }
 
   /// True if the nominal type has generic requirements other than its
   /// parent metadata.
@@ -1080,14 +1125,32 @@ struct TargetMethodDescriptor {
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
-struct VTableDescriptorHeader {
-  /// The offset of the vtable for this class in its metadata, if any.
+template <typename Runtime>
+struct TargetVTableDescriptorHeader {
+  using StoredPointer = typename Runtime::StoredPointer;
+
+private:
+  /// The offset of the vtable for this class in its metadata, if any,
+  /// in words.
+  ///
+  /// If this class has a resilient superclass, this offset is relative to the
+  /// the start of the immediate class's metadata. Otherwise, it is relative
+  /// to the metadata address point.
   uint32_t VTableOffset;
+
+public:
   /// The number of vtable entries. This is the number of MethodDescriptor
   /// records following the vtable header in the class's nominal type
   /// descriptor, which is equal to the number of words this subclass's vtable
   /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
+
+  uint32_t getVTableOffset(const TargetClassMetadata<Runtime> *metadata) const {
+    const auto *description = metadata->getDescription();
+    if (description->GenericParams.Flags.hasResilientSuperclass())
+      return metadata->SuperClass->getSizeInWords() + VTableOffset;
+    return VTableOffset;
+  }
 };
 
 template<typename Runtime> struct TargetNominalTypeDescriptor;
@@ -1096,7 +1159,7 @@ template<typename Runtime>
 using TargetNominalTypeDescriptorTrailingObjects
   = swift::ABI::TrailingObjects<TargetNominalTypeDescriptor<Runtime>,
         GenericContextDescriptor,
-        VTableDescriptorHeader,
+        TargetVTableDescriptorHeader<Runtime>,
         TargetMethodDescriptor<Runtime>>;
 
 /// Common information about all nominal types. For generic types, this
@@ -1116,6 +1179,9 @@ private:
 public:
   using StoredPointer = typename Runtime::StoredPointer;
   using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+  using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
+  using GenericParameterDescriptorHeader = TargetGenericParameterDescriptorHeader<Runtime>;
+  using ClassMetadata = TargetClassMetadata<Runtime>;
   
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
@@ -1127,19 +1193,22 @@ public:
       /// The number of stored properties in the class, not including its
       /// superclasses. If there is a field offset vector, this is its length.
       uint32_t NumFields;
+
+    private:
       /// The offset of the field offset vector for this class's stored
-      /// properties in its metadata, if any. 0 means there is no field offset
+      /// properties in its metadata, in words. 0 means there is no field offset
       /// vector.
       ///
-      /// To deal with resilient superclasses correctly, this will
-      /// eventually need to be relative to the start of this class's
-      /// metadata area.
+      /// If this class has a resilient superclass, this offset is relative to
+      /// the size of the resilient superclass metadata. Otherwise, it is
+      /// absolute.
       uint32_t FieldOffsetVectorOffset;
-      
+
+    public:
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
-      
+
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
@@ -1148,7 +1217,16 @@ public:
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }      
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
+
+      unsigned getFieldOffsetVectorOffset(const ClassMetadata *metadata) const {
+        const auto *description = metadata->getDescription();
+
+        if (description->GenericParams.Flags.hasResilientSuperclass())
+          return metadata->SuperClass->getSizeInWords() + FieldOffsetVectorOffset;
+
+        return FieldOffsetVectorOffset;
+      }
     } Class;
     
     /// Information about struct types.
@@ -1503,7 +1581,7 @@ public:
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
     assert(isTypeMetadata());
-    auto offset = getDescription()->Class.FieldOffsetVectorOffset;
+    auto offset = getDescription()->Class.getFieldOffsetVectorOffset(this);
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
@@ -1518,6 +1596,13 @@ public:
       return nullptr;
     
     return getter(this);
+  }
+
+  uint32_t getSizeInWords() const {
+    assert(isTypeMetadata());
+    uint32_t size = getClassSize() - getClassAddressPoint();
+    assert(size % sizeof(StoredPointer) == 0);
+    return size / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1730,9 +1815,12 @@ struct TargetForeignClassMetadata
   : public TargetForeignTypeMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
 
+  /// An out-of-line description of the type.
+  const TargetNominalTypeDescriptor<Runtime> *Description;
+
   /// The superclass of the foreign class, if any.
   ConstTargetMetadataPointer<Runtime, swift::TargetForeignClassMetadata>
-  SuperClass;
+    SuperClass;
 
   /// Reserved space.  For now, these should be zero-initialized.
   StoredPointer Reserved[3];
@@ -1768,7 +1856,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
 
     auto asWords = reinterpret_cast<
       ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return (asWords + Description->GenericParams.Offset);
+    return (asWords + Description->GenericParams.getOffset(this));
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
@@ -2459,56 +2547,47 @@ private:
   // Some description of the type that is resolvable at runtime.
   union {
     /// A direct reference to the metadata.
-    RelativeDirectPointer<const TargetMetadata<Runtime>> DirectType;
+    RelativeDirectPointerIntPair<const TargetMetadata<Runtime>,
+                                 TypeMetadataRecordKind> DirectType;
 
     /// The nominal type descriptor for a resilient or generic type.
-    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      TypeDescriptor;
   };
 
-  /// Flags describing the type metadata record.
-  TypeMetadataRecordFlags Flags;
-  
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeKind();
+    return DirectType.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
       break;
         
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectObjCClass:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
-    return this->DirectType;
+    return this->DirectType.getPointer();
   }
 
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not generic metadata pattern");
     }
     
-    return this->TypeDescriptor;
+    return this->TypeDescriptor.getPointer();
   }
 
   /// Get the canonical metadata for the type referenced by this record, or
@@ -2531,154 +2610,139 @@ public:
 
 private:
   /// The protocol being conformed to.
-  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
+  ///
+  /// The remaining low bit is reserved for future use.
+  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
+    Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
-    /// A direct reference to the metadata.
-    ///
-    /// Depending on the conformance kind, this may not be usable
-    /// metadata without being first processed by the runtime.
-    RelativeIndirectablePointer<TargetMetadata<Runtime>> DirectType;
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+
+    /// A direct reference to the metadata, which must be uniqued before
+    /// being used.
+    RelativeDirectPointerIntPair<TargetMetadata<Runtime>,
+                                 TypeMetadataRecordKind> NonuniqueDirectType;
     
     /// An indirect reference to the metadata.
-    RelativeIndirectablePointer<const TargetClassMetadata<Runtime> *>
-    IndirectClass;
-    
-    /// The nominal type descriptor for a resilient or generic type which has
-    /// instances that conform to the protocol.
-    RelativeIndirectablePointer<TargetNominalTypeDescriptor<Runtime>>
-    TypeDescriptor;
+    ///
+    /// Only valid when the \c IndirectClassOrDirectType value is
+    // \c IsIndirectClass.
+    RelativeDirectPointerIntPair<const TargetClassMetadata<Runtime> *,
+                                 TypeMetadataRecordKind> IndirectObjCClass;
   };
   
   
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<const WitnessTable> WitnessTable;
+    RelativeDirectPointerIntPair<const WitnessTable,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type.
-    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
+    RelativeDirectPointerIntPair<WitnessTableAccessorFn,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTableAccessor;
   };
-  
-  /// Flags describing the protocol conformance.
-  ProtocolConformanceFlags Flags;
+
+  /// Reserved word.
+  unsigned Reserved;
   
 public:
   const ProtocolDescriptor *getProtocol() const {
-    return Protocol;
+    return Protocol.getPointer();
   }
-  
-  ProtocolConformanceFlags getFlags() const {
-    return Flags;
-  }
-  
+
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeKind();
+    return DirectNominalTypeDescriptor.getInt();
   }
+
   ProtocolConformanceReferenceKind getConformanceKind() const {
-    return Flags.getConformanceKind();
+    return WitnessTable.getInt();
   }
   
   const TargetMetadata<Runtime> *getDirectType() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueDirectType:
+    switch (getTypeKind()) {
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectObjCClass:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
-    return DirectType;
+    return NonuniqueDirectType.getPointer();
   }
   
-  // FIXME: This shouldn't exist
-  const TargetClassMetadata<Runtime> *getDirectClass() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-    case TypeMetadataRecordKind::UniqueDirectClass:
+  const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::IndirectObjCClass:
       break;
         
-    case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      assert(false && "not direct class object");
-    }
-
-    const TargetMetadata<Runtime> *metadata = DirectType;
-    return static_cast<const TargetClassMetadata<Runtime>*>(metadata);
-    
-  }
-  
-  const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
-
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not indirect class object");
     }
     
-    return IndirectClass;
+    return IndirectObjCClass.getPointer();
   }
   
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
-    switch (Flags.getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      return nullptr;
+    switch (getTypeKind()) {
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-      break;
-        
-    case TypeMetadataRecordKind::UniqueDirectClass:
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueDirectType:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+      return *IndirectNominalTypeDescriptor.getPointer();
+
+    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     
-    return TypeDescriptor;
+    return nullptr;
   }
   
   /// Get the directly-referenced static witness table.
   const swift::WitnessTable *getStaticWitnessTable() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
+
+    case ProtocolConformanceReferenceKind::Reserved:
+      break;
     }
-    return WitnessTable;
+    return WitnessTable.getPointer();
   }
   
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
-    switch (Flags.getConformanceKind()) {
+    switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::Reserved:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
-    return WitnessTableAccessor;
+    return WitnessTableAccessor.getPointer();
   }
   
   /// Get the canonical metadata for the type referenced by this record, or

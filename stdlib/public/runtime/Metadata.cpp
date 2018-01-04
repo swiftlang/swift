@@ -170,24 +170,25 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
          metadataSize - pattern->TemplateSize);
 
   // Okay, move to the address point.
-  bytes += pattern->AddressPoint;
-  ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
+  ClassMetadata *metadata =
+      reinterpret_cast<ClassMetadata *>(bytes + pattern->AddressPoint);
+  auto patternBytes =
+    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+    pattern->AddressPoint;
+  auto patternMetadata = reinterpret_cast<const ClassMetadata*>(patternBytes);
   assert(metadata->isTypeMetadata());
 
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
   // Adjust the relative reference to the nominal type descriptor.
   if (!metadata->isArtificialSubclass()) {
-    auto patternBytes =
-      reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
-      pattern->AddressPoint;
-    metadata->setDescription(
-        reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
+    metadata->setDescription(patternMetadata->getDescription());
   }
 
   // The pattern might have private prefix matter prior to the start
   // of metadata.
   assert(metadata->getClassAddressPoint() <= pattern->AddressPoint);
+  metadata->setClassSize(metadataSize);
 
   return metadata;
 }
@@ -1447,7 +1448,8 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->VTableOffset + i] = description->getMethod(i);
+        classWords[vtable->getVTableOffset(theClass) + i]
+          = description->getMethod(i);
       }
     }
   }
@@ -1469,23 +1471,23 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
 
     // Copy the generic requirements.
     if (genericParams.hasGenericRequirements()) {
-      unsigned numParamWords = genericParams.NumGenericRequirements;
-      memcpy(classWords + genericParams.Offset,
-             superWords + genericParams.Offset,
-             numParamWords * sizeof(uintptr_t));
+      memcpy(classWords + genericParams.getOffset(ancestor),
+             superWords + genericParams.getOffset(ancestor),
+             genericParams.NumGenericRequirements * sizeof(uintptr_t));
     }
 
     // Copy the vtable entries.
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
-      memcpy(classWords + vtable->VTableOffset,
-             superWords + vtable->VTableOffset,
+      memcpy(classWords + vtable->getVTableOffset(ancestor),
+             superWords + vtable->getVTableOffset(ancestor),
              vtable->VTableSize * sizeof(uintptr_t));
     }
 
     // Copy the field offsets.
     if (description->Class.hasFieldOffsetVector()) {
-      unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
+      unsigned fieldOffsetVector =
+        description->Class.getFieldOffsetVectorOffset(ancestor);
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
              description->Class.NumFields * sizeof(uintptr_t));
@@ -1539,6 +1541,8 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
 
     rawNewClass += self->getClassAddressPoint();
     auto *newClass = (ClassMetadata *) rawNewClass;
+    newClass->setClassSize(metadataSize);
+
     assert(newClass->isTypeMetadata());
 
     return newClass;

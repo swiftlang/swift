@@ -3463,5 +3463,30 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+// Test to see if we can constant fold a classify_bridge_object on a Swift class
+// to false.
+// CHECK-LABEL: sil @test_classify_fold
+// CHECK-NOT: classify_bridge_object
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: return
+sil @test_classify_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> Builtin.Int1 {
+bb0(%0 : $_ContiguousArrayStorage<B>):
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
+  %2 = classify_bridge_object %1 : $Builtin.BridgeObject
+  %3 = tuple_extract %2 : $(Builtin.Int1, Builtin.Int1), 0
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @bridge_cast_noop_fold
+// CHECK: bb0(%0
+// CHECK-NEXT: %1 = upcast %0
+// CHECK-NEXT: return %1
+sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> _ContiguousArrayStorageBase {
+bb0(%0 : $_ContiguousArrayStorage<B>):
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
+  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
+  return %2 : $_ContiguousArrayStorageBase
+}
+
 
 

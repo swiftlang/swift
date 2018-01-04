@@ -311,9 +311,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     return InlineCost::Expensive;
     
   // TODO: Bridge object conversions imply a masking operation that should be
-  // "hella cheap" but not really expensive
+  // "hella cheap" but not really expensive.
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::ClassifyBridgeObjectInst:
     return InlineCost::Expensive;
 
   case SILInstructionKind::MetatypeInst:

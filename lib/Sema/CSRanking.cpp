@@ -147,6 +147,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
@@ -635,23 +636,43 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        for (unsigned i = 0; i != numParams2; ++i) {
-          // If there is no corresponding argument in the first
-          // parameter list...
-          if (i >= numParams1) {
-            // We need either a default argument or a variadic
-            // argument for the first declaration to be more
-            // specialized.
-            if (!defaultMapType2[i] &&
-                !params2[i].isVariadic())
+        for (unsigned param1 = 0, param2 = 0; param2 != numParams2; ++param2) {
+          // If there is a default for parameter in the second function
+          // while there are still some parameters left unclaimed in first,
+          // it could only mean that default parameters are intermixed e.g.
+          //
+          // ```swift
+          // func foo(a: Int) {}
+          // func foo(q: String = "", a: Int) {}
+          // ```
+          // or
+          // ```swift
+          // func foo(a: Int, c: Int) {}
+          // func foo(a: Int, b: Int = 0, c: Int) {}
+          // ```
+          // and we shouldn't claim parameter from the first function.
+          if (param1 < numParams1 && numParams1 != numParams2 &&
+              defaultMapType2[param2]) {
+            fewerEffectiveParameters = true;
+            continue;
+          }
+
+          // If we've claimed all of the parameters from first
+          // function, the rest of the parameters in second should
+          // be either default or variadic.
+          if (param1 >= numParams1) {
+            if (!defaultMapType2[param2] && !params2[param2].isVariadic())
               return false;
 
             fewerEffectiveParameters = true;
             continue;
           }
 
-          if (!maybeAddSubtypeConstraint(params1[i], params2[i]))
+          if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
             return false;
+
+          // claim the parameter as used.
+          ++param1;
         }
 
         if (compareTrailingClosureParamsSeparately)
@@ -827,6 +848,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       break;
     }
     

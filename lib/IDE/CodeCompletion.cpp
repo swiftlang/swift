@@ -1546,9 +1546,14 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
     OneArg = (NonDefault == 0);
   }
 
-  if (OneArg)
-    if (auto Fn = funcType->getParams().back().getType()->getAs<AnyFunctionType>())
-      return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+  if (OneArg) {
+    auto param = funcType->getParams().back();
+    if (!param.isAutoClosure()) {
+      if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
+        return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+      }
+    }
+  }
 
   return false;
 }

@@ -119,6 +119,10 @@ bool SILType::isPointerSizeAndAligned() {
 // struct {A, B, C} -> struct {A, B} is castable
 // struct { struct {A, B}, C} -> struct {A, B} is castable
 // struct { A, B, C} -> struct { struct {A, B}, C} is NOT castable
+//
+// FIXME: This is unnecessarily conservative given the current ABI
+// (TypeLayout.rst). It would be simpler to flatten both `from` and `to` types,
+// exploding all structs and tuples, then trivially check if `to` is a prefix.
 static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
                                 SILType toType, SILModule &M) {
   auto fromRange = fromStruct->getStoredProperties();

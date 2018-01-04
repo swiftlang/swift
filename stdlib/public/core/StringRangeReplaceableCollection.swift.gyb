@@ -454,16 +454,14 @@ extension Collection {
 }
 //===----------------------------------------------------------------------===//
 
-extension String {
+extension Sequence where Element == String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
-  public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
-    where S.Iterator.Element == String {
-      fatalError()
+  public static func + (lhs: Self, rhs: String) -> Never {
+    fatalError()
   }
 
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
-  public static func + <S : Sequence>(lhs: String, rhs: S) -> Never
-    where S.Iterator.Element == String {
-      fatalError()
+  public static func + (lhs: String, rhs: Self) -> Never {
+    fatalError()
   }
 }

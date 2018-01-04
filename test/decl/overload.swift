@@ -261,6 +261,29 @@ func inout2(x: inout Int) { }
 func optional(x: Int?) { } // expected-note{{previously declared}}
 func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
 
+func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
+// expected-note@-1 {{previously declared}}
+func optionalInOut(x: inout Int!) { } // expected-warning{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-1 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+  // expected-warning@-2 {{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-3 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+
+class optionalOverloads {
+  class func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
+  // expected-note@-1 {{previously declared}}
+  class func optionalInOut(x: inout Int!) { } // expected-warning{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-1 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+  // expected-warning@-2 {{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-3 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+
+  func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
+  // expected-note@-1 {{previously declared}}
+  func optionalInOut(x: inout Int!) { } // expected-warning{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-1 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+  // expected-warning@-2 {{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  // expected-note@-3 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+}
+
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
 
