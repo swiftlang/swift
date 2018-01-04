@@ -510,32 +510,38 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                                      : (Decl *)nullptr,
                                   constant, forDefinition);
 
-  ProfileCounter entryCount = ProfileCounter();
+  ASTNode profiledNode;
   if (constant.hasDecl()) {
     if (auto *fd = constant.getFuncDecl()) {
       if (hasSILBody(fd)) {
         // Set up the function for profiling instrumentation.
         F->createProfiler(fd);
-        if (SILProfiler *SP = F->getProfiler())
-          entryCount =
-              SP->getExecutionCount(fd->getBody(/*canSynthesize=*/false));
+        profiledNode = fd->getBody(/*canSynthesize=*/false);
       }
     }
   } else if (auto *ace = constant.getAbstractClosureExpr()) {
-    // Closures inherit profiling metadata and counters from their parent.
+    // Closures inherit profiling metadata and counters from their parent, if
+    // one exists. If not, they receive a fresh profiler.
     if (auto *parentDecl = dyn_cast_or_null<ValueDecl>(
             ace->getInnermostDeclarationDeclContext())) {
       SILDeclRef parentConstant(parentDecl, SILDeclRef::Kind::Func);
       auto parentIt = emittedFunctions.find(parentConstant);
       if (parentIt != emittedFunctions.end()) {
         F->setProfiler(parentIt->second->getProfiler());
-        if (SILProfiler *SP = F->getProfiler())
-          entryCount = SP->getExecutionCount(ace);
+        profiledNode = ace;
+      }
+    }
+
+    if (!profiledNode) {
+      if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
+        F->createProfiler(ce);
+        profiledNode = ce;
       }
     }
   }
   // Set the function entry count for PGO.
-  F->setEntryCount(entryCount);
+  if (SILProfiler *SP = F->getProfiler())
+    F->setEntryCount(SP->getExecutionCount(profiledNode));
 
   assert(F && "SILFunction should have been defined");
 
@@ -717,6 +723,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
     SILDeclRef constant(decl);
 
+    bool ForCoverageMapping = M.getOptions().EmitProfileCoverageMapping;
+
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
       PrettyStackTraceSILFunction X("silgen emitFunction", f);
@@ -725,7 +733,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
       else
         SILGenFunction(*this, *f).emitFunction(fd);
       postEmitFunction(constant, f);
-    });
+    }, /*forceEmission=*/ForCoverageMapping);
   }
 }
 
