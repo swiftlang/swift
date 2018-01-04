@@ -3233,7 +3233,7 @@ namespace {
 
         // Otherwise, we know the offset at compile time, even if our
         // clients do not, so just emit a constant.
-        auto &layout = IGM.getMetadataLayout(theClass);
+        auto &layout = IGM.getClassMetadataLayout(theClass);
 
         auto value = layout.getStartOfImmediateMembers();
         auto *init = llvm::ConstantInt::get(IGM.SizeTy, value.getValue());
