@@ -39,6 +39,11 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+/// Returns true if the partitioning pass should ignore this user.
+static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
+  return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
+}
+
 static bool isOverflowCheckingIntegerOp(SILInstruction *inst) {
   auto *BI = dyn_cast<BuiltinInst>(inst);
   if (!BI) return false;
@@ -390,9 +395,10 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
     worklist.push_back(instBB);
 
     // Add the blocks that any users live in.
-    for (auto result: i->getResults()) {
+    for (auto result : i->getResults()) {
       for (auto user : result->getUses()) {
-        if (user->getUser()->getParent() != instBB)
+        if (user->getUser()->getParent() != instBB &&
+            !isUserIgnoredByPartitioning(user->getUser()))
           worklist.push_back(user->getUser()->getParent());
       }
     }
@@ -557,7 +563,7 @@ private:
   void markValue(SILValue value);
 
   // Rewriting the host function.
-  PartitionedTensorProgram createTensorProgramStart();
+  PartitionedTensorProgram insertTensorProgramStartEndTerminate();
 };
 } // end anonymous namespace
 
@@ -747,7 +753,7 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     for (auto result : inst.getResults())
       for (auto *operand : result->getUses()) {
         auto user = operand->getUser();
-        if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user))
+        if (isUserIgnoredByPartitioning(user))
           markInstruction(*user, Marking::Delete);
       }
   }
@@ -994,6 +1000,7 @@ bool TFFunctionPartition::markFunction() {
                                          SILBasicBlock *B2) -> SILBasicBlock* {
     return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
   });
+  assert(endBB && "Didn't find an end point for the tensor program");
 
   // Compute the end point by doing a backward scan.
   if (bbOps.empty()) {
@@ -1572,7 +1579,7 @@ void PartitionCloner::finalizeOriginal() {
     bool needsCopy = false;
     for (auto operand : arg->getUses()) {
       auto user = operand->getUser();
-      if (isa<DebugValueInst>(user) || isa<RefCountingInst>(user)) {
+      if (isUserIgnoredByPartitioning(user)) {
         instToRemove.push_back(user);
         continue;
       }
@@ -1617,16 +1624,6 @@ void PartitionCloner::finalizeOriginal() {
     if (callee->use_empty())  // Remove the function_ref too.
       cast<SingleValueInstruction>(callee)->eraseFromParent();
   }
-
-  // If the host program reaches any of the tensorKillBlocks, it should abort
-  // execution of the tensor program.
-  for (auto *killBB : FP.tensorKillBlocks) {
-    SILBuilder B(&killBB->front());
-    B.createBuiltin(FP.fn.getLocation(),
-                    FP.fn.getASTContext().getIdentifier("tensorFlow_abort"),
-                    FP.fn.getModule().Types.getEmptyTupleType(),
-                    /*no substitutions*/{}, /*no arguments*/{});
-  }
 }
 
 /// Wrap a value in a simple struct wrapper, these are common in the standard
@@ -1662,7 +1659,7 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// start point of the tensor function, passing in the tensor program itself,
 /// input tensor arguments etc.
 auto TFFunctionPartition::
-createTensorProgramStart() -> PartitionedTensorProgram {
+insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   auto &ctx = fn.getASTContext();
   auto loc = fn.getLocation();
 
@@ -1677,12 +1674,52 @@ createTensorProgramStart() -> PartitionedTensorProgram {
   auto startProgramFn =
     fn.getModule().findFunction("_swift_tfc_StartTensorProgram",
                                 SILLinkage::PublicExternal);
-  if (!startProgramFn) {
+
+  // We are going to create a call to this function to syncronize with the
+  // completed tensor program and collect the results.
+  //
+  // @_silgen_name("_swift_tfc_FinishTensorProgram") public
+  // func _TFCFinishTensorProgram(
+  //    _ program: TensorProgram,
+  //    _ resultAddress: UnsafeMutablePointer<AnyTensorHandle>,
+  //    _ tensorResultCount: Int) {...}
+  auto finishProgramFn =
+    fn.getModule().findFunction("_swift_tfc_FinishTensorProgram",
+                                SILLinkage::PublicExternal);
+
+  // We may also generate a call to this function to kill the tensor program if
+  // the host execution goes awry:
+  //
+  // @_silgen_name("_swift_tfc_TerminateTensorProgram")
+  // public func _TFCTerminateTensorProgram(_ program: TensorProgram) {...}
+  //
+  auto terminateProgramFn =
+    fn.getModule().findFunction("_swift_tfc_TerminateTensorProgram",
+                                SILLinkage::PublicExternal);
+
+  if (!startProgramFn || !finishProgramFn || !terminateProgramFn) {
     diagnose(ctx, fn.getLocation().getSourceLoc(),
              diag::tf_internal_error,
-             "'_swift_tfc_StartTensorProgram' not found in TensorFlow module");
+             "'_swift_tfc_' entrypoints not found in TensorFlow module");
     return { nullptr, nullptr, nullptr, SILValue()};
   }
+
+  // Create various types and SIL types that we'll be using below.
+  auto anyTensorHandleTy = ctx.getAnyTensorHandleDecl()->getDeclaredType();
+  auto anyTensorHandleSILTy =
+    SILType::getPrimitiveObjectType(anyTensorHandleTy->getCanonicalType());
+  auto unsafePointerType =
+    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
+                          anyTensorHandleTy);
+  auto unsafePointerSILType =
+    SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
+  auto unsafeMutPointerType =
+    BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(), /*parent*/Type(),
+                          anyTensorHandleTy);
+  auto unsafeMutPointerSILType =
+    SILType::getPrimitiveObjectType(unsafeMutPointerType->getCanonicalType());
+
+
 
   SILBuilder B(tensorStartPoint);
 
@@ -1703,9 +1740,6 @@ createTensorProgramStart() -> PartitionedTensorProgram {
   //   (..., _ inputs: UnsafePointer<AnyTensorHandle>, _ numInputs: Int)
   // to get this, we create an N-ary tuple on the stack and pass the address of
   // the first element.
-  auto anyTensorHandleTy = ctx.getAnyTensorHandleDecl()->getDeclaredType();
-  auto anyTensorHandleSILTy =
-    SILType::getPrimitiveObjectType(anyTensorHandleTy->getCanonicalType());
 
   // Note that the allocation becomes a scalar value when it has one value.
   SmallVector<TupleTypeElt, 8> tupleEltTypes(tensorFnArguments.size(),
@@ -1748,27 +1782,24 @@ createTensorProgramStart() -> PartitionedTensorProgram {
                                       SILType::getRawPointerType(ctx));
 
   // %4 = struct $UnsafePointer<AnyTensorHandle>(%3 : $Builtin.RawPointer)
-  auto unsafePointerType =
-    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
-                          anyTensorHandleTy);
-  auto unsafePointerSILType =
-    SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
   firstPtr = B.createStruct(loc, unsafePointerSILType, firstPtr);
 
   auto numTensorArguments = createIntValue(tensorFnArguments.size(), B, loc);
 
+  // TODO: When the runtime matures, we shouldn't have to pass in the # results.
+  auto numTensorResults = createIntValue(resultValues.size(), B, loc);
+
   // The first two arguments are the program, the rest of the arguments are the
   // parameters passed in.
-  SILValue startArgs[4] = {
-    program, programLength, firstPtr, numTensorArguments
+  SILValue startArgs[] = {
+    program, programLength, firstPtr, numTensorArguments, numTensorResults
   };
 
   // Now that we have our argument list, create a call.
   auto startProgramFnRef = B.createFunctionRef(loc, startProgramFn);
 
-
-  // Create the builtin in the host program that kicks off the tensor program,
-  // setting the argument values.
+  // Create the runtime call in the host program that kicks off the tensor
+  // program, setting the argument values we provide as the tensor params.
   auto tensorProgram =
     B.createApply(loc, startProgramFnRef, /*no substitutions*/{}, startArgs,
                   /*isNonThrowing*/false);
@@ -1782,6 +1813,120 @@ createTensorProgramStart() -> PartitionedTensorProgram {
   B.emitDestroyAddr(loc, stackAlloc);
   // dealloc_stack %0 : $*(AnyTensorHandle, AnyTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
+
+
+
+  // Create the runtime call in the host program that rendezvous with the tensor
+  // program and returns the results.
+
+  // Start by creating an uninitialized buffer to receive the values into.
+  B.setInsertionPoint(tensorEndPoint);
+
+  // Note that the allocation becomes a scalar value when it has one value.
+  tupleEltTypes = SmallVector<TupleTypeElt, 8>(resultValues.size(),
+                                               TupleTypeElt(anyTensorHandleTy));
+  tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
+
+  // %0 = alloc_stack $(AnyTensorHandle, AnyTensorHandle)
+  stackAlloc =
+    B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
+
+  // Ok, now we have our uninitialized array on the stack.  Start a write
+  // access, and get the address of the first element as an
+  // UnsafePointer<AnyTensorHandle>.
+  // %1 = begin_access [write] [static] %0 : $*(AnyTensorHandle,AnyTensorHandle)
+  access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Modify,
+                               SILAccessEnforcement::Static);
+
+  // %2 = tuple_element_addr %1 : $*(AnyTensorHandle, AnyTensorHandle), 0
+  firstPtr = access;
+  if (resultValues.size() >= 2)
+    firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
+                                        anyTensorHandleSILTy.getAddressType());
+  // %3 = address_to_pointer %2 : $*AnyTensorHandle to $Builtin.RawPointer
+  firstPtr = B.createAddressToPointer(loc, firstPtr,
+                                      SILType::getRawPointerType(ctx));
+
+  // %4 = struct $UnsafeMutablePointer<AnyTensorHandle>(%3: $Builtin.RawPointer)
+  firstPtr = B.createStruct(loc, unsafeMutPointerSILType, firstPtr);
+
+  auto finishProgramFnRef = B.createFunctionRef(loc, finishProgramFn);
+
+  // Create the builtin in the host program that kicks off the tensor program,
+  // setting the argument values.
+  B.createApply(loc, finishProgramFnRef, /*no substitutions*/{},
+                /*args*/ {tensorProgram, firstPtr, numTensorResults},
+                /*isNonThrowing*/false);
+
+  // end_access %1 : $*(AnyTensorHandle, AnyTensorHandle)
+  B.createEndAccess(loc, access, /*aborted*/false);
+
+
+  // After the call, we have a buffer filled in with tensor values, load them,
+  // taking ownership and RAUW'ing uses of the old value to the newly loaded
+  // value.
+  for (unsigned resultNumber = 0, e = resultValues.size(); resultNumber != e;
+       ++resultNumber) {
+    SILValue result = resultValues[resultNumber];
+    SILValue eltAddress = stackAlloc;
+    if (resultValues.size() > 1) {
+      eltAddress =
+        B.createTupleElementAddr(result.getLoc(),
+                                 eltAddress, resultNumber,
+                                 anyTensorHandleSILTy.getAddressType());
+    }
+
+    // The load takes ownership from the buffer, leaving the buffer
+    // uninitialized again.
+    auto ownershipQualifier =
+      fn.hasQualifiedOwnership() ? LoadOwnershipQualifier::Take :
+                                   LoadOwnershipQualifier::Unqualified;
+    SILValue newValue = B.createLoad(result.getLoc(), eltAddress,
+                                     ownershipQualifier);
+
+    // Downcast it to the proper TensorHandle<T> type.
+    newValue = B.createUnconditionalCheckedCast(result.getLoc(), newValue,
+                                                result->getType());
+
+    // Manually walk the use list in a custom way to avoid invalidating the
+    // iterator as we potentially change it.
+    for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
+      auto *operand = *UI++;
+      auto user = operand->getUser();
+
+      // Users may be either inside (e.g. another tensor op, or a non-tensor
+      // op that causes a copy back to the host) or outside the tensor
+      // program.  If it is after the tensor op, we can replace the use with
+      // the corresponding result value.  If inside, we'll nuke it later.
+      if (DI.dominates(tensorEndPoint, user))
+        operand->set(newValue);
+    }
+  }
+
+  // Now that we are done with the buffer of results, get rid of it.  It is
+  // uninitialized at this point, so it should not be destroyed.
+
+  // dealloc_stack %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  B.createDeallocStack(loc, stackAlloc);
+
+
+
+  // tensorProgram is the return value of _TFCStartTensorProgram.  By
+  // construction, it is known to dominate all abort points and the finish point
+  // point of the program.
+  //
+  // If the host program reaches any of the tensorKillBlocks, it should abort
+  // execution of the tensor program.
+  for (auto *killBB : tensorKillBlocks) {
+    B.setInsertionPoint(&killBB->front());
+
+    auto terminateProgramFnRef = B.createFunctionRef(loc, terminateProgramFn);
+
+    // Create the builtin in the host program that kicks off the tensor program,
+    // setting the argument values.
+    B.createApply(loc, terminateProgramFnRef, /*no substitutions*/{},
+                  /*args*/{ tensorProgram }, /*isNonThrowing*/false);
+  }
 
   return {
     nullptr,  // New function hasn't been created yet.
@@ -1806,54 +1951,14 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   assert(!markedBlocks.empty() &&
          "Shouldn't run on functions with no tensor ops");
 
-  auto result = createTensorProgramStart();
+  // Insert the start/finish and any terminate runtime calls.
+  auto result = insertTensorProgramStartEndTerminate();
 
   // If the TensorFlow module is malformed, bail out without breaking the code.
   if (!result.theTensorProgram)
     return result;
 
-  // Create the builtin in the host program that rendezvous with the tensor
-  // program and returns the results.
-  SmallVector<TupleTypeElt, 4> resultTypes;
-  for (auto r : resultValues)
-    resultTypes.push_back({r->getType().getSwiftRValueType()});
-  auto tuple = TupleType::get(resultTypes, fn.getASTContext());
-    auto resultType =SILType::getPrimitiveObjectType(tuple->getCanonicalType());
 
-  SILBuilder B(tensorEndPoint);
-  auto resultInst = B.createBuiltin(fn.getLocation(),
-                            fn.getASTContext().getIdentifier("tensorFlow_done"),
-                                    resultType, /*no substitutions*/{},
-                                    /*no arguments*/{});
-
-  {
-    // Go over all of the returned values, replacing uses dominated by the end
-    // point with uses of the returned values.
-    unsigned resultNumber = 0;
-    for (SILValue result : resultValues) {
-      SILValue newValue = resultInst;
-      if (resultValues.size() != 1) {
-        newValue = B.createTupleExtract(resultInst->getLoc(), newValue,
-                                        resultNumber, result->getType());
-      }
-
-      // Manually walk the use list in a custom way to avoid invalidating the
-      // iterator as we potentially change it.
-      for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
-        auto *operand = *UI++;
-        auto user = operand->getUser();
-
-        // Users may be either inside (e.g. another tensor op, or a non-tensor
-        // op that causes a copy back to the host) or outside the tensor
-        // program.  If it is after the tensor op, we can replace the use with
-        // the corresponding result value.
-        if (DI.dominates(tensorEndPoint, user)) {
-          operand->set(newValue);
-        }
-      }
-      ++resultNumber;
-    }
-  }
 
   // Calculate the parameter list for the new function.
   SmallVector<SILParameterInfo, 4> params;
@@ -1876,7 +1981,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                          /*interfaceYields*/{},
                          results, /*interfaceErrorResult*/None,
                          fn.getModule().getASTContext());
-  auto newFn =
+  result.fn =
     fn.getModule().getOrCreateFunction(fn.getLocation(),
                                        fn.getName().str()+".tf_partition",
                                        SILLinkage::Private, newFnType,
@@ -1884,7 +1989,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                                        IsNotSerialized);
 
   {
-    PartitionCloner PC(*this, *newFn);
+    PartitionCloner PC(*this, *result.fn);
     // Fill in the cloned function body.
     PC.cloneFunction();
 
@@ -1892,7 +1997,6 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
     PC.finalizeOriginal();
   }
 
-  result.fn = newFn;
   return result;
 }
 

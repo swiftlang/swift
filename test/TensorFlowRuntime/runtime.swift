@@ -51,12 +51,18 @@ func runProgram(_ progName: String,
   let program = _TFCStartTensorProgram(graphProto.utf8Start,
                                        graphProto.utf8CodeUnitCount,
                                        UnsafePointer<AnyTensorHandle>(inputTensors),
-                                       inputTensors.count)
-  let outputTensors = _TFCFinishTensorProgram(program)
-  print("Program \(progName) has \(outputTensors.count) output tensors.")
-  precondition(outputTensors.count == 1)
+                                       inputTensors.count,
+                                       /*number of output tensors*/1)
+  let outputBuffer = UnsafeMutablePointer<AnyTensorHandle>.allocate(capacity: 1)
+  _TFCFinishTensorProgram(program, outputBuffer, 1)
 
-  return outputTensors
+  // Load the result tensor, taking ownership from the unsafe pointer.
+  let resultTensor = outputBuffer.move()
+  outputBuffer.deallocate()
+
+  print("Program \(progName) produced a tensor.")
+
+  return [resultTensor]
 }
 
 func runTanh() {
