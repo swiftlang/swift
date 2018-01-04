@@ -1333,6 +1333,10 @@ public:
     return getGenericContexts()[i];
   }
 
+  bool isUnique() const {
+    return GenericParams.Flags.isUnique();
+  }
+
   bool hasVTable() const {
     return getKind() == NominalTypeKind::Class
       && GenericParams.Flags.hasVTable();
@@ -1355,6 +1359,9 @@ public:
            && i < numTrailingObjects(OverloadToken<MethodDescriptor>{}));
     return getMethodDescriptors()[i].Impl.get();
   }
+
+  /// Determine whether two nominal type descriptors are equivalent.
+  bool isEqual(const TargetNominalTypeDescriptor *other) const;
 
 private:
   size_t numTrailingObjects(OverloadToken<GenericContextDescriptor>) const {

@@ -2205,6 +2205,9 @@ namespace {
         }
       }
 
+      // Whether the nominal type descriptor is known to be unique.
+      flags = flags.withIsUnique(asImpl().isUniqueDescriptor());
+
       // Calculate the number of generic parameters at each nesting depth.
       unsigned totalGenericParams = 0;
       SmallVector<unsigned, 2> numPrimaryParams;
@@ -2263,12 +2266,21 @@ namespace {
 
       return var;
     }
-    
+
+    // Imported declarations have nonunique nominal type descriptors.
+    bool isUniqueDescriptor() {
+      return !isa<ClangModuleUnit>(
+                                asImpl().getTarget()->getModuleScopeContext());
+    }
+
     // Derived class must provide:
     //   NominalTypeDecl *getTarget();
     //   unsigned getKind();
     //   unsigned getGenericParamsOffset();
     //   void addKindDependentFields();
+    //
+    // Derived class can override:
+    //   bool isUniqueDescriptor();
   };
   
   /// Build a doubly-null-terminated list of field names.

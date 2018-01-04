@@ -435,14 +435,18 @@ bool isRelatedType(const Metadata *type, const void *candidate,
                    bool candidateIsMetadata) {
 
   while (true) {
-    if (type == candidate && candidateIsMetadata)
+    // Check whether the types match.
+    if (candidateIsMetadata && type == candidate)
       return true;
 
-    // If the type is resilient or generic, see if there's a witness table
-    // keyed off the nominal type descriptor.
-    const auto *description = type->getNominalTypeDescriptor();
-    if (description == candidate && !candidateIsMetadata)
-      return true;
+    // Check whether the nominal type descriptors match.
+    if (!candidateIsMetadata) {
+      const auto *description = type->getNominalTypeDescriptor();
+      auto candidateDescription =
+      static_cast<const NominalTypeDescriptor *>(candidate);
+      if (description && description->isEqual(candidateDescription))
+        return true;
+    }
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
@@ -568,7 +572,8 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         case ProtocolConformanceReferenceKind::WitnessTable:
           // If the record provides a nondependent witness table for all
           // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(R, P, record.getStaticWitnessTable());
+          C.cacheSuccess(type->getNominalTypeDescriptor(), P,
+                         record.getStaticWitnessTable());
           break;
 
         case ProtocolConformanceReferenceKind::WitnessTableAccessor:
