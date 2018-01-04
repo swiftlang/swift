@@ -424,17 +424,21 @@ contains:
 - A reference to the **conforming type**, represented as a 32-bit offset
   relative to the field. The lower two bits indicate how the conforming
   type is represented:
+
     0. A direct reference to a nominal type descriptor.
     1. An indirect reference to a nominal type descriptor.
     2. A reference to nonunique, foreign type metadata.
     3. A reference to a pointer to an Objective-C class object.
+
 - The **witness table field** that provides access to the witness table
   describing the conformance itself, represented as a direct 32-bit relative
   offset. The lower two bits indicate how the witness table is represented:
+
     0. The **witness table field** is a reference to a witness table.
     1. The **witness table field** is a reference to a **witness table
        accessor** function for an unconditional conformance.
     2. The **witness table field** is a reference to a **witness table
        accessor** function for a conditional conformance.
     3. Reserved for future use.
+
 - A 32-bit value reserved for future use.
