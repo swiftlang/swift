@@ -5063,11 +5063,10 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
     return SGF.emitRValue(injection->getSubExpr(), C);
   }
 
-  // If this is an implicit force of an ImplicitlyUnwrappedOptional,
-  // and we're emitting into an unbridging conversion, try adjusting the
-  // context.
-  if (loc->isImplicit() &&
-      E->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
+  // If this is an implicit force of an Optional, and we're emitting
+  // into an unbridging conversion, try adjusting the context.
+  if (loc->isImplicit()) {
+    assert(E->getType()->getAnyOptionalObjectType());
     if (auto conv = C.getAsConversion()) {
       if (auto adjusted = conv->getConversion().adjustForInitialForceValue()) {
         auto value =
