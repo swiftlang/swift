@@ -34,7 +34,7 @@ using namespace swift;
 using namespace importer;
 
 /// Classify the given Clang enumeration to describe how to import it.
-void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
+void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
   assert(decl);
   clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
@@ -52,7 +52,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
   // First, check for attributes that denote the classification
   if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
     kind = EnumKind::Enum;
-    nsErrorDomain = ctx.AllocateCopy(domainAttr->getErrorDomain()->getName());
+    nsErrorDomain = domainAttr->getErrorDomain()->getName();
     return;
   }
   if (decl->hasAttr<clang::FlagEnumAttr>()) {
@@ -203,8 +203,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 
 /// Determine the prefix to be stripped from the names of the enum constants
 /// within the given enum.
-void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
-                                           const clang::EnumDecl *decl) {
+void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
   switch (getKind()) {
   case EnumKind::Enum:
   case EnumKind::Options:
@@ -324,16 +323,17 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
     commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
   }
 
-  constantNamePrefix = ctx.AllocateCopy(commonPrefix);
+  constantNamePrefix = commonPrefix;
 }
 
 EnumInfo EnumInfoCache::getEnumInfo(const clang::EnumDecl *decl) {
-  if (enumInfos.count(decl)) {
+  auto iter = enumInfos.find(decl);
+  if (iter != enumInfos.end()) {
     ++EnumInfoNumCacheHits;
-    return enumInfos[decl];
+    return iter->second;
   }
   ++EnumInfoNumCacheMisses;
-  EnumInfo enumInfo(swiftCtx, decl, clangPP);
+  EnumInfo enumInfo(decl, clangPP);
   enumInfos[decl] = enumInfo;
   return enumInfo;
 }
