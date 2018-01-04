@@ -41,6 +41,7 @@
 #include "ConstantBuilder.h"
 #include "EnumMetadataVisitor.h"
 #include "FixedTypeInfo.h"
+#include "ForeignClassMetadataVisitor.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenDecl.h"
@@ -296,16 +297,22 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
 }
 
 /// Emit a reference to the type metadata for a foreign type.
-static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
-                                               CanType type) {
-  llvm::Value *candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
+static llvm::Value *uniqueForeignTypeMetadataRef(IRGenFunction &IGF,
+                                                 llvm::Value *candidate) {
   auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
-                                candidate);
+                                     candidate);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
                      llvm::Attribute::NoUnwind);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
                      llvm::Attribute::ReadNone);
   return call;
+}
+
+/// Emit a reference to the type metadata for a foreign type.
+static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
+                                               CanType type) {
+  llvm::Value *candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
+  return uniqueForeignTypeMetadataRef(IGF, candidate);
 }
 
 /// Returns a metadata reference for a nominal type.
@@ -2189,11 +2196,13 @@ namespace {
       // GenericParameterDescriptorFlags Flags;
       GenericParameterDescriptorFlags flags;
       if (auto *cd = dyn_cast<ClassDecl>(ntd)) {
-        auto &layout = IGM.getMetadataLayout(cd);
-        if (layout.getVTableSize() > 0)
-          flags = flags.withHasVTable(true);
-        if (layout.hasResilientSuperclass())
-          flags = flags.withHasResilientSuperclass(true);
+        if (!cd->isForeign()) {
+          auto &layout = IGM.getClassMetadataLayout(cd);
+          if (layout.getVTableSize() > 0)
+            flags = flags.withHasVTable(true);
+          if (layout.hasResilientSuperclass())
+            flags = flags.withHasResilientSuperclass(true);
+        }
       }
 
       // Calculate the number of generic parameters at each nesting depth.
@@ -2428,7 +2437,13 @@ namespace {
                                        ClassDecl *c)
       : super(IGM), Target(c)
     {
-      auto &layout = IGM.getMetadataLayout(Target);
+      if (Target->isForeign()) {
+        VTable = nullptr;
+        VTableSize = 0;
+        return;
+      }
+
+      auto &layout = IGM.getClassMetadataLayout(Target);
 
       VTable = IGM.getSILModule().lookUpVTable(Target);
       VTableSize = layout.getVTableSize();
@@ -2834,7 +2849,7 @@ namespace {
       // fill indexes are word-indexed.
       auto *metadataWords = IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy);
 
-      auto genericReqtOffset = IGM.getMetadataLayout(Target)
+      auto genericReqtOffset = IGM.getNominalMetadataLayout(Target)
           .getGenericRequirementsOffset(IGF);
 
       for (auto &fillOp : FillOps) {
@@ -3145,7 +3160,7 @@ namespace {
         auto fn = entry.Method;
 
         auto *classDecl = cast<ClassDecl>(fn.getDecl()->getDeclContext());
-        auto &layout = IGM.getMetadataLayout(classDecl);
+        auto &layout = IGM.getClassMetadataLayout(classDecl);
 
         auto offset = layout.getMethodInfo(IGF, fn).getOffset();
 
@@ -3493,7 +3508,7 @@ namespace {
       if (!HasResilientSuperclass)
         return;
 
-      auto &layout = IGM.getMetadataLayout(Target);
+      auto &layout = IGM.getClassMetadataLayout(Target);
 
       // Load the size of the superclass metadata.
       Address metadataAsBytes(
@@ -3747,7 +3762,7 @@ namespace {
       if (doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
         auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
         auto numImmediateMembers = IGM.getSize(
-          Size(IGM.getMetadataLayout(Target).getNumImmediateMembers()));
+          Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
         metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
                                           {metadata, templateSize,
                                            numImmediateMembers});
@@ -3838,7 +3853,7 @@ namespace {
       }
 
       auto numImmediateMembers =
-        IGM.getSize(Size(IGM.getMetadataLayout(Target).getNumImmediateMembers()));
+        IGM.getSize(Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
 
       return IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
                                     {metadataPattern, arguments, superMetadata,
@@ -4230,7 +4245,7 @@ std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   ClassDecl *theClass,
                                                   llvm::Value *metadata) {
-  auto &layout = IGF.IGM.getMetadataLayout(theClass);
+  auto &layout = IGF.IGM.getClassMetadataLayout(theClass);
 
   Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
                           IGF.IGM.getPointerAlignment());
@@ -4487,7 +4502,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
 
   auto methodInfo =
-    IGF.IGM.getMetadataLayout(declaringClass).getMethodInfo(IGF, overridden);
+    IGF.IGM.getClassMetadataLayout(declaringClass).getMethodInfo(IGF, overridden);
   auto offset = methodInfo.getOffset();
 
   auto slot = IGF.emitAddressAtOffset(metadata, offset,
@@ -4887,36 +4902,6 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// A CRTP layout class for foreign class metadata.
-  template <class Impl>
-  class ForeignClassMetadataVisitor
-         : public NominalMetadataVisitor<Impl> {
-    using super = NominalMetadataVisitor<Impl>;
-  protected:
-    ClassDecl *Target;
-    using super::asImpl;
-  public:
-    ForeignClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
-      : super(IGM), Target(target) {}
-
-    void layout() {
-      super::layout();
-      asImpl().addSuperClass();
-      asImpl().addReservedWord();
-      asImpl().addReservedWord();
-      asImpl().addReservedWord();
-    }
-
-    bool requiresInitializationFunction() {
-      // TODO: superclasses?
-      return false;
-    }
-           
-    CanType getTargetType() const {
-      return Target->getDeclaredType()->getCanonicalType();
-    }
-  };
-  
   /// An adapter that turns a metadata layout class into a foreign metadata
   /// layout class.
   ///
@@ -5033,8 +5018,23 @@ namespace {
       : ForeignMetadataBuilderBase(IGM, target, B) {}
 
     void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
-      // TODO: superclasses?
-      llvm_unreachable("no supported forms of initialization");
+      // Dig out the address of the superclass field.
+      auto &layout = IGF.IGM.getForeignMetadataLayout(Target);
+      Address metadataWords(IGF.Builder.CreateBitCast(metadata,
+                                                      IGM.Int8PtrPtrTy),
+                            IGM.getPointerAlignment());
+      auto superclassField =
+        createPointerSizedGEP(IGF, metadataWords,
+                              layout.getSuperClassOffset().getStaticOffset());
+      superclassField =
+        IGF.Builder.CreateBitCast(
+                          superclassField,
+                          llvm::PointerType::get(IGM.TypeMetadataPtrTy, 0));
+
+      // Unique the superclass field and write it back.
+      auto superclass = IGF.Builder.CreateLoad(superclassField);
+      auto uniquedSuperclass = uniqueForeignTypeMetadataRef(IGF, superclass);
+      IGF.Builder.CreateStore(uniquedSuperclass, superclassField);
     }
 
     // Visitor methods.
@@ -5053,9 +5053,26 @@ namespace {
       B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
     }
 
+    void addNominalTypeDescriptor() {
+      auto descriptor = ClassNominalTypeDescriptorBuilder(this->IGM, Target).emit();
+      B.add(descriptor);
+    }
+
+    void noteStartOfSuperClass() { }
+
     void addSuperClass() {
-      // TODO: superclasses
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+      auto superclassDecl = Target->getSuperclassDecl();
+      if (!superclassDecl || !superclassDecl->isForeign()) {
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+
+      auto superclassType =
+        superclassDecl->swift::TypeDecl::getDeclaredInterfaceType()
+          ->getCanonicalType();
+      auto superclass =
+        IGM.getAddrOfForeignTypeMetadataCandidate(superclassType);
+      B.add(superclass);
     }
 
     void addReservedWord() {

@@ -49,8 +49,8 @@ public:
   enum class Kind {
     Class,
     Struct,
-    Enum
-    // Update NominalMetadataLayout::classof if you add a non-nominal layout.
+    Enum,
+    ForeignClass,
   };
 
   class StoredOffset {
@@ -151,7 +151,15 @@ public:
   Offset getGenericRequirementsOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
-    return true; // No non-nominal metadata for now.
+    switch (layout->getKind()) {
+    case MetadataLayout::Kind::Class:
+    case MetadataLayout::Kind::Enum:
+    case MetadataLayout::Kind::Struct:
+      return true;
+
+    case MetadataLayout::Kind::ForeignClass:
+      return false;
+    }
   }
 };
 
@@ -335,6 +343,22 @@ public:
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;
+  }
+};
+
+/// Layout for foreign class type metadata.
+class ForeignClassMetadataLayout : public MetadataLayout {
+  ClassDecl *Class;
+  StoredOffset SuperClassOffset;
+
+  friend class IRGenModule;
+  ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
+
+public:
+  StoredOffset getSuperClassOffset() const { return SuperClassOffset; }
+
+  static bool classof(const MetadataLayout *layout) {
+    return layout->getKind() == Kind::ForeignClass;
   }
 };
 
