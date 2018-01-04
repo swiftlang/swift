@@ -210,13 +210,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
           PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
       auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
+      if (!FuncNamePtr)
+        FuncNamePtr = llvm::createPGOFuncNameVar(
+            *IGF.IGM.getModule(), llvm::GlobalValue::LinkOnceAnyLinkage,
+            PGOFuncName);
 
-      if (FuncNamePtr) {
-        llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-        NameGEP = llvm::ConstantExpr::getGetElementPtr(
-            ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
-            FuncNamePtr, makeArrayRef(Indices));
-      }
+      llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+      NameGEP = llvm::ConstantExpr::getGetElementPtr(
+          ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+          FuncNamePtr, makeArrayRef(Indices));
     }
 
     // Replace the placeholder value with the new GEP.
