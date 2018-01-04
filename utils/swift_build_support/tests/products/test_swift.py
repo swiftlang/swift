@@ -52,7 +52,8 @@ class SwiftTestCase(unittest.TestCase):
             clang_compiler_version=None,
             swift_user_visible_version=None,
             darwin_deployment_version_osx="10.9",
-            benchmark=False,
+            build_benchmarks=False,
+            test_benchmarks=False,
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
             enable_sil_ownership=False,
@@ -228,7 +229,8 @@ class SwiftTestCase(unittest.TestCase):
         self.args.clang_compiler_version = None
 
     def test_benchmark_flags(self):
-        self.args.benchmark = True
+        self.args.build_benchmarks = True
+        self.args.test_benchmarks = True
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,
