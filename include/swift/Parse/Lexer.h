@@ -406,6 +406,7 @@ public:
     SourceLoc getEndLoc() {
       return Loc.getAdvancedLoc(Length);
     }
+
   };
   
   /// \brief Compute the bytes that the actual string literal should codegen to.

@@ -76,6 +76,12 @@ void RawTokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   case tok::string_interpolation_anchor:
     OS << "string_interpolation_anchor";
     break;
+  case tok::string_quote:
+    OS << "string_quote";
+    break;
+  case tok::string_segment:
+    OS << "string_segment";
+    break;
   case tok::contextual_keyword:
     OS << "contextual_keyword";
     break;

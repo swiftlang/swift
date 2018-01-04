@@ -28,6 +28,12 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
+    # FIXME: Enforce the requirement that the members can only be
+    # StringSegment or ExpressionSegment
+    Node('StringInterpolationSegments', kind='SyntaxCollection',
+         element='Syntax',
+         element_name='Segment'),
+
     # The try operator.
     # try foo()
     # try? foo()
@@ -404,5 +410,28 @@ EXPR_NODES = [
          children=[
              Child('Expression', kind='Expr'),
              Child('OperatorToken', kind='PostfixOperatorToken'),
+         ]),
+
+    # string literal segment in a string interpolation expression.
+    Node('StringSegment', kind='Syntax',
+         children=[
+             Child('Content', kind='StringSegmentToken'),
+         ]),
+
+    # expression segment in a string interpolation expression.
+    Node('ExpressionSegment', kind='Syntax',
+         children=[
+             Child('Backslash', kind='BackslashToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Expression', kind='Expr'),
+             Child('RightParen', kind='StringInterpolationAnchorToken'),
+         ]),
+
+    # e.g. "abc \(foo()) def"
+    Node('StringInterpolationExpr', kind='Expr',
+         children=[
+             Child('OpenQuote', kind='StringQuoteToken'),
+             Child('Segments', kind='StringInterpolationSegments'),
+             Child('CloseQuote', kind='StringQuoteToken'),
          ]),
 ]

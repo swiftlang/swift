@@ -877,6 +877,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   std::function<ParserStatus()> callback) {
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
+  if (Kind == SyntaxKind::Unknown)
+    ListContext->setTransparent();
 
   SyntaxKind ElementKind = getListElementKind(Kind);
 
@@ -896,7 +898,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     SourceLoc StartLoc = Tok.getLoc();
 
     SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
-
+    if (ElementKind == SyntaxKind::Unknown)
+      ElementContext.setTransparent();
     Status |= callback();
     if (Tok.is(RightK))
       break;
