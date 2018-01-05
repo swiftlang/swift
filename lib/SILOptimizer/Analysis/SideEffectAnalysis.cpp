@@ -120,6 +120,7 @@ static SILValue skipValueProjections(SILValue V) {
       case ValueKind::TupleExtractInst:
       case ValueKind::UncheckedEnumDataInst:
       case ValueKind::UncheckedTrivialBitCastInst:
+      case ValueKind::UncheckedRefCastInst:
         V = cast<SingleValueInstruction>(V)->getOperand(0);
         break;
       default:
