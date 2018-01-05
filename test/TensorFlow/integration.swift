@@ -2,49 +2,9 @@
 
 import TensorFlow
 
-public func testTensor() {
-  var x = Tensor<Float>(oneD: 1.0, 2.0, 3.0)  // expected-warning {{value implicitly copied to accelerator, use .toDevice() to make transfer explicit}}
-  x += x
-  x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
-  // GraphGen doesn't support sends yet: expected-error @-1 {{internal error generating TensorFlow graph}}
-
-  print(x) // expected-note {{value used here}}
-  var y = Tensor1D<Float>(1, 2, 3.0).toDevice()
-  y += y
-  print(y)
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
-// CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:   %1 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %2 = builtin "__tfop_Sub__tt:t__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %3 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%2 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:   %4 = builtin "tensorflowReceive_0"<TensorHandle<Float>>() : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = builtin "__tfop_Add__tt:t__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   return %5 : $TensorHandle<Float>
-
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
-// CHECK: sil @{{.*}}testTensor{{.*}} : $@convention(thin) () -> () {
-
-// Graph lowering fails on testTensor because it requires send and receive instructions.
-// CHECK: string_literal utf8 ""
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NOT: = apply
-
-// We're passing one TensorHandle in.
-// CHECK: [[ALLOC:%.*]] = alloc_stack $OpaquePointer
-// CHECK: ref_element_addr
-// CHECK: begin_access [read] [static] [[ALLOC]] : $*OpaquePointer
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
-// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
-// CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
-
 public func testScalar(f: Float) {
-  var x = Tensor<Float>(zeroD: f) +    // expected-warning {{value implicitly copied to accelerator}}
-          Tensor<Float>(zeroD: 1.0)
+  var x = Tensor<Float>(f) +    // expected-warning {{value implicitly copied to accelerator}}
+          Tensor<Float>(1.0)
   x += x
   print(x)
 }
@@ -79,7 +39,7 @@ public func testScalar(f: Float) {
 
 
 public func testExitBranch(i : Int) {
-  var x = Tensor<Float>(zeroD: 1.0)
+  var x = Tensor<Float>(1.0)
 
   if i == 0 {
     return   // Should terminate the tensor program.
