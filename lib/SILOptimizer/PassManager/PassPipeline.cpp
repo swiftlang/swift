@@ -404,6 +404,8 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addReleaseDevirtualizer();
 
   addSSAPasses(P, OptimizationLevelKind::LowLevel);
+
+  P.addObjectOutliner();
   P.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
