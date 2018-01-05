@@ -13,7 +13,7 @@ let newline = "\n".utf16.first!
 let carriageReturn = "\n".utf16.first!
 let quote = "\"".utf16.first!
 
-@inline(__always) func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
+func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
     var result: Substring = "" // we accumulate the result
     
     while !remainder.isEmpty {
@@ -46,7 +46,7 @@ let quote = "\"".utf16.first!
 }
 
 // Consume a single field from `remainder`
-@inline(__always) func parseField(_ remainder: inout Substring) throws -> Substring? {
+func parseField(_ remainder: inout Substring) throws -> Substring? {
     guard let start = remainder.utf16.first else { return nil }
     switch start {
     case quote:
