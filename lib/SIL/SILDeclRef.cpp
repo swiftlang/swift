@@ -79,39 +79,31 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
   return false;
 }
 
-/// FIXME: merge requiresForeignEntryPoint() into getMethodDispatch() and add
-/// an ObjectiveC case to the MethodDispatch enum.
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
+  assert(!isa<AbstractStorageDecl>(vd));
+
+  if (vd->isDynamic())
+    return true;
+
+  if (vd->isObjC() && isa<ProtocolDecl>(vd->getDeclContext()))
+    return true;
+
   if (vd->isImportAsMember())
     return true;
 
-  // Final functions never require ObjC dispatch.
-  if (vd->isFinal())
-    return false;
-
-  if (requiresForeignToNativeThunk(vd))
+  if (vd->hasClangNode())
     return true;
 
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-  
     // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter())
-      return requiresForeignEntryPoint(fd->getAccessorStorageDecl());
-
-    return fd->isDynamic();
+    if (fd->isGetterOrSetter()) {
+      auto *asd = fd->getAccessorStorageDecl();
+      if (asd->isObjC() && asd->hasClangNode())
+        return true;
+    }
   }
 
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    if (cd->hasClangNode())
-      return true;
-
-    return cd->isDynamic();
-  }
-
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresForeignGetterAndSetter();
-
-  return vd->isDynamic();
+  return false;
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
