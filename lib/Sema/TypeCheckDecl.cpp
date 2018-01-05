@@ -1250,14 +1250,12 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
-    assert(!D->isDynamic());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
   }
 }
 
 void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isDynamic()) {
-    assert(!D->isFinal());
     D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
 }
@@ -2567,6 +2565,10 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
     return;
 
+  // The presence of 'dynamic' blocks the inference of 'dynamic'.
+  if (D->isDynamic())
+    return;
+
   // Only 'objc' declarations use 'dynamic'.
   if (!D->isObjC() || D->hasClangNode())
     return;
@@ -2575,16 +2577,16 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     (D->getOverriddenDecl() &&
      D->getOverriddenDecl()->hasClangNode());
 
-  // Only introduce 'dynamic' on declarations...
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
-  if (!isa<ExtensionDecl>(D->getDeclContext())) {
-    // ...and in classes on decls marked @NSManaged.
-    if (!isNSManaged && !overridesImportedMethod)
-      return;
-  }
 
-  // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
-  if (D->isDynamic() || D->isFinal())
+  bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
+
+  // We only infer 'dynamic' in these three cases.
+  if (!isExtension && !isNSManaged && !overridesImportedMethod)
+    return;
+
+  // The presence of 'final' blocks the inference of 'dynamic'.
+  if (D->isFinal() && !isNSManaged)
     return;
 
   // Variables declared with 'let' cannot be 'dynamic'.
@@ -5485,8 +5487,7 @@ public:
 
     // If this is a class member, mark it final if the class is final.
     if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (cls->isFinal() && !FD->isAccessor() &&
-          !FD->isFinal() && !FD->isDynamic()) {
+      if (cls->isFinal() && !FD->isFinal()) {
         makeFinal(TC.Context, FD);
       }
       // static func declarations in classes are synonyms
@@ -7817,7 +7818,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // class is final, or if it was declared with 'let'.
       if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
         if (cls->isFinal() || VD->isLet()) {
-          if (!VD->isFinal() && !VD->isDynamic()) {
+          if (!VD->isFinal()) {
             makeFinal(Context, VD);
           }
         }

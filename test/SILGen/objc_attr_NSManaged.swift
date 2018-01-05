@@ -95,6 +95,23 @@ extension ProtoAdopter {
 }
 
 
+// SR-6534: @NSManaged properties can be 'final'
+protocol EntityIDProto {
+  var entityID: String { get set }
+}
+
+class FinalEntity: NSObject, EntityIDProto {
+	@NSManaged final var entityID: String
+}
+
+// CHECK-LABEL: sil private @_T019objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout FinalEntity, @thick FinalEntity.Type) -> ()
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
+// CHECK: return
+
+// CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged11FinalEntityC8entityIDSSvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed FinalEntity) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!getter.1.foreign
+// CHECK: return
+
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10SwiftGizmoC1xAA1XCfsTo
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10{{[_0-9a-zA-Z]*}}FinalGizmoC1yytfgTo
@@ -102,19 +119,19 @@ extension ProtoAdopter {
 
 // The vtable should not contain any entry points for getters and setters.
 // CHECK-LABEL: sil_vtable SwiftGizmo {
-// CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
-// CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoCSQyACGycfc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc
-// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: _T019objc_attr_NSManaged10SwiftGizmoCfD
+// CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
+// CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoCSQyACGycfc
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: @_T019objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable FinalGizmo {
-// CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT:   #FinalGizmo.deinit!deallocator: _T019objc_attr_NSManaged10FinalGizmoCfD
+// CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @_T019objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @_T019objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @_T019objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
+// CHECK-NEXT:   #FinalGizmo.deinit!deallocator: @_T019objc_attr_NSManaged10FinalGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable ProtoAdopter {

@@ -24,16 +24,16 @@ class Root {
 }
 
 // CHECK-LABEL: sil_vtable Baboom {
-// CHECK:   #Boom.init!allocator.1: (Boom.Type) -> () -> Boom : _T029objc_required_designated_init6BaboomCACycfC [override]
-// CHECK:   #Baboom.deinit!deallocator: _T029objc_required_designated_init6BaboomCfD
+// CHECK:   #Boom.init!allocator.1: (Boom.Type) -> () -> Boom : @_T029objc_required_designated_init6BaboomCACycfC [override]
+// CHECK:   #Baboom.deinit!deallocator: @_T029objc_required_designated_init6BaboomCfD
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable BigBadaBoom {
-// CHECK:   #Badaboom.init!allocator.1: <U> (Badaboom<U>.Type) -> () -> Badaboom<U> : _T029objc_required_designated_init11BigBadaBoomCACyxGycfC [override]
-// CHECK:   #BigBadaBoom.deinit!deallocator: _T029objc_required_designated_init11BigBadaBoomCfD
+// CHECK:   #Badaboom.init!allocator.1: <U> (Badaboom<U>.Type) -> () -> Badaboom<U> : @_T029objc_required_designated_init11BigBadaBoomCACyxGycfC [override]
+// CHECK:   #BigBadaBoom.deinit!deallocator: @_T029objc_required_designated_init11BigBadaBoomCfD
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable Root {
-// CHECK:   #Root.init!allocator.1: (Root.Type) -> () -> Root : _T029objc_required_designated_init4RootCACycfC
-// CHECK:   #Root.deinit!deallocator: _T029objc_required_designated_init4RootCfD
+// CHECK:   #Root.init!allocator.1: (Root.Type) -> () -> Root : @_T029objc_required_designated_init4RootCACycfC
+// CHECK:   #Root.deinit!deallocator: @_T029objc_required_designated_init4RootCfD
 // CHECK: }

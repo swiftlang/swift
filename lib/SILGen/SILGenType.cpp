@@ -609,24 +609,6 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   return table;
 }
 
-static bool maybeOpenCodeProtocolWitness(
-    SILGenFunction &SGF, ProtocolConformanceRef conformance, SILLinkage linkage,
-    Type selfInterfaceType, Type selfType, GenericEnvironment *genericEnv,
-    SILDeclRef requirement, SILDeclRef witness, SubstitutionList witnessSubs) {
-  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
-    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
-      auto reqFn = cast<FuncDecl>(requirement.getDecl());
-      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
-                                                 selfInterfaceType, selfType,
-                                                 genericEnv, reqFn, witnessFn,
-                                                 witnessSubs);
-    }
-  }
-
-  return false;
-}
-
 SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     IsSerialized_t isSerialized, SILDeclRef requirement, SILDeclRef witnessRef,
@@ -695,34 +677,36 @@ SILFunction *SILGenModule::emitProtocolWitness(
   PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
 
   // Create the witness.
-  Type selfInterfaceType;
-  Type selfType;
-
-  // If the witness is a free function, there is no Self type.
-  if (!isFree) {
-    auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-    selfInterfaceType = proto->getSelfInterfaceType().subst(reqtSubMap);
-    selfType = GenericEnvironment::mapTypeIntoContext(
-        genericEnv, selfInterfaceType);
-  }
-
   SILGenFunction SGF(*this, *f);
 
   // Substitutions mapping the generic parameters of the witness to
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
-  // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(SGF, conformance, linkage,
-                                   selfInterfaceType, selfType, genericEnv,
-                                   requirement, witnessRef, witnessSubs)) {
-    assert(!isFree);
-    return f;
+  // Open-code protocol witness thunks for materializeForSet.
+  if (auto witnessFn = dyn_cast<FuncDecl>(witnessRef.getDecl())) {
+    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+      assert(!isFree);
+
+      auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
+      auto selfInterfaceType = proto->getSelfInterfaceType().subst(reqtSubMap);
+      auto selfType = GenericEnvironment::mapTypeIntoContext(
+          genericEnv, selfInterfaceType);
+
+      auto reqFn = cast<FuncDecl>(requirement.getDecl());
+      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
+
+      if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
+                                              selfInterfaceType, selfType,
+                                              genericEnv, reqFn, witnessFn,
+                                              witnessSubs))
+        return f;
+
+      // Proceed down the normal path.
+    }
   }
 
-  SGF.emitProtocolWitness(selfType,
-                          AbstractionPattern(reqtOrigTy),
-                          reqtSubstTy,
+  SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, witnessRef,
                           witnessSubs, isFree);
 

@@ -559,23 +559,23 @@ class Sub : Base {
 
 // Make sure addressors don't get vtable entries.
 // CHECK-LABEL: sil_vtable Base {
-// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : _T010addressors4BaseC4dataSpys5Int32VGvg
-// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : _T010addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC4dataSpys5Int32VGvm
-// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : _T010addressors4BaseC5values5Int32Vvg
-// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : _T010addressors4BaseC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC5values5Int32Vvm
-// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010addressors4BaseCACycfc
-// CHECK-NEXT: #Base.deinit!deallocator: _T010addressors4BaseCfD
+// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @_T010addressors4BaseC4dataSpys5Int32VGvg
+// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @_T010addressors4BaseC4dataSpys5Int32VGvs
+// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @_T010addressors4BaseC4dataSpys5Int32VGvm
+// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @_T010addressors4BaseC5values5Int32Vvg
+// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @_T010addressors4BaseC5values5Int32Vvs
+// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @_T010addressors4BaseC5values5Int32Vvm
+// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T010addressors4BaseCACycfc
+// CHECK-NEXT: #Base.deinit!deallocator: @_T010addressors4BaseCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
-// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : _T010addressors4BaseC4dataSpys5Int32VGvg
-// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : _T010addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC4dataSpys5Int32VGvm
-// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : _T010addressors3SubC5values5Int32Vvg
-// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : _T010addressors3SubC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors3SubC5values5Int32Vvm
-// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010addressors3SubCACycfc
-// CHECK-NEXT: #Sub.deinit!deallocator: _T010addressors3SubCfD
+// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @_T010addressors4BaseC4dataSpys5Int32VGvg
+// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @_T010addressors4BaseC4dataSpys5Int32VGvs
+// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @_T010addressors4BaseC4dataSpys5Int32VGvm
+// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @_T010addressors3SubC5values5Int32Vvg
+// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @_T010addressors3SubC5values5Int32Vvs
+// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @_T010addressors3SubC5values5Int32Vvm
+// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T010addressors3SubCACycfc
+// CHECK-NEXT: #Sub.deinit!deallocator: @_T010addressors3SubCfD
 // CHECK-NEXT: }

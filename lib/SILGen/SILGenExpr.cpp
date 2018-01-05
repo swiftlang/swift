@@ -1023,8 +1023,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     assert(var->hasAccessorFunctions() && "Unknown rvalue case");
 
-    bool isDirectAccessorUse = (semantics == AccessSemantics::DirectToAccessor);
-    SILDeclRef getter = getGetterDeclRef(var, isDirectAccessorUse);
+    SILDeclRef getter = getGetterDeclRef(var);
 
     ArgumentSource selfSource;
     
@@ -1048,6 +1047,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       auto metatypeRV = RValue(*this, loc, baseMeta, metatypeMV);
       selfSource = ArgumentSource(loc, std::move(metatypeRV));
     }
+
+    bool isDirectAccessorUse = (semantics == AccessSemantics::DirectToAccessor);
     return emitGetAccessor(loc, getter,
                            SGM.getNonMemberVarDeclSubstitutions(var),
                            std::move(selfSource),
@@ -1090,14 +1091,11 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
     llvm_unreachable("should already have been filtered out!");
 
   case AccessStrategy::DirectToAccessor:
-    return SGF.getGetterDeclRef(storage, true);
-
   case AccessStrategy::DispatchToAccessor:
-    return SGF.getGetterDeclRef(storage, false);
+    return SGF.getGetterDeclRef(storage);
 
   case AccessStrategy::Addressor:
-    return SGF.getAddressorDeclRef(storage, AccessKind::Read,
-                                   /*always direct for now*/ true);
+    return SGF.getAddressorDeclRef(storage, AccessKind::Read);
   }
   llvm_unreachable("should already have been filtered out!");
 }
@@ -3639,12 +3637,7 @@ getIdForKeyPathComponentComputedProperty(SILGenFunction &SGF,
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    // Use the foreign selector if the decl is ObjC-imported, dynamic, or
-    // otherwise requires objc_msgSend for its ABI.
-    return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func,
-                      ResilienceExpansion::Minimal,
-                      /*curried*/ false,
-                      /*foreign*/ storage->requiresForeignGetterAndSetter());
+    return SGF.getGetterDeclRef(storage);
   }
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("unpossible");

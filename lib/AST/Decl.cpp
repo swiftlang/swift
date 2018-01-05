@@ -1260,34 +1260,25 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  auto nominal = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) return false;
+  if (storage->isDynamic())
+    return true;
 
-  switch (nominal->getKind()) {
-#define DECL(ID, BASE) case DeclKind::ID:
-#define NOMINAL_TYPE_DECL(ID, BASE)
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type!");
+  // Imported declarations behave like they are dynamic, even if they're
+  // not marked as such explicitly.
+  if (storage->isObjC() && storage->hasClangNode())
+    return true;
 
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-    return false;
-
-  case DeclKind::Protocol:
-    return !storage->getDeclContext()->isExtensionContext();
-
-  case DeclKind::Class:
-    // Final properties can always be direct, even in classes.
-    if (storage->isFinal())
+  if (auto *classDecl = dyn_cast<ClassDecl>(storage->getDeclContext())) {
+    if (storage->isFinal() || classDecl->isFinal())
       return false;
-    // Extension properties are statically dispatched, unless they're @objc.
-    if (storage->getDeclContext()->isExtensionContext()
-        && !storage->isObjC())
-      return false;
+
     return true;
   }
-  llvm_unreachable("bad DeclKind");
+
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+    return true;
+
+  return false;
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
@@ -4185,36 +4176,6 @@ bool VarDecl::isSelfParameter() const {
 
   return false;
 }
-
-/// Return true if this stored property has a getter and
-/// setter that are accessible from Objective-C.
-bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
-  if (auto override = getOverriddenDecl())
-    return override->hasForeignGetterAndSetter();
-
-  if (!isObjC())
-    return false;
-
-  return true;
-}
-
-bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
-  if (isFinal())
-    return false;
-  if (hasAccessorFunctions() && getGetter()->isImportAsMember())
-    return true;
-  if (!hasForeignGetterAndSetter())
-    return false;
-  // Imported accessors are foreign and only have objc entry points.
-  if (hasClangNode())
-    return true;
-  // Otherwise, we only dispatch by @objc if the declaration is dynamic,
-  // NSManaged, or dispatched through an ObjC protocol.
-  return isDynamic()
-    || getAttrs().hasAttribute<NSManagedAttr>()
-    || (isa<ProtocolDecl>(getDeclContext()) && isProtocolRequirement());
-}
-
 
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();

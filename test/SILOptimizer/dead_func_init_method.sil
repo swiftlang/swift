@@ -32,11 +32,11 @@ bb0(%1 : $Derived):
 }
 
 sil_vtable Base {
-  #Base.init!initializer.1: BaseInit
+  #Base.init!initializer.1: @BaseInit
 }
 
 sil_vtable Derived {
-  #Base.init!initializer.1: DerivedInit
+  #Base.init!initializer.1: @DerivedInit
 }
 
 

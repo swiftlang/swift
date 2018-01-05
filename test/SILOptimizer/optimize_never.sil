@@ -468,29 +468,29 @@ bb0(%0 : $Base):
 }
 
 sil_vtable C {
-  #C.foo!1: _T014optimize_never1CC3foos5Int32VyF
-  #C.deinit!deallocator: _T014optimize_never1CCfD
-  #C.init!initializer.1: _T014optimize_never1CCACycfc
+  #C.foo!1: @_T014optimize_never1CC3foos5Int32VyF
+  #C.deinit!deallocator: @_T014optimize_never1CCfD
+  #C.init!initializer.1: @_T014optimize_never1CCACycfc
 }
 
 sil_vtable D {
-  #C.foo!1: _T014optimize_never1DC3foos5Int32VyF
-  #C.init!initializer.1: _T014optimize_never1DCACycfc
-  #D.deinit!deallocator: _T014optimize_never1DCfD
+  #C.foo!1: @_T014optimize_never1DC3foos5Int32VyF
+  #C.init!initializer.1: @_T014optimize_never1DCACycfc
+  #D.deinit!deallocator: @_T014optimize_never1DCfD
 }
 
 sil_vtable Base {
-  #Base.foo!1: _T014optimize_never4BaseC3foos5Int32VyF
-  #Base.boo!1: _T014optimize_never4BaseC3boos5Int32VyF
+  #Base.foo!1: @_T014optimize_never4BaseC3foos5Int32VyF
+  #Base.boo!1: @_T014optimize_never4BaseC3boos5Int32VyF
 }
 
 sil_vtable Derived1 {
-  #Base.foo!1: _T014optimize_never8Derived1C3foos5Int32VyF
-  #Base.boo!1: _T014optimize_never8Derived1C3boos5Int32VyF
+  #Base.foo!1: @_T014optimize_never8Derived1C3foos5Int32VyF
+  #Base.boo!1: @_T014optimize_never8Derived1C3boos5Int32VyF
 }
 
 sil_vtable Derived2 {
-  #Base.foo!1: _T014optimize_never8Derived2C3foos5Int32VyF
-  #Base.boo!1: _T014optimize_never8Derived2C3boos5Int32VyF
+  #Base.foo!1: @_T014optimize_never8Derived2C3foos5Int32VyF
+  #Base.boo!1: @_T014optimize_never8Derived2C3boos5Int32VyF
 }
 
