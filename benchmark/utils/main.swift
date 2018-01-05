@@ -32,6 +32,7 @@ import ByteSwap
 import CString
 import Calculator
 import CaptureProp
+import CharacterProperties
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import Chars
@@ -153,6 +154,8 @@ registerBenchmark(ByteSwap)
 registerBenchmark(CString)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
+registerBenchmark(CharacterPropertiesFetch)
+registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)
 registerBenchmark(Chars)
