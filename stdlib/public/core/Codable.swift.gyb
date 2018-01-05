@@ -1796,11 +1796,23 @@ internal final class _KeyedDecodingContainerBox<
 
 % for type in codable_types:
 extension ${type} : Codable {
+  /// Creates a new instance by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self = try decoder.singleValueContainer().decode(${type}.self)
   }
 
+  /// Encodes this value into the given encoder.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
@@ -1809,6 +1821,12 @@ extension ${type} : Codable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Encodable {
+  /// Encodes this value into the given encoder.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
@@ -1817,6 +1835,12 @@ extension RawRepresentable where RawValue == ${type}, Self : Encodable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Decodable {
+  /// Creates a new instance by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
@@ -1837,6 +1861,12 @@ extension RawRepresentable where RawValue == ${type}, Self : Decodable {
 //===----------------------------------------------------------------------===//
 
 extension Optional : Encodable where Wrapped : Encodable {
+  /// Encodes this optional value into the given encoder.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
@@ -1848,6 +1878,12 @@ extension Optional : Encodable where Wrapped : Encodable {
 }
 
 extension Optional : Decodable where Wrapped : Decodable {
+  /// Creates a new instance by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
@@ -1861,6 +1897,13 @@ extension Optional : Decodable where Wrapped : Decodable {
 }
 
 extension Array : Encodable where Element : Encodable {
+  /// Encodes the elements of this array into the given encoder in an unkeyed
+  /// container.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
@@ -1871,6 +1914,12 @@ extension Array : Encodable where Element : Encodable {
 }
 
 extension Array : Decodable where Element : Decodable {
+  /// Creates a new array by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
@@ -1884,6 +1933,13 @@ extension Array : Decodable where Element : Decodable {
 }
 
 extension Set : Encodable where Element : Encodable {
+  /// Encodes the elements of this set into the given encoder in an unkeyed
+  /// container.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
@@ -1894,6 +1950,12 @@ extension Set : Encodable where Element : Encodable {
 }
 
 extension Set : Decodable where Element : Decodable {
+  /// Creates a new set by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
@@ -1931,6 +1993,16 @@ internal struct _DictionaryCodingKey : CodingKey {
 }
 
 extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
+  /// Encodes the contents of this dictionary into the given encoder.
+  ///
+  /// If the dictionary uses `String` or `Int` keys, the contents are encoded
+  /// in a keyed container. Otherwise, the contents are encoded as alternating
+  /// key-value pairs in an unkeyed container.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
   @_inlineable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     if Key.self == String.self {
@@ -1961,6 +2033,12 @@ extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
 }
 
 extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
+  /// Creates a new dictionary by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
   @_inlineable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
