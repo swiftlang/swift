@@ -181,10 +181,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// The conformance is for a foreign type described by its type metadata.
-  /// getDirectType() points to a nonunique metadata record for the type, which
-  /// needs to be uniqued by the runtime.
-  NonuniqueDirectType = 0x02,
+  /// Reserved for future use.
+  Reserved = 0x02,
   
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
@@ -288,6 +286,7 @@ enum class ProtocolDispatchStrategy: uint8_t {
 class GenericParameterDescriptorFlags {
   typedef uint16_t int_type;
   enum : int_type {
+    IsNonUnique            = 0x0002,
     HasVTable              = 0x0004,
     HasResilientSuperclass = 0x0008,
   };
@@ -300,6 +299,17 @@ public:
   constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
     return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
                                              : (Data & ~HasVTable));
+  }
+
+  constexpr GenericParameterDescriptorFlags withIsUnique(bool b) const {
+    return GenericParameterDescriptorFlags(!b ? (Data | IsNonUnique)
+                                           : (Data & ~IsNonUnique));
+  }
+
+  /// Whether this nominal type descriptor is known to be nonunique, requiring
+  /// comparison operations to check string equality of the mangled name.
+  bool isUnique() const {
+    return !(Data & IsNonUnique);
   }
 
   /// If this type is a class, does it have a vtable?  If so, the number
