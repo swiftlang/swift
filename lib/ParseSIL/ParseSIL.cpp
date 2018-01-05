@@ -5278,6 +5278,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
       } else {
         if (P.parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
             parseSILLinkage(Linkage, P) ||
+            P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
             VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                            diag::expected_sil_value_name))
         return true;

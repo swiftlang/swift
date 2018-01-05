@@ -1638,12 +1638,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: {{.*}} : _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: {{.*}} : @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 // CHECK: }
 sil_vtable Foo {
   // Override the linke to check if it is parsed correctly.
-  #Foo.subscript!getter.1: hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!getter.1: hidden @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
   // The public linkage is the same as the function's linkage and should not be printed.
-  #Foo.subscript!setter.1: public _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!setter.1: public @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }
