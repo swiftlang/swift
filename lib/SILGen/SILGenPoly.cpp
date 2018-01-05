@@ -3231,19 +3231,12 @@ enum class WitnessDispatchKind {
   Class
 };
 
-static WitnessDispatchKind
-getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
-  // Free functions are always statically dispatched...
-  if (isFree)
-    return WitnessDispatchKind::Static;
+static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
+  auto *decl = witness.getDecl();
 
-  // If we have a non-class, non-objc method or a class, objc method that is
-  // final, we do not dynamic dispatch.
-  ClassDecl *C = selfType->getClassOrBoundGenericClass();
+  ClassDecl *C = decl->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!C)
     return WitnessDispatchKind::Static;
-
-  auto *decl = witness.getDecl();
 
   // If the witness is dynamic, go through dynamic dispatch.
   if (decl->isDynamic()
@@ -3326,7 +3319,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
   FormalEvaluationScope formalEvalScope(*this);
 
-  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
+  auto witnessKind = getWitnessDispatchKind(witness);
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
