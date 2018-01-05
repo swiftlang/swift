@@ -94,6 +94,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpenClose
     single-source/Phonebook
+    single-source/PointerArithmetics
     single-source/PolymorphicCalls
     single-source/PopFront
     single-source/PopFrontGeneric
