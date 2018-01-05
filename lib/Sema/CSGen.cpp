@@ -1106,7 +1106,13 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice(baseTy, decl, FunctionRefKind::DoubleApply);
+        OverloadChoice choice;
+        if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+              baseTy, decl, FunctionRefKind::DoubleApply);
+        } else {
+          choice = OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        }
         CS.addBindOverloadConstraint(fnTy, choice, memberLocator,
                                      CurDC);
       } else {
