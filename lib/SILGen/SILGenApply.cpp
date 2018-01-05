@@ -4736,7 +4736,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   }
 
   // Dispatch in a struct/enum or to a final method is always direct.
-  if (!isClassDispatch || decl->isFinal())
+  if (!isClassDispatch)
     return Callee::forDirect(SGF, constant, subs, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,
