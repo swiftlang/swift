@@ -1140,6 +1140,8 @@ class swift::MultiConformanceChecker {
 public:
   MultiConformanceChecker(TypeChecker &TC): TC(TC){}
 
+  TypeChecker &getTypeChecker() const { return TC; }
+
   /// Add a conformance into the batched checker.
   void addConformance(NormalProtocolConformance *conformance) {
     AllConformances.push_back(conformance);
@@ -3988,6 +3990,7 @@ static bool shouldWarnAboutPotentialWitness(
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
+  groupChecker.getTypeChecker().computeAccessLevel(witness);
   if (witness->getFormalAccess() < access) {
     if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
