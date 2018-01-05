@@ -1250,14 +1250,12 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
-    assert(!D->isDynamic());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
   }
 }
 
 void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isDynamic()) {
-    assert(!D->isFinal());
     D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
 }
@@ -5485,8 +5483,7 @@ public:
 
     // If this is a class member, mark it final if the class is final.
     if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (cls->isFinal() && !FD->isAccessor() &&
-          !FD->isFinal() && !FD->isDynamic()) {
+      if (cls->isFinal() && !FD->isFinal()) {
         makeFinal(TC.Context, FD);
       }
       // static func declarations in classes are synonyms
@@ -7817,7 +7814,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // class is final, or if it was declared with 'let'.
       if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
         if (cls->isFinal() || VD->isLet()) {
-          if (!VD->isFinal() && !VD->isDynamic()) {
+          if (!VD->isFinal()) {
             makeFinal(Context, VD);
           }
         }
