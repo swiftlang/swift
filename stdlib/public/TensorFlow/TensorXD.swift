@@ -37,7 +37,7 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
 
   @_inlineable
   public init(identicallyRanked other: Tensor<Element>) {
-    precondition(other.rank == Tensor1D.rank, "Rank must be \(Tensor1D.rank)")
+    assert(other.rank == Tensor1D.rank)
     self.init(underlying: other)
   }
 
@@ -155,7 +155,7 @@ public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
 
   @_inlineable
   public init(identicallyRanked other: Tensor<Element>) {
-    precondition(other.rank == Tensor2D.rank, "Rank must be \(Tensor2D.rank)")
+    assert(other.rank == Tensor2D.rank)
     self.init(underlying: other)
   }
 

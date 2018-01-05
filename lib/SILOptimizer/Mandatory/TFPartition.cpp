@@ -574,6 +574,7 @@ private:
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
+
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
@@ -589,7 +590,7 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
   // Emit the warning.
   diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
            diag::tf_value_implicitly_copied_to_accel)
-  .highlight(loc.getSourceRange());
+    .highlight(loc.getSourceRange());
 }
 
 bool TFFunctionPartition::
@@ -2078,12 +2079,10 @@ public:
     if (fn->getModule().getSwiftModule() == tfModule)
       return;
 
-    // TODO: When we get into autodiff, we'll probably want to put the autodiff
-    // code into a separate SILModule so the rest of the SIL optimizer pipeline
-    // isn't affected (we can also just reuse existing function names that way
-    // instead of appending .tfcompiler.  For now, we just create the
-    // partitioned function in the current module, emit it to a graph, then
-    // delete it.
+    // If this function has no source location information, then it came from
+    // a deserialized module.  Don't transform it.
+    if (fn->getLocation().isNull())
+      return;
 
     TFFunctionPartition partitioner(*fn, PM, *tfModule);
     if (!partitioner.markFunction())
