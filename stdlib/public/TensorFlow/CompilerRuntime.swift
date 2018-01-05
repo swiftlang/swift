@@ -24,12 +24,12 @@ func checkOk(_ s: CTF_Status) {
 }
 
 // The call sequence for the APIs below must be one of the two:
-// init -> terminate()
-// init -> finish()
+//    init -> terminate()
+//    init -> finish()
+// The finish/terminate APIs may only be called once.
+//
 public final class TensorProgram {
-  // inputTensors is kept for debugging. Currently unused.
-  let inputTensors: [AnyTensorHandle]
-  let outputTensors: [AnyTensorHandle]
+  let outputTensors: [CTensorHandle]
 
   // Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
   // and 'size', start the computation, and return a state object as a unique
@@ -37,17 +37,15 @@ public final class TensorProgram {
   @_versioned
   init(programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
-       tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
+       tensorArgumentAddress: UnsafePointer<CTensorHandle>,
        tensorArgumentCount: Int,
        // TODO(clattner): resultCount should go away when the runtime is
        // implemented with an async design.
        resultCount: Int) {
-    inputTensors =
-      Array(UnsafeBufferPointer(start: tensorArgumentAddress,
-                                count: tensorArgumentCount))
+    let inputTensors = UnsafeBufferPointer(start: tensorArgumentAddress,
+                                           count: tensorArgumentCount)
 
     let s = TF_NewStatus()
-
     let tfFunc = TF_FunctionImportFunctionDef(programByteAddress,
                                               programByteCount, s)
     checkOk(s)
@@ -66,26 +64,24 @@ public final class TensorProgram {
     checkOk(s)
 
     for inputTensor in inputTensors {
-      let cTensorHandle = inputTensor.cTensorHandle
-      TFE_OpAddInput(op, cTensorHandle, s)
+      TFE_OpAddInput(op, inputTensor, s)
       checkOk(s)
     }
 
-    var retVals = [CTensorHandle](repeating: nil, count: resultCount)
+    var retVals = [CTensorHandle?](repeating: nil, count: resultCount)
     var retValCount = CInt(resultCount)
     TFE_Execute(op, &retVals, &retValCount, s)
     checkOk(s)
     assert(Int(retValCount) == resultCount,
            "internal compiler error, result count mismatch!")
     TFE_DeleteOp(op)
-
-    let outputTensors = retVals.map(AnyTensorHandle.init)
-
     TFE_DeleteContext(ctx, s)
     checkOk(s)
     TF_DeleteStatus(s)
 
-    self.outputTensors = outputTensors
+    // Now that all the elements have been filled in, remove a level of
+    // optional.
+    self.outputTensors = retVals.map { $0! }
   }
 
   // Terminate the computation as given by 'program', and clean up the state.
@@ -100,11 +96,10 @@ public final class TensorProgram {
   //
   // TODO(hongm): add real logic, including handling input/output and errors.
   @_versioned
-  func finish() -> [AnyTensorHandle] {
+  func finish() -> [CTensorHandle] {
     return outputTensors
   }
 }
-
 
 
 //===----------------------------------------------------------------------===//
@@ -126,7 +121,7 @@ public final class TensorProgram {
 public func _TFCStartTensorProgram(
   _ programByteAddress: UnsafeRawPointer,
   _ programByteCount: Int,
-  _ tensorArgumentAddress: UnsafePointer<AnyTensorHandle>,
+  _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   _ tensorArgumentCount: Int,
   // TODO(clattner): resultCount should go away when the runtime is implemented
   // with an async design.
@@ -158,7 +153,7 @@ public func _TFCTerminateTensorProgram(_ program: TensorProgram) {
 @_silgen_name("_swift_tfc_FinishTensorProgram")
 public func _TFCFinishTensorProgram(
   _ program: TensorProgram,
-  _ tensorResultAddress: UnsafeMutablePointer<AnyTensorHandle>,
+  _ tensorResultAddress: UnsafeMutablePointer<CTensorHandle>,
   _ tensorResultCount: Int) {
 
   let results = program.finish()
@@ -167,7 +162,7 @@ public func _TFCFinishTensorProgram(
 
   let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
                                                 count: tensorResultCount)
-  resultBuffer.initialize(from: results)
+  _ = resultBuffer.initialize(from: results)
 }
 
 
