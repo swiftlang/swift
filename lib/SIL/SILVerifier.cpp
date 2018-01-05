@@ -3172,6 +3172,22 @@ public:
         opTI, resTI, "convert_function cannot change function ABI");
   }
 
+  void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
+    auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
+                                  "convert_escape_to_noescape operand");
+    auto resTI = ICI->getType().castTo<SILFunctionType>();
+
+    // FIXME: Not yet, to be enabled when this is true.
+    // require(resTI->isTrivial(F.getModule()),
+    //         "convert_escape_to_noescape should produce a trivial result type");
+
+    // convert_escape_to_noescape is required to be an ABI-compatible
+    // conversion once escapability is the same on both sides.
+    requireABICompatibleFunctionTypes(
+        opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
+        "convert_escape_to_noescape cannot change function ABI");
+  }
+
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     auto opTI = requireObjectType(SILFunctionType, CI->getOperand(),
                                   "thin_function_to_pointer operand");
