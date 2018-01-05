@@ -47,6 +47,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CaptureProp
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
+    single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/DeadArray
