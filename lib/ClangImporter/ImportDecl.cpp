@@ -1215,6 +1215,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationStarted();
+    Impl.recordForceUnwrapForDecl(
+        param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
     valueParameters.push_back(param);
   }
 
