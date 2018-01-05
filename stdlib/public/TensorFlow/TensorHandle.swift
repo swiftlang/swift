@@ -41,6 +41,18 @@ public final class TensorHandle<T: TensorElementProtocol> {
   }
 }
 
+public extension TensorHandle {
+  var rank: Int {
+    return Int(TFE_TensorHandleNumDims(cTensorHandle))
+  }
+
+  var shape: [Int] {
+    return (0..<rank).map { dimIndex in
+      Int(TFE_TensorHandleDim(cTensorHandle, Int32(dimIndex)))
+    }
+  }
+}
+
 // For "print", REPL, and Playgrounds integeration, we'll eventually want to
 // implement this, probably in terms of fetching a summary.  For now, this is
 // disabled.

@@ -10,9 +10,8 @@ func testTensorElementProtocol<T : TensorElementProtocol>(a : T) -> T {
 
 
 func testTensor() {
-  _ = Tensor<Float>(zeroD: 1.0)
-  _ = Tensor<Int>(zeroD: 2)
-
-  _ = Tensor<Int>(zeroD: 2.0) // expected-error {{'Double' is not convertible to 'Int'}}
+  _ = Tensor<Float>(1.0)
+  _ = Tensor<Int>(2)
+  _ = Tensor<Int>([1.0, 2.0]) // expected-error {{cannot convert value of type '[Double]'}}
 }
 
