@@ -42,15 +42,6 @@ func genEnumArray() {
   // should be a nop
 }
 
-// Check the performance of destroying an array of implicit unwrapped
-// optional where the optional has a single payload of trivial
-// type. Destroying the elements should be a nop.
-@inline(never)
-func genIOUArray() {
-  _ = RefArray<Int!>(3)
-  // should be a nop
-}
-
 // Check the performance of destroying an array of structs where the
 // struct has multiple fields of trivial type. Destroying the
 // elements should be a nop.
@@ -68,7 +59,6 @@ func genStructArray() {
 public func run_ArrayOfGenericPOD(_ N: Int) {
   for _ in 0...N {
     genEnumArray()
-    genIOUArray()
     genStructArray()
   }
 }
