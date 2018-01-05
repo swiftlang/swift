@@ -2565,6 +2565,10 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
     return;
 
+  // The presence of 'dynamic' blocks the inference of 'dynamic'.
+  if (D->isDynamic())
+    return;
+
   // Only 'objc' declarations use 'dynamic'.
   if (!D->isObjC() || D->hasClangNode())
     return;
@@ -2573,16 +2577,16 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     (D->getOverriddenDecl() &&
      D->getOverriddenDecl()->hasClangNode());
 
-  // Only introduce 'dynamic' on declarations...
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
-  if (!isa<ExtensionDecl>(D->getDeclContext())) {
-    // ...and in classes on decls marked @NSManaged.
-    if (!isNSManaged && !overridesImportedMethod)
-      return;
-  }
 
-  // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
-  if (D->isDynamic() || D->isFinal())
+  bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
+
+  // We only infer 'dynamic' in these three cases.
+  if (!isExtension && !isNSManaged && !overridesImportedMethod)
+    return;
+
+  // The presence of 'final' blocks the inference of 'dynamic'.
+  if (D->isFinal() && !isNSManaged)
     return;
 
   // Variables declared with 'let' cannot be 'dynamic'.

@@ -95,6 +95,23 @@ extension ProtoAdopter {
 }
 
 
+// SR-6534: @NSManaged properties can be 'final'
+protocol EntityIDProto {
+  var entityID: String { get set }
+}
+
+class FinalEntity: NSObject, EntityIDProto {
+	@NSManaged final var entityID: String
+}
+
+// CHECK-LABEL: sil private @_T019objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout FinalEntity, @thick FinalEntity.Type) -> ()
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
+// CHECK: return
+
+// CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged11FinalEntityC8entityIDSSvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed FinalEntity) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!getter.1.foreign
+// CHECK: return
+
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10SwiftGizmoC1xAA1XCfsTo
 // CHECK-NOT: sil hidden @_T019objc_attr_NSManaged10{{[_0-9a-zA-Z]*}}FinalGizmoC1yytfgTo
