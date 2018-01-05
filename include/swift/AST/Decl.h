@@ -4248,14 +4248,6 @@ public:
   /// only valid on a declaration with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
-  /// Return true if this storage can (but doesn't have to) be accessed with
-  /// Objective-C-compatible getters and setters.
-  bool hasForeignGetterAndSetter() const;
-
-  /// Return true if this storage *must* be accessed with Objective-C-compatible
-  /// getters and setters.
-  bool requiresForeignGetterAndSetter() const;
-
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
   ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
