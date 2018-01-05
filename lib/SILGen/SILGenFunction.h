@@ -548,8 +548,7 @@ public:
   ///
   /// This is used for both concrete witness thunks and default witness
   /// thunks.
-  void emitProtocolWitness(Type selfType,
-                           AbstractionPattern reqtOrigTy,
+  void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,

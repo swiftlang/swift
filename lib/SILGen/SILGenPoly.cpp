@@ -3304,8 +3304,7 @@ static CanType dropLastElement(CanType type) {
   return TupleType::get(elts, type->getASTContext())->getCanonicalType();
 }
 
-void SILGenFunction::emitProtocolWitness(Type selfType,
-                                         AbstractionPattern reqtOrigTy,
+void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
@@ -3325,12 +3324,6 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  // Handle special abstraction differences in "self".
-  // If the witness is a free function, drop it completely.
-  // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
-  if (isFree)
-    origParams.pop_back();
-
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
   CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
@@ -3349,6 +3342,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
   if (isFree) {
+    origParams.pop_back();
     reqtOrigInputTy = reqtOrigInputTy.dropLastTupleElement();
     reqtSubstInputTy = dropLastElement(reqtSubstInputTy);
   }
