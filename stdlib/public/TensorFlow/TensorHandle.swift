@@ -10,19 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TensorHandle and AnyTensorHandle types.
+// This file defines the TensorHandle type.
 //
 //===----------------------------------------------------------------------===//
 
 import CTensorFlow
 
 // The C type is TF_TensorHandle*
-public typealias CTensorHandle = OpaquePointer?
+public typealias CTensorHandle = OpaquePointer
 
-// This corresponds to the TensorHandle class in TF eager C API.
-public class AnyTensorHandle {
-  // FIXME: Implement in terms of a TensorFlow TensorHandle, using the C API.
-  // TODO(hongm): Assess whether to avoid wrapping an optional here.
+/// TensorHandle<T> is the type used by "ops" and the #tfop() syntax
+/// specifically.  It includes an element type, which the tf-compiler internals
+/// depend on to know what the dtype of params are when they are extracted out
+/// into a tensor program.
+public final class TensorHandle<T: TensorElementProtocol> {
+  // This is the underlying "TF_TensorHandle*" which this TensorHandle
+  // represents.
+  //
+  // NOTE: The compiler knows that TensorHandle has a single stored property,
+  // and assumes that this is it.  Changing the design of TensorHandle will
+  // require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
   public init(cTensorHandle: CTensorHandle) {
@@ -32,13 +39,6 @@ public class AnyTensorHandle {
   deinit {
     TFE_DeleteTensorHandle(cTensorHandle)
   }
-}
-
-/// TensorHandle<T> is the type used by "ops" and the #tfop() syntax
-/// specifically.  It includes an element type, which the tf-compiler internals
-/// depend on to know what the dtype of params are when they are extracted out
-/// into a tensor program.
-public class TensorHandle<T: TensorElementProtocol> : AnyTensorHandle {
 }
 
 // For "print", REPL, and Playgrounds integeration, we'll eventually want to

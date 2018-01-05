@@ -1666,10 +1666,13 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // We are going to create a call to this function to kick off the tensor
   // program:
   //
+  // The C type is TF_TensorHandle*
+  // public typealias CTensorHandle = OpaquePointer
+  //
   // @_silgen_name("_swift_tfc_StartTensorProgram")
   // public func startTensorProgram(_ programBytes: UnsafeRawPointer,
   //                                _ programSize: Int,
-  //                                _ inputs: UnsafePointer<AnyTensorHandle>,
+  //                                _ inputs: UnsafePointer<CTensorHandle>,
   //                                _ numInputs: Int) -> TensorProgram {...}
   auto startProgramFn =
     fn.getModule().findFunction("_swift_tfc_StartTensorProgram",
@@ -1681,7 +1684,7 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // @_silgen_name("_swift_tfc_FinishTensorProgram") public
   // func _TFCFinishTensorProgram(
   //    _ program: TensorProgram,
-  //    _ resultAddress: UnsafeMutablePointer<AnyTensorHandle>,
+  //    _ resultAddress: UnsafeMutablePointer<CTensorHandle>,
   //    _ tensorResultCount: Int) {...}
   auto finishProgramFn =
     fn.getModule().findFunction("_swift_tfc_FinishTensorProgram",
@@ -1705,20 +1708,31 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   }
 
   // Create various types and SIL types that we'll be using below.
-  auto anyTensorHandleTy = ctx.getAnyTensorHandleDecl()->getDeclaredType();
-  auto anyTensorHandleSILTy =
-    SILType::getPrimitiveObjectType(anyTensorHandleTy->getCanonicalType());
+  auto cTensorHandleTy = ctx.getOpaquePointerDecl()->getDeclaredType();
+  auto cTensorHandleSILTy =
+    SILType::getPrimitiveObjectType(cTensorHandleTy->getCanonicalType());
   auto unsafePointerType =
     BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
-                          anyTensorHandleTy);
+                          cTensorHandleTy);
   auto unsafePointerSILType =
     SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
   auto unsafeMutPointerType =
     BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(), /*parent*/Type(),
-                          anyTensorHandleTy);
+                          cTensorHandleTy);
   auto unsafeMutPointerSILType =
     SILType::getPrimitiveObjectType(unsafeMutPointerType->getCanonicalType());
 
+  // This assumes that the first member of TensorHandle is the CTensorHandle.
+  auto tensorHandleDecl = ctx.getTensorHandleDecl();
+  auto tensorHandleMember = *tensorHandleDecl->getStoredProperties().begin();
+
+  // Ownership markers for CTensorHandle accesses.
+  auto loadOwnership =
+    fn.hasQualifiedOwnership() ? LoadOwnershipQualifier::Trivial :
+                                 LoadOwnershipQualifier::Unqualified;
+  auto storeOwnership =
+    fn.hasQualifiedOwnership() ? StoreOwnershipQualifier::Trivial :
+                                 StoreOwnershipQualifier::Unqualified;
 
 
   SILBuilder B(tensorStartPoint);
@@ -1736,52 +1750,49 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
 
   // We pass the list of N tensor arguments as a pointer + length of
-  // AnyTensorHandle values, i.e.:
-  //   (..., _ inputs: UnsafePointer<AnyTensorHandle>, _ numInputs: Int)
+  // CTensorHandle values, i.e.:
+  //   (..., _ inputs: UnsafePointer<CTensorHandle>, _ numInputs: Int)
   // to get this, we create an N-ary tuple on the stack and pass the address of
   // the first element.
 
   // Note that the allocation becomes a scalar value when it has one value.
   SmallVector<TupleTypeElt, 8> tupleEltTypes(tensorFnArguments.size(),
-                                             TupleTypeElt(anyTensorHandleTy));
+                                             TupleTypeElt(cTensorHandleTy));
   auto tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
-  // %0 = alloc_stack $(AnyTensorHandle, AnyTensorHandle)
+  // %0 = alloc_stack $(CTensorHandle, CTensorHandle)
   auto stackAlloc =
     B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
 
-  // Emit a store into the tuple for each parameter.  We are transfering
-  // ownership of the parameters into the tuple (which we release en-mass when
-  // we're done with it) so we don't do a retain of each TensorHandle here.
+  // Emit a store into the tuple for each parameter, giving it a copy of the
+  // OpaquePointer that is within the TensorHandle<T> value we have.
   for (size_t i = 0, numArgs = tensorFnArguments.size(); i != numArgs; ++i) {
-    auto upcast = B.createUpcast(loc, tensorFnArguments[i],
-                                 anyTensorHandleSILTy);
+    auto fieldAddress =
+      B.createRefElementAddr(loc, tensorFnArguments[i], tensorHandleMember);
+
+    auto argCTensorHandle = B.createLoad(loc, fieldAddress, loadOwnership);
     SILValue eltAddr = stackAlloc;
     if (numArgs >= 2)
       eltAddr = B.createTupleElementAddr(loc, stackAlloc, i,
-                                         anyTensorHandleSILTy.getAddressType());
-
-    auto ownershipQualifier =
-      fn.hasQualifiedOwnership() ? StoreOwnershipQualifier::Init :
-                                   StoreOwnershipQualifier::Unqualified;
-    B.createStore(loc, upcast, eltAddr, ownershipQualifier);
+                                         cTensorHandleSILTy.getAddressType());
+    B.createStore(loc, argCTensorHandle, eltAddr, storeOwnership);
   }
 
   // Ok, now we have our array on the stack.  Start a read access, and get the
-  // address of the first element as an UnsafePointer<AnyTensorHandle>.
-  // %1 = begin_access [read] [static] %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  // address of the first element as an UnsafePointer<CTensorHandle>.
+  // %1 = begin_access [read] [static] %0 : $*(CTensorHandle, CTensorHandle)
   auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
                                     SILAccessEnforcement::Static);
 
-  // %2 = tuple_element_addr %1 : $*(AnyTensorHandle, AnyTensorHandle), 0
+  // %2 = tuple_element_addr %1 : $*(CTensorHandle, CTensorHandle), 0
   SILValue firstPtr = access;
   if (tensorFnArguments.size() >= 2)
     firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
-                                        anyTensorHandleSILTy.getAddressType());
-  // %3 = address_to_pointer %2 : $*AnyTensorHandle to $Builtin.RawPointer
+                                        cTensorHandleSILTy.getAddressType());
+  // %3 = address_to_pointer %2 : $*CTensorHandle to $Builtin.RawPointer
   firstPtr = B.createAddressToPointer(loc, firstPtr,
                                       SILType::getRawPointerType(ctx));
 
-  // %4 = struct $UnsafePointer<AnyTensorHandle>(%3 : $Builtin.RawPointer)
+  // %4 = struct $UnsafePointer<CTensorHandle>(%3 : $Builtin.RawPointer)
   firstPtr = B.createStruct(loc, unsafePointerSILType, firstPtr);
 
   auto numTensorArguments = createIntValue(tensorFnArguments.size(), B, loc);
@@ -1804,16 +1815,15 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
     B.createApply(loc, startProgramFnRef, /*no substitutions*/{}, startArgs,
                   /*isNonThrowing*/false);
 
-  // Finish our read access, destroy the tuple (releasing all the input tensors)
-  // and free the stack memory.
-
-  // end_access %1 : $*(AnyTensorHandle, AnyTensorHandle)
+  // Finish our read access and free the stack memory.
+  // end_access %1 : $*(CTensorHandle, CTensorHandle)
   B.createEndAccess(loc, access, /*aborted*/false);
-  // destroy_addr %0 : $*(AnyTensorHandle, AnyTensorHandle)
-  B.emitDestroyAddr(loc, stackAlloc);
-  // dealloc_stack %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  // dealloc_stack %0 : $*(CTensorHandle, CTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
 
+  // Finally, release all of the TensorHandle's, releasing their memory.
+  for (auto arg : tensorFnArguments)
+    B.createReleaseValue(loc, arg, Atomicity::Atomic);
 
 
   // Create the runtime call in the host program that rendezvous with the tensor
@@ -1824,30 +1834,30 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
 
   // Note that the allocation becomes a scalar value when it has one value.
   tupleEltTypes = SmallVector<TupleTypeElt, 8>(resultValues.size(),
-                                               TupleTypeElt(anyTensorHandleTy));
+                                               TupleTypeElt(cTensorHandleTy));
   tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
 
-  // %0 = alloc_stack $(AnyTensorHandle, AnyTensorHandle)
+  // %0 = alloc_stack $(CTensorHandle, CTensorHandle)
   stackAlloc =
     B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
 
   // Ok, now we have our uninitialized array on the stack.  Start a write
   // access, and get the address of the first element as an
-  // UnsafePointer<AnyTensorHandle>.
-  // %1 = begin_access [write] [static] %0 : $*(AnyTensorHandle,AnyTensorHandle)
+  // UnsafePointer<CTensorHandle>.
+  // %1 = begin_access [write] [static] %0 : $*(CTensorHandle, CTensorHandle)
   access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Modify,
                                SILAccessEnforcement::Static);
 
-  // %2 = tuple_element_addr %1 : $*(AnyTensorHandle, AnyTensorHandle), 0
+  // %2 = tuple_element_addr %1 : $*(CTensorHandle, CTensorHandle), 0
   firstPtr = access;
   if (resultValues.size() >= 2)
     firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
-                                        anyTensorHandleSILTy.getAddressType());
-  // %3 = address_to_pointer %2 : $*AnyTensorHandle to $Builtin.RawPointer
+                                        cTensorHandleSILTy.getAddressType());
+  // %3 = address_to_pointer %2 : $*CTensorHandle to $Builtin.RawPointer
   firstPtr = B.createAddressToPointer(loc, firstPtr,
                                       SILType::getRawPointerType(ctx));
 
-  // %4 = struct $UnsafeMutablePointer<AnyTensorHandle>(%3: $Builtin.RawPointer)
+  // %4 = struct $UnsafeMutablePointer<CTensorHandle>(%3: $Builtin.RawPointer)
   firstPtr = B.createStruct(loc, unsafeMutPointerSILType, firstPtr);
 
   auto finishProgramFnRef = B.createFunctionRef(loc, finishProgramFn);
@@ -1858,13 +1868,12 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
                 /*args*/ {tensorProgram, firstPtr, numTensorResults},
                 /*isNonThrowing*/false);
 
-  // end_access %1 : $*(AnyTensorHandle, AnyTensorHandle)
+  // end_access %1 : $*(CTensorHandle, CTensorHandle)
   B.createEndAccess(loc, access, /*aborted*/false);
 
-
-  // After the call, we have a buffer filled in with tensor values, load them,
-  // taking ownership and RAUW'ing uses of the old value to the newly loaded
-  // value.
+  // After the call, we have a buffer filled in with CTensorHandle values, load
+  // them, taking ownership and RAUW'ing uses of the old value to the newly
+  // loaded value.
   for (unsigned resultNumber = 0, e = resultValues.size(); resultNumber != e;
        ++resultNumber) {
     SILValue result = resultValues[resultNumber];
@@ -1873,20 +1882,25 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
       eltAddress =
         B.createTupleElementAddr(result.getLoc(),
                                  eltAddress, resultNumber,
-                                 anyTensorHandleSILTy.getAddressType());
+                                 cTensorHandleSILTy.getAddressType());
     }
 
     // The load takes ownership from the buffer, leaving the buffer
     // uninitialized again.
-    auto ownershipQualifier =
-      fn.hasQualifiedOwnership() ? LoadOwnershipQualifier::Take :
-                                   LoadOwnershipQualifier::Unqualified;
     SILValue newValue = B.createLoad(result.getLoc(), eltAddress,
-                                     ownershipQualifier);
+                                     loadOwnership);
 
-    // Downcast it to the proper TensorHandle<T> type.
-    newValue = B.createUnconditionalCheckedCast(result.getLoc(), newValue,
-                                                result->getType());
+    // Create a new TensorHandle<T> type to take ownership.
+    auto newTH = B.createAllocRef(result.getLoc(), result->getType(),
+                                  /*objc*/false, /*canAllocOnStack*/false,
+                                  /*elementTypes*/{},
+                                  /*elementCountOperands*/{});
+    auto fieldAddress =
+      B.createRefElementAddr(result.getLoc(), newTH, tensorHandleMember);
+
+    B.createStore(result.getLoc(), newValue, fieldAddress,
+                  storeOwnership);
+
 
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
@@ -1899,7 +1913,7 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
       // program.  If it is after the tensor op, we can replace the use with
       // the corresponding result value.  If inside, we'll nuke it later.
       if (DI.dominates(tensorEndPoint, user))
-        operand->set(newValue);
+        operand->set(newTH);
     }
   }
 

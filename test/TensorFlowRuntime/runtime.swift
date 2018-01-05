@@ -12,7 +12,7 @@ func checkOk(_ s: OpaquePointer?) {
   precondition(TF_OK == TF_GetCode(s), String(cString: TF_Message(s)))
 }
 
-func createFloatTensorHandle(_ f: Float) -> AnyTensorHandle {
+func createFloatTensorHandle(_ f: Float) -> CTensorHandle {
   let s = TF_NewStatus()
   let in_t = TF_AllocateTensor(TF_FLOAT, nil, 0, 4)
 
@@ -21,16 +21,16 @@ func createFloatTensorHandle(_ f: Float) -> AnyTensorHandle {
   let inputPtr = inputRawPtr.bindMemory(to: CFloat.self, capacity: 1)
   inputPtr.pointee = CFloat(f)
 
-  let in_h = TFE_NewTensorHandle(in_t, s)
+  let cTensorHandle = TFE_NewTensorHandle(in_t, s)!
   checkOk(s)
   TF_DeleteTensor(in_t)
   TF_DeleteStatus(s)
-  return AnyTensorHandle(cTensorHandle: in_h)
+  return cTensorHandle
 }
 
-func checkFloatValueNear(_ outputTensor: AnyTensorHandle, _ expectedVal: Float) {
+func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
   let s = TF_NewStatus()
-  let out_t = TFE_TensorHandleResolve(outputTensor.cTensorHandle, s)
+  let out_t = TFE_TensorHandleResolve(outputTensor, s)
   checkOk(s)
   TF_DeleteStatus(s)
 
@@ -44,16 +44,16 @@ func checkFloatValueNear(_ outputTensor: AnyTensorHandle, _ expectedVal: Float) 
 
 func runProgram(_ progName: String,
   _ graphProto: StaticString,
-  _ inputTensors: AnyTensorHandle...
-) -> [AnyTensorHandle] {
+  _ inputTensors: CTensorHandle...
+) -> [CTensorHandle] {
   print("The input graph of program \(progName) has \(graphProto.utf8CodeUnitCount) bytes.")
 
   let program = _TFCStartTensorProgram(graphProto.utf8Start,
                                        graphProto.utf8CodeUnitCount,
-                                       UnsafePointer<AnyTensorHandle>(inputTensors),
+                                       UnsafePointer<CTensorHandle>(inputTensors),
                                        inputTensors.count,
                                        /*number of output tensors*/1)
-  let outputBuffer = UnsafeMutablePointer<AnyTensorHandle>.allocate(capacity: 1)
+  let outputBuffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 1)
   _TFCFinishTensorProgram(program, outputBuffer, 1)
 
   // Load the result tensor, taking ownership from the unsafe pointer.
