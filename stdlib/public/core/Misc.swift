@@ -111,6 +111,25 @@ func _typeByName(_ name: String) -> Any.Type? {
   }
 }
 
+@_silgen_name("swift_getTypeByMangledName")
+internal func _getTypeByMangledName(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt)
+  -> Any.Type?
+
+/// Lookup a class given a mangled name. This is a placeholder while we bring
+/// up this functionality.
+public  // TEMPORARY
+func _typeByMangledName(_ name: String) -> Any.Type? {
+  let nameUTF8 = Array(name.utf8)
+  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    let type = _getTypeByMangledName(nameUTF8.baseAddress!,
+                                     UInt(nameUTF8.endIndex))
+
+    return type
+  }
+}
+
 /// Returns `floor(log(x))`.  This equals to the position of the most
 /// significant non-zero bit, or 63 - number-of-zeros before it.
 ///
