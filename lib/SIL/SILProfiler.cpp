@@ -32,9 +32,14 @@ static bool isUnmapped(ASTNode N) {
   }
 
   auto *D = N.get<Decl *>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     if (!AFD->getBody())
       return true;
+
+    if (auto *fd = dyn_cast<FuncDecl>(AFD))
+      if (fd->isImplicit() && fd->isGetter())
+        return false;
+  }
 
   if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
     return false;
