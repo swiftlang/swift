@@ -47,6 +47,8 @@ using namespace swift;
 - (id)debugQuickLookObject;
 @end
 
+// mangled Swift._Object
+#define SwiftObject _TtCs7_Object
 @class SwiftObject;
 #endif
 

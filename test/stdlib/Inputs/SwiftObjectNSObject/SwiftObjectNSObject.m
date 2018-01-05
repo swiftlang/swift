@@ -37,9 +37,9 @@ static int Errors;
 /*
   Summary of Swift definitions from SwiftObjectNSObject.swift:
 
-  class SwiftObject <NSObject> { ... }
+  class Swift._Object <NSObject> { ... }
 
-  class C : SwiftObject {
+  class C : Swift._Object {
   @objc func cInstanceMethod()
   @objc class func cClassMethod()
   }
@@ -51,11 +51,15 @@ static int Errors;
 */
 
 // Add methods to class SwiftObject that can be called by performSelector: et al
-    @interface SwiftObject /* trust me, I know what I'm doing */ @end
-      @implementation SwiftObject (MethodsToPerform)
-      -(id) perform0 {
-        return self;
-    }
+
+// mangled Swift._Object
+#define SwiftObject _TtCs7_Object
+
+@interface SwiftObject /* trust me, I know what I'm doing */ @end
+@implementation SwiftObject (MethodsToPerform)
+-(id) perform0 {
+    return self;
+}
 
 -(id) perform1:(id)one {
   expectTrue ([one isEqual:@1]);
@@ -73,7 +77,7 @@ void TestSwiftObjectNSObject(id c, id d)
 {
   printf("TestSwiftObjectNSObject\n");
 
-  Class S = objc_getClass("SwiftObject");
+  Class S = objc_getClass("Swift._Object");
   Class C = objc_getClass("SwiftObjectNSObject.C");
   Class D = objc_getClass("SwiftObjectNSObject.D");
 
@@ -401,10 +405,10 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c description] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S description] isEqual:@"SwiftObject"]);
+  expectTrue ([[S description] isEqual:@"Swift._Object"]);
   expectTrue ([[D_meta description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta description] isEqual:@"SwiftObject"]);
+  expectTrue ([[S_meta description] isEqual:@"Swift._Object"]);
 
   // NSLog() calls -description and also some private methods.
   // This output is checked by FileCheck in SwiftObjectNSObject.swift.
@@ -419,10 +423,10 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S debugDescription] isEqual:@"SwiftObject"]);
+  expectTrue ([[S debugDescription] isEqual:@"Swift._Object"]);
   expectTrue ([[D_meta debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta debugDescription] isEqual:@"SwiftObject"]);
+  expectTrue ([[S_meta debugDescription] isEqual:@"Swift._Object"]);
 
 
   printf("NSObjectProtocol.performSelector\n");

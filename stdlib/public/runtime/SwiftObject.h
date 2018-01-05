@@ -30,6 +30,10 @@
 
 #if SWIFT_OBJC_INTEROP
 
+// Source code: "SwiftObject"
+// Real class name: mangled "Swift._Object"
+#define SwiftObject _TtCs7_Object
+
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))
 #endif
