@@ -122,7 +122,9 @@ def build_swift(config):
     ])
 
     swift_cmake_options = ','.join([
+        '-DSWIFT_ENABLE_PROFILE_GENERATION:BOOL=ON',
         '-DSWIFT_ENABLE_IR_PROFILE_GENERATION:BOOL=ON',
+        '-DSWIFT_PROFILE_OUTPUT_DIR={}'.format(config.profiles_dir),
     ])
 
     build_script_options = [
