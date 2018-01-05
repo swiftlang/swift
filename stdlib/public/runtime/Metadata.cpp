@@ -1052,6 +1052,21 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 }
 
 /***************************************************************************/
+/*** Nominal type descriptors **********************************************/
+/***************************************************************************/
+template<>
+bool NominalTypeDescriptor::isEqual(const NominalTypeDescriptor *other) const {
+  // Fast path: pointer equality.
+  if (this == other) return true;
+
+  // If both nominal type descriptors are known to be unique, we're done.
+  if (this->isUnique() && other->isUnique()) return false;
+
+  // Compare the mangled names.
+  return strcmp(this->Name.get(), other->Name.get()) == 0;
+}
+
+/***************************************************************************/
 /*** Common value witnesses ************************************************/
 /***************************************************************************/
 

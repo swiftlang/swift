@@ -17,10 +17,8 @@ public protocol Runcible {
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
-// -- type metadata + 0x02 (nonunique type metadata)
-// CHECK:           i32 add
-// CHECK:           @_T0SC6NSRectVN
-// CHECK:           i32 2
+// -- nominal type descriptor
+// CHECK:           @_T0SC6NSRectVMn
 // -- witness table
 // CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
 // -- reserved

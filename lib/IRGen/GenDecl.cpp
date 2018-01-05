@@ -2211,18 +2211,9 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 
   auto nom = conformingType->getAnyNominal();
   auto clas = dyn_cast<ClassDecl>(nom);
-  if (doesConformanceReferenceNominalTypeDescriptor(IGM, conformingType)) {
-    // Conformances for generics and concrete subclasses of generics
-    // are represented by referencing the nominal type descriptor.
-    typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
-    entity = LinkEntity::forNominalTypeDescriptor(nom);
-    defaultTy = IGM.NominalTypeDescriptorTy;
-    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
-  } else if (clas && !clas->isForeign()) {
+  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(IGM, clas)) {
     // A reference to an Objective-C class object.
     assert(clas->isObjC() && "Must have an Objective-C class here");
-    assert(!hasKnownSwiftMetadata(IGM, clas) &&
-           "Should use nominal type descriptor");
 
     // Form the class reference.
     (void)IGM.getAddrOfObjCClassRef(clas);
@@ -2232,12 +2223,12 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     defaultTy = IGM.TypeMetadataPtrTy;
     defaultPtrTy = IGM.TypeMetadataPtrTy;
   } else {
-    // Metadata for Clang types should be uniqued like foreign classes.
-    assert(isa<ClangModuleUnit>(nom->getModuleScopeContext()));
-    typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-    entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-    defaultTy = IGM.TypeMetadataStructTy;
-    defaultPtrTy = IGM.TypeMetadataPtrTy;
+    // Conformances for generics and concrete subclasses of generics
+    // are represented by referencing the nominal type descriptor.
+    typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
+    entity = LinkEntity::forNominalTypeDescriptor(nom);
+    defaultTy = IGM.NominalTypeDescriptorTy;
+    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
   }
 
   return {typeKind, *entity, defaultTy, defaultPtrTy};
