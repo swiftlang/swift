@@ -109,11 +109,11 @@ sil @_TFC4main3Bar4pingfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 sil @_TFC4main3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> ()
 
 sil_vtable Bar {
-  #Bar.ping!1: _TFC4main3Bar4pingfS0_FT_T_
+  #Bar.ping!1: @_TFC4main3Bar4pingfS0_FT_T_
 }
 
 sil_vtable Foo {
-  #Bar.ping!1: _TFC4main3Foo4pingfS0_FT_T_
+  #Bar.ping!1: @_TFC4main3Foo4pingfS0_FT_T_
 }
 
 

@@ -41,31 +41,31 @@ sil hidden_external [serialized] @_T01x7DerivedCACycfC : $@convention(method) (@
 sil hidden_external [serialized] @_T01x7DerivedCACycfc : $@convention(method) (@owned Derived) -> @owned Derived
 
 sil_vtable Base {
-  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF
-  #Base.m2!1: (Base) -> () -> () : _T01x4BaseC2m2yyF
-  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x4BaseCACycfc
-  #Base.deinit!deallocator: _T01x4BaseCfD
+  #Base.m1!1: (Base) -> () -> () : @_T01x4BaseC2m1yyF
+  #Base.m2!1: (Base) -> () -> () : @_T01x4BaseC2m2yyF
+  #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T01x4BaseCACycfc
+  #Base.deinit!deallocator: @_T01x4BaseCfD
 }
 
 // CHECK-LABEL: sil_vtable Base {
-// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF
-// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : _T01x4BaseC2m2yyF
-// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x4BaseCACycfc
-// CHECK-NEXT:  #Base.deinit!deallocator: _T01x4BaseCfD
+// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : @_T01x4BaseC2m1yyF
+// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : @_T01x4BaseC2m2yyF
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T01x4BaseCACycfc
+// CHECK-NEXT:  #Base.deinit!deallocator: @_T01x4BaseCfD
 // CHECK-NEXT: }
 
 sil_vtable Derived {
-  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF [inherited]
-  #Base.m2!1: (Base) -> () -> () : _T01x7DerivedC2m2yyF [override]
-  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x7DerivedCACycfc [override]
-  #Derived.m3!1: (Derived) -> () -> () : _T01x7DerivedC2m3yyF
-  #Derived.deinit!deallocator: _T01x7DerivedCfD
+  #Base.m1!1: (Base) -> () -> () : @_T01x4BaseC2m1yyF [inherited]
+  #Base.m2!1: (Base) -> () -> () : @_T01x7DerivedC2m2yyF [override]
+  #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T01x7DerivedCACycfc [override]
+  #Derived.m3!1: (Derived) -> () -> () : @_T01x7DerivedC2m3yyF
+  #Derived.deinit!deallocator: @_T01x7DerivedCfD
 }
 
 // CHECK-LABEL: sil_vtable Derived {
-// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF [inherited]
-// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : _T01x7DerivedC2m2yyF [override]
-// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x7DerivedCACycfc [override]
-// CHECK-NEXT:  #Derived.m3!1: (Derived) -> () -> () : _T01x7DerivedC2m3yyF
-// CHECK-NEXT:  #Derived.deinit!deallocator: _T01x7DerivedCfD
+// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : @_T01x4BaseC2m1yyF [inherited]
+// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : @_T01x7DerivedC2m2yyF [override]
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T01x7DerivedCACycfc [override]
+// CHECK-NEXT:  #Derived.m3!1: (Derived) -> () -> () : @_T01x7DerivedC2m3yyF
+// CHECK-NEXT:  #Derived.deinit!deallocator: @_T01x7DerivedCfD
 // CHECK-NEXT: }

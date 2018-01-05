@@ -500,59 +500,59 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooC6nativeACSi_tcfc
-// CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       _T07dynamic3FooC12nativeMethodyyF
-// CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  _T07dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
-// CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  _T07dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
+// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   @_T07dynamic3FooC6nativeACSi_tcfc
+// CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       @_T07dynamic3FooC12nativeMethodyyF
+// CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  @_T07dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  @_T07dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooC6nativeS2i_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooC6nativeS2i_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   @_T07dynamic3FooC6nativeS2i_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   @_T07dynamic3FooC6nativeS2i_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet.1
-// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooC4objcACSi_tcfc
-// CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         _T07dynamic3FooC10objcMethodyyF
-// CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
-// CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
+// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   @_T07dynamic3FooC4objcACSi_tcfc
+// CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         @_T07dynamic3FooC10objcMethodyyF
+// CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    @_T07dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    @_T07dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC4objcSiyXl_tcig // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC4objcSiyXl_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : @_T07dynamic3FooC4objcSiyXl_tcig // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : @_T07dynamic3FooC4objcSiyXl_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
-// CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
+// CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : @_T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
 // CHECK-NEXT: }
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public @_T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
 // CHECK: }
 
 // Check vtables for implicitly-inherited initializers
 // CHECK-LABEL: sil_vtable SubclassWithInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic26SubclassWithInheritedInitsC6nativeACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic26SubclassWithInheritedInitsC4objcACSi_tcfc
 // CHECK-NOT: .init!
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable GrandchildWithInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic28GrandchildWithInheritedInitsC6nativeACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic28GrandchildWithInheritedInitsC4objcACSi_tcfc
 // CHECK-NOT: .init!
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable GrandchildOfInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic26GrandchildOfInheritedInitsC6nativeACSi_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @_T07dynamic26GrandchildOfInheritedInitsC4objcACSi_tcfc
 // CHECK-NOT: .init!
 // CHECK: }
 
 // No vtable entry for override of @objc extension property
 // CHECK-LABEL: sil_vtable [serialized] SubExt {
-// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
-// CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
+// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : @_T07dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
+// CHECK-NEXT: #SubExt.deinit!deallocator: @_T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable [serialized] ConcreteDerived {
-// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
-// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
-// CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public @_T07dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @_T07dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
+// CHECK-NEXT: #ConcreteDerived.deinit!deallocator: @_T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

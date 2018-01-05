@@ -1471,9 +1471,9 @@ bb0(%0 : $Z):
 }
 
 sil_vtable X {
-  #X.deinit!deallocator: _T04main1XCfD
+  #X.deinit!deallocator: @_T04main1XCfD
 }
 
 sil_vtable Z {
-  #Z.deinit!deallocator: _T04main1ZCfD
+  #Z.deinit!deallocator: @_T04main1ZCfD
 }

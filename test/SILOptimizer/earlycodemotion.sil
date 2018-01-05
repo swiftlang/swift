@@ -661,7 +661,7 @@ bb4:
 
 sil @virtual_callee : $@convention(method) (@guaranteed Test) -> UInt64
 sil_vtable Test {
-  #Test.testing!1: virtual_callee
+  #Test.testing!1: @virtual_callee
 }
 
 // CHECK-LABEL: sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {

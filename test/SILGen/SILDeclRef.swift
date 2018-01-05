@@ -55,11 +55,11 @@ public func testBase(b: Base) -> Int32 {
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
 // CHECK: sil_vtable [serialized] Base {
-// CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo()
-// CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3foo1nys5Int32V_tF	// Base.foo(n:)
-// CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foo1fs5Int32VSf_tF	// Base.foo(f:)
-// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init()
-// CHECK-NEXT:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
+// CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : @_T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo()
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : @_T010SILDeclRef4BaseC3foo1nys5Int32V_tF	// Base.foo(n:)
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : @_T010SILDeclRef4BaseC3foo1fs5Int32VSf_tF	// Base.foo(f:)
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : @_T010SILDeclRef4BaseCACycfc	// Base.init()
+// CHECK-NEXT:  #Base.deinit!deallocator: @_T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
 // CHECK-NEXT: }
 
 // CHECK:sil_witness_table [serialized] Base: P module SILDeclRef {

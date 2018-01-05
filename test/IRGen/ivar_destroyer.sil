@@ -37,7 +37,7 @@ class TrivialBase {}
 sil public_external @init_TrivialBase : $@convention(method) (@owned TrivialBase) -> @owned TrivialBase
 
 sil_vtable TrivialBase {
-  #TrivialBase.init!initializer.1: init_TrivialBase
+  #TrivialBase.init!initializer.1: @init_TrivialBase
 }
 
 class NonTrivialDerived : TrivialBase {
@@ -51,7 +51,7 @@ sil public_external @alloc_NonTrivialDerived : $@convention(method) (@thick NonT
 sil public_external @_T014ivar_destroyer17NonTrivialDerivedCfE : $@convention(method) (@guaranteed NonTrivialDerived) -> ()
 
 sil_vtable NonTrivialDerived {
-  #NonTrivialDerived.init!initializer.1: init_NonTrivialDerived
-  #NonTrivialDerived.init!allocator.1: alloc_NonTrivialDerived
-  #NonTrivialDerived!ivardestroyer.1: _T014ivar_destroyer17NonTrivialDerivedCfE
+  #NonTrivialDerived.init!initializer.1: @init_NonTrivialDerived
+  #NonTrivialDerived.init!allocator.1: @alloc_NonTrivialDerived
+  #NonTrivialDerived!ivardestroyer.1: @_T014ivar_destroyer17NonTrivialDerivedCfE
 }

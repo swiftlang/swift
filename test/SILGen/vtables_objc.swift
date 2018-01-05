@@ -56,27 +56,27 @@ func callWotsit(_ w: Wotsit) {
 // Entries only exist for native Swift methods
 
 // CHECK: sil_vtable Hoozit {
-// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T012vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T012vtables_objc6HoozitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6HoozitC7bellsOnSQyACGSi_tcfc
-// CHECK-NEXT:   #Hoozit.deinit!deallocator: _T012vtables_objc6HoozitCfD
+// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @_T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @_T012vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : @_T012vtables_objc6HoozitCSQyACGycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : @_T012vtables_objc6HoozitC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #Hoozit.deinit!deallocator: @_T012vtables_objc6HoozitCfD
 // CHECK-NEXT: }
 
 // CHECK: sil_vtable Wotsit {
-// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T012vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T012vtables_objc6WotsitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T012vtables_objc6WotsitC7bellsOnSQyACGSi_tcfc
-// CHECK-NEXT:   #Wotsit.deinit!deallocator: _T012vtables_objc6WotsitCfD
+// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @_T012vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @_T012vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : @_T012vtables_objc6WotsitCSQyACGycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : @_T012vtables_objc6WotsitC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #Wotsit.deinit!deallocator: @_T012vtables_objc6WotsitCfD
 // CHECK-NEXT: }
 
 // <rdar://problem/15282548>
 // CHECK: sil_vtable Base {
-// CHECK:   #Base.init!initializer.1: {{.*}} : _T012vtables_objc4BaseC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #Base.init!initializer.1: {{.*}} : @_T012vtables_objc4BaseC{{[_0-9a-zA-Z]*}}fc
 // CHECK: }
 // CHECK: sil_vtable Derived {
-// CHECK:   #Base.init!initializer.1: {{.*}} : _T012vtables_objc7DerivedC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #Base.init!initializer.1: {{.*}} : @_T012vtables_objc7DerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK: }
 @objc class Base {}
 
