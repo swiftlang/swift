@@ -1223,15 +1223,15 @@ protected:
         auto flags =
             TargetFunctionTypeFlags<StoredSize>::fromIntValue(flagsValue);
 
-        using Parameter =
-            ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
-        auto totalSize = sizeof(TargetFunctionTypeMetadata<Runtime>) +
-                         flags.getNumParameters() * sizeof(Parameter);
+        auto totalSize =
+            sizeof(TargetFunctionTypeMetadata<Runtime>) +
+            flags.getNumParameters() * sizeof(FunctionTypeMetadata::Parameter);
 
         if (flags.hasParameterFlags())
           totalSize += flags.getNumParameters() * sizeof(uint32_t);
 
-        return _readMetadata(address, totalSize);
+        return _readMetadata(address,
+                             roundUpToAlignment(totalSize, sizeof(void *)));
       }
       case MetadataKind::HeapGenericLocalVariable:
         return _readMetadata<TargetGenericBoxHeapMetadata>(address);

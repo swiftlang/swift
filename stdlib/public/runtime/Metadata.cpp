@@ -326,13 +326,6 @@ public:
     const uint32_t *ParameterFlags;
     const Metadata *Result;
 
-    Key(FunctionTypeFlags flags,
-        const Metadata *const *params,
-        const uint32_t *paramFlags,
-        const Metadata *result)
-      : Flags(flags), Parameters(params), ParameterFlags(paramFlags),
-        Result(result) {}
-
     FunctionTypeFlags getFlags() const { return Flags; }
     const Metadata *getParameter(unsigned index) const {
       assert(index < Flags.getNumParameters());
@@ -351,13 +344,13 @@ public:
     }
   };
 
-  FunctionCacheEntry(Key key);
+  FunctionCacheEntry(const Key &key);
 
   intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value here.
   }
 
-  int compareWithKey(Key key) const {
+  int compareWithKey(const Key &key) const {
     auto keyFlags = key.getFlags();
     if (auto result = compareIntegers(keyFlags.getIntValue(),
                                       Data.Flags.getIntValue()))
@@ -379,7 +372,7 @@ public:
 
     return 0;
   }
-  static size_t getExtraAllocationSize(Key key) {
+  static size_t getExtraAllocationSize(const Key &key) {
     return getExtraAllocationSize(key.Flags);
   }
 
@@ -387,14 +380,12 @@ public:
     return getExtraAllocationSize(Data.Flags);
   }
 
-  static size_t getExtraAllocationSize(const FunctionTypeFlags flags) {
+  static size_t getExtraAllocationSize(const FunctionTypeFlags &flags) {
     const auto numParams = flags.getNumParameters();
     auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
-
-    const auto alignment = sizeof(void *);
-    return (size + alignment - 1) & ~(alignment - 1);
+    return roundUpToAlignment(size, sizeof(void *));
   }
 };
 
@@ -453,7 +444,7 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
-FunctionCacheEntry::FunctionCacheEntry(Key key) {
+FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   auto flags = key.getFlags();
 
   // Pick a value witness table appropriate to the function convention.

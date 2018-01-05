@@ -769,7 +769,7 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
               TypeMetadataPtrTy->getPointerTo(0),
               Int32Ty->getPointerTo(0),
               TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(NoUnwind))
 
 // Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
 //                                          const Metadata *resultMetadata);
