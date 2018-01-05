@@ -34,9 +34,9 @@ public func testTensor() {
 // CHECK-NOT: = apply
 
 // We're passing one TensorHandle in.
-// CHECK: [[ALLOC:%.*]] = alloc_stack $AnyTensorHandle
-// CHECK: upcast
-// CHECK: begin_access [read] [static] [[ALLOC]] : $*AnyTensorHandle
+// CHECK: [[ALLOC:%.*]] = alloc_stack $OpaquePointer
+// CHECK: ref_element_addr
+// CHECK: begin_access [read] [static] [[ALLOC]] : $*OpaquePointer
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
@@ -69,7 +69,7 @@ public func testScalar(f: Float) {
 // CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
 
 // StartTensorProgram is called with one input tensor
-// CHECK: [[TENSORS:%.*]] = struct $UnsafePointer<AnyTensorHandle> ({{%.*}} : $Builtin.RawPointer)
+// CHECK: [[TENSORS:%.*]] = struct $UnsafePointer<OpaquePointer> ({{%.*}} : $Builtin.RawPointer)
 // CHECK-NEXT: [[TENSOR_COUNT:%.*]] = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: [[TENSOR_COUNT_STRUCT:%.*]] = struct $Int ([[TENSOR_COUNT]] : $Builtin.Int64)
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
