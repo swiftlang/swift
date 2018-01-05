@@ -21,7 +21,9 @@
 import TestsUtils
 
 public let ArrayOfGenericPOD = BenchmarkInfo(
-  name: "ArrayOfGenericPOD",
+  // Renamed benchmark to "2" when IUO test was removed, which
+  // effectively changed what we're benchmarking here.
+  name: "ArrayOfGenericPOD2",
   runFunction: run_ArrayOfGenericPOD,
   tags: [.validation, .api, .Array])
 
