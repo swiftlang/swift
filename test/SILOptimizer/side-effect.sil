@@ -147,7 +147,7 @@ bb0(%0 : $*X, %1 : $X):
 }
 
 // CHECK-LABEL: sil @release_owned
-// CHECK: <func=rw+-,param0=-;alloc;trap;readrc>
+// CHECK: <func=,param0=->
 sil @release_owned : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   strong_release %0 : $X

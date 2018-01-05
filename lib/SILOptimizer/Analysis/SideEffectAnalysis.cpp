@@ -347,10 +347,6 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::UnownedReleaseInst:
       FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
-      
-      // TODO: Check the call graph to be less conservative about what
-      // destructors might be called.
-      FInfo->FE.setWorstEffects();
       return;
     case SILInstructionKind::UnconditionalCheckedCastInst:
       FInfo->FE.getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads = true;
