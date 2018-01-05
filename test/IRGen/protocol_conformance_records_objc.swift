@@ -31,9 +31,9 @@ extension NSRect: Runcible {
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
-// -- class object reference + 0x03 (indirect class object)
+// -- class object reference + 0x03 (class object reference, TODO: indirect me)
 // CHECK:           i32 add
-// CHECK:           @"OBJC_CLASS_REF_$_Gizmo"
+// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
 // CHECK:           i32 3
 // -- witness table
 // CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP

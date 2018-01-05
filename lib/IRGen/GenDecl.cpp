@@ -1354,8 +1354,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
-    return false;
-
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -2215,13 +2213,10 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     // A reference to an Objective-C class object.
     assert(clas->isObjC() && "Must have an Objective-C class here");
 
-    // Form the class reference.
-    (void)IGM.getAddrOfObjCClassRef(clas);
-
     typeKind = TypeMetadataRecordKind::IndirectObjCClass;
-    entity = LinkEntity::forObjCClassRef(clas);
     defaultTy = IGM.TypeMetadataPtrTy;
     defaultPtrTy = IGM.TypeMetadataPtrTy;
+    entity = LinkEntity::forObjCClass(clas);
   } else {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
