@@ -433,6 +433,7 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
+  case tok::dollarident:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   case tok::string_literal: {
