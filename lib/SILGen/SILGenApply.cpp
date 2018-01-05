@@ -4974,28 +4974,10 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
-static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
-                                           bool isDirectUse) {
-  // Members of Objective-C protocols should be dynamically dispatched.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
-    return protoDecl->isObjC();
-
-  // C functions imported as members should be referenced as C functions.
-  if (storage->getGetter()->isImportAsMember())
-    return true;
-  
-  // Otherwise, favor native entry points for direct accesses.
-  if (isDirectUse)
-    return false;
-  
-  return storage->requiresForeignGetterAndSetter();
-}
-
-SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
-  // Use the ObjC entry point
-  return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func)
-    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
+SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage) {
+  auto *getter = storage->getGetter();
+  return SILDeclRef(getter, SILDeclRef::Kind::Func)
+    .asForeign(requiresForeignEntryPoint(getter));
 }
 
 /// Emit a call to a getter.
@@ -5031,10 +5013,10 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   return emission.apply(c);
 }
 
-SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
-  return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func)
-    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
+SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage) {
+  auto *setter = storage->getSetter();
+  return SILDeclRef(setter, SILDeclRef::Kind::Func)
+    .asForeign(requiresForeignEntryPoint(setter));
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
@@ -5097,8 +5079,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 }
 
 SILDeclRef
-SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
+SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
   return SILDeclRef(storage->getMaterializeForSetFunc(),
                     SILDeclRef::Kind::Func);
 }
@@ -5176,8 +5157,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 }
 
 SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
-                                               AccessKind accessKind,
-                                               bool isDirectUse) {
+                                               AccessKind accessKind) {
   FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
   return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }
