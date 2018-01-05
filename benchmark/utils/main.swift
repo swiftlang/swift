@@ -30,6 +30,7 @@ import ArraySubscript
 import BitCount
 import ByteSwap
 import CString
+import CSVParsing
 import Calculator
 import CaptureProp
 import CharacterLiteralsLarge
@@ -151,6 +152,7 @@ registerBenchmark(ArraySubscript)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(CString)
+registerBenchmark(CSVParsing)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
 registerBenchmark(CharacterLiteralsLarge)

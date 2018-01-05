@@ -43,6 +43,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BitCount
     single-source/ByteSwap
     single-source/CString
+    single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
     single-source/CharacterLiteralsLarge
