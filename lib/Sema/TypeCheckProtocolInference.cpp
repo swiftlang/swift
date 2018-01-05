@@ -876,20 +876,6 @@ AssociatedTypeInference::computeAbstractTypeWitness(
       return derivedType;
   }
 
-  // If there is a generic parameter of the named type, use that.
-  if (auto gpList = dc->getGenericParamsOfContext()) {
-    GenericTypeParamDecl *foundGP = nullptr;
-    for (auto gp : *gpList) {
-      if (gp->getName() == assocType->getName()) {
-        foundGP = gp;
-        break;
-      }
-    }
-
-    if (foundGP)
-      return dc->mapTypeIntoContext(foundGP->getDeclaredInterfaceType());
-  }
-
   return Type();
 }
 

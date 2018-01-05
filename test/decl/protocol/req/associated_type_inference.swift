@@ -391,15 +391,15 @@ struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P
   func foo(arg: inout Int) {}
 }
 
-// "Infer" associated type from generic parameter.
+// Don't "infer" associated type from generic parameter.
 protocol P14 {
-  associatedtype Value
+  associatedtype Value // expected-note 2{{protocol requires nested type 'Value'}}
 }
 
-struct P14a<Value>: P14 { }
+struct P14a<Value>: P14 { } // expected-error{{type 'P14a<Value>' does not conform to protocol 'P14'}}
 
 struct P14b<Value> { }
-extension P14b: P14 { }
+extension P14b: P14 { } // expected-error{{type 'P14b<Value>' does not conform to protocol 'P14'}}
 
 // Associated type defaults in overridden associated types.
 struct X15 { }
