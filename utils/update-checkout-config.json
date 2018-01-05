@@ -73,6 +73,26 @@
                 "ninja": "release"
             }
         },
+        "swift5-transition" : {
+            "aliases": ["swift5-transition", "llvm-swift5-transition",
+                        "master-llvm-swift5-transition"],
+            "repos": {
+                "llvm": "swift-5.0-branch",
+                "clang": "swift-5.0-branch",
+                "compiler-rt": "swift-5.0-branch",
+                "swift": "master-llvm-swift5-transition",
+                "lldb": "llvm-swift5-transition",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
+            }
+        },
         "swift-3.0-branch" : {
             "aliases": ["swift-3.0-branch"],
             "repos": {
