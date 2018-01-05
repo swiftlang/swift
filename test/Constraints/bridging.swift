@@ -296,7 +296,7 @@ func rdar20029786(_ ns: NSString?) {
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
 
-  var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{20-20=(}}{{31-31=) as String}}
+  var s4: String = ns ?? "str" // expected-error{{cannot convert value of type 'NSString' to specified type 'String'}}
   var s5: String = (ns ?? "str") as String // fixed version
 }
 
