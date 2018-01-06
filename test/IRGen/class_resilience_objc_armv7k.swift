@@ -13,7 +13,7 @@ public class FixedLayoutObjCSubclass : NSObject {
   public final var field: Int32 = 0
 };
 
-// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k29testConstantDirectFieldAccessyAA23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC*)
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k29testConstantDirectFieldAccessyyAA23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC*)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T028class_resilience_objc_armv7k23FixedLayoutObjCSubclassC5fields5Int32VvpWvd
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
@@ -32,7 +32,7 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
   public final var field: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k32testNonConstantDirectFieldAccessyAA0F23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC*)
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k32testNonConstantDirectFieldAccessyyAA0F23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC*)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T028class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC5fields5Int32VvpWvd
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
@@ -54,7 +54,7 @@ public class GenericObjCSubclass<T> : NSCoder {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k31testConstantIndirectFieldAccessyAA19GenericObjCSubclassCyxGlF(%T28class_resilience_objc_armv7k19GenericObjCSubclassC*)
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k31testConstantIndirectFieldAccessyyAA19GenericObjCSubclassCyxGlF(%T28class_resilience_objc_armv7k19GenericObjCSubclassC*)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
