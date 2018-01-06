@@ -30,20 +30,20 @@
 #include "llvm/Support/Path.h"
 
 Optional<std::pair<std::vector<std::string>,
-                   std::vector<const SupplementaryOutputPaths>>>
+                   std::vector<SupplementaryOutputPaths>>>
 ArgsToFrontendOutputsConverter::convert() {
   const auto requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
 
   if (!FrontendOptions::doesActionProduceOutput(requestedAction))
     return std::make_pair(std::vector<std::string>(),
-                          std::vector<const SupplementaryOutputPaths>());
+                          std::vector<SupplementaryOutputPaths>());
 
   Optional<std::vector<std::string>> outputFiles =
       OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
   if (!outputFiles)
     return None;
-  Optional<std::vector<const SupplementaryOutputPaths>> outputPaths =
+  Optional<std::vector<SupplementaryOutputPaths>> outputPaths =
       OutputPathsComputer(Args, Diags, InputsAndOutputs, *outputFiles,
                           ModuleName)
           .computeOutputPaths();
@@ -205,9 +205,9 @@ OutputPathsComputer::OutputPathsComputer(
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
 
-Optional<std::vector<const SupplementaryOutputPaths>>
+Optional<std::vector<SupplementaryOutputPaths>>
 OutputPathsComputer::computeOutputPaths() const {
-  std::vector<const SupplementaryOutputPaths> outputs;
+  std::vector<SupplementaryOutputPaths> outputs;
   bool hadError = false;
   unsigned i = 0;
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
@@ -222,7 +222,7 @@ OutputPathsComputer::computeOutputPaths() const {
       });
   return hadError
              ? None
-             : Optional<std::vector<const SupplementaryOutputPaths>>(outputs);
+             : Optional<std::vector<SupplementaryOutputPaths>>(outputs);
 }
 
 std::vector<SupplementaryOutputPaths>

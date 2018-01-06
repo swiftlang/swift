@@ -45,7 +45,7 @@ public:
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
   Optional<std::pair<std::vector<std::string>,
-                     std::vector<const SupplementaryOutputPaths>>>
+                     std::vector<SupplementaryOutputPaths>>>
   convert();
 
   static std::vector<std::string>
@@ -120,7 +120,7 @@ public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
                       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  Optional<std::vector<const SupplementaryOutputPaths>>
+  Optional<std::vector<SupplementaryOutputPaths>>
   computeOutputPaths() const;
 
 private:

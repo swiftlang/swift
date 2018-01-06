@@ -207,7 +207,7 @@ private:
   friend class ArgsToFrontendOptionsConverter;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
-      ArrayRef<const SupplementaryOutputPaths> supplementaryOutputs);
+      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 
