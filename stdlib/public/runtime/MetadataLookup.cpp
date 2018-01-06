@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/TypeDecoder.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -243,4 +244,147 @@ const Metadata *
 _getTypeByName(const char *typeName, size_t typeNameLength) {
   llvm::StringRef name(typeName, typeNameLength);
   return _classByName(name);
+}
+
+#pragma mark Metadata lookup via mangled name
+
+namespace {
+/// Constructs metadata by decoding a mangled type name, for use with
+/// \c TypeDecoder.
+class DecodedMetadataBuilder {
+public:
+  using BuiltType = const Metadata *;
+  using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
+
+  BuiltNominalTypeDecl createNominalTypeDecl(
+                                     const Demangle::NodePointer &node) const {
+    // FIXME: Implement.
+    return BuiltNominalTypeDecl();
+  }
+
+  BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
+                              BuiltType parent) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
+                                   ArrayRef<BuiltType> genericArgs,
+                                   BuiltType parent) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createBuiltinType(StringRef mangledName) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
+    return swift_getMetatypeMetadata(instance);
+  }
+
+  BuiltType createExistentialMetatypeType(BuiltType instance) const {
+    return swift_getExistentialMetatypeMetadata(instance);
+  }
+
+  BuiltType createProtocolCompositionType(ArrayRef<BuiltType> protocols,
+                                          bool hasExplicitAnyObject) const {
+    // FIXME: Handle protocols and superclasses.
+    if (!protocols.empty()) return BuiltType();
+
+    auto classConstraint =
+      hasExplicitAnyObject ? ProtocolClassConstraint::Class
+                           : ProtocolClassConstraint::Any;
+    return swift_getExistentialTypeMetadata(classConstraint, nullptr, 0,
+                                            nullptr);
+  }
+
+  BuiltType createProtocolType(StringRef mangledName, StringRef moduleName,
+                               StringRef privateDiscriminator,
+                               StringRef name) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createGenericTypeParameterType(unsigned depth,
+                                           unsigned index) const {
+    // FIXME: Implement substitution logic here.
+    return BuiltType();
+  }
+
+  BuiltType createFunctionType(
+                           ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+                           BuiltType result, FunctionTypeFlags flags) const {
+    std::vector<BuiltType> paramTypes;
+    std::vector<uint32_t> paramFlags;
+
+    // Fill in the parameters.
+    paramTypes.reserve(params.size());
+    if (flags.hasParameterFlags())
+      paramFlags.reserve(params.size());
+    for (const auto &param : params) {
+      paramTypes.push_back(param.getType());
+      if (flags.hasParameterFlags())
+        paramFlags.push_back(param.getFlags().getIntValue());
+    }
+
+    return swift_getFunctionTypeMetadata(flags, paramTypes.data(),
+                                         flags.hasParameterFlags()
+                                           ? paramFlags.data()
+                                           : nullptr,
+                                         result);
+  }
+
+  BuiltType createTupleType(ArrayRef<BuiltType> elements,
+                            std::string labels,
+                            bool variadic) const {
+    // TODO: 'variadic' should no longer exist
+    return swift_getTupleTypeMetadata(elements.size(), elements.data(),
+                                      labels.empty() ? nullptr : labels.c_str(),
+                                      /*proposedWitnesses=*/nullptr);
+  }
+
+  BuiltType createDependentMemberType(StringRef name, BuiltType base,
+                                      BuiltType protocol) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createUnownedStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createUnmanagedStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createWeakStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createSILBoxType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+};
+
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata * _Nullable
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
+  // Demangle the type name.
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  Demangler demangler;
+  NodePointer node = demangler.demangleType(typeName);
+  if (!node) {
+    return nullptr;
+  }
+
+  DecodedMetadataBuilder builder;
+  return Demangle::decodeMangledType(builder, node);
 }

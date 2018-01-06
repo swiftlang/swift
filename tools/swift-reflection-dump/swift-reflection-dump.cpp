@@ -193,7 +193,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
 
       Demangle::Demangler Dem;
       auto demangled = Dem.demangleType(line);
-      auto *typeRef = swift::remote::decodeMangledType(builder, demangled);
+      auto *typeRef = swift::Demangle::decodeMangledType(builder, demangled);
       if (typeRef == nullptr) {
         OS << "Invalid typeref: " << line << "\n";
         continue;
