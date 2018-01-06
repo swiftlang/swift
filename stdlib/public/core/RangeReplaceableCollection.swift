@@ -902,38 +902,6 @@ extension RangeReplaceableCollection
   }
 }
 
-extension Sequence {
-  /// Creates a new collection by concatenating the elements of a sequence and a
-  /// collection.
-  ///
-  /// The two arguments must have the same `Element` type. For example, you can
-  /// concatenate the elements of a `Range<Int>` instance and an integer array.
-  ///
-  ///     let numbers = [7, 8, 9, 10]
-  ///     let moreNumbers = 1...6 + numbers
-  ///     print(moreNumbers)
-  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
-  ///
-  /// The resulting collection has the type of argument on the right-hand side.
-  /// In the example above, `moreNumbers` has the same type as `numbers`, which
-  /// is `[Int]`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A collection or finite sequence.
-  ///   - rhs: A range-replaceable collection.
-  @_inlineable
-  public static func + <
-    Other : RangeReplaceableCollection
-  >(lhs: Self, rhs: Other) -> Other
-  where Element == Other.Element {
-    var result = Other()
-    result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
-    result.append(contentsOf: lhs)
-    result.append(contentsOf: rhs)
-    return result
-  }
-}
-
 extension RangeReplaceableCollection {
   /// Creates a new collection by concatenating the elements of a collection and
   /// a sequence.
@@ -962,6 +930,36 @@ extension RangeReplaceableCollection {
     // FIXME: what if lhs is a reference type?  This will mutate it.
     lhs.append(contentsOf: rhs)
     return lhs
+  }
+
+  /// Creates a new collection by concatenating the elements of a sequence and a
+  /// collection.
+  ///
+  /// The two arguments must have the same `Element` type. For example, you can
+  /// concatenate the elements of a `Range<Int>` instance and an integer array.
+  ///
+  ///     let numbers = [7, 8, 9, 10]
+  ///     let moreNumbers = 1...6 + numbers
+  ///     print(moreNumbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+  ///
+  /// The resulting collection has the type of argument on the right-hand side.
+  /// In the example above, `moreNumbers` has the same type as `numbers`, which
+  /// is `[Int]`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A collection or finite sequence.
+  ///   - rhs: A range-replaceable collection.
+  @_inlineable
+  public static func + <
+    Other : Sequence
+  >(lhs: Other, rhs: Self) -> Self
+  where Element == Other.Element {
+    var result = Self()
+    result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
+    result.append(contentsOf: lhs)
+    result.append(contentsOf: rhs)
+    return result
   }
 
   /// Appends the elements of a sequence to a range-replaceable collection.
