@@ -65,5 +65,10 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(type(of: f2_variadic_inout), _typeByMangledName("yyytd_ytztc")!)
 }
 
+DemangleToMetadataTests.test("metatype types") {
+  expectEqual(type(of: type(of: ())), _typeByMangledName("ytm")!)
+  expectEqual(type(of: type(of: f0)), _typeByMangledName("yycm")!)
+}
+
 runAllTests()
 

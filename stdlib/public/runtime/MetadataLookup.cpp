@@ -281,8 +281,7 @@ public:
   }
 
   BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
-    // FIXME: Implement.
-    return BuiltType();
+    return swift_getMetatypeMetadata(instance);
   }
 
   BuiltType createExistentialMetatypeType(BuiltType instance) const {
