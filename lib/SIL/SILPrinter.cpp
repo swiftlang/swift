@@ -2832,8 +2832,8 @@ void SILDefaultWitnessTable::dump() const {
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << getHash() << " {\t// " << demangleSymbol(getName())
-     << "\n";
+     << " " << QuotedString(getPGOFuncName()) << " " << getHash() << " {\t// "
+     << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())
     std::sort(MappedRegions.begin(), MappedRegions.end(),
               [](const MappedRegion &LHS, const MappedRegion &RHS) {

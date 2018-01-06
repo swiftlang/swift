@@ -2200,14 +2200,14 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
   ProfileCounter trueCount = ProfileCounter();
   ProfileCounter falseCount = ProfileCounter();
-  auto parent = SGF.SGM.getPGOParent(E);
+  auto parent = SGF.getPGOParent(E);
   if (parent) {
     auto &Node = parent.getValue();
     auto *NodeS = Node.get<Stmt *>();
     if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
-      trueCount = SGF.SGM.loadProfilerCount(IS->getThenStmt());
+      trueCount = SGF.loadProfilerCount(IS->getThenStmt());
       if (auto *ElseStmt = IS->getElseStmt()) {
-        falseCount = SGF.SGM.loadProfilerCount(ElseStmt);
+        falseCount = SGF.loadProfilerCount(ElseStmt);
       }
     }
   }
@@ -4413,8 +4413,8 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
-  auto NumTrueTaken = SGF.SGM.loadProfilerCount(E->getThenExpr());
-  auto NumFalseTaken = SGF.SGM.loadProfilerCount(E->getElseExpr());
+  auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
+  auto NumFalseTaken = SGF.loadProfilerCount(E->getElseExpr());
 
   if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     // If the result is loadable, emit each branch and forward its result
