@@ -165,12 +165,10 @@ namespace {
                               OptionalTypeKind OptKind) {
     OptKind = getOptionalKind(kind, OptKind);
 
-    switch (OptKind) {
-    case OTK_None:
+    if (OptKind == OTK_None)
       return payloadType;
-    default:
-      return OptionalType::get(OptKind, payloadType);
-    }
+
+    return OptionalType::get(OptKind, payloadType);
   }
 
   class SwiftTypeConverter :
@@ -363,7 +361,7 @@ namespace {
       if (pointeeQualType->isVoidType())
         pointeeType = Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
       else
-        pointeeType = Impl.importTypeIgnoreForceUnwrap(
+        pointeeType = Impl.importTypeIgnoreIUO(
             pointeeQualType, ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
             Bridgeability::None);
 
@@ -414,7 +412,7 @@ namespace {
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
-      Type pointeeType = Impl.importTypeIgnoreForceUnwrap(
+      Type pointeeType = Impl.importTypeIgnoreIUO(
           type->getPointeeType(), ImportTypeKind::Abstract,
           AllowNSUIntegerAsInt, Bridging);
       if (!pointeeType)
@@ -452,7 +450,7 @@ namespace {
       // Importing as a tuple at least fills the right amount of space, and
       // we can cheese static-offset "indexing" using .$n operations.
 
-      Type elementType = Impl.importTypeIgnoreForceUnwrap(
+      Type elementType = Impl.importTypeIgnoreIUO(
           type->getElementType(), ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
           Bridgeability::None);
       if (!elementType)
@@ -506,7 +504,7 @@ namespace {
 
       // Import the result type.  We currently provide no mechanism
       // for this to be audited.
-      auto resultTy = Impl.importTypeIgnoreForceUnwrap(
+      auto resultTy = Impl.importTypeIgnoreIUO(
           type->getReturnType(), ImportTypeKind::Result, AllowNSUIntegerAsInt,
           Bridging, OTK_Optional);
       if (!resultTy)
@@ -516,7 +514,7 @@ namespace {
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
-        auto swiftParamTy = Impl.importTypeIgnoreForceUnwrap(
+        auto swiftParamTy = Impl.importTypeIgnoreIUO(
             *param, ImportTypeKind::Parameter, AllowNSUIntegerAsInt, Bridging,
             OTK_Optional);
         if (!swiftParamTy)
@@ -539,7 +537,7 @@ namespace {
     ImportResult
     VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
       // Import functions without prototypes as functions with no parameters.
-      auto resultTy = Impl.importTypeIgnoreForceUnwrap(
+      auto resultTy = Impl.importTypeIgnoreIUO(
           type->getReturnType(), ImportTypeKind::Result, AllowNSUIntegerAsInt,
           Bridging, OTK_Optional);
       if (!resultTy)
@@ -987,7 +985,7 @@ namespace {
 
           // Convert the type arguments.
           for (auto typeArg : typeArgs) {
-            Type importedTypeArg = Impl.importTypeIgnoreForceUnwrap(
+            Type importedTypeArg = Impl.importTypeIgnoreIUO(
                 typeArg, ImportTypeKind::BridgedValue, AllowNSUIntegerAsInt,
                 Bridging, OTK_None);
             if (!importedTypeArg) {
@@ -1470,7 +1468,7 @@ std::pair<Type, bool> ClangImporter::Implementation::importType(
   return {adjustedType, isIUO};
 }
 
-Type ClangImporter::Implementation::importTypeIgnoreForceUnwrap(
+Type ClangImporter::Implementation::importTypeIgnoreIUO(
     clang::QualType type, ImportTypeKind importKind, bool allowNSUIntegerAsInt,
     Bridgeability bridging, OptionalTypeKind optionality,
     bool resugarNSErrorPointer) {
@@ -1728,7 +1726,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
-    recordForceUnwrapForDecl(paramInfo, isIUO);
+    recordImplicitUnwrapForDecl(paramInfo, isIUO);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -2173,7 +2171,7 @@ std::pair<Type, bool> ClangImporter::Implementation::importMethodType(
                                            swiftParamTy,
                                            ImportedHeaderUnit);
     paramInfo->setInterfaceType(swiftParamTy->mapTypeOutOfContext());
-    recordForceUnwrapForDecl(paramInfo, paramIsIUO);
+    recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

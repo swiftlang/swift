@@ -1215,7 +1215,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationStarted();
-    Impl.recordForceUnwrapForDecl(
+    Impl.recordImplicitUnwrapForDecl(
         param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
     valueParameters.push_back(param);
   }
@@ -2449,7 +2449,7 @@ namespace {
         // type. That matches how we want to use them in most cases. All other
         // types should be imported in a non-bridged way.
         clang::QualType ClangType = Decl->getUnderlyingType();
-        SwiftType = Impl.importTypeIgnoreForceUnwrap(
+        SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
             getTypedefBridgeability(ClangType), OTK_Optional);
       }
@@ -2553,7 +2553,7 @@ namespace {
 
       case EnumKind::Unknown: {
         // Compute the underlying type of the enumeration.
-        auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
+        auto underlyingType = Impl.importTypeIgnoreIUO(
             decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
             Bridgeability::None);
         if (!underlyingType)
@@ -2587,7 +2587,7 @@ namespace {
           return nativeDecl;
 
         // Compute the underlying type.
-        auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
+        auto underlyingType = Impl.importTypeIgnoreIUO(
             decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
             Bridgeability::None);
         if (!underlyingType)
@@ -3208,7 +3208,7 @@ namespace {
 
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
-        auto type = Impl.importTypeIgnoreForceUnwrap(
+        auto type = Impl.importTypeIgnoreIUO(
             clangContext.getTagDeclType(clangEnum), ImportTypeKind::Value,
             isInSystemModule(dc), Bridgeability::None);
         if (!type)
@@ -3244,7 +3244,7 @@ namespace {
           return nullptr;
 
         // Import the enumeration type.
-        auto enumType = Impl.importTypeIgnoreForceUnwrap(
+        auto enumType = Impl.importTypeIgnoreIUO(
             Impl.getClangASTContext().getTagDeclType(clangEnum),
             ImportTypeKind::Value, isInSystemModule(dc), Bridgeability::None);
         if (!enumType)
@@ -3321,7 +3321,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -3454,7 +3454,7 @@ namespace {
 
       result->setInterfaceType(type);
       result->setValidationStarted();
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccess(AccessLevel::Public);
@@ -3545,7 +3545,7 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3629,7 +3629,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // If imported as member, the member should be final.
       if (dc->getAsClassOrClassExtensionContext())
@@ -3955,7 +3955,7 @@ namespace {
       result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
       result->setValidationStarted();
 
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4500,7 +4500,7 @@ namespace {
           decl->getSuperClassType()->stripObjCKindOfTypeAndQuals(clangCtx);
         clangSuperclassType =
           clangCtx.getObjCObjectPointerType(clangSuperclassType);
-        superclassType = Impl.importTypeIgnoreForceUnwrap(
+        superclassType = Impl.importTypeIgnoreIUO(
             clangSuperclassType, ImportTypeKind::Abstract, isInSystemModule(dc),
             Bridgeability::None);
         if (superclassType) {
@@ -4721,7 +4721,7 @@ namespace {
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
-      Impl.recordForceUnwrapForDecl(result, isIUO);
+      Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -5117,7 +5117,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   structDecl->setCheckedInheritanceClause();
 
   // Import the type of the underlying storage
-  auto storedUnderlyingType = Impl.importTypeIgnoreForceUnwrap(
+  auto storedUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Value, isInSystemModule(dc),
       Bridgeability::None, OTK_None);
 
@@ -5138,7 +5138,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   }
 
   // Find a bridged type, which may be different
-  auto computedPropertyUnderlyingType = Impl.importTypeIgnoreForceUnwrap(
+  auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
       Bridgeability::Full, OTK_None);
   if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
@@ -5350,7 +5350,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   ASTContext &ctx = Impl.SwiftContext;
 
   // Compute the underlying type.
-  auto underlyingType = Impl.importTypeIgnoreForceUnwrap(
+  auto underlyingType = Impl.importTypeIgnoreIUO(
       decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
       Bridgeability::None);
   if (!underlyingType)
@@ -5451,7 +5451,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
-  Impl.recordForceUnwrapForDecl(result, isIUO);
+  Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5551,7 +5551,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
     result->setImportAsStaticMember();
   }
 
-  Impl.recordForceUnwrapForDecl(result, isIUO);
+  Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
   assert(selfIdx ? result->getSelfIndex() == *selfIdx
                  : result->isImportAsStaticMember());
@@ -5699,7 +5699,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
-  Impl.recordForceUnwrapForDecl(property, isIUO);
+  Impl.recordImplicitUnwrapForDecl(property, isIUO);
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -6085,7 +6085,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   result->setInterfaceType(interfaceAllocType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
-  Impl.recordForceUnwrapForDecl(result, isIUO);
+  Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
   if (implicit)
     result->setImplicit();
@@ -6495,7 +6495,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
 
-  Impl.recordForceUnwrapForDecl(subscript, isIUO);
+  Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
 
   addObjCAttribute(subscript, None);
 
@@ -6631,7 +6631,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       if (clangBound->getInterfaceDecl()) {
         auto unqualifiedClangBound =
             clangBound->stripObjCKindOfTypeAndQuals(Impl.getClangASTContext());
-        Type superclassType = Impl.importTypeIgnoreForceUnwrap(
+        Type superclassType = Impl.importTypeIgnoreIUO(
             clang::QualType(unqualifiedClangBound, 0), ImportTypeKind::Abstract,
             false, Bridgeability::None);
         if (!superclassType) {

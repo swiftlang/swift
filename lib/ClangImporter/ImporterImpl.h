@@ -584,7 +584,7 @@ public:
     RegisteredExternalDecls.push_back(D);
   }
 
-  void recordForceUnwrapForDecl(Decl *decl, bool isIUO) {
+  void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
 #if !defined(NDEBUG)
     Type ty;
     if (auto *FD = dyn_cast<FuncDecl>(decl)) {
@@ -608,9 +608,9 @@ public:
       assert(ty->getAnyOptionalObjectType());
     }
 
-    auto *forceAttr = new (SwiftContext)
+    auto *IUOAttr = new (SwiftContext)
         ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
-    decl->getAttrs().add(forceAttr);
+    decl->getAttrs().add(IUOAttr);
   }
 
   /// \brief Retrieve the Clang AST context.
@@ -974,7 +974,7 @@ public:
   ///
   /// \returns The imported type, or null if this type could
   ///   not be represented in Swift.
-  Type importTypeIgnoreForceUnwrap(
+  Type importTypeIgnoreIUO(
       clang::QualType type, ImportTypeKind kind, bool allowNSUIntegerAsInt,
       Bridgeability topLevelBridgeability,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
