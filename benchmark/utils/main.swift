@@ -29,16 +29,19 @@ import ArraySetElement
 import ArraySubscript
 import BitCount
 import ByteSwap
+import COWTree
 import CString
 import CSVParsing
 import Calculator
 import CaptureProp
-import CharacterProperties
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
+import CharacterProperties
 import Chars
 import ClassArrayGetter
+import Combos
 import DeadArray
+import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
 import DictTest3
@@ -64,10 +67,13 @@ import IterateData
 import Join
 import LazyFilter
 import LinkedList
+import LuhnAlgoEager
+import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MonteCarloE
 import MonteCarloPi
+import NibbleSort
 import NSDictionaryCastToSwift
 import NSError
 import NSStringConversion
@@ -81,6 +87,7 @@ import ObserverForwarderStruct
 import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpenClose
+import PartialApplyDynamicType
 import Phonebook
 import PolymorphicCalls
 import PopFront
@@ -95,6 +102,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RangeIteration
+import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
 import ReversedCollections
@@ -114,6 +122,7 @@ import StringEdits
 import StringEnum
 import StringInterpolation
 import StringMatch
+import StringRemoveDupes
 import StringTests
 import StringWalk
 import Substring
@@ -152,17 +161,20 @@ registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
+registerBenchmark(COWTree)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
-registerBenchmark(CharacterPropertiesFetch)
-registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)
+registerBenchmark(CharacterPropertiesFetch)
+registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(Chars)
+registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DeadArray)
+registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
 registerBenchmark(Dictionary3)
@@ -188,6 +200,8 @@ registerBenchmark(IterateData)
 registerBenchmark(Join)
 registerBenchmark(LazyFilter)
 registerBenchmark(LinkedList)
+registerBenchmark(LuhnAlgoEager)
+registerBenchmark(LuhnAlgoLazy)
 registerBenchmark(MapReduce)
 registerBenchmark(Memset)
 registerBenchmark(MonteCarloE)
@@ -195,6 +209,7 @@ registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
 registerBenchmark(NSStringConversion)
+registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 registerBenchmark(ObjectiveCBridging)
@@ -205,6 +220,7 @@ registerBenchmark(ObserverForwarderStruct)
 registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
 registerBenchmark(OpenClose)
+registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
 registerBenchmark(PolymorphicCalls)
 registerBenchmark(PopFront)
@@ -219,6 +235,7 @@ registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
+registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(ReversedCollections)
@@ -238,6 +255,7 @@ registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)
 registerBenchmark(StringMatch)
+registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)

@@ -42,6 +42,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySubscript
     single-source/BitCount
     single-source/ByteSwap
+    single-source/COWTree
     single-source/CString
     single-source/CSVParsing
     single-source/Calculator
@@ -51,7 +52,9 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Combos
     single-source/DeadArray
+    single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
     single-source/DictTest3
@@ -77,6 +80,8 @@ set(SWIFT_BENCH_MODULES
     single-source/Join
     single-source/LazyFilter
     single-source/LinkedList
+    single-source/LuhnAlgoEager
+    single-source/LuhnAlgoLazy
     single-source/MapReduce
     single-source/Memset
     single-source/MonteCarloE
@@ -84,6 +89,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSDictionaryCastToSwift
     single-source/NSError
     single-source/NSStringConversion
+    single-source/NibbleSort
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging
@@ -94,6 +100,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverPartiallyAppliedMethod
     single-source/ObserverUnappliedMethod
     single-source/OpenClose
+    single-source/PartialApplyDynamicType
     single-source/Phonebook
     single-source/PolymorphicCalls
     single-source/PopFront
@@ -107,6 +114,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RangeIteration
+    single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
     single-source/ReversedCollections
@@ -126,6 +134,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringEnum
     single-source/StringInterpolation
     single-source/StringMatch
+    single-source/StringRemoveDupes
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring
