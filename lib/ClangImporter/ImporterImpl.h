@@ -1010,8 +1010,26 @@ public:
   ///   Strictly speaking, though, this is a hack used to break cyclic
   ///   dependencies.
   ///
-  /// \returns The imported type, or null if this type could
-  ///   not be represented in Swift.
+  /// \returns An ImportedType value which holds the imported type. If
+  ///          this type is an Optional, it also has a flag which
+  ///          indicates if the Optional is implicitly unwrapped. If
+  ///          the type cannot be represented in Swift, then the type
+  ///          field will be null.
+  ImportedType
+  importType(clang::QualType type, ImportTypeKind kind,
+             bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
+             OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+             bool resugarNSErrorPointer = true);
+
+  /// \brief Import the given Clang type into Swift.
+  ///
+  /// For a description of parameters, see importType(). This differs
+  /// only in that it returns a Type rather than ImportedType, which
+  /// means that we do not retain the information of whether the type
+  /// returned might be an implicitly unwrapped optional.
+  ///
+  /// \returns The imported type, or null if this type could not be
+  ///   represented in Swift.
   Type importTypeIgnoreIUO(
       clang::QualType type, ImportTypeKind kind, bool allowNSUIntegerAsInt,
       Bridgeability topLevelBridgeability,
@@ -1025,11 +1043,6 @@ public:
   /// \returns A pair of the imported type and whether we should treat
   /// it as an optional that is implicitly unwrapped. The returned
   /// type is null if it cannot be represented in Swift.
-  ImportedType
-  importType(clang::QualType type, ImportTypeKind kind,
-             bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
-             OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-             bool resugarNSErrorPointer = true);
 
   /// \brief Import the given function type.
   ///
