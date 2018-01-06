@@ -876,11 +876,12 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, DefaultCC,
 // Metadata *swift_getTupleTypeMetadata(size_t numElements,
 //                                      Metadata * const *elts,
 //                                      const char *labels,
+//                                      uint32_t flags,
 //                                      value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
-              Int8PtrTy, WitnessTablePtrTy),
+              Int8PtrTy, Int32Ty, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,

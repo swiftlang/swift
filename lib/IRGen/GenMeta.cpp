@@ -687,10 +687,12 @@ namespace {
           if (i == 0) pointerToFirst = eltPtr.getAddress();
         }
 
+        TupleTypeFlags flags(0);
         llvm::Value *args[] = {
           llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
           pointerToFirst,
           getTupleLabelsString(IGF.IGM, type),
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
           llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
         };
 
@@ -1661,11 +1663,13 @@ namespace {
           if (i == 0) pointerToFirst = eltPtr.getAddress();
         }
 
+        TupleTypeFlags flags(0);
         llvm::Value *args[] = {
           llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
           pointerToFirst,
           // labels don't matter for layout
           llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy),
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
           llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
         };
 

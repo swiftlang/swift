@@ -893,6 +893,7 @@ const TupleTypeMetadata *
 swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
+                                  TupleTypeFlags flags,
                                   const ValueWitnessTable *proposedWitnesses) {
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
@@ -900,7 +901,34 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // Search the cache.
   TupleCacheEntry::Key key = { numElements, elements, labels };
-  return &TupleTypes.getOrInsert(key, proposedWitnesses).first->Data;
+
+  // If we have constant labels, directly check the cache.
+  if (!flags.hasNonConstantLabels())
+    return &TupleTypes.getOrInsert(key, proposedWitnesses).first->Data;
+
+  // If we have non-constant labels, we can't simply record the result.
+  // Look for an existing result, first.
+  if (auto found = TupleTypes.find(key))
+    return &found->Data;
+
+  // Allocate a copy of the labels string within the tuple type allocator.
+  size_t labelsLen = strlen(labels);
+  char *newLabels =
+    (char *)TupleTypes.getAllocator().Allocate(labelsLen + 1, alignof(char));
+  strcpy(newLabels, labels);
+  key.Labels = newLabels;
+
+  // Update the metadata cache.
+  auto result = TupleTypes.getOrInsert(key, proposedWitnesses);
+
+  // If we didn't manage to perform the insertion, free the memory associated
+  // with the copy of the labels: nobody else can reference it.
+  if (!result.second) {
+    TupleTypes.getAllocator().Deallocate(newLabels, labelsLen + 1);
+  }
+
+  // Done.
+  return &result.first->Data;
 }
 
 TupleCacheEntry::TupleCacheEntry(const Key &key,
@@ -980,7 +1008,8 @@ swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1 };
-  return swift_getTupleTypeMetadata(2, elts, labels, proposedWitnesses);
+  return swift_getTupleTypeMetadata(2, elts, labels, TupleTypeFlags(0),
+                                    proposedWitnesses);
 }
 
 const TupleTypeMetadata *
@@ -989,7 +1018,8 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1, elt2 };
-  return swift_getTupleTypeMetadata(3, elts, labels, proposedWitnesses);
+  return swift_getTupleTypeMetadata(3, elts, labels, TupleTypeFlags(0),
+                                    proposedWitnesses);
 }
 
 /***************************************************************************/

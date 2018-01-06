@@ -2878,6 +2878,7 @@ const TupleTypeMetadata *
 swift_getTupleTypeMetadata(size_t numElements,
                            const Metadata * const *elements,
                            const char *labels,
+                           TupleTypeFlags flags,
                            const ValueWitnessTable *proposedWitnesses);
 
 SWIFT_RUNTIME_EXPORT
