@@ -190,7 +190,7 @@ def main():
     merge_profraw_files('stdlib.profdata')
 
     # Generate profiles using the source compat suite
-    if not os.exists(SOURCE_COMPAT_SUITE_DIR):
+    if not os.path.exists(SOURCE_COMPAT_SUITE_DIR):
         call(['git', 'clone', SOURCE_COMPAT_SUITE_URL,
               SOURCE_COMPAT_SUITE_DIR])
     else:
