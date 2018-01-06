@@ -275,6 +275,44 @@ private:
 
 using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
 
+/// The result of importing a clang type. It holds both the Swift Type
+/// as well as a bool which true 'true' indicates either:
+///   This is an Optional type.
+///   This is a function type where the result type is an Optional.
+/// It is otherwise 'false'.
+class ImportedType {
+  Type type;
+  bool isIUO;
+
+public:
+  ImportedType() {
+    type = Type();
+    isIUO = false;
+  }
+
+  ImportedType(Type ty, bool implicitlyUnwrap)
+      : type(ty), isIUO(implicitlyUnwrap) {
+#if !defined(NDEBUG)
+    if (implicitlyUnwrap) {
+      assert(ty->getAnyOptionalObjectType() || ty->getAs<AnyFunctionType>());
+      if (!ty->getAnyOptionalObjectType()) {
+        auto fnTy = ty->castTo<AnyFunctionType>();
+        assert(fnTy->getResult()->getAnyOptionalObjectType());
+      }
+    }
+#endif
+  }
+
+  Type getType() { return type; }
+
+  bool isImplicitlyUnwrapped() { return isIUO; }
+
+  // Allow a direct test in boolean contexts. It makes sense to base
+  // this entirely on the type as the isIUO is meaningless for a null
+  // type.
+  explicit operator bool() const { return type.getPointer() != nullptr; }
+};
+
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
@@ -987,7 +1025,7 @@ public:
   /// \returns A pair of the imported type and whether we should treat
   /// it as an optional that is implicitly unwrapped. The returned
   /// type is null if it cannot be represented in Swift.
-  std::pair<Type, bool>
+  ImportedType
   importType(clang::QualType type, ImportTypeKind kind,
              bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
              OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
@@ -1012,11 +1050,11 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  std::pair<Type, bool>
-  importFunctionType(DeclContext *dc, const clang::FunctionDecl *clangDecl,
-                     ArrayRef<const clang::ParmVarDecl *> params,
-                     bool isVariadic, bool isFromSystemModule, DeclName name,
-                     ParameterList *&parameterList);
+  ImportedType importFunctionType(DeclContext *dc,
+                                  const clang::FunctionDecl *clangDecl,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isVariadic, bool isFromSystemModule,
+                                  DeclName name, ParameterList *&parameterList);
 
   /// \brief Import the given function return type.
   ///
@@ -1028,10 +1066,9 @@ public:
   ///
   /// \returns the imported function return type, or null if the type cannot be
   /// imported.
-  std::pair<Type, bool>
-  importFunctionReturnType(DeclContext *dc,
-                           const clang::FunctionDecl *clangDecl,
-                           bool allowNSUIntegerAsInt);
+  ImportedType importFunctionReturnType(DeclContext *dc,
+                                        const clang::FunctionDecl *clangDecl,
+                                        bool allowNSUIntegerAsInt);
 
   /// \brief Import the parameter list for a function
   ///
@@ -1051,9 +1088,8 @@ public:
                               bool isVariadic, bool allowNSUIntegerAsInt,
                               ArrayRef<Identifier> argNames);
 
-  std::pair<Type, bool>
-  importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
-                     bool isFromSystemModule);
+  ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
+                                  bool isFromSystemModule);
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
@@ -1083,7 +1119,7 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  std::pair<Type, bool>
+  ImportedType
   importMethodType(const DeclContext *dc,
                    const clang::ObjCMethodDecl *clangDecl,
                    ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -1107,10 +1143,12 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  std::pair<Type, bool> importAccessorMethodType(
-      const DeclContext *dc, const clang::ObjCPropertyDecl *property,
-      const clang::ObjCMethodDecl *clangDecl, bool isFromSystemModule,
-      importer::ImportedName importedName, ParameterList **params);
+  ImportedType importAccessorMethodType(const DeclContext *dc,
+                                        const clang::ObjCPropertyDecl *property,
+                                        const clang::ObjCMethodDecl *clangDecl,
+                                        bool isFromSystemModule,
+                                        importer::ImportedName importedName,
+                                        ParameterList **params);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
