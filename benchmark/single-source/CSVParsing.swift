@@ -1,3 +1,9 @@
+import TestsUtils
+public let CSVParsing = BenchmarkInfo(
+    name: "CSVParsing",
+    runFunction: run_CSVParsing,
+    tags: [.miniapplication, .api, .String])
+
 struct ParseError: Error {
     var message: String
 }
@@ -7,7 +13,7 @@ let newline = "\n".utf16.first!
 let carriageReturn = "\n".utf16.first!
 let quote = "\"".utf16.first!
 
-@inline(__always) func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
+func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
     var result: Substring = "" // we accumulate the result
     
     while !remainder.isEmpty {
@@ -40,7 +46,7 @@ let quote = "\"".utf16.first!
 }
 
 // Consume a single field from `remainder`
-@inline(__always) func parseField(_ remainder: inout Substring) throws -> Substring? {
+func parseField(_ remainder: inout Substring) throws -> Substring? {
     guard let start = remainder.utf16.first else { return nil }
     switch start {
     case quote:
@@ -103,42 +109,42 @@ func parseLine<State>(_ remainder: inout Substring, result: inout State, process
     return !remainder.isEmpty && fieldNumber > 0
 }
 
-import Foundation
+let workloadBase = """
+    Heading1,Heading2,Heading3,Heading4,Heading5,Heading6,Heading7
+    FirstEntry,"secondentry",third,fourth,fifth,sixth,seventh
+    zéro,un,deux,trois,quatre,cinq,six
+    pagh,wa',cha',wej,IoS,vagh,jav
+    ᬦᬸᬮ᭄,ᬲᬶᬓᬶ,ᬤᬸᬯ,ᬢᭂᬮᬸ,ᬧᬧᬢ᭄,ᬮᬶᬫᬾ,ᬦᭂᬦᭂᬫ᭄
+    unu,du,tri,kvar,kvin,ses,sep
+    𐌏𐌉𐌍𐌏,𐌃𐌏,𐌕𐌓𐌉,𐌐𐌄𐌕𐌏𐌓,𐌐𐌄𐌌𐌐𐌄,𐌔𐌖𐌄𐌊𐌏𐌔,𐌔𐌄𐌗𐌕𐌀𐌌
+    zero,un,duo.tres.quantro,cinque,sex
+    nolla,yksi,kaksi,kolme,neljä,viisi,kuusi
+    нула,једин,два,три,четыри,петь,шесть
+    一,二,三,四,五,六,七,
+    saquui,ta'lo,tso'i,nvgi,hisgi,sudali,galiquogi
+    """
+let targetRowNumber = 300_000
+let repeatCount = targetRowNumber / workloadBase.split(separator: "\n").count
+let workload: String = repeatElement(workloadBase, count: repeatCount).joined()
 
-func time<Result>(name: StaticString = #function, line: Int = #line, _ f: () throws -> Result) rethrows -> Result {
-    let startTime = DispatchTime.now()
-    let result = try f()
-    let endTime = DispatchTime.now()
-    let diff = Double(endTime.uptimeNanoseconds - startTime.uptimeNanoseconds) / 1_000_000_000 as Double
-    print("\(name) (line \(line)): \(diff) sec")
-    return result
-}
+@inline(never)
+public func run_CSVParsing(_ N: Int) {
+    let contents = workload
 
-try time {
-    // URL for this file: http://www.maxmind.com/download/worldcities/worldcitiespop.txt.gz
-    //    let file = URL(fileURLWithPath: "/Users/chris/Downloads/1489325/stops.txt")
-    let file = URL(fileURLWithPath: "worldcitiespop.txt")
-    
-    // The + "\n" is a a trick by Ole Begemann, which forces the String to be a Swift String (not an NSString). It makes it more than twice as fast on my computer...
-    let contents = try String(contentsOf: file, encoding: .isoLatin1) + ""
-    
-    var remainder = contents[...]
-    
-    var result: Int = 0
-    var x: () = ()
-    
-    while !remainder.isEmpty {
-        _ = try parseLine(&remainder, result: &x, processField: { state, _, field in
-            ()
-        })
-        if result < 10 {
-            print("result: \(result)")
+    for _ in 0..<N {
+        var remainder = contents[...]
+        
+        var result: Int = 0
+        var x: () = ()
+        
+        while !remainder.isEmpty {
+            blackHole(try? parseLine(&remainder, result: &x, processField: { state, _, field in
+                ()
+            }))
+            blackHole(x)
+            result += 1
         }
-        result += 1
-        if result % 100_000 == 0 {
-            print(result)
-        }
+        blackHole(result)
     }
-    print(result)
-    
 }
+
