@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
