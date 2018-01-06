@@ -325,3 +325,28 @@ class FailingClass {
     fatalError("gotcha")
   }
 }
+
+// <https://bugs.swift.org/browse/SR-2729>
+// We should not report unreachable code inside protocol witness thunks
+
+protocol Fooable {
+  func foo() -> Never
+}
+struct Foo: Fooable {
+  func foo() -> Never { // no-warning
+    while true {}
+  }
+}
+
+// We should not report unreachable code inside vtable thunks
+class Base {
+  func foo(x: Int) -> Never {
+    while true {}
+  }
+}
+
+class Derived : Base {
+  override func foo(x: Int?) -> Never {
+    while true {}
+  }
+}
