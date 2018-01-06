@@ -7463,8 +7463,7 @@ namespace {
               closure = Rewriter.coerceClosureExprToVoid(closure);
             // A single-expression closure with a Never expression type
             // coerces to any other function type.
-            } else if (!fnType->getResult()->isUninhabited() &&
-                       cs.getType(body)->isUninhabited()) {
+            } else if (cs.getType(body)->isUninhabited()) {
               closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
             
