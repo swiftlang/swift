@@ -113,6 +113,6 @@ func tuple_existentials() {
   // 4 element tuple
   var t4 = (1,2,3,4)
   a = t4
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata(i64 4, {{.*}}, i8* null, i8** null)
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata(i64 4, {{.*}}, i8* null, i32 0, i8** null)
 }
 
