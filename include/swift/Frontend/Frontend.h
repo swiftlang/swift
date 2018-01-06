@@ -308,19 +308,22 @@ public:
 /// and set up the basic compiler invariants.  Calling \a setup multiple
 /// times on a single CompilerInstance is not permitted.
 class CompilerInstance {
+public:
+  // Inputs:
+  // NB: Must come before Context, because Context has a dtor that
+  // touches Inputs::SourceMgr.
+  CI_Inputs Inputs;
+
+private:
   CompilerInvocation Invocation;
   std::unique_ptr<ASTContext> Context;
-  
+
   /// Used when parsing SIL input, which isn't done in batch mode.
   std::unique_ptr<SILModule> TheSILModule;
 
   DependencyTracker *DepTracker = nullptr;
 
   SerializedModuleLoader *SML = nullptr;
-
-public:
-  // Inputs:
-  CI_Inputs Inputs;
 
 private:
   ModuleDecl *MainModule = nullptr;
