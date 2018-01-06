@@ -319,9 +319,9 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (Components[0]) {
   case 3:
 #ifdef SWIFT_VERSION_PATCHLEVEL
-    return Version{3, 3, SWIFT_VERSION_PATCHLEVEL};
+    return Version{3, 4, SWIFT_VERSION_PATCHLEVEL};
 #else
-    return Version{3, 3};
+    return Version{3, 4};
 #endif
   case 4:
     static_assert(SWIFT_VERSION_MAJOR == 4,
