@@ -2090,7 +2090,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::Method:
       return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
-                                           std::move(calleeInfo));
+                                           std::move(calleeInfo), false);
 
     case SILFunctionType::Representation::CFunctionPointer:
       assert(!selfValue && "C function pointer has self?");
@@ -2109,8 +2109,10 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     assert(vector.size() == 2 && "thick function pointer with size != 2");
     llvm::Value *functionValue = vector[0];
     llvm::Value *contextValue = vector[1];
+    bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
-                                         std::move(calleeInfo));
+                                         std::move(calleeInfo),
+                                         castToRefcountedContext);
   }
 
   case LoweredValue::Kind::EmptyExplosion:
@@ -4588,7 +4590,10 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;
   to.add(from.claimNext());
-  to.add(IGM.RefCountedNull);
+  if (i->getType().castTo<SILFunctionType>()->isNoEscape())
+    to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
+  else
+    to.add(IGM.RefCountedNull);
   setLoweredExplosion(i, to);
 }
 
