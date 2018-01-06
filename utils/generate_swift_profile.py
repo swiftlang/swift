@@ -62,7 +62,7 @@ def pushd(dir):
 class SwiftBuildConfig(object):
 
     BUILD_SUBDIR = 'swift-profile-gen'
-    INSTALL_PREFIX = os.path.join('toolchain', 'usr')
+    INSTALL_PREFIX = os.path.join(os.sep, 'toolchain', 'usr')
 
     def __init__(self, **kwargs):
         self.assertions = kwargs.get('assertions', False)
