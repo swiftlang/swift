@@ -458,7 +458,7 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
   Optional<std::pair<std::vector<std::string>,
-                     std::vector<const SupplementaryOutputPaths>>>
+                     std::vector<SupplementaryOutputPaths>>>
       outs = ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
                                             Opts.InputsAndOutputs, Diags)
                  .convert();

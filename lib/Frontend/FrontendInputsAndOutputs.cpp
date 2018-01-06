@@ -307,7 +307,7 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
 
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     ArrayRef<std::string> outputFiles,
-    ArrayRef<const SupplementaryOutputPaths> supplementaryOutputs) {
+    ArrayRef<SupplementaryOutputPaths> supplementaryOutputs) {
   assert(countOfFilesProducingOutput() == outputFiles.size());
   assert(countOfFilesProducingSupplementaryOutput() ==
          supplementaryOutputs.size());
