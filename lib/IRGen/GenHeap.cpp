@@ -234,9 +234,9 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     if (field.isPOD())
       continue;
 
-    field.getType().destroy(IGF, field.project(IGF, structAddr, offsets),
-                            fieldTy,
-                            false /*not outlined in heap's code paths*/);
+    field.getType().destroy(
+        IGF, field.project(IGF, structAddr, offsets), fieldTy,
+        true /*Called from metadata constructors: must be outlined*/);
   }
 
   emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
