@@ -285,15 +285,19 @@ public:
   }
 
   BuiltType createExistentialMetatypeType(BuiltType instance) const {
-    // FIXME: Implement.
-    return BuiltType();
+    return swift_getExistentialMetatypeMetadata(instance);
   }
 
   BuiltType createProtocolCompositionType(ArrayRef<BuiltType> protocols,
                                           bool hasExplicitAnyObject) const {
-    // FIXME: Implement.
-    // NOTE: protocols.back() could be a class type. Clean up this API.
-    return BuiltType();
+    // FIXME: Handle protocols and superclasses.
+    if (!protocols.empty()) return BuiltType();
+
+    auto classConstraint =
+      hasExplicitAnyObject ? ProtocolClassConstraint::Class
+                           : ProtocolClassConstraint::Any;
+    return swift_getExistentialTypeMetadata(classConstraint, nullptr, 0,
+                                            nullptr);
   }
 
   BuiltType createProtocolType(StringRef mangledName, StringRef moduleName,
@@ -305,7 +309,7 @@ public:
 
   BuiltType createGenericTypeParameterType(unsigned depth,
                                            unsigned index) const {
-    // FIXME: Implement.
+    // FIXME: Implement substitution logic here.
     return BuiltType();
   }
 

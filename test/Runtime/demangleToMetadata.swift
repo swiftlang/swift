@@ -33,6 +33,8 @@ func f2(x: (), y: ()) { }
 
 func f1_variadic(x: ()...) { }
 func f1_inout(x: inout ()) { }
+func f1_shared(x: __shared AnyObject) { }
+func f1_owned(x: __owned AnyObject) { }
 
 func f2_variadic_inout(x: ()..., y: inout ()) { }
 
@@ -59,7 +61,8 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(type(of: f1_inout), _typeByMangledName("yyytzc")!)
 
   // Ownership parameters.
-  // FIXME: Shared/owned
+  expectEqual(type(of: f1_shared), _typeByMangledName("yyyXlhc")!)
+  expectEqual(type(of: f1_owned), _typeByMangledName("yyyXlc")!)
 
   // Mix-and-match.
   expectEqual(type(of: f2_variadic_inout), _typeByMangledName("yyytd_ytztc")!)
@@ -68,6 +71,24 @@ DemangleToMetadataTests.test("function types") {
 DemangleToMetadataTests.test("metatype types") {
   expectEqual(type(of: type(of: ())), _typeByMangledName("ytm")!)
   expectEqual(type(of: type(of: f0)), _typeByMangledName("yycm")!)
+}
+
+func f2_any_anyobject(_: Any, _: AnyObject) { }
+
+DemangleToMetadataTests.test("existential types") {
+  // Any, AnyObject
+  expectEqual(type(of: f2_any_anyobject), _typeByMangledName("yyyp_yXltc")!)
+
+  // FIXME: References to protocols.
+  // FIXME: References to superclass.
+}
+
+DemangleToMetadataTests.test("existential metatype types") {
+  // Any
+  expectEqual(type(of: Any.self), _typeByMangledName("ypm")!)
+
+  // AnyObject
+  expectEqual(type(of: AnyObject.self), _typeByMangledName("yXlm")!)
 }
 
 runAllTests()
