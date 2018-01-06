@@ -41,18 +41,18 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @checkMetadata()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %0 = call %swift.type* @_T021subclass_existentials1P_AA1CCXcMa()
+// CHECK-NEXT:   %0 = call %swift.type* @"$S21subclass_existentials1P_AA1CCXcMa"()
 // CHECK-NEXT:   call swiftcc void @takesMetadata(%swift.type* %0, %swift.type* %0)
 // CHECK-NEXT:   ret void
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T021subclass_existentials1P_AA1CCXcMa()
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$S21subclass_existentials1P_AA1CCXcMa"()
 // CHECK:      entry:
 // CHECK-NEXT:   [[PROTOCOL_ARRAY:%.*]] = alloca [1 x %swift.protocol*]
 // CHECK:      cacheIsNull:
 // CHECK:        [[PROTOCOLS:%.*]] = bitcast [1 x %swift.protocol*]* [[PROTOCOL_ARRAY]] to %swift.protocol**
 // CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds %swift.protocol*, %swift.protocol** [[PROTOCOLS]], i32 0
-// CHECK-NEXT:   store %swift.protocol* @_T021subclass_existentials1PMp, %swift.protocol** [[PROTOCOL]]
-// CHECK-NEXT:   [[SUPERCLASS:%.*]] = call %swift.type* @_T021subclass_existentials1CCMa()
+// CHECK-NEXT:   store %swift.protocol* @"$S21subclass_existentials1PMp", %swift.protocol** [[PROTOCOL]]
+// CHECK-NEXT:   [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1CCMa"()
 // CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_rt_swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, %swift.protocol** [[PROTOCOLS]])
 // CHECK:        ret
 
@@ -69,7 +69,7 @@ bb0:
 // CHECK-LABEL: define{{( protected)?}} swiftcc { %T21subclass_existentials1CC*, i8** } @eraseToExistential(%T21subclass_existentials1DC*)
 // CHECK:       [[INSTANCE:%.*]] = bitcast %T21subclass_existentials1DC* %0 to %T21subclass_existentials1CC*
 // CHECK-NEXT:  [[RESULT1:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } undef, %T21subclass_existentials1CC* [[INSTANCE]], 0
-// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } [[RESULT1]], i8** @_T021subclass_existentials1DCAA1PAAWP, 1
+// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } [[RESULT1]], i8** @"$S21subclass_existentials1DCAA1PAAWP", 1
 // CHECK-NEXT:  ret { %T21subclass_existentials1CC*, i8** } [[RESULT2]]
 sil @eraseToExistential : $@convention(thin) (@owned D) -> @owned C & P {
 bb0(%0 : $D):
@@ -80,7 +80,7 @@ bb0(%0 : $D):
 // CHECK-LABEL: define{{( protected)?}} swiftcc { %T21subclass_existentials1GC*, i8** } @eraseToExistentialWithGeneric(%T21subclass_existentials1EC*)
 // CHECK:       [[INSTANCE:%.*]] = bitcast %T21subclass_existentials1EC* %0 to %T21subclass_existentials1GC*
 // CHECK-NEXT:  [[RESULT1:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } undef, %T21subclass_existentials1GC* [[INSTANCE]], 0
-// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @_T021subclass_existentials1ECyxGAA1PAAWP, 1
+// CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @"$S21subclass_existentials1ECyxGAA1PAAWP", 1
 // CHECK-NEXT:  ret { %T21subclass_existentials1GC*, i8** } [[RESULT2]]
 sil @eraseToExistentialWithGeneric : $@convention(thin) <τ_0_0> (@owned E<τ_0_0>) -> @owned G<τ_0_0> & P {
 bb0(%0 : $E<τ_0_0>):
@@ -95,8 +95,8 @@ bb0(%0 : $C, %1 : $C & P):
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
 // CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %0 to i8*
-// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @_T021subclass_existentials1DCMa()
-// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.type* [[SUPERCLASS]], %swift.protocol* @_T021subclass_existentials1RMp)
+// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1DCMa"()
+// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.type* [[SUPERCLASS]], %swift.protocol* @"$S21subclass_existentials1RMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %T21subclass_existentials1DC*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
@@ -146,7 +146,7 @@ bb0(%0 : $C):
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
 // CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %0 to i8*
-// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.protocol* @_T021subclass_existentials1PMp)
+// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.protocol* @"$S21subclass_existentials1PMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %T21subclass_existentials1CC*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
@@ -180,8 +180,8 @@ sil @checkExistentialMetatypeDowncast : $@convention(thin) (@owned @thick C.Type
 bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
-// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @_T021subclass_existentials1DCMa()
-// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.type* [[SUPERCLASS]], %swift.protocol* @_T021subclass_existentials1RMp)
+// CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @"$S21subclass_existentials1DCMa"()
+// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.type* [[SUPERCLASS]], %swift.protocol* @"$S21subclass_existentials1RMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %swift.type*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
@@ -200,7 +200,7 @@ sil @checkExistentialSameClassMetatypeDowncast : $@convention(thin) (@owned @thi
 bb0(%0 : $@thick C.Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
-// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.protocol* @_T021subclass_existentials1PMp)
+// CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.protocol* @"$S21subclass_existentials1PMp")
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %swift.type*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1

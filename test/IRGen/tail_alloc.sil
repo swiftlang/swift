@@ -17,7 +17,7 @@ sil_vtable TestClass {}
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
@@ -34,7 +34,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 28, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -46,7 +46,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}CMa()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}CMa"()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 40, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -60,7 +60,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 [[A]], i64 7)
@@ -73,7 +73,7 @@ bb0(%c : $Builtin.Word):
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]
 // CHECK-NEXT: [[S3:%[0-9]+]] = add i64 [[S2]], 3

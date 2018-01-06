@@ -16,11 +16,11 @@ public protocol Runcible {
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
+// CHECK:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
 // -- nominal type descriptor
-// CHECK:           @_T0SC6NSRectVMn
+// CHECK:           @"$SSC6NSRectVMn"
 // -- witness table
-// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @"$SSC6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
 // -- reserved
 // CHECK:           i32 0
 // CHECK:         },
@@ -36,7 +36,7 @@ extension NSRect: Runcible {
 // CHECK:           @"got.OBJC_CLASS_$_Gizmo"
 // CHECK:           i32 3
 // -- witness table
-// CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
 // -- reserved
 // CHECK:           i32 0
 // CHECK:         }

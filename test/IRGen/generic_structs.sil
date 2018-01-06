@@ -6,20 +6,20 @@ import Builtin
 
 // -- Generic structs with dynamic layout contain the vwtable pattern as part
 //    of the metadata pattern, and no independent vwtable symbol
-// CHECK: @_T015generic_structs13SingleDynamicVWV = internal constant
-// CHECK-SAME:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @_T015generic_structs13SingleDynamicVwCP to i8*),
+// CHECK: @"$S15generic_structs13SingleDynamicVWV" = internal constant
+// CHECK-SAME:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @"$S15generic_structs13SingleDynamicVwCP" to i8*),
 // -- ...
 // -- placeholder for size, flags, stride
 // CHECK-SAME:   i8* null, i8* null, i8* null
 // -- extra inhabitants
 // CHECK-SAME:   i8* null,
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T015generic_structs13SingleDynamicVwxs to i8*),
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T015generic_structs13SingleDynamicVwxg to i8*)]
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S15generic_structs13SingleDynamicVwxs" to i8*),
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S15generic_structs13SingleDynamicVwxg" to i8*)]
 
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"15generic_structs13SingleDynamicV\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
-// CHECK: @_T015generic_structs13SingleDynamicVMn = hidden constant <{ {{.*}} i32 }> <{
+// CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK-SAME:   [34 x i8]* [[SINGLEDYNAMIC_NAME]]
 // --       field count
@@ -41,14 +41,14 @@ import Builtin
 // --       generic parameters at depth 0
 // CHECK-SAME: i32 1
 // CHECK-SAME: }>
-// CHECK: @_T015generic_structs13SingleDynamicVMP = internal global <{ {{.*}} }> <{
+// CHECK: @"$S15generic_structs13SingleDynamicVMP" = internal global <{ {{.*}} }> <{
 // -- template header
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_SingleDynamic,
 // CHECK-SAME:   i32 48, i16 1, i16 16, [{{[0-9]+}} x i8*] zeroinitializer,
 // -- vwtable pointer
-// CHECK-SAME:   @_T015generic_structs13SingleDynamicVWV
+// CHECK-SAME:   @"$S15generic_structs13SingleDynamicVWV"
 // -- address point
-// CHECK-SAME:   i64 1, {{.*}}* @_T015generic_structs13SingleDynamicVMn
+// CHECK-SAME:   i64 1, {{.*}}* @"$S15generic_structs13SingleDynamicVMn"
 // -- field offset vector; generic parameter vector
 // CHECK-SAME:   i64 0, %swift.type* null }>
 
@@ -56,7 +56,7 @@ import Builtin
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"15generic_structs23DynamicWithRequirementsV\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
-// CHECK: @_T015generic_structs23DynamicWithRequirementsVMn = hidden constant <{ {{.*}} i32 }> <{
+// CHECK: @"$S15generic_structs23DynamicWithRequirementsVMn" = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK-SAME: [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count
@@ -79,18 +79,18 @@ import Builtin
 // CHECK-SAME: i32 2
 // CHECK-SAME: }>
 
-// CHECK: @_T015generic_structs23DynamicWithRequirementsVMP = internal global <{ {{.*}} }> <{
+// CHECK: @"$S15generic_structs23DynamicWithRequirementsVMP" = internal global <{ {{.*}} }> <{
 // -- field offset vector; generic parameter vector
 // CHECK:   i64 0, i64 0, %swift.type* null, %swift.type* null, i8** null, i8** null }>
 
 // -- Fixed-layout struct metadata contains fixed field offsets
-// CHECK: @_T015generic_structs6IntishVMf = internal constant <{ {{.*}} i64 }> <{
+// CHECK: @"$S15generic_structs6IntishVMf" = internal constant <{ {{.*}} i64 }> <{
 // CHECK-SAME:   i64 0
 // CHECK-SAME: }>
-// CHECK: @_T015generic_structs7CharethVMf = internal constant <{ {{.*}} i64 }> <{
+// CHECK: @"$S15generic_structs7CharethVMf" = internal constant <{ {{.*}} i64 }> <{
 // CHECK-SAME:   i64 0
 // CHECK-SAME: }>
-// CHECK: @_T015generic_structs8StringlyVMf = internal constant <{ {{.*}} i64, i64, i64 }> <{
+// CHECK: @"$S15generic_structs8StringlyVMf" = internal constant <{ {{.*}} i64, i64, i64 }> <{
 // CHECK-SAME:   i64 0, i64 8, i64 16
 // CHECK-SAME: }>
 
@@ -181,7 +181,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // Check that we directly delegate buffer witnesses to a single dynamic field:
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwCP([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
@@ -195,7 +195,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 
 
 //   initializeBufferWithTakeOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwTK([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S15generic_structs13SingleDynamicVwTK"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1

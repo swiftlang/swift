@@ -5,7 +5,7 @@ class A {
 
 class B { }
 
-// CHECK: define {{.*}} @_T011WeakCapture8functionyyF()
+// CHECK: define {{.*}} @"$S11WeakCapture8functionyyF"()
 func function() {
     let b = B()
 

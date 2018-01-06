@@ -17,7 +17,7 @@ _ = testit()
 // CHECK: sil hidden @{{.*}}testit
 
 // CHECK:      // MyStruct.StaticVar.getter
-// CHECK-NEXT: sil private @_{{.*}}StaticVar
+// CHECK-NEXT: sil private @$S{{.*}}StaticVar
 
 // CHECK:      // Global.getter
-// CHECK-NEXT: sil private @_{{.*}}Global
+// CHECK-NEXT: sil private @$S{{.*}}Global

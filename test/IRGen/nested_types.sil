@@ -20,8 +20,8 @@ bb0(%0 : $@thick Outer.Inner.Type):
   return %1 : $@thick Outer.Type
 }
 // CHECK-LABEL: define{{ | protected }}swiftcc %swift.type* @test0(%swift.type*)
-// CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
+// CHECK:      [[T0:%.*]] = call %swift.type* @"$S12nested_types5OuterCMa"()
 // CHECK-NEXT: ret %swift.type* [[T0]]
 
-// CHECK-LABEL: define hidden %swift.type* @_T012nested_types5OuterC5InnerVMa()
-// CHECK:      ret %swift.type* bitcast {{.*}} @_T012nested_types5OuterC5InnerVMf
+// CHECK-LABEL: define hidden %swift.type* @"$S12nested_types5OuterC5InnerVMa"()
+// CHECK:      ret %swift.type* bitcast {{.*}} @"$S12nested_types5OuterC5InnerVMf"
