@@ -138,6 +138,14 @@ contain the following fields:
   If the function takes no arguments, **parameter type vector** as well as
   **parameter flags vector** are going to be empty.
 
+Currently we have specialized ABI endpoints to retrieve metadata for functions
+with 0/1/2/3 parameters - `swift_getFunctionTypeMetadata{0|1|2|3}` and the general
+one `swift_getFunctionTypeMetadata` which handles all other function types and
+functions with parameter flags e.g. `(inout Int) -> Void`. Based on the usage
+information collected from Swift Standard Library and Overlays as well as Source
+Compatibility Suite it was decided not to have specialized ABI endpoints for
+functions with parameter flags due their minimal use.
+
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
 

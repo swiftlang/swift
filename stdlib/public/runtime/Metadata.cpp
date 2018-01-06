@@ -326,13 +326,6 @@ public:
     const uint32_t *ParameterFlags;
     const Metadata *Result;
 
-    Key(FunctionTypeFlags flags,
-        const Metadata *const *params,
-        const uint32_t *paramFlags,
-        const Metadata *result)
-      : Flags(flags), Parameters(params), ParameterFlags(paramFlags),
-        Result(result) {}
-
     FunctionTypeFlags getFlags() const { return Flags; }
     const Metadata *getParameter(unsigned index) const {
       assert(index < Flags.getNumParameters());
@@ -351,13 +344,13 @@ public:
     }
   };
 
-  FunctionCacheEntry(Key key);
+  FunctionCacheEntry(const Key &key);
 
   intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value here.
   }
 
-  int compareWithKey(Key key) const {
+  int compareWithKey(const Key &key) const {
     auto keyFlags = key.getFlags();
     if (auto result = compareIntegers(keyFlags.getIntValue(),
                                       Data.Flags.getIntValue()))
@@ -379,7 +372,7 @@ public:
 
     return 0;
   }
-  static size_t getExtraAllocationSize(Key key) {
+  static size_t getExtraAllocationSize(const Key &key) {
     return getExtraAllocationSize(key.Flags);
   }
 
@@ -387,14 +380,12 @@ public:
     return getExtraAllocationSize(Data.Flags);
   }
 
-  static size_t getExtraAllocationSize(const FunctionTypeFlags flags) {
+  static size_t getExtraAllocationSize(const FunctionTypeFlags &flags) {
     const auto numParams = flags.getNumParameters();
     auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
-
-    const auto alignment = sizeof(void *);
-    return (size + alignment - 1) & ~(alignment - 1);
+    return roundUpToAlignment(size, sizeof(void *));
   }
 };
 
@@ -402,6 +393,14 @@ public:
 
 /// The uniquing structure for function type metadata.
 static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
+                                      const Metadata *result) {
+  assert(flags.getNumParameters() == 0
+         && "wrong number of arguments in function metadata flags?!");
+  return swift_getFunctionTypeMetadata(flags, nullptr, nullptr, result);
+}
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
@@ -414,21 +413,6 @@ swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
 }
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 1
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0 };
-  const uint32_t parameterFlags[] = { flags0.getIntValue() };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
-}
-
-const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const Metadata *arg0,
                                       const Metadata *arg1,
@@ -437,26 +421,6 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
          && "wrong number of arguments in function metadata flags?!");
   const Metadata *parameters[] = { arg0, arg1 };
   return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *arg1,
-                                               ParameterFlags flags1,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 2
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0, arg1 };
-  const uint32_t parameterFlags[] = {
-    flags0.getIntValue(),
-    flags1.getIntValue()
-  };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
 }
 
 const FunctionTypeMetadata *
@@ -472,29 +436,6 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
 }
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
-                                               const Metadata *arg0,
-                                               ParameterFlags flags0,
-                                               const Metadata *arg1,
-                                               ParameterFlags flags1,
-                                               const Metadata *arg2,
-                                               ParameterFlags flags2,
-                                               const Metadata *result) {
-  assert(flags.getNumParameters() == 3
-         && "wrong number of arguments in function metadata flags?!");
-  const Metadata *parameters[] = { arg0, arg1, arg2 };
-  const uint32_t parameterFlags[] = {
-    flags0.getIntValue(),
-    flags1.getIntValue(),
-    flags2.getIntValue()
-  };
-  return swift_getFunctionTypeMetadata(flags,
-                                       parameters,
-                                       parameterFlags,
-                                       result);
-}
-
-const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
                                      const Metadata *const *parameters,
                                      const uint32_t *parameterFlags,
@@ -503,7 +444,7 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
-FunctionCacheEntry::FunctionCacheEntry(Key key) {
+FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   auto flags = key.getFlags();
 
   // Pick a value witness table appropriate to the function convention.

@@ -769,6 +769,13 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
               TypeMetadataPtrTy->getPointerTo(0),
               Int32Ty->getPointerTo(0),
               TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
+//                                          const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata0, swift_getFunctionTypeMetadata0, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata1(unsigned long flags,
@@ -779,16 +786,6 @@ FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1, DefaultCC,
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
 
-// Metadata *swift_getFunctionTypeMetadata1WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t paramFlags,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata1WithFlags, swift_getFunctionTypeMetadata1WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // Metadata *swift_getFunctionTypeMetadata2(unsigned long flags,
 //                                          const Metadata *arg0,
 //                                          const Metadata *arg1,
@@ -798,19 +795,6 @@ FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2,
         RETURNS(TypeMetadataPtrTy),
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getFunctionTypeMetadata2WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
-//                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata2WithFlags, swift_getFunctionTypeMetadata2WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata3(unsigned long flags,
 //                                          const Metadata *arg0,
@@ -823,21 +807,6 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
              TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getFunctionTypeMetadata3WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
-//                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
-//                                                   const Metadata *arg2,
-//                                                   const uint32_t flags2,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata3WithFlags, swift_getFunctionTypeMetadata3WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
 FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, DefaultCC,

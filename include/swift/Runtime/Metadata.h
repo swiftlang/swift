@@ -2805,16 +2805,14 @@ swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                               const Metadata *arg0,
+swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
                                const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *result);
+swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
+                               const Metadata *arg0,
+                               const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
@@ -2824,15 +2822,6 @@ swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *arg1,
-                                        ParameterFlags flags1,
-                                        const Metadata *result);
-
-SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 FunctionTypeFlags flags,
                                                 const Metadata *arg0,
@@ -2840,102 +2829,7 @@ const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 const Metadata *arg2,
                                                 const Metadata *result);
 
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
-                                                FunctionTypeFlags flags,
-                                                const Metadata *arg0,
-                                                ParameterFlags flags0,
-                                                const Metadata *arg1,
-                                                ParameterFlags flags1,
-                                                const Metadata *arg2,
-                                                ParameterFlags flags2,
-                                                const Metadata *result);
-
-/// \brief Fetch a uniqued metadata for a thin function type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata(size_t numArguments,
-                                  const void * argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata1(const void *arg0,
-                                   const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata2(const void *arg0,
-                                   const void *arg1,
-                                   const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata3(const void *arg0,
-                                   const void *arg1,
-                                   const void *arg2,
-                                   const Metadata *resultMetadata);
-
-/// \brief Fetch a uniqued metadata for a C function type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata(size_t numArguments,
-                               const void * argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata1(const void *arg0,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata2(const void *arg0,
-                                const void *arg1,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata3(const void *arg0,
-                                const void *arg1,
-                                const void *arg2,
-                                const Metadata *resultMetadata);
-
 #if SWIFT_OBJC_INTEROP
-/// \brief Fetch a uniqued metadata for a block type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata(size_t numArguments,
-                           const void *argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata1(const void *arg0,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata2(const void *arg0,
-                            const void *arg1,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata3(const void *arg0,
-                            const void *arg1,
-                            const void *arg2,
-                            const Metadata *resultMetadata);
-
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
