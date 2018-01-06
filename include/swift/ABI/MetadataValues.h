@@ -676,6 +676,40 @@ public:
 };
 using ParameterFlags = TargetParameterTypeFlags<uint32_t>;
 
+template <typename int_type>
+class TargetTupleTypeFlags {
+  enum : int_type {
+    NonConstantLabelsMask    = 1 << 0,
+  };
+  int_type Data;
+
+public:
+  constexpr TargetTupleTypeFlags(int_type Data) : Data(Data) {}
+
+  constexpr TargetTupleTypeFlags<int_type> withNonConstantLabels(
+                                             bool hasNonConstantLabels) const {
+    return TargetTupleTypeFlags<int_type>(
+                        (Data & NonConstantLabelsMask) |
+                          (hasNonConstantLabels ? NonConstantLabelsMask : 0));
+  }
+
+  bool hasNonConstantLabels() const { return Data & NonConstantLabelsMask; }
+
+  int_type getIntValue() const { return Data; }
+
+  static TargetTupleTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetTupleTypeFlags(Data);
+  }
+
+  bool operator==(TargetTupleTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetTupleTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using TupleTypeFlags = TargetTupleTypeFlags<uint32_t>;
+
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.
 class FieldType {
