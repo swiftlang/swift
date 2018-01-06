@@ -116,7 +116,8 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
         llvm::cl::init(""));
 
 static llvm::cl::opt<std::string>
-Target("target", llvm::cl::desc("target triple"));
+Target("target", llvm::cl::desc("target triple"),
+       llvm::cl::init(llvm::sys::getDefaultTargetTriple()));
 
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
