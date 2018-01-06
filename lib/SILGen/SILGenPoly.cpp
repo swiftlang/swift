@@ -3392,7 +3392,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   SILValue reqtResultValue = resultPlanner.execute(witnessResultValue);
 
   scope.pop();
-  B.createReturn(loc, reqtResultValue);
+  B.createReturn(CleanupLocation::get(loc), reqtResultValue);
 }
 
 //===----------------------------------------------------------------------===//
