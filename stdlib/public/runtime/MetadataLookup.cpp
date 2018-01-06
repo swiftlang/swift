@@ -313,8 +313,24 @@ public:
   BuiltType createFunctionType(
                            ArrayRef<Demangle::FunctionParam<BuiltType>> params,
                            BuiltType result, FunctionTypeFlags flags) const {
-    // FIXME: Implement.
-    return BuiltType();
+    std::vector<BuiltType> paramTypes;
+    std::vector<uint32_t> paramFlags;
+
+    // Fill in the parameters.
+    paramTypes.reserve(params.size());
+    if (flags.hasParameterFlags())
+      paramFlags.reserve(params.size());
+    for (const auto &param : params) {
+      paramTypes.push_back(param.getType());
+      if (flags.hasParameterFlags())
+        paramFlags.push_back(param.getFlags().getIntValue());
+    }
+
+    return swift_getFunctionTypeMetadata(flags, paramTypes.data(),
+                                         flags.hasParameterFlags()
+                                           ? paramFlags.data()
+                                           : nullptr,
+                                         result);
   }
 
   BuiltType createTupleType(ArrayRef<BuiltType> elements,

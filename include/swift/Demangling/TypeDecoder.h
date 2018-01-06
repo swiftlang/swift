@@ -255,12 +255,15 @@ class TypeDecoder {
 
       bool isThrow =
         Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
-      flags = flags.withThrows(true);
+      flags = flags.withThrows(isThrow);
 
+      bool hasParamFlags = false;
       std::vector<FunctionParam<BuiltType>> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
-                                          parameters))
+                                          parameters, hasParamFlags))
         return BuiltType();
+      flags = flags.withNumParameters(parameters.size())
+          .withParameterFlags(hasParamFlags);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
@@ -435,11 +438,13 @@ private:
 
   bool decodeMangledFunctionInputType(
       const Demangle::NodePointer &node,
-      std::vector<FunctionParam<BuiltType>> &params) {
+      std::vector<FunctionParam<BuiltType>> &params,
+      bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
         node->getKind() == NodeKind::ArgumentTuple) {
-      return decodeMangledFunctionInputType(node->getFirstChild(), params);
+      return decodeMangledFunctionInputType(node->getFirstChild(), params,
+                                            hasParamFlags);
     }
 
     auto decodeParamTypeAndFlags =
@@ -450,10 +455,12 @@ private:
       case NodeKind::InOut:
         param.setInOut();
         node = node->getFirstChild();
+        hasParamFlags = true;
         break;
 
       case NodeKind::Shared:
         param.setShared();
+        hasParamFlags = true;
         node = node->getFirstChild();
         break;
 
@@ -483,6 +490,7 @@ private:
 
         case NodeKind::VariadicMarker:
           param.setVariadic();
+          hasParamFlags = true;
           break;
 
         case NodeKind::Type:
