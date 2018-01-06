@@ -680,6 +680,22 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getBody());
 
+  // Emit the call to super.init() right before exiting from the initializer.
+  if (NeedsBoxForSelf) {
+    if (auto *SI = ctor->getSuperInitCall()) {
+      B.setInsertionPoint(ReturnDest.getBlock());
+
+      emitRValue(SI);
+
+      B.emitBlock(B.splitBlockForFallthrough(), ctor);
+
+      ReturnDest = JumpDest(B.getInsertionBB(),
+                            ReturnDest.getDepth(),
+                            ReturnDest.getCleanupLocation());
+      B.clearInsertionPoint();
+    }
+  }
+
   CleanupStateRestorationScope SelfCleanupSave(Cleanups);
 
   // Build a custom epilog block, since the AST representation of the
@@ -693,16 +709,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
            "emitting epilog in wrong scope");
 
     SILGenSavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
-    assert(B.getInsertionBB()->empty() && "Epilog already set up?");
     auto cleanupLoc = CleanupLocation(ctor);
 
     // If we're using a box for self, reload the value at the end of the init
     // method.
     if (NeedsBoxForSelf) {
-      // Emit the call to super.init() right before exiting from the initializer.
-      if (Expr *SI = ctor->getSuperInitCall())
-        emitRValue(SI);
-
       ManagedValue storedSelf =
           ManagedValue::forUnmanaged(VarLocs[selfDecl].value);
       selfArg = B.createLoadCopy(cleanupLoc, storedSelf);

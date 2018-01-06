@@ -132,3 +132,29 @@ class ChildOfParentWithNoDefaultInit : ParentWithNoDefaultInit {
 // CHECK: return
   }
 }
+
+// <https://bugs.swift.org/browse/SR-5974> - auto-generated super.init()
+// delegation to a throwing or failing initializer
+class FailingParent {
+  init?() {}
+}
+
+class ThrowingParent {
+  init() throws {}
+}
+
+class FailingThrowingParent {
+  init?() throws {}
+}
+
+class FailingChild : FailingParent {
+  override init?() {}
+}
+
+class ThrowingChild : ThrowingParent {
+  override init() throws {}
+}
+
+class FailingThrowingChild : FailingThrowingParent {
+  override init?() throws {}
+}
