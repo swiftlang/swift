@@ -34,10 +34,10 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
   return x*z
 }
 
-// CHECK-LABEL: define hidden swiftcc double @_T08test_v7k8addStackS{{.*}}(double, double, double, double, double, double, double, float, double)
+// CHECK-LABEL: define hidden swiftcc double @_T08test_v7k8addStack{{.*}}(double, double, double, double, double, double, double, float, double)
 // CHECK: fadd double
 // CHECK: ret double
-// V7K-LABEL: __T08test_v7k8addStackS
+// V7K-LABEL: __T08test_v7k8addStack
 // V7K: vldr d16, [sp]
 // V7K: vadd.f64 d0, d6, d16
 // a is assigned to d6, c is passed via stack
@@ -46,9 +46,9 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
   return a+c
 }
 
-// CHECK-LABEL: define hidden swiftcc float @_T08test_v7k9addStack2{{.*}}(double, double, double, double, double, double, double, float, double, float)
+// CHECK-LABEL: define hidden swiftcc float @_T08test_v7k9addStack{{.*}}(double, double, double, double, double, double, double, float, double, float)
 // CHECK: fadd float
-// V7K-LABEL: __T08test_v7k9addStack2
+// V7K-LABEL: __T08test_v7k9addStack
 // V7K: vldr s0, [sp, #8]
 // V7K: vadd.f32 s0, s14, s0
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
@@ -214,8 +214,8 @@ func testOpt(x: Float?) -> Float {
 }
 
 // Returning tuple: (Int, Int)
-// CHECK-LABEL: define hidden swiftcc { i32, i32 } @_T08test_v7k6minMaxS{{.*}}(i32, i32)
-// V7K-LABEL: __T08test_v7k6minMaxS
+// CHECK-LABEL: define hidden swiftcc { i32, i32 } @_T08test_v7k6minMax{{.*}}(i32, i32)
+// V7K-LABEL: __T08test_v7k6minMax
 // V7K: ldr r0
 // V7K: ldr r1
 func minMax(x : Int, y : Int) -> (min: Int, max: Int) {
