@@ -2139,17 +2139,10 @@ extension BinaryFloatingPoint {
         return (source.sign == .minus ? -.infinity : .infinity, true)
       }
       // IEEE 754 requires that any NaN payload be propagated, if possible.
-      let payload_ = source.isSignalingNaN
-        ? source.significandBitPattern ^
-          Source.signalingNaN.significandBitPattern
-        : source.significandBitPattern ^ Source.nan.significandBitPattern
-      // For all extant conforming types,
-      //
-      //   .nan.significandBitPattern | .signalingNaN.significandBitPattern
-      //     == .signalingNaN.significandBitPattern
-      //
-      // However, there appears to be no semantic guarantee of this relation,
-      // either in Swift or in IEEE 754. Therefore, we proceed conservatively.
+      let payload_ =
+        source.significandBitPattern &
+          ~(Source.nan.significandBitPattern |
+            Source.signalingNaN.significandBitPattern)
       let mask =
         Self.greatestFiniteMagnitude.significandBitPattern &
           ~(Self.nan.significandBitPattern |

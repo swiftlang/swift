@@ -125,14 +125,10 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
   expectTrue(Float._convert(from: Double.nan).value.isNaN)
   expectFalse(Double._convert(from: Float.nan).value.isSignalingNaN)
   expectFalse(Float._convert(from: Double.nan).value.isSignalingNaN)
-  expectTrue(Double._convert(from: Float.signalingNaN).value.isSignalingNaN)
-  expectTrue(Float._convert(from: Double.signalingNaN).value.isSignalingNaN)
+  expectTrue(Double._convert(from: Float.signalingNaN).value.isNaN)
+  expectTrue(Float._convert(from: Double.signalingNaN).value.isNaN)
 
-  var x = Float(bitPattern: Float.nan.bitPattern | 0xf)
-  expectEqual(
-    Float._convert(from: Double._convert(from: x).value).value.bitPattern,
-    x.bitPattern)
-  x = Float(bitPattern: Float.signalingNaN.bitPattern | 0xf)
+  let x = Float(bitPattern: Float.nan.bitPattern | 0xf)
   expectEqual(
     Float._convert(from: Double._convert(from: x).value).value.bitPattern,
     x.bitPattern)
@@ -140,15 +136,11 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
   expectEqual(
     Double._convert(from: Float._convert(from: y).value).value.bitPattern,
     y.bitPattern)
-  y = Double(bitPattern: Double.signalingNaN.bitPattern | 0xf)
-  expectEqual(
-    Double._convert(from: Float._convert(from: y).value).value.bitPattern,
-    y.bitPattern)
-  y = Double(bitPattern: Double.signalingNaN.bitPattern | (1 << 32 - 1))
+  y = Double(bitPattern: Double.nan.bitPattern | (1 << 32 - 1))
   expectNotEqual(
     Double._convert(from: Float._convert(from: y).value).value.bitPattern,
     y.bitPattern)
-  expectTrue(Float._convert(from: y).value.isSignalingNaN)
+  expectTrue(Float._convert(from: y).value.isNaN)
   expectFalse(Float._convert(from: y).exact)
 
   expectTrue(
