@@ -57,32 +57,9 @@ struct SupplementaryOutputPaths {
         SerializedDiagnosticsPath(serializedDiagnosticsPath),
         LoadedModuleTracePath(loadedModuleTracePath), TBDPath(tbdPath) {}
 
-  SupplementaryOutputPaths(
-      unsigned i, Optional<std::vector<std::string>> &objCHeaderOutputs,
-      Optional<std::vector<std::string>> &moduleOutput,
-      Optional<std::vector<std::string>> &moduleDocOutputs,
-      Optional<std::vector<std::string>> &dependenciesFiles,
-      Optional<std::vector<std::string>> &referenceDependenciesFiles,
-      Optional<std::vector<std::string>> &serializedDiagnostics,
-      Optional<std::vector<std::string>> &loadedModuleTrace,
-      Optional<std::vector<std::string>> &TBDs)
-      : ObjCHeaderOutputPath(ith(objCHeaderOutputs, i)),
-        ModuleOutputPath(ith(moduleOutput, i)),
-        ModuleDocOutputPath(ith(moduleDocOutputs, i)),
-        DependenciesFilePath(ith(dependenciesFiles, i)),
-        ReferenceDependenciesFilePath(ith(referenceDependenciesFiles, i)),
-        SerializedDiagnosticsPath(ith(serializedDiagnostics, i)),
-        LoadedModuleTracePath(ith(loadedModuleTrace, i)),
-        TBDPath(ith(TBDs, i)) {}
-
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
-private:
-  static std::string ith(Optional<std::vector<std::string>> &names,
-                         unsigned i) {
-    return !names ? "" : (*names)[i];
-  }
 };
 } // namespace swift
 
