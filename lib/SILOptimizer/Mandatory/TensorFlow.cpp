@@ -13,9 +13,18 @@
 #include "TensorFlow.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "llvm/ADT/StringExtras.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#ifdef SWIFT_ENABLE_TENSORFLOW
+#ifdef CMAKE_INTDIR
+#include "tensorflow/c/c_api.h"
+#else
+#include "tensorflow/c/c_api.h"
+#endif
+#endif
+
 using namespace swift;
 using namespace tf;
 
@@ -46,6 +55,74 @@ Type tf::isTensorHandle(Type ty) {
     }
   }
   return Type();
+}
+
+static bool is64(Type ty) {
+  return ty->getASTContext().LangOpts.Target.isArch64Bit();
+}
+
+/// This function maps a Swift type (either a language type like Float or an
+/// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
+///
+/// This returns 0 (which is an invalid tensorflow type ID) on error.
+///
+unsigned tf::convertSwiftTypeToTF(Type ty) {
+#ifdef SWIFT_ENABLE_TENSORFLOW
+  // Handle wrappers like Float, which come up in TensorHandle<Float>
+  if (auto *s = ty->getAs<StructType>()) {
+    // Make sure the type is defined inside the Swift module.
+    auto context = s->getDecl()->getDeclContext()->getParentModule();
+    if (!context || context->getName().str() != "Swift")
+      return 0;
+
+    return llvm::StringSwitch<unsigned>(s->getDecl()->getNameStr())
+      .Case("Bool", TF_BOOL)
+      .Case("Int8", TF_INT8)
+      .Case("UInt8", TF_UINT8)
+      .Case("Int16", TF_INT16)
+      .Case("UInt16", TF_UINT16)
+      .Case("Int32", TF_INT32)
+      .Case("UInt32", TF_UINT32)
+      .Case("Int64", TF_INT64)
+      .Case("UInt64", TF_UINT64)
+      .Case("Int8", TF_INT8)
+      .Case("UInt8", TF_UINT8)
+      .Case("Float", TF_FLOAT)
+      .Case("Double", TF_DOUBLE)
+      .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
+      .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
+      .Default(0);
+  }
+
+  // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
+  // so we can't rely on getting type information from the builtin types
+  // themselves.  For now we'll just use signed types.
+  if (auto *BII = ty->getAs<BuiltinIntegerType>()) {
+    if (BII->getWidth().isPointerWidth())
+      return is64(ty) ? TF_INT64 : TF_INT32;
+
+    switch (BII->getFixedWidth()) {
+    case 1: return TF_BOOL;
+    case 8: return TF_INT8;
+    case 16: return TF_INT16;
+    case 32: return TF_INT32;
+    case 64: return TF_INT64;
+    }
+  }
+
+  if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
+    switch (BIF->getFPKind()) {
+    case BuiltinFloatType::IEEE16: return TF_HALF;
+    case BuiltinFloatType::IEEE32: return TF_FLOAT;
+    case BuiltinFloatType::IEEE64: return TF_DOUBLE;
+    case BuiltinFloatType::IEEE80:
+    case BuiltinFloatType::IEEE128:
+    case BuiltinFloatType::PPC128:
+      return 0;
+    }
+  }
+#endif
+  return 0;
 }
 
 
@@ -228,7 +305,6 @@ bool TensorOpInfo::decode() {
 /// user.  As such, walk the inlining location of the specified node to return
 /// the first location *outside* of the tensor implementation goop.
 SILLocation tf::getUserSourceLocation(SILLocation loc, SILNode *value) {
-
   // If we are dealing with a SILInstruction, we can produce the location
   // that the instruction was inlined into, which is a better place to report
   // as the location of the diagnostic.
