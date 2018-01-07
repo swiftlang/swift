@@ -91,5 +91,31 @@ DemangleToMetadataTests.test("existential metatype types") {
   expectEqual(type(of: AnyObject.self), _typeByMangledName("yXlm")!)
 }
 
+struct S {
+  struct Nested { }
+}
+
+enum E { case e }
+
+class C { }
+
+DemangleToMetadataTests.test("nominal types") {
+  // Simple Struct
+  expectEqual(type(of: S()), _typeByMangledName("4main1SV")!)
+
+  // Simple Enum
+  expectEqual(type(of: E.e), _typeByMangledName("4main1EO")!)
+
+  // Simple Class
+  expectEqual(type(of: C()), _typeByMangledName("4main1CC")!)
+
+  // Swift standard library types
+  expectEqual(type(of: Int()), _typeByMangledName("Si")!)
+  expectEqual(type(of: Int16()), _typeByMangledName("s5Int16V")!)
+
+  // Nested struct
+  expectEqual(type(of: S.Nested()), _typeByMangledName("4main1SV6NestedV")!)
+}
+
 runAllTests()
 

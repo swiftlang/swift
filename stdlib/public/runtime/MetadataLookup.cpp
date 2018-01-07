@@ -171,6 +171,33 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
 }
 
 static const Metadata *
+_typeByMangledName(llvm::StringRef mangledName) {
+  const Metadata *foundMetadata = nullptr;
+  auto &T = TypeMetadataRecords.get();
+
+  // Look for an existing entry.
+  // Find the bucket for the metadata entry.
+  if (auto Value = T.Cache.find(mangledName))
+    return Value->getMetadata();
+
+  // Check type metadata records
+  T.SectionsToScanLock.withLock([&] {
+    foundMetadata = _searchTypeMetadataRecords(T, mangledName);
+  });
+
+  // Check protocol conformances table. Note that this has no support for
+  // resolving generic types yet.
+  if (!foundMetadata)
+    foundMetadata = _searchConformancesByMangledTypeName(mangledName);
+
+  if (foundMetadata) {
+    T.Cache.getOrInsert(mangledName, foundMetadata);
+  }
+
+  return foundMetadata;
+}
+
+static const Metadata *
 _classByName(const llvm::StringRef typeName) {
 
   size_t DotPos = typeName.find('.');
@@ -190,42 +217,7 @@ _classByName(const llvm::StringRef typeName) {
   ClassNd->addChild(NameNd, Factory);
 
   std::string Mangled = mangleNode(ClassNd);
-  StringRef MangledName = Mangled;
-
-  const Metadata *foundMetadata = nullptr;
-  auto &T = TypeMetadataRecords.get();
-
-  // Look for an existing entry.
-  // Find the bucket for the metadata entry.
-  if (auto Value = T.Cache.find(MangledName))
-    return Value->getMetadata();
-
-  // Check type metadata records
-  T.SectionsToScanLock.withLock([&] {
-    foundMetadata = _searchTypeMetadataRecords(T, MangledName);
-  });
-
-  // Check protocol conformances table. Note that this has no support for
-  // resolving generic types yet.
-  if (!foundMetadata)
-    foundMetadata = _searchConformancesByMangledTypeName(MangledName);
-
-  if (foundMetadata) {
-    T.Cache.getOrInsert(MangledName, foundMetadata);
-  }
-
-#if SWIFT_OBJC_INTEROP
-  // Check for ObjC class
-  // FIXME does this have any value? any ObjC class with a Swift name
-  // should already be registered as a Swift type.
-  if (foundMetadata == nullptr) {
-    std::string prefixedName("_Tt" + typeName.str());
-    foundMetadata = reinterpret_cast<ClassMetadata *>
-      (objc_lookUpClass(prefixedName.c_str()));
-  }
-#endif
-
-  return foundMetadata;
+  return _typeByMangledName(Mangled);
 }
 
 /// Return the type metadata for a given name, used in the
@@ -259,13 +251,32 @@ public:
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
+    // FIXME: Mangled Objective-C class names should go directly
+    // through objc_lookupClass.
+    auto mangledName = Demangle::mangleNode(node);
+
+    // FIXME: _typeByMangledName should return nominal type descriptors when
+    // it can.
+    if (auto type = _typeByMangledName(mangledName)) {
+      return type->getNominalTypeDescriptor();
+    }
+
     // FIXME: Implement.
     return BuiltNominalTypeDecl();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
                               BuiltType parent) const {
-    // FIXME: Implement.
+    // FIXME: Generic nominal types.
+    if (typeDecl->GenericParams.isGeneric())
+      return BuiltType();
+
+    // Use the access function to compute type metadata.
+    if (auto accessFunction = typeDecl->getAccessFunction()) {
+      return accessFunction();
+    }
+
+    // FIXME: Shouldn't get here? We've hit an unsupported case.
     return BuiltType();
   }
 
