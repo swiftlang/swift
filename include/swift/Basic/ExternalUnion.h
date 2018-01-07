@@ -56,6 +56,9 @@ public:
 template <class... Members>
 struct MembersHelper;
 
+template <unsigned NumMembers>
+struct OptimalKindTypeHelper;
+
 } // end namespace ExternalUnionImpl
 
 /// A class used to define the list of member types which need to be
@@ -375,6 +378,46 @@ public:
   }
 };
 
+template <class KindHelper, class Members>
+class SimpleExternalUnionBase
+  : public ExternalUnion<typename KindHelper::Kind, Members,
+              KindHelper::template coerceKindToIndex<typename Members::Index>> {
+public:
+  using Kind = typename KindHelper::Kind;
+
+  template <class T>
+  static constexpr Kind kindForMember() {
+    return KindHelper::coerceIndexToKind(Members::template indexOf<T>());
+  }
+
+  template <class T>
+  T *dyn_cast(Kind kind) {
+    return (kind == kindForMember<T>()
+              ? &this->template get<T>(kind) : nullptr);
+  }
+
+  template <class T>
+  const T *dyn_cast(Kind kind) const {
+    return (kind == kindForMember<T>()
+              ? &this->template get<T>(kind) : nullptr);
+  }
+};
+
+/// A particularly simple form of ExternalUnion suitable for unions where
+/// the kind only exists to distinguish between cases of the union.
+///
+/// Recommended usage:
+///   using Union = SimpleExternalUnion<void, int, std::string>;
+///   Union::Kind Kind : 2 = Union::kindForMember<void>();
+///   ...
+///   Union Storage;
+template <class... Members>
+class SimpleExternalUnion
+    : public SimpleExternalUnionBase<
+        ExternalUnionImpl::OptimalKindTypeHelper<sizeof...(Members)>,
+        ExternalUnionMembers<Members...> > {
+};
+
 namespace ExternalUnionImpl {
 
 /// The MembersHelper base case.
@@ -549,6 +592,44 @@ struct UnionMemberInfo<void> {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void destruct(void *self) {}
+};
+
+template <unsigned NumMembers,
+          bool FitsInUInt8 = (NumMembers < (1 << sizeof(uint8_t))),
+          bool FitsInUInt16 = (NumMembers < (1 << sizeof(uint16_t)))>
+struct OptimalUnderlyingType;
+
+template <unsigned NumMembers>
+struct OptimalUnderlyingType<NumMembers, true, true> {
+  using type = uint8_t;
+};
+
+template <unsigned NumMembers>
+struct OptimalUnderlyingType<NumMembers, false, true> {
+  using type = uint16_t;
+};
+
+template <unsigned NumMembers>
+struct OptimalUnderlyingType<NumMembers, false, false> {
+  using type = unsigned;
+};
+
+template <unsigned NumMembers>
+struct OptimalKindTypeHelper {
+private:
+  using UnderlyingType = typename OptimalUnderlyingType<NumMembers>::type;
+public:
+  enum Kind : UnderlyingType {};
+
+  template <class IndexType>
+  static constexpr IndexType coerceKindToIndex(Kind kind) {
+    return IndexType(UnderlyingType(kind));
+  }
+
+  template <class IndexType>
+  static constexpr Kind coerceIndexToKind(IndexType index) {
+    return Kind(UnderlyingType(index));
+  }
 };
 
 } // end namespace ExternalUnionImpl
