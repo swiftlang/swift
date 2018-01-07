@@ -52,18 +52,18 @@ namespace {
     }
   };
 
-  struct TypeMetadataCacheEntry {
+  struct NominalTypeDescriptorCacheEntry {
   private:
     std::string Name;
-    const Metadata *Metadata;
+    const NominalTypeDescriptor *Description;
 
   public:
-    TypeMetadataCacheEntry(const llvm::StringRef name,
-                           const ::Metadata *metadata)
-      : Name(name.str()), Metadata(metadata) {}
+    NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
+                           const NominalTypeDescriptor *description)
+      : Name(name.str()), Description(description) {}
 
-    const ::Metadata *getMetadata(void) {
-      return Metadata;
+    const NominalTypeDescriptor *getDescription() {
+      return Description;
     }
 
     int compareWithKey(llvm::StringRef aName) const {
@@ -78,7 +78,7 @@ namespace {
 } // end anonymous namespace
 
 struct TypeMetadataState {
-  ConcurrentMap<TypeMetadataCacheEntry> Cache;
+  ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   std::vector<TypeMetadataSection> SectionsToScan;
   Mutex SectionsToScanLock;
 
@@ -126,75 +126,50 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
-// returns the type metadata for the type named by typeNode
-const Metadata *
-swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
-                                       const Metadata *metadata,
-                                       const NominalTypeDescriptor *ntd) {
-  if (metadata != nullptr) {
-    assert(ntd == nullptr);
-    ntd = metadata->getNominalTypeDescriptor();
-  }
-
-  if (ntd == nullptr || ntd->Name.get() != typeName)
-    return nullptr;
-
-  // Call the accessor if there is one.
-  if (metadata == nullptr && !ntd->GenericParams.isGeneric()) {
-    if (auto accessFn = ntd->getAccessFunction())
-      metadata = accessFn();
-  }
-
-  return metadata;
-}
-
-// returns the type metadata for the type named by typeName
-static const Metadata *
+// returns the nominal type descriptor for the type named by typeName
+static const NominalTypeDescriptor *
 _searchTypeMetadataRecords(const TypeMetadataState &T,
                            const llvm::StringRef typeName) {
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
-  const Metadata *foundMetadata = nullptr;
-
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
-
-      if (foundMetadata != nullptr)
-        return foundMetadata;
+      if (auto ntd = record.getNominalTypeDescriptor()) {
+        if (ntd->Name.get() == typeName)
+          return ntd;
+      }
     }
   }
 
   return nullptr;
 }
 
-static const Metadata *
-_typeByMangledName(llvm::StringRef mangledName) {
-  const Metadata *foundMetadata = nullptr;
+static const NominalTypeDescriptor *
+_findNominalTypeDescriptor(llvm::StringRef mangledName) {
+  const NominalTypeDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
-  if (auto Value = T.Cache.find(mangledName))
-    return Value->getMetadata();
+  if (auto Value = T.NominalCache.find(mangledName))
+    return Value->getDescription();
 
   // Check type metadata records
   T.SectionsToScanLock.withLock([&] {
-    foundMetadata = _searchTypeMetadataRecords(T, mangledName);
+    foundNominal = _searchTypeMetadataRecords(T, mangledName);
   });
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
-  if (!foundMetadata)
-    foundMetadata = _searchConformancesByMangledTypeName(mangledName);
+  if (!foundNominal)
+    foundNominal = _searchConformancesByMangledTypeName(mangledName);
 
-  if (foundMetadata) {
-    T.Cache.getOrInsert(mangledName, foundMetadata);
+  if (foundNominal) {
+    T.NominalCache.getOrInsert(mangledName, foundNominal);
   }
 
-  return foundMetadata;
+  return foundNominal;
 }
 
 static const Metadata *
@@ -217,7 +192,12 @@ _classByName(const llvm::StringRef typeName) {
   ClassNd->addChild(NameNd, Factory);
 
   std::string Mangled = mangleNode(ClassNd);
-  return _typeByMangledName(Mangled);
+  if (auto nominal = _findNominalTypeDescriptor(Mangled)) {
+    if (!nominal->GenericParams.isGeneric() &&
+        nominal->getAccessFunction())
+      return nominal->getAccessFunction()();
+  }
+  return nullptr;
 }
 
 /// Return the type metadata for a given name, used in the
@@ -253,16 +233,10 @@ public:
                                      const Demangle::NodePointer &node) const {
     // FIXME: Mangled Objective-C class names should go directly
     // through objc_lookupClass.
+
+    // Look for a nominal type descriptor based on its mangled name.
     auto mangledName = Demangle::mangleNode(node);
-
-    // FIXME: _typeByMangledName should return nominal type descriptors when
-    // it can.
-    if (auto type = _typeByMangledName(mangledName)) {
-      return type->getNominalTypeDescriptor();
-    }
-
-    // FIXME: Implement.
-    return BuiltNominalTypeDecl();
+    return _findNominalTypeDescriptor(mangledName);
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
