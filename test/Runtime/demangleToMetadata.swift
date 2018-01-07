@@ -115,6 +115,9 @@ DemangleToMetadataTests.test("nominal types") {
 
   // Nested struct
   expectEqual(type(of: S.Nested()), _typeByMangledName("4main1SV6NestedV")!)
+
+  // Class referenced by "ModuleName.ClassName" syntax.
+  expectEqual(type(of: C()), _typeByMangledName("main.C")!)
 }
 
 runAllTests()

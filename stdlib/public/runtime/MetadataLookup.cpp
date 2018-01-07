@@ -366,12 +366,29 @@ public:
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata * _Nullable
 swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
-  // Demangle the type name.
   llvm::StringRef typeName(typeNameStart, typeNameLength);
+
   Demangler demangler;
-  NodePointer node = demangler.demangleType(typeName);
-  if (!node) {
-    return nullptr;
+  NodePointer node;
+
+  // Check whether this is the convenience syntax "ModuleName.ClassName".
+  size_t dotPos = typeName.find('.');
+  if (dotPos != llvm::StringRef::npos &&
+      typeName.find('.', dotPos + 1) == llvm::StringRef::npos) {
+    // Form a demangle tree for this class.
+    NodePointer classNode = demangler.createNode(Node::Kind::Class);
+    NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
+                                                  typeName.substr(0, dotPos));
+    NodePointer nameNode = demangler.createNode(Node::Kind::Identifier,
+                                            typeName.substr(dotPos + 1));
+    classNode->addChild(moduleNode, demangler);
+    classNode->addChild(nameNode, demangler);
+
+    node = classNode;
+  } else {
+    // Demangle the type name.
+    node = demangler.demangleType(typeName);
+    if (!node) return nullptr;
   }
 
   DecodedMetadataBuilder builder;
