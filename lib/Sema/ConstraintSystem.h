@@ -969,6 +969,7 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
+  llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1595,10 +1596,19 @@ public:
     ExprTypes[E] = T.getPointer();
   }
 
+  void setType(TypeLoc &L, Type T) {
+    assert(T && "Expected non-null type!");
+    TypeLocTypes[&L] = T.getPointer();
+  }
+
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
     return ExprTypes.find(E) != ExprTypes.end();
+  }
+
+  bool hasType(const TypeLoc &L) const {
+    return TypeLocTypes.find(&L) != TypeLocTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1609,6 +1619,11 @@ public:
     //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
     //           "Mismatched types!");
     return ExprTypes.find(E)->second;
+  }
+
+  Type getType(const TypeLoc &L) const {
+    assert(hasType(L) && "Expected type to have been set!");
+    return TypeLocTypes.find(&L)->second;
   }
 
   /// Cache the type of the expression argument and return that same

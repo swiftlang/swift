@@ -2458,10 +2458,9 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
-      auto toType = simplifyType(expr->getTypeLoc().getType());
+      auto toType = simplifyType(cs.getType(expr->getTypeLoc()));
       expr->getTypeLoc().setType(toType, /*validated=*/true);
       cs.setType(expr, MetatypeType::get(toType));
-      
       return expr;
     }
 
@@ -3121,7 +3120,7 @@ namespace {
     Expr *visitIsExpr(IsExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &tc = cs.getTypeChecker();
-      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       auto sub = cs.coerceToRValue(expr->getSubExpr());
 
       checkForImportedUsedConformances(toType);
@@ -3193,6 +3192,7 @@ namespace {
                                sub, expr->getLoc(), SourceLoc(),
                                TypeLoc::withoutLoc(toType));
         cs.setType(cast, toOptType);
+        cs.setType(cast->getCastTypeLoc(), toType);
         if (expr->isImplicit())
           cast->setImplicit();
 
@@ -3470,7 +3470,7 @@ namespace {
 
     Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
       // Simplify the type we're casting to.
-      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 
@@ -3556,7 +3556,7 @@ namespace {
     // Most of the logic for dealing with ForcedCheckedCastExpr.
     Expr *handleForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
-      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 
@@ -3599,6 +3599,7 @@ namespace {
         auto *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
                                                    expr->getCastTypeLoc());
         cs.setType(result, toType);
+        cs.setType(result->getCastTypeLoc(), toType);
         unsigned disjunctionChoice =
           (castKind == CheckedCastKind::Coercion ? 0 : 1);
         return visitCoerceExpr(result, disjunctionChoice);
@@ -3636,7 +3637,7 @@ namespace {
     Expr *handleConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
                                            bool isInsideIsExpr = false) {
       // Simplify the type we're casting to.
-      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       checkForImportedUsedConformances(toType);
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
@@ -3674,6 +3675,7 @@ namespace {
         auto *coerce = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
                                                    expr->getCastTypeLoc());
         cs.setType(coerce, toType);
+        cs.setType(coerce->getCastTypeLoc(), toType);
         unsigned disjunctionChoice =
           (castKind == CheckedCastKind::Coercion ? 0 : 1);
         Expr *result = visitCoerceExpr(coerce, disjunctionChoice);

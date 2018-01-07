@@ -1349,7 +1349,7 @@ namespace {
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openUnboundGenericType(type, locator);
-      E->getTypeLoc().setType(type, /*validated=*/true);
+      CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }
 
@@ -2521,7 +2521,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(fromExpr);
       auto locator = CS.getConstraintLocator(expr);
@@ -2550,7 +2550,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
@@ -2584,7 +2584,7 @@ namespace {
       // Open the type we're casting to.
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(fromExpr);
       auto locator = CS.getConstraintLocator(expr);
@@ -2613,7 +2613,7 @@ namespace {
       // FIXME: Locator for the cast type?
       auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
                                               CS.getConstraintLocator(expr));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      CS.setType(expr->getCastTypeLoc(), toType);
 
       // Add a checked cast constraint.
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3203,6 +3203,7 @@ namespace {
 
             auto *TE = TypeExpr::createImplicit(joinTy, CS.getASTContext());
             CS.cacheType(TE);
+            CS.setType(TE->getTypeLoc(), joinTy);
 
             auto *DSE = new (CS.getASTContext())
                 DotSelfExpr(TE, SourceLoc(), SourceLoc(), CS.getType(TE));
