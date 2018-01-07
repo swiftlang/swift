@@ -179,19 +179,24 @@ struct ConformanceDiagnostic {
 /// DeclContext, but a new brace statement is not.  There's no
 /// particular mandate for this, though.
 ///
-/// Note that DeclContexts have stricter alignment requirements than AST nodes
-/// in general, so if an AST node class multiply inherits from DeclContext
-/// and another base class, it must 'using DeclContext::operator new;' in order
-/// to use an allocator with the correct alignment.
+/// Please note that DeclContext assumes that it prefaces AST type hierarchies
+/// and therefore can safely access trailing memory. If you need to create a
+/// macro context, please see GenericContext for how to minimize new entries in
+/// the ASTHierarchy enum below.
 class alignas(1 << DeclContextAlignInBits) DeclContext {
-  
-  enum {
-    KindBits = DeclContextAlignInBits
+  enum class ASTHierarchy : uint8_t {
+    Expr,
+    Decl,
+    FileUnit,
+    Initializer,
+    SerializedLocal,
+    // If you add a new AST hierarchies, then update the static_assert() below.
   };
-  static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
-                "Not enough KindBits for DeclContextKind");
-  
-  llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
+  static_assert(unsigned(ASTHierarchy::SerializedLocal) <
+                (1 << DeclContextAlignInBits),
+                "ASTHierarchy exceeds bits available");
+
+  llvm::PointerIntPair<DeclContext*, 3, ASTHierarchy> ParentAndKind;
 
   /// Change the parent of this context.  This should only be used
   /// very carefully.
@@ -209,16 +214,19 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   /// extension thereof, return the GenericTypeDecl.
   GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
 
+  static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind);
+  DeclContextKind getKindFromASTHierarchy(ASTHierarchy Hier) const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(Parent, Kind) {
-    assert((Parent != 0 || isModuleContext()) &&
-           "DeclContext must have a parent unless it is a module!");
+      : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
+    if (Kind != DeclContextKind::Module)
+      assert(Parent != nullptr && "DeclContext must have a parent context");
   }
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const {
-    return ParentAndKind.getInt();
+    return getKindFromASTHierarchy(ParentAndKind.getInt());
   }
   
   /// Determines whether this context is itself a local scope in a

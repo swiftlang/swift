@@ -1100,3 +1100,71 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
 
   return false;
 }
+
+DeclContext::ASTHierarchy
+DeclContext::getASTHierarchyFromKind(DeclContextKind Kind) {
+  switch (Kind) {
+  case DeclContextKind::AbstractClosureExpr:
+    return ASTHierarchy::Expr;
+  case DeclContextKind::Initializer:
+    return ASTHierarchy::Initializer;
+  case DeclContextKind::SerializedLocal:
+    return ASTHierarchy::SerializedLocal;
+  case DeclContextKind::FileUnit:
+    return ASTHierarchy::FileUnit;
+  case DeclContextKind::Module:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+    return ASTHierarchy::Decl;
+  }
+  llvm_unreachable("Unhandled DeclContextKind");
+}
+
+DeclContextKind
+DeclContext::getKindFromASTHierarchy(DeclContext::ASTHierarchy Hier) const {
+  switch (Hier) {
+  case ASTHierarchy::Expr:
+    return DeclContextKind::AbstractClosureExpr;
+  case ASTHierarchy::Initializer:
+    return DeclContextKind::Initializer;
+  case ASTHierarchy::SerializedLocal:
+    return DeclContextKind::SerializedLocal;
+  case ASTHierarchy::FileUnit:
+    return DeclContextKind::FileUnit;
+  case ASTHierarchy::Decl: {
+    auto decl = reinterpret_cast<const Decl*>(this + 1);
+    if (isa<AbstractFunctionDecl>(decl))
+      return DeclContextKind::AbstractFunctionDecl;
+    if (isa<GenericTypeDecl>(decl))
+      return DeclContextKind::GenericTypeDecl;
+    switch (decl->getKind()) {
+    case DeclKind::Module:
+      return DeclContextKind::Module;
+    case DeclKind::TopLevelCode:
+      return DeclContextKind::TopLevelCodeDecl;
+    case DeclKind::Subscript:
+      return DeclContextKind::SubscriptDecl;
+    case DeclKind::Extension:
+      return DeclContextKind::ExtensionDecl;
+    default:
+      llvm_unreachable("Unhandled Decl kind");
+    }
+  }
+  }
+  llvm_unreachable("Unhandled DeclContext ASTHierarchy");
+}
+
+#define DECL(Id, Parent)
+#define CONTEXT_DECL(Id, Parent) \
+  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error");
+#define CONTEXT_VALUE_DECL(Id, Parent) \
+  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error");
+#include "swift/AST/DeclNodes.def"
+
+#define EXPR(Id, Parent)
+#define CONTEXT_EXPR(Id, Parent) \
+  static_assert(alignof(DeclContext) == alignof(Id##Expr), "Alignment error");
+#include "swift/AST/ExprNodes.def"
