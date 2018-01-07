@@ -1627,13 +1627,14 @@ Driver::buildBatchModeAction(const ToolChain &TC, const OutputInfo &OI,
                        : buildPrecompileAction(TC, C);
 
   ModuleAndLinkerInputs allInputsResult;
-  return allInputsResult
-      .append(buildBatchModeSwiftInputActions(SwiftInputs, OI, OutOfDateMap, C,
-                                              PCH))
-      .append(buildBatchModeSILSIBInputActions(SILSIBInputs, OI, OutOfDateMap,
-                                               C, PCH))
-      .append(buildBatchModeModuleInputActions(ModuleInputs, OI, C))
-      .append(buildBatchModeObjectInputActions(ObjectInputs, OI, C));
+  auto &r = allInputsResult
+                .append(buildBatchModeSwiftInputActions(SwiftInputs, OI,
+                                                        OutOfDateMap, C, PCH))
+                .append(buildBatchModeSILSIBInputActions(SILSIBInputs, OI,
+                                                         OutOfDateMap, C, PCH))
+                .append(buildBatchModeModuleInputActions(ModuleInputs, OI, C))
+                .append(buildBatchModeObjectInputActions(ObjectInputs, OI, C));
+  return r;
 }
 
 Driver::ModuleAndLinkerInputs Driver::buildBatchModeSwiftInputActions(
@@ -2101,10 +2102,10 @@ static StringRef getOutputFilename(Compilation &C,
   return Buffer.str();
 }
 
-static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
-                               types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap,
-                               StringRef outputPath = StringRef()) {
+static void addAuxiliaryOutputs(Compilation &C, CommandOutput &output,
+                                types::ID outputType, const OutputInfo &OI,
+                                const TypeToPathMap *outputMap,
+                                StringRef outputPath = StringRef()) {
   StringRef outputMapPath;
   if (outputMap) {
     auto iter = outputMap->find(outputType);
@@ -2114,25 +2115,30 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
 
   if (!outputMapPath.empty()) {
     // Prefer a path from the OutputMap.
-    output.setAdditionalOutputForType(outputType, outputMapPath);
+    output.addAdditionalOutputForType(outputType, outputMapPath);
   } else if (!outputPath.empty()) {
-    output.setAdditionalOutputForType(outputType, outputPath);
+    output.addAdditionalOutputForType(outputType, outputPath);
   } else {
-    // Put the auxiliary output file next to the primary output file.
-    llvm::SmallString<128> path;
-    if (output.getPrimaryOutputType() != types::TY_Nothing)
-      path = output.getPrimaryOutputFilenames()[0];
+    // Put the auxiliary output file next to the primary output files.
+    auto fn = [&](StringRef primaryOutput) -> void {
+      llvm::SmallString<128> path(primaryOutput);
+      bool isTempFile = C.isTemporaryFile(path);
+      llvm::sys::path::replace_extension(path,
+                                         types::getTypeTempSuffix(outputType));
+      output.addAdditionalOutputForType(outputType, path);
+      if (isTempFile)
+        C.addTemporaryFile(path);
+    };
+    if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile &&
+        CommandOutput::doesBatchModeProduceMultiples(outputType))
+      for (StringRef primaryOutput : output.getPrimaryOutputFilenames())
+        fn(primaryOutput);
+    else if (output.getPrimaryOutputType() != types::TY_Nothing)
+      fn(output.getPrimaryOutputFilenames()[0]);
     else if (!output.getBaseInput(0).empty())
-      path = llvm::sys::path::stem(output.getBaseInput(0));
+      fn(llvm::sys::path::stem(output.getBaseInput(0)));
     else
-      path = OI.ModuleName;
-
-    bool isTempFile = C.isTemporaryFile(path);
-    llvm::sys::path::replace_extension(path,
-                                       types::getTypeTempSuffix(outputType));
-    output.setAdditionalOutputForType(outputType, path);
-    if (isTempFile)
-      C.addTemporaryFile(path);
+      fn(OI.ModuleName);
   }
 }
 
@@ -2183,8 +2189,8 @@ static void addDiagFileOutputForPersistentPCHAction(Compilation &C,
   }
 
   if (!outPathBuf.empty()) {
-    addAuxiliaryOutput(C, output, types::TY_SerializedDiagnostics, OI,
-                       outputMap, outPathBuf.str());
+    addAuxiliaryOutputs(C, output, types::TY_SerializedDiagnostics, OI,
+                        outputMap, outPathBuf.str());
   }
 }
 
@@ -2297,10 +2303,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   if (OI.ShouldGenerateModule &&
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
-    chooseSwiftModuleDocOutputPath(C, OutputMap, Output.get());
+    chooseSwiftModuleDocOutputPath(C, OI, OutputMap, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
-    chooseRemappingOutputPath(C, OutputMap, Output.get());
+    chooseRemappingOutputPath(C, OI, OutputMap, Output.get());
 
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
@@ -2329,7 +2335,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
-  if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
+  if (!J->getOutput().getAdditionalDependenciesOutput().empty()) {
     if (InputActions.size() == 1) {
       auto compileJob = cast<CompileJobAction>(JA);
       bool alwaysRebuildDependents =
@@ -2377,12 +2383,11 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                [] { llvm::outs() << ", "; });
 
     types::forAllTypes([&J](types::ID Ty) {
-      StringRef AdditionalOutput =
-        J->getOutput().getAdditionalOutputForType(Ty);
-      if (!AdditionalOutput.empty()) {
+      ArrayRef<std::string> AdditionalOutputs =
+          J->getOutput().getAdditionalOutputsForType(Ty);
+      for (const auto &AdditionalOutput : AdditionalOutputs)
         llvm::outs() << ", " << types::getTypeName(Ty) << ": \""
-          << AdditionalOutput << '"';
-      }
+                     << AdditionalOutput << '"';
     });
     llvm::outs() << '}';
 
@@ -2454,6 +2459,14 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
                                          const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_SwiftModuleFile, OI,
+                                               Output);
+    return;
+  }
+
   StringRef OFMModuleOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_SwiftModuleFile);
@@ -2464,12 +2477,12 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
   const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
   if (!OFMModuleOutputPath.empty()) {
     // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
+    Output->addAdditionalOutputForType(types::TY_SwiftModuleFile,
                                        OFMModuleOutputPath);
   } else if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     // We're performing a single compilation (and thus no merge module step),
     // so prefer to use -emit-module-path, if present.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
+    Output->addAdditionalOutputForType(types::TY_SwiftModuleFile,
                                        A->getValue());
   } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
              OI.ShouldTreatModuleAsTopLevelOutput) {
@@ -2482,13 +2495,13 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
       llvm::sys::path::remove_filename(Path);
       llvm::sys::path::append(Path, OI.ModuleName);
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      Output->addAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
     } else {
       // A top-level output wasn't specified, so just output to
       // <ModuleName>.swiftmodule.
       llvm::SmallString<128> Path(OI.ModuleName);
       llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      Output->addAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
     }
   } else {
     // We're only generating the module as an intermediate, so put it next
@@ -2496,15 +2509,24 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
     bool isTempFile = C.isTemporaryFile(Path);
     llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-    Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+    Output->addAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
   }
 }
 
 void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
+                                            const OutputInfo &OI,
                                             const TypeToPathMap *OutputMap,
                                             CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_SwiftModuleDocFile,
+                                               OI, Output);
+    return;
+  }
+
   StringRef OFMModuleDocOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_SwiftModuleDocFile);
@@ -2513,7 +2535,7 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
   }
   if (!OFMModuleDocOutputPath.empty()) {
     // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
+    Output->addAdditionalOutputForType(types::TY_SwiftModuleDocFile,
                                        OFMModuleDocOutputPath);
   } else {
     // Otherwise, put it next to the swiftmodule file.
@@ -2521,15 +2543,23 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
         Output->getAnyOutputForType(types::TY_SwiftModuleFile));
     bool isTempFile = C.isTemporaryFile(Path);
     llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_DOC_EXTENSION);
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
+    Output->addAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
   }
 }
 
-void Driver::chooseRemappingOutputPath(Compilation &C,
+void Driver::chooseRemappingOutputPath(Compilation &C, const OutputInfo &OI,
                                        const TypeToPathMap *OutputMap,
                                        CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_Remapping, OI,
+                                               Output);
+    return;
+  }
+
   StringRef OFMFixitsOutputPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_Remapping);
@@ -2537,13 +2567,13 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
       OFMFixitsOutputPath = iter->second;
   }
   if (!OFMFixitsOutputPath.empty()) {
-    Output->setAdditionalOutputForType(types::ID::TY_Remapping,
+    Output->addAdditionalOutputForType(types::ID::TY_Remapping,
                                        OFMFixitsOutputPath);
   } else {
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
     bool isTempFile = C.isTemporaryFile(Path);
     llvm::sys::path::replace_extension(Path, "remap");
-    Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
+    Output->addAdditionalOutputForType(types::ID::TY_Remapping, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
   }
@@ -2554,14 +2584,22 @@ void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
                                              const OutputInfo &OI,
                                              const TypeToPathMap *OutputMap,
                                              CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(
+        C, types::TY_SerializedDiagnostics, OI, Output);
+    return;
+  }
+
   if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
     auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
     if (pchJA && pchJA->isPersistentPCH()) {
       addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OI, OutputMap,
                                               Diags);
     } else {
-      addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
-                         OutputMap);
+      addAuxiliaryOutputs(C, *Output, types::TY_SerializedDiagnostics, OI,
+                          OutputMap);
     }
 
     // Remove any existing diagnostics files so that clients can detect their
@@ -2577,11 +2615,19 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
                                            const TypeToPathMap *OutputMap,
                                            llvm::SmallString<128> &Buf,
                                            CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_Dependencies, OI,
+                                               Output);
+    return;
+  }
+
   if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
-    addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
+    addAuxiliaryOutputs(C, *Output, types::TY_Dependencies, OI, OutputMap);
   }
   if (C.getIncrementalBuildEnabled()) {
-    addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
+    addAuxiliaryOutputs(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
   }
   chooseLoadedModuleTracePath(C, OI, Buf, Output);
   chooseTBDPath(C, OI, Buf, Output);
@@ -2590,6 +2636,14 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
 void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
                                          llvm::SmallString<128> &Buf,
                                          CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_ModuleTrace, OI,
+                                               Output);
+    return;
+  }
+
   // The loaded-module-trace is the same for all compile jobs: all `import`
   // statements are processed, even ones from non-primary files. Thus, only
   // one of those jobs needs to emit the file, and we can get it to write
@@ -2615,13 +2669,20 @@ void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
           /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
     }
 
-    Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
+    Output->addAdditionalOutputForType(types::TY_ModuleTrace, filename);
   }
 }
 
 void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
                            llvm::SmallString<128> &Buf,
                            CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_TBD, OI, Output);
+    return;
+  }
+
   if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
     if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
       llvm::outs() << "TBD emission has been disabled, because it requires a "
@@ -2632,7 +2693,7 @@ void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
           OI, C.getArgs(), options::OPT_emit_tbd_path, types::TY_TBD,
           /*TreatAsTopLevelOutput=*/true, "tbd", Buf);
 
-      Output->setAdditionalOutputForType(types::TY_TBD, filename);
+      Output->addAdditionalOutputForType(types::TY_TBD, filename);
     }
   }
 }
@@ -2640,12 +2701,20 @@ void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
 void Driver::chooseSaveOptimizationPath(Compilation &C, const OutputInfo &OI,
                                         llvm::SmallString<128> &Buf,
                                         CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_OptRecord, OI,
+                                               Output);
+    return;
+  }
+
   if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
         OI, C.getArgs(), options::OPT_save_optimization_record_path,
         types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true, "opt.yaml", Buf);
 
-    Output->setAdditionalOutputForType(types::TY_OptRecord, filename);
+    Output->addAdditionalOutputForType(types::TY_OptRecord, filename);
   } else
     // FIXME: We should use the OutputMap in this case.
     Diags.diagnose({}, diag::warn_opt_remark_disabled);
@@ -2655,6 +2724,14 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               const OutputInfo &OI,
                                               const TypeToPathMap *OutputMap,
                                               CommandOutput *Output) const {
+  // FIXME: dmu temp hack to get timings
+  // is the right way to do something here or to vectorize the OutputMap?
+  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
+    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_ObjCHeader, OI,
+                                               Output);
+    return;
+  }
+
   StringRef ObjCHeaderPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_ObjCHeader);
@@ -2667,14 +2744,21 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
       ObjCHeaderPath = A->getValue();
 
   if (!ObjCHeaderPath.empty()) {
-    Output->setAdditionalOutputForType(types::TY_ObjCHeader, ObjCHeaderPath);
+    Output->addAdditionalOutputForType(types::TY_ObjCHeader, ObjCHeaderPath);
   } else {
     // Put the header next to the primary output file.
     // FIXME: That's not correct if the user /just/ passed -emit-header
     // and not -emit-module.
-    addAuxiliaryOutput(C, *Output, types::TY_ObjCHeader, OI,
-                       /*output file map*/ nullptr);
+    addAuxiliaryOutputs(C, *Output, types::TY_ObjCHeader, OI,
+                        /*output file map*/ nullptr);
   }
+}
+
+// xxx elim?
+void Driver::chooseSupplementaryOutputsForBatchModeHack(
+    Compilation &C, driver::types::ID type, const OutputInfo &OI,
+    CommandOutput *Output) const {
+  addAuxiliaryOutputs(C, *Output, type, OI, nullptr);
 }
 
 static unsigned printActions(const Action *A,

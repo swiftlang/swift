@@ -300,8 +300,7 @@ namespace driver {
                              int ReturnCode,
                              SmallVector<const Job *, N> &Dependents) {
       const CommandOutput &Output = FinishedCmd->getOutput();
-      StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+      StringRef DependenciesFile = Output.getAdditionalDependenciesOutput();
 
       if (DependenciesFile.empty()) {
         // If this job doesn't track dependencies, it must always be run.
@@ -505,7 +504,7 @@ namespace driver {
         // FIXME: We can probably do better here!
         Job::Condition Condition = Job::Condition::Always;
         StringRef DependenciesFile =
-          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+            Cmd->getOutput().getAdditionalDependenciesOutput();
         if (!DependenciesFile.empty()) {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
@@ -624,7 +623,7 @@ namespace driver {
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
           StringRef DependenciesFile =
-            Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+              Cmd->getOutput().getAdditionalDependenciesOutput();
           if (DependenciesFile.empty())
             continue;
 
@@ -808,8 +807,8 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
         for (auto &output : outputInfo.getPrimaryOutputFilenames())
           out << output << "\n";
       } else {
-        auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
-        if (!output.empty())
+        for (auto &output :
+             outputInfo.getAdditionalOutputsForType(filelistInfo.type))
           out << output << "\n";
       }
     }
