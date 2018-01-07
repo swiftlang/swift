@@ -172,53 +172,6 @@ _findNominalTypeDescriptor(llvm::StringRef mangledName) {
   return foundNominal;
 }
 
-static const Metadata *
-_classByName(const llvm::StringRef typeName) {
-
-  size_t DotPos = typeName.find('.');
-  if (DotPos == llvm::StringRef::npos)
-    return nullptr;
-  if (typeName.find('.', DotPos + 1) != llvm::StringRef::npos)
-    return nullptr;
-
-  Demangle::NodeFactory Factory;
-
-  NodePointer ClassNd = Factory.createNode(Node::Kind::Class);
-  NodePointer ModuleNd = Factory.createNode(Node::Kind::Module,
-                                            typeName.substr(0, DotPos));
-  NodePointer NameNd = Factory.createNode(Node::Kind::Identifier,
-                                          typeName.substr(DotPos + 1));
-  ClassNd->addChild(ModuleNd, Factory);
-  ClassNd->addChild(NameNd, Factory);
-
-  std::string Mangled = mangleNode(ClassNd);
-  if (auto nominal = _findNominalTypeDescriptor(Mangled)) {
-    if (!nominal->GenericParams.isGeneric() &&
-        nominal->getAccessFunction())
-      return nominal->getAccessFunction()();
-  }
-  return nullptr;
-}
-
-/// Return the type metadata for a given name, used in the
-/// implementation of _typeByName().
-///
-/// Currently only top-level classes are supported.
-
-/// \param typeName The name of a class in the form: <module>.<class>
-/// \return Returns the metadata of the type, if found.
-
-/// internal func _getTypeByName(_ name: UnsafePointer<UInt8>,
-///                              _ nameLength: UInt)  -> Any.Type?
-#define _getTypeByName \
-  MANGLE_SYM(s14_getTypeByNameyypXpSgSPys5UInt8VG_SutF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata *
-_getTypeByName(const char *typeName, size_t typeNameLength) {
-  llvm::StringRef name(typeName, typeNameLength);
-  return _classByName(name);
-}
-
 #pragma mark Metadata lookup via mangled name
 
 namespace {
