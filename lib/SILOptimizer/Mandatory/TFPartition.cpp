@@ -158,6 +158,24 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   }
 }
 
+/// If the specified type is a TensorHandle<T> type, return it.  Otherwise, it
+/// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
+static SILType convertToTensorHandleType(SILType ty) {
+  // If this is already TensorHandle<T>, return it.
+  if (isTensorHandle(ty.getSwiftRValueType()))
+    return ty;
+
+  // Otherwise, this is a valid TensorFlow element type "T", like Builtin.Int32,
+  // turn it into a TensorHandle<T> type.
+  assert(isValidTensorFlowElementType(ty.getSwiftRValueType()));
+  auto decl = ty.getASTContext().getTensorHandleDecl();
+  auto tensorType =
+    BoundGenericClassType::get(decl, /*parent*/Type(),
+                               ty.getSwiftRValueType());
+
+  return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
+}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -574,7 +592,6 @@ private:
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
-
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
@@ -1103,18 +1120,8 @@ public:
     }
   }
 
-  SILType remapType(SILType Ty) {
-    // If this is a valid TensorFlow element type "T", like Builtin.Int32, turn
-    // it into a TensorHandle<T> type.
-    if (!isValidTensorFlowElementType(Ty.getSwiftRValueType()))
-      return Ty;
-
-    auto decl = getBuilder().getASTContext().getTensorHandleDecl();
-    auto tensorType =
-      BoundGenericClassType::get(decl, /*parent*/Type(),
-                                 Ty.getSwiftRValueType());
-
-    return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
+  SILType remapType(SILType ty) {
+    return convertToTensorHandleType(ty);
   }
 
   void visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo);
@@ -1162,7 +1169,8 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
   // arguments.
   if (BB == FP.tensorStartPoint->getParent()) {
     for (auto arg : FP.tensorFnArguments) {
-      auto newArg = newBB->createFunctionArgument(arg->getType());
+      auto argTy = convertToTensorHandleType(arg->getType());
+      auto newArg = newBB->createFunctionArgument(argTy);
       ValueMap[arg] = SILValue(newArg);
     }
   }
@@ -1636,14 +1644,13 @@ static SILValue wrapInStruct(SILValue v, NominalTypeDecl *decl, SILBuilder &B,
   return B.createStruct(loc, silType, v);
 }
 
-/// Create a value of 'Swift.Int' type holding the specified value.  It is a bit
-/// trickier to create than some types because its contents are target platform
-/// specific: Builtin.Int32 or Builtin.Int64.
-static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
-                               IntegerLiteralInst **ILI = nullptr) {
-  // Int should have one field, a Builtin.Int32/64.
-  auto intDecl = B.getASTContext().getIntDecl();
-  auto intFieldType = (*intDecl->getStoredProperties().begin())->getType();
+/// Create a value of some standard library integer type, as specified by
+/// integerDecl.
+static SILValue createSomeIntegerValue(intmax_t value, SILBuilder &B,
+                                       SILLocation loc,
+                                       NominalTypeDecl *integerDecl,
+                                       IntegerLiteralInst **ILI = nullptr) {
+  auto intFieldType = (*integerDecl->getStoredProperties().begin())->getType();
   auto intFieldSILType =
     SILType::getPrimitiveObjectType(intFieldType->getCanonicalType());
 
@@ -1652,9 +1659,71 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
   // If the caller wanted the integer_literal instruction, return it too.
   if (ILI) *ILI = literal;
 
-  return wrapInStruct(literal, intDecl, B, loc);
+  return wrapInStruct(literal, integerDecl, B, loc);
 }
 
+/// Create a value of 'Swift.Int' type holding the specified value.  It is a bit
+/// trickier to create than some types because its contents are target platform
+/// specific: Builtin.Int32 or Builtin.Int64.
+static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
+                               IntegerLiteralInst **ILI = nullptr) {
+  // Int should have one field, a Builtin.Int32/64.
+  auto intDecl = B.getASTContext().getIntDecl();
+  return createSomeIntegerValue(value, B, loc, intDecl, ILI);
+}
+
+
+/// Convert the specified scalar value (e.g. an i32) into a 0d CTensorHandle
+/// value using the TensorFlow runtime utilities.
+static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
+                                                SILLocation loc) {
+  assert(convertSwiftTypeToTF(value->getType().getSwiftRValueType()) != 0 &&
+         "Can only convert TF compatible types to Tensors");
+
+  // Get a reference to the CreateCTensorHandle function, which is defined like
+  // this:
+  // @_silgen_name("_swift_tfc_CreateCTensorHandle")
+  // func _TFC_CreateCTensorHandle<T>(_ value : T,
+  //                                  _ dtype: TF_DataType) -> CTensorHandle
+  auto createFn = B.getModule().findFunction("_swift_tfc_CreateCTensorHandle",
+                                             SILLinkage::PublicExternal);
+  auto *fnRef = B.createFunctionRef(loc, createFn);
+
+  // We need to create a dtype value.  It is an imported C enum value, so it is
+  // modeled as a struct that wraps an integer value (itself a struct).
+  auto dtypeVal = convertSwiftTypeToTF(value->getType().getSwiftRValueType());
+
+  auto dtypeType = fnRef->getFunctionType()->getParameters()[1].getType();
+  auto dtypeDecl = dtypeType->getAnyNominal();
+  auto dtypeFieldType = (*dtypeDecl->getStoredProperties().begin())->getType();
+
+  // The internal type is something like UInt32.  Create it now.
+  auto dtype = createSomeIntegerValue(dtypeVal, B, loc,
+                                      dtypeFieldType->getAnyNominal());
+  // Then wrap it in the dtype enum.
+  dtype = wrapInStruct(dtype, dtypeDecl, B, loc);
+
+  // This is a generic function over the value type, so we have to pass it in
+  // by address on the stack.
+  auto stackAlloc = B.createAllocStack(loc, value->getType());
+
+  auto storeOwnership =
+    B.getFunction().hasQualifiedOwnership() ? StoreOwnershipQualifier::Trivial :
+                                          StoreOwnershipQualifier::Unqualified;
+  B.createStore(loc, value, stackAlloc, storeOwnership);
+
+  auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
+                                    SILAccessEnforcement::Static);
+
+  Substitution sub(value->getType().getSwiftRValueType(), {});
+  auto result = B.createApply(loc, fnRef, {sub}, { access, dtype },
+                              /* isNonThrowing */false);
+  // Finish our read access and free the stack memory.
+  B.createEndAccess(loc, access, /*aborted*/false);
+  B.createDeallocStack(loc, stackAlloc);
+
+  return result;
+}
 
 /// Rewrite the host program, inserting a call to _TFCStartTensorProgram at the
 /// start point of the tensor function, passing in the tensor program itself,
@@ -1767,15 +1836,24 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // Emit a store into the tuple for each parameter, giving it a copy of the
   // OpaquePointer that is within the TensorHandle<T> value we have.
   for (size_t i = 0, numArgs = tensorFnArguments.size(); i != numArgs; ++i) {
-    auto fieldAddress =
-      B.createRefElementAddr(loc, tensorFnArguments[i], tensorHandleMember);
+    auto tensorValue = tensorFnArguments[i];
 
-    auto argCTensorHandle = B.createLoad(loc, fieldAddress, loadOwnership);
+    // The argument is either a TensorHandle<T> or a scalar value that we've
+    // closed over.  If it is a TensorHandle<T>, load the CTensorHandle out of
+    // it.  If it is a scalar, then we need to box the scalar in a
+    // CTensorHandle.
+    if (isTensorHandle(tensorValue->getType().getSwiftRValueType())) {
+      auto fieldAddress = B.createRefElementAddr(loc, tensorValue,
+                                                 tensorHandleMember);
+      tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
+    } else {
+      tensorValue = convertScalarToHostTensorHandle(tensorValue, B, loc);
+    }
     SILValue eltAddr = stackAlloc;
     if (numArgs >= 2)
       eltAddr = B.createTupleElementAddr(loc, stackAlloc, i,
                                          cTensorHandleSILTy.getAddressType());
-    B.createStore(loc, argCTensorHandle, eltAddr, storeOwnership);
+    B.createStore(loc, tensorValue, eltAddr, storeOwnership);
   }
 
   // Ok, now we have our array on the stack.  Start a read access, and get the
@@ -1973,13 +2051,13 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   if (!result.theTensorProgram)
     return result;
 
-
-
   // Calculate the parameter list for the new function.
   SmallVector<SILParameterInfo, 4> params;
-  for (auto v : tensorFnArguments)
-    params.push_back(SILParameterInfo(v->getType().getSwiftRValueType(),
+  for (auto v : tensorFnArguments) {
+    auto argTy = convertToTensorHandleType(v->getType());
+    params.push_back(SILParameterInfo(argTy.getSwiftRValueType(),
                                       ParameterConvention::Direct_Unowned));
+  }
 
   SmallVector<SILResultInfo, 4> results;
   for (auto r : resultValues)
@@ -2003,15 +2081,13 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                                        /*What's this*/IsBare, IsNotTransparent,
                                        IsNotSerialized);
 
-  {
-    PartitionCloner PC(*this, *result.fn);
-    // Fill in the cloned function body.
-    PC.cloneFunction();
+  PartitionCloner PC(*this, *result.fn);
 
-    // Clean up the source function, removing the tensor code.
-    PC.finalizeOriginal();
-  }
+  // Fill in the cloned function body.
+  PC.cloneFunction();
 
+  // Clean up the source function, removing the tensor code.
+  PC.finalizeOriginal();
   return result;
 }
 

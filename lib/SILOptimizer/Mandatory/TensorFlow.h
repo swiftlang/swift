@@ -30,6 +30,11 @@ namespace tf {
   /// "T".  If not, return a null type.
   Type isTensorHandle(Type ty);
 
+  /// This function maps a Swift type (either a language type like Float or an
+  /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
+  unsigned convertSwiftTypeToTF(Type ty);
+
+
   /// This is the interpretation of the operand passed into a SILInstruction for
   /// an op in the host program.
   enum class OpCommand {
