@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_CALLEMISSION_H
 #define SWIFT_IRGEN_CALLEMISSION_H
 
-#include "Address.h"
+#include "Temporary.h"
 #include "Callee.h"
 
 namespace llvm {
@@ -36,22 +36,20 @@ class CallEmission {
 public:
   IRGenFunction &IGF;
 
-  struct TypedTemporary {
-    StackAddress Temp;
-    SILType Type;
-  };
-
 private:
   /// The builtin/special arguments to pass to the call.
   SmallVector<llvm::Value*, 8> Args;
 
   /// Temporaries required by the call.
-  SmallVector<TypedTemporary, 4> Temporaries;
+  TemporarySet Temporaries;
 
   /// The function we're going to call.
   Callee CurCallee;
 
   unsigned LastArgWritten;
+
+  /// Whether this is a coroutine invocation.
+  bool IsCoroutine;
 
   /// Whether we've emitted the call for the current callee yet.  This
   /// is just for debugging purposes --- e.g. the destructor asserts
@@ -62,6 +60,7 @@ private:
   void setFromCallee();
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
+  void emitYieldsToExplosion(Explosion &out);
   llvm::CallSite emitCallSite();
 
 public:
@@ -89,10 +88,19 @@ public:
   void emitToMemory(Address addr, const LoadableTypeInfo &substResultTI,
                     bool isOutlined);
   void emitToExplosion(Explosion &out, bool isOutlined);
+
+  TemporarySet claimTemporaries() {
+    // Move the actual temporary set out.
+    auto result = std::move(Temporaries);
+
+    // Flag that we've cleared the set.
+    Temporaries.clear();
+
+    return result;
+  }
 };
 
-
-}
-}
+} // end namespace irgen
+} // end namespace swift
 
 #endif

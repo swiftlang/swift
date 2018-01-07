@@ -136,6 +136,10 @@ public:
     }
   }
 
+  std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
+    return mangleTypeSymbol(type, "TC");
+  }
+
   std::string mangleReflectionBuiltinDescriptor(Type type) {
     return mangleTypeSymbol(type, "MB");
   }

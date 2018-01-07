@@ -27,6 +27,17 @@
 
 namespace swift {
 
+enum {
+  /// The number of words (pointers) in a value buffer.
+  NumWords_ValueBuffer = 3,
+
+  /// The number of words in a yield-once coroutine buffer.
+  NumWords_YieldOnceBuffer = 4,
+
+  /// The number of words in a yield-many coroutine buffer.
+  NumWords_YieldManyBuffer = 8,
+};
+
 struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;

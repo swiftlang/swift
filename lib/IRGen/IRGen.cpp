@@ -63,6 +63,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/Transforms/Coroutines.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -203,6 +204,9 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
+
+  if (!Opts.DisableLLVMOptzns)
+    addCoroutinePassesToExtensionPoints(PMBuilder);
 
   PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                          addSwiftMergeFunctionsPass);
