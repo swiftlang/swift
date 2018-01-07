@@ -34,7 +34,7 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
   return x*z
 }
 
-// CHECK-LABEL: define hidden swiftcc double @"$S08test_v7k8addStack{{.*}}"(double, double, double, double, double, double, double, float, double)
+// CHECK-LABEL: define hidden swiftcc double @"$S8test_v7k8addStack{{.*}}"(double, double, double, double, double, double, double, float, double)
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: _$S8test_v7k8addStack
