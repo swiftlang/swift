@@ -37,4 +37,4 @@ let s = C2()
 
 s.bar
 
-// CHECK: call {{.*}} @_T029protocol_extensions_constrain2C3VAA2P3AAWP
+// CHECK: call {{.*}} @"$S29protocol_extensions_constrain2C3VAA2P3AAWP"

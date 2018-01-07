@@ -1269,7 +1269,7 @@ composed of literals. The static initializer is represented as a list of
 literal and aggregate instructions where the last instruction is the top-level
 value of the static initializer::
 
-  sil_global hidden @_T04test3varSiv : $Int {
+  sil_global hidden @$S4test3varSiv : $Int {
     %0 = integer_literal $Builtin.Int64, 27
     %initval = struct $Int (%0 : $Builtin.Int64)
   }
