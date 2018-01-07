@@ -133,9 +133,7 @@ public:
       }
     }
     types::forAllTypes([&](types::ID Ty) {
-      const std::string &Output =
-          Cmd.getOutput().getAdditionalOutputForType(Ty);
-      if (!Output.empty())
+      for (const auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty))
         Outputs.push_back(OutputPair(Ty, Output));
     });
   }

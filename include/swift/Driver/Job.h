@@ -46,7 +46,8 @@ class CommandOutput {
   /// from which the output file is derived.
   SmallVector<StringRef, 1> BaseInputs;
 
-  llvm::SmallDenseMap<types::ID, std::string, 4> AdditionalOutputsMap;
+  llvm::SmallDenseMap<types::ID, std::vector<std::string>, 4>
+      AdditionalOutputsMap;
 
 public:
   CommandOutput(types::ID PrimaryOutputType)
@@ -69,13 +70,19 @@ public:
   ArrayRef<std::string> getPrimaryOutputFilenames() const {
     return PrimaryOutputFilenames;
   }
-  
-  void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
-  const std::string &getAdditionalOutputForType(types::ID type) const;
 
+  void addAdditionalOutputForType(types::ID type, StringRef OutputFilename);
+  const std::string &getAdditionalDependenciesOutput() const;
+  const std::string &getAdditionalSerializedDiagnosticsOutput() const;
+  ArrayRef<std::string> getAdditionalOutputsForType(types::ID type) const;
+
+  // xxx now that there can be multiples, does this still make sense?
   const std::string &getAnyOutputForType(types::ID type) const;
 
   StringRef getBaseInput(int Index) const { return BaseInputs[Index]; }
+
+  // xxx move this info into type??
+  static bool doesBatchModeProduceMultiples(types::ID type);
 };
 
 class Job {

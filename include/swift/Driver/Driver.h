@@ -283,10 +283,11 @@ private:
                                    const TypeToPathMap *OutputMap,
                                    CommandOutput *Output) const;
 
-  void chooseSwiftModuleDocOutputPath(Compilation &C,
+  void chooseSwiftModuleDocOutputPath(Compilation &C, const OutputInfo &OI,
                                       const TypeToPathMap *OutputMap,
                                       CommandOutput *Output) const;
-  void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
+  void chooseRemappingOutputPath(Compilation &C, const OutputInfo &OI,
+                                 const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;
 
   void chooseSerializedDiagnosticsPath(Compilation &C, const JobAction *JA,
@@ -313,6 +314,11 @@ private:
 
   void chooseTBDPath(Compilation &C, const OutputInfo &OI,
                      llvm::SmallString<128> &Buf, CommandOutput *Output) const;
+
+  void chooseSupplementaryOutputsForBatchModeHack(Compilation &C,
+                                                  driver::types::ID type,
+                                                  const OutputInfo &OI,
+                                                  CommandOutput *Output) const;
 
 public:
   /// Handle any arguments which should be treated before building actions or
