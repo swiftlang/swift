@@ -41,7 +41,7 @@ class Derived : Base<Int>, P {
 
 protocol R {}
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @owned Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @owned Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
 
 
 func conversions(
@@ -117,7 +117,7 @@ func conversions(
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@owned Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@owned Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
 
 func methodCalls(
   baseAndP: Base<Int> & P,
@@ -153,7 +153,7 @@ func methodCalls(
 
   // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
   // CHECK: [[METATYPE_REF:%.*]] = upcast [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type to $@thick Base<Int>.Type
-  // CHECK: [[METHOD:%.*]] = function_ref @_T021subclass_existentials4BaseC15classSelfReturnACyxGXDyFZ : $@convention(method) <τ_0_0> (@thick Base<τ_0_0>.Type) -> @owned Base<τ_0_0>
+  // CHECK: [[METHOD:%.*]] = function_ref @$S21subclass_existentials4BaseC15classSelfReturnACyxGXDyFZ : $@convention(method) <τ_0_0> (@thick Base<τ_0_0>.Type) -> @owned Base<τ_0_0>
   // CHECK: [[RESULT_REF2:%.*]] = apply [[METHOD]]<Int>([[METATYPE_REF]])
   // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_REF2]] : $Base<Int> to $@opened("{{.*}}") (Base<Int> & P)
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") (Base<Int> & P) : $@opened("{{.*}}") (Base<Int> & P), $Base<Int> & P
@@ -205,7 +205,7 @@ class PropertyC {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@owned PropertyC & PropertyP) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@owned PropertyC & PropertyP) -> () {
 func propertyAccesses(_ x: PropertyP & PropertyC) {
   var xx = x
   xx.p.p = x
@@ -223,7 +223,7 @@ func propertyAccesses(_ x: PropertyP & PropertyC) {
   xx[(1, 2)] += 1
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base<Int> & P, @owned @callee_guaranteed () -> @thick (Base<Int> & P).Type, @owned @callee_guaranteed () -> @owned Derived, @owned @callee_guaranteed () -> @thick Derived.Type, @owned @callee_guaranteed () -> @owned Derived & R, @owned @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base<Int> & P, @owned @callee_guaranteed () -> @thick (Base<Int> & P).Type, @owned @callee_guaranteed () -> @owned Derived, @owned @callee_guaranteed () -> @thick Derived.Type, @owned @callee_guaranteed () -> @owned Derived & R, @owned @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
 func functionConversions(
   returnsBaseAndP: @escaping () -> (Base<Int> & P),
   returnsBaseAndPType: @escaping () -> (Base<Int> & P).Type,
@@ -254,7 +254,7 @@ func functionConversions(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
 func downcasts(
   baseAndP: Base<Int> & P,
   derived: Derived,
@@ -303,7 +303,7 @@ func downcasts(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT) -> () {
 func archetypeUpcasts<T,
                       BaseTAndP : Base<T> & P,
                       BaseIntAndP : Base<Int> & P,
@@ -331,7 +331,7 @@ func archetypeUpcasts<T,
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in S, @in T, @in PT, @owned BaseT, @owned BaseInt, @owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT, @owned Derived & R, @owned Base<T> & P, @owned Base<Int> & P) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in S, @in T, @in PT, @owned BaseT, @owned BaseInt, @owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT, @owned Derived & R, @owned Base<T> & P, @owned Base<Int> & P) -> () {
 func archetypeDowncasts<S,
                         T,
                         PT : P,

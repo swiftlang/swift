@@ -251,14 +251,14 @@ func testRenamedOptionyEnum() {
 #if !swift(>=4)
 
 func useSwift3Name(_: ImportantCStruct) {}
-// CHECK-SILGEN-3: sil hidden @_T09versioned13useSwift3NameyySC20VeryImportantCStructVF
+// CHECK-SILGEN-3: sil hidden @$S9versioned13useSwift3NameyySC20VeryImportantCStructVF
 
 func useNewlyNested(_: InnerInSwift4) {}
-// CHECK-SILGEN-3: sil hidden @_T09versioned14useNewlyNestedyySC5OuterV5InnerVF
+// CHECK-SILGEN-3: sil hidden @$S9versioned14useNewlyNestedyySC5OuterV5InnerVF
 #endif
 
 func useSwift4Name(_: VeryImportantCStruct) {}
-// CHECK-SILGEN: sil hidden @_T09versioned13useSwift4NameyySC20VeryImportantCStructVF
+// CHECK-SILGEN: sil hidden @$S9versioned13useSwift4NameyySC20VeryImportantCStructVF
 
 
 

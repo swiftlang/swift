@@ -14,8 +14,8 @@ func callsTakesP<T : P>(_ t: T) {
   takesP(t)
 }
 
-// CHECK-LABEL: sil hidden @_T026specialize_self_conforming16callsTakesPWithPyyAA1P_pF : $@convention(thin) (@owned P) -> () {
-// CHECK: [[FN:%.*]] = function_ref @_T026specialize_self_conforming6takesPyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+// CHECK-LABEL: sil hidden @$S26specialize_self_conforming16callsTakesPWithPyyAA1P_pF : $@convention(thin) (@owned P) -> () {
+// CHECK: [[FN:%.*]] = function_ref @$S26specialize_self_conforming6takesPyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
 // CHECK: apply [[FN]]<P>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
 // CHECK: return
 
