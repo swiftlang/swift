@@ -737,22 +737,60 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
+/// If AI is the version of an initializer where we pass in either an apply or
+/// an alloc_ref to initialize in place, validate that we are able to continue
+/// optimizing and return To
+static bool getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
+  assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
+                              "failure we can clear without worrying about the "
+                              "caller accumulating and thus our eliminating "
+                              "passed in state.");
+  SILValue Arg0 = AI->getArgument(0);
+
+  if (Arg0->getType().isExistentialType()) {
+    // This is a version of the initializer which receives a pre-allocated
+    // buffer as first argument. To completely eliminate the allocation, we must
+    // destroy the extra allocations as well as the initializer,
+    if (auto *Result = dyn_cast<ApplyInst>(Arg0)) {
+      ToDestroy.emplace_back(Result);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
+    if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
+          if (Op->getUser() == AI)
+            return true;
+          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
+            ToDestroy.emplace_back(SRI);
+            return true;
+          }
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  // We may have added elements to the array before we failed. To avoid such a
+  // problem, we clear the out array here. We assert at the beginning that the
+  // out array is empty, so this is safe.
+  ToDestroy.clear();
+  return true;
+}
+
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
 
-  ApplyInst *AllocBufferAI = nullptr;
-  SILValue Arg0 = AI->getArgument(0);
-  if (Arg0->getType().isExistentialType()) {
-    // This is a version of the initializer which receives a pre-allocated
-    // buffer as first argument. If we want to delete the initializer we also
-    // have to delete the allocation.
-    AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
-    if (!AllocBufferAI)
-      return false;
-  }
+  llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;
+  if (!getDeadInstsAfterInitializerRemoved(AI,
+                                           instsDeadAfterInitializerRemoved))
+    return false;
 
   if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
@@ -762,8 +800,9 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
   eraseUsesOfInstruction(AI);
   assert(AI->use_empty() && "All users should have been removed.");
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
-  if (AllocBufferAI) {
-    recursivelyDeleteTriviallyDeadInstructions(AllocBufferAI, true);
+  if (instsDeadAfterInitializerRemoved.size()) {
+    recursivelyDeleteTriviallyDeadInstructions(instsDeadAfterInitializerRemoved,
+                                               true);
   }
   ++DeadAllocApplyEliminated;
   return true;
