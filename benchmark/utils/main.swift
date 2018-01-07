@@ -89,6 +89,7 @@ import ObserverUnappliedMethod
 import OpenClose
 import PartialApplyDynamicType
 import Phonebook
+import PointerArithmetics
 import PolymorphicCalls
 import PopFront
 import PopFrontGeneric
@@ -222,6 +223,7 @@ registerBenchmark(ObserverUnappliedMethod)
 registerBenchmark(OpenClose)
 registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
+registerBenchmark(PointerArithmetics)
 registerBenchmark(PolymorphicCalls)
 registerBenchmark(PopFront)
 registerBenchmark(PopFrontArrayGeneric)
