@@ -422,14 +422,16 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     return false;
   }
 
-  std::vector<std::string> outputFilenames =
+  Optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
                                                                        Diags);
 
-  auto nameToStem = ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
-                        outputFilenames)
-                        ? outputFilenames.front()
-                        : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+  auto nameToStem =
+      outputFilenames &&
+              ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
+                  *outputFilenames)
+          ? outputFilenames->front()
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;

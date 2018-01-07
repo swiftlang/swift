@@ -164,8 +164,9 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
 }
 
 bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                       Diags);
   return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
-         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
-                                                                          Diags)
-                 .size() == 1;
+         userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1;
 }
