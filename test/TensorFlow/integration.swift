@@ -122,3 +122,56 @@ public func testExitBranch(i : Int) {
 // CHECK: bb3:
 
 
+
+// This program results in a boolean parameter being passed in.
+public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can only handle single basic block programs}}
+  var a = Tensor1D<Float>(1,2,3).toDevice()
+  let b = Tensor1D<Float>(1,2,4).toDevice()
+
+  if cond {  // expected-warning {{value implicitly copied to accelerator}}
+
+    // TODO: Bogus warning!
+    a -= b   // expected-warning {{value implicitly copied to the host}}
+  }
+  a += b
+  print(a.toHost())
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
+// CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
+// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
+
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
+// CHECK: = function_ref @_swift_tfc_CreateCTensorHandle : $@convention(thin)
+// CHECK-NEXT: = integer_literal $Builtin.Int32, 10
+// CHECK-NEXT: = struct $UInt32 ({{.*}} : $Builtin.Int32)
+// CHECK-NEXT:  = struct $TF_DataType ({{.*}} : $UInt32)
+// CHECK-NEXT:  = alloc_stack $Builtin.Int1
+// CHECK-NEXT: store
+// CHECK-NEXT:  = begin_access [read] [static]
+// CHECK-NEXT:  = apply {{.*}}<Builtin.Int1>({{.*}}, {{.*}}) : $@convention(thin)
+// CHECK-NEXT:  end_access
+// CHECK-NEXT:  dealloc_stack
+
+
+// This should also result in a boolean parameter, but due to evaluation order
+// we get a send instead.
+public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can only handle single basic block programs}}
+  var a = Tensor1D<Float>(1,2,3).toDevice()
+  let b = Tensor1D<Float>(1,2,4).toDevice()
+
+  // TODO: Bogus warning!
+  a += b  // expected-warning {{value implicitly copied to the host}}
+
+  // TODO: fix this to use an argument!
+  if cond {  // expected-warning {{value implicitly copied to accelerator}}
+
+    // TODO: Bogus warning!
+    a -= b   // expected-warning {{value implicitly copied to the host}}
+  }
+  a += b
+  print(a.toHost())
+}
+
+
