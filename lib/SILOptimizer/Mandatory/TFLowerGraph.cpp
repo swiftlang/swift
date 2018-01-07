@@ -195,76 +195,22 @@ std::string TFGraphLowering::getUniqueOpName(SILDebugLocation loc) {
   return name;
 }
 
-static bool is64(const StructType *ty) {
-  return ty->getDecl()->getASTContext().LangOpts.Target.isArch64Bit();
-}
-
-static TF_DataType convertSwiftPrimitiveTypeToTF(Type ty) {
-  // Handle wrappers like Float, which come up in TensorHandle<Float>
-  if (auto *s = ty->getAs<StructType>()) {
-    // Make sure the type is defined inside the Swift module.
-    auto context = s->getDecl()->getDeclContext()->getParentModule();
-    if (!context || context->getName().str() != "Swift")
-      return TF_DataType();
-
-    return llvm::StringSwitch<TF_DataType>(s->getDecl()->getNameStr())
-      .Case("Bool", TF_BOOL)
-      .Case("Int8", TF_INT8)
-      .Case("UInt8", TF_UINT8)
-      .Case("Int16", TF_INT16)
-      .Case("UInt16", TF_UINT16)
-      .Case("Int32", TF_INT32)
-      .Case("UInt32", TF_UINT32)
-      .Case("Int64", TF_INT64)
-      .Case("UInt64", TF_UINT64)
-      .Case("Int8", TF_INT8)
-      .Case("UInt8", TF_UINT8)
-      .Case("Float", TF_FLOAT)
-      .Case("Double", TF_DOUBLE)
-      .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
-      .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
-      .Default(TF_DataType());
-  }
-
-  // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
-  // so we can't rely on getting type information from the builtin types
-  // themselves.
-
-  if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
-    switch (BIF->getFPKind()) {
-    case BuiltinFloatType::IEEE16: return TF_HALF;
-    case BuiltinFloatType::IEEE32: return TF_FLOAT;
-    case BuiltinFloatType::IEEE64: return TF_DOUBLE;
-    case BuiltinFloatType::IEEE80:
-    case BuiltinFloatType::IEEE128:
-    case BuiltinFloatType::PPC128:
-      return TF_DataType();
-    }
-  }
-
-  return TF_DataType();
-}
-
-static TF_DataType convertSwiftPrimitiveTypeToTF(SILType ty) {
-  return convertSwiftPrimitiveTypeToTF(ty.getSwiftRValueType());
-}
-
-
 TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
                                                    SILLocation loc) {
   // Handle things like TensorHandle<Float>.
   if (auto elt = tf::isTensorHandle(type.getSwiftRValueType())) {
-    if (auto ty = convertSwiftPrimitiveTypeToTF(elt))
+    if (auto ty = (TF_DataType)convertSwiftTypeToTF(elt))
       return ty;
   }
 
-  if (auto ty = convertSwiftPrimitiveTypeToTF(type))
+  if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getSwiftRValueType()))
     return ty;
 
   internalError(loc, "Unknown Swift type to lower to TensorFlow: " +
                 type.getAsString());
   return TF_DataType(-1);
 }
+
 
 
 /// Lower the graph that we've generated so far into a serialized binary
@@ -407,6 +353,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   } else if (!inst->getType().isVoid()) {
     numActualResults = 1;
   }
+
   if (numOpResults != numActualResults) {
     diagnose(SILFn->getASTContext(), inst->getLoc().getSourceLoc(),
              diag::tfop_incorrect_definition,

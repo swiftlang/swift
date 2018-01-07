@@ -19,6 +19,7 @@ import CTensorFlow
 // The C type is TF_Status*
 public typealias CTF_Status = OpaquePointer?
 
+@_versioned
 func checkOk(_ s: CTF_Status) {
   precondition(TF_GetCode(s) == TF_OK, String(cString: TF_Message(s)))
 }
@@ -165,4 +166,21 @@ public func _TFCFinishTensorProgram(
   _ = resultBuffer.initialize(from: results)
 }
 
+/// This function transforms a scalar value into a TensorHandle.
+@_inlineable
+@_silgen_name("_swift_tfc_CreateCTensorHandle")
+public func _TFC_CreateCTensorHandle<T>(_ value : T,
+                                        _ dtype: TF_DataType) -> CTensorHandle {
+  let tensor = TF_AllocateTensor(dtype, nil, 0, MemoryLayout<T>.stride)
+
+  // This chunk of code does: *reinterpret_cast<float*>(TF_TensorData(in_t)) = f
+  TF_TensorData(tensor).bindMemory(to: T.self, capacity: 1).pointee = value
+
+  let status = TF_NewStatus()
+  let cTensorHandle = TFE_NewTensorHandle(tensor, status)
+  checkOk(status)
+  TF_DeleteStatus(status)
+  TF_DeleteTensor(tensor)
+  return cTensorHandle!
+}
 
