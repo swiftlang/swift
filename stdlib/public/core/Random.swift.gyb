@@ -101,7 +101,7 @@ extension RandomNumberGenerator {
 /// example of calling this directly:
 ///
 ///     let random = Random.default.next(UInt8.self)
-///     let randomToTen = Random.default.next(UInt32.self, upperBound: 128)
+///     let randomToTen = Random.default.next(upperBound: UInt32(10))
 ///
 /// However, you should strive to use the random functions on the numeric types.
 /// Using the preferred way:
@@ -110,7 +110,7 @@ extension RandomNumberGenerator {
 ///     let randomToTen = UInt32.random(in: 0 ... 128)
 ///
 /// - Note: The default implementation of randomness is cryptographically secure.
-///   It utilizes arc4random on newer versions of macOS, iOS, etc. On older
+///   It utilizes arc4random(3) on newer versions of macOS, iOS, etc. On older
 ///   versions of these operating systems it uses SecRandomCopyBytes. For Linux,
 ///   it tries to use the getrandom(2) system call on newer kernel versions. On
 ///   older kernel versions, it reads from /dev/urandom.
