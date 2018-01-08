@@ -120,8 +120,10 @@ func genericFunc<V: AnyObject>(_ v: V.Type) {
 }
 
 // CHECK-LABEL: sil hidden @$S21objc_imported_generic23configureWithoutOptionsyyF : $@convention(thin) () -> ()
-// CHECK: enum $Optional<Dictionary<GenericOption, Any>>, #Optional.none!enumelt
-// CHECK: return
+// CHECK:      // function_ref Optional.none<A>(_:)
+// CHECK-NEXT: [[ENUM_CASE:%.*]] = function_ref @$SSq4noneyxSgABmlF
+// CHECK-NEXT: apply [[ENUM_CASE]]<[GenericOption : Any]>({{%.*}}, {{%.*}})
+// CHECK:      return
 func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)
 }

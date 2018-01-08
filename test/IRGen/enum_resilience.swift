@@ -119,10 +119,22 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT:i32|i64]] -1
 // CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8, !invariant.load !11
+// CHECK-NEXT: [[ALLOCA_SIZE:%.*]] = ptrtoint i8* [[WITNESS]] to i64
+// CHECK-NEXT: [[STACK:%.*]] = alloca i8, i64 [[ALLOCA_SIZE]], align 16
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[STACK]])
+// CHECK-NEXT: [[DEST:%.*]] = bitcast i8* [[STACK]] to %swift.opaque*
+
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK-NEXT: [[COPY:%.*]] = call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* [[METADATA]])
+// CHECK-NEXT: [[COPY:%.*]] = call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias [[DEST]], %swift.opaque* noalias %1, %swift.type* [[METADATA]])
+
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
+// CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
+// CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
+// CHECK-NEXT: [[COPY:%.*]] = call %swift.opaque* %initializeWithTake(%swift.opaque* noalias %0, %swift.opaque* noalias [[DEST]], %swift.type* [[METADATA]])
 
 // CHECK-NEXT: [[METADATA2:%.*]] = call %swift.type* @"$S14resilient_enum6MediumOMa"()
 // CHECK-NEXT: [[METADATA_ADDR2:%.*]] = bitcast %swift.type* [[METADATA2]] to i8***
@@ -138,6 +150,9 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %1, %swift.type* [[METADATA]])
+
+// CHECK-NEXT: [[STACK:%.*]] = bitcast %swift.opaque* [[DEST]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[STACK]])
 
 // CHECK-NEXT: ret void
   return Medium.Postcard(s)

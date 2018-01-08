@@ -407,9 +407,17 @@ template <typename T>
 static TypeRepr *
 validateParameterWithSpecifier(Parser &parser,
                                Parser::ParsedParameter &paramInfo,
-                               StringRef specifierName) {
+                               StringRef specifierName,
+                               bool parsingEnumElt) {
   auto type = paramInfo.Type;
   auto loc = paramInfo.SpecifierLoc;
+  // If we're validating an enum element, 'inout' is not allowed
+  // at all - Sema will catch this for us.  In all other contexts, we
+  // assume the user put 'inout' in the wrong place and offer a fixit.
+  if (parsingEnumElt) {
+    return new (parser.Context) T(type, loc);
+  }
+
   if (isa<SpecifierTypeRepr>(type)) {
     parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
   } else {
@@ -446,10 +454,11 @@ mapParsedParameters(Parser &parser,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
+    bool parsingEnumElt
+      = (paramContext == Parser::ParameterContextKind::EnumElement);
     // If we're not parsing an enum case, lack of a SourceLoc for both
     // names indicates the parameter is synthetic.
-    if (paramContext != Parser::ParameterContextKind::EnumElement &&
-        argNameLoc.isInvalid() && paramNameLoc.isInvalid())
+    if (!parsingEnumElt && argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
 
     // If we diagnosed this parameter as a parse error, propagate to the decl.
@@ -458,21 +467,19 @@ mapParsedParameters(Parser &parser,
     
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
-      if (paramContext != Parser::ParameterContextKind::EnumElement) {
-        // If 'inout' was specified, turn the type into an in-out type.
-        if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
-          type = validateParameterWithSpecifier<InOutTypeRepr>(parser,
-                                                               paramInfo,
-                                                               "inout");
-        } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
-          type = validateParameterWithSpecifier<SharedTypeRepr>(parser,
-                                                                paramInfo,
-                                                                "__shared");
-        } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
-          type = validateParameterWithSpecifier<OwnedTypeRepr>(parser,
-                                                               paramInfo,
-                                                               "__owned");
-        }
+      // If 'inout' was specified, turn the type into an in-out type.
+      if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
+        type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
+                                                             "inout",
+                                                             parsingEnumElt);
+      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
+        type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
+                                                              "__shared",
+                                                              parsingEnumElt);
+      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
+        type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
+                                                             "__owned",
+                                                             parsingEnumElt);
       }
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {

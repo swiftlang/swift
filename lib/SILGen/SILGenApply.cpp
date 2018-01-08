@@ -3481,10 +3481,6 @@ public:
     extraSites.push_back(std::move(site));
   }
 
-  bool isArgTupleShuffle() const {
-    return ArgValue.isTupleShuffleExpr();
-  }
-  
   /// Add a level of function application by passing in its possibly
   /// unevaluated arguments and their formal type
   template<typename...T>
@@ -3637,12 +3633,6 @@ CallEmission::applyFirstLevelCallee(SGFContext C) {
 
   if (isPartiallyAppliedSuperMethod()) {
     return applyPartiallyAppliedSuperMethod(C);
-  }
-
-  if (isEnumElementConstructor() && !llvm::any_of(uncurriedSites, [](const CallSite &s){
-     return s.isArgTupleShuffle();
-   })) {
-    return applyEnumElementConstructor(C);
   }
 
   return applyNormalCall(C);

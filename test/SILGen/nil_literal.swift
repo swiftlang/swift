@@ -13,8 +13,10 @@ func takesANull(_: CustomNull) {}
 // CHECK-LABEL: sil hidden @$S11nil_literal4testyyF : $@convention(thin) () -> ()
 func test() {
   // CHECK: [[NIL:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  // CHECK: br [[DEST_BB:bb.*]]([[NIL]] : $Optional<@callee_guaranteed () -> ()>)
+  // CHECK: [[DEST_BB]]([[NIL_ARG:%.*]] : @owned $Optional<@callee_guaranteed () -> ()>):
   // CHECK: [[FN:%.*]] = function_ref @$S11nil_literal21takesOptionalFunctionyyyycSgF
-  // CHECK: apply [[FN]]([[NIL]])
+  // CHECK: apply [[FN]]([[NIL_ARG]])
   _ = takesOptionalFunction(nil)
 
   // CHECK: [[METATYPE:%.*]] = metatype $@thin CustomNull.Type

@@ -17,10 +17,14 @@ func g(x: Any) {
   // CHECK: apply [[FN:%.*]]({{.*}}) : $@convention(thin) (@in Any) -> ()
   fn(data: x)
 
-  // CHECK: inject_enum_addr {{.*}} : $*HasAnyCase, #HasAnyCase.any!enumelt.1
+  // CHECK:      // function_ref HasAnyCase.any(_:)
+  // CHECK-NEXT: [[ENUM_CASE:%.*]] = function_ref @$S23argument_shuffle_swift310HasAnyCaseO3anyyACypcACmF
+  // CHECK-NEXT: apply [[ENUM_CASE]]({{.*}})
   _ = HasAnyCase.any(123)
 
-  // CHECK: inject_enum_addr {{.*}} : $*HasAnyCase, #HasAnyCase.any!enumelt.1
+  // CHECK:      // function_ref HasAnyCase.any(_:)
+  // CHECK-NEXT: [[ENUM_CASE:%.*]] = function_ref @$S23argument_shuffle_swift310HasAnyCaseO3anyyACypcACmF
+  // CHECK-NEXT: apply [[ENUM_CASE]]({{.*}})
   _ = HasAnyCase.any(data: 123)
 
   // CHECK: return

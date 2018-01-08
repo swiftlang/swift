@@ -17,11 +17,15 @@ enum Boolish {
 // CHECK-LABEL: sil hidden @$Ss13Boolish_casesyyF
 func Boolish_cases() {
   // CHECK:       [[BOOLISH:%[0-9]+]] = metatype $@thin Boolish.Type
-  // CHECK-NEXT:  [[FALSY:%[0-9]+]] = enum $Boolish, #Boolish.falsy!enumelt
+  // CHECK-NEXT:  // function_ref Boolish.falsy(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss7BoolishO5falsyyA2BmF
+  // CHECK-NEXT:  [[FALSY:%[0-9]+]] = apply [[ENUM_CASE]]([[BOOLISH]])
   _ = Boolish.falsy
 
   // CHECK-NEXT:  [[BOOLISH:%[0-9]+]] = metatype $@thin Boolish.Type
-  // CHECK-NEXT:  [[TRUTHY:%[0-9]+]] = enum $Boolish, #Boolish.truthy!enumelt
+  // CHECK-NEXT:  // function_ref Boolish.truthy(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss7BoolishO6truthyyA2BmF
+  // CHECK-NEXT:  [[TRUTHY:%[0-9]+]] = apply [[ENUM_CASE]]([[BOOLISH]])
   _ = Boolish.truthy
 }
 
@@ -42,7 +46,9 @@ func Optionable_cases(_ x: Int) {
   _ = Optionable.mere
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
-  // CHECK-NEXT:  [[RES:%.*]] = enum $Optionable, #Optionable.mere!enumelt.1, %0 : $Int
+  // CHECK-NEXT:  // function_ref Optionable.mere(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%.*]] = function_ref @$Ss10OptionableO4mereyABSicABmF
+  // CHECK-NEXT:  [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]](%0, [[METATYPE]])
   _ = Optionable.mere(x)
 }
 
@@ -75,30 +81,35 @@ func AddressOnly_cases(_ s: S) {
   // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = AddressOnly.mere
 
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[NOUGHT:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  inject_enum_addr [[NOUGHT]]
+  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
+  // CHECK-NEXT:  // function_ref AddressOnly.nought(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss11AddressOnlyO6noughtyA2BmF
+  // CHECK-NEXT:  [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]([[NOUGHT]], [[METATYPE]])
   // CHECK-NEXT:  destroy_addr [[NOUGHT]]
   // CHECK-NEXT:  dealloc_stack [[NOUGHT]]
   _ = AddressOnly.nought
 
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
+  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
+  // CHECK-NEXT:  [[PAYLOAD:%.*]] = alloc_stack $P
   // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
   // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
-  // CHECK-NEXT:  inject_enum_addr [[MERE]]
+  // CHECK-NEXT:  // function_ref AddressOnly.mere(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss11AddressOnlyO4mereyABs1P_pcABmF
+  // CHECK-NEXT:  [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]([[MERE]], [[PAYLOAD]], [[METATYPE]])
+  // CHECK-NEXT:  dealloc_stack [[PAYLOAD]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
   _ = AddressOnly.mere(s)
 
   // Address-only enum vs loadable payload
 
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[PHANTOM:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
-  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD]]
-  // CHECK-NEXT:  inject_enum_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
+  // CHECK-NEXT:  // function_ref AddressOnly.phantom(_:)
+  // CHECK-NEXT:  [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss11AddressOnlyO7phantomyABs1SVcABmF
+  // CHECK-NEXT:  [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]([[PHANTOM]], %0, [[METATYPE]])
   // CHECK-NEXT:  destroy_addr [[PHANTOM]]
   // CHECK-NEXT:  dealloc_stack [[PHANTOM]]
 
@@ -127,18 +138,23 @@ enum PolyOptionable<T> {
 // CHECK-LABEL: sil hidden @$Ss20PolyOptionable_casesyyxlF
 func PolyOptionable_cases<T>(_ t: T) {
 
-// CHECK:         [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
-// CHECK-NEXT:    [[NOUGHT:%.*]] = alloc_stack $PolyOptionable<T>
-// CHECK-NEXT:    inject_enum_addr [[NOUGHT]]
+// CHECK:         [[NOUGHT:%.*]] = alloc_stack $PolyOptionable<T>
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
+// CHECK-NEXT:    // function_ref PolyOptionable.nought<A>(_:)
+// CHECK-NEXT:    [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss14PolyOptionableO6noughtyAByxGADmlF
+// CHECK-NEXT:    [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]<T>([[NOUGHT]], [[METATYPE]])
 // CHECK-NEXT:    destroy_addr [[NOUGHT]]
 // CHECK-NEXT:    dealloc_stack [[NOUGHT]]
   _ = PolyOptionable<T>.nought
 
-// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
 // CHECK-NEXT:    [[MERE:%.*]] = alloc_stack $PolyOptionable<T>
-// CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[PAYLOAD]]
-// CHECK-NEXT:    inject_enum_addr [[MERE]]
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
+// CHECK-NEXT:    [[PAYLOAD:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr %0 to [initialization] [[PAYLOAD]] : $*T
+// CHECK-NEXT:    // function_ref PolyOptionable.mere<A>(_:)
+// CHECK-NEXT:    [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss14PolyOptionableO4mereyAByxGxcADmlF
+// CHECK-NEXT:    [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]<T>([[MERE]], [[PAYLOAD]], [[METATYPE]])
+// CHECK-NEXT:    dealloc_stack [[PAYLOAD]]
 // CHECK-NEXT:    destroy_addr [[MERE]]
 // CHECK-NEXT:    dealloc_stack [[MERE]]
 
@@ -154,12 +170,25 @@ func PolyOptionable_cases<T>(_ t: T) {
 // CHECK-LABEL: sil hidden @$Ss32PolyOptionable_specialized_casesyySiF
 func PolyOptionable_specialized_cases(_ t: Int) {
 
-// CHECK:         [[METATYPE:%.*]] = metatype $@thin PolyOptionable<Int>.Type
-// CHECK-NEXT:    [[NOUGHT:%.*]] = enum $PolyOptionable<Int>, #PolyOptionable.nought!enumelt
+// CHECK:         [[NOUGHT:%.*]] = alloc_stack $PolyOptionable<Int>
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<Int>.Type
+// CHECK-NEXT:    // function_ref PolyOptionable.nought<A>(_:)
+// CHECK-NEXT:    [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss14PolyOptionableO6noughtyAByxGADmlF
+// CHECK-NEXT:    [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]<Int>([[NOUGHT]], [[METATYPE]])
+// CHECK-NEXT:    [[RES:%.*]] = load [trivial] [[NOUGHT]]
+// CHECK-NEXT:    dealloc_stack [[NOUGHT]]
   _ = PolyOptionable<Int>.nought
 
+// CHECK-NEXT:    [[MERE:%.*]] = alloc_stack $PolyOptionable<Int>
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<Int>.Type
-// CHECK-NEXT:    [[NOUGHT:%.*]] = enum $PolyOptionable<Int>, #PolyOptionable.mere!enumelt.1, %0
+// CHECK-NEXT:    [[ARG_STACK:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    store %0 to [trivial] [[ARG_STACK]] : $*Int
+// CHECK-NEXT:    // function_ref PolyOptionable.mere<A>(_:)
+// CHECK-NEXT:    [[ENUM_CASE:%[0-9]+]] = function_ref @$Ss14PolyOptionableO4mereyAByxGxcADmlF
+// CHECK-NEXT:    [[ENUM_ELT:%[0-9]+]] = apply [[ENUM_CASE]]<Int>([[MERE]], [[ARG_STACK]], [[METATYPE]])
+// CHECK-NEXT:    dealloc_stack [[ARG_STACK]]
+// CHECK-NEXT:    [[RES:%.*]] = load [trivial] [[MERE]]
+// CHECK-NEXT:    dealloc_stack [[MERE]]
   _ = PolyOptionable<Int>.mere(t)
 
 // CHECK:         return

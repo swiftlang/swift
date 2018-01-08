@@ -15,11 +15,11 @@
 class C {
   class func fromMetatype() -> Self? { return nil }
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC12fromMetatypeACXDSgyFZ"(%swift.type* swiftself)
-  // CHECK: ret i64 0
+  // CHECK: ret i64 {{%.*}}
 
   func fromInstance() -> Self? { return nil }
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC12fromInstanceACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
-  // CHECK: ret i64 0
+  // CHECK: ret i64 {{%.*}}
 
   func dynamicSelfArgument() -> Self? {
     return id(nil)
