@@ -28,17 +28,32 @@
 /// equal hash values are not necessarily equal to each other.
 ///
 /// - Important: Hash values are not guaranteed to be equal across different
-///   executions of your program. Do not save hash values to use in a
-///   future execution.
+///   executions of your program. Do not save hash values to use in a future
+///   execution.
 ///
 /// Conforming to the Hashable Protocol
 /// ===================================
 ///
 /// To use your own custom type in a set or as the key type of a dictionary,
-/// add `Hashable` conformance to your type by providing a `hashValue`
-/// property. The `Hashable` protocol inherits from the `Equatable` protocol,
-/// so you must also add an equal-to operator (`==`) function for your
-/// custom type.
+/// add `Hashable` conformance to your type. The `Hashable` protocol inherits
+/// from the `Equatable` protocol, so you must also satisfy that protocol's
+/// requirements.
+///
+/// A custom type's `Hashable` and `Equatable` requirements are automatically
+/// synthesized by the compiler when you declare `Hashable` conformance in the
+/// type's original declaration and your type meets these criteria:
+///
+/// - For a `struct`, all its stored properties must conform to `Hashable`.
+/// - For an `enum`, all its associated values must conform to `Hashable`. (An
+///   `enum` without associated values has `Hashable` conformance even without
+///   the declaration.)
+///
+/// To customize your type's `Hashable` conformance, to adopt `Hashable` in a
+/// type that doesn't meet the criteria listed above, or to extend an existing
+/// type to conform to `Hashable`, implement the `hashValue` property in your
+/// custom type. To ensure that your type meets the semantic requirements of
+/// the `Hashable` and `Equatable` protocols, it's a good idea to also
+/// customize your type's `Equatable` conformance to match.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a
 /// grid of buttons. Here's the initial declaration of the `GridPoint` type:

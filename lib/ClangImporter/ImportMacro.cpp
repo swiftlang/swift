@@ -90,9 +90,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
-    auto literalType = Impl.importType(clangTy, ImportTypeKind::Value,
-                                       isInSystemModule(DC),
-                                       Bridgeability::None);
+    auto literalType = Impl.importTypeIgnoreIUO(
+        clangTy, ImportTypeKind::Value, isInSystemModule(DC),
+        Bridgeability::None);
     if (!literalType)
       return nullptr;
 
@@ -100,9 +100,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     if (castType.isNull()) {
       constantType = literalType;
     } else {
-      constantType = Impl.importType(castType, ImportTypeKind::Value,
-                                     isInSystemModule(DC),
-                                     Bridgeability::None);
+      constantType = Impl.importTypeIgnoreIUO(
+          castType, ImportTypeKind::Value, isInSystemModule(DC),
+          Bridgeability::None);
       if (!constantType)
         return nullptr;
     }
@@ -276,10 +276,9 @@ static Optional<std::pair<llvm::APSInt, Type>>
     if (auto literal = parseNumericLiteral<clang::IntegerLiteral>(impl,token)) {
       auto value = llvm::APSInt { literal->getValue(),
                                   literal->getType()->isUnsignedIntegerType() };
-      auto type  = impl.importType(literal->getType(),
-                                   ImportTypeKind::Value,
-                                   isInSystemModule(DC),
-                                   Bridgeability::None);
+      auto type = impl.importTypeIgnoreIUO(
+          literal->getType(), ImportTypeKind::Value, isInSystemModule(DC),
+          Bridgeability::None);
       return {{ value, type }};
     }
 

@@ -16,27 +16,29 @@ public protocol Runcible {
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
-// -- type metadata
-// CHECK:           @_T0SC6NSRectVN
+// CHECK:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
+// -- nominal type descriptor
+// CHECK:           @"$SSC6NSRectVMn"
 // -- witness table
-// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x02: nonunique direct metadata
-// CHECK:           i32 2 },
+// CHECK:           @"$SSC6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
+// -- reserved
+// CHECK:           i32 0
+// CHECK:         },
 extension NSRect: Runcible {
   public func runce() {}
 }
 
-// -- TODO class refs should be indirected through their ref variable
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
-// -- class object (TODO should be class ref variable)
+// -- class object reference + 0x03 (class object reference, TODO: indirect me)
+// CHECK:           i32 add
 // CHECK:           @"got.OBJC_CLASS_$_Gizmo"
+// CHECK:           i32 3
 // -- witness table
-// CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
-// CHECK:           i32 1
+// CHECK:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
+// -- reserved
+// CHECK:           i32 0
 // CHECK:         }
 extension Gizmo: Runcible {
   public func runce() {}

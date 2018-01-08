@@ -50,11 +50,11 @@ class KlassWithBuffer {
   var buffer: Buffer
 
   // Make sure that the allocating init forwards into the initializing init at +1.
-  // CHECK-LABEL: sil hidden @_T0s15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
+  // CHECK-LABEL: sil hidden @$Ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
   // CHECK: bb0([[ARG:%.*]] : @owned $Klass,
-  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @_T0s15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
+  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @$Ss15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
   // CHECK:   apply [[INITIALIZING_INIT]]([[ARG]],
-  // CHECK: } // end sil function '_T0s15KlassWithBufferC3inKABs0A0C_tcfC'
+  // CHECK: } // end sil function '$Ss15KlassWithBufferC3inKABs0A0C_tcfC'
   init(inK: Klass = Klass()) {
     buffer = Buffer(inK: inK)
   }
@@ -64,7 +64,7 @@ class KlassWithBuffer {
   // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
-  // CHECK-LABEL: sil hidden @_T0s15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
+  // CHECK-LABEL: sil hidden @$Ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $KlassWithBuffer):
   // CHECK:   [[BUF_BOX:%.*]] = alloc_stack $Buffer
   // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $KlassWithBuffer, #KlassWithBuffer.buffer!getter.1
@@ -79,7 +79,7 @@ class KlassWithBuffer {
   // CHECK:   end_borrow [[BORROWED_BUF_KLASS]]
   // CHECK:   destroy_value [[BUF_KLASS]]
   // CHECK:   return [[COPY_CASTED_BORROWED_BUF_KLASS]]
-  // CHECK: } // end sil function '_T0s15KlassWithBufferC03getC14AsNativeObjectBoyF'
+  // CHECK: } // end sil function '$Ss15KlassWithBufferC03getC14AsNativeObjectBoyF'
   func getBufferAsNativeObject() -> Builtin.NativeObject {
     return Builtin.unsafeCastToNativeObject(buffer.k)
   }
@@ -88,13 +88,13 @@ class KlassWithBuffer {
 struct StructContainingBridgeObject {
   var rawValue: Builtin.BridgeObject
 
-  // CHECK-LABEL: sil hidden @_T0s28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
+  // CHECK-LABEL: sil hidden @$Ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[BORROWED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   [[COPY_CASTED_ARG:%.*]] = copy_value [[CASTED_ARG]]
   // CHECK:   assign [[COPY_CASTED_ARG]] to
-  // CHECK: } // end sil function '_T0s28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
+  // CHECK: } // end sil function '$Ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
   init(swiftObj: AnyObject) {
     rawValue = Builtin.reinterpretCast(swiftObj)
   }

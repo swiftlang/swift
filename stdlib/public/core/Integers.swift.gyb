@@ -1293,7 +1293,7 @@ extension Numeric {
 ///     // r == 82
 ///     //   == 0b01010010
 ///
-///     let s = Int16(truncatingIfNeeded: s)     // extend 'r' to fill 16 bits
+///     let s = Int16(truncatingIfNeeded: r)     // extend 'r' to fill 16 bits
 ///     // s == 82
 ///     //   == 0b00000000_01010010
 ///
@@ -1489,7 +1489,12 @@ public protocol BinaryInteger :
   ///
   /// This property is a constant for instances of fixed-width integer
   /// types.
-  var bitWidth : Int { get }
+  var bitWidth: Int { get }
+
+  /// Returns the integer binary logarithm of this value.
+  ///
+  /// If the value is negative, a runtime error will occur.
+  func _binaryLogarithm() -> Self
 
   /// The number of trailing zeros in this value's binary representation.
   ///
@@ -1595,6 +1600,25 @@ extension BinaryInteger {
     return it.next() ?? 0
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _binaryLogarithm() -> Self {
+    _precondition(self > 0)
+    let wordBitWidth = Magnitude.Words.Element.bitWidth
+    let reversedWords = magnitude.words.reversed()
+    // If, internally, a variable-width binary integer uses digits of greater
+    // bit width than that of Magnitude.Words.Element (i.e., UInt), then it is
+    // possible that more than one element of Magnitude.Words could be entirely
+    // zero.
+    let reversedWordsLeadingZeroBitCount =
+      zip(0..., reversedWords)
+        .first { $0.1 != 0 }
+        .map { $0.0 &* wordBitWidth &+ $0.1.leadingZeroBitCount }!
+    let logarithm =
+      reversedWords.count &* wordBitWidth &-
+        (reversedWordsLeadingZeroBitCount &+ 1)
+    return Self(logarithm)
+  }
+
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1648,6 +1672,14 @@ ${operatorComment(x.nonMaskingOperator, False)}
 // Strideable conformance
 extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
+  /// Returns the distance from this value to the given value, expressed as a
+  /// stride.
+  ///
+  /// For two values `x` and `y`, and a distance `n = x.distance(to: y)`,
+  /// `x.advanced(by: n) == y`.
+  ///
+  /// - Parameter other: The value to calculate the distance to.
+  /// - Returns: The distance from this value to `other`.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func distance(to other: Self) -> Int {
@@ -1677,6 +1709,17 @@ extension BinaryInteger {
   }
 
   // FIXME(ABI): using Int as the parameter type is wrong.
+  /// Returns a value that is offset the specified distance from this value.
+  ///
+  /// Use the `advanced(by:)` method in generic code to offset a value by a
+  /// specified distance. If you're working directly with numeric values, use
+  /// the addition operator (`+`) instead of this method.
+  ///
+  /// For a value `x`, a distance `n`, and a value `y = x.advanced(by: n)`,
+  /// `x.distance(to: y) == n`.
+  ///
+  /// - Parameter n: The distance to advance this value.
+  /// - Returns: A value that is offset from this value by `n`.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func advanced(by n: Int) -> Self {
@@ -1696,12 +1739,31 @@ extension BinaryInteger {
 
 extension Int {
   // FIXME(ABI): using Int as the return type is wrong.
+  /// Returns the distance from this value to the given value, expressed as a
+  /// stride.
+  ///
+  /// For two values `x` and `y`, and a distance `n = x.distance(to: y)`,
+  /// `x.advanced(by: n) == y`.
+  ///
+  /// - Parameter other: The value to calculate the distance to.
+  /// - Returns: The distance from this value to `other`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func distance(to other: Int) -> Int {
     return other - self
   }
 
+  /// Returns a value that is offset the specified distance from this value.
+  ///
+  /// Use the `advanced(by:)` method in generic code to offset a value by a
+  /// specified distance. If you're working directly with numeric values, use
+  /// the addition operator (`+`) instead of this method.
+  ///
+  /// For a value `x`, a distance `n`, and a value `y = x.advanced(by: n)`,
+  /// `x.distance(to: y) == n`.
+  ///
+  /// - Parameter n: The distance to advance this value.
+  /// - Returns: A value that is offset from this value by `n`.
   // FIXME(ABI): using Int as the parameter type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
@@ -2175,6 +2237,12 @@ extension FixedWidthInteger {
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _binaryLogarithm() -> Self {
+    _precondition(self > 0)
+    return Self(Magnitude.bitWidth &- (magnitude.leadingZeroBitCount &+ 1))
+  }
+
   /// Creates an integer from its little-endian representation, changing the
   /// byte order if necessary.
   ///
@@ -2367,7 +2435,7 @@ extension FixedWidthInteger {
   ) -> (value: Self?, exact: Bool) {
     guard _fastPath(!source.isZero) else { return (0, true) }
     guard _fastPath(source.isFinite) else { return (nil, false) }
-    guard Self.isSigned || source > 0 else { return (nil, false) }
+    guard Self.isSigned || source > -1 else { return (nil, false) }
     let exponent = source.exponent
     if _slowPath(Self.bitWidth <= exponent) { return (nil, false) }
     let minBitWidth = source.significandWidth
@@ -2405,7 +2473,7 @@ extension FixedWidthInteger {
   /// zero, a runtime error may occur.
   ///
   ///     let z = UInt(-21.5)
-  ///     // Error: ...the result would be less than UInt.min
+  ///     // Error: ...outside the representable range
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
@@ -2417,8 +2485,7 @@ extension FixedWidthInteger {
     guard let value = Self._convert(from: source).value else {
       fatalError("""
         \(T.self) value cannot be converted to \(Self.self) because it is \
-        infinite or NaN, or because the result would be greater than \
-        \(Self.self).max or less than \(Self.self).min
+        outside the representable range
         """)
     }
     self = value
@@ -3208,6 +3275,7 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   // FIXME should be RandomAccessCollection
+  /// A type that represents the words of this integer.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : BidirectionalCollection {
     public typealias Indices = CountableRange<Int>
@@ -3287,6 +3355,8 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
   }
 
+  /// A type that can represent the absolute value of any possible value of
+  /// this type.
   public typealias Magnitude = ${U}${Self}
 
 % if signed:

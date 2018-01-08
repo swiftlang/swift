@@ -286,8 +286,12 @@ protected:
     HasOriginalType : 1
   );
 
+  SWIFT_INLINE_BITFIELD(SugarType, TypeBase, 1,
+    HasCachedType : 1
+  );
+
   enum { NumFlagBits = 5 };
-  SWIFT_INLINE_BITFIELD(ParenType, TypeBase, NumFlagBits,
+  SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
   );
@@ -1461,13 +1465,62 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
   
+/// An abstract type for all sugared types to make getDesugaredType() fast by
+/// sharing field offsets and logic for the fast path.
+class SugarType : public TypeBase {
+  // The state of this union is known via Bits.SugarType.HasCachedType so that
+  // we can avoid masking the pointer on the fast path.
+  union {
+    TypeBase *UnderlyingType;
+    const ASTContext *Context;
+  };
+
+protected:
+  // Sugar types are never canonical.
+  SugarType(TypeKind K, const ASTContext *ctx,
+            RecursiveTypeProperties properties)
+      : TypeBase(K, nullptr, properties), Context(ctx) {
+    Bits.SugarType.HasCachedType = false;
+  }
+
+  // Sugar types are never canonical.
+  SugarType(TypeKind K, Type type, RecursiveTypeProperties properties)
+      : TypeBase(K, nullptr, properties), UnderlyingType(type.getPointer()) {
+    Bits.SugarType.HasCachedType = true;
+  }
+
+  void setUnderlyingType(Type type) {
+    assert(!Bits.SugarType.HasCachedType && "Cached type already set");
+    Bits.SugarType.HasCachedType = true;
+    UnderlyingType = type.getPointer();
+  }
+
+public:
+  /// Remove one level of top-level sugar from this type.
+  Type getSinglyDesugaredTypeSlow();
+  TypeBase *getSinglyDesugaredType() const {
+    if (LLVM_LIKELY(Bits.SugarType.HasCachedType))
+      return UnderlyingType;
+    auto Ty = const_cast<SugarType*>(this);
+    return Ty->getSinglyDesugaredTypeSlow().getPointer();
+  }
+
+  static bool classof(const TypeBase *T) {
+    if (TypeKind::Last_Type == TypeKind::Last_SugarType)
+      return T->getKind() >= TypeKind::First_SugarType;
+    return T->getKind() >= TypeKind::First_SugarType &&
+           T->getKind() <= TypeKind::Last_SugarType;
+  }
+};
+
 /// NameAliasType - An alias type is a name for another type, just like a
 /// typedef in C.
-class NameAliasType : public TypeBase {
+class NameAliasType : public SugarType {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) 
-    : TypeBase(TypeKind::NameAlias, nullptr, RecursiveTypeProperties()),
+    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
+                RecursiveTypeProperties()),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
@@ -1476,9 +1529,6 @@ public:
 
   using TypeBase::setRecursiveProperties;
    
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
@@ -1561,22 +1611,17 @@ public:
 };
 
 /// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public TypeBase {
-  Type UnderlyingType;
-
+class ParenType : public SugarType {
   friend class ASTContext;
   
   ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
             ParameterTypeFlags flags);
 
 public:
-  Type getUnderlyingType() const { return UnderlyingType; }
+  Type getUnderlyingType() const { return getSinglyDesugaredType(); }
 
   static ParenType *get(const ASTContext &C, Type underlying,
                         ParameterTypeFlags flags = {});
-
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
 
   /// Get the parameter flags
   ParameterTypeFlags getParameterFlags() const {
@@ -3951,25 +3996,15 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
 /// Arrays: [T] -> Array<T>
 /// Optionals: T? -> Optional<T>
 /// Dictionaries: [K : V]  -> Dictionary<K, V>
-class SyntaxSugarType : public TypeBase {
-  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
-
-  Type getImplementationTypeSlow();
-
+class SyntaxSugarType : public SugarType {
 protected:
   // Syntax sugar types are never canonical.
   SyntaxSugarType(TypeKind K, const ASTContext &ctx,
-                     RecursiveTypeProperties properties)
-    : TypeBase(K, nullptr, properties), ImplOrContext(&ctx) {}
+                  RecursiveTypeProperties properties)
+    : SugarType(K, &ctx, properties) {}
 
 public:
-  TypeBase *getSinglyDesugaredType();
-
-  Type getImplementationType() {
-    if (ImplOrContext.is<Type>())
-      return ImplOrContext.get<Type>();
-    return getImplementationTypeSlow();
-  }
+  Type getImplementationType() const { return getSinglyDesugaredType(); }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SyntaxSugarType &&
@@ -5168,6 +5203,12 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
   : Depth(p->getDepth()), Index(p->getIndex()) { }
+
+inline TypeBase *TypeBase::getDesugaredType() {
+  if (!isa<SugarType>(this))
+    return this;
+  return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
+}
 
 } // end namespace swift
 

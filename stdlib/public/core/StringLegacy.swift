@@ -235,7 +235,7 @@ internal func _digitASCII(
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-internal func _integerToString<T: FixedWidthInteger>(
+internal func _integerToString<T : FixedWidthInteger>(
   _ value: T, radix: Int, uppercase: Bool
 ) -> String {
   if value == 0 {
@@ -303,16 +303,18 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  // FIXME(integers): support a more general BinaryInteger protocol
-  // FIXME(integers): support larger bitwidths than 64
   @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
+    // FIXME(integers): support a more general BinaryInteger protocol
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     if T.bitWidth <= 64 {
-      self = _int64ToString(
-        Int64(value), radix: Int64(radix), uppercase: uppercase)
+      self = T.isSigned
+        ? _int64ToString(
+          Int64(value), radix: Int64(radix), uppercase: uppercase)
+        : _uint64ToString(
+          UInt64(value), radix: Int64(radix), uppercase: uppercase)
     } else {
       self = _integerToString(value, radix: radix, uppercase: uppercase)
     }
@@ -347,12 +349,12 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : SignedInteger {
+    // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     if T.bitWidth <= 64 {
       self = _int64ToString(
@@ -391,11 +393,11 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  // FIXME(integers): support a more general BinaryInteger protocol
   @_inlineable // FIXME(sil-serialize-all)
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : UnsignedInteger {
+    // FIXME(integers): support a more general BinaryInteger protocol
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     if T.bitWidth <= 64 {
       self = _uint64ToString(

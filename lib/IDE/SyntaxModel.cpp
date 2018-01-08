@@ -526,6 +526,16 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 
       pushStructureNode(SN, Tup);
     }
+  } else if (auto *Closure = dyn_cast<ClosureExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ClosureExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+    if (Closure->hasExplicitResultType())
+      SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                          Closure->getExplicitResultTypeLoc().getSourceRange());
+
+    pushStructureNode(SN, Closure);
   }
 
   return { true, E };

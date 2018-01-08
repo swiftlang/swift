@@ -132,6 +132,13 @@ SYNTAX_TOKENS = [
     Token('PostfixQuestionMark', 'question_postfix', text='?'),
     Token('InfixQuestionMark', 'question_infix', text='?'),
     Token('ExclamationMark', 'exclaim_postfix', text='!'),
+    Token('Backslash', 'backslash', text='\\\\'),
+    Token('StringInterpolationAnchor', 'string_interpolation_anchor',
+          text=')'),
+    Token('StringQuote', 'string_quote', text='\\\"'),
+    Token('MultilineStringQuote', 'multiline_string_quote',
+          text='\\\"\\\"\\\"'),
+    Token('StringSegment', 'string_segment'),
     Token('Identifier', 'identifier'),
     Token('DollarIdentifier', 'dollarident'),
     Token('UnspacedBinaryOperator', 'oper_binary_unspaced'),
@@ -141,7 +148,6 @@ SYNTAX_TOKENS = [
     Token('IntegerLiteral', 'integer_literal'),
     Token('FloatingLiteral', 'floating_literal'),
     Token('StringLiteral', 'string_literal'),
-    Token('StringInterpolationAnchor', 'string_interpolation_anchor'),
     Token('ContextualKeyword', 'contextual_keyword'),
 ]
 

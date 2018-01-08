@@ -866,6 +866,10 @@ void IRGenModule::emitGlobalLists() {
                  false);
 }
 
+static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
+  return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
+}
+
 void IRGenerator::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
@@ -885,8 +889,10 @@ void IRGenerator::emitGlobalTopLevel() {
   
   // Emit SIL functions.
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
-    // Only eagerly emit functions that are externally visible.
-    if (!f.isPossiblyUsedExternally())
+    // Eagerly emit functions that are externally visible. Functions with code
+    // coverage instrumentation must also be eagerly emitted.
+    if (!f.isPossiblyUsedExternally() &&
+        !hasCodeCoverageInstrumentation(f, PrimaryIGM->getSILModule()))
       continue;
 
     CurrentIGMPtr IGM = getGenModule(&f);
@@ -1917,7 +1923,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     }
 
   // Otherwise, if we have a lazy definition for it, be sure to queue that up.
-  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally()) {
+  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally() &&
+             !hasCodeCoverageInstrumentation(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
 
@@ -2187,9 +2194,17 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
 
 namespace {
 struct TypeEntityInfo {
-  ProtocolConformanceFlags flags;
+  TypeMetadataRecordKind typeKind;
   LinkEntity entity;
   llvm::Type *defaultTy, *defaultPtrTy;
+
+  /// Adjust the flags once we know whether the reference to this entity
+  /// will be indirect.
+  void adjustForKnownRef(ConstantReference &ref) {
+    if (ref.isIndirect() &&
+        typeKind == TypeMetadataRecordKind::DirectNominalTypeDescriptor)
+      typeKind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
+  }
 };
 } // end anonymous namespace
 
@@ -2201,57 +2216,24 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 
   auto nom = conformingType->getAnyNominal();
   auto clas = dyn_cast<ClassDecl>(nom);
-  if (doesConformanceReferenceNominalTypeDescriptor(IGM, conformingType)) {
+  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(IGM, clas)) {
+    // A reference to an Objective-C class object.
+    assert(clas->isObjC() && "Must have an Objective-C class here");
+
+    typeKind = TypeMetadataRecordKind::IndirectObjCClass;
+    defaultTy = IGM.TypeMetadataPtrTy;
+    defaultPtrTy = IGM.TypeMetadataPtrTy;
+    entity = LinkEntity::forObjCClass(clas);
+  } else {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
-    typeKind = TypeMetadataRecordKind::UniqueNominalTypeDescriptor;
+    typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
     defaultTy = IGM.NominalTypeDescriptorTy;
     defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
-  } else if (clas) {
-    if (clas->isForeign()) {
-      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-      entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    } else {
-      // TODO: We should indirectly reference classes. For now directly
-      // reference the class object, which is totally wrong for ObjC interop.
-
-      typeKind = TypeMetadataRecordKind::UniqueDirectClass;
-      if (hasKnownSwiftMetadata(IGM, clas))
-        entity = LinkEntity::forTypeMetadata(
-                         conformingType,
-                         TypeMetadataAddress::AddressPoint,
-                         /*isPattern*/ false);
-      else
-        entity = LinkEntity::forObjCClass(clas);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    }
-  } else {
-    // Metadata for Clang types should be uniqued like foreign classes.
-    if (isa<ClangModuleUnit>(nom->getModuleScopeContext())) {
-      typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-      entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    } else {
-      // We can reference the canonical metadata for native value types
-      // directly.
-      typeKind = TypeMetadataRecordKind::UniqueDirectType;
-      entity = LinkEntity::forTypeMetadata(
-                       conformingType,
-                       TypeMetadataAddress::AddressPoint,
-                       /*isPattern*/ false);
-      defaultTy = IGM.TypeMetadataStructTy;
-      defaultPtrTy = IGM.TypeMetadataPtrTy;
-    }
   }
 
-  auto flags = ProtocolConformanceFlags().withTypeKind(typeKind);
-
-  return {flags, *entity, defaultTy, defaultPtrTy};
+  return {typeKind, *entity, defaultTy, defaultPtrTy};
 }
 
 /// Form an LLVM constant for the relative distance between a reference
@@ -2324,27 +2306,32 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
     emitAssociatedTypeMetadataRecord(conformance);
 
-    // Relative reference to the nominal type descriptor.
+    // Relative reference to the protocol descriptor.
     auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     record.addRelativeAddress(descriptorRef);
 
-    // Relative reference to the type entity info.
-    auto typeEntity = getTypeEntityInfo(*this,
-                                    conformance->getType()->getCanonicalType());
+    // Relative reference to the type entity info, with the type reference
+    // kind mangled in the lower bits.
+    auto typeEntity =
+      getTypeEntityInfo(*this, conformance->getType()->getCanonicalType());
+
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
       typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
-    record.addRelativeAddress(typeRef);
+    typeEntity.adjustForKnownRef(typeRef);
+    record.addTaggedRelativeOffset(RelativeAddressTy,
+                                   typeRef.getValue(),
+                                   static_cast<unsigned>(typeEntity.typeKind));
 
     // Figure out what kind of witness table we have.
-    auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
+    ProtocolConformanceReferenceKind conformanceKind;
+
     if (!isResilient(conformance->getProtocol(),
                      ResilienceExpansion::Maximal) &&
         conformance->getConditionalRequirements().empty()) {
-      flags = flags.withConformanceKind(
-          ProtocolConformanceReferenceKind::WitnessTable);
+      conformanceKind = ProtocolConformanceReferenceKind::WitnessTable;
 
       // If the conformance is in this object's table, then the witness table
       // should also be in this object file, so we can always directly reference
@@ -2352,11 +2339,11 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
       witnessTableVar = getAddrOfWitnessTable(conformance);
     } else {
       if (conformance->getConditionalRequirements().empty()) {
-        flags = flags.withConformanceKind(
-            ProtocolConformanceReferenceKind::WitnessTableAccessor);
+        conformanceKind =
+          ProtocolConformanceReferenceKind::WitnessTableAccessor;
       } else {
-        flags = flags.withConformanceKind(
-            ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor);
+        conformanceKind =
+          ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor;
       }
 
       witnessTableVar = getAddrOfWitnessTableAccessFunction(
@@ -2364,12 +2351,11 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     }
 
     // Relative reference to the witness table.
-    auto witnessTableRef =
-      ConstantReference(witnessTableVar, ConstantReference::Direct);
-    record.addRelativeAddress(witnessTableRef);
+    record.addTaggedRelativeOffset(RelativeAddressTy, witnessTableVar,
+                                   static_cast<unsigned>(conformanceKind));
 
-    // Flags.
-    record.addInt(Int32Ty, flags.getValue());
+    // Reserved.
+    record.addInt(Int32Ty, 0);
 
     record.finishAndAddTo(recordsArray);
   }
@@ -2378,20 +2364,20 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   // resolve relocations relative to it.
 
   auto var = recordsArray.finishAndCreateGlobal("\x01l_protocol_conformances",
-                                                getPointerAlignment(),
+                                                Alignment(4),
                                                 /*isConstant*/ true,
                                           llvm::GlobalValue::PrivateLinkage);
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift2_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift2_protocol_conformances";
+    sectionName = "swift5_protocol_conformances";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2prtc$B";
+    sectionName = ".sw5prtc$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
@@ -2408,13 +2394,13 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift2_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift2_type_metadata";
+    sectionName = "swift5_type_metadata";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2tymd$B";
+    sectionName = ".sw5tymd$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
@@ -2444,13 +2430,19 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     auto typeEntity = getTypeEntityInfo(*this, type);
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
             typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
+    typeEntity.adjustForKnownRef(typeRef);
 
+    // Form the relative address, with the type refernce kind in the low bits.
     unsigned arrayIdx = elts.size();
-    llvm::Constant *recordFields[] = {
-      emitRelativeReference(typeRef, var, { arrayIdx, 0 }),
-      llvm::ConstantInt::get(Int32Ty, typeEntity.flags.getValue()),
-    };
+    llvm::Constant *relativeAddr =
+      emitDirectRelativeReference(typeRef.getValue(), var, { arrayIdx, 0 });
+    unsigned lowBits = static_cast<unsigned>(typeEntity.typeKind);
+    if (lowBits != 0) {
+      relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
+                       llvm::ConstantInt::get(RelativeAddressTy, lowBits));
+    }
 
+    llvm::Constant *recordFields[] = { relativeAddr };
     auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy,
                                             recordFields);
     elts.push_back(record);
@@ -2460,7 +2452,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   var->setInitializer(initializer);
   var->setSection(sectionName);
-  var->setAlignment(getPointerAlignment().getValue());
+  var->setAlignment(4);
   addUsedGlobal(var);
   return var;
 }

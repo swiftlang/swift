@@ -217,94 +217,46 @@ public:
                                        LValueOptions options);
 };
 
-static ManagedValue
-emitGetIntoTemporary(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
-                     std::unique_ptr<TemporaryInitialization> &&temporaryInit,
-                     LogicalPathComponent &&component) {
-  // Emit a 'get' into the temporary.
-  RValue value =
-    std::move(component).get(SGF, loc, base, SGFContext(temporaryInit.get()));
+/// Materialize this component into a temporary.
+ManagedValue LogicalPathComponent::materializeIntoTemporary(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
+  const TypeLowering &RValueTL = SGF.getTypeLowering(getTypeOfRValue());
+  TemporaryInitializationPtr tempInit;
+  RValue rvalue;
 
-  // Force the value into the temporary if necessary.
-  if (!value.isInContext()) {
-    std::move(value).forwardInto(SGF, loc, temporaryInit.get());
+  // If the RValue type has an openedExistential, then the RValue must be
+  // materialized before allocating a temporary for the RValue type. In that
+  // case, the RValue cannot be emitted directly into the temporary.
+  if (getTypeOfRValue().getSwiftRValueType()->hasOpenedExistential()) {
+    // Emit a 'get'.
+    rvalue = std::move(*this).get(SGF, loc, base, SGFContext());
+
+    // Create a temporary, whose type may depend on the 'get'.
+    tempInit = SGF.emitFormalAccessTemporary(loc, RValueTL);
+  } else {
+    // Create a temporary for a static (non-dependent) RValue type.
+    tempInit = SGF.emitFormalAccessTemporary(loc, RValueTL);
+
+    // Emit a 'get' directly into the temporary.
+    rvalue = std::move(*this).get(SGF, loc, base, SGFContext(tempInit.get()));
   }
+  // `this` is now dead.
 
-  return temporaryInit->getManagedAddress();
+  // Force `value` into a temporary if is wasn't emitted there.
+  if (!rvalue.isInContext())
+    std::move(rvalue).forwardInto(SGF, loc, tempInit.get());
+
+  return tempInit->getManagedAddress();
 }
 
 ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
                                                    SILLocation loc,
                                                    ManagedValue base,
                                                    AccessKind kind) && {
-  if (getTypeOfRValue().getSwiftRValueType()->hasOpenedExistential()) {
-    if (kind == AccessKind::Read) {
-      // Emit a 'get' into the temporary.
-      RValue value =
-        std::move(*this).get(SGF, loc, base, SGFContext());
+  if (kind == AccessKind::Read)
+    return std::move(*this).materializeIntoTemporary(SGF, loc, base);
 
-      // Create a temporary.
-      std::unique_ptr<TemporaryInitialization> temporaryInit =
-        SGF.emitFormalAccessTemporary(loc,
-                                      SGF.getTypeLowering(getTypeOfRValue()));
-
-      std::move(value).forwardInto(SGF, loc, temporaryInit.get());
-
-      return temporaryInit->getManagedAddress();
-    }
-
-    assert(SGF.InFormalEvaluationScope &&
-         "materializing l-value for modification without writeback scope");
-
-    // Clone anything else about the component that we might need in the
-    // writeback.
-    auto clonedComponent = clone(SGF, loc);
-
-    SILValue mv;
-    {
-      FormalEvaluationScope Scope(SGF);
-
-      // Otherwise, we need to emit a get and set.  Borrow the base for
-      // the getter.
-      ManagedValue getterBase =
-        base ? base.formalAccessBorrow(SGF, loc) : ManagedValue();
-
-      // Emit a 'get' into a temporary and then pop the borrow of base.
-      RValue value =
-        std::move(*this).get(SGF, loc, getterBase, SGFContext());
-
-      mv = std::move(value).forwardAsSingleValue(SGF, loc);
-    }
-
-    auto &TL = SGF.getTypeLowering(getTypeOfRValue());
-
-    // Create a temporary.
-    std::unique_ptr<TemporaryInitialization> temporaryInit =
-      SGF.emitFormalAccessTemporary(loc, TL);
-
-    SGF.emitSemanticStore(loc, mv, temporaryInit->getAddress(),
-                          TL, IsInitialization);
-    temporaryInit->finishInitialization(SGF);
-
-    auto temporary = temporaryInit->getManagedAddress();
-
-    // Push a writeback for the temporary.
-    pushWriteback(SGF, loc, std::move(clonedComponent), base,
-                  MaterializedLValue(temporary));
-    return temporary.unmanagedBorrow();
-  }
-
-  // If this is just for a read, emit a load into a temporary memory
-  // location.
-  if (kind == AccessKind::Read) {
-    // Create a temporary.
-    std::unique_ptr<TemporaryInitialization> temporaryInit =
-        SGF.emitFormalAccessTemporary(loc,
-                                      SGF.getTypeLowering(getTypeOfRValue()));
-    return emitGetIntoTemporary(SGF, loc, base, std::move(temporaryInit),
-                                std::move(*this));
-  }
-
+  // AccessKind is Write or ReadWrite. We need to emit a get and set.
   assert(SGF.InFormalEvaluationScope &&
          "materializing l-value for modification without writeback scope");
 
@@ -312,29 +264,12 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
   // writeback.
   auto clonedComponent = clone(SGF, loc);
 
-  ManagedValue temporary;
-  {
-    // Create a temporary.
-    std::unique_ptr<TemporaryInitialization> temporaryInit =
-        SGF.emitFormalAccessTemporary(loc,
-                                      SGF.getTypeLowering(getTypeOfRValue()));
-
-    FormalEvaluationScope Scope(SGF);
-
-    // Otherwise, we need to emit a get and set.  Borrow the base for
-    // the getter.
-    ManagedValue getterBase =
-        base ? base.formalAccessBorrow(SGF, loc) : ManagedValue();
-
-    // Emit a 'get' into a temporary and then pop the borrow of base.
-    temporary = emitGetIntoTemporary(
-        SGF, loc, getterBase, std::move(temporaryInit), std::move(*this));
-  }
+  ManagedValue temp = std::move(*this).materializeIntoTemporary(SGF, loc, base);
 
   // Push a writeback for the temporary.
   pushWriteback(SGF, loc, std::move(clonedComponent), base,
-                MaterializedLValue(temporary));
-  return temporary.unmanagedBorrow();
+                MaterializedLValue(temp));
+  return temp.unmanagedBorrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
@@ -1058,15 +993,15 @@ namespace {
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
       if (accessKind == AccessKind::Read) {
-        return SGF.getGetterDeclRef(decl, IsDirectAccessorUse);
+        return SGF.getGetterDeclRef(decl);
       } else {
-        return SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+        return SGF.getSetterDeclRef(decl);
       }
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef setter = SGF.getSetterDeclRef(decl);
 
       // Pull everything out of this that we'll need, because we're
       // about to modify the LValue and delete this component.
@@ -1109,7 +1044,7 @@ namespace {
 
     void set(SILGenFunction &SGF, SILLocation loc,
              ArgumentSource &&value, ManagedValue base) && override {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef setter = SGF.getSetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
       // Pass in just the setter.
@@ -1215,8 +1150,7 @@ namespace {
                                          optSubscripts);
       }());
 
-      SILDeclRef materializeForSet =
-        SGF.getMaterializeForSetDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef materializeForSet = SGF.getMaterializeForSetDeclRef(decl);
 
       MaterializedLValue materialized;
       {
@@ -1368,7 +1302,7 @@ namespace {
     
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
-      SILDeclRef getter = SGF.getGetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef getter = SGF.getGetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
 
@@ -1525,7 +1459,7 @@ namespace {
 
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
-      return SGF.getAddressorDeclRef(decl, accessKind, IsDirectAccessorUse);
+      return SGF.getAddressorDeclRef(decl, accessKind);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -1533,8 +1467,7 @@ namespace {
       assert(SGF.InFormalEvaluationScope &&
              "offsetting l-value for modification without writeback scope");
 
-      SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind, 
-                                                     IsDirectAccessorUse);
+      SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind);
       std::pair<ManagedValue, ManagedValue> result;
       {
         FormalEvaluationScope scope(SGF);

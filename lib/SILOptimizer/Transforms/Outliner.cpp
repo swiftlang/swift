@@ -193,7 +193,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
 ///
 ///  bb8(%36 : $NSString):
 ///    // function_ref static String._unconditionallyBridgeFromObjectiveC(_:)
-///    %37 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+///    %37 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
 ///    %38 = enum $Optional<NSString>, #Optional.some!enumelt.1, %36 : $NSString
 ///    %39 = metatype $@thin String.Type
 ///    %40 = apply %37(%38, %39) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
@@ -408,7 +408,7 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   //    switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
   //
   //  bb8(%36 : $NSString):
-  //    %37 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  //    %37 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   //    %38 = enum $Optional<NSString>, #Optional.some!enumelt.1, %36 : $NSString
   //    %39 = metatype $@thin String.Type
   //    %40 = apply %37(%38, %39) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
@@ -482,7 +482,7 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   if (!SomeBBArg->hasOneUse())
     return false;
 
-  // %37 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // %37 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   auto *FunRef = dyn_cast<FunctionRefInst>(It);
   if (!FunRef || !FunRef->hasOneUse())
     return false;
@@ -547,7 +547,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   //    switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
   //
   //  bb8(%36 : $NSString):
-  //    %37 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  //    %37 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   //    %38 = enum $Optional<NSString>, #Optional.some!enumelt.1, %36 : $NSString
   //    %39 = metatype $@thin String.Type
   //    %40 = apply %37(%38, %39) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
@@ -615,7 +615,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
 
 namespace {
 /// Match a bridged argument.
-/// %15 = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+/// %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 /// %16 = apply %15(%14) :
 ///         $@convention(method) (@guaranteed String) -> @owned NSString
 /// %17 = enum $Optional<NSString>, #Optional.some!enumelt.1, %16 : $NSString
@@ -685,7 +685,7 @@ void BridgedArgument::eraseFromParent() {
 BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
                                        ApplyInst *AI) {
   // Match
-  // %15 = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // %16 = apply %15(%14) :
   //         $@convention(method) (@guaranteed String) -> @owned NSString
   // %17 = enum $Optional<NSString>, #Optional.some!enumelt.1, %16 : $NSString
@@ -801,7 +801,7 @@ void BridgedReturn::outline(SILFunction *Fun, ApplyInst *NewOutlinedCall) {
 //   switch_enum %20 : $Optional<NSString>, case #O.some: bb1, case #O.none: bb2
 //
 // bb1(%23 : $NSString):
-//   %24 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveC
+//   %24 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveC
 //   %25 = enum $Optional<NSString>, #Optional.some!enumelt.1, %23 : $NSString
 //   %26 = metatype $@thin String.Type
 //   %27 = apply %24(%25, %26)
@@ -900,7 +900,7 @@ bool BridgedReturn::match(ApplyInst *BridgedCall) {
   if (!SomeBBArg->hasOneUse())
     return false;
 
-  // %37 = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // %37 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   auto *FunRef = dyn_cast<FunctionRefInst>(It);
   if (!FunRef || !FunRef->hasOneUse())
     return false;

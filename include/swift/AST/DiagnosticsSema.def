@@ -613,6 +613,12 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
+WARNING(deprecated_redecl_by_optionality, none,
+        "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
+        (DeclName, Type, Type))
+NOTE(deprecated_redecl_by_optionality_note, none,
+     "overloading by kind of optional is deprecated and will be removed in a future release", ())
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,none,

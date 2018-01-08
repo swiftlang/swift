@@ -3,18 +3,18 @@
 class B { }
 class D : B { }
 
-// CHECK-LABEL: sil hidden @_T05casts6upcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts6upcast{{[_0-9a-zA-Z]*}}F
 func upcast(d: D) -> B {
   // CHECK: {{%.*}} = upcast
   return d
 }
-// CHECK-LABEL: sil hidden @_T05casts8downcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(b: B) -> D {
   // CHECK: {{%.*}} = unconditional_checked_cast
   return b as! D
 }
 
-// CHECK-LABEL: sil hidden @_T05casts3isa{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts3isa{{[_0-9a-zA-Z]*}}F
 func isa(b: B) -> Bool {
   // CHECK: bb0([[ARG:%.*]] : @owned $B):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -33,19 +33,19 @@ func isa(b: B) -> Bool {
   return b is D
 }
 
-// CHECK-LABEL: sil hidden @_T05casts16upcast_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts16upcast_archetype{{[_0-9a-zA-Z]*}}F
 func upcast_archetype<T : B>(t: T) -> B {
   // CHECK: {{%.*}} = upcast
   return t
 }
 
-// CHECK-LABEL: sil hidden @_T05casts25upcast_archetype_metatype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts25upcast_archetype_metatype{{[_0-9a-zA-Z]*}}F
 func upcast_archetype_metatype<T : B>(t: T.Type) -> B.Type {
   // CHECK: {{%.*}} = upcast
   return t
 }
 
-// CHECK-LABEL: sil hidden @_T05casts18downcast_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts18downcast_archetype{{[_0-9a-zA-Z]*}}F
 func downcast_archetype<T : B>(b: B) -> T {
   // CHECK: {{%.*}} = unconditional_checked_cast
   return b as! T
@@ -54,7 +54,7 @@ func downcast_archetype<T : B>(b: B) -> T {
 // This is making sure that we do not have the default propagating behavior in
 // the address case.
 //
-// CHECK-LABEL: sil hidden @_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S5casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
   // CHECK: bb0([[ARG1:%.*]] : @owned $B, [[ARG2:%.*]] : @owned $T):
   // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
@@ -66,9 +66,9 @@ func is_archetype<T : B>(b: B, _: T) -> Bool {
   // CHECK:   integer_literal {{.*}} 0
   return b is T
 }
-// CHECK: } // end sil function '_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$S5casts12is_archetype{{[_0-9a-zA-Z]*}}F'
 
-// CHECK: sil hidden @_T05casts20downcast_conditional{{[_0-9a-zA-Z]*}}F
+// CHECK: sil hidden @$S5casts20downcast_conditional{{[_0-9a-zA-Z]*}}F
 // CHECK:   checked_cast_br {{%.*}} : $B to $D
 // CHECK:   bb{{[0-9]+}}({{.*}} : $Optional<D>)
 func downcast_conditional(b: B) -> D? {
@@ -78,7 +78,7 @@ func downcast_conditional(b: B) -> D? {
 protocol P {}
 struct S : P {}
 
-// CHECK: sil hidden @_T05casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
+// CHECK: sil hidden @$S5casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[IN:%.*]] : @trivial $*P):
 // CHECK:   [[COPY:%.*]] = alloc_stack $P
 // CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]

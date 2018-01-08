@@ -8,7 +8,7 @@
   @objc optional subscript (i: Int) -> Int { get }
 }
 
-// CHECK-LABEL: sil hidden @_T017protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
@@ -26,9 +26,9 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.method!1.foreign
   var methodRef = t.method
 }
-// CHECK: } // end sil function '_T017protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF'
+// CHECK: } // end sil function '$S17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF'
 
-// CHECK-LABEL: sil hidden @_T017protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
@@ -46,9 +46,9 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.prop!getter.1.foreign
   var propertyRef = t.prop
 }
-// CHECK: } // end sil function '_T017protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$S17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_T017protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
@@ -64,10 +64,10 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-  // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @_T0Si2{{[_0-9a-zA-Z]*}}fC
+  // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC
   // CHECK:   [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
   // CHECK:   alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]
 }
-// CHECK: } // end sil function '_T017protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$S17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F'

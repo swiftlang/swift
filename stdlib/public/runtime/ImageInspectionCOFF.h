@@ -45,8 +45,8 @@ struct MetadataSections {
     size_t length;
   };
 
-  Range swift2_protocol_conformances;
-  Range swift2_type_metadata;
+  Range swift5_protocol_conformances;
+  Range swift5_type_metadata;
   Range swift3_typeref;
   Range swift3_reflstr;
   Range swift3_fieldmd;

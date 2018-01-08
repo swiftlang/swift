@@ -5,20 +5,34 @@
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REFRIGERATOR:%TSo14CCRefrigeratorC]] = type
+// CHECK: [[MUTABLE_REFRIGERATOR:%TSo21CCMutableRefrigeratorC]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
 // CHECK: [[REFRIGERATOR_NAME:@.*]] = private constant [20 x i8] c"So14CCRefrigeratorC\00"
 
-// CHECK-32: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{
+// CHECK-32: @"$SSo14CCRefrigeratorCN" = linkonce_odr hidden global <{ {{.*}} }> <{
 // CHECK-32-SAME: [[REFRIGERATOR_NAME]] to i32
 // CHECK-32-SAME: i32 0,
-// CHECK-32-SAME: i8** @_T0BOWV, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
+// CHECK-32-SAME: i8** @"$SBOWV", i32 16, {{.*}}"$SSo14CCRefrigeratorCMn", [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
-// CHECK-64: @_T0So14CCRefrigeratorCN = linkonce_odr hidden global <{ {{.*}} }> <{
+// CHECK-64: @"$SSo14CCRefrigeratorCN" = linkonce_odr hidden global <{ {{.*}} }> <{
 // CHECK-64-SAME: i32 0,
 // CHECK-64-SAME: i32 trunc {{.*}} [[REFRIGERATOR_NAME]] to i64
 // CHECK-64-SAME: i64 0,
-// CHECK-64-SAME: i8** @_T0BOWV, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
+// CHECK-64-SAME: i8** @"$SBOWV", i64 16, {{.*}}"$SSo14CCRefrigeratorCMn", [[TYPE]]* null, i8* null, i8* null, i8* null }>
+
+// CHECK: [[MUTABLE_REFRIGERATOR_NAME:@.*]] = private constant [27 x i8] c"So21CCMutableRefrigeratorC\00"
+
+// CHECK-64: @"$SSo21CCMutableRefrigeratorCMn" = linkonce_odr hidden constant
+// CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
+// CHECK-64-SAME: @get_field_types_CCMutableRefrigerator
+// CHECK-64-SAME: i16 1, i16 2, i32 0 }>
+
+// CHECK-64: @"$SSo21CCMutableRefrigeratorCN" = linkonce_odr hidden global <{ {{.*}} }> <{
+// CHECK-64-SAME: @initialize_metadata_CCMutableRefrigerator
+// CHECK-64-SAME: i32 trunc {{.*}} [[MUTABLE_REFRIGERATOR_NAME]] to i64
+// CHECK-64-SAME: i64 1,
+// CHECK-64-SAME: i8** @"$SBOWV", i64 16, {{.*}}"$SSo21CCMutableRefrigeratorCMn", [[TYPE]]* bitcast{{.*}}@"$SSo14CCRefrigeratorCN{{.*}} to %swift.type*), i8* null, i8* null, i8* null }>
 
 sil_stage canonical
 
@@ -27,20 +41,32 @@ import Swift
 
 sil public_external @generic_function : $@convention(thin) <T where T : AnyObject> (@owned T) -> ()
 
-sil @call_generic : $@convention(thin) (@owned CCRefrigerator) -> () {
-bb0(%0 : $CCRefrigerator):
-  %1 = function_ref @generic_function : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
-  %2 = apply %1<CCRefrigerator>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
-  %3 = tuple ()
-  return %3 : $()
+sil @call_generic : $@convention(thin) (@owned CCRefrigerator, @owned CCMutableRefrigerator) -> () {
+bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
+  %2 = function_ref @generic_function : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %3 = apply %2<CCRefrigerator>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %4 = apply %2<CCMutableRefrigerator>(%1) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %5 = tuple ()
+  return %5 : $()
 }
 
-// CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @_T0So14CCRefrigeratorCMa()
+// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @"$SSo14CCRefrigeratorCMa"()
+// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
+// CHECK:      [[T0:%.*]] = bitcast [[MUTABLE_REFRIGERATOR]]* %1 to [[OBJC]]*
+// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @"$SSo21CCMutableRefrigeratorCMa"()
 // CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
 // CHECK-NEXT: ret void
 
-// CHECK:    define linkonce_odr hidden [[TYPE]]* @_T0So14CCRefrigeratorCMa()
-// CHECK-32:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @_T0So14CCRefrigeratorCN to i8*), i32 12) to [[TYPE]]*))
-// CHECK-64:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @_T0So14CCRefrigeratorCN to i8*), i64 24) to [[TYPE]]*))
+// CHECK:    define linkonce_odr hidden [[TYPE]]* @"$SSo14CCRefrigeratorCMa"()
+// CHECK-32:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo14CCRefrigeratorCN" to i8*), i32 12) to [[TYPE]]*))
+// CHECK-64:    call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo14CCRefrigeratorCN" to i8*), i64 24) to [[TYPE]]*))
+
+// CHECK:    define private void @initialize_metadata_CCMutableRefrigerator(%swift.type*)
+// CHECK-64:   [[T0:%.*]] = bitcast %swift.type* %0 to i8**
+// CHECK-64:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[T0]], i32 2
+// CHECK-64:   [[T2:%.*]] = bitcast i8** [[T1]] to %swift.type**
+// CHECK-64:   [[T3:%.*]] = load %swift.type*, %swift.type** [[T2]]
+// CHECK-64:   [[T4:%.*]] = call %swift.type* @swift_getForeignTypeMetadata(%swift.type* [[T3]])
+// CHECK-64:  store %swift.type* [[T4]], %swift.type** [[T2]]

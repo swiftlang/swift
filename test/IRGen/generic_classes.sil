@@ -13,7 +13,7 @@ import Swift
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"15generic_classes11RootGenericC\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 
-// CHECK-LABEL: @_T015generic_classes11RootGenericCMn =
+// CHECK-LABEL: @"$S15generic_classes11RootGenericCMn" =
 // CHECK-SAME:   hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       name
 // CHECK-SAME:   [32 x i8]* [[ROOTGENERIC_NAME]]
@@ -41,25 +41,25 @@ import Swift
 // CHECK-SAME:   i32 4
 // CHECK-SAME: }
 
-// CHECK-LABEL: @_T015generic_classes11RootGenericCMP = internal global
+// CHECK-LABEL: @"$S15generic_classes11RootGenericCMP" = internal global
 // --       template fill function
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
 // --       nominal type descriptor
-// CHECK-SAME:   @_T015generic_classes11RootGenericCMn
+// CHECK-SAME:   @"$S15generic_classes11RootGenericCMn"
 // --       ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1xs5UInt8VvpWvd = hidden constant i64 16, align 8
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1ySayxGvpWvd = hidden constant i64 24, align 8
-// CHECK: @_T015generic_classes22RootGenericFixedLayoutC1zs5UInt8VvpWvd = hidden constant i64 32, align 8
+// CHECK: @"$S15generic_classes22RootGenericFixedLayoutC1xs5UInt8VvpWvd" = hidden constant i64 16, align 8
+// CHECK: @"$S15generic_classes22RootGenericFixedLayoutC1ySayxGvpWvd" = hidden constant i64 24, align 8
+// CHECK: @"$S15generic_classes22RootGenericFixedLayoutC1zs5UInt8VvpWvd" = hidden constant i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"15generic_classes14RootNonGenericC\00"
-// CHECK: @_T015generic_classes14RootNonGenericCMn = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
+// CHECK: @"$S15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       name
 // CHECK-SAME:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
@@ -76,13 +76,13 @@ import Swift
 // CHECK-SAME:   i32 0, i32 0
 // CHECK-SAME: }>
 
-// CHECK: @_T015generic_classes14RootNonGenericCMf = internal global <{ {{.*}} }> <{
-// CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @_T015generic_classes14RootNonGenericCfD,
-// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK: @"$S15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
+// CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$S15generic_classes14RootNonGenericCfD",
+// CHECK-SAME:   i8** @"$SBoWV",
 // CHECK-SAME-native: i64 0,
 // CHECK-SAME-native: %swift.type* null,
 // CHECK-SAME-native: %swift.opaque* null,
-// CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @_T015generic_classes14RootNonGenericCMm to i64),
+// CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @"$S15generic_classes14RootNonGenericCMm" to i64),
 // CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK-SAME-objc:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
@@ -91,19 +91,19 @@ import Swift
 // CHECK-SAME:   i32 33,
 // CHECK-SAME:   i16 7,
 // CHECK-SAME:   i16 0,
-// CHECK-SAME:   {{.*}}* @_T015generic_classes14RootNonGenericCMn
+// CHECK-SAME:   {{.*}}* @"$S15generic_classes14RootNonGenericCMn"
 // CHECK-SAME: }>
 
-// CHECK: @_T015generic_classes015GenericInheritsC0CMP = internal global
+// CHECK: @"$S15generic_classes015GenericInheritsC0CMP" = internal global
 // --       template fill function
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
 // --       nominal type descriptor
-// CHECK-SAME:   @_T015generic_classes015GenericInheritsC0CMn,
+// CHECK-SAME:   @"$S15generic_classes015GenericInheritsC0CMn",
 // --       ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }
 
-// CHECK: @_T015generic_classes018GenericInheritsNonC0CMP
+// CHECK: @"$S15generic_classes018GenericInheritsNonC0CMP"
 
 class RootGeneric<T> {
   var x : UInt8
@@ -122,7 +122,7 @@ class RootGeneric<T> {
 
   func bas()
 }
-sil @_T015generic_classes11RootGenericCfD : $@convention(method) <T> (RootGeneric<T>) -> ()
+sil @$S15generic_classes11RootGenericCfD : $@convention(method) <T> (RootGeneric<T>) -> ()
 
 sil @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
@@ -131,9 +131,9 @@ sil @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ : $@convention(metho
 sil @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
 sil_vtable RootGeneric {
-  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
-  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
-  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
+  #RootGeneric.foo!1: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
+  #RootGeneric.bar!1: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
+  #RootGeneric.bas!1: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
 }
 
 class RootGenericFixedLayout<T> {
@@ -144,7 +144,7 @@ class RootGenericFixedLayout<T> {
   init()
 }
 sil_vtable RootGenericFixedLayout {}
-sil @_T015generic_classes22RootGenericFixedLayoutCfD : $@convention(method) <T> (RootGenericFixedLayout<T>) -> ()
+sil @$S15generic_classes22RootGenericFixedLayoutCfD : $@convention(method) <T> (RootGenericFixedLayout<T>) -> ()
 
 class RootNonGeneric {
   var x : UInt8
@@ -154,7 +154,7 @@ class RootNonGeneric {
   init()
 }
 sil_vtable RootNonGeneric {}
-sil @_T015generic_classes14RootNonGenericCfD : $@convention(method) (RootNonGeneric) -> ()
+sil @$S15generic_classes14RootNonGenericCfD : $@convention(method) (RootNonGeneric) -> ()
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
@@ -165,7 +165,7 @@ class GenericInheritsGeneric<A, B> : RootGeneric<A> {
 
   override init()
 }
-sil @_T015generic_classes015GenericInheritsC0CfD : $@convention(method) <T, U> (GenericInheritsGeneric<T, U>) -> ()
+sil @$S15generic_classes015GenericInheritsC0CfD : $@convention(method) <T, U> (GenericInheritsGeneric<T, U>) -> ()
 
 sil @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
@@ -174,12 +174,12 @@ sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@c
 sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
 sil_vtable GenericInheritsGeneric {
-  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ [inherited]
-  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ [inherited]
-  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ [inherited]
-  #GenericInheritsGeneric.zippity!1: _TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
-  #GenericInheritsGeneric.doo!1: _TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
-  #GenericInheritsGeneric.dah!1: _TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
+  #RootGeneric.foo!1: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bar!1: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bas!1: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ [inherited]
+  #GenericInheritsGeneric.zippity!1: @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.doo!1: @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.dah!1: @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
 }
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
@@ -188,7 +188,7 @@ class GenericInheritsNonGeneric<C> : RootNonGeneric {
   override init()
 }
 sil_vtable GenericInheritsNonGeneric {}
-sil @_T015generic_classes018GenericInheritsNonC0CfD : $@convention(method) <T> (GenericInheritsNonGeneric<T>) -> ()
+sil @$S15generic_classes018GenericInheritsNonC0CfD : $@convention(method) <T> (GenericInheritsNonGeneric<T>) -> ()
 
 // rdar://18067671
 class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
@@ -202,11 +202,11 @@ class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
   override init()
 }
 sil_vtable RecursiveGenericInheritsGeneric {}
-sil @_T015generic_classes024RecursiveGenericInheritsD0CfD : $@convention(method) <T, U> (RecursiveGenericInheritsGeneric<T, U>) -> ()
+sil @$S15generic_classes024RecursiveGenericInheritsD0CfD : $@convention(method) <T, U> (RecursiveGenericInheritsGeneric<T, U>) -> ()
 
 
 // CHECK: define{{( protected)?}} swiftcc [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @_T015generic_classes11RootGenericCMa
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @"$S15generic_classes11RootGenericCMa"
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
@@ -319,7 +319,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the superclass.
-// CHECK:   [[SUPER:%.*]] = call %swift.type* @_T015generic_classes11RootGenericCMa(%swift.type* %A)
+// CHECK:   [[SUPER:%.*]] = call %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type* %A)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[T0]], i64 6)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
@@ -364,5 +364,5 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// OSIZE: define hidden %swift.type* @_T015generic_classes11RootGenericCMa(%swift.type*) [[ATTRS:#[0-9]+]] {
+// OSIZE: define hidden %swift.type* @"$S15generic_classes11RootGenericCMa"(%swift.type*) [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline

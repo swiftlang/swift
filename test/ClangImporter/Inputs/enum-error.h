@@ -19,4 +19,10 @@ typedef NS_ERROR_ENUM(int, OtherErrorCode, OtherErrorDomain) {
   OtherC,
 };
 
+extern NSString *TypedefOnlyErrorDomain;
+typedef enum __attribute__((ns_error_domain(TypedefOnlyErrorDomain))) {
+  TypedefOnlyErrorBadness
+} TypedefOnlyError;
+
+
 TestError getErr();

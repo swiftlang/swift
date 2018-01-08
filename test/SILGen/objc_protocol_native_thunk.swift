@@ -10,7 +10,7 @@ import Foundation
   func c(_: String) {}
 }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0{{.*}}1P{{.*}}1p{{.*}} : $@convention(method) <Self where Self : P> (@owned String, @guaranteed Self) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] @$S{{.*}}1P{{.*}}1p{{.*}} : $@convention(method) <Self where Self : P> (@owned String, @guaranteed Self) -> ()
 func foo(x: Bool, y: C & P) -> (String) -> () {
   return x ? y.c : y.p
 }

@@ -433,6 +433,7 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
+  case tok::dollarident:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   case tok::string_literal: {
@@ -5172,6 +5173,9 @@ bool SILParserTUState::parseDeclSILStage(Parser &P) {
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool SILParserTUState::parseSILGlobal(Parser &P) {
+  // Inform the lexer that we're lexing the body of the SIL declaration.
+  Lexer::SILBodyRAII Tmp(*P.L);
+
   P.consumeToken(tok::kw_sil_global);
   Optional<SILLinkage> GlobalLinkage;
   Identifier GlobalName;
@@ -5180,8 +5184,6 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   bool isLet = false;
 
-  // Inform the lexer that we're lexing the body of the SIL declaration.
-  Lexer::SILBodyRAII Tmp(*P.L);
   Scope S(&P, ScopeKind::TopLevel);
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
@@ -5277,6 +5279,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
       } else {
         if (P.parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
             parseSILLinkage(Linkage, P) ||
+            P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
             VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                            diag::expected_sil_value_name))
         return true;
@@ -5924,7 +5927,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
   return None;
 }
 
-/// decl-sil-coverage-map ::= 'sil_coverage_map' CoveredName CoverageHash
+/// decl-sil-coverage-map ::= 'sil_coverage_map' CoveredName PGOFuncName CoverageHash
 ///                           decl-sil-coverage-body
 /// decl-sil-coverage-body:
 ///   '{' sil-coverage-entry* '}'
@@ -5951,6 +5954,14 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
   if (State.parseSILIdentifier(FuncName, FuncLoc,
                                diag::expected_sil_value_name))
     return true;
+
+  // Parse the PGO func name.
+  if (!P.Tok.is(tok::string_literal)) {
+    P.diagnose(P.Tok, diag::sil_coverage_expected_quote);
+    return true;
+  }
+  StringRef PGOFuncName = P.Tok.getText().drop_front().drop_back();
+  P.consumeToken();
 
   SILFunction *Func = M.lookUpFunction(FuncName.str());
   if (!Func) {
@@ -6008,9 +6019,8 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
                        LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(M, Filename.str(), FuncName.str(),
-                           Func->isPossiblyUsedExternally(), Hash, Regions,
-                           Builder.getExpressions());
+    SILCoverageMap::create(M, Filename.str(), FuncName.str(), PGOFuncName.str(),
+                           Hash, Regions, Builder.getExpressions());
   return false;
 }
 
