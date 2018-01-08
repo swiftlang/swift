@@ -63,8 +63,8 @@ public struct LazyMapSequence<Base : Sequence, Element>
     return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
-  /// Returns a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
+  /// A value less than or equal to the number of elements in the sequence,
+  /// calculated nondestructively.
   ///
   /// - Complexity: O(*n*)
   @_inlineable

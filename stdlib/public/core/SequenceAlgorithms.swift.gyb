@@ -46,7 +46,7 @@ equivalenceExplanation = """\
 
 extension Sequence {
   /// Returns a sequence of pairs (*n*, *x*), where *n* represents a
-  /// consecutive integer starting at zero, and *x* represents an element of
+  /// consecutive integer starting at zero and *x* represents an element of
   /// the sequence.
   ///
   /// This example enumerates the characters of the string "Swift" and prints
