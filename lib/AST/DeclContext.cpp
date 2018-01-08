@@ -47,32 +47,15 @@ ASTContext &DeclContext::getASTContext() const {
 
 GenericTypeDecl *
 DeclContext::getAsTypeOrTypeExtensionContext() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return nullptr;
-
-  case DeclContextKind::ExtensionDecl: {
-    auto ED = cast<ExtensionDecl>(this);
-    auto type = ED->getExtendedType();
-
-    if (!type)
+  if (auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext())) {
+    if (auto ED = dyn_cast<ExtensionDecl>(decl)) {
+      if (auto type = ED->getExtendedType())
+        return type->getAnyNominal();
       return nullptr;
-
-    return type->getAnyNominal();
+    }
+    return dyn_cast<GenericTypeDecl>(decl);
   }
-
-  case DeclContextKind::GenericTypeDecl:
-    return const_cast<GenericTypeDecl*>(cast<GenericTypeDecl>(this));
-  }
-
-  llvm_unreachable("Unhandled DeclContextKind in switch.");
+  return nullptr;
 }
 
 /// If this DeclContext is a NominalType declaration or an
@@ -101,10 +84,11 @@ ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
 }
 
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
-  if (getContextKind() != DeclContextKind::ExtensionDecl)
-    return nullptr;
-
-  return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
+  if (auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext()))
+    if (auto ED = dyn_cast<ExtensionDecl>(decl))
+      if (auto type = ED->getExtendedType())
+        return dyn_cast_or_null<ProtocolDecl>(type->getAnyNominal());
+  return nullptr;
 }
 
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
@@ -384,33 +368,10 @@ DeclContext *DeclContext::getInnermostTypeContext() {
 
 Decl *DeclContext::getInnermostDeclarationDeclContext() {
   DeclContext *DC = this;
-  while (DC) {
-    switch (DC->getContextKind()) {
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-      break;
-
-    case DeclContextKind::TopLevelCodeDecl:
-      return cast<TopLevelCodeDecl>(DC);
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(DC);
-
-    case DeclContextKind::SubscriptDecl:
-      return cast<SubscriptDecl>(DC);
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(DC);
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(DC);
-    }
-
-    DC = DC->getParent();
-  }
+  do {
+    if (auto decl = DC->getAsDeclOrDeclExtensionContext())
+      return isa<ModuleDecl>(decl) ? nullptr : decl;
+  } while ((DC = DC->getParent()));
 
   return nullptr;
 }
@@ -1134,14 +1095,46 @@ DeclContextKind DeclContext::getContextKind() const {
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
 }
 
-#define DECL(Id, Parent)
+#define DECL(Id, Parent) \
+  static_assert(!std::is_base_of<DeclContext, Id##Decl>::value, \
+                "Non-context Decl node has context?");
 #define CONTEXT_DECL(Id, Parent) \
-  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error");
+  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error"); \
+  static_assert(std::is_base_of<DeclContext, Id##Decl>::value, \
+                "CONTEXT_DECL nodes must inherit from DeclContext");
 #define CONTEXT_VALUE_DECL(Id, Parent) \
-  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error");
+  static_assert(alignof(DeclContext) == alignof(Id##Decl), "Alignment error"); \
+  static_assert(std::is_base_of<DeclContext, Id##Decl>::value, \
+                "CONTEXT_VALUE_DECL nodes must inherit from DeclContext");
 #include "swift/AST/DeclNodes.def"
 
+#define EXPR(Id, Parent) \
+  static_assert(!std::is_base_of<DeclContext, Id##Expr>::value, \
+                "Non-context Expr node has context?");
+#define CONTEXT_EXPR(Id, Parent) \
+  static_assert(alignof(DeclContext) == alignof(Id##Expr), "Alignment error"); \
+  static_assert(std::is_base_of<DeclContext, Id##Expr>::value, \
+                "CONTEXT_EXPR nodes must inherit from DeclContext");
+#include "swift/AST/ExprNodes.def"
+
+#ifndef NDEBUG
+// XXX -- static_cast is not static enough for use with static_assert().
+// DO verify this by temporarily breaking a Decl or Expr.
+// DO NOT assume that the compiler will emit this code blindly.
+__attribute__((constructor))
+static void verify_DeclContext_is_start_of_node() {
+  auto decl = reinterpret_cast<Decl*>(sizeof(DeclContext));
+#define DECL(Id, Parent)
+#define CONTEXT_DECL(Id, Parent) \
+  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Decl*>(decl)));
+#define CONTEXT_VALUE_DECL(Id, Parent) \
+  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Decl*>(decl)));
+#include "swift/AST/DeclNodes.def"
+
+  auto expr = reinterpret_cast<Expr*>(sizeof(DeclContext));
 #define EXPR(Id, Parent)
 #define CONTEXT_EXPR(Id, Parent) \
-  static_assert(alignof(DeclContext) == alignof(Id##Expr), "Alignment error");
+  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Expr*>(expr)));
 #include "swift/AST/ExprNodes.def"
+}
+#endif

@@ -235,6 +235,14 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
     llvm_unreachable("Unhandled DeclContextKind");
   }
 
+  Decl *getAsDeclOrDeclExtensionContext() {
+    return ParentAndKind.getInt() == ASTHierarchy::Decl ?
+      reinterpret_cast<Decl*>(this + 1) : nullptr;
+  }
+  const Decl *getAsDeclOrDeclExtensionContext() const {
+    return const_cast<DeclContext*>(this)->getAsDeclOrDeclExtensionContext();
+  }
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
       : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
