@@ -130,7 +130,7 @@ public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can 
 
   if cond {  // expected-warning {{value implicitly copied to accelerator}}
 
-    // TODO: Bogus warning!
+    // TODO: Bogus warning, only on linux?
     a -= b   // expected-warning {{value implicitly copied to the host}}
   }
   a += b
@@ -140,6 +140,8 @@ public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
 // CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
+// CHECK: %3 = builtin "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK: cond_br %3, bb2, bb1
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
@@ -161,7 +163,7 @@ public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
-  // TODO: Bogus warning!
+  // TODO: Bogus warning, only on linux?
   a += b  // expected-warning {{value implicitly copied to the host}}
 
   // TODO: fix this to use an argument!
@@ -174,4 +176,21 @@ public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can
   print(a.toHost())
 }
 
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
+// CHECK: sil private @{{.*}}test_bool_param2{{.*}}
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:  [[BOOLTENSOR:%.*]] = builtin "tensorflowReceive_0"<TensorHandle<Builtin.Int1>>() : $TensorHandle<Builtin.Int1>
+// CHECK-NEXT:    [[BOOL:%.*]] = builtin "tf_tensor_to_i1"([[BOOLTENSOR]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK-NEXT:    cond_br [[BOOL]]
+// ...
+// CHECK: }
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param2{{.*}}
+// CHECK: bb0(%0 : $Bool)
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
+// CHECK:  [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
+// CHECK:  builtin "tensorflowSend_0"<Builtin.Int1>([[BOOLVAL]]
+// CHECK: cond_br [[BOOLVAL]],
 
