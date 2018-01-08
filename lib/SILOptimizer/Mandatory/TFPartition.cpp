@@ -882,6 +882,30 @@ void TFFunctionPartition::markArgument(SILArgument *arg) {
   }
 }
 
+/// The specified instruction is in the region dominated by the start point of
+/// the tensor computation and needs to be copied into it.  Try to hoist above
+/// the start point, since we prefer arguments to the tensor program rather than
+/// send and receives.  This returns true if it successfully hoists the
+/// computation.
+static bool hoistValueAboveStartPoint(SILInstruction *inst,
+                                      SILInstruction *tensorStartPoint,
+                                      DominanceInfo &DI) {
+  // In general, we need to check to see if we have a chain of side-effect free
+  // instructions whose ultimate inputs dominate the start point.
+  //
+  // For now though, our implementation is extremely simple: we just check for
+  // struct_extract(x), since it is the thing that unboxes primitives like
+  // Int and Bool into the underlying values.  We can extend this in the future
+  // when there is a need.
+  if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
+    if (DI.properlyDominates(sei->getOperand(), tensorStartPoint)) {
+      sei->moveBefore(tensorStartPoint);
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /// Indicate that the specified value must be available on the accelerator.
 /// This can be done by moving the computation over, or by inserting a data
@@ -905,8 +929,11 @@ void TFFunctionPartition::markValue(SILValue value) {
     return;
 
   // If the value is defined outside of the region dominated by the tensor
-  // operations, then it is passed in as an argument to the tensor function.
-  if (!DI.properlyDominates(tensorStartPoint, inst)) {
+  // operations (or it can be hoisted above it), then it is passed in as an
+  // argument to the tensor function.
+  if (!DI.properlyDominates(tensorStartPoint, inst) ||
+      // If we can hoist it above the start point then it can be an argument.
+      hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
     diagnoseCopyInIfNotSend(value);
