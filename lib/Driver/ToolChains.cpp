@@ -58,12 +58,14 @@ static void addInputsOfType(ArgStringList &Arguments,
                             types::ID InputType,
                             const char *PrefixArgument = nullptr) {
   for (const Job *Cmd : Jobs) {
-    auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
-    if (!output.empty()) {
-      if (PrefixArgument)
-        Arguments.push_back(PrefixArgument);
-      Arguments.push_back(output.c_str());
-    }
+    Cmd->getOutput().forEachOutputOfType(
+        InputType, [&](const std::string &output) {
+          if (!output.empty()) {
+            if (PrefixArgument)
+              Arguments.push_back(PrefixArgument);
+            Arguments.push_back(output.c_str());
+          }
+        });
   }
 }
 
@@ -746,9 +748,10 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
     assert(Arguments.size() - origLen >=
            context.Inputs.size() + context.InputActions.size());
-    assert((Arguments.size() - origLen == context.Inputs.size() ||
-            !context.InputActions.empty()) &&
-           "every input to MergeModule must generate a swiftmodule");
+    // FIXME: dmu What does Jordan really want here?
+    //    assert((Arguments.size() - origLen == context.Inputs.size() ||
+    //            !context.InputActions.empty()) &&
+    //           "every input to MergeModule must generate a swiftmodule");
   }
 
   // Tell all files to parse as library, which is necessary to load them as
