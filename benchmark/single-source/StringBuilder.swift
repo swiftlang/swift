@@ -17,6 +17,14 @@ public let StringBuilder = [
   BenchmarkInfo(name: "StringBuilder", runFunction: run_StringBuilder, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringBuilderLong", runFunction: run_StringBuilderLong, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringUTF16Builder", runFunction: run_StringUTF16Builder, tags: [.validation, .api, .String]),
+  BenchmarkInfo(
+    name: "StringWordBuilder",
+    runFunction: run_StringWordBuilder,
+    tags: [.validation, .api, .String]),
+  BenchmarkInfo(
+    name: "StringWordBuilderReservingCapacity",
+    runFunction: run_StringWordBuilderReservingCapacity,
+    tags: [.validation, .api, .String]),
 ]
 
 @inline(never)
@@ -82,3 +90,28 @@ public func run_StringBuilderLong(_ N: Int) {
   }
 }
 
+@inline(never)
+func buildString(
+  word: String,
+  count: Int,
+  reservingCapacity: Bool
+) -> String {
+  var sb = ""
+  if reservingCapacity {
+    sb.reserveCapacity(count * word.unicodeScalars.count)
+  }
+  for _ in 0 ..< count {
+    sb += word
+  }
+  return sb
+}
+
+@inline(never)
+public func run_StringWordBuilder(_ N: Int) {
+  _ = buildString(word: "bumfuzzle", count: 50_000 * N, reservingCapacity: false)
+}
+
+@inline(never)
+public func run_StringWordBuilderReservingCapacity(_ N: Int) {
+  _ = buildString(word: "bumfuzzle", count: 50_000 * N, reservingCapacity: true)
+}
