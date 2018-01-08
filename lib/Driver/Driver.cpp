@@ -2724,14 +2724,6 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               const OutputInfo &OI,
                                               const TypeToPathMap *OutputMap,
                                               CommandOutput *Output) const {
-  // FIXME: dmu temp hack to get timings
-  // is the right way to do something here or to vectorize the OutputMap?
-  if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {
-    chooseSupplementaryOutputsForBatchModeHack(C, types::TY_ObjCHeader, OI,
-                                               Output);
-    return;
-  }
-
   StringRef ObjCHeaderPath;
   if (OutputMap) {
     auto iter = OutputMap->find(types::TY_ObjCHeader);
