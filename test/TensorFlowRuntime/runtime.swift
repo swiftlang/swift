@@ -44,7 +44,8 @@ func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
 
 func runProgram(_ progName: String,
   _ graphProto: StaticString,
-  _ inputTensors: CTensorHandle...
+  _ inputTensors: [CTensorHandle],
+  shouldAbort: Bool = false
 ) -> [CTensorHandle] {
   print("The input graph of program \(progName) has \(graphProto.utf8CodeUnitCount) bytes.")
 
@@ -54,11 +55,19 @@ func runProgram(_ progName: String,
                                        inputTensors.count,
                                        /*number of output tensors*/1)
   let outputBuffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 1)
-  _TFCFinishTensorProgram(program, outputBuffer, 1)
 
+  defer {
+    outputBuffer.deallocate()
+  }
+
+  if (shouldAbort) {
+    _TFCTerminateTensorProgram(program)
+    return []
+  }
+
+  _TFCFinishTensorProgram(program, outputBuffer, 1)
   // Load the result tensor, taking ownership from the unsafe pointer.
   let resultTensor = outputBuffer.move()
-  outputBuffer.deallocate()
 
   print("Program \(progName) produced a tensor.")
 
@@ -75,12 +84,12 @@ func runTanh() {
    */
   let graphProto: StaticString = "\n4\n\u{0C}the_function\u{12}\t\n\u{05}arg_0\u{18}\u{01}\u{1A}\u{19}\n\u{15}op__t04main1gyyf_11_6\u{18}\u{01}\u{1A}-\n\u{15}op._T04main1gyyF.11.6\u{12}\u{04}Tanh\u{1A}\u{05}arg_0*\u{07}\n\u{01}T\u{12}\u{02}0\u{01}\"2\n\u{15}op__t04main1gyyf_11_6\u{12}\u{19}op._T04main1gyyF.11.6:y:0"
 
-  let outputTensors = runProgram("Tanh", graphProto, createFloatTensorHandle(1.2))
+  let outputTensors = runProgram("Tanh", graphProto, [createFloatTensorHandle(1.2)])
 
   checkFloatValueNear(outputTensors[0], 0.833655)
 }
 
-func runAdd() {
+func runAdd(shouldAbort: Bool) {
   /* The corresponding Swift program:
   func f() {
     let a = Tensor1D<Float>(1,2,3)
@@ -91,9 +100,14 @@ func runAdd() {
   */
   let graphProto: StaticString = "\nE\n\u{0C}the_function\u{12}\t\n\u{05}arg_0\u{18}\u{01}\u{12}\t\n\u{05}arg_1\u{18}\u{01}\u{1A}\u{1F}\n\u{1B}op__t04main8test_addyyf_4_6\u{18}\u{01}\u{1A}9\n\u{1B}op._T04main8test_addyyF.4.6\u{12}\u{03}Add\u{1A}\u{05}arg_0\u{1A}\u{05}arg_1*\u{07}\n\u{01}T\u{12}\u{02}0\u{01}\">\n\u{1B}op__t04main8test_addyyf_4_6\u{12}\u{1F}op._T04main8test_addyyF.4.6:z:0"
 
-  let outputTensors = runProgram("Add", graphProto, createFloatTensorHandle(1.2), createFloatTensorHandle(3.4))
+  let outputTensors = runProgram("Add", graphProto,
+                                 [createFloatTensorHandle(1.2),
+                                  createFloatTensorHandle(3.4)],
+                                 shouldAbort: shouldAbort)
 
-  checkFloatValueNear(outputTensors[0], 1.2+3.4)
+  if (!shouldAbort) {
+      checkFloatValueNear(outputTensors[0], 1.2+3.4)
+  }
 }
 
 RuntimeTests.test("Runtime/BasicTanhTest") {
@@ -101,7 +115,20 @@ RuntimeTests.test("Runtime/BasicTanhTest") {
 }
 
 RuntimeTests.test("Runtime/BasicAddTest") {
-  runAdd()
+  runAdd(shouldAbort: false)
 }
+
+RuntimeTests.test("Runtime/AddThenAbbortTest") {
+  runAdd(shouldAbort: true)
+}
+
+RuntimeTests.test("Runtime/BasicTanhSyncTest") {
+  _TFCRuntimeConfig.usesSynchronousExecution = true
+  runTanh()
+}
+
+// Tests are currently executed sequentially, so if there are any subsequent
+// tests intended for async runtime, set _TFCRuntimeConfig.usesSynchronousExecution = false
+// for those tests.
 
 runAllTests()
