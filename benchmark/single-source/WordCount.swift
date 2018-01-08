@@ -158,16 +158,14 @@ extension Character {
 }
 
 struct Words: IteratorProtocol, Sequence {
+  public typealias Iterator = Words
+
   let text: String
   var nextIndex: String.Index
 
   init(_ text: String) {
     self.text = text
     self.nextIndex = text.startIndex
-  }
-
-  func makeIterator() -> Words {
-    return self
   }
 
   mutating func next() -> String? {
