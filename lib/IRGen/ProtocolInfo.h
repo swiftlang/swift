@@ -110,8 +110,9 @@ public:
   }
 
   bool matchesAssociatedType(AssociatedType assocType) const {
-    auto decl = MemberOrAssociatedType.get<Decl*>();
-    return decl == assocType.getAssociation() && Protocol == nullptr;
+    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
+      return decl == assocType.getAssociation() && Protocol == nullptr;
+    return false;
   }
 
   AssociatedTypeDecl *getAssociatedType() const {

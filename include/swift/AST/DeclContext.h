@@ -185,8 +185,8 @@ struct ConformanceDiagnostic {
 /// the ASTHierarchy enum below.
 class alignas(1 << DeclContextAlignInBits) DeclContext {
   enum class ASTHierarchy : unsigned {
-    Expr,
     Decl,
+    Expr,
     FileUnit,
     Initializer,
     SerializedLocal,
