@@ -1101,31 +1101,8 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   return false;
 }
 
-DeclContext::ASTHierarchy
-DeclContext::getASTHierarchyFromKind(DeclContextKind Kind) {
-  switch (Kind) {
-  case DeclContextKind::AbstractClosureExpr:
-    return ASTHierarchy::Expr;
-  case DeclContextKind::Initializer:
-    return ASTHierarchy::Initializer;
-  case DeclContextKind::SerializedLocal:
-    return ASTHierarchy::SerializedLocal;
-  case DeclContextKind::FileUnit:
-    return ASTHierarchy::FileUnit;
-  case DeclContextKind::Module:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::ExtensionDecl:
-    return ASTHierarchy::Decl;
-  }
-  llvm_unreachable("Unhandled DeclContextKind");
-}
-
-DeclContextKind
-DeclContext::getKindFromASTHierarchy(DeclContext::ASTHierarchy Hier) const {
-  switch (Hier) {
+DeclContextKind DeclContext::getContextKind() const {
+  switch (ParentAndKind.getInt()) {
   case ASTHierarchy::Expr:
     return DeclContextKind::AbstractClosureExpr;
   case ASTHierarchy::Initializer:

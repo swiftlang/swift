@@ -72,7 +72,7 @@ namespace serialization {
 using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
 }
 
-enum class DeclContextKind : uint8_t {
+enum class DeclContextKind : unsigned {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
@@ -184,7 +184,7 @@ struct ConformanceDiagnostic {
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
 class alignas(1 << DeclContextAlignInBits) DeclContext {
-  enum class ASTHierarchy : uint8_t {
+  enum class ASTHierarchy : unsigned {
     Expr,
     Decl,
     FileUnit,
@@ -214,8 +214,26 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   /// extension thereof, return the GenericTypeDecl.
   GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
 
-  static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind);
-  DeclContextKind getKindFromASTHierarchy(ASTHierarchy Hier) const;
+  static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind) {
+    switch (Kind) {
+    case DeclContextKind::AbstractClosureExpr:
+      return ASTHierarchy::Expr;
+    case DeclContextKind::Initializer:
+      return ASTHierarchy::Initializer;
+    case DeclContextKind::SerializedLocal:
+      return ASTHierarchy::SerializedLocal;
+    case DeclContextKind::FileUnit:
+      return ASTHierarchy::FileUnit;
+    case DeclContextKind::Module:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::GenericTypeDecl:
+    case DeclContextKind::ExtensionDecl:
+      return ASTHierarchy::Decl;
+    }
+    llvm_unreachable("Unhandled DeclContextKind");
+  }
 
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
@@ -225,9 +243,7 @@ public:
   }
 
   /// Returns the kind of context this is.
-  DeclContextKind getContextKind() const {
-    return getKindFromASTHierarchy(ParentAndKind.getInt());
-  }
+  DeclContextKind getContextKind() const;
   
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
