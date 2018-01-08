@@ -138,6 +138,14 @@ contain the following fields:
   If the function takes no arguments, **parameter type vector** as well as
   **parameter flags vector** are going to be empty.
 
+Currently we have specialized ABI endpoints to retrieve metadata for functions
+with 0/1/2/3 parameters - `swift_getFunctionTypeMetadata{0|1|2|3}` and the general
+one `swift_getFunctionTypeMetadata` which handles all other function types and
+functions with parameter flags e.g. `(inout Int) -> Void`. Based on the usage
+information collected from Swift Standard Library and Overlays as well as Source
+Compatibility Suite it was decided not to have specialized ABI endpoints for
+functions with parameter flags due their minimal use.
+
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
 
@@ -272,6 +280,19 @@ parameter vector contains witness tables for those protocols, as if laid out::
     FungibleWitnessTable *U_Fungible;
     AnsibleWitnessTable *U_Ansible;
   };
+
+Foreign Class Metadata
+~~~~~~~~~~~~~~~~~~~~~~
+
+Foreign class metadata describes "foreign" class types, which support Swift
+reference counting but are otherwise opaque to the Swift runtime.
+
+- The `nominal type descriptor`_ for the most-derived class type is stored at
+  **offset 0**.
+- The **super pointer** pointing to the metadata record for the superclass is
+  stored at **offset 1**. If the class is a root class, it is null.
+- Three **pointer-sized fields**, starting at **offset 2**, are reserved for
+  future use.
 
 Nominal Type Descriptor
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -417,21 +438,28 @@ section, which is scanned by the Swift runtime when needed (e.g., in response to
 a `swift_conformsToProtocol()` query). Each protocol conformance record
 contains:
 
-- The `protocol descriptor`_ describing the protocol of the conformance.
-- A reference to the metadata for the **conforming type**, whose form is
-  determined by the **protocol conformance flags** described below.
-- The **witness table field** that provides access to the witness table
-  describing the conformance itself; the form of this field is determined by the
-  **protocol conformance flags** described below.
-- The **protocol conformance flags** is a 32-bit field comprised of:
+- The `protocol descriptor`_ describing the protocol of the conformance,
+  represented as an (possibly indirect) 32-bit offset relative to the field.
+  The low bit indicates whether it is an indirect offset; the second lowest
+  bit is reserved for future use.
+- A reference to the **conforming type**, represented as a 32-bit offset
+  relative to the field. The lower two bits indicate how the conforming
+  type is represented:
 
-  * **Bits 0-3** contain the type metadata record kind, which indicates how
-    the **conforming type** field is encoded.
-  * **Bits 4-5** contain the kind of witness table. The value can be one of:
+    0. A direct reference to a nominal type descriptor.
+    1. An indirect reference to a nominal type descriptor.
+    2. Reserved for future use.
+    3. A reference to a pointer to an Objective-C class object.
+
+- The **witness table field** that provides access to the witness table
+  describing the conformance itself, represented as a direct 32-bit relative
+  offset. The lower two bits indicate how the witness table is represented:
 
     0. The **witness table field** is a reference to a witness table.
     1. The **witness table field** is a reference to a **witness table
        accessor** function for an unconditional conformance.
     2. The **witness table field** is a reference to a **witness table
        accessor** function for a conditional conformance.
+    3. Reserved for future use.
 
+- A 32-bit value reserved for future use.

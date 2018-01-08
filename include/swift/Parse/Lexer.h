@@ -406,6 +406,7 @@ public:
     SourceLoc getEndLoc() {
       return Loc.getAdvancedLoc(Length);
     }
+
   };
   
   /// \brief Compute the bytes that the actual string literal should codegen to.
@@ -484,6 +485,7 @@ private:
   }
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
+  void formEscapedIdentifierToken(const char *TokStart);
 
   /// Advance to the end of the line.
   /// If EatNewLine is true, CurPtr will be at end of newline character.

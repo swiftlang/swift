@@ -792,6 +792,12 @@ public struct ${Self}<Pointee>: _Pointer {
   /// After executing `body`, this method rebinds memory back to the original
   /// `Pointee` type.
   ///
+  /// - Note: Only use this method to rebind the pointer's memory to a type
+  ///   with the same size and stride as the currently bound `Pointee` type.
+  ///   To bind a region of memory to a type that is a different size, convert
+  ///   the pointer to a raw pointer and use the `bindMemory(to:capacity:)`
+  ///   method.
+  ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. The type `T` must be the same size and be layout compatible

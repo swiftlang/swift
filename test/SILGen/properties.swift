@@ -24,13 +24,13 @@ func tuple_rvalue() -> (Int, Int) {}
 // CHECK-LABEL: sil hidden @{{.*}}physical_tuple_rvalue
 func physical_tuple_rvalue() -> Int {
   return tuple_rvalue().1
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties12tuple_rvalue{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S10properties12tuple_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[FUNC]]()
   // CHECK: [[RET:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties16tuple_assignment{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties16tuple_assignment{{[_0-9a-zA-Z]*}}F
 func tuple_assignment(_ a: inout Int, b: inout Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[B_ADDR]]
@@ -44,7 +44,7 @@ func tuple_assignment(_ a: inout Int, b: inout Int) {
   (a, b) = (b, a)
 }
 
-// CHECK-LABEL: sil hidden @_T010properties18tuple_assignment_2{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18tuple_assignment_2{{[_0-9a-zA-Z]*}}F
 func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   (a, b) = xy
@@ -94,7 +94,7 @@ struct Val {
   subscript(i: Int) -> Float { get {} set {} }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties22physical_struct_lvalue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties22physical_struct_lvalue{{[_0-9a-zA-Z]*}}F
 func physical_struct_lvalue(_ c: Int) {
   var v : Val
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
@@ -104,7 +104,7 @@ func physical_struct_lvalue(_ c: Int) {
   // CHECK: assign %0 to [[YADDR]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Ref, Int) -> ()
+// CHECK-LABEL: sil hidden @$S10properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Ref, Int) -> ()
 // CHECK: bb0([[ARG0:%.*]] : $Ref,
  func physical_class_lvalue(_ r: Ref, a: Int) {
     r.y = a
@@ -116,7 +116,7 @@ func physical_struct_lvalue(_ c: Int) {
   }
 
 
-// CHECK-LABEL: sil hidden @_T010properties24physical_subclass_lvalue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties24physical_subclass_lvalue{{[_0-9a-zA-Z]*}}F
 func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: bb0([[ARG1:%.*]] : $RefSubclass, [[ARG2:%.*]] : $Int):
   r.y = a
@@ -140,10 +140,10 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
 
 func struct_rvalue() -> Val {}
 
-// CHECK-LABEL: sil hidden @_T010properties22physical_struct_rvalue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties22physical_struct_rvalue{{[_0-9a-zA-Z]*}}F
 func physical_struct_rvalue() -> Int {
   return struct_rvalue().y
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties13struct_rvalueAA3ValVyF
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S10properties13struct_rvalueAA3ValVyF
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[FUNC]]()
   // CHECK: [[BORROWED_STRUCT:%.*]] = begin_borrow [[STRUCT]]
   // CHECK: [[RET:%[0-9]+]] = struct_extract [[BORROWED_STRUCT]] : $Val, #Val.y
@@ -154,48 +154,48 @@ func physical_struct_rvalue() -> Int {
 
 func class_rvalue() -> Ref {}
 
-// CHECK-LABEL: sil hidden @_T010properties21physical_class_rvalue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties21physical_class_rvalue{{[_0-9a-zA-Z]*}}F
 func physical_class_rvalue() -> Int {
   return class_rvalue().y
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties12class_rvalueAA3RefCyF
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S10properties12class_rvalueAA3RefCyF
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
   // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
   // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties18logical_struct_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18logical_struct_get{{[_0-9a-zA-Z]*}}F
 func logical_struct_get() -> Int {
   return struct_rvalue().z
-  // CHECK: [[GET_RVAL:%[0-9]+]] = function_ref @_T010properties13struct_rvalue{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[GET_RVAL:%[0-9]+]] = function_ref @$S10properties13struct_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[GET_RVAL]]()
-  // CHECK: [[GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vg
+  // CHECK: [[GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV1z{{[_0-9a-zA-Z]*}}vg
   // CHECK: [[VALUE:%[0-9]+]] = apply [[GET_METHOD]]([[STRUCT]])
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties18logical_struct_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18logical_struct_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_set(_ value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[WRITE]])
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T010properties27logical_struct_in_tuple_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties27logical_struct_in_tuple_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_1]])
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T010properties29logical_struct_in_reftype_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties29logical_struct_in_reftype_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
@@ -221,7 +221,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
-  // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
+  // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
   // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
@@ -233,7 +233,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
   // -- writeback to val.ref.val_prop.z_tuple
   // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [trivial] [[V_R_VP_Z_TUPLE_MAT]]
-  // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvs
+  // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvs
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
   // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
@@ -254,12 +254,12 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
 
 func reftype_rvalue() -> Ref {}
 
-// CHECK-LABEL: sil hidden @_T010properties18reftype_rvalue_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18reftype_rvalue_set{{[_0-9a-zA-Z]*}}F
 func reftype_rvalue_set(_ value: Val) {
   reftype_rvalue().val_prop = value
 }
 
-// CHECK-LABEL: sil hidden @_T010properties27tuple_in_logical_struct_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties27tuple_in_logical_struct_set{{[_0-9a-zA-Z]*}}F
 func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
@@ -268,7 +268,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[VAL1:%[0-9]+]] = load_borrow [[WRITE]]
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
-  // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
+  // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
   // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
@@ -278,46 +278,46 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [trivial] [[Z_TUPLE_MATERIALIZED]]
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvs
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvs
   // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[WRITE]])
   // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]
   // CHECK: return
 }
 
 var global_prop : Int {
-  // CHECK-LABEL: sil hidden @_T010properties11global_prop{{[_0-9a-zA-Z]*}}vg
+  // CHECK-LABEL: sil hidden @$S10properties11global_prop{{[_0-9a-zA-Z]*}}vg
   get {
     return zero
   }
-  // CHECK-LABEL: sil hidden @_T010properties11global_prop{{[_0-9a-zA-Z]*}}vs
+  // CHECK-LABEL: sil hidden @$S10properties11global_prop{{[_0-9a-zA-Z]*}}vs
   set {
     use(newValue)
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties18logical_global_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18logical_global_get{{[_0-9a-zA-Z]*}}F
 func logical_global_get() -> Int {
   return global_prop
-  // CHECK: [[GET:%[0-9]+]] = function_ref @_T010properties11global_prop{{[_0-9a-zA-Z]*}}vg
+  // CHECK: [[GET:%[0-9]+]] = function_ref @$S10properties11global_prop{{[_0-9a-zA-Z]*}}vg
   // CHECK: [[VALUE:%[0-9]+]] = apply [[GET]]()
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties18logical_global_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties18logical_global_set{{[_0-9a-zA-Z]*}}F
 func logical_global_set(_ x: Int) {
   global_prop = x
-  // CHECK: [[SET:%[0-9]+]] = function_ref @_T010properties11global_prop{{[_0-9a-zA-Z]*}}vs
+  // CHECK: [[SET:%[0-9]+]] = function_ref @$S10properties11global_prop{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[SET]](%0)
 }
 
-// CHECK-LABEL: sil hidden @_T010properties17logical_local_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties17logical_local_get{{[_0-9a-zA-Z]*}}F
 func logical_local_get(_ x: Int) -> Int {
   var prop : Int {
     get {
       return x
     }
   }
-  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_T010properties17logical_local_getyS2iF4propL_Sivg]]
+  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@\$S10properties17logical_local_getyS2iF4propL_Sivg]]
   // CHECK: apply [[GET_REF]](%0)
   return prop
 }
@@ -343,7 +343,7 @@ func logical_generic_local_get<T>(_ x: Int, _: T) {
   _ = prop2
 }
 
-// CHECK-LABEL: sil hidden @_T010properties26logical_local_captured_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties26logical_local_captured_get{{[_0-9a-zA-Z]*}}F
 func logical_local_captured_get(_ x: Int) -> Int {
   var prop : Int {
     get {
@@ -355,22 +355,22 @@ func logical_local_captured_get(_ x: Int) -> Int {
   }
 
   return get_prop()
-  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_T010properties26logical_local_captured_getyS2iF0E5_propL_SiyF
+  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S10properties26logical_local_captured_getyS2iF0E5_propL_SiyF
   // CHECK: apply [[FUNC_REF]](%0)
 }
-// CHECK: sil private @_T010properties26logical_local_captured_get{{.*}}vg
+// CHECK: sil private @$S10properties26logical_local_captured_get{{.*}}vg
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
 func inout_arg(_ x: inout Int) {}
 
-// CHECK-LABEL: sil hidden @_T010properties14physical_inout{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties14physical_inout{{[_0-9a-zA-Z]*}}F
 func physical_inout(_ x: Int) {
   var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_T010properties9inout_arg{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @$S10properties9inout_arg{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[INOUT_ARG]]([[WRITE]])
 }
 
@@ -378,19 +378,19 @@ func physical_inout(_ x: Int) {
 /* TODO check writeback to more complex logical prop, check that writeback
  * reuses temporaries */
 
-// CHECK-LABEL: sil hidden @_T010properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Val, Int) -> Float
+// CHECK-LABEL: sil hidden @$S10properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Val, Int) -> Float
 // CHECK: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(_ v: Val, i: Int) -> Float {
   return v[i]
   // CHECK: [[BORROWED_VVAL:%.*]] = begin_borrow [[VVAL]]
-  // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV{{[_0-9a-zA-Z]*}}ig
+  // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV{{[_0-9a-zA-Z]*}}ig
   // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[BORROWED_VVAL]]) : $@convention(method) (Int, @guaranteed Val)
   // CHECK: end_borrow [[BORROWED_VVAL]] from [[VVAL]]
   // CHECK: destroy_value [[VVAL]]
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @_T010properties17val_subscript_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties17val_subscript_set{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $Val, [[I:%[0-9]+]] : $Int, [[X:%[0-9]+]] : $Float):
 func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
@@ -398,7 +398,7 @@ func val_subscript_set(_ v: Val, i: Int, x: Float) {
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV{{[_0-9a-zA-Z]*}}is
+  // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV{{[_0-9a-zA-Z]*}}is
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[WRITE]])
 }
 
@@ -411,45 +411,45 @@ struct Generic<T> {
 
   subscript(x: T) -> T { get {} set {} }
 
-  // CHECK-LABEL: sil hidden @_T010properties7GenericV19copy_typevar_member{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$S10properties7GenericV19copy_typevar_member{{[_0-9a-zA-Z]*}}F
   mutating
   func copy_typevar_member(_ x: Generic<T>) {
     typevar_member = x.typevar_member
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties21generic_mono_phys_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties21generic_mono_phys_get{{[_0-9a-zA-Z]*}}F
 func generic_mono_phys_get<T>(_ g: Generic<T>) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
 
-// CHECK-LABEL: sil hidden @_T010properties20generic_mono_log_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties20generic_mono_log_get{{[_0-9a-zA-Z]*}}F
 func generic_mono_log_get<T>(_ g: Generic<T>) -> Int {
   return g.mono_log
-  // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_T010properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vg
+  // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @$S10properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vg
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
-// CHECK-LABEL: sil hidden @_T010properties20generic_mono_log_set{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties20generic_mono_log_set{{[_0-9a-zA-Z]*}}F
 func generic_mono_log_set<T>(_ g: Generic<T>, x: Int) {
   var g = g
   g.mono_log = x
-  // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_T010properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vs
+  // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @$S10properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
-// CHECK-LABEL: sil hidden @_T010properties26generic_mono_subscript_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties26generic_mono_subscript_get{{[_0-9a-zA-Z]*}}F
 func generic_mono_subscript_get<T>(_ g: Generic<T>, i: Int) -> Float {
   return g[i]
-  // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_T010properties7GenericV{{[_0-9a-zA-Z]*}}ig
+  // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @$S10properties7GenericV{{[_0-9a-zA-Z]*}}ig
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}generic_mono_subscript_set
 func generic_mono_subscript_set<T>(_ g: inout Generic<T>, i: Int, x: Float) {
   g[i] = x
-  // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_T010properties7GenericV{{[_0-9a-zA-Z]*}}is
+  // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @$S10properties7GenericV{{[_0-9a-zA-Z]*}}is
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
@@ -459,14 +459,14 @@ func bound_generic_mono_phys_get(_ g: inout Generic<UnicodeScalar>, x: Int) -> I
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
 
-// CHECK-LABEL: sil hidden @_T010properties26bound_generic_mono_log_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties26bound_generic_mono_log_get{{[_0-9a-zA-Z]*}}F
 func bound_generic_mono_log_get(_ g: Generic<UnicodeScalar>, x: Int) -> Int {
   return g.mono_log
-// CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_T010properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vg
+// CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @$S10properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vg
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
-// CHECK-LABEL: sil hidden @_T010properties22generic_subscript_type{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties22generic_subscript_type{{[_0-9a-zA-Z]*}}F
 func generic_subscript_type<T>(_ g: Generic<T>, i: T, x: T) -> T {
   var g = g
   g[i] = x
@@ -484,14 +484,14 @@ struct StaticProperty {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties10static_get{{[_0-9a-zA-Z]*}}F
-// CHECK:   function_ref @_T010properties14StaticPropertyV3foo{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin StaticProperty.Type) -> Int
+// CHECK-LABEL: sil hidden @$S10properties10static_get{{[_0-9a-zA-Z]*}}F
+// CHECK:   function_ref @$S10properties14StaticPropertyV3foo{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin StaticProperty.Type) -> Int
 func static_get() -> Int {
   return StaticProperty.foo
 }
 
-// CHECK-LABEL: sil hidden @_T010properties10static_set{{[_0-9a-zA-Z]*}}F
-// CHECK:   function_ref @_T010properties14StaticPropertyV3foo{{[_0-9a-zA-Z]*}}vsZ : $@convention(method) (Int, @thin StaticProperty.Type) -> ()
+// CHECK-LABEL: sil hidden @$S10properties10static_set{{[_0-9a-zA-Z]*}}F
+// CHECK:   function_ref @$S10properties14StaticPropertyV3foo{{[_0-9a-zA-Z]*}}vsZ : $@convention(method) (Int, @thin StaticProperty.Type) -> ()
 func static_set(_ x: Int) {
   StaticProperty.foo = x
 }
@@ -506,7 +506,7 @@ struct DidSetWillSetTests: ForceAccessors {
   var a: Int {
     willSet(newA) {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.willset
-      // CHECK-NEXT: sil hidden @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+      // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
@@ -517,19 +517,19 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[FIELDPTR]] : $*Int
       // CHECK-NEXT: end_access [[READ]]
-      // CHECK: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
+      // CHECK: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       takeInt(newA)
 
       // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
-      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
+      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
     }
 
     didSet {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.didset
-      // CHECK-NEXT: sil hidden @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+      // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
       // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
@@ -541,13 +541,13 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
       // CHECK-NEXT: end_access [[READ]]
       // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
-      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
+      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
 
       // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
-      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_T010properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$S10properties4zero{{[_0-9a-zA-Z]*}}vau
       // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
       // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
@@ -568,14 +568,14 @@ struct DidSetWillSetTests: ForceAccessors {
   // These are the synthesized getter and setter for the willset/didset variable.
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
-  // CHECK-NEXT: sil hidden [transparent] @_T010properties010DidSetWillC5TestsV1aSivg
+  // CHECK-NEXT: sil hidden [transparent] @$S10properties010DidSetWillC5TestsV1aSivg
   // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
-  // CHECK-NEXT: sil hidden @_T010properties010DidSetWillC5TestsV1aSivs
+  // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1aSivs
   // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: debug_value_addr %1
@@ -588,7 +588,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
-  // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+  // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
   // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: end_access [[WRITE]]
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
@@ -597,10 +597,10 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: end_access [[WRITE]]
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
-  // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
 
-  // CHECK-LABEL: sil hidden @_T010properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
   // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
   // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
   // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
@@ -627,26 +627,26 @@ func force_global_observing_property_setter() {
 }
 
 // The property is initialized with "zero".
-// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(c) () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: alloc_global @_T010properties25global_observing_propertySiv
-// CHECK-NEXT: %1 = global_addr @_T010properties25global_observing_propertySivp : $*Int
+// CHECK-NEXT: alloc_global @$S10properties25global_observing_propertySiv
+// CHECK-NEXT: %1 = global_addr @$S10properties25global_observing_propertySivp : $*Int
 // CHECK: properties.zero.unsafeMutableAddressor
 // CHECK: return
 
 // The didSet implementation needs to call takeInt.
 
-// CHECK-LABEL: sil hidden @_T010properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+// CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
 // CHECK: function_ref properties.takeInt
-// CHECK-NEXT: function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
 
 // The setter needs to call didSet implementation.
 
-// CHECK-LABEL: sil hidden @_T010properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
+// CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
 // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
-// CHECK-NEXT:  function_ref @_T010properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
+// CHECK-NEXT:  function_ref @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
 // CHECK: function_ref properties.global_observing_property.didset
-// CHECK-NEXT: function_ref @_T010properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+// CHECK-NEXT: function_ref @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
 
 
 // Test local observing properties.
@@ -718,11 +718,11 @@ class rdar16151899Base {
 }
 
 class rdar16151899Derived : rdar16151899Base {
-    // CHECK-LABEL: sil hidden @_T010properties19rdar16151899DerivedC{{[_0-9a-zA-Z]*}}fc
+    // CHECK-LABEL: sil hidden @$S10properties19rdar16151899DerivedC{{[_0-9a-zA-Z]*}}fc
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
-        // CHECK: function_ref @_T010properties16rdar16151899BaseCACycfc : $@convention(method) (@owned rdar16151899Base) -> @owned rdar16151899Base
+        // CHECK: function_ref @$S10properties16rdar16151899BaseCACycfc : $@convention(method) (@owned rdar16151899Base) -> @owned rdar16151899Base
 
         // This should not be a direct access, it should call the setter in the
         // base.
@@ -751,7 +751,7 @@ func propertyWithDidSetTakingOldValue() {
 }
 
 // CHECK: // setter of p #1 : Swift.Int in properties.propertyWithDidSetTakingOldValue()
-// CHECK-NEXT: sil {{.*}} @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_Sivs
+// CHECK-NEXT: sil {{.*}} @$S10properties32propertyWithDidSetTakingOldValueyyF1pL_Sivs
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
@@ -766,11 +766,11 @@ func propertyWithDidSetTakingOldValue() {
 // SEMANTIC ARC TODO: Another case where we need to put the mark_function_escape on a new projection after a copy.
 // CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @$S10properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
 // CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
-// CHECK-NEXT:} // end sil function '_T010properties32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'
+// CHECK-NEXT:} // end sil function '$S10properties32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'
 
 
 class BaseProperty {
@@ -787,15 +787,15 @@ class DerivedProperty : BaseProperty {
 
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
-// CHECK-LABEL: sil hidden @_T010properties15DerivedPropertyC24super_property_referenceSiyF : $@convention(method) (@guaranteed DerivedProperty) -> Int {
+// CHECK-LABEL: sil hidden @$S10properties15DerivedPropertyC24super_property_referenceSiyF : $@convention(method) (@guaranteed DerivedProperty) -> Int {
 // CHECK: bb0([[SELF:%.*]] : $DerivedProperty):
 // CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
 // CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
-// CHECK:   [[FN:%[0-9]+]] = function_ref @_T010properties12BasePropertyC1xSivg : $@convention(method) (@guaranteed BaseProperty) -> Int 
+// CHECK:   [[FN:%[0-9]+]] = function_ref @$S10properties12BasePropertyC1xSivg : $@convention(method) (@guaranteed BaseProperty) -> Int 
 // CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
 // CHECK:   destroy_value [[BASEPTR]]
 // CHECK:   return [[RESULT]] : $Int
-// CHECK: } // end sil function '_T010properties15DerivedPropertyC24super_property_referenceSiyF'
+// CHECK: } // end sil function '$S10properties15DerivedPropertyC24super_property_referenceSiyF'
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property
@@ -861,7 +861,7 @@ struct SomeGenericStruct<T> {
   var x: Int
 }
 
-// CHECK-LABEL: sil hidden @_T010properties4getX{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties4getX{{[_0-9a-zA-Z]*}}F
 // CHECK:         struct_extract {{%.*}} : $SomeGenericStruct<T>, #SomeGenericStruct.x
 func getX<T>(_ g: SomeGenericStruct<T>) -> Int {
   return g.x
@@ -930,7 +930,7 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties12genericPropsyyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
+// CHECK-LABEL: sil hidden @$S10properties12genericPropsyyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -953,7 +953,7 @@ func genericProps(_ x: GenericClass<String>) {
   let _ = x.z
 }
 
-// CHECK-LABEL: sil hidden @_T010properties28genericPropsInGenericContext{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties28genericPropsInGenericContext{{[_0-9a-zA-Z]*}}F
 func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -972,7 +972,7 @@ class ClassWithLetProperty {
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
-// CHECK-LABEL: sil hidden @_T010properties20ClassWithLetPropertyC14ReturnConstant{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties20ClassWithLetPropertyC14ReturnConstant{{[_0-9a-zA-Z]*}}F
 // CHECK:       bb0([[ARG:%.*]] : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
@@ -984,7 +984,7 @@ class ClassWithLetProperty {
 
   // This property is marked dynamic, so go through the getter, always.
   func ReturnDynamicConstant() -> Int { return q }
-// CHECK-LABEL: sil hidden @_T010properties20ClassWithLetPropertyC21ReturnDynamicConstant{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10properties20ClassWithLetPropertyC21ReturnDynamicConstant{{[_0-9a-zA-Z]*}}F
 // CHECK: objc_method %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }
 
@@ -999,7 +999,7 @@ class r19254812Derived: r19254812Base{
   }
   
 // Accessing the "pi" property should not copy_value/release self.
-// CHECK-LABEL: sil hidden @_T010properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
+// CHECK-LABEL: sil hidden @$S10properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself]
 // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
@@ -1033,7 +1033,7 @@ class RedundantSelfRetains {
   func testMethod1() {
     f = RedundantSelfRetains()
   }
-  // CHECK-LABEL: sil hidden @_T010properties20RedundantSelfRetainsC11testMethod1{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$S10properties20RedundantSelfRetainsC11testMethod1{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0(%0 : $RedundantSelfRetains):
 
   // CHECK-NOT: copy_value
@@ -1054,7 +1054,7 @@ func testRedundantRetains() {
   a.field = 4  // no copy_value/release of a necessary here.
 }
 
-// CHECK-LABEL: sil hidden @_T010properties20testRedundantRetainsyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$S10properties20testRedundantRetainsyyF : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
 // CHECK-NOT: copy_value
 // CHECK: destroy_value [[A]] : $RedundantRetains
@@ -1076,12 +1076,12 @@ func addressOnlyNonmutatingProperty<T>(_ x: AddressOnlyNonmutatingSet<T>)
   x.prop = 0
   return x.prop
 }
-// CHECK-LABEL: sil hidden @_T010properties30addressOnlyNonmutatingProperty{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[SET:%.*]] = function_ref @_T010properties25AddressOnlyNonmutatingSetV4propSivs
+// CHECK-LABEL: sil hidden @$S10properties30addressOnlyNonmutatingProperty{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[SET:%.*]] = function_ref @$S10properties25AddressOnlyNonmutatingSetV4propSivs
 // CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%[0-9]*]])
 // CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
-// CHECK:         [[GET:%.*]] = function_ref @_T010properties25AddressOnlyNonmutatingSetV4propSivg
+// CHECK:         [[GET:%.*]] = function_ref @$S10properties25AddressOnlyNonmutatingSetV4propSivg
 // CHECK:         apply [[GET]]<T>([[TMP:%[0-9]*]])
 // CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
@@ -1093,10 +1093,10 @@ struct AddressOnlyReadOnlySubscript {
   subscript(z: Int) -> Int { return z }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties015addressOnlyReadC24SubscriptFromMutableBase
+// CHECK-LABEL: sil hidden @$S10properties015addressOnlyReadC24SubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box ${ var AddressOnlyReadOnlySubscript }
 // CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
-// CHECK:         [[GETTER:%.*]] = function_ref @_T010properties015AddressOnlyReadC9SubscriptV{{[_0-9a-zA-Z]*}}ig
+// CHECK:         [[GETTER:%.*]] = function_ref @$S10properties015AddressOnlyReadC9SubscriptV{{[_0-9a-zA-Z]*}}ig
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
 func addressOnlyReadOnlySubscriptFromMutableBase(_ x: Int) {
   var base = AddressOnlyReadOnlySubscript()
@@ -1111,7 +1111,7 @@ struct MutatingGetterStruct {
     mutating get {  }
   }
 
-  // CHECK-LABEL: sil hidden @_T010properties20MutatingGetterStructV4test
+  // CHECK-LABEL: sil hidden @$S10properties20MutatingGetterStructV4test
   // CHECK: [[X:%.*]] = alloc_box ${ var MutatingGetterStruct }, var, name "x"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
   // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
@@ -1146,9 +1146,9 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_T010properties29BaseClassWithInternalPropertyC1xytvg
+// CHECK-LABEL: sil hidden [transparent] @$S10properties29BaseClassWithInternalPropertyC1xytvg
 
-// CHECK-LABEL: sil [transparent] [serialized] @_T010properties30DerivedClassWithPublicPropertyC1xytvg
+// CHECK-LABEL: sil [transparent] [serialized] @$S10properties30DerivedClassWithPublicPropertyC1xytvg
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
@@ -1158,7 +1158,7 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK-NEXT:    end_borrow [[BORROWED_SUPER]] from [[SUPER]]
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
-// CHECK: } // end sil function '_T010properties30DerivedClassWithPublicPropertyC1xytvg'
+// CHECK: } // end sil function '$S10properties30DerivedClassWithPublicPropertyC1xytvg'
 
 // Make sure that we can handle this AST:
 // (load_expr
@@ -1177,7 +1177,7 @@ protocol NonmutatingProtocol {
   var x: Int { get nonmutating set }
 }
 
-// sil hidden @_T010properties19overlappingLoadExpr1cyAA13ReferenceTypeCz_tF : $@convention(thin) (@inout ReferenceType) -> () {
+// sil hidden @$S10properties19overlappingLoadExpr1cyAA13ReferenceTypeCz_tF : $@convention(thin) (@inout ReferenceType) -> () {
 // CHECK:        [[RESULT:%.*]] = alloc_stack $Int
 // CHECK-NEXT:   [[UNINIT:%.*]] = mark_uninitialized [var] [[RESULT]] : $*Int
 // CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
@@ -1186,15 +1186,16 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C_FIELD_BOX:%.*]] = alloc_stack $NonmutatingProtocol
 // CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
 // CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
-// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
+
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
+// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
+// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int

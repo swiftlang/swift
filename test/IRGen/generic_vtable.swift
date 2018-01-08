@@ -20,7 +20,7 @@ public class Concrete : Derived<Int> {
 
 //// Nominal type descriptor for 'Base' does not have any method descriptors.
 
-// CHECK-LABEL: @_T014generic_vtable4BaseCMn = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(protected )?}}constant
 // -- nesting depth
 // CHECK-SAME: i16 1,
 // -- flags: has vtable
@@ -36,20 +36,20 @@ public class Concrete : Derived<Int> {
 
 //// Type metadata for 'Base' has a static vtable.
 
-// CHECK-LABEL: @_T014generic_vtable4BaseCMf = internal global
+// CHECK-LABEL: @"$S14generic_vtable4BaseCMf" = internal global
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @_T014generic_vtable4BaseC2m1yyF
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @_T014generic_vtable4BaseC2m2yyF
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m2yyF"
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable4BaseC* (%T14generic_vtable4BaseC*)* @_T014generic_vtable4BaseCACycfc
+// CHECK-SAME: %T14generic_vtable4BaseC* (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseCACycfc"
 // --
 // CHECK-SAME: , align 8
 
 
 //// Nominal type descriptor for 'Derived' has method descriptors.
 
-// CHECK-LABEL: @_T014generic_vtable7DerivedCMn = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(protected )?}}constant
 // -- nesting depth
 // CHECK-SAME: i16 1,
 // -- flags: has vtable
@@ -61,16 +61,16 @@ public class Concrete : Derived<Int> {
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m3()
-// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedC2m3yyF
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m3yyF"
 // --
 // CHECK-SAME: section "{{.*}}", align 8
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
 
-// CHECK-LABEL: @_T014generic_vtable7DerivedCMP = internal global <{{.*}}> <{
+// CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal global <{{.*}}> <{
 // -- nominal type descriptor
-// CHECK-SAME: @_T014generic_vtable7DerivedCMn,
+// CHECK-SAME: @"$S14generic_vtable7DerivedCMn",
 // -- ivar destroyer
 // CHECK-SAME: i8* null
 // --
@@ -79,7 +79,7 @@ public class Concrete : Derived<Int> {
 
 //// Nominal type descriptor for 'Concrete' has method descriptors.
 
-// CHECK-LABEL: @_T014generic_vtable8ConcreteCMn = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(protected )?}}constant
 // -- nesting depth
 // CHECK-SAME: i16 1,
 // -- flags: has vtable
@@ -91,16 +91,16 @@ public class Concrete : Derived<Int> {
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m4()
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @_T014generic_vtable8ConcreteC2m4yyF
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
 // --
 // CHECK-SAME: section "{{.*}}", align 8
 
 //// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
 //// filled in at initialization time.
 
-// CHECK-LABEL: @_T014generic_vtable8ConcreteCMf = internal global <{{.*}}> <{
+// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
 // -- nominal type descriptor
-// CHECK-SAME: @_T014generic_vtable8ConcreteCMn,
+// CHECK-SAME: @"$S14generic_vtable8ConcreteCMn",
 // -- ivar destroyer
 // CHECK-SAME: i8* null
 // --
@@ -121,12 +121,13 @@ public class Concrete : Derived<Int> {
 
 // -- method override for 'm2()'
 // CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 11
-// CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedC2m2yyF to i8*), i8** [[VTABLE0]], align 8
+// CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 11
+// CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m2yyF" to i8*), i8** [[VTABLE0]], align 8
 
 // -- method override for 'init()'
-// CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 12
-// CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedCACyxGycfc to i8*), i8** [[VTABLE1]], align 8
+// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+// CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
+// CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
 
 // CHECK: ret %swift.type* [[METADATA]]
 
@@ -135,16 +136,16 @@ public class Concrete : Derived<Int> {
 //// and installs overrides for 'init()' and 'm3()'.
 
 // CHECK-LABEL: define private void @initialize_metadata_Concrete(i8*)
-// CHECK: [[SUPERCLASS:%.*]] = call %swift.type* @_T014generic_vtable7DerivedCySiGMa()
-// CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @_T014generic_vtable8ConcreteCMf
+// CHECK: [[SUPERCLASS:%.*]] = call %swift.type* @"$S14generic_vtable7DerivedCySiGMa"()
+// CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
 // CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 
 // -- method override for 'init()'
-// CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @_T014generic_vtable8ConcreteCACycfc to i8*), i8**
+// CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc" to i8*), i8**
 
 // -- method override for 'm3()'
-// CHECK: store i8* bitcast (void (%T14generic_vtable8ConcreteC*)* @_T014generic_vtable8ConcreteC2m3yyF to i8*), i8**
+// CHECK: store i8* bitcast (void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m3yyF" to i8*), i8**
 
-// CHECK: store atomic %swift.type* [[METADATA]], %swift.type** @_T014generic_vtable8ConcreteCML release, align 8
+// CHECK: store atomic %swift.type* [[METADATA]], %swift.type** @"$S14generic_vtable8ConcreteCML" release, align 8
 // CHECK: ret void

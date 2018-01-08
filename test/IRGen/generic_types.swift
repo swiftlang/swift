@@ -8,7 +8,7 @@
 // CHECK: [[C:%T13generic_types1CC]] = type
 // CHECK: [[D:%T13generic_types1DC]] = type
 
-// CHECK-LABEL: @_T013generic_types1ACMP = internal global
+// CHECK-LABEL: @"$S13generic_types1ACMP" = internal global
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_A,
 // CHECK-native-SAME: i32 104,
 // CHECK-objc-SAME:   i32 288,
@@ -16,8 +16,8 @@
 // CHECK-native-SAME: i16 24,
 // CHECK-objc-SAME:   i16 208,
 // CHECK-SAME:   [{{[0-9]+}} x i8*] zeroinitializer,
-// CHECK-SAME:   void ([[A]]*)* @_T013generic_types1ACfD,
-// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD",
+// CHECK-SAME:   i8** @"$SBoWV",
 // CHECK-SAME:   i64 0,
 // CHECK-SAME:   %swift.type* null,
 // CHECK-native-SAME: %swift.opaque* null,
@@ -32,12 +32,12 @@
 // CHECK-SAME:   i32 152,
 // CHECK-SAME:   i32 16,
 // -- nominal type descriptor
-// CHECK-SAME:   @_T013generic_types1ACMn,
+// CHECK-SAME:   @"$S13generic_types1ACMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }
 
-// CHECK-LABEL: @_T013generic_types1BCMP = internal global
+// CHECK-LABEL: @"$S13generic_types1BCMP" = internal global
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
 // CHECK-native-SAME: i32 104,
 // CHECK-objc-SAME:   i32 288,
@@ -45,8 +45,8 @@
 // CHECK-native-SAME: i16 24,
 // CHECK-objc-SAME:   i16 208,
 // CHECK-SAME:   [{{[0-9]+}} x i8*] zeroinitializer,
-// CHECK-SAME:   void ([[B]]*)* @_T013generic_types1BCfD,
-// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD",
+// CHECK-SAME:   i8** @"$SBoWV",
 // CHECK-SAME:   i64 0,
 // CHECK-SAME:   %swift.type* null,
 // CHECK-native-SAME: %swift.opaque* null,
@@ -61,14 +61,14 @@
 // CHECK-SAME:   i32 144,
 // CHECK-SAME:   i32 16,
 // -- nominal type descriptor
-// CHECK-SAME:   @_T013generic_types1BCMn,
+// CHECK-SAME:   @"$S13generic_types1BCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }
 
-// CHECK-LABEL: @_T013generic_types1CCMP = internal global
-// CHECK-SAME:   void ([[C]]*)* @_T013generic_types1CCfD,
-// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK-LABEL: @"$S13generic_types1CCMP" = internal global
+// CHECK-SAME:   void ([[C]]*)* @"$S13generic_types1CCfD",
+// CHECK-SAME:   i8** @"$SBoWV",
 // CHECK-SAME:   i64 0,
 // CHECK-SAME:   %swift.type* null,
 // CHECK-native-SAME: %swift.opaque* null,
@@ -83,14 +83,14 @@
 // CHECK-SAME:   i32 160,
 // CHECK-SAME:   i32 16,
 // -- nominal type descriptor
-// CHECK-SAME:   @_T013generic_types1CCMn,
+// CHECK-SAME:   @"$S13generic_types1CCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }
 
-// CHECK-LABEL: @_T013generic_types1DCMP = internal global
-// CHECK-SAME:   void ([[D]]*)* @_T013generic_types1DCfD,
-// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK-LABEL: @"$S13generic_types1DCMP" = internal global
+// CHECK-SAME:   void ([[D]]*)* @"$S13generic_types1DCfD",
+// CHECK-SAME:   i8** @"$SBoWV",
 // CHECK-SAME:   i64 0,
 // CHECK-SAME:   %swift.type* null,
 // CHECK-native-SAME: %swift.opaque* null,
@@ -105,7 +105,7 @@
 // CHECK-SAME:   i32 160,
 // CHECK-SAME:   i32 16,
 // -- nominal type descriptor
-// CHECK-SAME:   @_T013generic_types1DCMn,
+// CHECK-SAME:   @"$S13generic_types1DCMn",
 // -- ivar destroyer
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }

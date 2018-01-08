@@ -77,10 +77,6 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  if (Tok.isEscapedIdentifier()) {
-    LeadingTrivia.push_back(TriviaPiece::backtick());
-    TrailingTrivia.push_front(TriviaPiece::backtick());
-  }
   addRawSyntax(RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
                                     SourcePresence::Present, LeadingTrivia,
                                     TrailingTrivia));
@@ -110,13 +106,22 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     return;
 
   switch (Kind) {
-  case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::SuperRefExpr:
+  case SyntaxKind::OptionalChainingExpr:
+  case SyntaxKind::ForcedValueExpr:
+  case SyntaxKind::PostfixUnaryExpr:
   case SyntaxKind::TernaryExpr: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::ImplicitMemberExpr:
+  case SyntaxKind::SimpleTypeIdentifier:
+  case SyntaxKind::MemberTypeIdentifier:
+  case SyntaxKind::FunctionCallExpr:
+  case SyntaxKind::SubscriptExpr:
   case SyntaxKind::ExprList: {
     createNodeInPlace(Kind, Parts.size());
     break;

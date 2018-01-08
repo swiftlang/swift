@@ -3,7 +3,7 @@
 protocol P { func foo() }
 protocol Q: class, P {}
 
-// CHECK-LABEL: sil hidden @_T046partial_apply_protocol_class_refinement_method0A5ApplyyyycAA1Q_pF
+// CHECK-LABEL: sil hidden @$S46partial_apply_protocol_class_refinement_method0A5ApplyyyycAA1Q_pF
 func partialApply(_ q: Q) -> () -> () {
   // CHECK: [[OPENED:%.*]] = open_existential_ref
   // CHECK: [[COPY:%.*]] = copy_value [[OPENED]]

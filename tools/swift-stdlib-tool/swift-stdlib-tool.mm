@@ -471,7 +471,7 @@ int parse_macho(int fd, uint32_t offset, uint32_t size,
             else if (uuidVisitor  &&  cmd->cmd() == LC_UUID) {
                 macho_uuid_command<T>* uuid_cmd = (macho_uuid_command<T>*)cmd;
                 if (uuid_cmd->cmdsize() < sizeof(uuid_command)) continue;
-                CFUUIDBytes uuid_bytes = *(CFUUIDBytes *)uuid_cmd->uuid();
+                CFUUIDBytes uuid_bytes = *(const CFUUIDBytes *)uuid_cmd->uuid();
                 NSUUID *uuid = (NSUUID *)
                     CFUUIDCreateFromUUIDBytes(nil, uuid_bytes);
                 uuidVisitor(uuid);

@@ -37,7 +37,7 @@ set(SWIFTLIB_ESSENTIAL
   Character.swift
   CharacterUnicodeScalars.swift
   CocoaArray.swift
-  Codable.swift
+  Codable.swift.gyb
   Collection.swift
   CollectionAlgorithms.swift.gyb
   Comparable.swift

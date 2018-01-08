@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -295,14 +296,6 @@ namespace {
 
           // If the superclass is resilient to us, we cannot statically
           // know the layout of either its instances or its class objects.
-          //
-          // FIXME: We need to implement indirect field/vtable entry access
-          // before we can enable this
-          if (!IGM.Context.LangOpts.EnableClassResilience) {
-            addFieldsForClass(superclass, superclassType);
-            NumInherited = Elements.size();
-          }
-
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -2335,17 +2328,3 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
   auto &layout = selfTI.getClassLayout(IGM, selfType);
   return layout.MetadataRequiresDynamicInitialization;
 }
-
-bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
-                                                       CanType conformingType) {
-  NominalTypeDecl *nom = conformingType->getAnyNominal();
-  auto *clas = dyn_cast<ClassDecl>(nom);
-  if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
-    return true;
-
-  if (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))
-    return true;
-
-  return false;
-}
-

@@ -876,6 +876,13 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
 
+    // Set the IUO attribute on the decl if this was declared with !.
+    if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto *forceAttr =
+          new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
+      ctor->getAttrs().add(forceAttr);
+    }
+
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));

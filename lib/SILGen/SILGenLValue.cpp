@@ -1058,15 +1058,15 @@ namespace {
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
       if (accessKind == AccessKind::Read) {
-        return SGF.getGetterDeclRef(decl, IsDirectAccessorUse);
+        return SGF.getGetterDeclRef(decl);
       } else {
-        return SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+        return SGF.getSetterDeclRef(decl);
       }
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef setter = SGF.getSetterDeclRef(decl);
 
       // Pull everything out of this that we'll need, because we're
       // about to modify the LValue and delete this component.
@@ -1109,7 +1109,7 @@ namespace {
 
     void set(SILGenFunction &SGF, SILLocation loc,
              ArgumentSource &&value, ManagedValue base) && override {
-      SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef setter = SGF.getSetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
       // Pass in just the setter.
@@ -1215,8 +1215,7 @@ namespace {
                                          optSubscripts);
       }());
 
-      SILDeclRef materializeForSet =
-        SGF.getMaterializeForSetDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef materializeForSet = SGF.getMaterializeForSetDeclRef(decl);
 
       MaterializedLValue materialized;
       {
@@ -1368,7 +1367,7 @@ namespace {
     
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
-      SILDeclRef getter = SGF.getGetterDeclRef(decl, IsDirectAccessorUse);
+      SILDeclRef getter = SGF.getGetterDeclRef(decl);
 
       FormalEvaluationScope scope(SGF);
 
@@ -1525,7 +1524,7 @@ namespace {
 
     SILDeclRef getAccessor(SILGenFunction &SGF,
                            AccessKind accessKind) const override {
-      return SGF.getAddressorDeclRef(decl, accessKind, IsDirectAccessorUse);
+      return SGF.getAddressorDeclRef(decl, accessKind);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -1533,8 +1532,7 @@ namespace {
       assert(SGF.InFormalEvaluationScope &&
              "offsetting l-value for modification without writeback scope");
 
-      SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind, 
-                                                     IsDirectAccessorUse);
+      SILDeclRef addressor = SGF.getAddressorDeclRef(decl, accessKind);
       std::pair<ManagedValue, ManagedValue> result;
       {
         FormalEvaluationScope scope(SGF);
@@ -2104,7 +2102,20 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
-  return SGF.emitRValueAsSingleValue(e, ctx);
+  ManagedValue mv = SGF.emitRValueAsSingleValue(e, ctx);
+  if (mv.isPlusZeroRValueOrTrivial())
+    return mv;
+
+  // Any temporaries needed to materialize the lvalue must be destroyed when
+  // at the end of the lvalue's formal evaluation scope.
+  // e.g. for foo(self.bar)
+  //   %self = load [copy] %ptr_self
+  //   %rvalue = barGetter(%self)
+  //   destroy_value %self // self must be released before calling foo.
+  //   foo(%rvalue)
+  SILValue value = mv.forward(SGF);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(CleanupLocation(e),
+                                                      value);
 }
 
 LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind,

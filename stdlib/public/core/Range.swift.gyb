@@ -18,8 +18,8 @@ public protocol RangeExpression {
   /// The type for which the expression describes a range.
   associatedtype Bound: Comparable
 
-  /// Returns the range of indices within the given collection described by
-  /// this range expression.
+  /// Returns the range of indices described by this range expression within
+  /// the given collection.
   ///
   /// You can use the `relative(to:)` method to convert a range expression,
   /// which could be missing one or both of its endpoints, into a concrete

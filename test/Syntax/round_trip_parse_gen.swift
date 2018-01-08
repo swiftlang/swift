@@ -65,6 +65,21 @@ class C {
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
   }
+
+  func superExpr() {
+    _ = super.foo
+    super.bar()
+    super[12] = 1
+    super.init()
+  }
+
+  func implictMember() {
+    _ = .foo
+    _ = .foo(x: 12)
+    _ = .foo { 12 }
+    _ = .foo[12]
+    _ = .foo.bar
+  }
 }
 
 #endif
@@ -165,31 +180,50 @@ func tryfoo() {
 }
 #else
 func closure() {
-  {[weak a,
+  _ = {[weak a,
     unowned(safe) self,
     b = 3,
     unowned(unsafe) c = foo().bar] in
   }
-  {[] in }
+  _ = {[] in }
 
-  { [] a, b, _ -> Int in
+  _ = { [] a, b, _ -> Int in
     return 2
   }
-  { [] (a: Int, b: Int, _: Int) -> Int in
+  _ = { [] (a: Int, b: Int, _: Int) -> Int in
     return 2
   }
-  { [] a, b, _ throws -> Int in
+  _ = { [] a, b, _ throws -> Int in
     return 2
   }
-  { [] (a: Int, _ b: Int) throws -> Int in
+  _ = { [] (a: Int, _ b: Int) throws -> Int in
     return 2
   }
-  { a, b in }
-  {}
-  { s1, s2 in s1 > s2 }
-  { $0 > $1 }
+  _ = { a, b in }
+  _ = {}
+  _ = { s1, s2 in s1 > s2 }
+  _ = { $0 > $1 }
 }
 #endif
+
+func postfix() {
+  foo()
+  foo() {}
+  foo {}
+  foo.bar()
+  foo.bar() {}
+  foo.bar {}
+  foo[]
+  foo[1]
+  foo[] {}
+  foo[1] {}
+  foo[1][2,x:3]
+  foo?++.bar!(baz)
+
+  foo(x:y:)()
+  _ = .foo(x:y:)
+  _ = x.foo(x:y:)
+}
 
 #if blah
 #else
@@ -281,4 +315,30 @@ func statementTests() {
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
+}
+
+// MARK: - ExtensionDecl
+
+extension ext {
+  var s: Int {
+    return 42
+  }
+}
+
+@available(*, unavailable)
+fileprivate extension ext {}
+
+extension ext : extProtocol {}
+
+extension ext where A == Int, B: Numeric {}
+
+extension ext.a.b {}
+
+func foo() {
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = """
+  abc \( foo() + bar() )
+  de \(3 + 3 + "abc \(foo()) def")
+  fg
+  """
 }

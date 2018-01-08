@@ -902,117 +902,120 @@ extension RangeReplaceableCollection
   }
 }
 
-/// Creates a new collection by concatenating the elements of a collection and
-/// a sequence.
-///
-/// The two arguments must have the same `Element` type. For example, you can
-/// concatenate the elements of an integer array and a `Range<Int>` instance.
-///
-///     let numbers = [1, 2, 3, 4]
-///     let moreNumbers = numbers + 5...10
-///     print(moreNumbers)
-///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
-///
-/// The resulting collection has the type of the argument on the left-hand
-/// side. In the example above, `moreNumbers` has the same type as `numbers`,
-/// which is `[Int]`.
-///
-/// - Parameters:
-///   - lhs: A range-replaceable collection.
-///   - rhs: A collection or finite sequence.
-@_inlineable
-public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
-  where S.Element == C.Element {
+extension RangeReplaceableCollection {
+  /// Creates a new collection by concatenating the elements of a collection and
+  /// a sequence.
+  ///
+  /// The two arguments must have the same `Element` type. For example, you can
+  /// concatenate the elements of an integer array and a `Range<Int>` instance.
+  ///
+  ///     let numbers = [1, 2, 3, 4]
+  ///     let moreNumbers = numbers + 5...10
+  ///     print(moreNumbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+  ///
+  /// The resulting collection has the type of the argument on the left-hand
+  /// side. In the example above, `moreNumbers` has the same type as `numbers`,
+  /// which is `[Int]`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A range-replaceable collection.
+  ///   - rhs: A collection or finite sequence.
+  @_inlineable
+  public static func + <
+    Other : Sequence
+  >(lhs: Self, rhs: Other) -> Self
+  where Element == Other.Element {
+    var lhs = lhs
+    // FIXME: what if lhs is a reference type?  This will mutate it.
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
 
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.append(contentsOf: rhs)
-  return lhs
+  /// Creates a new collection by concatenating the elements of a sequence and a
+  /// collection.
+  ///
+  /// The two arguments must have the same `Element` type. For example, you can
+  /// concatenate the elements of a `Range<Int>` instance and an integer array.
+  ///
+  ///     let numbers = [7, 8, 9, 10]
+  ///     let moreNumbers = 1...6 + numbers
+  ///     print(moreNumbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+  ///
+  /// The resulting collection has the type of argument on the right-hand side.
+  /// In the example above, `moreNumbers` has the same type as `numbers`, which
+  /// is `[Int]`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A collection or finite sequence.
+  ///   - rhs: A range-replaceable collection.
+  @_inlineable
+  public static func + <
+    Other : Sequence
+  >(lhs: Other, rhs: Self) -> Self
+  where Element == Other.Element {
+    var result = Self()
+    result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
+    result.append(contentsOf: lhs)
+    result.append(contentsOf: rhs)
+    return result
+  }
+
+  /// Appends the elements of a sequence to a range-replaceable collection.
+  ///
+  /// Use this operator to append the elements of a sequence to the end of
+  /// range-replaceable collection with same `Element` type. This example appends
+  /// the elements of a `Range<Int>` instance to an array of integers.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers += 10...15
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+  ///
+  /// - Parameters:
+  ///   - lhs: The array to append to.
+  ///   - rhs: A collection or finite sequence.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  @_inlineable
+  public static func += <
+    Other : Sequence
+  >(lhs: inout Self, rhs: Other)
+  where Element == Other.Element {
+    lhs.append(contentsOf: rhs)
+  }
+
+  /// Creates a new collection by concatenating the elements of two collections.
+  ///
+  /// The two arguments must have the same `Element` type. For example, you can
+  /// concatenate the elements of two integer arrays.
+  ///
+  ///     let lowerNumbers = [1, 2, 3, 4]
+  ///     let higherNumbers: ContiguousArray = [5, 6, 7, 8, 9, 10]
+  ///     let allNumbers = lowerNumbers + higherNumbers
+  ///     print(allNumbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+  ///
+  /// The resulting collection has the type of the argument on the left-hand
+  /// side. In the example above, `moreNumbers` has the same type as `numbers`,
+  /// which is `[Int]`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A range-replaceable collection.
+  ///   - rhs: Another range-replaceable collection.
+  @_inlineable
+  public static func + <
+    Other : RangeReplaceableCollection
+  >(lhs: Self, rhs: Other) -> Self
+  where Element == Other.Element {
+    var lhs = lhs
+    // FIXME: what if lhs is a reference type?  This will mutate it.
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
 }
 
-/// Creates a new collection by concatenating the elements of a sequence and a
-/// collection.
-///
-/// The two arguments must have the same `Element` type. For example, you can
-/// concatenate the elements of a `Range<Int>` instance and an integer array.
-///
-///     let numbers = [7, 8, 9, 10]
-///     let moreNumbers = 1...6 + numbers
-///     print(moreNumbers)
-///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
-///
-/// The resulting collection has the type of argument on the right-hand side.
-/// In the example above, `moreNumbers` has the same type as `numbers`, which
-/// is `[Int]`.
-///
-/// - Parameters:
-///   - lhs: A collection or finite sequence.
-///   - rhs: A range-replaceable collection.
-@_inlineable
-public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: S, rhs: C) -> C
-  where S.Element == C.Element {
-
-  var result = C()
-  result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
-  result.append(contentsOf: lhs)
-  result.append(contentsOf: rhs)
-  return result
-}
-
-/// Creates a new collection by concatenating the elements of two collections.
-///
-/// The two arguments must have the same `Element` type. For example, you can
-/// concatenate the elements of two integer arrays.
-///
-///     let lowerNumbers = [1, 2, 3, 4]
-///     let higherNumbers: ContiguousArray = [5, 6, 7, 8, 9, 10]
-///     let allNumbers = lowerNumbers + higherNumbers
-///     print(allNumbers)
-///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
-///
-/// The resulting collection has the type of the argument on the left-hand
-/// side. In the example above, `moreNumbers` has the same type as `numbers`,
-/// which is `[Int]`.
-///
-/// - Parameters:
-///   - lhs: A range-replaceable collection.
-///   - rhs: Another range-replaceable collection.
-@_inlineable
-public func +<
-  RRC1 : RangeReplaceableCollection,
-  RRC2 : RangeReplaceableCollection
->(lhs: RRC1, rhs: RRC2) -> RRC1
-  where RRC1.Element == RRC2.Element {
-
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.append(contentsOf: rhs)
-  return lhs
-}
-
-/// Appends the elements of a sequence to a range-replaceable collection.
-///
-/// Use this operator to append the elements of a sequence to the end of
-/// range-replaceable collection with same `Element` type. This example appends
-/// the elements of a `Range<Int>` instance to an array of integers.
-///
-///     var numbers = [1, 2, 3, 4, 5]
-///     numbers += 10...15
-///     print(numbers)
-///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-///
-/// - Parameters:
-///   - lhs: The array to append to.
-///   - rhs: A collection or finite sequence.
-///
-/// - Complexity: O(*n*), where *n* is the length of the resulting array.
-@_inlineable
-public func += <
-  R : RangeReplaceableCollection, S : Sequence
->(lhs: inout R, rhs: S) 
- where R.Element == S.Element {
-  lhs.append(contentsOf: rhs)
-}
 
 extension RangeReplaceableCollection {
   /// Returns a new collection of the same type containing, in order, the

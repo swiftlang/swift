@@ -304,8 +304,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
-      RelativeAddressTy,
-      Int32Ty
+      RelativeAddressTy
     });
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);

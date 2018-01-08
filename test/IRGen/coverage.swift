@@ -4,16 +4,16 @@
 // IR-NOT: __llvm_coverage_names
 // IR-NOT: __profn
 
-// SIL-DAG: sil hidden @_T08coverage2f1yyF
-// SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:{{.*}}_T08coverage2f1yyF"
+// SIL-DAG: sil hidden @$S8coverage2f1yyF
+// SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:{{.*}}$S8coverage2f1yyF"
 internal func f1() {}
 
-// SIL-DAG: sil private @_T08coverage2f233_[[F2HASH:[_a-zA-Z0-9]+]]
-// SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:_T08coverage2f233_[[F2HASH]]"
+// SIL-DAG: sil private @$S8coverage2f233_[[F2HASH:[_a-zA-Z0-9]+]]
+// SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:$S8coverage2f233_[[F2HASH]]"
 private func f2() {}
 
-// SIL-DAG: sil @_T08coverage2f3yyF
-// SIL-DAG: string_literal utf8 "_T08coverage2f3yyF"
+// SIL-DAG: sil @$S8coverage2f3yyF
+// SIL-DAG: string_literal utf8 "$S8coverage2f3yyF"
 public func f3() {
   f1();
   f2();

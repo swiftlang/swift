@@ -4,7 +4,7 @@
 
 import CoreCooling
 
-// CHECK: sil hidden @_T02cf8useEmAllyySo16CCMagnetismModelCF :
+// CHECK: sil hidden @$S2cf8useEmAllyySo16CCMagnetismModelCF :
 // CHECK: bb0([[ARG:%.*]] : $CCMagnetismModel):
 func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
@@ -65,23 +65,23 @@ protocol Impedance {
 
 extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4realSdvg
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4imagSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC11CCImpedanceV4realSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC11CCImpedanceV4imagSdvg
 
 class MyMagnetism : CCMagnetismModel {
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func getRefrigerator() -> CCRefrigerator {
     return super.getRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC16takeRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC16takeRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
   override func takeRefrigerator() -> CCRefrigerator {
     return super.takeRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC18borrowRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC18borrowRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func borrowRefrigerator() -> CCRefrigerator {
     return super.borrowRefrigerator()
   }

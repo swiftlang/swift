@@ -268,8 +268,18 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
       toFn->getType(), /*appliedParams=*/1, SGM.M, subs, calleeConvention);
   SILValue toClosure =
     B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
-  if (resultTy != closureTy)
-    toClosure = B.createConvertFunction(vd, toClosure, resultTy);
+  if (resultTy != closureTy) {
+    CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
+    CanSILFunctionType closureFnTy = closureTy.castTo<SILFunctionType>();
+    if (resultFnTy->isABICompatibleWith(closureFnTy).isCompatible()) {
+      toClosure = B.createConvertFunction(vd, toClosure, resultTy);
+    } else {
+      toClosure =
+          emitCanonicalFunctionThunk(vd, ManagedValue::forUnmanaged(toClosure),
+                                     closureFnTy, resultFnTy)
+              .forward(*this);
+    }
+  }
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
 }
 

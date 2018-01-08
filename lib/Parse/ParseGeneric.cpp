@@ -276,10 +276,7 @@ ParserStatus Parser::parseGenericWhereClause(
   do {
     SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
     // Parse the leading type-identifier.
-    auto FirstTypeResult = parseTypeIdentifier();
-    if (FirstTypeResult.hasSyntax())
-      SyntaxContext->addSyntax(FirstTypeResult.getSyntax());
-    ParserResult<TypeRepr> FirstType = FirstTypeResult.getASTResult();
+    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletion();

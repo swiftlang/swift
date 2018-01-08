@@ -1298,17 +1298,12 @@ private:
     }
 
     // SyntaxSugarType derivations.
+    case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
     case TypeKind::Optional:
     case TypeKind::ImplicitlyUnwrappedOptional: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
       auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
-      return getOrCreateDesugaredType(CanTy, DbgTy);
-    }
-
-    case TypeKind::Dictionary: {
-      auto *DictionaryTy = cast<DictionaryType>(BaseTy);
-      auto *CanTy = DictionaryTy->getDesugaredType();
       return getOrCreateDesugaredType(CanTy, DbgTy);
     }
 

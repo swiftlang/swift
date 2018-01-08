@@ -296,6 +296,10 @@ option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
   "Build the standard libraries and overlays with sil ownership enabled."
   FALSE)
 
+option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  "Build the standard libraries, overlays, and runtime with normal arguments at +0"
+  FALSE)
+
 #
 # End of user-configurable options.
 #
@@ -384,6 +388,10 @@ option(SWIFT_BUILD_SOURCEKIT
 option(SWIFT_ENABLE_SOURCEKIT_TESTS
     "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS FALSE)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 #
 # Assume a new enough ar to generate the index at construction time. This avoids

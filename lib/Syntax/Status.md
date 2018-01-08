@@ -24,31 +24,29 @@
   * ForceTryExpr
   * OptionalTryExpr
   * ClosureExpr
+  * FunctionCallExpr
+  * SubscriptExpr
+  * PostfixUnaryExpr
+  * ForcedValueExpr
+  * SuperRefExpr
+  * ImplicitMemberExpr
+  * InterpolatedStringLiteralExpr
 
 ### In-progress (UnknownExpr):
-  * InterpolatedStringLiteralExpr
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
-  * CallExpr
-  * UnresolvedDotExpr
   * InOutExpr
   * KeyPathExpr
   * KeyPathDotExpr
   * EditorPlaceholderExpr
 
 ### Not-started (UnknownExpr):
-  * SuperRefExpr
   * UnresolvedSpecializeExpr
   * DotSelfExpr
-  * SubscriptExpr
   * KeyPathApplicationExpr
   * CaptureListExpr
   * AutoClosureExpr
   * DynamicTypeExpr
-  * BindOptionalExpr
-  * OptionalEvaluationExpr
-  * ForceValueExpr
-  * PostfixUnaryExpr
   * ForcedCheckedCastExpr
   * ConditionalCheckedCastExpr
   * IsExpr
@@ -70,9 +68,9 @@
   * IfConfigDecl
   * PatternBindingDecl
   * VarDecl
+  * ExtensionDecl
 
 ### In-progress (UnknownDecl):
-  * ExtensionDecl (SR-6572)
 
 ### Not-started (UnknownDecl):
   * EnumCaseDecl
@@ -98,12 +96,12 @@
   * ContinueStmt
   * FallthroughStmt
   * ThrowStmt
-
-### Not-started (UnknownStmt):
   * IfStmt
   * GuardStmt
   * WhileStmt
-  * ForEachStmt
+  * ForInStmt
+
+### Not-started (UnknownStmt):
   * SwitchStmt
 
 ## Pattern

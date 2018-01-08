@@ -49,8 +49,8 @@ public:
   enum class Kind {
     Class,
     Struct,
-    Enum
-    // Update NominalMetadataLayout::classof if you add a non-nominal layout.
+    Enum,
+    ForeignClass,
   };
 
   class StoredOffset {
@@ -151,7 +151,15 @@ public:
   Offset getGenericRequirementsOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
-    return true; // No non-nominal metadata for now.
+    switch (layout->getKind()) {
+    case MetadataLayout::Kind::Class:
+    case MetadataLayout::Kind::Enum:
+    case MetadataLayout::Kind::Struct:
+      return true;
+
+    case MetadataLayout::Kind::ForeignClass:
+      return false;
+    }
   }
 };
 
@@ -167,7 +175,12 @@ public:
   };
 
 private:
+  bool HasResilientSuperclass = false;
+
+  StoredOffset StartOfImmediateMembers;
+
   StoredOffset MetadataSize;
+  StoredOffset MetadataAddressPoint;
 
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
@@ -210,7 +223,13 @@ public:
     return cast<ClassDecl>(Nominal);
   }
 
+  bool hasResilientSuperclass() const {
+    return HasResilientSuperclass;
+  }
+
   Size getMetadataSizeOffset() const;
+
+  Size getMetadataAddressPointOffset() const;
 
   Size getInstanceSizeOffset() const;
 
@@ -252,6 +271,12 @@ public:
   Size getRelativeVTableOffset() const;
 
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
+
+  /// If the start of the immediate members is statically known, this
+  /// method will return it. Otherwise, it will assert.
+  Size getStartOfImmediateMembers() const {
+    return StartOfImmediateMembers.getStaticOffset();
+  }
 
   /// The number of members to add after superclass metadata. The size of
   /// this metadata is the superclass size plus the number of immediate
@@ -326,6 +351,22 @@ public:
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;
+  }
+};
+
+/// Layout for foreign class type metadata.
+class ForeignClassMetadataLayout : public MetadataLayout {
+  ClassDecl *Class;
+  StoredOffset SuperClassOffset;
+
+  friend class IRGenModule;
+  ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
+
+public:
+  StoredOffset getSuperClassOffset() const { return SuperClassOffset; }
+
+  static bool classof(const MetadataLayout *layout) {
+    return layout->getKind() == Kind::ForeignClass;
   }
 };
 

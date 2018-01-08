@@ -814,7 +814,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     // Could print "20"
   func random<T: RandomNumberGenerator>(using generator: T) -> Element?
 
-  @available(swift, deprecated, message: "all index distances are now of type Int")
+  @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
 }
 
@@ -1237,7 +1237,7 @@ extension Collection {
   @_inlineable
   public var underestimatedCount: Int {
     // TODO: swift-3-indexing-model - review the following
-    return numericCast(count)
+    return count
   }
 
   /// The number of elements in the collection.
@@ -1300,17 +1300,17 @@ extension Collection {
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     // TODO: swift-3-indexing-model - review the following
-    let count: Int = numericCast(self.count)
-    if count == 0 {
+    let n = self.count
+    if n == 0 {
       return []
     }
 
     var result = ContiguousArray<T>()
-    result.reserveCapacity(count)
+    result.reserveCapacity(n)
 
     var i = self.startIndex
 
-    for _ in 0..<count {
+    for _ in 0..<n {
       result.append(try transform(self[i]))
       formIndex(after: &i)
     }
@@ -1342,7 +1342,7 @@ extension Collection {
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
-      offsetBy: numericCast(n), limitedBy: endIndex) ?? endIndex
+      offsetBy: n, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
@@ -1368,9 +1368,9 @@ extension Collection {
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = Swift.max(0, numericCast(count) - n)
+    let amount = Swift.max(0, count - n)
     let end = index(startIndex,
-      offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
+      offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
 
@@ -1416,7 +1416,7 @@ extension Collection {
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
     let end = index(startIndex,
-      offsetBy: numericCast(maxLength), limitedBy: endIndex) ?? endIndex
+      offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
 
@@ -1463,9 +1463,9 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let amount = Swift.max(0, numericCast(count) - maxLength)
+    let amount = Swift.max(0, count - maxLength)
     let start = index(startIndex,
-      offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
+      offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
@@ -1764,9 +1764,9 @@ extension Collection where SubSequence == Self {
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+    _precondition(count >= n,
       "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
+    self = self[index(startIndex, offsetBy: n)..<endIndex]
   }
 }
 

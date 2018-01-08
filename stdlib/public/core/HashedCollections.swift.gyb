@@ -566,6 +566,8 @@ extension Set : Sequence {
   ///
   /// - Parameter member: An element to look for in the set.
   /// - Returns: `true` if `member` exists in the set; otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
   public func contains(_ member: Element) -> Bool {
     return _variantBuffer.maybeGet(member) != nil
@@ -650,6 +652,8 @@ extension Set : Collection {
   /// - Parameter member: An element to search for in the set.
   /// - Returns: The index of `member` if it exists in the set; otherwise,
   ///   `nil`.
+  ///
+  /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
   public func index(of member: Element) -> Index? {
     return _variantBuffer.index(forKey: member)
@@ -1151,7 +1155,7 @@ extension Set : SetAlgebra {
   /// instances of equivalent elements, only the first instance is kept.
   ///
   ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     let visitors = ["Diana", ""Marcia", "Nathaniel"]
+  ///     let visitors = ["Diana", "Marcia", "Nathaniel"]
   ///     attendees.formUnion(visitors)
   ///     print(attendees)
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
@@ -1754,9 +1758,10 @@ public struct Dictionary<Key : Hashable, Value> {
   /// Creates a new dictionary from the key-value pairs in the given sequence.
   ///
   /// You use this initializer to create a dictionary when you have a sequence
-  /// of key-value tuples with unique keys. If your sequence might have
-  /// duplicate keys, use the `Dictionary(_:uniquingKeysWith:)` initializer
-  /// instead.
+  /// of key-value tuples with unique keys. Passing a sequence with duplicate
+  /// keys to this initializer results in a runtime error. If your
+  /// sequence might have duplicate keys, use the
+  /// `Dictionary(_:uniquingKeysWith:)` initializer instead.
   ///
   /// The following example creates a new dictionary using an array of strings
   /// as the keys and the integers in a countable range as the values:

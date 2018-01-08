@@ -213,10 +213,6 @@ struct OverloadSignature {
   /// The full name of the declaration.
   DeclName Name;
 
-  /// The interface type of the declaration, when relevant to the
-  /// overload signature.
-  CanType InterfaceType;
-
   /// The kind of unary operator.
   UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
 
@@ -231,11 +227,15 @@ struct OverloadSignature {
 };
 
 /// Determine whether two overload signatures conflict.
-bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
+bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
+                 bool skipProtocolExtensionCheck = false);
 
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
@@ -587,34 +587,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     NumberOfVTableEntries : 2
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Decl);
-    SWIFT_INLINE_BITS(PatternBindingDecl);
-    SWIFT_INLINE_BITS(EnumCaseDecl);
-    SWIFT_INLINE_BITS(ValueDecl);
-    SWIFT_INLINE_BITS(AbstractStorageDecl);
-    SWIFT_INLINE_BITS(AbstractFunctionDecl);
-    SWIFT_INLINE_BITS(VarDecl);
-    SWIFT_INLINE_BITS(ParamDecl);
-    SWIFT_INLINE_BITS(EnumElementDecl);
-    SWIFT_INLINE_BITS(FuncDecl);
-    SWIFT_INLINE_BITS(ConstructorDecl);
-    SWIFT_INLINE_BITS(TypeDecl);
-    SWIFT_INLINE_BITS(GenericTypeParamDecl);
-    SWIFT_INLINE_BITS(TypeAliasDecl);
-    SWIFT_INLINE_BITS(NominalTypeDecl);
-    SWIFT_INLINE_BITS(ProtocolDecl);
-    SWIFT_INLINE_BITS(ClassDecl);
-    SWIFT_INLINE_BITS(StructDecl);
-    SWIFT_INLINE_BITS(EnumDecl);
-    SWIFT_INLINE_BITS(AssociatedTypeDecl);
-    SWIFT_INLINE_BITS(PrecedenceGroupDecl);
-    SWIFT_INLINE_BITS(ImportDecl);
-    SWIFT_INLINE_BITS(ExtensionDecl);
-    SWIFT_INLINE_BITS(IfConfigDecl);
-    SWIFT_INLINE_BITS(MissingMemberDecl);
   } Bits;
 
   // Storage for the declaration attributes.
@@ -2276,8 +2248,12 @@ public:
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
 
-  /// Compute the overload signature for this declaration.
+  /// Compute the untyped overload signature for this declaration.
   OverloadSignature getOverloadSignature() const;
+
+  /// Retrieve the type used to describe this entity for the purposes of
+  /// overload resolution.
+  CanType getOverloadSignatureType() const;
 
   /// Returns true if the decl requires Objective-C interop.
   ///
@@ -4271,14 +4247,6 @@ public:
   /// \brief Return the funcdecl for the didSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
-
-  /// Return true if this storage can (but doesn't have to) be accessed with
-  /// Objective-C-compatible getters and setters.
-  bool hasForeignGetterAndSetter() const;
-
-  /// Return true if this storage *must* be accessed with Objective-C-compatible
-  /// getters and setters.
-  bool requiresForeignGetterAndSetter() const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.

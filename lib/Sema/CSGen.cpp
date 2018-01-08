@@ -997,7 +997,14 @@ namespace {
                                       TVO_CanBindToLValue |
                                       TVO_CanBindToInOut);
 
-      OverloadChoice choice(CS.getType(base), decl, functionRefKind);
+      OverloadChoice choice;
+      if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+            CS.getType(base), decl, functionRefKind);
+      } else {
+        choice = OverloadChoice(CS.getType(base), decl, functionRefKind);
+      }
+
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
@@ -1099,7 +1106,13 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice(baseTy, decl, FunctionRefKind::DoubleApply);
+        OverloadChoice choice;
+        if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+              baseTy, decl, FunctionRefKind::DoubleApply);
+        } else {
+          choice = OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        }
         CS.addBindOverloadConstraint(fnTy, choice, memberLocator,
                                      CurDC);
       } else {
@@ -1295,11 +1308,18 @@ namespace {
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator,
                                       TVO_CanBindToLValue);
-      CS.resolveOverload(locator, tv,
-                         OverloadChoice(Type(), E->getDecl(),
-                                        E->getFunctionRefKind()),
-                         CurDC);
-      
+
+      OverloadChoice choice;
+      if (E->getDecl()
+              ->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+            Type(), E->getDecl(), E->getFunctionRefKind());
+      } else {
+        choice = OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
+      }
+      CS.resolveOverload(locator, tv, choice, CurDC);
+
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->getInterfaceType() &&
             !VD->getInterfaceType()->is<TypeVariableType>()) {
@@ -1374,8 +1394,16 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        choices.push_back(OverloadChoice(Type(), decls[i],
-                                         expr->getFunctionRefKind()));
+        OverloadChoice choice;
+        if (decls[i]
+                ->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          choice = OverloadChoice::getDeclForImplicitlyUnwrappedOptional(
+              Type(), decls[i], expr->getFunctionRefKind());
+        } else {
+          choice = OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
+        }
+        choices.push_back(choice);
       }
 
       // If there are no valid overloads, give up.
@@ -2494,6 +2522,18 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    Type
+    createTypeVariableAndDisjunctionForIUOCoercion(Type toType,
+                                                   ConstraintLocator *locator) {
+      auto implicitUnwrapLocator = CS.getConstraintLocator(
+          locator, ConstraintLocator::ImplicitlyUnwrappedValue);
+      auto typeVar =
+          CS.createTypeVariable(implicitUnwrapLocator, /*options=*/0);
+      CS.buildDisjunctionForImplicitlyUnwrappedOptional(typeVar, toType,
+                                                        implicitUnwrapLocator);
+      return typeVar;
+    }
+
     Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
       auto fromExpr = expr->getSubExpr();
@@ -2517,6 +2557,12 @@ namespace {
       // The source type can be checked-cast to the destination type.
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
 
+      // If the result type was declared IUO, add a disjunction for
+      // bindings for the result of the coercion.
+      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
+        return createTypeVariableAndDisjunctionForIUOCoercion(toType, locator);
+
       return toType;
     }
 
@@ -2537,8 +2583,17 @@ namespace {
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
 
-      CS.addExplicitConversionConstraint(fromType, toType, /*allowFixes=*/true,
-                                         locator);
+      // Add a conversion constraint for the direct conversion between
+      // types.
+      CS.addExplicitConversionConstraint(fromType, toType,
+                                         /*allowFixes=*/true, locator);
+
+      // If the result type was declared IUO, add a disjunction for
+      // bindings for the result of the coercion.
+      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
+        return createTypeVariableAndDisjunctionForIUOCoercion(toType, locator);
+
       return toType;
     }
 
@@ -2561,7 +2616,16 @@ namespace {
 
       auto fromType = CS.getType(fromExpr);
       auto locator = CS.getConstraintLocator(expr);
+
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
+
+      // If the result type was declared IUO, add a disjunction for
+      // bindings for the result of the coercion.
+      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
+        return createTypeVariableAndDisjunctionForIUOCoercion(
+            OptionalType::get(toType), locator);
+
       return OptionalType::get(toType);
     }
 

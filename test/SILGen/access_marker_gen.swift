@@ -7,7 +7,7 @@ public struct S {
   var o: AnyObject?
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSyAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
+// CHECK-LABEL: sil hidden [noinline] @$S17access_marker_gen5initSyAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
 // CHECK: bb0(%0 : @owned $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
@@ -26,7 +26,7 @@ public struct S {
 // CHECK: [[RET:%.*]] = load [copy] [[ACCESS3]] : $*S
 // CHECK: end_access [[ACCESS3]] : $*S
 // CHECK: return [[RET]] : $S
-// CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSyAA1SVyXlSgF'
+// CHECK-LABEL: } // end sil function '$S17access_marker_gen5initSyAA1SVyXlSgF'
 @inline(never)
 func initS(_ o: AnyObject?) -> S {
   var s: S
@@ -41,7 +41,7 @@ func initS(_ o: AnyObject?) -> S {
 @inline(never)
 func takeS(_ s: S) {}
 
-// CHECK-LABEL: sil @_T017access_marker_gen14modifyAndReadSyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @$S17access_marker_gen14modifyAndReadSyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
@@ -52,7 +52,7 @@ func takeS(_ s: S) {}
 // CHECK: %[[ACCESS2:.*]] = begin_access [read] [unknown] %[[ADDRS]] : $*S
 // CHECK: %{{.*}} = load [copy] %[[ACCESS2]] : $*S
 // CHECK: end_access %[[ACCESS2]] : $*S
-// CHECK-LABEL: } // end sil function '_T017access_marker_gen14modifyAndReadSyyF'
+// CHECK-LABEL: } // end sil function '$S17access_marker_gen14modifyAndReadSyyF'
 public func modifyAndReadS() {
   var s = initS(nil)
   s.i = 42
@@ -65,8 +65,8 @@ func readGlobal() -> AnyObject? {
   return global.o
 }
 
-// CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobalyXlSgyF
-// CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVvau :
+// CHECK-LABEL: sil hidden @$S17access_marker_gen10readGlobalyXlSgyF
+// CHECK:         [[ADDRESSOR:%.*]] = function_ref @$S17access_marker_gen6globalAA1SVvau :
 // CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
 // CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
 // CHECK-NEXT:    [[T2:%.*]] = begin_access [read] [dynamic] [[T1]]
@@ -80,7 +80,7 @@ public struct HasTwoStoredProperties {
   var f: Int = 7
   var g: Int = 9
 
-// CHECK-LABEL: sil hidden @_T017access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
+// CHECK-LABEL: sil hidden @$S17access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
 // CHECK:       [[ACCESS1:%.*]] = begin_access [read] [unknown] [[SELF_ADDR:%.*]] : $*HasTwoStoredProperties
 // CHECK-NEXT:  [[G_ADDR:%.*]] = struct_element_addr [[ACCESS1]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.g
 // CHECK-NEXT:  [[G_VAL:%.*]] = load [trivial] [[G_ADDR]] : $*Int
@@ -102,7 +102,7 @@ func testClassInstanceProperties(c: C) {
   let y = c.x
   c.x = y
 }
-// CHECK-LABEL: sil hidden @_T017access_marker_gen27testClassInstanceProperties1cyAA1CC_tF :
+// CHECK-LABEL: sil hidden @$S17access_marker_gen27testClassInstanceProperties1cyAA1CC_tF :
 // CHECK:       [[C:%.*]] = begin_borrow %0 : $C
 // CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [read] [dynamic] [[CX]] : $*Int
@@ -118,18 +118,18 @@ class D {
   var x: Int = 0
 }
 //   materializeForSet callback
-// CHECK-LABEL: sil private [transparent] @_T017access_marker_gen1DC1xSivmytfU_
+// CHECK-LABEL: sil private [transparent] @$S17access_marker_gen1DC1xSivmytfU_
 // CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
 //   materializeForSet
-// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSivm
+// CHECK-LABEL: sil hidden [transparent] @$S17access_marker_gen1DC1xSivm
 // CHECK:       [[T0:%.*]] = ref_element_addr %2 : $D, #D.x
 // CHECK-NEXT:  begin_unpaired_access [modify] [dynamic] [[T0]] : $*Int
 
 func testDispatchedClassInstanceProperty(d: D) {
   modify(&d.x)
 }
-// CHECK-LABEL: sil hidden @_T017access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
+// CHECK-LABEL: sil hidden @$S17access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
 // CHECK:       [[D:%.*]] = begin_borrow %0 : $D
 // CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
 // CHECK:       apply [[METHOD]]({{.*}}, [[D]])

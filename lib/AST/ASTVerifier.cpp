@@ -2314,7 +2314,9 @@ public:
       }
 
       if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        auto varTy = var->getInterfaceType()->getReferenceStorageReferent();
+        auto varTy = var->getInterfaceType()
+                         ->getReferenceStorageReferent()
+                         ->getWithoutSpecifierType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2690,7 +2692,10 @@ public:
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
-        if (resultOptionality != CD->getFailability()) {
+        auto declOptionality = CD->getFailability();
+
+        if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
+            (resultOptionality == OTK_None || declOptionality == OTK_None)) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
           abort();
@@ -2702,7 +2707,8 @@ public:
           resultOptionality = OTK_None;
           genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
             ->getAnyOptionalObjectType(resultOptionality);
-          if (resultOptionality != CD->getFailability()) {
+          if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
+              (resultOptionality == OTK_None || declOptionality == OTK_None)) {
             Out << "Initializer has result optionality/failability mismatch\n";
             CD->dump(llvm::errs());
             abort();
@@ -2713,7 +2719,15 @@ public:
       if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
         if (!CD->getInterfaceType() ||
             !CD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected FuncDecl to have a function type!\n";
+          Out << "Expected ConstructorDecl to have a function type!\n";
+          CD->dump(llvm::errs());
+          abort();
+        }
+
+        if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
+          Out << "Expected IUO failability for constructor with IUO decl "
+                 "attribute!\n";
+          CD->dump(llvm::errs());
           abort();
         }
 
@@ -2723,7 +2737,15 @@ public:
         // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getAnyOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
-                 "on functions with optional return types\n";
+                 "on constructors with optional return types\n";
+          CD->dump(llvm::errs());
+          abort();
+        }
+      } else {
+        if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+          Out << "Expected IUO decl attribute for constructor with IUO "
+                 "failability!\n";
+          CD->dump(llvm::errs());
           abort();
         }
       }
@@ -2925,7 +2947,7 @@ public:
           abort();
         }
 
-        auto resultTy = FD->getResultInterfaceType();
+        auto resultTy = FD->getResultInterfaceType()->getWithoutSpecifierType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed

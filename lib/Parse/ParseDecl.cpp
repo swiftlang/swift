@@ -196,8 +196,6 @@ bool Parser::parseTopLevel() {
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
 
-  skipExtraTopLevelRBraces();
-
   // If we are in SIL mode, and if the first token is the start of a sil
   // declaration, parse that one SIL function and return to the top level.  This
   // allows type declarations and other things to be parsed, name bound, and
@@ -274,24 +272,13 @@ bool Parser::parseTopLevel() {
                             InPoundLineEnvironment);
 
   // If we are done parsing the whole file, finalize the token receiver.
-  if (Tok.is(tok::eof))
+  if (Tok.is(tok::eof)) {
+    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
     TokReceiver->finalize();
+  }
 
   return FoundTopLevelCodeToExecute;
 }
-
-bool Parser::skipExtraTopLevelRBraces() {
-  if (!Tok.is(tok::r_brace))
-    return false;
-  while (Tok.is(tok::r_brace)) {
-    diagnose(Tok, diag::extra_rbrace)
-        .fixItRemove(Tok.getLoc());
-    consumeToken();
-  }
-  return true;
-}
-
-
 
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
@@ -1621,13 +1608,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
 
     if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
-      ParserPosition LParenPosition = getParserPosition();
+      BacktrackingScope backtrack(*this);
       skipSingle();
       // If we found '->', or 'throws' after paren, it's likely a parameter
       // of function type.
-      if (Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows,
+      if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_rethrows,
                     tok::kw_throw))
-        backtrackToPosition(LParenPosition);
+        backtrack.cancelBacktrack();
     }
     return true;
   }
@@ -2429,9 +2416,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
       DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
       DeclResult = parseDeclImport(Flags, Attributes);
       break;
-    case tok::kw_extension:
+    case tok::kw_extension: {
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ExtensionDecl);
       DeclResult = parseDeclExtension(Flags, Attributes);
       break;
+    }
     case tok::kw_let:
     case tok::kw_var: {
       // Collect all modifiers into a modifier list.
@@ -3076,6 +3065,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
     LBLoc = PreviousLoc;
@@ -3251,6 +3241,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 ParserResult<TypeDecl> Parser::
 parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserPosition startPosition = getParserPosition();
+  llvm::Optional<SyntaxParsingContext> TmpCtxt;
+  TmpCtxt.emplace(SyntaxContext);
+  TmpCtxt->setTransparent();
+
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   SourceLoc EqualLoc;
   Identifier Id;
@@ -3286,11 +3280,14 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   if (Flags.contains(PD_InProtocol) && !genericParams && !Tok.is(tok::equal)) {
+    TmpCtxt->setDiscard();
+    TmpCtxt.reset();
     // If we're in a protocol and don't see an '=' this looks like leftover Swift 2
     // code intending to be an associatedtype.
     backtrackToPosition(startPosition);
     return parseDeclAssociatedType(Flags, Attributes);
   }
+  TmpCtxt.reset();
   
   ParserResult<TypeRepr> UnderlyingTy;
 
@@ -3888,9 +3885,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // attributes might not be appertaining to the accessor, but to the first
     // declaration inside the implicit getter, we need to save the parser
     // position and restore it later.
+    llvm::Optional<SyntaxParsingContext> BacktrackCtxt;
     ParserPosition BeginParserPosition;
-    if (Tok.is(tok::at_sign))
+    if (Tok.is(tok::at_sign)) {
       BeginParserPosition = getParserPosition();
+      BacktrackCtxt.emplace(SyntaxContext);
+      BacktrackCtxt->setTransparent();
+    }
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
@@ -3927,6 +3928,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       // that the diagnostics point to correct tokens.
       if (BeginParserPosition.isValid()) {
         backtrackToPosition(BeginParserPosition);
+        BacktrackCtxt->setDiscard();
+        BacktrackCtxt.reset();
         Attributes = DeclAttributes();
       }
       if (!IsFirstAccessor) {
@@ -3940,6 +3943,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
     }
+    if (BacktrackCtxt)
+      BacktrackCtxt.reset();
 
     // Set the contextual keyword kind properly.
     if (AccessorKeywordLoc.isValid()) {

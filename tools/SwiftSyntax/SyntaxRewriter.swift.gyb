@@ -59,3 +59,32 @@ open class SyntaxRewriter {
     return Syntax.fromRaw(node.raw.replacingLayout(newLayout))
   }
 }
+
+open class SyntaxVisitor {
+    public init() {}
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+  open func visit(_ node: ${node.name}) {
+    visitChildren(node)
+  }
+%   end
+% end
+
+  open func visit(_ token: TokenSyntax) {}
+
+  public func visit(_ node: Syntax) {
+    switch node.raw.kind {
+    case .token: visit(node as! TokenSyntax)
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+    case .${node.swift_syntax_kind}: visit(node as! ${node.name})
+%   end
+% end
+    default: visitChildren(node)
+    }
+  }
+
+  func visitChildren(_ node: Syntax) {
+    node.children.forEach { visit($0) }
+  }
+}

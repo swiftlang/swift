@@ -17,9 +17,9 @@ import gizmo
 // CHECK: [[NSRECT:%TSC6NSRectV]] = type
 
 class Hoozit : Gizmo {
-  // CHECK: define hidden swiftcc void @_T010objc_super6HoozitC4frobyyF([[HOOZIT]]* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc void @"$S10objc_super6HoozitC4frobyyF"([[HOOZIT]]* swiftself) {{.*}} {
   override func frob() {
-    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @"$S10objc_super6HoozitCMa"()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frob)"
@@ -28,7 +28,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc void @_T010objc_super6HoozitC5runceyyFZ([[TYPE]]* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc void @"$S10objc_super6HoozitC5runceyyFZ"([[TYPE]]* swiftself) {{.*}} {
   override class func runce() {
     // CHECK: store [[CLASS]]* @"OBJC_METACLASS_$__TtC10objc_super6Hoozit", [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(runce)"
@@ -37,9 +37,9 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSC6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc { double, double, double, double } @"$S10objc_super6HoozitC5frameSC6NSRectVyF"(%T10objc_super6HoozitC* swiftself) {{.*}} {
   override func frame() -> NSRect {
-    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @"$S10objc_super6HoozitCMa"()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frame)"
@@ -48,7 +48,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitC1xACSi_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @"$S10objc_super6HoozitC1xACSi_tcfc"(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(x:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(init)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
@@ -58,7 +58,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitC1yACSi_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @"$S10objc_super6HoozitC1yACSi_tcfc"(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(y:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(initWithBellsOn:)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*, i64)*)([[SUPER]]* {{.*}}, i8* {{.*}}, i64 {{.*}})
@@ -72,9 +72,9 @@ class Hoozit : Gizmo {
 func acceptFn(_ fn: () -> Void) { }
 
 class PartialApply : Gizmo {
-  // CHECK: define hidden swiftcc void @_T010objc_super12PartialApplyC4frobyyF([[PARTIAL_APPLY_CLASS]]* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc void @"$S10objc_super12PartialApplyC4frobyyF"([[PARTIAL_APPLY_CLASS]]* swiftself) {{.*}} {
   override func frob() {
-    // CHECK: call swiftcc void @_T010objc_super8acceptFnyyyycF(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %4)
+    // CHECK: call swiftcc void @"$S10objc_super8acceptFnyyyycF"(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@"\$[A-Za-z0-9_]+"]] to i8*), %swift.refcounted* %4)
     acceptFn(super.frob)
   }
   // CHECK: }
@@ -87,7 +87,7 @@ class GenericRuncer<T> : Gizmo {
 // Use a constant indirect field access instead of a non-constant direct
 // access because the layout dependents on the alignment of y.
 
-// CHECK: define hidden swiftcc i64 @_T010objc_super13GenericRuncerC1xSo5GizmoCSgvg(%T10objc_super13GenericRuncerC* swiftself)
+// CHECK: define hidden swiftcc i64 @"$S10objc_super13GenericRuncerC1xSo5GizmoCSgvg"(%T10objc_super13GenericRuncerC* swiftself)
 // CHECK:    inttoptr
 // CHECK:   [[CAST:%.*]] = bitcast %T10objc_super13GenericRuncerC* %0 to i64*
 // CHECK:   [[ISA:%.*]] = load i64, i64* [[CAST]]
@@ -106,9 +106,9 @@ class GenericRuncer<T> : Gizmo {
 // CHECK:    call %objc_object* @objc_retain(%objc_object* [[OBJ]]
 // CHECK:   ret i64 [[OPTIONAL]]
 
-  // CHECK: define hidden swiftcc void @_T010objc_super13GenericRuncerC5runceyyFZ(%swift.type* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc void @"$S10objc_super13GenericRuncerC5runceyyFZ"(%swift.type* swiftself) {{.*}} {
   override class func runce() {
-    // CHECK:      [[CLASS:%.*]] = call %swift.type* @_T010objc_super13GenericRuncerCMa(%swift.type* %T)
+    // CHECK:      [[CLASS:%.*]] = call %swift.type* @"$S10objc_super13GenericRuncerCMa"(%swift.type* %T)
     // CHECK-NEXT: [[CLASS1:%.*]] = bitcast %swift.type* [[CLASS]] to %objc_class*
     // CHECK-NEXT: [[CLASS2:%.*]] = bitcast %objc_class* [[CLASS1]] to i64*
     // CHECK-NEXT: [[ISA:%.*]] = load i64, i64* [[CLASS2]], align 8
@@ -126,7 +126,7 @@ class GenericRuncer<T> : Gizmo {
 }
 
 // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself) #0 {
-// CHECK: call %swift.type* @_T010objc_super12PartialApplyCMa()
+// CHECK: call %swift.type* @"$S10objc_super12PartialApplyCMa"()
 // CHECK: @"\01L_selector(frob)"
 // CHECK: call void bitcast (void ()* @objc_msgSendSuper2
 // CHECK: }

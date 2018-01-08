@@ -710,11 +710,6 @@ public:
   /// Options that control the parsing of declarations.
   typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
 
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
-
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
@@ -930,9 +925,9 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
-  SyntaxParserResult<syntax::TypeSyntax, CompositionTypeRepr> parseAnyType();
+  ParserResult<CompositionTypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          const TypeAttributes &attrs,
                                          Optional<Scope> &GenericsScope);
@@ -1176,6 +1171,10 @@ public:
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
+
+  ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
+                                   SmallVectorImpl<Expr*> &Exprs,
+                                   Token EntireTok);
 
   /// Parse an argument label `identifier ':'`, if it exists.
   ///

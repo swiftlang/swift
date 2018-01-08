@@ -44,6 +44,7 @@ public:
     typedef std::random_access_iterator_tag iterator_category;
 
     Projected operator*() const { return Project(*Ptr); }
+    Projected operator->() const { return operator*(); }
     iterator &operator++() { Ptr++; return *this; }
     iterator operator++(int) { return iterator(Ptr++); }
     bool operator==(iterator rhs) const { return Ptr == rhs.Ptr; }

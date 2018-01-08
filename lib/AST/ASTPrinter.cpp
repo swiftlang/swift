@@ -3381,8 +3381,6 @@ public:
 
     if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
       T = sugarType->getImplementationType();
-    else if (auto dictType = dyn_cast<DictionaryType>(T.getPointer()))
-      T = dictType->getImplementationType();
 
     TypePrinter(Printer, innerOptions).visit(T);
   }
@@ -3581,7 +3579,7 @@ public:
     }
 
     bool needsParens =
-      !isa<ParenType>(inputType.getPointer()) &&
+      !inputType->hasParenSugar() &&
       !inputType->is<TupleType>();
 
     if (needsParens)
@@ -3620,7 +3618,7 @@ public:
     Printer << " ";
 
     bool needsParens =
-      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->hasParenSugar() &&
       !T->getInput()->is<TupleType>();
 
     if (needsParens)

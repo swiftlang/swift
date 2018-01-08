@@ -1269,7 +1269,7 @@ composed of literals. The static initializer is represented as a list of
 literal and aggregate instructions where the last instruction is the top-level
 value of the static initializer::
 
-  sil_global hidden @_T04test3varSiv : $Int {
+  sil_global hidden @$S4test3varSiv : $Int {
     %0 = integer_literal $Builtin.Int64, 27
     %initval = struct $Int (%0 : $Builtin.Int64)
   }
@@ -4616,6 +4616,19 @@ pointer_to_thin_function
 ````````````````````````
 
 TODO
+
+classify_bridge_object
+``````````````````````
+::
+
+  sil-instruction ::= 'classify_bridge_object' sil-operand
+
+  %1 = classify_bridge_object %0 : $Builtin.BridgeObject
+  // %1 will be of type (Builtin.Int1, Builtin.Int1)
+
+Decodes the bit representation of the specified ``Builtin.BridgeObject`` value,
+returning two bits: the first indicates whether the object is an Objective-C
+object, the second indicates whether it is an Objective-C tagged pointer value.
 
 ref_to_bridge_object
 ````````````````````

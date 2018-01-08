@@ -1155,11 +1155,8 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(
-        ITR,
-        TC.Context.AllocateCopy(genericArgs),
-        angleRange,
-        TC.Context);
+      return TypeExpr::createForSpecializedDecl(ITR, genericArgs, angleRange,
+                                                TC.Context);
     }
   }
 
@@ -1422,8 +1419,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       if (!rhs) return nullptr;
       Types.push_back(rhs->getTypeRepr());
 
-      auto CompRepr = new (TC.Context) CompositionTypeRepr(
-          TC.Context.AllocateCopy(Types),
+      auto CompRepr = CompositionTypeRepr::create(TC.Context, Types,
           lhsExpr->getStartLoc(), binaryExpr->getSourceRange());
       return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
     }
@@ -3023,6 +3019,7 @@ void Solution::dump(raw_ostream &out) const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
@@ -3199,6 +3196,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
         out << choice.getDecl()->getBaseName() << ": "

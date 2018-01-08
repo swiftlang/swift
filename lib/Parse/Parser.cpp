@@ -35,6 +35,71 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 
+static void getStringPartTokens(const swift::Token &Tok,
+                                const swift::LangOptions &LangOpts,
+                                const swift::SourceManager &SM, int BufID,
+                                std::vector<swift::Token> &Toks);
+
+namespace swift {
+template <typename DF>
+void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
+              unsigned BufferID, unsigned Offset, unsigned EndOffset,
+              CommentRetentionMode RetainComments,
+              TriviaRetentionMode TriviaRetention,
+              bool TokenizeInterpolatedString, ArrayRef<Token> SplitTokens,
+              DF &&DestFunc) {
+  assert((TriviaRetention != TriviaRetentionMode::WithTrivia ||
+          !TokenizeInterpolatedString) &&
+         "string interpolation with trivia is not implemented yet");
+
+  if (Offset == 0 && EndOffset == 0)
+    EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
+
+  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          RetainComments, TriviaRetention, Offset, EndOffset);
+
+  auto TokComp = [&](const Token &A, const Token &B) {
+    return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
+  };
+
+  std::set<Token, decltype(TokComp)> ResetTokens(TokComp);
+  for (auto C = SplitTokens.begin(), E = SplitTokens.end(); C != E; ++C) {
+    ResetTokens.insert(*C);
+  }
+
+  Token Tok;
+  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  do {
+    L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+    // If the token has the same location as a reset location,
+    // reset the token stream
+    auto F = ResetTokens.find(Tok);
+    if (F != ResetTokens.end()) {
+      assert(F->isNot(tok::string_literal));
+
+      DestFunc(*F, syntax::Trivia(), syntax::Trivia());
+
+      auto NewState = L.getStateForBeginningOfTokenLoc(
+          F->getLoc().getAdvancedLoc(F->getLength()));
+      L.restoreState(NewState);
+      continue;
+    }
+
+    if (Tok.is(tok::string_literal) && TokenizeInterpolatedString) {
+      std::vector<Token> StrTokens;
+      getStringPartTokens(Tok, LangOpts, SM, BufferID, StrTokens);
+      for (auto &StrTok : StrTokens) {
+        DestFunc(StrTok, syntax::Trivia(), syntax::Trivia());
+      }
+    } else {
+      DestFunc(Tok, LeadingTrivia, TrailingTrivia);
+    }
+
+  } while (Tok.getKind() != tok::eof);
+}
+} // namespace swift
+
 using namespace swift;
 using namespace swift::syntax;
 
@@ -217,86 +282,43 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString,
                                    ArrayRef<Token> SplitTokens) {
-  if (Offset == 0 && EndOffset == 0)
-    EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
-
-  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          KeepComments ? CommentRetentionMode::ReturnAsTokens
-                       : CommentRetentionMode::AttachToNextToken,
-          TriviaRetentionMode::WithoutTrivia,
-          Offset, EndOffset);
-
-  auto TokComp = [&] (const Token &A, const Token &B) {
-    return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
-  };
-
-  std::set<Token, decltype(TokComp)> ResetTokens(TokComp);
-  for (auto C = SplitTokens.begin(), E = SplitTokens.end(); C != E; ++C) {
-    ResetTokens.insert(*C);
-  }
-
   std::vector<Token> Tokens;
-  Trivia LeadingTrivia, TrailingTrivia;
-  do {
-    Tokens.emplace_back();
-    L.lex(Tokens.back(), LeadingTrivia, TrailingTrivia);
 
-    // If the token has the same location as a reset location,
-    // reset the token stream
-    auto F = ResetTokens.find(Tokens.back());
-    if (F != ResetTokens.end()) {
-      Tokens.back() = *F;
-      assert(Tokens.back().isNot(tok::string_literal));
+  tokenize(LangOpts, SM, BufferID, Offset, EndOffset,
+           KeepComments ? CommentRetentionMode::ReturnAsTokens
+                        : CommentRetentionMode::AttachToNextToken,
+           TriviaRetentionMode::WithoutTrivia, TokenizeInterpolatedString,
+           SplitTokens,
+           [&](const Token &Tok, const Trivia &LeadingTrivia,
+               const Trivia &TrailingTrivia) { Tokens.push_back(Tok); });
 
-      auto NewState = L.getStateForBeginningOfTokenLoc(
-                                    F->getLoc().getAdvancedLoc(F->getLength()));
-      L.restoreState(NewState);
-      continue;
-    }
-
-    if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
-      Token StrTok = Tokens.back();
-      Tokens.pop_back();
-      getStringPartTokens(StrTok, LangOpts, SM, BufferID, Tokens);
-    }
-  } while (Tokens.back().isNot(tok::eof));
+  assert(Tokens.back().is(tok::eof));
   Tokens.pop_back(); // Remove EOF.
   return Tokens;
 }
 
-// TODO: Refactor into common implementation with swift::tokenize.
-std::vector<std::pair<RC<syntax::RawTokenSyntax>,
-                                 syntax::AbsolutePosition>>
-swift::tokenizeWithTrivia(const LangOptions &LangOpts,
-                          const SourceManager &SM,
-                          unsigned BufferID,
-                          unsigned Offset,
+std::vector<std::pair<RC<syntax::RawTokenSyntax>, syntax::AbsolutePosition>>
+swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
+                          unsigned BufferID, unsigned Offset,
                           unsigned EndOffset) {
-  if (Offset == 0 && EndOffset == 0)
-    EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
-
-  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken,
-          TriviaRetentionMode::WithTrivia,
-          Offset, EndOffset);
-  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
-                        syntax::AbsolutePosition>> Tokens;
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>, syntax::AbsolutePosition>>
+      Tokens;
   syntax::AbsolutePosition RunningPos;
-  Token Tok;
-  Trivia LeadingTrivia, TrailingTrivia;
-  do {
-    L.lex(Tok, LeadingTrivia, TrailingTrivia);
-    if (Tok.isEscapedIdentifier()) {
-      LeadingTrivia.push_back(TriviaPiece::backtick());
-      TrailingTrivia.push_front(TriviaPiece::backtick());
-    }
-    auto ThisToken = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
-                                      SourcePresence::Present, LeadingTrivia,
-                                      TrailingTrivia);
 
-    auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
-    Tokens.push_back({ThisToken, ThisTokenPos});
-  } while (Tokens.back().first->isNot(tok::eof));
+  tokenize(
+      LangOpts, SM, BufferID, Offset, EndOffset,
+      CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
+      /*TokenizeInterpolatedString=*/false,
+      /*SplitTokens=*/ArrayRef<Token>(),
+      [&](const Token &Tok, const Trivia &LeadingTrivia,
+          const Trivia &TrailingTrivia) {
+        auto ThisToken = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
+                                              SourcePresence::Present,
+                                              LeadingTrivia, TrailingTrivia);
+
+        auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
+        Tokens.push_back({ThisToken, ThisTokenPos});
+      });
 
   return Tokens;
 }
@@ -467,9 +489,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 }
 
 Parser::~Parser() {
-  if (Tok.is(tok::eof))
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-
   delete L;
   delete TokReceiver;
   delete SyntaxContext;
@@ -858,6 +877,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   std::function<ParserStatus()> callback) {
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
+  if (Kind == SyntaxKind::Unknown)
+    ListContext->setTransparent();
 
   SyntaxKind ElementKind = getListElementKind(Kind);
 
@@ -877,7 +898,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     SourceLoc StartLoc = Tok.getLoc();
 
     SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
-
+    if (ElementKind == SyntaxKind::Unknown)
+      ElementContext.setTransparent();
     Status |= callback();
     if (Tok.is(RightK))
       break;

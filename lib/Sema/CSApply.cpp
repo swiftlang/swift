@@ -2674,6 +2674,7 @@ namespace {
 
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       case OverloadChoiceKind::DeclViaDynamic: {
         bool isDynamic
           = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
@@ -3016,14 +3017,19 @@ namespace {
         = cs.getType(unwrappedSubExpr)->getAnyOptionalObjectType(calledOTK);
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
       if (calledOTK != OTK_None && inCtor->getFailability() == OTK_None) {
-        bool isError = (calledOTK == OTK_Optional);
+        bool isChaining;
+        auto *otherCtorRef = expr->getCalledConstructor(isChaining);
+        ConstructorDecl *ctor = otherCtorRef->getDecl();
+        assert(ctor);
+
+        // If the initializer we're calling is not declared as
+        // checked, it's an error.
+        bool isError =
+            !ctor->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 
         // If we're suppressing diagnostics, just fail.
         if (isError && SuppressDiagnostics)
           return nullptr;
-
-        bool isChaining;
-        auto *otherCtorRef = expr->getCalledConstructor(isChaining);
 
         auto &tc = cs.getTypeChecker();
         auto &ctx = tc.Context;
@@ -3041,7 +3047,6 @@ namespace {
           } else {
             // Give the user the option of adding '!' or making the enclosing
             // initializer failable.
-            ConstructorDecl *ctor = otherCtorRef->getDecl();
             tc.diagnose(otherCtorRef->getLoc(),
                         diag::delegate_chain_nonoptional_to_optional,
                         isChaining, ctor->getFullName());
@@ -3169,7 +3174,7 @@ namespace {
           cast->setImplicit();
 
         // Type-check this conditional case.
-        Expr *result = visitConditionalCheckedCastExpr(cast, true);
+        Expr *result = handleConditionalCheckedCastExpr(cast, true);
         if (!result)
           return nullptr;
 
@@ -3408,7 +3413,28 @@ namespace {
       return addFinalOptionalInjections(result);
     }
 
+    bool hasForcedOptionalResult(ExplicitCastExpr *expr) {
+      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+        auto *locator = cs.getConstraintLocator(
+            expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+        return solution.getDisjunctionChoice(locator);
+      }
+      return false;
+    }
+
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      // If we need to insert a force-unwrap for coercions of the form
+      // 'as T!', do so now.
+      if (hasForcedOptionalResult(expr)) {
+        auto *coerced = visitCoerceExpr(expr, None);
+        if (!coerced)
+          return nullptr;
+
+        return coerceImplicitlyUnwrappedOptionalToValue(
+            coerced, cs.getType(coerced)->getOptionalObjectType());
+      }
+
       return visitCoerceExpr(expr, None);
     }
 
@@ -3427,7 +3453,8 @@ namespace {
       // If we weren't explicitly told by the caller which disjunction choice,
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
-      auto locator = cs.getConstraintLocator(expr);
+      auto *locator = cs.getConstraintLocator(expr);
+
       if (!choice) {
         if (tc.Context.LangOpts.EnableObjCInterop)
           choice = solution.getDisjunctionChoice(locator);
@@ -3480,7 +3507,24 @@ namespace {
       return expr;
     }
 
+    // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
+      // If we need to insert a force-unwrap for coercions of the form
+      // 'as! T!', do so now.
+      if (hasForcedOptionalResult(expr)) {
+        auto *coerced = handleForcedCheckedCastExpr(expr);
+        if (!coerced)
+          return nullptr;
+
+        return coerceImplicitlyUnwrappedOptionalToValue(
+            coerced, cs.getType(coerced)->getOptionalObjectType());
+      }
+
+      return handleForcedCheckedCastExpr(expr);
+    }
+
+    // Most of the logic for dealing with ForcedCheckedCastExpr.
+    Expr *handleForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
@@ -3544,8 +3588,23 @@ namespace {
                                            OptionalBindingsCastKind::Forced);
     }
 
-    Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
-                                          bool isInsideIsExpr = false) {
+    Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+      // If we need to insert a force-unwrap for coercions of the form
+      // 'as! T!', do so now.
+      if (hasForcedOptionalResult(expr)) {
+        auto *coerced = handleConditionalCheckedCastExpr(expr);
+        if (!coerced)
+          return nullptr;
+
+        return coerceImplicitlyUnwrappedOptionalToValue(
+            coerced, cs.getType(coerced)->getOptionalObjectType());
+      }
+
+      return handleConditionalCheckedCastExpr(expr);
+    }
+
+    Expr *handleConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
+                                           bool isInsideIsExpr = false) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       checkForImportedUsedConformances(toType);
@@ -7408,8 +7467,7 @@ namespace {
               closure = Rewriter.coerceClosureExprToVoid(closure);
             // A single-expression closure with a Never expression type
             // coerces to any other function type.
-            } else if (!fnType->getResult()->isUninhabited() &&
-                       cs.getType(body)->isUninhabited()) {
+            } else if (cs.getType(body)->isUninhabited()) {
               closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
             

@@ -31,8 +31,8 @@ bb0(%0 : $Foo):
 }
 
 sil_vtable Foo {
-  #Foo.ping!1: _TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
-  #Foo.init!initializer.1: _TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+  #Foo.ping!1: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer.1: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
 }
 
 class C {
@@ -69,6 +69,6 @@ bb0(%0 : $@thick C.Type):
 }
 
 sil_vtable C {
-  #C.foo!1: _TZFC4spec1C3foofMS0_FT_T_
-  #C.bar!1: _TZFC4spec1C3barfMS0_FT_T_
+  #C.foo!1: @_TZFC4spec1C3foofMS0_FT_T_
+  #C.bar!1: @_TZFC4spec1C3barfMS0_FT_T_
 }

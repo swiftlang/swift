@@ -370,11 +370,14 @@ public:
   bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
 
   /// Emit code to increment a counter for profiling.
-  void emitProfilerIncrement(ASTNode N) {
-    if (SGM.Profiler && SGM.Profiler->hasRegionCounters() &&
-        SGM.M.getOptions().UseProfile.empty())
-      SGM.Profiler->emitCounterIncrement(B, N);
-  }
+  void emitProfilerIncrement(ASTNode Node);
+
+  /// Load the profiled execution count corresponding to \p Node, if one is
+  /// available.
+  ProfileCounter loadProfilerCount(ASTNode Node) const;
+
+  /// Get the PGO node's parent.
+  Optional<ASTNode> getPGOParent(ASTNode Node) const;
 
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
@@ -548,8 +551,7 @@ public:
   ///
   /// This is used for both concrete witness thunks and default witness
   /// thunks.
-  void emitProtocolWitness(Type selfType,
-                           AbstractionPattern reqtOrigTy,
+  void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,
@@ -569,7 +571,13 @@ public:
                                CanAnyFunctionType funcTy,
                                CanAnyFunctionType blockTy,
                                CanSILFunctionType loweredBlockTy);
-  
+
+  /// Given a non-canonical function type, create a thunk for the function's
+  /// canonical type.
+  ManagedValue emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
+                                          CanSILFunctionType nonCanonicalTy,
+                                          CanSILFunctionType canonicalTy);
+
   /// Thunk with the signature of a base class method calling a derived class
   /// method.
   ///
@@ -1102,16 +1110,14 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionList substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1119,8 +1125,7 @@ public:
                        RValue &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
-                                         bool isDirectAccessorUse);  
+  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 SubstitutionList substitutions,
@@ -1137,8 +1142,7 @@ public:
   void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind,
-                                 bool isDirectAccessorUse);
+                                 AccessKind accessKind);
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionList substitutions,

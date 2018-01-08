@@ -108,17 +108,10 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
-  if (auto nominalTy = dyn_cast<NominalType>(*this))
-    return (GenericTypeDecl*)nominalTy->getDecl();
-  
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return (GenericTypeDecl*)boundTy->getDecl();
-  
-  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
-    return unboundTy->getDecl();
+  if (auto Ty = dyn_cast<AnyGenericType>(*this))
+    return Ty->getDecl();
   return nullptr;
 }
-
 
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
@@ -685,7 +678,7 @@ Type TypeBase::getWithoutParens() {
 Type TypeBase::getWithoutImmediateLabel() {
   Type Ty = this;
   if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       Ty = tupleTy->getElementType(0);
   }
   return Ty;
@@ -870,7 +863,7 @@ Type TypeBase::getRValueInstanceType() {
   
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       type = tupleTy->getElementType(0);
   }
   
@@ -1028,7 +1021,7 @@ static Type
 getCanonicalInputType(AnyFunctionType *funcType,
                       llvm::function_ref<CanType(Type)> getCanonicalType) {
   auto origInputType = funcType->getInput();
-  bool isParen = isa<ParenType>(origInputType.getPointer());
+  bool isParen = origInputType->hasParenSugar();
   Type inputType = getCanonicalType(origInputType);
 
   if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
@@ -1045,7 +1038,7 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-void TypeBase::computeCanonicalType() {
+CanType TypeBase::computeCanonicalType() {
   assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
   TypeBase *Result = nullptr;
@@ -1223,6 +1216,7 @@ void TypeBase::computeCanonicalType() {
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
+  return CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
@@ -1255,56 +1249,16 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Func(this).getPointer();
 }
 
-TypeBase *TypeBase::getDesugaredType() {
-  switch (getKind()) {
-#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
+#define TYPE(Id, Parent)
+#define SUGARED_TYPE(Id, Parent) \
+  static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
-  case TypeKind::Tuple:
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::LValue:
-  case TypeKind::InOut:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Metatype:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::Protocol:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
-  case TypeKind::DynamicSelf:
-    // None of these types have sugar at the outer level.
-    return this;
-#define SUGARED_TYPE(ID, PARENT) \
-  case TypeKind::ID: \
-    return cast<ID##Type>(this)->getSinglyDesugaredType()->getDesugaredType();
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-  }
-
-  llvm_unreachable("Unknown type kind");
-}
 
 ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
                      ParameterTypeFlags flags)
-  : TypeBase(TypeKind::Paren, nullptr, properties),
-    UnderlyingType(flags.isInOut()
-                     ? InOutType::get(baseType)
-                     : baseType) {
+  : SugarType(TypeKind::Paren,
+              flags.isInOut() ? InOutType::get(baseType) : baseType,
+              properties) {
   Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
@@ -1313,60 +1267,56 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
 }
 
 
-TypeBase *ParenType::getSinglyDesugaredType() {
-  return getUnderlyingType().getPointer();
-}
-
-TypeBase *NameAliasType::getSinglyDesugaredType() {
-  return getDecl()->getUnderlyingTypeLoc().getType().getPointer();
-}
-
-TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type SyntaxSugarType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
+Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
+  auto &ctx = *Context;
   NominalTypeDecl *implDecl;
 
-  if (isa<ArraySliceType>(this)) {
+  // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
+  // we could handle the entire switch statement via macros.
+  switch (getKind()) {
+#define TYPE(Id, Parent) \
+  case TypeKind::Id: llvm_unreachable("non-sugared type?");
+#define SUGARED_TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Paren:
+    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
+  case TypeKind::NameAlias: {
+    auto Ty = cast<NameAliasType>(this);
+    auto UTy = Ty->getDecl()->getUnderlyingTypeLoc().getType().getPointer();
+    if (isa<NominalOrBoundGenericNominalType>(UTy)) {
+      Bits.SugarType.HasCachedType = true;
+      UnderlyingType = UTy;
+    }
+    return UTy;
+  }
+  case TypeKind::ArraySlice:
     implDecl = ctx.getArrayDecl();
-    assert(implDecl && "Array type has not been set yet");
-  } else if (isa<OptionalType>(this)) {
+    break;
+  case TypeKind::Optional:
     implDecl = ctx.getOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
-  } else if (isa<ImplicitlyUnwrappedOptionalType>(this)) {
+    break;
+  case TypeKind::ImplicitlyUnwrappedOptional:
     implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
+    break;
+  case TypeKind::Dictionary:
+    implDecl = ctx.getDictionaryDecl();
+    break;
+  }
+  assert(implDecl && "Type has not been set yet");
+
+  Bits.SugarType.HasCachedType = true;
+  if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
+    UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
+  } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
+    UnderlyingType = BoundGenericType::get(implDecl, Type(),
+                                      { Ty->getKeyType(), Ty->getValueType() });
   } else {
-    llvm_unreachable("Unhandled syntax sugar type");
+    llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
 
   // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
-  return ImplOrContext.get<Type>();
-}
-
-TypeBase *DictionaryType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type DictionaryType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
-  // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
-  NominalTypeDecl *implDecl = ctx.getDictionaryDecl();
-  assert(implDecl && "Dictionary type has not been set yet");
-
-  // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), { Key, Value });
-  return ImplOrContext.get<Type>();
+  return UnderlyingType;
 }
 
 unsigned GenericTypeParamType::getDepth() const {

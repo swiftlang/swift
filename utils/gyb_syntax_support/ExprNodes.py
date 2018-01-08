@@ -28,6 +28,10 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
+    Node('StringInterpolationSegments', kind='SyntaxCollection',
+         element='Syntax', element_name='Segment',
+         element_choices=['StringSegment', 'ExpressionSegment']),
+
     # The try operator.
     # try foo()
     # try? foo()
@@ -44,10 +48,35 @@ EXPR_NODES = [
              Child('Expression', kind='Expr'),
          ]),
 
+    # declname-arguments -> '(' declname-argument-list ')'
+    # declname-argument-list -> declname-argument*
+    # declname-argument -> identifier ':'
+    Node('DeclNameArgument', kind='Syntax',
+         children=[
+             Child('Name', kind='Token'),
+             Child('Colon', kind='ColonToken'),
+         ]),
+    Node('DeclNameArgumentList', kind='SyntaxCollection',
+         element='DeclNameArgument'),
+    Node('DeclNameArguments', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Arguments', kind='DeclNameArgumentList'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     # An identifier expression.
     Node('IdentifierExpr', kind='Expr',
          children=[
              Child('Identifier', kind='IdentifierToken'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
+         ]),
+
+    # An 'super' expression.
+    Node('SuperRefExpr', kind='Expr',
+         children=[
+             Child('SuperKeyword', kind='SuperToken'),
          ]),
 
     # A nil expression.
@@ -129,14 +158,6 @@ EXPR_NODES = [
              Child('FloatingDigits', kind='FloatingLiteralToken'),
          ]),
 
-    Node('FunctionCallExpr', kind='Expr',
-         children=[
-             Child('CalledExpression', kind='Expr'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('ArgumentList', kind='FunctionCallArgumentList'),
-             Child('RightParen', kind='RightParenToken'),
-         ]),
-
     Node('TupleExpr', kind='Expr',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -162,6 +183,15 @@ EXPR_NODES = [
                        Child('Elements', kind='DictionaryElementList'),
                    ]),
              Child('RightSquare', kind='RightSquareToken'),
+         ]),
+
+    # .foo
+    Node('ImplicitMemberExpr', kind='Expr',
+         children=[
+             Child("Dot", kind='PrefixPeriodToken'),
+             Child("Name", kind='Token'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
          ]),
 
     # function-call-argument -> label? ':'? expression ','?
@@ -243,7 +273,9 @@ EXPR_NODES = [
          children=[
              Child("Base", kind='Expr'),
              Child("Dot", kind='PeriodToken'),
-             Child("Name", kind='Token')
+             Child("Name", kind='Token'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
          ]),
 
     # is TypeName
@@ -330,5 +362,82 @@ EXPR_NODES = [
     Node('UnresolvedPatternExpr', kind='Expr',
          children=[
              Child('Pattern', kind='Pattern'),
+         ]),
+
+    # call-expr -> expr '(' call-argument-list ')' closure-expr?
+    #            | expr closure-expr
+    Node('FunctionCallExpr', kind='Expr',
+         children=[
+             Child('CalledExpression', kind='Expr'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
+    Node('SubscriptExpr', kind='Expr',
+         children=[
+             Child('CalledExpression', kind='Expr'),
+             Child('LeftBracket', kind='LeftSquareBracketToken'),
+             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('RightBracket', kind='RightSquareBracketToken'),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # optional-chaining-expr -> expr '?'
+    Node('OptionalChainingExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('QuetionMark', kind='PostfixQuestionMarkToken'),
+         ]),
+
+    # forced-value-expr -> expr '!'
+    Node('ForcedValueExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('ExclamationMark', kind='ExclamationMarkToken'),
+         ]),
+
+    # postfix-unary-expr -> expr postfix-operator
+    Node('PostfixUnaryExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('OperatorToken', kind='PostfixOperatorToken'),
+         ]),
+
+    # string literal segment in a string interpolation expression.
+    Node('StringSegment', kind='Syntax',
+         children=[
+             Child('Content', kind='StringSegmentToken'),
+         ]),
+
+    # expression segment in a string interpolation expression.
+    Node('ExpressionSegment', kind='Syntax',
+         children=[
+             Child('Backslash', kind='BackslashToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Expression', kind='Expr'),
+             Child('RightParen', kind='StringInterpolationAnchorToken'),
+         ]),
+
+    # e.g. "abc \(foo()) def"
+    Node('StringInterpolationExpr', kind='Expr',
+         children=[
+             Child('OpenQuote', kind='Token',
+                   token_choices=[
+                       'StringQuoteToken',
+                       'MultilineStringQuoteToken',
+                   ]),
+             Child('Segments', kind='StringInterpolationSegments'),
+             Child('CloseQuote', kind='Token',
+                   token_choices=[
+                       'StringQuoteToken',
+                       'MultilineStringQuoteToken',
+                   ]),
          ]),
 ]

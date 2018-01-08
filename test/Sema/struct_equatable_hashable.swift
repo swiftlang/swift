@@ -10,6 +10,8 @@ struct Point: Hashable {
 if Point(x: 1, y: 2) == Point(x: 2, y: 1) { }
 var pointHash: Int = Point(x: 3, y: 5).hashValue
 
+Point(x: 1, y: 2) == Point(x: 2, y: 1) // expected-warning {{result of operator '==' is unused}}
+
 struct Pair<T: Hashable>: Hashable {
   let first: T
   let second: T

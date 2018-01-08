@@ -11,8 +11,11 @@ public struct Int {
   public init() {}
 }
 
+// Check that a specialized version of a function is produced
+// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] @$SSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
+
 // Check that a call of a @_semantics function was not inlined if early-serialization is enabled.
-// CHECK: sil [serialized] @_T0s28userOfSemanticsAnnotatedFuncySiSaySiGF
+// CHECK: sil [serialized] @$Ss28userOfSemanticsAnnotatedFuncySiSaySiGF
 // CHECK: function_ref
 // CHECK: apply
 @_inlineable
@@ -24,10 +27,8 @@ public struct Array<T> {
   @_inlineable
   public init() {}
 
-  // Check that a specialized version of a function is produced
-  // CHECK: sil shared [serializable] [_semantics "array.get_capacity"] @_T0Sa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
   // Check that the generic version of a @_semantics function is preserved.
-  // CHECK: sil [serialized] [_semantics "array.get_capacity"] @_T0Sa12_getCapacitySiyF : $@convention(method) <T> (Array<T>) -> Int
+  // CHECK: sil [serialized] [_semantics "array.get_capacity"] @$SSa12_getCapacitySiyF : $@convention(method) <T> (Array<T>) -> Int
   @_inlineable
   @_versioned
   @_semantics("array.get_capacity")
