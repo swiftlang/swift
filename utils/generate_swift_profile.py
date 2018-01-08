@@ -203,6 +203,7 @@ def main():
     with pushd(SOURCE_COMPAT_SUITE_DIR):
         call([
             './runner.py',
+            '--swift-branch', 'master',
             '--swiftc', swiftc_bin,
             '--projects', projects_file,
         ])

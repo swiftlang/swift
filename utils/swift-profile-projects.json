@@ -5,11 +5,12 @@
     "path": "AMScrollingNavbar",
     "branch": "master",
     "maintainer": "andrea@fancypixel.it",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "424000e3ee8549fdc0705cb4fd1a0fae321ad787"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -29,11 +30,12 @@
     "path": "Alamofire",
     "branch": "master",
     "maintainer": "cnoon@alamofire.org",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "b03b43cc381ec02eb9855085427186ef89055eef"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -80,11 +82,12 @@
     "url": "https://github.com/AsyncNinja/AsyncNinja.git",
     "path": "AsyncNinja",
     "branch": "master",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "91b80dd2fc959b7673b5151bba41beef8e877607"
       }
-    },
+    ],
     "maintainer": "antonvmironov@gmail.com",
     "platforms": [
       "Darwin",
@@ -145,17 +148,7 @@
       },
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-6333",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6333"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       },
       {
         "action": "TestSwiftPackage"
@@ -168,11 +161,12 @@
     "path": "BeaconKit",
     "branch": "master",
     "maintainer": "igormaka@gmail.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "1d2a69c6cb6d3850a9893374b2391ab749aaf414"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -193,11 +187,12 @@
     "path": "BlueSocket",
     "branch": "master",
     "maintainer": "babt@us.ibm.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "b0dcf15387be3641ecafea52f872fcd106cb644a"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -224,11 +219,12 @@
     "path": "Chatto",
     "branch": "master",
     "maintainer": "a.p.schukin@gmail.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "0eb7ac56b76ed5c1024b7035ed0e29f69c74c8e7"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -280,14 +276,16 @@
     "path": "CleanroomLogger",
     "branch": "master",
     "maintainer": "emaloney@gilt.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "1d6cd902ace110048c91b4bfdfeffa955738522f"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "d023ef2e6a2165bb162f4385828e321d4573fca0"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -334,11 +332,12 @@
     "path": "CoreStore",
     "branch": "master",
     "maintainer": "rommel.estropia@gmail.com",
-    "compatibility": {
-      "3.1": {
-        "commit": "42c28b064ad87ef783dccdeea7c518f6a0ae3b9d"
+    "compatibility": [
+      {
+        "version": "3.2",
+        "commit": "305e2b61a000753b6f1aff7f3f6485a88b3ff4e7"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -348,90 +347,35 @@
         "workspace": "CoreStore.xcworkspace",
         "scheme": "CoreStore iOS",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4981"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "CoreStore.xcworkspace",
         "scheme": "CoreStore OSX",
         "destination": "generic/platform=macOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4981"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "CoreStore.xcworkspace",
         "scheme": "CoreStore tvOS",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4981"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "CoreStore.xcworkspace",
         "scheme": "CoreStore watchOS",
         "destination": "generic/platform=watchOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4981"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "CoreStore.xcworkspace",
         "scheme": "CoreStoreDemo",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4981",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4981"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "TestXcodeWorkspaceScheme",
@@ -459,11 +403,16 @@
     "path": "DNS",
     "branch": "master",
     "maintainer": "bouke@haarsma.eu",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "9e102ed702045a09eae77b16d223160a66c3f8bc"
+      },
+      {
+        "version": "4.0",
+        "commit": "04ae84dbaf423214c644590cbe0d837edfbfd411"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -483,11 +432,12 @@
     "path": "Dollar",
     "branch": "master",
     "maintainer": "ankur.patel@ymail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "c0dd3c0f8cd5fa12f8b433f3f2e3e50fa7debdf5"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -507,14 +457,16 @@
     "path": "Dwifft",
     "branch": "master",
     "maintainer": "jflinter11@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "e3e8bf0d2355a23dc0f1af3a0b6465efcb3b6488"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "e3e8bf0d2355a23dc0f1af3a0b6465efcb3b6488"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -533,11 +485,16 @@
     "url": "https://github.com/groue/GRDB.swift.git",
     "path": "GRDB.swift",
     "branch": "master",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "4.0",
+        "commit": "58e05d13d1e5b42c70c6dd36d64cf1a44fabbb45"
+      },
+      {
+        "version": "3.1",
         "commit": "ba8375adb120a9c67de8cc8f420c934581a82e3b"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -557,14 +514,16 @@
     "url": "https://github.com/artsabintsev/Guitar.git",
     "path": "Guitar",
     "branch": "master",
-    "compatibility": {
-      "4.0": {
+    "compatibility": [
+      {
+        "version": "4.0",
         "commit": "d88afd48e8793d66f4609db98710b679ce039341"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "f3135a5c1fc7ac079cf4156992455b254b16bb84"
       }
-    },
+    ],
     "maintainer": "arthur@sabintsev.com",
     "platforms": [
       "Darwin",
@@ -586,11 +545,12 @@
     "path": "IBAnimatable",
     "branch": "master",
     "maintainer": "JakeLinAu@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "b428dd736d9418e03a1fad19d89f2c9b99389227"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -613,45 +573,16 @@
   },
   {
     "repository": "Git",
-    "url": "https://github.com/jessesquires/JSQDataSourcesKit.git",
-    "path": "JSQDataSourcesKit",
-    "branch": "master",
-    "maintainer": "jesse@jessesquires.com",
-    "compatibility": {
-      "3.0": {
-        "commit": "b764e341713d67ab9c8160929f46e55ad1e2ca07"
-      }
-    },
-    "platforms": [
-      "Darwin"
-    ],
-    "actions": [
-      {
-        "action": "BuildXcodeProjectTarget",
-        "project": "JSQDataSourcesKit.xcodeproj",
-        "target": "JSQDataSourcesKit-iOS",
-        "destination": "generic/platform=iOS",
-        "configuration": "Release"
-      },
-      {
-        "action": "TestXcodeProjectScheme",
-        "project": "JSQDataSourcesKit.xcodeproj",
-        "scheme": "JSQDataSourcesKitTests",
-        "destination": "platform=iOS Simulator,name=iPhone 6s"
-      }
-    ]
-  },
-  {
-    "repository": "Git",
     "url": "https://github.com/jessesquires/JSQCoreDataKit.git",
     "path": "JSQCoreDataKit",
     "branch": "master",
     "maintainer": "jesse@jessesquires.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "5e8b8327fc87c008e718a2c1aa0a78b7eac16a53"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -673,15 +604,47 @@
   },
   {
     "repository": "Git",
+    "url": "https://github.com/jessesquires/JSQDataSourcesKit.git",
+    "path": "JSQDataSourcesKit",
+    "branch": "master",
+    "maintainer": "jesse@jessesquires.com",
+    "compatibility": [
+      {
+        "version": "3.0",
+        "commit": "b764e341713d67ab9c8160929f46e55ad1e2ca07"
+      }
+    ],
+    "platforms": [
+      "Darwin"
+    ],
+    "actions": [
+      {
+        "action": "BuildXcodeProjectTarget",
+        "project": "JSQDataSourcesKit.xcodeproj",
+        "target": "JSQDataSourcesKit-iOS",
+        "destination": "generic/platform=iOS",
+        "configuration": "Release"
+      },
+      {
+        "action": "TestXcodeProjectScheme",
+        "project": "JSQDataSourcesKit.xcodeproj",
+        "scheme": "JSQDataSourcesKitTests",
+        "destination": "platform=iOS Simulator,name=iPhone 6s"
+      }
+    ]
+  },
+  {
+    "repository": "Git",
     "url": "https://github.com/kishikawakatsumi/KeychainAccess.git",
     "path": "KeychainAccess",
     "branch": "master",
     "maintainer": "kishikawakatsumi@mac.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "6e3d9679fd49c7ae8869454e76edf1306983c62c"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -722,11 +685,12 @@
     "path": "Kickstarter-Prelude",
     "branch": "master",
     "maintainer": "stephen@stephencelis.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "9b2cc23ce8acf29b4b666a80a665c67cba800aac"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -767,11 +731,12 @@
     "path": "Kickstarter-ReactiveExtensions",
     "branch": "master",
     "maintainer": "stephen@stephencelis.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "732eab9da730699f264dceb4f423586754191d67"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -781,64 +746,28 @@
         "project": "ReactiveExtensions.xcodeproj",
         "scheme": "ReactiveExtensions-iOS",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectScheme",
         "project": "ReactiveExtensions.xcodeproj",
         "scheme": "ReactiveExtensions-TestHelpers-iOS",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectScheme",
         "project": "ReactiveExtensions.xcodeproj",
         "scheme": "ReactiveExtensions-TestHelpers-tvOS",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectScheme",
         "project": "ReactiveExtensions.xcodeproj",
         "scheme": "ReactiveExtensions-tvOS",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       }
     ]
   },
@@ -848,11 +777,12 @@
     "path": "Kingfisher",
     "branch": "master",
     "maintainer": "onev@onevcat.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "5cfa0dd5c9fc48e1c31f574ad8eaa31a3a9d4003"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -893,11 +823,12 @@
     "path": "Kitura",
     "branch": "master",
     "maintainer": "navneet@us.ibm.com",
-    "compatibility": {
-      "3.0": {
-        "commit": "5ebf8f63fe6ab1fd2f50de860e19a07661fbb974"
+    "compatibility": [
+      {
+        "version": "4.0",
+        "commit": "edbd229ba8b99db936bc552c8e4f8e190a6dc633"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -905,17 +836,7 @@
     "actions": [
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "<rdar://problem/34812868> Kitura is using an old version of SwiftyJSON that references _Incrementable",
-                "swift-4.1-branch": "<rdar://problem/34812868> Kitura is using an old version of SwiftyJSON that references _Incrementable"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       }
     ]
   },
@@ -925,11 +846,12 @@
     "path": "Kronos",
     "branch": "master",
     "maintainer": "Reflejo@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "56bb7200af13151184a319a4826e64764adacdf2"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -977,11 +899,16 @@
     "path": "Lark",
     "branch": "master",
     "maintainer": "bouke@haarsma.eu",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "0179286cd571fa49a7d95cbcafa725cba9e11207"
+      },
+      {
+        "version": "4.0",
+        "commit": "7604f91d757d888c456f75e19c00ea755d94fe8f"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1000,11 +927,12 @@
     "url": "https://github.com/Moya/Moya.git",
     "path": "Moya",
     "branch": "master",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "c4e58ee23db4aaec944505a2f7b001a89b602d7d"
       }
-    },
+    ],
     "maintainer": "ash@ashfurrow.com",
     "platforms": [
       "Darwin"
@@ -1012,16 +940,7 @@
     "actions": [
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       },
       {
         "action": "TestSwiftPackage"
@@ -1034,11 +953,12 @@
     "path": "NetService",
     "branch": "master",
     "maintainer": "bouke@haarsma.eu",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "4c20bd99c56f6ba370faf1d014599f7149fb834d"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -1046,16 +966,7 @@
     "actions": [
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-6334"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       },
       {
         "action": "TestSwiftPackage"
@@ -1068,11 +979,12 @@
     "path": "ObjectMapper",
     "branch": "master",
     "maintainer": "tristanhimmelman@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "eef27bfcfd201036a12992b6988e64a088fe7354"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1113,11 +1025,12 @@
     "path": "Perfect",
     "branch": "master",
     "maintainer": "sean@perfect.org",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "540feb1d8b3c1965823e0e3ecc9e975d47006b80"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -1134,11 +1047,12 @@
     "url": "https://github.com/willowtreeapps/PinkyPromise.git",
     "path": "PinkyPromise",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "a127ac74685daec77dd4580bd82c8ace8cc9cc29"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1186,11 +1100,12 @@
     "url": "https://github.com/pinterest/plank.git",
     "path": "Plank",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "d69c8e6f9942c098e589a75162d3196dec183929"
       }
-    },
+    ],
     "maintainer": "rmalik@pinterest.com",
     "platforms": [
       "Darwin",
@@ -1212,14 +1127,16 @@
     "path": "ProcedureKit",
     "branch": "master",
     "maintainer": "danthorpe@me.com",
-    "compatibility": {
-      "3.0": {
-        "commit": "006f9ff23448e28342a9f5d134327d58e3b4aa0d"
+    "compatibility": [
+      {
+        "version": "3.0",
+        "commit": "d6389ea98ec2e0d17ab368f40045bfe48622ac67"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "46bdfdf2910acc84e58ed686df14a46a5cbc61f4"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1232,11 +1149,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5265"
+                "master": "https://bugs.swift.org/browse/SR-6618",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6618"
               }
             }
           }
@@ -1250,11 +1166,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5265"
+                "master": "https://bugs.swift.org/browse/SR-6618",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6618"
               }
             }
           }
@@ -1268,11 +1183,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5265"
+                "master": "https://bugs.swift.org/browse/SR-6618",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6618"
               }
             }
           }
@@ -1286,11 +1200,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5265"
+                "master": "https://bugs.swift.org/browse/SR-6618",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6618"
               }
             }
           }
@@ -1306,9 +1219,13 @@
           "compatibility": {
             "3.0": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5265",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5265"
+                "swift-4.0-branch": "rdar://35814436"
+              }
+            },
+            "3.1": {
+              "branch": {
+                "master": "https://bugs.swift.org/browse/SR-6618",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6618"
               }
             }
           }
@@ -1328,11 +1245,12 @@
     "path": "PromiseKit",
     "branch": "master",
     "maintainer": "mxcl@me.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "63ccb34a3d2834b7b08ce2014536344966399668"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1373,11 +1291,12 @@
     "path": "R.swift",
     "branch": "master",
     "maintainer": "tom@lokhorst.eu",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "ac56b87a94a4ea8b795af45012d0f89d4981919e"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1397,11 +1316,12 @@
     "path": "Re-Lax",
     "branch": "master",
     "maintainer": "marksands07@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "b65d53b9547f2f5047c4253fb97ed1d504b4c36d"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1421,11 +1341,12 @@
     "path": "ReSwift",
     "branch": "master",
     "maintainer": "Benjamin.Encz@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "db35c2e64bb9c8385a821d580c1dad6c113d073d"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1465,14 +1386,16 @@
     "url": "https://github.com/ReactiveCocoa/ReactiveCocoa.git",
     "path": "ReactiveCocoa",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "fdc02f188228666d56966fd4f82fb596f14576f1"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "afe5b34d384a86fec79766672b965de56005ba42"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1486,9 +1409,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
+                "master": "https://bugs.swift.org/browse/SR-6658",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6658"
               }
             }
           }
@@ -1502,9 +1426,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
+                "master": "https://bugs.swift.org/browse/SR-6658",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6658"
               }
             }
           }
@@ -1518,9 +1443,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
+                "master": "https://bugs.swift.org/browse/SR-6658",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6658"
               }
             }
           }
@@ -1534,9 +1460,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.1": {
               "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
+                "master": "https://bugs.swift.org/browse/SR-6658",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6658"
               }
             }
           }
@@ -1549,14 +1476,16 @@
     "url": "https://github.com/ReactiveCocoa/ReactiveSwift.git",
     "path": "ReactiveSwift",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "1556b846de627cac0b96291ec2835fbc349c5e21"
       },
-      "3.1": {
+      {
+        "version": "3.1",
         "commit": "b9d5b350a446b85704396ce332a1f9e4960cfc6b"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -1568,64 +1497,28 @@
         "workspace": "ReactiveSwift.xcworkspace",
         "scheme": "ReactiveSwift-macOS",
         "destination": "generic/platform=macOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "ReactiveSwift.xcworkspace",
         "scheme": "ReactiveSwift-iOS",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "ReactiveSwift.xcworkspace",
         "scheme": "ReactiveSwift-tvOS",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeWorkspaceScheme",
         "workspace": "ReactiveSwift.xcworkspace",
         "scheme": "ReactiveSwift-watchOS",
         "destination": "generic/platform=watchOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6335"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       }
     ]
   },
@@ -1635,11 +1528,12 @@
     "path": "Realm",
     "branch": "master",
     "maintainer": "ci@realm.io",
-    "compatibility": {
-      "3.0": {
-        "commit": "3df0fb6ec06a0f3c5ca49c88bd51ab5b64f4f0af"
+    "compatibility": [
+      {
+        "version": "3.2",
+        "commit": "2493b356b3422f3bbb4dab27dc351f16ebdda13c"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1652,30 +1546,48 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.2": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4730",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4730",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4730",
-                "swift-3.1-branch": "https://bugs.swift.org/browse/SR-4879"
+                "master": "https://bugs.swift.org/browse/SR-6538",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6538"
               }
             }
           }
         }
       },
       {
-        "action": "TestXcodeProjectScheme",
+        "action": "BuildXcodeProjectScheme",
         "project": "Realm.xcodeproj",
         "scheme": "RealmSwift",
         "destination": "generic/platform=macOS",
-        "configuration": "Release"
+        "configuration": "Release",
+        "xfail": {
+          "compatibility": {
+            "3.2": {
+              "branch": {
+                "master": "https://bugs.swift.org/browse/SR-6538",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6538"
+              }
+            }
+          }
+        }
       },
       {
-        "action": "TestXcodeProjectScheme",
+        "action": "BuildXcodeProjectScheme",
         "project": "Realm.xcodeproj",
         "scheme": "RealmSwift",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release"
+        "configuration": "Release",
+        "xfail": {
+          "compatibility": {
+            "3.2": {
+              "branch": {
+                "master": "https://bugs.swift.org/browse/SR-6538",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6538"
+              }
+            }
+          }
+        }
       },
       {
         "action": "BuildXcodeProjectScheme",
@@ -1685,12 +1597,10 @@
         "configuration": "Release",
         "xfail": {
           "compatibility": {
-            "3.0": {
+            "3.2": {
               "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4730",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4730",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4730",
-                "swift-3.1-branch": "https://bugs.swift.org/browse/SR-4879"
+                "master": "https://bugs.swift.org/browse/SR-6538",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6538"
               }
             }
           }
@@ -1703,11 +1613,12 @@
     "url": "https://github.com/antitypical/Result.git",
     "path": "Result",
     "branch": "master",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "1a2a979e6399dfb3574c935d6ccee36bc0214405"
       }
-    },
+    ],
     "maintainer": "rob.rix@github.com",
     "platforms": [
       "Darwin"
@@ -1728,11 +1639,12 @@
     "path": "RxDataSources",
     "branch": "master",
     "maintainer": "krunoslav.zaher@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "c06ebe2207ed3a74d69a9d9b9bb59b48b64a09b4"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1759,11 +1671,12 @@
     "path": "RxSwift",
     "branch": "master",
     "maintainer": "krunoslav.zaher@gmail.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "102424379fb8d6c69b33b95c67504679042f44cc"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1881,29 +1794,19 @@
     "path": "SRP",
     "branch": "master",
     "maintainer": "bouke@haarsma.eu",
-    "compatibility": {
-      "3.1": {
-        "commit": "ea8a65f1b5185444364637da490356aff0daadae"
+    "compatibility": [
+      {
+        "version": "4.0",
+        "commit": "b166838d4cf9218933c03151d62e50772460f95e"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
     "actions": [
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.1": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-4968",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-4968",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-4968"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       },
       {
         "action": "TestSwiftPackage"
@@ -1915,11 +1818,12 @@
     "url": "https://github.com/nodes-ios/Serpent.git",
     "path": "Serpent",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "16a3bf87f4b3ad13827c65deabb0bf0af07ae59d"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -1938,11 +1842,12 @@
     "path": "Sourcery",
     "branch": "master",
     "maintainer": "krzysztof.zablocki@pixle.pl",
-    "compatibility": {
-      "3.1": {
-        "commit": "92a180906cd5863bc6a1dea881abcfc2d9389a1f"
+    "compatibility": [
+      {
+        "version": "4.0",
+        "commit": "c96f06602d53e0eeca1fe5273f21080af63c7f31"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -1952,11 +1857,10 @@
         "configuration": "release",
         "xfail": {
           "compatibility": {
-            "3.1": {
+            "4.0": {
               "branch": {
-                "master": "rdar://problem/32185310",
-                "swift-4.1-branch": "rdar://problem/32185310",
-                "swift-4.0-branch": "rdar://problem/32185310"
+                "master": "https://bugs.swift.org/browse/SR-6556",
+                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6556"
               }
             }
           }
@@ -1973,11 +1877,12 @@
     "path": "Starscream",
     "branch": "master",
     "maintainer": "daltoniam@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "13859364e33368687a5ee0c9cc0d5782e4212b66"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2053,11 +1958,12 @@
     "path": "Surge",
     "branch": "master",
     "maintainer": "rfdickerson@gmail.com",
-    "compatibility": {
-      "3.0": {
-        "commit": "88bc48b14b649f67384faec4db10c32cda207693"
+    "compatibility": [
+      {
+        "version": "3.2",
+        "commit": "64d93875a2aa9391724b039867be567ead84a11a"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2067,18 +1973,7 @@
         "project": "Surge.xcodeproj",
         "scheme": "Surge",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "rdar://problem/32185310",
-                "swift-4.1-branch": "rdar://problem/32185310",
-                "swift-4.0-branch": "rdar://problem/32185310"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       }
     ]
   },
@@ -2088,11 +1983,12 @@
     "path": "SwiftDate",
     "branch": "master",
     "maintainer": "me@danielemargutti.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "b8a6ace0b4a419d377886615ece14a3f259323fc"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2133,11 +2029,12 @@
     "path": "SwiftGraph",
     "branch": "master",
     "maintainer": "david@oaksnow.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "07b088eef5cb883e5544ea4d2e9a1338318f0596"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
@@ -2154,17 +2051,16 @@
     "url": "https://github.com/realm/SwiftLint.git",
     "path": "SwiftLint",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
-        "commit": "d8f5a316f29077cd22f7d129e8bfaf4f4238d6f1"
-      },
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "c34c5c164954132a87e90d2312a74826a54487ed"
       },
-      "4.0": {
+      {
+        "version": "4.0",
         "commit": "c34c5c164954132a87e90d2312a74826a54487ed"
       }
-    },
+    ],
     "maintainer": "jp@jpsim.com",
     "platforms": [
       "Darwin",
@@ -2173,29 +2069,7 @@
     "actions": [
       {
         "action": "BuildSwiftPackage",
-        "configuration": "release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "rdar://problem/35633455",
-                "swift-4.1-branch": "rdar://problem/35633455"
-              }
-            },
-            "3.1": {
-              "branch": {
-                "master": "rdar://problem/35633455",
-                "swift-4.1-branch": "rdar://problem/35633455"
-              }
-            },
-            "4.0": {
-              "branch": {
-                "master": "rdar://problem/35633455",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-6349"
-              }
-            }
-          }
-        }
+        "configuration": "release"
       },
       {
         "action": "TestSwiftPackage"
@@ -2208,11 +2082,12 @@
     "path": "SwifterSwift",
     "branch": "master",
     "maintainer": "omaralbeik@gmail.com",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "66e5237f055f72f725536cd3322f7f6483e7aeed"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2271,11 +2146,12 @@
     "path": "Then",
     "branch": "master",
     "maintainer": "devxoul@gmail.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "daaea1ac2100ae86bd20f0920ebbd2f1becb2e6e"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2295,11 +2171,12 @@
     "path": "URBNJSONDecodableSPM",
     "branch": "master",
     "maintainer": "lsykes@urbn.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "6dc998583b170395e8ba03cacabe1ea44256b1bd"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2316,11 +2193,12 @@
     "path": "kommander",
     "branch": "master",
     "maintainer": "alejandro.ruperez@intelygenz.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "1d258f90416b82cafa2b1cf0146720ce99ceaf28"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2361,11 +2239,12 @@
     "path": "launchscreensnapshot",
     "branch": "master",
     "maintainer": "contact@alexruperez.com",
-    "compatibility": {
-      "3.1": {
+    "compatibility": [
+      {
+        "version": "3.1",
         "commit": "9af0557c932b69648ff5aa0c70b5468fdf65cb93"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2385,11 +2264,12 @@
     "path": "mapper",
     "branch": "master",
     "maintainer": "k@keith.so",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "db431abebe6b6ec632a3829edd75be0a440e331a"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2399,72 +2279,28 @@
         "project": "Mapper.xcodeproj",
         "target": "Mapper",
         "destination": "generic/platform=iOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5683"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectTarget",
         "project": "Mapper.xcodeproj",
         "target": "Mapper",
         "destination": "generic/platform=macOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5683"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectTarget",
         "project": "Mapper.xcodeproj",
         "target": "Mapper",
         "destination": "generic/platform=tvOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5683"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildXcodeProjectTarget",
         "project": "Mapper.xcodeproj",
         "target": "Mapper",
         "destination": "generic/platform=watchOS",
-        "configuration": "Release",
-        "xfail": {
-          "compatibility": {
-            "3.0": {
-              "branch": {
-                "master": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.1-branch": "https://bugs.swift.org/browse/SR-5683",
-                "swift-4.0-branch": "https://bugs.swift.org/browse/SR-5683"
-              }
-            }
-          }
-        }
+        "configuration": "Release"
       },
       {
         "action": "BuildSwiftPackage",
@@ -2480,11 +2316,12 @@
     "url": "https://github.com/louisdh/panelkit.git",
     "path": "panelkit",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "d451d956fb31f0ca5d76940c0b1db46b8c74a089"
       }
-    },
+    ],
     "platforms": [
       "Darwin"
     ],
@@ -2517,11 +2354,12 @@
     "url": "https://github.com/bustoutsolutions/siesta.git",
     "path": "siesta",
     "branch": "master",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "1665db77a35b0e5c60269825d2e9b4d6971b81b5"
       }
-    },
+    ],
     "maintainer": "cantrell@pobox.com",
     "platforms": [
       "Darwin"
@@ -2563,11 +2401,12 @@
     "path": "vapor",
     "branch": "master",
     "maintainer": "tanner@vapor.codes",
-    "compatibility": {
-      "3.0": {
+    "compatibility": [
+      {
+        "version": "3.0",
         "commit": "652e8d8316696bd0f0bbde07da555210e81557f1"
       }
-    },
+    ],
     "platforms": [
       "Darwin",
       "Linux"
