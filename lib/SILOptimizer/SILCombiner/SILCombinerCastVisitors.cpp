@@ -236,9 +236,10 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   // larger OutputType (the actual memory object must be large enough to hold
   // both types). However, such address casts cannot be converted to value
   // casts.
-  if (!SILType::canUnsafeCastValue(InputTy, OutputTy, UADCI->getModule()))
+  if (!SILType::canPerformABICompatibleUnsafeCastValue(InputTy, OutputTy,
+                                                       UADCI->getModule())) {
     return nullptr;
-
+  }
   // For each user U of the unchecked_addr_cast...
   for (auto U : getNonDebugUses(UADCI))
     // Check if it is load. If it is not a load, bail...
