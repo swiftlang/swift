@@ -3406,5 +3406,5 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   SILValue reqtResultValue = resultPlanner.execute(witnessResultValue);
 
   scope.pop();
-  B.createReturn(loc, reqtResultValue);
+  B.createReturn(CleanupLocation::get(loc), reqtResultValue);
 }

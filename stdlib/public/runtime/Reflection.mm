@@ -589,11 +589,17 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   Mirror mirror;
 
   bool take = mirrorValue == value;
+
   ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
+
+  // Destroy the whole original value if we couldn't take it.
+  if (!take)
+      type->vw_destroy(value);
+
   return result;
 }
 

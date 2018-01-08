@@ -99,3 +99,8 @@ func haltAndCatchFire() -> Never { while true { } }
 let backupPlan: () -> Int = { haltAndCatchFire() }
 func missionCritical(storage: () -> String) {}
 missionCritical(storage: { haltAndCatchFire() })
+
+// <https://bugs.swift.org/browse/SR-4963>
+enum E { }
+func takesAnotherUninhabitedType(e: () -> E) {}
+takesAnotherUninhabitedType { haltAndCatchFire() }
