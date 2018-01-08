@@ -3607,12 +3607,34 @@ public:
   }
   
   void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
-    require(IBSHI->getBlockStorage()->getType().isAddress(),
+    auto storage = IBSHI->getBlockStorage();
+    require(storage->getType().isAddress(),
             "block storage operand must be an address");
-    auto storageTy
-      = IBSHI->getBlockStorage()->getType().getAs<SILBlockStorageType>();
+
+    auto storageTy = storage->getType().getAs<SILBlockStorageType>();
     require(storageTy, "block storage operand must be a @block_storage type");
-    
+
+    auto captureTy = storageTy->getCaptureType();
+    if (auto capturedFnTy = captureTy->getAs<SILFunctionType>()) {
+      if (capturedFnTy->isNoEscape()) {
+        // If the capture is a noescape function then it must be possible to
+        // locally determine the value stored to initialize the storage for the
+        // capture. This is required to diagnose static exclusivity violations
+        // when a noescape closure is converted to a noescape block that
+        // is then passed to a function.
+        auto *storageProjection =
+           storage->getSingleUserOfType<ProjectBlockStorageInst>();
+        require(storageProjection,
+                "block storage operand with noescape capture must have "
+                "projection from block");
+
+        auto *storeInst = storageProjection->getSingleUserOfType<StoreInst>();
+        require(storeInst,
+                "block storage operand with noescape capture must have "
+                "store to projection");
+      }
+    }
+
     require(IBSHI->getInvokeFunction()->getType().isObject(),
             "invoke function operand must be a value");
     auto invokeTy
