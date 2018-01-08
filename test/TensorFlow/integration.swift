@@ -1,5 +1,5 @@
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
-
 import TensorFlow
 
 public func testTensor() {
@@ -129,9 +129,7 @@ public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can 
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
   if cond {  // expected-warning {{value implicitly copied to accelerator}}
-
-    // TODO: Bogus warning, only on linux?
-    a -= b   // expected-warning {{value implicitly copied to the host}}
+    a -= b
   }
   a += b
   print(a.toHost())
@@ -163,14 +161,10 @@ public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
-  // TODO: Bogus warning, only on linux?
-  a += b  // expected-warning {{value implicitly copied to the host}}
+  a += b
 
-  // TODO: fix this to use an argument!
   if cond {  // expected-warning {{value implicitly copied to accelerator}}
-
-    // TODO: Bogus warning!
-    a -= b   // expected-warning {{value implicitly copied to the host}}
+    a -= b
   }
   a += b
   print(a.toHost())

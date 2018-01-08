@@ -37,7 +37,10 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
 
   @_inlineable
   public init(identicallyRanked other: Tensor<Element>) {
-    assert(other.rank == Tensor1D.rank)
+    // Assertion disabled because "x.rank" causes a copy of X 
+    // back to the host.  TODO(clattner): need a better way of
+    // exposing rank information in our model.
+    //assert(other.rank == Tensor1D.rank)
     self.init(underlying: other)
   }
 
