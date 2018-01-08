@@ -1690,6 +1690,11 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
   if (Info.Kind != RangeKind::SingleExpression
       && Info.Kind != RangeKind::PartOfExpression)
     return nullptr;
+
+  // FIXME: We should always have a valid node.
+  if (Info.ContainedNodes.empty())
+    return nullptr;
+
   Expr *E = Info.ContainedNodes[0].get<Expr*>();
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
