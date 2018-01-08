@@ -155,8 +155,6 @@ public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can 
 // CHECK-NEXT:  dealloc_stack
 
 
-// This should also result in a boolean parameter, but due to evaluation order
-// we get a send instead.
 public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can only handle single basic block programs}}
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
@@ -172,19 +170,20 @@ public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK:  [[BOOLTENSOR:%.*]] = builtin "tensorflowReceive_0"<TensorHandle<Builtin.Int1>>() : $TensorHandle<Builtin.Int1>
-// CHECK-NEXT:    [[BOOL:%.*]] = builtin "tf_tensor_to_i1"([[BOOLTENSOR]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
+// CHECK-NEXT:    builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:    [[BOOL:%.*]] = builtin "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
 // CHECK-NEXT:    cond_br [[BOOL]]
 // ...
 // CHECK: }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param2{{.*}}
 // CHECK: bb0(%0 : $Bool)
+// CHECK: [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
+// CHECK: function_ref @_swift_tfc_CreateCTensorHandle
+// CHECK: [[BOOLADDR:%.*]] = alloc_stack $Builtin.Int1
+// CHECK-NEXT: store [[BOOLVAL]] to [[BOOLADDR]] : $*Builtin.Int1
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
-// CHECK:  [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
-// CHECK:  builtin "tensorflowSend_0"<Builtin.Int1>([[BOOLVAL]]
 // CHECK: cond_br [[BOOLVAL]],
 
