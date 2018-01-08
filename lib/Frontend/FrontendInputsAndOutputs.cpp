@@ -159,14 +159,10 @@ StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
   return input == nullptr ? StringRef() : input->file();
 }
 
-std::string
-FrontendInputsAndOutputs::getCombinedNamesOfPrimaryInputFiles() const {
-  std::string r;
-  forEachPrimaryInput([&](const InputFile &f) -> void {
-    r += f.file();
-    r += "_";
-  });
-  return r;
+std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
+  return isWholeModule()
+             ? "all"
+             : primaryInputCount() == 1 ? firstPrimaryInput().file() : "batch";
 }
 
 bool FrontendInputsAndOutputs::isFilePrimary(StringRef file) {
