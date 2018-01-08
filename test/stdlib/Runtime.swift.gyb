@@ -962,6 +962,16 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
     "\(list)")
 }
 
+enum MyError: Error {
+  case myFirstError(LifetimeTracked)
+}
+
+Reflection.test("Enum/CaseName/Error") {
+  // Just make sure this doesn't leak.
+  let e: Error = MyError.myFirstError(LifetimeTracked(0))
+  _ = String(describing: e)
+}
+
 class Brilliant : CustomReflectable {
   let first: Int
   let second: String
