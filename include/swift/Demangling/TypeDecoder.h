@@ -89,10 +89,19 @@ class TypeDecoder {
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
     case NodeKind::Global:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::TypeMangling:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Type:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
     case NodeKind::Enum:
@@ -107,7 +116,9 @@ class TypeDecoder {
     case NodeKind::BoundGenericClass:
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure: {
-      assert(Node->getNumChildren() == 2);
+      if (Node->getNumChildren() != 2)
+        return BuiltType();
+
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
       if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
@@ -146,7 +157,10 @@ class TypeDecoder {
           return BuiltType();
         if (repr->getText() != "@thin")
           wasAbstract = true;
+      } else if (Node->getNumChildren() < 1) {
+        return BuiltType();
       }
+
       auto instance = decodeMangledType(Node->getChild(i));
       if (!instance)
         return BuiltType();
@@ -162,6 +176,9 @@ class TypeDecoder {
       }
     }
     case NodeKind::ProtocolList: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       std::vector<BuiltType> protocols;
       auto TypeList = Node->getChild(0);
       for (auto componentType : *TypeList) {
@@ -177,6 +194,9 @@ class TypeDecoder {
           /*hasExplicitAnyObject=*/false);
     }
     case NodeKind::ProtocolListWithAnyObject: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       std::vector<BuiltType> protocols;
       auto ProtocolList = Node->getChild(0);
       auto TypeList = ProtocolList->getChild(0);
@@ -191,6 +211,9 @@ class TypeDecoder {
           /*hasExplicitAnyObject=*/true);
     }
     case NodeKind::ProtocolListWithClass: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       std::vector<BuiltType> members;
       auto ProtocolList = Node->getChild(0);
       auto TypeList = ProtocolList->getChild(0);
@@ -210,6 +233,9 @@ class TypeDecoder {
           /*hasExplicitAnyObject=*/true);
     }
     case NodeKind::Protocol: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       auto moduleName = Node->getChild(0)->getText();
       auto nameNode = Node->getChild(1);
       std::string privateDiscriminator, name;
@@ -244,6 +270,9 @@ class TypeDecoder {
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
     case NodeKind::FunctionType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -257,6 +286,9 @@ class TypeDecoder {
       bool isThrow =
         Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
       flags = flags.withThrows(isThrow);
+
+      if (isThrow && Node->getNumChildren() < 3)
+        return BuiltType();
 
       bool hasParamFlags = false;
       std::vector<FunctionParam<BuiltType>> parameters;
@@ -313,10 +345,19 @@ class TypeDecoder {
 
       return Builder.createFunctionType(parameters, result, flags);
     }
+
     case NodeKind::ArgumentTuple:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::ReturnType:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::Tuple: {
       std::vector<BuiltType> elements;
       std::string labels;
@@ -359,13 +400,27 @@ class TypeDecoder {
       return Builder.createTupleType(elements, std::move(labels), variadic);
     }
     case NodeKind::TupleElement:
-      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName) {
+        if (Node->getNumChildren() < 2)
+          return BuiltType();
+
         return decodeMangledType(Node->getChild(1));
+      }
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::DependentGenericType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(1));
     }
     case NodeKind::DependentMemberType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
@@ -375,27 +430,43 @@ class TypeDecoder {
         return BuiltType();
       return Builder.createDependentMemberType(member, base, protocol);
     }
-    case NodeKind::DependentAssociatedTypeRef:
+    case NodeKind::DependentAssociatedTypeRef: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+    }
     case NodeKind::Unowned: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createUnownedStorageType(base);
     }
     case NodeKind::Unmanaged: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createUnmanagedStorageType(base);
     }
     case NodeKind::Weak: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createWeakStorageType(base);
     }
     case NodeKind::SILBoxType: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
@@ -418,7 +489,9 @@ private:
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
-    assert(node->getNumChildren() == 2);
+    if (node->getNumChildren() < 2)
+      return false;
+
     auto moduleOrParentType = node->getChild(0);
 
     // Nested types are handled a bit funny here because a

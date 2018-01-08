@@ -887,7 +887,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   if (popNode(Node::Kind::EmptyList))
     return createNode(Node::Kind::LabelList);
 
-  assert(Type->getKind() == Node::Kind::Type);
+  if (!Type || Type->getKind() != Node::Kind::Type)
+    return nullptr;
 
   auto FuncType = Type->getFirstChild();
   if (FuncType->getKind() == Node::Kind::DependentGenericType)
