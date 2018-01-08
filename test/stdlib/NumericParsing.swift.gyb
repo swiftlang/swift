@@ -121,6 +121,15 @@ tests.test("${Self}/radixTooHigh") {
 
 % end
 
+tests.test("FixedWidthInteger/maxUInt64") {
+  func f<T : FixedWidthInteger>(_ x: T) -> String {
+    return String(x, radix: 16)
+  }
+  let x = f(UInt64.max)
+  let y = String(UInt64.max, radix: 16)
+  expectEqual(x, y)
+}
+
 % for Self in 'Float', 'Double', 'Float80':
 
 % if Self == 'Float80':

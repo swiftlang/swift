@@ -1097,7 +1097,11 @@ visitFullApply(FullApplySite apply) {
     return {true, UseLifetimeConstraint::MustBeLive};
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    // A +1 value may be passed to a guaranteed argument. From the caller's
+    // point of view, this is just like a normal non-consuming use.
+    // Direct_Guaranteed only accepts non-trivial types, but trivial types are
+    // already handled above.
+    return visitApplyParameter(ValueOwnershipKind::Any,
                                UseLifetimeConstraint::MustBeLive);
   // The following conventions should take address types.
   case ParameterConvention::Indirect_Inout:

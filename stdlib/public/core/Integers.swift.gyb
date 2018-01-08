@@ -1489,7 +1489,12 @@ public protocol BinaryInteger :
   ///
   /// This property is a constant for instances of fixed-width integer
   /// types.
-  var bitWidth : Int { get }
+  var bitWidth: Int { get }
+
+  /// Returns the integer binary logarithm of this value.
+  ///
+  /// If the value is negative, a runtime error will occur.
+  func _binaryLogarithm() -> Self
 
   /// The number of trailing zeros in this value's binary representation.
   ///
@@ -1593,6 +1598,25 @@ extension BinaryInteger {
   public var _lowWord: UInt {
     var it = words.makeIterator()
     return it.next() ?? 0
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _binaryLogarithm() -> Self {
+    _precondition(self > 0)
+    let wordBitWidth = Magnitude.Words.Element.bitWidth
+    let reversedWords = magnitude.words.reversed()
+    // If, internally, a variable-width binary integer uses digits of greater
+    // bit width than that of Magnitude.Words.Element (i.e., UInt), then it is
+    // possible that more than one element of Magnitude.Words could be entirely
+    // zero.
+    let reversedWordsLeadingZeroBitCount =
+      zip(0..., reversedWords)
+        .first { $0.1 != 0 }
+        .map { $0.0 &* wordBitWidth &+ $0.1.leadingZeroBitCount }!
+    let logarithm =
+      reversedWords.count &* wordBitWidth &-
+        (reversedWordsLeadingZeroBitCount &+ 1)
+    return Self(logarithm)
   }
 
   /// Returns the quotient and remainder of this value divided by the given
@@ -2212,6 +2236,12 @@ extension FixedWidthInteger {
   /// The number of bits in the binary representation of this value.
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _binaryLogarithm() -> Self {
+    _precondition(self > 0)
+    return Self(Magnitude.bitWidth &- (magnitude.leadingZeroBitCount &+ 1))
+  }
 
   /// Creates an integer from its little-endian representation, changing the
   /// byte order if necessary.
