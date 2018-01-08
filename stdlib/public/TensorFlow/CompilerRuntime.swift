@@ -15,12 +15,22 @@
 //===----------------------------------------------------------------------===//
 
 import CTensorFlow
+import Glibc
+
+// This struct is intended for prototyping.
+// TODO(hongm): Revisit the longer-term design.
+public struct _TFCRuntimeConfig {
+  // When true, run the entire tensor computation in _TFCStartTensorProgram(),
+  // instead of running it in a thread.
+  // Set to true only for debugging purposes.
+  static public var usesSynchronousExecution = false
+}
 
 // The C type is TF_Status*
-public typealias CTF_Status = OpaquePointer?
+public typealias CTFStatus = OpaquePointer
 
 @_versioned
-func checkOk(_ s: CTF_Status) {
+func checkOk(_ s: CTFStatus?) {
   precondition(TF_GetCode(s) == TF_OK, String(cString: TF_Message(s)))
 }
 
@@ -30,7 +40,25 @@ func checkOk(_ s: CTF_Status) {
 // The finish/terminate APIs may only be called once.
 //
 public final class TensorProgram {
-  let outputTensors: [CTensorHandle]
+  let status: CTFStatus?
+
+  // The C type is TFE_Context*
+  public typealias CTFContext = OpaquePointer
+  let context: CTFContext?
+
+  // The C type is TFE_Operator*
+  public typealias CTFOperator = OpaquePointer
+  let `operator`: CTFOperator?
+
+  var returnValues: [CTensorHandle?]
+  var returnValueCount: CInt
+
+  // The thread to run tensor computation in.
+  // TODO(hongm): For pthread portability on Darwin and other OSes, see
+  // swift/stdlib/private/SwiftPrivatePthreadExtras/SwiftPrivatePthreadExtras.swift
+  // https://github.com/ketzusaka/Strand/blob/master/Sources/Strand.swift
+  // Also assess Windows portability (where pthread_create does not exist).
+  var pthread: pthread_t
 
   // Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
   // and 'size', start the computation, and return a state object as a unique
@@ -46,59 +74,90 @@ public final class TensorProgram {
     let inputTensors = UnsafeBufferPointer(start: tensorArgumentAddress,
                                            count: tensorArgumentCount)
 
-    let s = TF_NewStatus()
+    self.status = TF_NewStatus()
     let tfFunc = TF_FunctionImportFunctionDef(programByteAddress,
-                                              programByteCount, s)
-    checkOk(s)
+                                              programByteCount, status)
+    checkOk(status)
 
     // Now we start the graph computation.
     let opts = TFE_NewContextOptions()
-    let ctx = TFE_NewContext(opts, s)
-    checkOk(s)
+    self.context = TFE_NewContext(opts, status)
+    checkOk(status)
     TFE_DeleteContextOptions(opts)
 
-    TFE_ContextAddFunction(ctx, tfFunc, s)
-    checkOk(s)
+    TFE_ContextAddFunction(context, tfFunc, status)
+    checkOk(status)
     TF_DeleteFunction(tfFunc)
 
-    let op = TFE_NewOp(ctx, "the_function", s)
-    checkOk(s)
+    self.`operator` = TFE_NewOp(context, "the_function", status)
+    checkOk(status)
 
     for inputTensor in inputTensors {
-      TFE_OpAddInput(op, inputTensor, s)
-      checkOk(s)
+      TFE_OpAddInput(`operator`, inputTensor, status)
+      checkOk(status)
     }
 
-    var retVals = [CTensorHandle?](repeating: nil, count: resultCount)
-    var retValCount = CInt(resultCount)
-    TFE_Execute(op, &retVals, &retValCount, s)
-    checkOk(s)
-    assert(Int(retValCount) == resultCount,
-           "internal compiler error, result count mismatch!")
-    TFE_DeleteOp(op)
-    TFE_DeleteContext(ctx, s)
-    checkOk(s)
-    TF_DeleteStatus(s)
+    self.returnValues = [CTensorHandle?](repeating: nil, count: resultCount)
+    self.returnValueCount = CInt(resultCount)
+    self.pthread = 0
+    if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+      let programPtr = Unmanaged.passRetained(self).toOpaque()
+      // When the closure gets long, split it into a static function that takes a TensorProgram.
+      let createStatus = pthread_create(&pthread, nil, { arg in
+        let program = Unmanaged<TensorProgram>.fromOpaque(arg!).takeRetainedValue()
+        TFE_Execute(program.`operator`,
+                    &program.returnValues,
+                    &program.returnValueCount,
+                    program.status)
+        checkOk(program.status)
+        return nil
+      }, UnsafeMutableRawPointer(programPtr))
+      // TODO(hongm): do error handling.
+      precondition(createStatus == 0)
+    } else {
+        // Print a debug message to differentiate from async computation.
+        print("Running tensor computation synchronously.")
+        let program = self
+        TFE_Execute(program.`operator`,
+                    &program.returnValues,
+                    &program.returnValueCount,
+                    program.status)
+        checkOk(program.status)
+    }
+  }
 
-    // Now that all the elements have been filled in, remove a level of
-    // optional.
-    self.outputTensors = retVals.map { $0! }
+  deinit {
+    TFE_DeleteOp(`operator`)
+    TFE_DeleteContext(context, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
   }
 
   // Terminate the computation as given by 'program', and clean up the state.
   //
-  // TODO(hongm): add real logic, including handling input/output and errors.
+  // TODO(hongm): add error handling.
   @_versioned
   func terminate() {
+    if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+      // TODO(hongm): Assess TF's thread cancel support.
+      let cancelStatus = pthread_cancel(pthread)
+      precondition(cancelStatus == 0)
+    }
   }
 
   // Wait for completion the computation as given by 'program', and returns
   // output handles.
   //
-  // TODO(hongm): add real logic, including handling input/output and errors.
+  // TODO(hongm): add error handling.
   @_versioned
   func finish() -> [CTensorHandle] {
-    return outputTensors
+    if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+      let joinStatus = pthread_join(pthread, nil)
+      precondition(joinStatus == 0)
+    }
+
+    // Now that all the elements have been filled in, remove a level of optional.
+    return self.returnValues.map { $0! }
   }
 }
 
@@ -158,8 +217,9 @@ public func _TFCFinishTensorProgram(
   _ tensorResultCount: Int) {
 
   let results = program.finish()
-  assert(results.count == tensorResultCount,
-         "internal compiler error: result count mismatch!")
+  // TODO(hongm): Change to some form of assert.
+  precondition(results.count == tensorResultCount,
+               "internal compiler error: result count mismatch!")
 
   let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
                                                 count: tensorResultCount)
