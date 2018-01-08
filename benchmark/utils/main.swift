@@ -107,6 +107,7 @@ import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
 import ReversedCollections
+import RomanNumbers
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -242,6 +243,7 @@ registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(ReversedCollections)
+registerBenchmark(RomanNumbers)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
