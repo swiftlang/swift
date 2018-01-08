@@ -739,11 +739,11 @@ extension ${Self} where Bound: BinaryFloatingPoint {
   /// If the range is empty, the value of this function is `nil`.
   ///
   ///     let range = 0.0 ..< 5.0
-  ///     if let randomNumber = numbers.random {
+  ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "3.1415926535"
-  public var random: Bound? {
+  public func random() -> Bound? {
     return self.random(using: Random.default)
   }
 
@@ -756,7 +756,7 @@ extension ${Self} where Bound: BinaryFloatingPoint {
   /// If the range is empty, the value of this function is `nil`.
   ///
   ///     let range = 0.0 ..< 5.0
-  ///     if let randomNumber = numbers.random {
+  ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "3.1415926535"

@@ -19,7 +19,7 @@ import SwiftShims
 /// that implement their own pseudo-random or cryptographically secure
 /// pseudo-random number generation. Using the RandomNumberGenerator protocol
 /// allows these types to be used with types that conform to `Randomizable`,
-/// collections with .random and .pick(_:), and collections/sequences with
+/// collections with .random() and .pick(_:), and collections/sequences with
 /// .shuffle() and .shuffled()
 ///
 /// Conforming to the RandomNumberGenerator protocol
@@ -106,7 +106,7 @@ extension RandomNumberGenerator {
 /// However, you should strive to use the random functions on the numeric types.
 /// Using the preferred way:
 ///
-///     let random = UInt8.random
+///     let random = UInt8.random()
 ///     let randomToTen = UInt32.random(in: 0 ... 128)
 ///
 /// - Note: The default implementation of randomness is cryptographically secure.
@@ -139,7 +139,7 @@ public struct Random : RandomNumberGenerator {
 /// The Randomizable protocol is to be used when types have the capability of
 /// being randomized. A good example of this is `Int`.
 ///
-///     let randomInt = Int.random
+///     let randomInt = Int.random()
 ///
 /// `Int` conforms to the Randomizable protocol because there is the ability to
 /// produce a random `Int`. Note that not all types that are able to implement
@@ -183,7 +183,7 @@ extension Randomizable {
   /// Shorthand for using the random(using:) function. This uses the default
   /// random implementation defined in the standard library.
   @_inlineable
-  public static var random: Self {
+  public static func random() -> Self {
     return self.random(using: Random.default)
   }
 }
@@ -203,7 +203,7 @@ extension Randomizable where Self: BinaryFloatingPoint {
       !range.isEmpty,
       "Range should not be empty when getting a random number"
     )
-    return range.random!
+    return range.random()!
   }
 
   /// Returns a random representation of this type within the range
@@ -241,7 +241,7 @@ extension Randomizable where Self: Strideable, Self.Stride: SignedInteger {
       !range.isEmpty,
       "Range should not be empty when getting a random number"
     )
-    return range.random!
+    return range.random()!
   }
 
   /// Returns a random representation of this type within the range

@@ -783,16 +783,16 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// A good example of this is getting a random greeting from an array:
   ///
   ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random
+  ///     let randomGreeting = greetings.random()
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random {
+  ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20"
-  var random: Element? { get }
+  func random() -> Element?
 
   /// Returns a random element from this collection.
   ///
@@ -803,12 +803,12 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// A good example of this is getting a random greeting from an array:
   ///
   ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random
+  ///     let randomGreeting = greetings.random()
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random {
+  ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20"
@@ -1033,17 +1033,17 @@ extension Collection {
   /// A good example of this is getting a random greeting from an array:
   ///
   ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random
+  ///     let randomGreeting = greetings.random()
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random {
+  ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20"
   @_inlineable
-  public var random: Element? {
+  public func random() -> Element? {
     return self.random(using: Random.default)
   }
 

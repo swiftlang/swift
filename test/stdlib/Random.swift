@@ -6,13 +6,13 @@ import StdlibUnittest
 let RandomTests = TestSuite("Random")
 
 RandomTests.test("random numbers") {
-  let randomNumber1 = Int.random
-  let randomNumber2 = Int.random
+  let randomNumber1 = Int.random()
+  let randomNumber2 = Int.random()
   expectTrue(randomNumber1 != randomNumber2)
 
-  let randomDouble1 = Double.random
+  let randomDouble1 = Double.random()
   expectTrue(randomDouble1 < 1 && randomDouble1 > 0)
-  let randomDouble2 = Double.random
+  let randomDouble2 = Double.random()
   expectTrue(randomDouble1 < 1 && randomDouble2 > 0)
   expectTrue(randomDouble1 != randomDouble2)
 }
@@ -46,7 +46,7 @@ RandomTests.test("random numbers from range") {
 RandomTests.test("random elements") {
   let greetings = ["hello", "hi", "hey", "hola", "what's up"]
   for _ in 0 ..< 20 {
-    let randomGreeting = greetings.random
+    let randomGreeting = greetings.random()
     expectNotNil(randomGreeting)
     expectTrue(greetings.contains(randomGreeting!))
   }
