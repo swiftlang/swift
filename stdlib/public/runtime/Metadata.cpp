@@ -913,8 +913,9 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
+  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
   char *newLabels =
-    (char *)TupleTypes.getAllocator().Allocate(labelsLen + 1, alignof(char));
+    (char *)TupleTypes.getAllocator().Allocate(labelsAllocSize, alignof(char));
   strcpy(newLabels, labels);
   key.Labels = newLabels;
 
@@ -924,7 +925,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
   if (!result.second) {
-    TupleTypes.getAllocator().Deallocate(newLabels, labelsLen + 1);
+    TupleTypes.getAllocator().Deallocate(newLabels, labelsAllocSize);
   }
 
   // Done.
