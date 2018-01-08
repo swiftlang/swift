@@ -1549,7 +1549,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
   auto &LangOpts = Invocation.getLangOptions();
   auto &SILOpts = Invocation.getSILOptions();
   std::string InputName =
-      FEOpts.InputsAndOutputs.getCombinedNamesOfPrimaryInputFiles();
+      FEOpts.InputsAndOutputs.getStatsFileMangledInputName();
   StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
   StringRef OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
