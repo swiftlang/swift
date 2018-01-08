@@ -83,9 +83,7 @@ extension BinaryInteger {
 @inline(never)
 func checkRomanNumerals(upTo limit: Int) {
   for i in 0 ..< limit {
-    guard Int(romanNumeral: identity(i.romanNumeral)) == i else {
-      fatalError()
-    }
+    CheckResults(Int(romanNumeral: identity(i.romanNumeral)) == i)
   }
 }
 
