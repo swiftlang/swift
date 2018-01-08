@@ -16,6 +16,9 @@ DemangleToMetadataTests.test("tuple types") {
   expectEqual(type(of: ((), b: ())), _typeByMangledName("yt_yt1bt")!)
   expectEqual(type(of: (a: (), ())), _typeByMangledName("yt1a_ytt")!)
   expectEqual(type(of: (a: (), b: ())), _typeByMangledName("yt1a_yt1bt")!)
+
+  // Initial creation of metadata via demangling a type name.
+  expectNotNil(_typeByMangledName("yt1a_yt3bcdt"))
 }
 
 func f0() { }
