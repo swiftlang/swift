@@ -27,7 +27,9 @@ public let CharacterPropertiesFetch = BenchmarkInfo(
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { run_CharacterPropertiesStashed(1) },
+  tearDownFunction: nil)
 
 public let CharacterPropertiesStashedMemo = BenchmarkInfo(
   name: "CharacterPropertiesStashedMemo",
@@ -37,7 +39,9 @@ public let CharacterPropertiesStashedMemo = BenchmarkInfo(
 public let CharacterPropertiesPrecomputed = BenchmarkInfo(
   name: "CharacterPropertiesPrecomputed",
   runFunction: run_CharacterPropertiesPrecomputed,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { run_CharacterPropertiesPrecomputed(1) },
+  tearDownFunction: nil)
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
