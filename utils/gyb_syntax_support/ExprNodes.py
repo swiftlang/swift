@@ -444,15 +444,15 @@ EXPR_NODES = [
     # e.g. "\a.b[2].a"
     Node('KeyPathExpr', kind='Expr',
          children=[
-              Child('Backslash', kind='BackslashToken'),
-              Child('Expression', kind='Expr'),
+             Child('Backslash', kind='BackslashToken'),
+             Child('Expression', kind='Expr'),
          ]),
 
     # e.g. "a." or "a"
     Node('ObjcNamePiece', kind='Syntax',
          children=[
-              Child('Name', kind='IdentifierToken'),
-              Child('Dot', kind='PeriodToken', is_optional=True),
+             Child('Name', kind='IdentifierToken'),
+             Child('Dot', kind='PeriodToken', is_optional=True),
          ]),
 
     # e.g. "a.b.c"
@@ -461,9 +461,9 @@ EXPR_NODES = [
     # e.g. "#keyPath(a.b.c)"
     Node('ObjcKeyPathExpr', kind='Expr',
          children=[
-              Child('KeyPath', kind='PoundKeyPathToken'),
-              Child('LeftParen', kind='LeftParenToken'),
-              Child('Name', kind='ObjcName'),
-              Child('RightParen', kind='RightParenToken'),
+             Child('KeyPath', kind='PoundKeyPathToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Name', kind='ObjcName'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 ]
