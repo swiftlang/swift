@@ -79,6 +79,10 @@ public:
   // xxx now that there can be multiples, does this still make sense?
   const std::string &getAnyOutputForType(types::ID type) const;
 
+  void
+  forEachOutputOfType(types::ID type,
+                      llvm::function_ref<void(std::string const &)> fn) const;
+
   StringRef getBaseInput(int Index) const { return BaseInputs[Index]; }
 
   // xxx move this info into type??

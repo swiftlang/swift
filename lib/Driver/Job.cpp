@@ -69,6 +69,18 @@ CommandOutput::getAnyOutputForType(types::ID type) const {
   return outs.empty() ? empty : outs[0];
 }
 
+void CommandOutput::forEachOutputOfType(
+    types::ID type, llvm::function_ref<void(const std::string &)> fn) const {
+  if (PrimaryOutputType == type) {
+    for (const auto &f : PrimaryOutputFilenames) {
+      fn(f);
+    }
+  }
+  for (const auto &f : getAdditionalOutputsForType(type)) {
+    fn(f);
+  }
+}
+
 bool CommandOutput::doesBatchModeProduceMultiples(types::ID type) {
   return type != types::TY_SwiftDeps && type != types::TY_SerializedDiagnostics;
 }
