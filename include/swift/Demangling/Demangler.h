@@ -290,6 +290,11 @@ protected:
   StringRef Text;
   size_t Pos = 0;
 
+  /// Mangling style where function type would have
+  /// labels attached to it, instead of having them
+  /// as part of the name.
+  bool IsOldFunctionTypeMangling = false;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
   Vector<unsigned> PendingSubstitutions;
