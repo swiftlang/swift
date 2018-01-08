@@ -133,6 +133,7 @@ import TwoSum
 import TypeFlood
 import UTF8Decode
 import Walsh
+import WordCount
 import XorLoop
 
 @inline(__always)
@@ -267,6 +268,7 @@ registerBenchmark(TwoSum)
 registerBenchmark(TypeFlood)
 registerBenchmark(UTF8Decode)
 registerBenchmark(Walsh)
+registerBenchmark(WordCount)
 registerBenchmark(XorLoop)
 
 main()
