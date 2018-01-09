@@ -1257,8 +1257,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
-  case Kind::Function:
-  case Kind::Other:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -1307,10 +1305,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   }
   case Kind::ReflectionAssociatedTypeDescriptor:
     if (getLinkageAsConformance() == SILLinkage::Shared)
-      return SILLinkage::Shared;
-    return SILLinkage::Private;
-  case Kind::ReflectionSuperclassDescriptor:
-    if (getDeclLinkage(getDecl()) == FormalLinkage::PublicNonUnique)
       return SILLinkage::Shared;
     return SILLinkage::Private;
   }
@@ -1363,8 +1357,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::Function:
-  case Kind::Other:
   case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableAccessFunction:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
@@ -1378,7 +1370,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
-  case Kind::ReflectionSuperclassDescriptor:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");

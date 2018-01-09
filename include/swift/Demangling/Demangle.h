@@ -206,6 +206,8 @@ public:
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
+  // Only to be used by the demangler parsers.
+  void removeChildAt(unsigned Pos, NodeFactory &factory);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -233,6 +235,12 @@ inline bool isMangledName(llvm::StringRef MangledName) {
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isSwiftSymbol(const char *mangledName);
+
+/// Returns true if the mangled name has the old scheme of function type
+/// mangling where labels are part of the type.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isOldFunctionTypeMangling(const char *mangledName);
 
 class Demangler;
 
