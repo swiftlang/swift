@@ -16,8 +16,8 @@
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
 // CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
-// CHECK:   %objc_class* @"OBJC_METACLASS_$__TtCs7_Object",
-// CHECK:   %objc_class* @"OBJC_METACLASS_$__TtCs7_Object",
+// CHECK:   %objc_class* @"OBJC_METACLASS_$__TtCs12_SwiftObject",
+// CHECK:   %objc_class* @"OBJC_METACLASS_$__TtCs12_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* null,
 // CHECK:   i64 ptrtoint ({{.*}}* @_METACLASS_DATA__TtC17objc_class_export3Foo to i64)
@@ -53,7 +53,7 @@
 // CHECK:   void ([[FOO]]*)* @_T017objc_class_export3FooCfD,
 // CHECK:   i8** @_T0BOWV,
 // CHECK:   i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" to i64),
-// CHECK:   %objc_class* @"OBJC_CLASS_$__TtCs7_Object",
+// CHECK:   %objc_class* @"OBJC_CLASS_$__TtCs12_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* null,
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
