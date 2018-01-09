@@ -3635,6 +3635,30 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
 %   end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs == rhs)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs < rhs)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return rhs < lhs
+  }
 }
 
 
