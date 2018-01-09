@@ -1127,9 +1127,6 @@ private:
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
-    /// \brief Whether to record failures or not.
-    bool recordFixes = false;
-
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
@@ -1689,10 +1686,7 @@ public:
 
   /// \brief Whether we should attempt to fix problems.
   bool shouldAttemptFixes() {
-    if (!(Options & ConstraintSystemFlags::AllowFixes))
-      return false;
-
-    return !solverState || solverState->recordFixes;
+    return Options.contains(ConstraintSystemFlags::AllowFixes);
   }
 
   /// \brief Log and record the application of the fix. Return true iff any

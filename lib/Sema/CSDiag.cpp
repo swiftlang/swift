@@ -8418,60 +8418,22 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
-  // Attempt to solve again, capturing all states that come from our attempts to
-  // select overloads or bind type variables.
-  //
-  // FIXME: can this be removed?  We need to arrange for recordFixes to be
-  // eliminated.
-  viable.clear();
-
-  {
-    // Set up solver state.
-    SolverState state(expr, *this);
-    state.recordFixes = true;
-
-    // Solve the system.
-    solveRec(viable, FreeTypeVariableBinding::Disallow);
-
-    // Check whether we have a best solution; this can happen if we found
-    // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, state.ExprWeights,
-                                     /*minimize=*/true)) {
-      if (*best != 0)
-        viable[0] = std::move(viable[*best]);
-      viable.erase(viable.begin() + 1, viable.end());
-      return false;
-    }
-
-    // FIXME: If we were able to actually fix things along the way,
-    // we may have to hunt for the best solution. For now, we don't care.
-
-    // Remove solutions that require fixes; the fixes in those systems should
-    // be diagnosed rather than any ambiguity.
-    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
-    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
-    viable.erase(newEnd, viable.end());
-
-    // If there are multiple solutions, try to diagnose an ambiguity.
-    if (viable.size() > 1) {
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log << "---Ambiguity error: "
-            << viable.size() << " solutions found---\n";
-        int i = 0;
-        for (auto &solution : viable) {
-          log << "---Ambiguous solution #" << i++ << "---\n";
-          solution.dump(log);
-          log << "\n";
-        }
-      }        
-
-      if (diagnoseAmbiguity(*this, viable, expr)) {
-        return true;
+  // If there are multiple solutions, try to diagnose an ambiguity.
+  if (viable.size() > 1) {
+    if (getASTContext().LangOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log << "---Ambiguity error: " << viable.size() << " solutions found---\n";
+      int i = 0;
+      for (auto &solution : viable) {
+        log << "---Ambiguous solution #" << i++ << "---\n";
+        solution.dump(log);
+        log << "\n";
       }
     }
 
-    // Fall through to produce diagnostics.
+    if (diagnoseAmbiguity(*this, viable, expr)) {
+      return true;
+    }
   }
 
   if (getExpressionTooComplex(viable)) {

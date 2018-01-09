@@ -7674,6 +7674,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
+    if (auto *coercion = dyn_cast<CoerceExpr>(affected))
+      affected = coercion->getSubExpr();
+
     const Expr *unwrapped = affected->getValueProvidingExpr();
     auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
@@ -7683,10 +7686,10 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                   type)
         .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
                       "try!");
-
     } else {
       auto diag = TC.diagnose(affected->getLoc(),
                               diag::missing_unwrap_optional, type);
+
       if (affected->canAppendPostfixExpression(true)) {
         diag.fixItInsertAfter(affected->getEndLoc(), "!");
       } else {
@@ -7710,9 +7713,33 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (auto *paren = dyn_cast<ParenExpr>(affected))
       affected = paren->getSubExpr();
 
+    // If this is already a coercion, let's suggest replacing
+    // "as" with "as!", if possible, since it has to be a forced downcast.
+    if (auto *coercion = dyn_cast<CoerceExpr>(affected)) {
+      auto fromType = solution.simplifyType(getType(coercion->getSubExpr()))
+                          ->getRValueType();
+      auto toType = solution.simplifyType(fix.first.getTypeArgument(*this));
+
+      bool isConvertable = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
+      bool isValidForced =
+          !isConvertable && TC.checkedCastMaySucceed(fromType, toType, DC);
+
+      if (!isValidForced) {
+        TC.diagnose(affected->getLoc(), diag::cannot_convert_coerce, fromType,
+                    toType);
+      } else {
+        auto diag =
+            TC.diagnose(affected->getLoc(), diag::missing_forced_downcast,
+                        fromType, toType);
+        diag.fixItReplace(coercion->getAsLoc(), "as!");
+      }
+      return true;
+    }
+
     auto fromType = solution.simplifyType(getType(affected))
                       ->getRValueObjectType();
     Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
+
     bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
     bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
                                                         DC);

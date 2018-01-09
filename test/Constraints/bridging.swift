@@ -291,7 +291,7 @@ func rdar19836341(_ ns: NSString?, vns: NSString?) {
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}
+  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'String' to expected argument type 'NSString'}}
   var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
