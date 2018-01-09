@@ -266,7 +266,8 @@ PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback
   return enumerateGenericSignatureRequirements(Generics, callback);
 }
 
-void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
+void PolymorphicConvention::
+enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
   enumerateRequirements([&](GenericRequirement requirement) {
     if (requirement.Protocol) {
       if (!Fulfillments.getWitnessTable(requirement.TypeParameter,
@@ -589,8 +590,9 @@ void EmitPolymorphicParameters::bindParameterSources(const GetParameterFn &getPa
   }
 }
 
-void EmitPolymorphicParameters::bindParameterSource(SILParameterInfo param, unsigned paramIndex,
-                         const GetParameterFn &getParameter) {
+void EmitPolymorphicParameters::
+bindParameterSource(SILParameterInfo param, unsigned paramIndex,
+                    const GetParameterFn &getParameter) {
   // Ignore indirect parameters for now.  This is potentially dumb.
   if (IGF.IGM.silConv.isSILIndirect(param))
     return;
@@ -3099,7 +3101,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
-                                         signature.getType()->getPointerTo());
+                                           signature.getType()->getPointerTo());
 
   return FunctionPointer(witnessFnPtr, signature);
 }

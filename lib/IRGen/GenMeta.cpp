@@ -5555,5 +5555,5 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
   // The instance type field of MetatypeMetadata is immediately after
   // the isa field.
   return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
-                                     IGF.IGM.TypeMetadataPtrTy);
+                                              IGF.IGM.TypeMetadataPtrTy);
 }
