@@ -143,10 +143,6 @@ class LinkEntity {
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
 
-    /// Some other kind of declaration.
-    /// The pointer is a Decl*.
-    Other,
-
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -246,7 +242,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::Other;
+    return k <= Kind::ProtocolDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -367,14 +363,6 @@ class LinkEntity {
   LinkEntity() = default;
 
 public:
-  static LinkEntity forNonFunction(ValueDecl *decl) {
-    assert(!isFunction(decl));
-
-    LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl);
-    return entity;
-  }
-
   static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
     LinkEntity entity;
     entity.Pointer = decl;

@@ -147,10 +147,6 @@ std::string LinkEntity::mangleAsString() const {
         if (!AsmA->Name.empty())
           return AsmA->Name;
 
-      // Otherwise, fall through into the 'other decl' case.
-      LLVM_FALLTHROUGH;
-
-    case Kind::Other:
       // As a special case, Clang functions and globals don't get mangled at all.
       if (auto clangDecl = getDecl()->getClangDecl()) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
@@ -170,9 +166,6 @@ std::string LinkEntity::mangleAsString() const {
         }
       }
 
-      if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-        return mangler.mangleNominalType(type);
-      }
       if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
         // FIXME: Hack. LinkInfo should be able to refer to the allocating
         // constructor rather than inferring it here.
