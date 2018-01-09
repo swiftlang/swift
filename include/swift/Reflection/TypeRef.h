@@ -398,7 +398,7 @@ public:
   }
 
   bool isError() const {
-    return MangledName == "s5Error_p";
+    return MangledName == "s5ErrorP";
   }
 
   const std::string &getMangledName() const {

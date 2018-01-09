@@ -143,6 +143,9 @@ bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
   return mangledName.size() >= 2 && mangledName[0] == '_' &&
       mangledName[1] == 'T';
 }
+
+llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
+  return mangledName.drop_front(getManglingPrefixLength(mangledName));
 }
 
 namespace swift {

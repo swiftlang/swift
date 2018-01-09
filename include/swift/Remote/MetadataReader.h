@@ -353,13 +353,20 @@ public:
         if (!ProtocolDescriptor)
           return BuiltType();
 
-        std::string MangledName;
+        std::string MangledNameStr;
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
-                                MangledName))
+                                MangledNameStr))
           return BuiltType();
+
+        StringRef MangledName =
+          Demangle::dropSwiftManglingPrefix(MangledNameStr);
+
         Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleSymbolAsNode(MangledName);
-        auto Protocol = decodeMangledType(Demangled);
+        auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+        if (!Demangled)
+          return BuiltType();
+
+        auto Protocol = decodeMangledType(Demanglede;)
         if (!Protocol)
           return BuiltType();
 

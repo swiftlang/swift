@@ -635,6 +635,9 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
     return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
   }
 
+  case Demangle::Node::Kind::Global:
+    return findDeclContext(node->getChild(0));
+
   // Bail out on other kinds of contexts.
   // TODO: extensions
   // TODO: local contexts

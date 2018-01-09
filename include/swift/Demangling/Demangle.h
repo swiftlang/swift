@@ -235,6 +235,12 @@ inline bool isMangledName(llvm::StringRef mangledName) {
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
 bool isSwiftSymbol(llvm::StringRef mangledName);
 
+/// Drops the Swift mangling prefix from the given mangled name, if there is
+/// one.
+///
+/// This does not include the old (<= swift 3.x) mangling prefix "_T".
+llvm::StringRef dropSwiftManglingPrefix(llvm::StringRef mangledName);
+
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///

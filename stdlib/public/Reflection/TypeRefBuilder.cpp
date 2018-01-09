@@ -28,6 +28,12 @@ using namespace reflection;
 
 TypeRefBuilder::TypeRefBuilder() : TC(*this) {}
 
+/// Determine whether the given reflection protocol name matches.
+static bool reflectionNameMatches(StringRef reflectionName,
+                                  StringRef searchName) {
+  return dropSwiftManglingPrefix(reflectionName) == searchName;
+}
+
 const TypeRef * TypeRefBuilder::
 lookupTypeWitness(const std::string &MangledTypeName,
                   const std::string &Member,
@@ -106,7 +112,7 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       if (!FD.hasMangledTypeName())
         continue;
       auto CandidateMangledName = FD.getMangledTypeName(Offset);
-      if (MangledName.compare(CandidateMangledName) != 0)
+      if (!reflectionNameMatches(CandidateMangledName, MangledName))
         continue;
       return {&FD, Offset};
     }
@@ -257,7 +263,8 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
     uintptr_t Offset = sections.Field.SectionOffset;
     for (const auto &descriptor : sections.Field.Metadata) {
       auto TypeName =
-          Demangle::demangleTypeAsString(descriptor.getMangledTypeName(Offset));
+        Demangle::demangleTypeAsString(
+          dropSwiftManglingPrefix(descriptor.getMangledTypeName(Offset)));
       OS << TypeName << '\n';
       for (size_t i = 0; i < TypeName.size(); ++i)
         OS << '-';
@@ -282,7 +289,8 @@ void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
       auto conformingTypeName = Demangle::demangleTypeAsString(
           descriptor.getMangledConformingTypeName(Offset));
       auto protocolName = Demangle::demangleTypeAsString(
-          descriptor.getMangledProtocolTypeName(Offset));
+          dropSwiftManglingPrefix(
+            descriptor.getMangledProtocolTypeName(Offset)));
 
       OS << "- " << conformingTypeName << " : " << protocolName;
       OS << '\n';
