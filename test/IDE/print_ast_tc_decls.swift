@@ -1311,6 +1311,16 @@ public func ParamAttrs4(a : @escaping () -> ()) {
   a()
 }
 
+// PASS_PRINT_AST: public func ParamAttrs5(a: (@escaping () -> ()) -> ())
+public func ParamAttrs5(a : (@escaping () -> ()) -> ()) {
+}
+
+// PASS_PRINT_AST: public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
+public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
+
+// PASS_PRINT_AST: public var ParamAttrs7: (@escaping () -> ()) -> ()
+public var ParamAttrs7: (@escaping () -> ()) -> () = { f in f() }
+
 // Setter
 // PASS_PRINT_AST: class FooClassComputed {
 class FooClassComputed {

@@ -518,11 +518,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
     if (willUseTypeReprPrinting(TL, CurrentType, Options)) {
-      if (auto repr = TL.getTypeRepr()) {
-        llvm::SaveAndRestore<bool> SPTA(Options.SkipParameterTypeAttributes,
-                                        true);
+      if (auto repr = TL.getTypeRepr())
         repr->print(Printer, Options);
-      }
       return;
     }
 
@@ -2264,13 +2261,11 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // FIXME: don't do if will be using type repr printing
-  printParameterFlags(Printer, Options, paramFlags);
-
   // Special case, if we're not going to use the type repr printing, peek
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+    printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy =
                 dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
       ++numParens;
