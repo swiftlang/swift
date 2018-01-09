@@ -90,7 +90,8 @@ class RemoteASTTypeBuilder {
 
 public:
   using BuiltType = swift::Type;
-  using BuiltNominalTypeDecl = swift::NominalTypeDecl*;
+  using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
+  using BuiltProtocolDecl = swift::ProtocolDecl *;
   explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   std::unique_ptr<IRGenContext> createIRGenContext() {
@@ -134,6 +135,10 @@ public:
   }
 
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
+
+  ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
+    return dyn_cast_or_null<ProtocolDecl>(createNominalTypeDecl(node));
+  }
 
   Type createNominalType(NominalTypeDecl *decl) {
     // If the declaration is generic, fail.
@@ -347,33 +352,15 @@ public:
     return FunctionType::get(funcParams, output, einfo);
   }
 
-  Type createProtocolType(StringRef mangledName,
-                          StringRef moduleName,
-                          StringRef privateDiscriminator,
-                          StringRef name) {
-    auto module = Ctx.getModuleByName(moduleName);
-    if (!module) return Type();
-
-    auto decl = findNominalTypeDecl(module,
-                                    Ctx.getIdentifier(name),
-                                    (privateDiscriminator.empty()
-                                     ? Identifier()
-                                     : Ctx.getIdentifier(privateDiscriminator)),
-                                    Demangle::Node::Kind::Protocol);
-    if (!decl) return Type();
-
-    return decl->getDeclaredType();
-  }
-
-  Type createProtocolCompositionType(ArrayRef<Type> members,
-                                     bool hasExplicitAnyObject) {
-    for (auto member : members) {
-      if (!member->isExistentialType() &&
-          !member->getClassOrBoundGenericClass())
-        return Type();
-    }
-
-    return ProtocolCompositionType::get(Ctx, members, hasExplicitAnyObject);
+  Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
+                                     Type superclass,
+                                     bool isClassBound) {
+    std::vector<Type> members;
+    for (auto protocol : protocols)
+      members.push_back(protocol->getDeclaredType());
+    if (superclass && superclass->getClassOrBoundGenericClass())
+      members.push_back(superclass);
+    return ProtocolCompositionType::get(Ctx, members, isClassBound);
   }
 
   Type createExistentialMetatypeType(Type instance) {
@@ -392,11 +379,18 @@ public:
     return GenericTypeParamType::get(depth, index, Ctx);
   }
 
-  Type createDependentMemberType(StringRef member, Type base, Type protocol) {
+  Type createDependentMemberType(StringRef member, Type base,
+                                 ProtocolDecl *protocol) {
     if (!base->isTypeParameter())
       return Type();
-    // TODO: look up protocol?
-    return DependentMemberType::get(base, Ctx.getIdentifier(member));
+
+    for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
+                                              /*ignoreNew=*/true)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
+        return DependentMemberType::get(base, assocType);
+    }
+
+    return Type();
   }
 
   Type createUnownedStorageType(Type base) {
@@ -634,6 +628,9 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
 
     return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
   }
+
+  case Demangle::Node::Kind::Global:
+    return findDeclContext(node->getChild(0));
 
   // Bail out on other kinds of contexts.
   // TODO: extensions

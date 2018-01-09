@@ -60,6 +60,13 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
 
+  std::string mangleBareProtocol(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("P");
+    return finalize();
+  }
+
   std::string mangleProtocolDescriptor(const ProtocolDecl *Decl) {
     beginMangling();
     appendProtocolName(Decl);
@@ -257,8 +264,8 @@ public:
 
   std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
     beginMangling();
-    appendType(Proto->getCanonicalType());
-    appendOperator("D");
+    appendProtocolName(Proto->getDecl());
+    appendOperator("P");
     return finalize();
   }
 
