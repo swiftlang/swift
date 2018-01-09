@@ -456,7 +456,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   auto fn = existingFn;
 
   // TODO: use the correct SILLocation from module.
-  SILLocation loc = RegularLocation(SourceLoc());
+  SILLocation loc = getEmptyLocation();
 
   // If we have an existing function, verify that the types match up.
   if (fn) {

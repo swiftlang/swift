@@ -2177,7 +2177,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   // Use an empty location for the alloc_stack. If Loc is variable declaration
   // the alloc_stack would look like the storage of that variable.
   auto *ControlVariableBox =
-      B.createAllocStack(RegularLocation(SourceLoc()), IVType);
+      B.createAllocStack(getEmptyLocation(), IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.

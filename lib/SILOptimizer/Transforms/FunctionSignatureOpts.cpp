@@ -979,12 +979,10 @@ static void createArgumentRelease(SILBuilder &Builder, ArgumentDescriptor &AD) {
   if (Arg->getType().isAddress()) {
     assert(AD.PInfo->getConvention() == ParameterConvention::Indirect_In
            && F.getConventions().useLoweredAddresses());
-    Builder.createDestroyAddr(RegularLocation(SourceLoc()),
-                              F.getArguments()[AD.Index]);
+    Builder.createDestroyAddr(getEmptyLocation(), F.getArguments()[AD.Index]);
     return;
   }
-  Builder.createReleaseValue(RegularLocation(SourceLoc()),
-                             F.getArguments()[AD.Index],
+  Builder.createReleaseValue(getEmptyLocation(), F.getArguments()[AD.Index],
                              Builder.getDefaultAtomicity());
 }
 
@@ -1028,13 +1026,13 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   SILInstruction *Call = findOnlyApply(F);
   if (auto AI = dyn_cast<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(AI)));
-    Builder.createRetainValue(RegularLocation(SourceLoc()), AI,
+    Builder.createRetainValue(getEmptyLocation(), AI,
                               Builder.getDefaultAtomicity());
   } else {
     SILBasicBlock *NormalBB = cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
-    Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getArgument(0), Builder.getDefaultAtomicity());
+    Builder.createRetainValue(getEmptyLocation(), NormalBB->getArgument(0),
+                              Builder.getDefaultAtomicity());
   }
 }
 
