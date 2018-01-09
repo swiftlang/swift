@@ -136,6 +136,10 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
+bool swift::Demangle::isOldFunctionTypeMangling(const char *mangledName) {
+  return mangledName[0] == '_' && mangledName[1] == 'T';
+}
+
 namespace swift {
 namespace Demangle {
 
@@ -149,6 +153,23 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
     Factory.Reallocate(Children, ReservedChildren, 1);
   assert(NumChildren < ReservedChildren);
   Children[NumChildren++] = Child;
+}
+
+void Node::removeChildAt(unsigned Pos, swift::Demangle::NodeFactory &factory) {
+  assert(Pos < NumChildren && "invalid child position!");
+
+  size_t Index = 0;
+  auto *NewChildren = factory.Allocate<NodePointer>(NumChildren - 1);
+  for (unsigned i = 0, n = NumChildren; i != n; ++i) {
+    auto Child = Children[i];
+    if (i != Pos) {
+      NewChildren[Index] = Child;
+      ++Index;
+    } else {
+      --NumChildren;
+    }
+  }
+  Children = NewChildren;
 }
 
 void Node::reverseChildren(size_t StartingAt) {
@@ -257,6 +278,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   if (PrefixLength == 0)
     return nullptr;
 
+  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName.data());
   Pos += PrefixLength;
 
   // If any other prefixes are accepted, please update Mangler::verify.
@@ -884,7 +906,7 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
 }
 
 NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
-  if (popNode(Node::Kind::EmptyList))
+  if (!IsOldFunctionTypeMangling && popNode(Node::Kind::EmptyList))
     return createNode(Node::Kind::LabelList);
 
   if (!Type || Type->getKind() != Node::Kind::Type)
@@ -905,19 +927,65 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   if (ParameterType->getIndex() == 0)
     return nullptr;
 
+  auto getChildIf =
+      [](NodePointer Node,
+         Node::Kind filterBy) -> std::pair<NodePointer, unsigned> {
+    for (unsigned i = 0, n = Node->getNumChildren(); i != n; ++i) {
+      auto Child = Node->getChild(i);
+      if (Child->getKind() == filterBy)
+        return {Child, i};
+    }
+    return {nullptr, 0};
+  };
+
+  auto getLabel = [&](NodePointer Params, unsigned Idx) -> NodePointer {
+    // Old-style function type mangling has labels as part of the argument.
+    if (IsOldFunctionTypeMangling) {
+      auto Param = Params->getChild(Idx);
+      auto Label = getChildIf(Param, Node::Kind::TupleElementName);
+
+      if (Label.first) {
+        Param->removeChildAt(Label.second, *this);
+        return createNodeWithAllocatedText(Node::Kind::Identifier,
+                                           Label.first->getText());
+      }
+
+      return createNode(Node::Kind::FirstElementMarker);
+    }
+
+    return popNode();
+  };
+
   auto LabelList = createNode(Node::Kind::LabelList);
+  auto Tuple = ParameterType->getFirstChild()->getFirstChild();
+
+  if (IsOldFunctionTypeMangling &&
+      (!Tuple || Tuple->getKind() != Node::Kind::Tuple))
+    return LabelList;
+
+  bool hasLabels = false;
   for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
-    auto Label = popNode();
+    auto Label = getLabel(Tuple, i);
+
     if (!Label)
       return nullptr;
+
     if (Label->getKind() != Node::Kind::Identifier &&
         Label->getKind() != Node::Kind::FirstElementMarker)
       return nullptr;
 
     LabelList->addChild(Label, *this);
+    hasLabels |= Label->getKind() != Node::Kind::FirstElementMarker;
   }
 
-  LabelList->reverseChildren();
+  // Old style label mangling can produce label list without
+  // actual labels, we need to support that case specifically.
+  if (!hasLabels)
+    return createNode(Node::Kind::LabelList);
+
+  if (!IsOldFunctionTypeMangling)
+    LabelList->reverseChildren();
+
   return LabelList;
 }
 
