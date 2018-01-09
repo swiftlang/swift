@@ -146,8 +146,7 @@ AbstractionPattern::getCurriedCFunctionAsMethod(CanType origType,
 }
 
 AbstractionPattern
-AbstractionPattern::getOptional(AbstractionPattern object,
-                                OptionalTypeKind optionalKind) {
+AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -168,16 +167,16 @@ AbstractionPattern::getOptional(AbstractionPattern object,
     return AbstractionPattern::getOpaque();
   case Kind::ClangType:
     return AbstractionPattern(object.getGenericSignature(),
-                              OptionalType::get(optionalKind, object.getType())
+                              OptionalType::get(object.getType())
                                 ->getCanonicalType(),
                               object.getClangType());
   case Kind::Type:
     return AbstractionPattern(object.getGenericSignature(),
-                              OptionalType::get(optionalKind, object.getType())
+                              OptionalType::get(object.getType())
                                 ->getCanonicalType());
   case Kind::Discard:
     return AbstractionPattern::getDiscard(object.getGenericSignature(),
-                              OptionalType::get(optionalKind, object.getType())
+                              OptionalType::get(object.getType())
                                 ->getCanonicalType());
   }
   llvm_unreachable("bad kind");

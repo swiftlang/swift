@@ -468,7 +468,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
   } else if (name == C.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
     auto intType = C.getIntDecl()->getDeclaredType();
-    auto optionalIntType = OptionalType::get(OTK_Optional, intType);
+    auto optionalIntType = OptionalType::get(intType);
 
     auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
       if (rawType && rawType->isEqual(intType)) {

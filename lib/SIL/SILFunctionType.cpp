@@ -784,7 +784,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
     substFormalResultType =
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
-        AbstractionPattern::getOptional(origResultType, OTK_Optional);
+        AbstractionPattern::getOptional(origResultType);
     return {origResultType, substFormalResultType};
 
   // These conventions don't require changes to the formal error type.
