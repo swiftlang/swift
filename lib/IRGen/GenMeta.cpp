@@ -5524,6 +5524,18 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
+
+  // If the protocol is resilient, emit dispatch thunks.
+  if (isResilient(protocol, ResilienceExpansion::Minimal)) {
+    for (auto *member : protocol->getMembers()) {
+      if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(funcDecl));
+      }
+      if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+      }
+    }
+  }
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.
