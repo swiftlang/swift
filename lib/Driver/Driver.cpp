@@ -2123,6 +2123,13 @@ static void addAuxiliaryOutputs(Compilation &C, CommandOutput &output,
     auto fn = [&](StringRef primaryOutput) -> void {
       llvm::SmallString<128> path(primaryOutput);
       bool isTempFile = C.isTemporaryFile(path);
+      // FIXME: (graydon) even worse hack than before, should be threading an
+      // OFM through, but for the time being note that foo.swift produces
+      // primary foo.swift.o -- not a typo! -- but we want to produce
+      // auxiliaries named foo.swiftmodule and foo.d not foo.swift.swiftmodule
+      // or foo.swift.d. So we have to trim one extension (.o) and then replace
+      // the remaining one (.swift).
+      llvm::sys::path::replace_extension(path, "");
       llvm::sys::path::replace_extension(path,
                                          types::getTypeTempSuffix(outputType));
       output.addAdditionalOutputForType(outputType, path);
