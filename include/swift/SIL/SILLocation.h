@@ -502,9 +502,11 @@ private:
   }
 };
 
-/// Empty locations may be applied to instructions without any clear
-/// correspondence to an AST node.
-static inline RegularLocation getEmptyLocation() { return {SourceLoc()}; }
+/// Compiler-generated locations may be applied to instructions without any
+/// clear correspondence to an AST node.
+static inline RegularLocation getCompilerGeneratedLocation() {
+  return {SourceLoc()};
+}
 
 /// Used to represent a return instruction in user code.
 ///
@@ -709,7 +711,8 @@ class SILDebugLocation {
   SILLocation Location;
 
 public:
-  SILDebugLocation() : Scope(nullptr), Location(getEmptyLocation()) {}
+  SILDebugLocation()
+      : Scope(nullptr), Location(getCompilerGeneratedLocation()) {}
   SILDebugLocation(SILLocation Loc, const SILDebugScope *DS)
       : Scope(DS), Location(Loc) {}
   SILLocation getLocation() const { return Location; }
