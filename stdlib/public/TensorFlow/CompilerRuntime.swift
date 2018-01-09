@@ -115,14 +115,14 @@ public final class TensorProgram {
       // TODO(hongm): do error handling.
       precondition(createStatus == 0)
     } else {
-        // Print a debug message to differentiate from async computation.
-        print("Running tensor computation synchronously.")
-        let program = self
-        TFE_Execute(program.`operator`,
-                    &program.returnValues,
-                    &program.returnValueCount,
-                    program.status)
-        checkOk(program.status)
+      // Print a debug message to differentiate from async computation.
+      print("Running tensor computation synchronously.")
+      let program = self
+      TFE_Execute(program.`operator`,
+                  &program.returnValues,
+                  &program.returnValueCount,
+                  program.status)
+      checkOk(program.status)
     }
   }
 
@@ -229,8 +229,8 @@ public func _TFCFinishTensorProgram(
 /// This function transforms a scalar value into a TensorHandle.
 @_inlineable
 @_silgen_name("_swift_tfc_CreateCTensorHandle")
-public func _TFC_CreateCTensorHandle<T>(_ value : T,
-                                        _ dtype: TF_DataType) -> CTensorHandle {
+public func _TFCCreateCTensorHandle<T>(_ value : T,
+                                       _ dtype: TF_DataType) -> CTensorHandle {
   let tensor = TF_AllocateTensor(dtype, nil, 0, MemoryLayout<T>.stride)
 
   // This chunk of code does: *reinterpret_cast<float*>(TF_TensorData(in_t)) = f
@@ -243,4 +243,3 @@ public func _TFC_CreateCTensorHandle<T>(_ value : T,
   TF_DeleteTensor(tensor)
   return cTensorHandle!
 }
-
