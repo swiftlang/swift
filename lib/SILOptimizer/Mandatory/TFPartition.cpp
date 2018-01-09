@@ -1710,8 +1710,8 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
   // Get a reference to the CreateCTensorHandle function, which is defined like
   // this:
   // @_silgen_name("_swift_tfc_CreateCTensorHandle")
-  // func _TFC_CreateCTensorHandle<T>(_ value : T,
-  //                                  _ dtype: TF_DataType) -> CTensorHandle
+  // func _TFCCreateCTensorHandle<T>(_ value : T,
+  //                                 _ dtype: TF_DataType) -> CTensorHandle
   auto createFn = B.getModule().findFunction("_swift_tfc_CreateCTensorHandle",
                                              SILLinkage::PublicExternal);
   auto *fnRef = B.createFunctionRef(loc, createFn);
@@ -1767,10 +1767,13 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // public typealias CTensorHandle = OpaquePointer
   //
   // @_silgen_name("_swift_tfc_StartTensorProgram")
-  // public func startTensorProgram(_ programBytes: UnsafeRawPointer,
-  //                                _ programSize: Int,
-  //                                _ inputs: UnsafePointer<CTensorHandle>,
-  //                                _ numInputs: Int) -> TensorProgram {...}
+  // public func _TFCStartTensorProgram(
+  //   _ programByteAddress: UnsafeRawPointer,
+  //   _ programByteCount: Int,
+  //   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
+  //   _ tensorArgumentCount: Int,
+  //   _ resultCount: Int
+  // ) -> TensorProgram {
   auto startProgramFn =
     fn.getModule().findFunction("_swift_tfc_StartTensorProgram",
                                 SILLinkage::PublicExternal);
