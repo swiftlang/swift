@@ -7,7 +7,7 @@ EXPR_NODES = [
     Node('InOutExpr', kind='Expr',
          children=[
              Child('Ampersand', kind='PrefixAmpersandToken'),
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Expression', kind='Expr'),
          ]),
 
     # A #column expression.
