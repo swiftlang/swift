@@ -29,9 +29,7 @@
 
 namespace swift {
   class CanType;
-  class Decl;
   class ProtocolConformance;
-  class ProtocolDecl;
 
 namespace irgen {
   class ConformanceInfo; // private to GenProto.cpp
@@ -43,10 +41,11 @@ namespace irgen {
 /// introduced by the protocol.
 class WitnessTableEntry {
 public:
-  void *MemberOrAssociatedType;
+  llvm::PointerUnion<Decl *, TypeBase *> MemberOrAssociatedType;
   ProtocolDecl *Protocol;
 
-  WitnessTableEntry(void *member, ProtocolDecl *protocol)
+  WitnessTableEntry(llvm::PointerUnion<Decl *, TypeBase *> member,
+                    ProtocolDecl *protocol)
     : MemberOrAssociatedType(member), Protocol(protocol) {}
 
 public:
@@ -54,15 +53,15 @@ public:
 
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
     assert(proto != nullptr);
-    return WitnessTableEntry(nullptr, proto);
+    return WitnessTableEntry({}, proto);
   }
 
   /// Is this a base-protocol entry?
-  bool isBase() const { return MemberOrAssociatedType == nullptr; }
+  bool isBase() const { return MemberOrAssociatedType.isNull(); }
 
   bool matchesBase(ProtocolDecl *proto) const {
     assert(proto != nullptr);
-    return MemberOrAssociatedType == nullptr && Protocol == proto;
+    return MemberOrAssociatedType.isNull() && Protocol == proto;
   }
 
   /// Given that this is a base-protocol entry, is the table
@@ -83,19 +82,21 @@ public:
   }
   
   bool isFunction() const {
-    return Protocol == nullptr &&
-           isa<AbstractFunctionDecl>(
-             static_cast<Decl*>(MemberOrAssociatedType));
+    auto decl = MemberOrAssociatedType.get<Decl*>();
+    return Protocol == nullptr && isa<AbstractFunctionDecl>(decl);
   }
 
   bool matchesFunction(AbstractFunctionDecl *func) const {
     assert(func != nullptr);
-    return MemberOrAssociatedType == func && Protocol == nullptr;
+    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
+      return decl == func && Protocol == nullptr;
+    return false;
   }
 
   AbstractFunctionDecl *getFunction() const {
     assert(isFunction());
-    return static_cast<AbstractFunctionDecl*>(MemberOrAssociatedType);
+    auto decl = MemberOrAssociatedType.get<Decl*>();
+    return static_cast<AbstractFunctionDecl*>(decl);
   }
 
   static WitnessTableEntry forAssociatedType(AssociatedType ty) {
@@ -103,19 +104,21 @@ public:
   }
   
   bool isAssociatedType() const {
-    return Protocol == nullptr &&
-           isa<AssociatedTypeDecl>(
-             static_cast<Decl*>(MemberOrAssociatedType));
+    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
+      return Protocol == nullptr && isa<AssociatedTypeDecl>(decl);
+    return false;
   }
 
   bool matchesAssociatedType(AssociatedType assocType) const {
-    return MemberOrAssociatedType == assocType.getAssociation() &&
-           Protocol == nullptr;
+    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
+      return decl == assocType.getAssociation() && Protocol == nullptr;
+    return false;
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
     assert(isAssociatedType());
-    return static_cast<AssociatedTypeDecl*>(MemberOrAssociatedType);
+    auto decl = MemberOrAssociatedType.get<Decl*>();
+    return static_cast<AssociatedTypeDecl*>(decl);
   }
 
   static WitnessTableEntry forAssociatedConformance(AssociatedConformance conf){
@@ -124,17 +127,20 @@ public:
   }
 
   bool isAssociatedConformance() const {
-    return Protocol != nullptr && MemberOrAssociatedType != nullptr;
+    return Protocol != nullptr && !MemberOrAssociatedType.isNull();
   }
 
   bool matchesAssociatedConformance(const AssociatedConformance &conf) const {
-    return MemberOrAssociatedType == conf.getAssociation().getPointer() &&
-           Protocol == conf.getAssociatedRequirement();
+    if (auto type = MemberOrAssociatedType.dyn_cast<TypeBase*>())
+      return type == conf.getAssociation().getPointer() &&
+             Protocol == conf.getAssociatedRequirement();
+    return false;
   }
 
   CanType getAssociatedConformancePath() const {
     assert(isAssociatedConformance());
-    return CanType(static_cast<TypeBase *>(MemberOrAssociatedType));
+    auto type = MemberOrAssociatedType.get<TypeBase*>();
+    return CanType(type);
   }
 
   ProtocolDecl *getAssociatedConformanceRequirement() const {
