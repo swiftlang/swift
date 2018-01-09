@@ -254,6 +254,28 @@ static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod) {
   return shouldTransformResults(genEnv, loweredTy, Mod);
 }
 
+static bool shouldTransformYields(GenericEnvironment *genEnv,
+                                  CanSILFunctionType loweredTy,
+                                  irgen::IRGenModule &Mod) {
+  if (!modifiableFunction(loweredTy)) {
+    return false;
+  }
+  for (auto &yield : loweredTy->getYields()) {
+    auto yieldStorageType = yield.getSILStorageType();
+    auto newYieldStorageType = getNewSILType(genEnv, yieldStorageType, Mod);
+    if (yieldStorageType != newYieldStorageType)
+      return true;
+  }
+  return false;
+}
+
+static bool modYieldType(SILFunction *F, irgen::IRGenModule &Mod) {
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  auto loweredTy = F->getLoweredFunctionType();
+
+  return shouldTransformYields(genEnv, loweredTy, Mod);
+}
+
 static SILParameterInfo
 getNewParameter(GenericEnvironment *env, SILParameterInfo param,
                 irgen::IRGenModule &IGM) {
@@ -413,6 +435,7 @@ protected:
   void visitAllocStackInst(AllocStackInst *instr);
   void visitPointerToAddressInst(PointerToAddressInst *instr);
   void visitReturnInst(ReturnInst *instr);
+  void visitYieldInst(YieldInst *instr);
   void visitDeallocInst(DeallocStackInst *instr);
   void visitInstr(SILInstruction *instr);
 };
@@ -432,6 +455,7 @@ void LargeValueVisitor::mapValueStorage() {
       switch (currIns->getKind()) {
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::PartialApplyInst: {
         visitApply(ApplySite(currIns));
         break;
@@ -442,7 +466,7 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
-        auto *MI = dyn_cast<MethodInst>(currIns);
+        auto *MI = cast<MethodInst>(currIns);
         visitMethodInst(MI);
         break;
       }
@@ -457,32 +481,32 @@ void LargeValueVisitor::mapValueStorage() {
         break;
       }
       case SILInstructionKind::StoreInst: {
-        auto *SI = dyn_cast<StoreInst>(currIns);
+        auto *SI = cast<StoreInst>(currIns);
         visitStoreInst(SI);
         break;
       }
       case SILInstructionKind::RetainValueInst: {
-        auto *RETI = dyn_cast<RetainValueInst>(currIns);
+        auto *RETI = cast<RetainValueInst>(currIns);
         visitRetainInst(RETI);
         break;
       }
       case SILInstructionKind::ReleaseValueInst: {
-        auto *RELI = dyn_cast<ReleaseValueInst>(currIns);
+        auto *RELI = cast<ReleaseValueInst>(currIns);
         visitReleaseInst(RELI);
         break;
       }
       case SILInstructionKind::DebugValueInst: {
-        auto *DI = dyn_cast<DebugValueInst>(currIns);
+        auto *DI = cast<DebugValueInst>(currIns);
         visitDebugValueInst(DI);
         break;
       }
       case SILInstructionKind::DestroyValueInst: {
-        auto *DI = dyn_cast<DestroyValueInst>(currIns);
+        auto *DI = cast<DestroyValueInst>(currIns);
         visitDestroyValueInst(DI);
         break;
       }
       case SILInstructionKind::SwitchEnumInst: {
-        auto *SEI = dyn_cast<SwitchEnumInst>(currIns);
+        auto *SEI = cast<SwitchEnumInst>(currIns);
         visitSwitchEnumInst(SEI);
         break;
       }
@@ -492,28 +516,33 @@ void LargeValueVisitor::mapValueStorage() {
         break;
       }
       case SILInstructionKind::AllocStackInst: {
-        auto *ASI = dyn_cast<AllocStackInst>(currIns);
+        auto *ASI = cast<AllocStackInst>(currIns);
         visitAllocStackInst(ASI);
         break;
       }
       case SILInstructionKind::PointerToAddressInst: {
-        auto *PTA = dyn_cast<PointerToAddressInst>(currIns);
+        auto *PTA = cast<PointerToAddressInst>(currIns);
         visitPointerToAddressInst(PTA);
         break;
       }
       case SILInstructionKind::ReturnInst: {
-        auto *RI = dyn_cast<ReturnInst>(currIns);
+        auto *RI = cast<ReturnInst>(currIns);
         visitReturnInst(RI);
         break;
       }
+      case SILInstructionKind::YieldInst: {
+        auto *YI = cast<YieldInst>(currIns);
+        visitYieldInst(YI);
+        break;
+      }
       case SILInstructionKind::DeallocStackInst: {
-        auto *DI = dyn_cast<DeallocStackInst>(currIns);
+        auto *DI = cast<DeallocStackInst>(currIns);
         visitDeallocInst(DI);
         break;
       }
       default: {
         assert(!ApplySite::isa(currIns) && "Did not expect an ApplySite");
-        assert(!dyn_cast<MethodInst>(currIns) && "Unhandled Method Inst");
+        assert(!isa<MethodInst>(currIns) && "Unhandled Method Inst");
         visitInstr(currIns);
         break;
       }
@@ -548,6 +577,21 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
       return;
     }
   }
+
+  // For coroutines, we need to consider the yields, not the direct result
+  // (which should always be void).
+  if (auto beginApply = dyn_cast<BeginApplyInst>(applySite)) {
+    for (auto yield : beginApply->getYieldedValues()) {
+      auto oldYieldType = yield->getType();
+      auto newYieldType = getNewSILType(genEnv, oldYieldType, pass.Mod);
+      if (oldYieldType != newYieldType) {
+        pass.applies.push_back(applySite.getInstruction());
+        return;
+      }
+    }
+    return;
+  }
+
   SILType currType = applySite.getType();
   SILType newType = getNewSILType(genEnv, currType, pass.Mod);
   // We only care about function type results
@@ -772,6 +816,12 @@ void LargeValueVisitor::visitReturnInst(ReturnInst *instr) {
   } // else: function signature return instructions remain as-is
 }
 
+void LargeValueVisitor::visitYieldInst(YieldInst *instr) {
+  if (!modYieldType(pass.F, pass.Mod)) {
+    visitInstr(instr);
+  } // else: function signature return instructions remain as-is
+}
+
 void LargeValueVisitor::visitDeallocInst(DeallocStackInst *instr) {
   auto opInstr = instr->getOperand();
   if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
@@ -859,6 +909,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       break;
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
+    case SILInstructionKind::BeginApplyInst:
     case SILInstructionKind::PartialApplyInst: {
       if (std::find(pass.applies.begin(), pass.applies.end(), userIns) ==
           pass.applies.end()) {
@@ -930,6 +981,7 @@ static bool usesContainApplies(LoadInst *unoptimizableLoad,
     switch (userIns->getKind()) {
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
+    case SILInstructionKind::BeginApplyInst:
     case SILInstructionKind::PartialApplyInst: {
       ApplySite site(userIns);
       SILValue callee = site.getCallee();
@@ -981,6 +1033,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
+    case SILInstructionKind::BeginApplyInst:
     case SILInstructionKind::PartialApplyInst: {
       ApplySite site(userIns);
       if (!modifiableApply(site, pass.Mod)) {
@@ -1062,7 +1115,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
 }
 
 void LoadableStorageAllocation::allocateLoadableStorage() {
-  // We need to map all functions exists
+  // We need to map all functions exits
   // required for Apply result's allocations
   // Else we might get the following error:
   // "stack dealloc does not match most recent stack alloc"
@@ -1178,16 +1231,14 @@ void LoadableStorageAllocation::convertApplyResults() {
   for (auto &BB : *pass.F) {
     for (auto &II : BB) {
       auto *currIns = &II;
-      if (!ApplySite::isa(currIns)) {
+      auto applySite = FullApplySite::isa(currIns);
+      if (!applySite) {
         continue;
       }
-      if (isa<PartialApplyInst>(currIns)) {
-        continue;
-      }
-      auto applySite = ApplySite(currIns);
       if (!modifiableApply(applySite, pass.Mod)) {
         continue;
       }
+
       CanSILFunctionType origSILFunctionType = applySite.getSubstCalleeType();
       GenericEnvironment *genEnv = nullptr;
       if (!shouldTransformResults(genEnv, origSILFunctionType, pass.Mod)) {
@@ -1495,6 +1546,7 @@ static bool allUsesAreReplaceable(SingleValueInstruction *instr,
       break;
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
+    case SILInstructionKind::BeginApplyInst:
     case SILInstructionKind::PartialApplyInst: {
       // Replaceable only if it is not the function pointer
       ApplySite site(userIns);
@@ -2132,7 +2184,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   // If we turned a direct result into an indirect parameter
   // Find the new alloc we created earlier.
   // and pass it as first parameter:
-  if (applyInst->getKind() != SILInstructionKind::PartialApplyInst &&
+  if ((isa<ApplyInst>(applyInst) || isa<TryApplyInst>(applyInst)) &&
       modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule())) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
@@ -2165,6 +2217,47 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
         castedApply->getLoc(), callee,
         applySite.getSubstitutions(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
+    break;
+  }
+  case SILInstructionKind::BeginApplyInst: {
+    auto oldApply = cast<BeginApplyInst>(applyInst);
+    auto newApply =
+      applyBuilder.createBeginApply(oldApply->getLoc(), callee,
+                                    applySite.getSubstitutions(), callArgs,
+                                    oldApply->isNonThrowing());
+
+    // Use the new token result.
+    oldApply->getTokenResult()->replaceAllUsesWith(newApply->getTokenResult());
+
+    // Rewrite all the yields.
+    auto oldYields = oldApply->getOrigCalleeType()->getYields();
+    auto oldYieldedValues = oldApply->getYieldedValues();
+    auto newYields = newApply->getOrigCalleeType()->getYields();
+    auto newYieldedValues = newApply->getYieldedValues();
+    assert(oldYields.size() == newYields.size() &&
+           oldYields.size() == oldYieldedValues.size() &&
+           newYields.size() == newYieldedValues.size());
+    for (auto i : indices(oldYields)) {
+      SILValue oldValue = oldYieldedValues[i];
+      SILValue newValue = newYieldedValues[i];
+
+      // For now, just replace the value with an immediate load.
+      if (oldValue->getType() != newValue->getType()) {
+        LoadOwnershipQualifier ownership;
+        if (!F->hasQualifiedOwnership()) {
+          ownership = LoadOwnershipQualifier::Unqualified;
+        } else if (newValue->getType().isTrivial(*getModule())) {
+          ownership = LoadOwnershipQualifier::Trivial;
+        } else {
+          assert(oldYields[i].isConsumed() &&
+                 "borrowed yields not yet supported here");
+          ownership = LoadOwnershipQualifier::Take;
+        }
+        newValue = applyBuilder.createLoad(applyInst->getLoc(), newValue,
+                                           ownership);
+      }
+      oldValue->replaceAllUsesWith(newValue);
+    }
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -2390,6 +2483,7 @@ void LoadableByAddress::run() {
               switch (currInstr->getKind()) {
               case SILInstructionKind::ApplyInst:
               case SILInstructionKind::TryApplyInst:
+              case SILInstructionKind::BeginApplyInst:
               case SILInstructionKind::PartialApplyInst: {
                 if (modApplies.count(currInstr) == 0) {
                   modApplies.insert(currInstr);

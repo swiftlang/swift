@@ -212,7 +212,7 @@ struct OpaqueValue;
 ///  - An initialized buffer is an allocated buffer whose value
 ///    storage has been initialized.
 struct ValueBuffer {
-  void *PrivateData[3];
+  void *PrivateData[NumWords_ValueBuffer];
 };
 
 /// Can a value with the given size and alignment be allocated inline?

@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/IRGen/ValueWitness.h"
 
 #include "Callee.h"
@@ -41,7 +42,7 @@ using namespace irgen;
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.
 Size irgen::getFixedBufferSize(IRGenModule &IGM) {
-  return 3 * IGM.getPointerSize();
+  return NumWords_ValueBuffer * IGM.getPointerSize();
 }
 Alignment irgen::getFixedBufferAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
@@ -453,6 +454,33 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               llvm::Value *arraySize,
                                               Alignment align,
                                               const llvm::Twine &name) {
+  // In coroutines, call llvm.coro.alloca.alloc.
+  if (isCoroutine()) {
+    // Compute the number of bytes to allocate.
+    llvm::Value *byteCount;
+    auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
+    if (eltSize == 1) {
+      byteCount = arraySize;
+    } else {
+      byteCount = Builder.CreateMul(arraySize, IGM.getSize(Size(eltSize)));
+    }
+
+    auto alignment = llvm::ConstantInt::get(IGM.Int32Ty, align.getValue());
+
+    // Allocate memory.  This produces an abstract token.
+    auto allocFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_alloc, { IGM.SizeTy });
+    auto allocToken = Builder.CreateCall(allocFn, { byteCount, alignment });
+
+    // Get the allocation result.
+    auto getFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_get);
+    auto ptr = Builder.CreateCall(getFn, { allocToken });
+
+    return {Address(ptr, align), allocToken};
+  }
+
+  // Otherwise, use a dynamic alloca.
   llvm::Value *stackRestorePoint = nullptr;
 
   // Save the stack pointer if we are not in the entry block (we could be
@@ -479,11 +507,23 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
-  if (!address.needsSPRestore())
+  // In coroutines, unconditionally call llvm.coro.alloca.free.
+  if (isCoroutine()) {
+    auto allocToken = address.getExtraInfo();
+    assert(allocToken && "dynamic alloca in coroutine without alloc token?");
+    auto freeFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_free);
+    Builder.CreateCall(freeFn, address.getAddressPointer());
+    return;
+  }
+
+  // Otherwise, call llvm.stackrestore if an address was saved.
+  auto savedSP = address.getExtraInfo();
+  if (savedSP == nullptr)
     return;
   auto *stackRestoreFn = llvm::Intrinsic::getDeclaration(
       &IGM.Module, llvm::Intrinsic::ID::stackrestore);
-  Builder.CreateCall(stackRestoreFn, address.getSavedSP());
+  Builder.CreateCall(stackRestoreFn, savedSP);
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.

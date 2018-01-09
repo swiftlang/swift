@@ -657,6 +657,9 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
+  // For now, we cannot inline begin_apply at all.
+  if (isa<BeginApplyInst>(AI))
+    return nullptr;
 
   SILFunction *Callee = AI.getReferencedFunction();
   SILFunction *EligibleCallee = nullptr;

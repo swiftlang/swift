@@ -1402,6 +1402,15 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
   return false;
 }
 
+/// Look up whether the given string corresponds to a SIL opcode.
+static Optional<SILInstructionKind> getOpcodeByName(StringRef OpcodeName) {
+  return llvm::StringSwitch<Optional<SILInstructionKind>>(OpcodeName)
+  #define FULL_INST(Id, TextualName, Parent, MemBehavior, MayRelease) \
+    .Case(#TextualName, SILInstructionKind::Id)
+  #include "swift/SIL/SILNodes.def"
+    .Default(None);
+}
+
 /// getInstructionKind - This method maps the string form of a SIL instruction
 /// opcode to an enum.
 bool SILParser::parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
@@ -1410,13 +1419,7 @@ bool SILParser::parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
   OpcodeName = P.Tok.getText();
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
-  Optional<SILInstructionKind> MaybeOpcode =
-      llvm::StringSwitch<Optional<SILInstructionKind>>(OpcodeName)
-#define FULL_INST(Id, TextualName, Parent, MemBehavior, MayRelease) \
-  .Case(#TextualName, SILInstructionKind::Id)
-#include "swift/SIL/SILNodes.def"
-          .Default(None);
-
+  auto MaybeOpcode = getOpcodeByName(OpcodeName);
   if (!MaybeOpcode) {
     P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
     return true;
@@ -3784,11 +3787,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // Parse a parenthesized (unless length-1), comma-separated list
     // of yielded values.
     if (P.consumeIf(tok::l_paren)) {
-      do {
-        if (parseTypedValueRef(Val, B))
-          return true;
-        values.push_back(Val);
-      } while (P.consumeIf(tok::comma));
+      if (!P.Tok.is(tok::r_paren)) {
+        do {
+          if (parseTypedValueRef(Val, B))
+            return true;
+          values.push_back(Val);
+        } while (P.consumeIf(tok::comma));
+      }
 
       if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
         return true;
@@ -4812,7 +4817,6 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     ResultVal =
       B.createBeginApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
-    ResultVal->dump();
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -4890,8 +4894,9 @@ bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
 /// 2. ()
 /// 3. (%name1
 /// 4. identifier | keyword
-/// where identifier is not followed by a '(' or ':', which would indicate
-/// a basic block.
+///   where the identifier is not followed by a ':' or '(', or it is
+///   followed by '(' and is an instruction name.  The exceptions here
+///   are for recognizing block names.
 bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::sil_local_name))
     return true;
@@ -4900,7 +4905,9 @@ bool SILParser::isStartOfSILInstruction() {
     return true;
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
     auto &peek = P.peekToken();
-    return !peek.is(tok::l_paren) && !peek.is(tok::colon);
+    if (peek.is(tok::l_paren))
+      return getOpcodeByName(P.Tok.getText()).hasValue();
+    return !peek.is(tok::colon);
   }
   return false;
 }

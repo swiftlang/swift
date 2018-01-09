@@ -221,6 +221,9 @@ class LinkEntity {
 
     /// A reflection metadata descriptor for a struct, enum, class or protocol.
     ReflectionFieldDescriptor,
+
+    /// A coroutine continuation prototype function.
+    CoroutineContinuationPrototype,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -561,6 +564,11 @@ public:
     return entity;
   }
 
+  static LinkEntity forCoroutineContinuationPrototype(CanSILFunctionType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::CoroutineContinuationPrototype, type);
+    return entity;
+  }
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;

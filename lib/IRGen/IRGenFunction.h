@@ -105,6 +105,21 @@ public:
 
   /// Set the error result slot.
   void setErrorResultSlot(llvm::Value *address);
+
+  /// Are we currently emitting a coroutine?
+  bool isCoroutine() {
+    return CoroutineHandle != nullptr;
+  }
+  llvm::Value *getCoroutineHandle() {
+    assert(isCoroutine());
+    return CoroutineHandle;
+  }
+
+  void setCoroutineHandle(llvm::Value *handle) {
+    assert(CoroutineHandle == nullptr && "already set handle");
+    assert(handle != nullptr && "setting a null handle");
+    CoroutineHandle = handle;
+  }
   
 private:
   void emitPrologue();
@@ -113,6 +128,7 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *ErrorResultSlot = nullptr;
+  llvm::Value *CoroutineHandle = nullptr;
 
 //--- Helper methods -----------------------------------------------------------
 public:

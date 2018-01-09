@@ -995,6 +995,10 @@ bool SILInstruction::mayRelease() const {
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::UnownedReleaseInst:

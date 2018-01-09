@@ -102,6 +102,11 @@ public:
     IRBuilderBase::SetInsertPoint(BB, before);
   }
 
+  void SetInsertPoint(llvm::Instruction *I) {
+    ClearedIP = nullptr;
+    IRBuilderBase::SetInsertPoint(I);
+  }
+
   /// A stable insertion point in the function.  "Stable" means that
   /// it will point to the same location in the function, even if
   /// instructions are subsequently added to the current basic block.
@@ -161,6 +166,14 @@ public:
   /// Capture a stable reference to the current IP.
   StableIP getStableIP() const {
     return StableIP(*this);
+  }
+
+  /// Return the LLVM module we're inserting into.
+  llvm::Module *getModule() const {
+    if (auto BB = GetInsertBlock())
+      return BB->getModule();
+    assert(ClearedIP && "IRBuilder has no active or cleared insertion block");
+    return ClearedIP->getModule();
   }
 
   /// Don't create allocas this way; you'll get a dynamic alloca.
@@ -318,6 +331,25 @@ public:
   llvm::CallInst *CreateAsmCall(llvm::InlineAsm *asmBlock,
                                 ArrayRef<llvm::Value *> args) {
     return IRBuilderBase::CreateCall(asmBlock, args);
+  }
+
+  /// Call an intrinsic with no type arguments.
+  llvm::CallInst *CreateIntrinsicCall(llvm::Intrinsic::ID intrinsicID,
+                                      ArrayRef<llvm::Value *> args,
+                                      const Twine &name = "") {
+    auto intrinsicFn =
+      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+    return CreateCall(intrinsicFn, args, name);
+  }
+
+  /// Call an intrinsic with type arguments.
+  llvm::CallInst *CreateIntrinsicCall(llvm::Intrinsic::ID intrinsicID,
+                                      ArrayRef<llvm::Type*> typeArgs,
+                                      ArrayRef<llvm::Value *> args,
+                                      const Twine &name = "") {
+    auto intrinsicFn =
+      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    return CreateCall(intrinsicFn, args, name);
   }
 };
 
