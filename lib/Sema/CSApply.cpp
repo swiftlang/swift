@@ -524,7 +524,7 @@ namespace {
     Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator, bool implicit,
                        FunctionRefKind functionRefKind,
-                       AccessSemantics semantics) {
+                       AccessSemantics semantics, bool forceUnwrap) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
       
@@ -554,7 +554,7 @@ namespace {
                          ConformanceCheckFlags::Used));
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
-                        conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
+                      conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because
@@ -583,11 +583,14 @@ namespace {
 
                 cs.cacheExprTypes(refExpr);
 
-               // Remove an outer function-conversion expression. This
-               // happens when we end up referring to a witness for a
-               // superclass conformance, and 'Self' differs.
-               if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
-                 refExpr = fnConv->getSubExpr();
+                // Remove an outer function-conversion expression. This
+                // happens when we end up referring to a witness for a
+                // superclass conformance, and 'Self' differs.
+                if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
+                  refExpr = fnConv->getSubExpr();
+
+                if (forceUnwrap)
+                  return forceUnwrapResult(refExpr);
 
                 return refExpr;
               }
@@ -600,10 +603,10 @@ namespace {
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
         cs.cacheExprTypes(base);
 
-        return buildMemberRef(base, openedType, SourceLoc(), decl,
-                              loc, openedFnType->getResult(),
-                              locator, locator, implicit, functionRefKind,
-                              semantics, /*isDynamic=*/false);
+        return buildMemberRef(base, openedType, SourceLoc(), decl, loc,
+                              openedFnType->getResult(), locator, locator,
+                              implicit, functionRefKind, semantics,
+                              /*isDynamic=*/false, forceUnwrap);
       }
 
       auto type = solution.simplifyType(openedType);
@@ -636,6 +639,9 @@ namespace {
                               loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
+      if (forceUnwrap)
+        return forceUnwrapResult(declRefExpr);
+
       return declRefExpr;
     }
 
@@ -878,9 +884,10 @@ namespace {
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, DeclNameLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
-                         ConstraintLocatorBuilder memberLocator,
-                         bool Implicit, FunctionRefKind functionRefKind,
-                         AccessSemantics semantics, bool isDynamic) {
+                         ConstraintLocatorBuilder memberLocator, bool Implicit,
+                         FunctionRefKind functionRefKind,
+                         AccessSemantics semantics, bool isDynamic,
+                         bool forceUnwrap) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -933,9 +940,11 @@ namespace {
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         cs.setType(ref, refTy);
         ref->setFunctionRefKind(functionRefKind);
-        return cs.cacheType(new (context)
-                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
-                                                         cs.getType(ref)));
+        auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
+            base, dotLoc, ref, cs.getType(ref)));
+        if (forceUnwrap)
+          return forceUnwrapResult(DSBI);
+        return DSBI;
       }
 
       // The formal type of the 'self' value for the member's declaration.
@@ -1056,6 +1065,8 @@ namespace {
           }
         }
 
+        if (forceUnwrap)
+          return forceUnwrapResult(ref);
         return ref;
       }
 
@@ -1082,6 +1093,8 @@ namespace {
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
+        if (forceUnwrap)
+          return forceUnwrapResult(result);
         return result;
       }
       
@@ -1102,6 +1115,8 @@ namespace {
       ApplyExpr *apply;
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
+        if (forceUnwrap)
+          ref = forceUnwrapResult(ref);
         apply = new (context) ConstructorRefCallExpr(ref, base);
       } else if (!baseIsInstance && member->isInstanceMember()) {
         // Reference to an unbound instance method.
@@ -1110,10 +1125,15 @@ namespace {
                                                               cs.getType(ref));
         cs.cacheType(result);
         closeExistential(result, locator, /*force=*/openedExistential);
+        if (forceUnwrap)
+          return forceUnwrapResult(result);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
+        if (forceUnwrap)
+          ref = forceUnwrapResult(ref);
+
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
@@ -1358,8 +1378,9 @@ namespace {
     Expr *buildSubscript(Expr *base, Expr *index,
                          ArrayRef<Identifier> argLabels,
                          bool hasTrailingClosure,
-                         ConstraintLocatorBuilder locator,
-                         bool isImplicit, AccessSemantics semantics) {
+                         ConstraintLocatorBuilder locator, bool isImplicit,
+                         AccessSemantics semantics) {
+
       // Determine the declaration selected for this subscript operation.
       auto selected = getOverloadChoiceIfAvailable(
                         cs.getConstraintLocator(
@@ -1386,13 +1407,31 @@ namespace {
         return nullptr;
       }
 
-      auto choice = selected->choice;
-      
+      // Build the new subscript.
+      auto newSubscript = buildSubscriptHelper(base, index, argLabels,
+                                               *selected, hasTrailingClosure,
+                                               locator, isImplicit, semantics);
+
+      if (shouldForceUnwrapResult(cs.getConstraintLocator(locator)->getAnchor(),
+                                  selected->choice))
+        return forceUnwrapResult(newSubscript);
+
+      return newSubscript;
+    }
+
+    Expr *buildSubscriptHelper(Expr *base, Expr *index,
+                               ArrayRef<Identifier> argLabels,
+                               SelectedOverload &selected,
+                               bool hasTrailingClosure,
+                               ConstraintLocatorBuilder locator,
+                               bool isImplicit, AccessSemantics semantics) {
+      auto choice = selected.choice;
+
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
-        auto applicationTy = simplifyType(selected->openedType)
-          ->castTo<FunctionType>();
-                
+        auto applicationTy =
+            simplifyType(selected.openedType)->castTo<FunctionType>();
+
         index = cs.coerceToRValue(index);
         // The index argument should be (keyPath: KeyPath<Root, Value>).
         // Dig the key path expression out of the argument tuple.
@@ -1495,7 +1534,7 @@ namespace {
       }
 
       // Figure out the index and result types.
-      auto subscriptTy = simplifyType(selected->openedType);
+      auto subscriptTy = simplifyType(selected.openedType);
       auto subscriptFnTy = subscriptTy->castTo<AnyFunctionType>();
       auto resultTy = subscriptFnTy->getResult();
 
@@ -1551,7 +1590,7 @@ namespace {
       }
 
       // Convert the base.
-      auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
+      auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
       auto openedBaseType = openedFullFnType->getInput();
       auto containerTy = solution.simplifyType(openedBaseType);
       base = coerceObjectArgumentToType(
@@ -2362,6 +2401,31 @@ namespace {
       return expr;
     }
 
+    bool shouldForceUnwrapResult(Expr *expr, OverloadChoice &choice) {
+      if (!choice.isImplicitlyUnwrappedValueOrReturnValue())
+        return false;
+
+      auto choiceLocator = cs.getConstraintLocator(
+          expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+
+      return solution.getDisjunctionChoice(choiceLocator);
+    }
+
+    Expr *forceUnwrapResult(Expr *newExpr) {
+      auto ty = simplifyType(cs.getType(newExpr));
+
+      if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+        auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
+
+        auto &ctx = cs.getTypeChecker().Context;
+        return cs.cacheType(new (ctx) ImplicitlyUnwrappedFunctionConversionExpr(
+            newExpr, underlyingType));
+      } else {
+        return coerceImplicitlyUnwrappedOptionalToValue(
+            newExpr, ty->getWithoutSpecifierType()->getAnyOptionalObjectType());
+      }
+    }
+
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
 
@@ -2378,13 +2442,11 @@ namespace {
       auto choice = selected->choice;
       auto decl = choice.getDecl();
 
-      // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
-      // new one?
+      auto forceUnwrap = shouldForceUnwrapResult(expr, choice);
       return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
-                          locator,
-                          expr->isImplicit(),
+                          locator, expr->isImplicit(),
                           expr->getFunctionRefKind(),
-                          expr->getAccessSemantics());
+                          expr->getAccessSemantics(), forceUnwrap);
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2416,10 +2478,11 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
+      auto forceUnwrap = shouldForceUnwrapResult(expr, choice);
       return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
                           locator, expr->isImplicit(),
                           choice.getFunctionRefKind(),
-                          AccessSemantics::Ordinary);
+                          AccessSemantics::Ordinary, forceUnwrap);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -2439,17 +2502,13 @@ namespace {
       auto selected = getOverloadChoice(memberLocator);
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-      return buildMemberRef(expr->getBase(),
-                            selected.openedFullType,
-                            expr->getDotLoc(),
-                            selected.choice.getDecl(), expr->getNameLoc(),
-                            selected.openedType,
-                            cs.getConstraintLocator(expr),
-                            memberLocator,
-                            expr->isImplicit(),
-                            selected.choice.getFunctionRefKind(),
-                            expr->getAccessSemantics(),
-                            isDynamic);
+      auto forceUnwrap = shouldForceUnwrapResult(expr, selected.choice);
+      return buildMemberRef(
+          expr->getBase(), selected.openedFullType, expr->getDotLoc(),
+          selected.choice.getDecl(), expr->getNameLoc(), selected.openedType,
+          cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
+          selected.choice.getFunctionRefKind(), expr->getAccessSemantics(),
+          isDynamic, forceUnwrap);
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2493,17 +2552,13 @@ namespace {
       // Build the member reference.
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-      auto result = buildMemberRef(base,
-                                   selected.openedFullType,
-                                   expr->getDotLoc(), member, 
-                                   expr->getNameLoc(),
-                                   selected.openedType,
-                                   cs.getConstraintLocator(expr),
-                                   memberLocator,
-                                   expr->isImplicit(),
-                                   selected.choice.getFunctionRefKind(),
-                                   AccessSemantics::Ordinary,
-                                   isDynamic);
+      auto forceUnwrap = shouldForceUnwrapResult(expr, selected.choice);
+      auto result = buildMemberRef(
+          base, selected.openedFullType, expr->getDotLoc(), member,
+          expr->getNameLoc(), selected.openedType,
+          cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
+          selected.choice.getFunctionRefKind(), AccessSemantics::Ordinary,
+          isDynamic, forceUnwrap);
       if (!result)
         return nullptr;
 
@@ -2520,8 +2575,7 @@ namespace {
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 
-      result = coerceToType(result, resultTy, cs.getConstraintLocator(expr));
-      return result;
+      return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
     
   private:
@@ -2550,15 +2604,12 @@ namespace {
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
-        return buildMemberRef(base, openedType, dotLoc, ctor, nameLoc,
-                              cs.getType(expr),
-                              ConstraintLocatorBuilder(
-                                cs.getConstraintLocator(expr)),
-                              ctorLocator,
-                              implicit,
-                              functionRefKind,
-                              AccessSemantics::Ordinary,
-                              /*isDynamic=*/false);
+        return buildMemberRef(
+            base, openedType, dotLoc, ctor, nameLoc, cs.getType(expr),
+            ConstraintLocatorBuilder(cs.getConstraintLocator(expr)),
+            ctorLocator, implicit, functionRefKind, AccessSemantics::Ordinary,
+            /*isDynamic=*/false,
+            /*forceUnwrap=*/false);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -2675,24 +2726,15 @@ namespace {
 
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       case OverloadChoiceKind::DeclViaDynamic: {
         bool isDynamic
           = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-        auto member = buildMemberRef(base,
-                                     selected.openedFullType,
-                                     dotLoc,
-                                     selected.choice.getDecl(),
-                                     nameLoc,
-                                     selected.openedType,
-                                     cs.getConstraintLocator(expr),
-                                     memberLocator,
-                                     implicit,
-                                     selected.choice.getFunctionRefKind(),
-                                     AccessSemantics::Ordinary,
-                                     isDynamic);
-
-        return member;
+        auto forceUnwrap = shouldForceUnwrapResult(expr, selected.choice);
+        return buildMemberRef(
+            base, selected.openedFullType, dotLoc, selected.choice.getDecl(),
+            nameLoc, selected.openedType, cs.getConstraintLocator(expr),
+            memberLocator, implicit, selected.choice.getFunctionRefKind(),
+            AccessSemantics::Ordinary, isDynamic, forceUnwrap);
       }
 
       case OverloadChoiceKind::TupleIndex: {
@@ -3433,7 +3475,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return visitCoerceExpr(expr, None);
@@ -3518,7 +3560,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return handleForcedCheckedCastExpr(expr);
@@ -3598,7 +3640,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
       }
 
       return handleConditionalCheckedCastExpr(expr);
@@ -7145,6 +7187,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))
     fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy);
 
+  bool unwrapResult = false;
+  if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {
+    unwrapResult = true;
+    fn = IUOFnTy->getSubExpr();
+  }
+
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
   // FIXME: It would be nicer if we could build the ASTs properly in the
@@ -7249,8 +7297,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           }
       }
     }
+
+    if (unwrapResult)
+      return forceUnwrapResult(result);
+
     return result;
   }
+
+  // FIXME: handle unwrapping everywhere else
+  assert(!unwrapResult);
 
   // If this is an UnresolvedType in the system, preserve it.
   if (cs.getType(fn)->is<UnresolvedType>()) {
@@ -7308,17 +7363,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-  Expr *declRef = buildMemberRef(fn,
-                                 selected->openedFullType,
-                                 /*dotLoc=*/SourceLoc(),
-                                 decl, DeclNameLoc(fn->getEndLoc()),
-                                 selected->openedType,
-                                 locator,
-                                 ctorLocator,
-                                 /*Implicit=*/true,
-                                 choice.getFunctionRefKind(),
-                                 AccessSemantics::Ordinary,
-                                 isDynamic);
+  auto forceUnwrap = shouldForceUnwrapResult(apply, choice);
+  Expr *declRef =
+      buildMemberRef(fn, selected->openedFullType,
+                     /*dotLoc=*/SourceLoc(), decl, DeclNameLoc(fn->getEndLoc()),
+                     selected->openedType, locator, ctorLocator,
+                     /*Implicit=*/true, choice.getFunctionRefKind(),
+                     AccessSemantics::Ordinary, isDynamic, forceUnwrap);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -8008,15 +8059,13 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   ExprRewriter rewriter(cs, solution,
                         /*suppressDiagnostics=*/false);
 
-  auto memberRef = rewriter.buildMemberRef(base, openedFullType,
-                                           base->getStartLoc(),
-                                           witness,
-                                           DeclNameLoc(base->getEndLoc()),
-                                           openedType, dotLocator, dotLocator,
-                                           /*Implicit=*/true,
-                                           FunctionRefKind::SingleApply,
-                                           AccessSemantics::Ordinary,
-                                           /*isDynamic=*/false);
+  auto memberRef = rewriter.buildMemberRef(
+      base, openedFullType, base->getStartLoc(), witness,
+      DeclNameLoc(base->getEndLoc()), openedType, dotLocator, dotLocator,
+      /*Implicit=*/true, FunctionRefKind::SingleApply,
+      AccessSemantics::Ordinary,
+      /*isDynamic=*/false,
+      /*forceUnwrap=*/false);
   call->setFn(memberRef);
 
   // Call the witness.
