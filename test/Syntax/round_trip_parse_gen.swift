@@ -343,3 +343,11 @@ func foo() {
   fg
   """
 }
+
+func keypath() {
+  _ = \a.?.b
+  _ = \a.b.c
+  _ = \a.b[1]
+  _ = \.a.b
+  _ = #keyPath(a.b.c)
+}
