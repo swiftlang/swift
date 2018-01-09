@@ -1502,7 +1502,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
 /// Given that we're going to define a global value but already have a
 /// forward-declaration of it, update its linkage.
-static void updateLinkageForDefinition(IRGenModule &IGM,
+void irgen::updateLinkageForDefinition(IRGenModule &IGM,
                                        llvm::GlobalValue *global,
                                        const LinkEntity &entity) {
   // TODO: there are probably cases where we can avoid redoing the
