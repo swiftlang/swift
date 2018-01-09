@@ -522,7 +522,6 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
         // FIXME: show deduced types, etc, etc.
         if (EmittedDecls.insert(choice.getDecl()).second)
           tc.diagnose(choice.getDecl(), diag::found_candidate);
@@ -8404,8 +8403,7 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
     if (resolved->Locator != locator) continue;
     
     // We only handle the simplest decl binding.
-    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl
-        && resolved->Choice.getKind() != OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional)
+    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
       return nullptr;
     return resolved->Choice.getDecl();
   }
