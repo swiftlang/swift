@@ -777,7 +777,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `endIndex`.
   func formIndex(after i: inout Index)
 
-  @available(swift, deprecated, message: "all index distances are now of type Int")
+  @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
 }
 
