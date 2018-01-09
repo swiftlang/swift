@@ -1030,6 +1030,9 @@ public:
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
 
+  /// Cast the given constant to i8*.
+  llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
+
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
@@ -1074,6 +1077,7 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);

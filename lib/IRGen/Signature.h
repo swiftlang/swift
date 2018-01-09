@@ -21,6 +21,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/ExternalUnion.h"
 
 namespace llvm {
   class FunctionType;
@@ -49,18 +50,65 @@ public:
   const clang::CodeGen::CGFunctionInfo *ClangInfo = nullptr;
 };
 
+/// An encapsulation of the extra lowering information we might want to
+/// store about a coroutine.
+///
+/// The ABI for yields breaks the yielded values down into a scalar type
+/// sequence, much like argument lowering does: indirect yields (either
+/// due to abstraction or size) become pointers and direct yields undergo
+/// the general expansion algorithm.  We then find the longest prefix of
+/// the resulting sequence for which the concatenation
+///   (continuation function pointer) + prefix + (optional remainder pointer)
+/// is a legal return type according to the swiftcall ABI.  The remainder
+/// pointer must be included whenever the prefix is strict; it points to
+/// a structure containing the remainder of the type sequence, with each
+/// element naturally aligned.
+///
+/// For example, suppose the yields are
+///   @in Any, @inout Double, @in Int64, Float, Int8, Int16, Int32
+/// This is expanded to the legal type sequence:
+///   Any*, double*, i64*, float, i8, i16, i32
+/// To the beginning is always appended a continuation function pointer:
+///   void (...)*, Any*, double*, i64*, float, i8, i16, i32
+/// Suppose that the current target can support at most 4 scalar results.
+/// Then the final sequence will be:
+///   void (...)*, Any*, double*, { i64*, float, i8, i16, i32 }*
+///
+/// This final sequence becomes the result type of the coroutine's ramp
+/// function and (if a yield_many coroutine) its continuation functions.
+class CoroutineInfo {
+public:
+  /// The number of yield components that are returned directly in the
+  /// coroutine return value.
+  unsigned NumDirectYieldComponents = 0;
+};
+
+namespace {
+  class SignatureExpansion;
+}
+
 /// A signature represents something which can actually be called.
 class Signature {
-  llvm::FunctionType *Type = nullptr;
+  using ExtraData = SimpleExternalUnion<void,
+                                        ForeignFunctionInfo,
+                                        CoroutineInfo>;
+
+  llvm::FunctionType *Type;
   llvm::AttributeList Attributes;
-  ForeignFunctionInfo ForeignInfo;
   llvm::CallingConv::ID CallingConv;
+  ExtraData::Kind ExtraDataKind; // packed with above
+  ExtraData ExtraDataStorage;
+  static_assert(ExtraData::union_is_trivially_copyable,
+                "not trivially copyable");
+
+  friend class irgen::SignatureExpansion;
 
 public:
-  Signature() {}
+  Signature() : Type(nullptr) {}
   Signature(llvm::FunctionType *fnType, llvm::AttributeList attrs,
             llvm::CallingConv::ID callingConv)
-    : Type(fnType), Attributes(attrs), CallingConv(callingConv) {}
+    : Type(fnType), Attributes(attrs), CallingConv(callingConv),
+      ExtraDataKind(ExtraData::kindForMember<void>()) {}
 
   bool isValid() const {
     return Type != nullptr;
@@ -73,6 +121,10 @@ public:
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM,
                                CanSILFunctionType formalType);
+
+  /// Compute the signature of a coroutine's continuation function.
+  static Signature forCoroutineContinuation(IRGenModule &IGM,
+                                            CanSILFunctionType coroType);
 
   llvm::FunctionType *getType() const {
     assert(isValid());
@@ -91,7 +143,17 @@ public:
 
   ForeignFunctionInfo getForeignInfo() const {
     assert(isValid());
-    return ForeignInfo;
+    if (auto info =
+          ExtraDataStorage.dyn_cast<ForeignFunctionInfo>(ExtraDataKind))
+      return *info;
+    return ForeignFunctionInfo();
+  }
+
+  CoroutineInfo getCoroutineInfo() const {
+    assert(isValid());
+    if (auto info = ExtraDataStorage.dyn_cast<CoroutineInfo>(ExtraDataKind))
+      return *info;
+    return CoroutineInfo();
   }
 
   // The mutators below should generally only be used when building up

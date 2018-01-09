@@ -18,6 +18,10 @@
 using namespace swift;
 
 bool SILInliner::canInlineFunction(FullApplySite AI) {
+  // For now, we cannot inline begin_apply at all.
+  if (isa<BeginApplyInst>(AI))
+    return false;
+
   return AI.getFunction() != &Original;
 }
 

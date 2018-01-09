@@ -1257,6 +1257,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
+  // Continuation prototypes need to be external or else LLVM will fret.
+  case Kind::CoroutineContinuationPrototype:
+    return SILLinkage::PublicExternal;
+
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -1370,6 +1374,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::CoroutineContinuationPrototype:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -3497,6 +3502,19 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
+  LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return entry;
+
+  auto signature = Signature::forCoroutineContinuation(*this, fnType);
+  LinkInfo link = LinkInfo::get(*this, entity, NotForDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
 }

@@ -2015,6 +2015,13 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     A->replaceAllUsesWith(NewAI);
     return NewAI;
   }
+  if (auto *A = dyn_cast<BeginApplyInst>(AI)) {
+    assert(!StoreResultTo);
+    auto *NewAI = Builder.createBeginApply(Loc, Callee, Subs, Arguments,
+                                           A->isNonThrowing());
+    A->replaceAllUsesPairwiseWith(NewAI);
+    return NewAI;
+  }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
