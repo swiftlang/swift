@@ -221,9 +221,6 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::ReflectionAssociatedTypeDescriptor:
       return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                       getProtocolConformance());
-    case Kind::ReflectionSuperclassDescriptor:
-      return mangler.mangleReflectionSuperclassDescriptor(
-                                                    cast<ClassDecl>(getDecl()));
   }
   llvm_unreachable("bad entity kind!");
 }

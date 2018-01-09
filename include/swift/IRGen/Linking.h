@@ -147,9 +147,6 @@ class LinkEntity {
     /// The pointer is a Decl*.
     Other,
 
-    /// A reflection metadata descriptor for the superclass of a class.
-    ReflectionSuperclassDescriptor,
-
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -249,7 +246,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ReflectionSuperclassDescriptor;
+    return k <= Kind::Other;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -577,13 +574,6 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformance(
         Kind::ReflectionAssociatedTypeDescriptor, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forReflectionSuperclassDescriptor(const ClassDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::ReflectionSuperclassDescriptor, decl);
     return entity;
   }
 
