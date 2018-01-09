@@ -115,29 +115,34 @@ static bool isFunctionAttr(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
-int swift::Demangle::getManglingPrefixLength(const char *mangledName) {
+int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
+  if (mangledName.empty()) return 0;
+
   // Check for the swift-4 prefix
-  if (mangledName[0] == '_' && mangledName[1] == 'T' && mangledName[2] == '0')
+  if (mangledName.size() >= 3 && mangledName[0] == '_' &&
+      mangledName[1] == 'T' && mangledName[2] == '0')
     return 3;
 
   // Check for the swift > 4 prefix
   unsigned Offset = (mangledName[0] == '_' ? 1 : 0);
-  if (mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
+  if (mangledName.size() >= Offset + 1 &&
+      mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
     return Offset + 2;
 
   return 0;
 }
 
-bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
-  // The old mangling.
-  if (mangledName[0] == '_' && mangledName[1] == 'T')
+bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
+  if (isOldFunctionTypeMangling(mangledName))
     return true;
 
   return getManglingPrefixLength(mangledName) != 0;
 }
 
-bool swift::Demangle::isOldFunctionTypeMangling(const char *mangledName) {
-  return mangledName[0] == '_' && mangledName[1] == 'T';
+bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
+  return mangledName.size() >= 2 && mangledName[0] == '_' &&
+      mangledName[1] == 'T';
+}
 }
 
 namespace swift {
