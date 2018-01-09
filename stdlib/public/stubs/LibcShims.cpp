@@ -333,11 +333,13 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
 // FIXME remove
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_print_hex(__swift_uintptr_t value, int newline) {
-  if (newline != 0) {
-    printf("%016tX\n", value);
-  }
-  else {
+  if (sizeof(value) == 4) {
+    printf("%08tX", value);
+  } else {
     printf("%016tX", value);
+  }
+  if (newline) {
+    printf("\n");
   }
 }
 
