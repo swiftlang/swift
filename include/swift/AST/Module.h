@@ -127,7 +127,7 @@ enum class ResilienceStrategy : unsigned {
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class ModuleDecl : public TypeDecl, public DeclContext {
+class ModuleDecl : public DeclContext, public TypeDecl {
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
