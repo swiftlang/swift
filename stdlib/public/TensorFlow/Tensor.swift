@@ -103,27 +103,80 @@ public extension Tensor {
     self.init(#tfop("Const", "dc:t", Element.self, value))
   }
 
-  // Vector (1-D) initializer, takes an array of values.
-  @inline(never) // make @_inlineable when implemented.
+
+  /// Vector (1-D) initializer, takes an array of values.
+  @_inlineable
   init(_ vector: [Element]) {
-    fatalError("FIXME: Implement vector initialization")
+    self.init(shape: [vector.count], elements: vector)
   }
 
-  // Matrix (2-D) initializer, takes an array of array of values
-  @inline(never) // make @_inlineable when implemented.
+  /// Matrix (2-D) initializer, takes an array of array of values.
+  @_inlineable
   init(_ matrix: [[Element]]) {
-    fatalError("FIXME: Implement matrix initialization")
+    /// Sanity check
+    guard let firstRow = matrix.first else {
+      preconditionFailure("The first dimension is empty. Cannot infer shape.")
+    }
+    precondition(firstRow.count >= 1,
+                 "The second dimension is empty. Dimension cannot be zero.")
+    /// Now we make assumption about the shape.
+    let rowCount = matrix.count, columnCount = firstRow.count
+    let contiguousSize = rowCount * columnCount
+    let byteSize = contiguousSize * MemoryLayout<Element>.stride
+    /// Check rest dimensions.
+    for row in matrix.dropFirst() {
+      precondition(row.count == columnCount,
+                   "Each dimension must have equal number of subdimensions.")
+    }
+    /// Initialize tensor and copy data.
+    /// We don't want to delegate initialization to `init(shape:elements:)`
+    /// because flattening `matrix` to an array is unnecessary cost.
+    let cTensor = TF_AllocateTensor(Element.cDataType,
+                                    [Int64(rowCount), Int64(columnCount)], 2,
+                                    byteSize)
+    let status = TF_NewStatus()
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
+    /// Copy to TF_Tensor memory, one row at a time.
+    for (i, row) in matrix.enumerated() {
+      row.withUnsafeBufferPointer { ptr in
+        addr.advanced(by: i * columnCount).assign(from: ptr.baseAddress!,
+                                                  count: columnCount)
+      }
+    }
+    /// Create handle and we are done.
+    let cHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    TF_DeleteTensor(cTensor)
+    self.init(TensorHandle(cTensorHandle: cHandle!))
   }
 
-  // Arbitrary shape initializer
-  // - Precondition: The number of elements should be the same as the
-  // product of all of shape's dimensions
-  @inline(never) // make @_inlineable when implemented.
+  /// Arbitrary shape initializer.
+  /// - Precondition: The number of elements should be the same as the
+  /// product of all of shape's dimensions.
+  @_inlineable
   init(shape: [Int], elements: [Element]) {
-    precondition(elements.count == shape.reduce(1, *), """
+    let contiguousSize = shape.reduce(1, *)
+    let byteSize = contiguousSize * MemoryLayout<Element>.stride
+    precondition(elements.count == contiguousSize, """
       The number of elements don't match the shape
       """)
-    fatalError("FIXME: Implement element conversion")
+    let cTensor = TF_AllocateTensor(Element.cDataType,
+                                    shape.map(Int64.init),
+                                    Int32(shape.count),
+                                    byteSize)
+    let status = TF_NewStatus()
+    /// Copy data
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
+    elements.withUnsafeBufferPointer { ptr in
+      addr.assign(from: ptr.baseAddress!, count: contiguousSize)
+    }
+    /// Create handle and we are done
+    let cHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    TF_DeleteTensor(cTensor)
+    self.init(TensorHandle(cTensorHandle: cHandle!))
   }
 
   /// Zero initializer, takes a list of dimensions.
@@ -174,13 +227,11 @@ public extension Tensor where Element : FloatingPoint {
 
 // Subscripting a tensor produces a smaller tensor.
 public extension Tensor {
-  subscript(tensor indices: Int...) -> Tensor {
+  /// Returns a subdimensional tensor at the specified list of indices.
+  /// - Todo: If possible, this should be defined as an op, to be run on the
+  /// accelerator.
+  subscript(indices: Int...) -> Tensor {
     fatalError("FIXME: implement subscript to tensor")
-  }
-
-  // Subscript to get a scalar.
-  subscript(scalar indices: Int...) -> Element {
-    fatalError("FIXME: implement subscript to scalar")
   }
 
   // Slicing out a range of elements.
