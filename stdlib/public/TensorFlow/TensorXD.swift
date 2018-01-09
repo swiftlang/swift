@@ -126,9 +126,10 @@ public extension Tensor1D where Element : FloatingPoint {
 
 // Subscripting a 1D tensor produces a scalar.
 public extension Tensor1D {
-  @_inlineable
   subscript(index: Int) -> Element {
-    return underlyingTensor[scalar: index]
+    @inline(never) get {
+      fatalError("Unimplemented")
+    }
   }
 }
 
@@ -236,12 +237,13 @@ public extension Tensor2D where Element : FloatingPoint {
 public extension Tensor2D {
   @_inlineable
   subscript(index: Int) -> Tensor1D<Element> {
-    return Tensor1D(underlying: underlyingTensor[tensor: index])
+    return Tensor1D(underlying: underlyingTensor[index])
   }
 
-  @_inlineable
   subscript(index1: Int, index2: Int) -> Element {
-    return underlyingTensor[scalar: index1, index2]
+    @inline(never) get {
+      fatalError("Implement")
+    }
   }
 }
 
