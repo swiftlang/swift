@@ -621,18 +621,11 @@ protected:
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
-  ClangNode getClangNodeImpl() const {
-    assert(Bits.Decl.FromClang);
-    return ClangNode::getFromOpaqueValue(
-        *(reinterpret_cast<void * const*>(this) - 1));
-  }
+  /// \brief Get the Clang node associated with this declaration.
+  ClangNode getClangNodeImpl() const;
 
   /// \brief Set the Clang node associated with this declaration.
-  void setClangNode(ClangNode Node) {
-    Bits.Decl.FromClang = true;
-    // Extra memory is allocated for this.
-    *(reinterpret_cast<void **>(this) - 1) = Node.getOpaqueValue();
-  }
+  void setClangNode(ClangNode Node);
 
   void updateClangNode(ClangNode node) {
     assert(hasClangNode());
@@ -1355,9 +1348,11 @@ public:
   }
 };
 
-class GenericContext : public DeclContext {
-private:
-  GenericParamList *GenericParams = nullptr;
+// A private class for forcing exact field layout.
+class _GenericContext {
+// Not really public. See GenericContext.
+public:
+    GenericParamList *GenericParams = nullptr;
 
   /// The trailing where clause.
   ///
@@ -1372,12 +1367,15 @@ private:
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
 
+};
+
+class GenericContext : private _GenericContext, public DeclContext {
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 protected:
   GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : DeclContext(Kind, Parent) { }
+    : _GenericContext(), DeclContext(Kind, Parent) { }
 
 public:
   /// \brief Retrieve the set of parameters to a generic context, or null if
@@ -1424,6 +1422,8 @@ public:
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
 };
+static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
+              sizeof(GenericContext), "Please add fields to _GenericContext");
 
 /// Describes what kind of name is being imported.
 ///
@@ -1532,7 +1532,7 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl final : public Decl, public GenericContext,
+class ExtensionDecl final : public GenericContext, public Decl,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
@@ -1948,13 +1948,13 @@ private:
 /// This, among other things, makes it easier to distinguish between local
 /// top-level variables (which are not live past the end of the statement) and
 /// global variables.
-class TopLevelCodeDecl : public Decl, public DeclContext {
+class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
 
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : Decl(DeclKind::TopLevelCode, Parent),
-      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+      Decl(DeclKind::TopLevelCode, Parent),
       Body(Body) {}
 
   BraceStmt *getBody() const { return Body; }
@@ -2373,7 +2373,7 @@ public:
 
 /// A type declaration that can have generic parameters attached to it.  Because
 /// it has these generic parameters, it is always a DeclContext.
-class GenericTypeDecl : public TypeDecl, public GenericContext {
+class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
@@ -4702,7 +4702,7 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl, public GenericContext {
+class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
@@ -4711,8 +4711,8 @@ public:
   SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
-      GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);
@@ -4794,7 +4794,7 @@ public:
 };
 
 /// \brief Base class for function-like declarations.
-class AbstractFunctionDecl : public ValueDecl, public GenericContext {
+class AbstractFunctionDecl : public GenericContext, public ValueDecl {
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -4854,8 +4854,8 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
-      : ValueDecl(Kind, Parent, Name, NameLoc),
-        GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+        ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);

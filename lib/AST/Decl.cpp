@@ -861,8 +861,8 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
-  : Decl(DeclKind::Extension, parent),
-    GenericContext(DeclContextKind::ExtensionDecl, parent),
+  : GenericContext(DeclContextKind::ExtensionDecl, parent),
+    Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
     ExtendedType(extendedType),
@@ -2490,8 +2490,8 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
-    TypeDecl(K, DC, name, nameLoc, inherited),
-    GenericContext(DeclContextKind::GenericTypeDecl, DC) {
+    GenericContext(DeclContextKind::GenericTypeDecl, DC),
+    TypeDecl(K, DC, name, nameLoc, inherited) {
   setGenericParams(GenericParams);
 }
 
@@ -5547,4 +5547,31 @@ void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
   LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+}
+
+ClangNode Decl::getClangNodeImpl() const {
+  assert(Bits.Decl.FromClang);
+  void * const *ptr = nullptr;
+  switch (getKind()) {
+#define DECL(Id, Parent) \
+  case DeclKind::Id: \
+    ptr = reinterpret_cast<void * const*>(static_cast<const Id##Decl*>(this)); \
+    break;
+#include "swift/AST/DeclNodes.def"
+  }
+  return ClangNode::getFromOpaqueValue(*(ptr - 1));
+}
+
+void Decl::setClangNode(ClangNode Node) {
+  Bits.Decl.FromClang = true;
+  // The extra/preface memory is allocated by the importer.
+  void **ptr = nullptr;
+  switch (getKind()) {
+#define DECL(Id, Parent) \
+  case DeclKind::Id: \
+    ptr = reinterpret_cast<void **>(static_cast<Id##Decl*>(this)); \
+    break;
+#include "swift/AST/DeclNodes.def"
+  }
+  *(ptr - 1) = Node.getOpaqueValue();
 }
