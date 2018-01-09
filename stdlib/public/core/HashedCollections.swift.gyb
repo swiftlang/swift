@@ -4632,6 +4632,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   }
 }
 #else
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}> { }
 #endif
@@ -6231,6 +6232,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 #endif
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Iterator = ${Self}Iterator<${TypeParameters}>
   internal typealias _NativeBuffer =

@@ -23,6 +23,7 @@
 
 import SwiftShims
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _Hashing {
   // FIXME(ABI)#41 : make this an actual public API.
@@ -45,6 +46,7 @@ struct _Hashing {
   }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _HashingDetail {
 

@@ -924,5 +924,6 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 }
 
 /// A namespace for Unicode utilities.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum Unicode {}
 

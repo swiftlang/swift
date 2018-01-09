@@ -19,6 +19,7 @@
 /// * Daniel J. Bernstein <djb@cr.yp.to>
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal enum _SipHashDetail {
   @_inlineable // FIXME(sil-serialize-all)

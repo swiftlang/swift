@@ -15,7 +15,9 @@
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 
 /// Enumeration describing POSIX error codes.
-@objc public enum POSIXErrorCode : Int32 {
+@_fixed_layout // FIXME(sil-serialize-all)
+@objc
+public enum POSIXErrorCode : Int32 {
   /// Operation not permitted.
   case EPERM           = 1
   /// No such file or directory.
@@ -267,6 +269,7 @@
 #elseif os(Linux) || os(Android)
 
 /// Enumeration describing POSIX error codes.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum POSIXErrorCode : Int32 {
   /// Operation not permitted.
   case EPERM           = 1

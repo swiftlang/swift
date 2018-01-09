@@ -29,6 +29,7 @@ internal func _getObjCSummary(_ data: _MagicMirrorData) -> String {
   return _cocoaStringToSwiftString_NonASCII(theDescription)
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public // SPI(runtime)
 struct _ObjCMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
@@ -63,6 +64,7 @@ struct _ObjCMirror : _Mirror {
   public var disposition: _MirrorDisposition { return .objCObject }
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public // SPI(runtime)
 struct _ObjCSuperMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)

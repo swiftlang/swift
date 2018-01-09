@@ -13,6 +13,8 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 struct _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
