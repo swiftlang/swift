@@ -223,6 +223,7 @@ func postfix() {
   foo(x:y:)()
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
+  _ = foo(&d)
 }
 
 #if blah
