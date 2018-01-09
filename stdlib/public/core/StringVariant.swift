@@ -14,7 +14,6 @@
 internal protocol _StringVariant : RandomAccessCollection
 where
   Element == Unicode.UTF16.CodeUnit,
-  IndexDistance == Int,
   SubSequence == Self {
   // FIXME associatedtype Encoding : _UnicodeEncoding
   associatedtype CodeUnit : FixedWidthInteger & UnsignedInteger

@@ -200,7 +200,7 @@ reflect(object: obj)
 // CHECK-32: (class reflect_multiple_types.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=121 alignment=8 stride=128 num_extra_inhabitants=0
+// CHECK-32-NEXT: (class_instance size=129 alignment=8 stride=136 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=t00 offset=8
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
@@ -259,7 +259,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t16 offset=88
-// CHECK-32-NEXT:     (struct size=16 alignment=4 stride=16 num_extra_inhabitants=1
+// CHECK-32-NEXT:     (struct size=16 alignment=4 stride=16 num_extra_inhabitants=4095
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t17 offset=104
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
@@ -273,11 +273,11 @@ reflect(object: obj)
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t20 offset=116
+// CHECK-32-NEXT:   (field name=t20 offset=120
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t21 offset=124
+// CHECK-32-NEXT:   (field name=t21 offset=128
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))

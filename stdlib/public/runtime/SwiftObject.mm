@@ -147,29 +147,26 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-NSString *swift::convertStringToNSString(String *swiftString) {
-  // public func _convertStringToNSString(_ string: String) -> NSString
-  typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
-  auto convertStringToNSString = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<ConversionFn*>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringySo0E0CSSF)))));
-
+NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
+  typedef SWIFT_CC(swift) NSString *GetDescriptionFn(OpaqueValue*, const Metadata*);
+  auto getDescription = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<GetDescriptionFn*>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation15_getDescriptionySo8NSStringCxlF)))));
+  
   // If Foundation hasn't loaded yet, fall back to returning the static string
   // "Swift._SwiftObject". The likelihood of someone invoking -description without
   // ObjC interop is low.
-  if (!convertStringToNSString)
+  if (!getDescription) {
     return @"Swift._SwiftObject";
+  }
 
-  return convertStringToNSString(swiftString->x,
-                                 swiftString->y,
-                                 swiftString->z);
+  return [getDescription(value, type) autorelease];
 }
 
-static NSString *_getDescription(SwiftObject *obj) {
-  String tmp;
+static NSString *_getObjectDescription(SwiftObject *obj) {
   swift_retain((HeapObject*)obj);
-  swift_getSummary(&tmp, (OpaqueValue*)&obj, _swift_getClassOfAllocated(obj));
-  return [convertStringToNSString(&tmp) autorelease];
+  return getDescription((OpaqueValue*)&obj,
+                        _swift_getClassOfAllocated(obj));
 }
 
 static NSString *_getClassDescription(Class cls) {
@@ -388,10 +385,10 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (NSString *)description {
-  return _getDescription(self);
+  return _getObjectDescription(self);
 }
 - (NSString *)debugDescription {
-  return _getDescription(self);
+  return _getObjectDescription(self);
 }
 
 + (NSString *)description {
