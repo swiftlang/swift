@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-struct _Prespecialize {
+internal enum _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
   static internal func _specializeArrays() {
