@@ -392,9 +392,12 @@ ManagedValue Transform::transform(ManagedValue v,
     });
   }
 
-  // If the value is IUO, but the desired formal type isn't optional, force it.
-  if (inputOTK == OTK_ImplicitlyUnwrappedOptional
-      && outputOTK == OTK_None) {
+  // If the value is an optional, but the desired formal type isn't an
+  // optional, force it. We should only ever get here with values
+  // declared as implicitly unwrapped optionals because type checking
+  // should weed out cases involving plain optionals.
+  if (inputOTK != OTK_None && outputOTK == OTK_None) {
+    assert(inputOTK == OTK_ImplicitlyUnwrappedOptional);
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
