@@ -35,7 +35,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   }
 
   // Create the branch to the header.
-  SILBuilder(Preheader).createBranch(RegularLocation(SourceLoc()), Header,
+  SILBuilder(Preheader).createBranch(getEmptyLocation(), Header,
                                      Args);
 
   return Preheader;

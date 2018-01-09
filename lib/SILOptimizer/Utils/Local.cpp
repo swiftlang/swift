@@ -50,7 +50,7 @@ swift::createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
 
   // Set up the builder we use to insert at our insertion point.
   SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
+  auto Loc = getEmptyLocation();
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
@@ -75,7 +75,7 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
 
   // Setup the builder we will use to insert at our insertion point.
   SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
+  auto Loc = getEmptyLocation();
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr->getType().isReferenceCounted(B.getModule())) {
