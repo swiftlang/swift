@@ -435,7 +435,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   }
 
   for (const std::string &DependenciesPath :
-       context.Output.getAdditionalOutputsForType(types::ID::TY_SwiftDeps)) {
+       context.Output.getAdditionalOutputsForType(types::ID::TY_Dependencies)) {
     Arguments.push_back("-emit-dependencies-path");
     Arguments.push_back(DependenciesPath.c_str());
   }
