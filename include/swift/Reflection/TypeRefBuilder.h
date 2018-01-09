@@ -151,6 +151,7 @@ class TypeRefBuilder {
 public:
   using BuiltType = const TypeRef *;
   using BuiltNominalTypeDecl = Optional<std::string>;
+  using BuiltProtocolDecl = Optional<std::string>;
 
   TypeRefBuilder();
 
@@ -197,6 +198,11 @@ public:
     return Demangle::mangleNode(node);
   }
 
+  Optional<std::string>
+  createProtocolDecl(const Demangle::NodePointer &node) {
+    return Demangle::mangleNode(node);
+  }
+
   Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
     return std::move(mangledName);
   }
@@ -239,24 +245,17 @@ public:
     return FunctionTypeRef::create(*this, params, result, flags);
   }
 
-  const ProtocolTypeRef *createProtocolType(const std::string &mangledName,
-                                            const std::string &moduleName,
-                                            const std::string &privateDiscriminator,
-                                            const std::string &name) {
-    return ProtocolTypeRef::create(*this, mangledName);
-  }
-
   const ProtocolCompositionTypeRef *
-  createProtocolCompositionType(const std::vector<const TypeRef*> &members,
-                                bool hasExplicitAnyObject) {
-    for (auto member : members) {
-      if (!isa<ProtocolTypeRef>(member) &&
-          !isa<NominalTypeRef>(member) &&
-          !isa<BoundGenericTypeRef>(member))
-        return nullptr;
+  createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
+                                BuiltType superclass,
+                                bool isClassBound) {
+    std::vector<const NominalTypeRef *> protocolRefs;
+    for (const auto &protocol : protocols) {
+      protocolRefs.push_back(createNominalType(protocol));
     }
-    return ProtocolCompositionTypeRef::create(*this, members,
-                                              hasExplicitAnyObject);
+
+    return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
+                                              isClassBound);
   }
 
   const ExistentialMetatypeTypeRef *
@@ -277,10 +276,8 @@ public:
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
                             const TypeRef *base,
-                            const TypeRef *protocol) {
-    if (!isa<ProtocolTypeRef>(protocol))
-      return nullptr;
-    return DependentMemberTypeRef::create(*this, member, base, protocol);
+                            Optional<std::string> protocol) {
+    return DependentMemberTypeRef::create(*this, member, base, *protocol);
   }
 
   const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
@@ -340,7 +337,7 @@ public:
   const TypeRef *
   lookupTypeWitness(const std::string &MangledTypeName,
                     const std::string &Member,
-                    const TypeRef *Protocol);
+                    StringRef Protocol);
 
   const TypeRef *
   lookupSuperclass(const TypeRef *TR);

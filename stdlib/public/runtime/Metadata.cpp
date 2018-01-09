@@ -2353,10 +2353,11 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
-swift::swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
-                                        const Metadata *superclassConstraint,
-                                        size_t numProtocols,
-                                        const ProtocolDescriptor **protocols)
+swift::swift_getExistentialTypeMetadata(
+                                  ProtocolClassConstraint classConstraint,
+                                  const Metadata *superclassConstraint,
+                                  size_t numProtocols,
+                                  const ProtocolDescriptor * const *protocols)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 
   // We entrust that the compiler emitting the call to
