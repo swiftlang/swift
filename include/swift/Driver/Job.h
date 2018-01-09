@@ -126,24 +126,22 @@ private:
   EnvironmentVector ExtraEnvironment;
 
   /// Whether the job wants a list of input or output files created.
-  FilelistInfo FilelistFileInfo;
+  std::vector<FilelistInfo> FilelistFileInfos;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
 public:
-  Job(const JobAction &Source,
-      SmallVectorImpl<const Job *> &&Inputs,
-      std::unique_ptr<CommandOutput> Output,
-      const char *Executable,
+  Job(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
+      std::unique_ptr<CommandOutput> Output, const char *Executable,
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
-      FilelistInfo Info = {})
+      std::vector<FilelistInfo> Infos = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfo(std::move(Info)) {}
+        FilelistFileInfos(std::move(Infos)) {}
 
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
@@ -151,7 +149,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
-  FilelistInfo getFilelistInfo() const { return FilelistFileInfo; }
+  ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
