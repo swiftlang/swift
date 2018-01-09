@@ -1123,18 +1123,21 @@ DeclContextKind DeclContext::getContextKind() const {
 // DO NOT assume that the compiler will emit this code blindly.
 SWIFT_CONSTRUCTOR
 static void verify_DeclContext_is_start_of_node() {
-  auto decl = reinterpret_cast<Decl*>(sizeof(DeclContext));
+  auto decl = reinterpret_cast<Decl*>(0x1000 + sizeof(DeclContext));
 #define DECL(Id, Parent)
 #define CONTEXT_DECL(Id, Parent) \
-  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Decl*>(decl)));
+  assert(reinterpret_cast<DeclContext*>(0x1000) == \
+         static_cast<Id##Decl*>(decl));
 #define CONTEXT_VALUE_DECL(Id, Parent) \
-  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Decl*>(decl)));
+  assert(reinterpret_cast<DeclContext*>(0x1000) == \
+         static_cast<Id##Decl*>(decl));
 #include "swift/AST/DeclNodes.def"
 
-  auto expr = reinterpret_cast<Expr*>(sizeof(DeclContext));
+  auto expr = reinterpret_cast<Expr*>(0x1000 + sizeof(DeclContext));
 #define EXPR(Id, Parent)
 #define CONTEXT_EXPR(Id, Parent) \
-  assert(nullptr == static_cast<DeclContext*>(static_cast<Id##Expr*>(expr)));
+  assert(reinterpret_cast<DeclContext*>(0x1000) == \
+         static_cast<Id##Expr*>(expr));
 #include "swift/AST/ExprNodes.def"
 }
 #endif
