@@ -175,7 +175,7 @@ def main():
     profdata_bin = os.path.join(bin_dir, 'llvm-profdata')
     swiftc_bin = os.path.join(bin_dir, 'swiftc')
 
-    def merge_profraw_files(output_file, output_dir=WORKSPACE_DIR):
+    def merge_profraw_files(output_file, output_dir=config.profiles_dir):
         output_path = os.path.join(output_dir, output_file)
 
         with pushd(config.profiles_dir):
@@ -199,13 +199,13 @@ def main():
             call(['git', 'fetch', '--all'])
             call(['git', 'pull'])
 
-    projects_file = os.path.join(UTILS_DIR, 'swift-profile-projects.json')
     with pushd(SOURCE_COMPAT_SUITE_DIR):
         call([
             './runner.py',
             '--swift-branch', 'master',
             '--swiftc', swiftc_bin,
-            '--projects', projects_file,
+            '--projects', 'projects.json',
+            '--include-actions', '\'action.startswith("Build")\'',
         ])
 
     # Merge and remove *.profraw files from building the source-compat-suite
