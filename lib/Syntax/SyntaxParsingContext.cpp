@@ -285,7 +285,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
 
   // Never.
   case AccumulationMode::NotSet:
-    assert(!Enabled && "Cleanup mode must be spefcified before destruction");
+    assert(!Enabled && "Cleanup mode must be specified before destruction");
     break;
   }
 }

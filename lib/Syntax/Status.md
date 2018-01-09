@@ -33,11 +33,11 @@
   * InterpolatedStringLiteralExpr
   * KeyPathExpr
   * KeyPathDotExpr
+  * InOutExpr
 
 ### In-progress (UnknownExpr):
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
-  * InOutExpr
   * EditorPlaceholderExpr
 
 ### Not-started (UnknownExpr):
