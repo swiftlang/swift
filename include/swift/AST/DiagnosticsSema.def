@@ -1056,7 +1056,7 @@ ERROR(iboutlet_non_optional,none,
 NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
-      "add '!' to form the implicitly unwrapped optional type %0", (Type))
+      "add '!' to form the implicitly unwrapped optional type %0!", (Type))
 
 ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
