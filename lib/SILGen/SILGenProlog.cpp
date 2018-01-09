@@ -522,7 +522,7 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
   // Record the ArgNo of the artificial $error inout argument. 
   unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
-    RegularLocation Loc = getEmptyLocation();
+    RegularLocation Loc = getCompilerGeneratedLocation();
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
       Loc = AFD->getThrowsLoc();
     else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
