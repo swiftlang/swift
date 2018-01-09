@@ -108,6 +108,18 @@ class LinkEntity {
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
+    /// A method dispatch thunk.  The pointer is a FuncDecl* inside a protocol
+    /// or a class.
+    DispatchThunk,
+
+    /// A method dispatch thunk for an initializing constructor.  The pointer
+    /// is a ConstructorDecl* inside a class.
+    DispatchThunkInitializer,
+
+    /// A method dispatch thunk for an allocating constructor.  The pointer is a
+    /// ConstructorDecl* inside a protocol or a class.
+    DispatchThunkAllocator,
+
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -353,6 +365,36 @@ class LinkEntity {
   LinkEntity() = default;
 
 public:
+  static LinkEntity forDispatchThunk(SILDeclRef declRef) {
+    assert(!declRef.isForeign &&
+           !declRef.isDirectReference &&
+           !declRef.isCurried);
+
+    LinkEntity::Kind kind;
+
+    auto *decl = declRef.getDecl();
+    assert(isa<ClassDecl>(decl->getDeclContext()) ||
+           isa<ProtocolDecl>(decl->getDeclContext()));
+
+    switch (declRef.kind) {
+    case SILDeclRef::Kind::Func:
+      kind = Kind::DispatchThunk;
+      break;
+    case SILDeclRef::Kind::Initializer:
+      kind = Kind::DispatchThunkInitializer;
+      break;
+    case SILDeclRef::Kind::Allocator:
+      kind = Kind::DispatchThunkAllocator;
+      break;
+    default:
+      llvm_unreachable("Bad SILDeclRef for dispatch thunk");
+    }
+
+    LinkEntity entity;
+    entity.setForDecl(kind, decl);
+    return entity;
+  }
+
   static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
     LinkEntity entity;
     entity.Pointer = decl;

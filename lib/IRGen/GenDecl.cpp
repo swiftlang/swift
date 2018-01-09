@@ -1213,6 +1213,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   };
 
   switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator: {
+    auto *decl = getDecl();
+
+    // Protocol requirements don't have their own access control
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+      decl = proto;
+
+    return getSILLinkage(getDeclLinkage(decl), forDefinition);
+  }
+
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
     auto type = getType();
@@ -1363,6 +1375,11 @@ static bool isAvailableExternally(IRGenModule &IGM, Type type) {
 
 bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+    return ::isAvailableExternally(IGM, getDecl());
+
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
     return ::isAvailableExternally(IGM, getType());
