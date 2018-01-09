@@ -1352,7 +1352,7 @@ public:
 class _GenericContext {
 // Not really public. See GenericContext.
 public:
-    GenericParamList *GenericParams = nullptr;
+  GenericParamList *GenericParams = nullptr;
 
   /// The trailing where clause.
   ///
@@ -1366,7 +1366,6 @@ public:
   /// environment will be lazily loaded.
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
-
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
