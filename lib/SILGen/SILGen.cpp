@@ -1241,11 +1241,6 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
 
-  // If we already emitted this witness table, we don't need to track the fact
-  // we need it.
-  if (emittedWitnessTables.count(root))
-    return;
-
   // If we delayed emitting this witness table, force it.
   auto foundDelayed = delayedConformances.find(root);
   if (foundDelayed != delayedConformances.end()) {
@@ -1254,8 +1249,16 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
     return;
   }
 
-  // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(root);
+  // Remember that we used this conformance, but also break any cycles when
+  // recursive constraints are involved.
+  if (!usedConformances.insert(root).second)
+    return;
+
+  // Separately check inherited protocols and associated type constraints.
+  // These conformances may have different owners, i.e. we may need to emit
+  // them even though we decide not to emit the result.
+  for (auto signatureConformance : root->getSignatureConformances())
+    useConformance(signatureConformance);
 }
 
 void
