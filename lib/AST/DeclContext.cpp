@@ -1121,7 +1121,7 @@ DeclContextKind DeclContext::getContextKind() const {
 // XXX -- static_cast is not static enough for use with static_assert().
 // DO verify this by temporarily breaking a Decl or Expr.
 // DO NOT assume that the compiler will emit this code blindly.
-__attribute__((constructor))
+SWIFT_CONSTRUCTOR
 static void verify_DeclContext_is_start_of_node() {
   auto decl = reinterpret_cast<Decl*>(sizeof(DeclContext));
 #define DECL(Id, Parent)
