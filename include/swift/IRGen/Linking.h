@@ -227,15 +227,6 @@ class LinkEntity {
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
-  static bool isFunction(ValueDecl *decl) {
-    return (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl) ||
-            isa<ConstructorDecl>(decl));
-  }
-
-  static bool hasGetterSetter(ValueDecl *decl) {
-    return (isa<VarDecl>(decl) || isa<SubscriptDecl>(decl));
-  }
-
   Kind getKind() const {
     return Kind(LINKENTITY_GET_FIELD(Data, Kind));
   }
