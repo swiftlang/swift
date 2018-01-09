@@ -108,10 +108,6 @@ class LinkEntity {
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
-    /// A function.
-    /// The pointer is a FuncDecl*.
-    Function,
-
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
