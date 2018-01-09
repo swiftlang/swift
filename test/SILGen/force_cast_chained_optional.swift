@@ -11,7 +11,7 @@ class Bar {
 class C {}
 class D: C {}
 
-// CHECK-LABEL: sil hidden @_T027force_cast_chained_optional4testAA1DCAA3FooCF
+// CHECK-LABEL: sil hidden @$S27force_cast_chained_optional4testyAA1DCAA3FooCF
 // CHECK: bb0([[ARG:%.*]] : @owned $Foo):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   class_method [[BORROWED_ARG]] : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar!, $@convention(method) (@guaranteed Foo) ->

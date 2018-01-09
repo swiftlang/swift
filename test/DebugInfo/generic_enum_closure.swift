@@ -5,11 +5,11 @@ struct CErrorOr<T>
  {
   var value : T?
   init(x : __CurrentErrno) {
-    // CHECK: define hidden {{.*}}void @_T020generic_enum_closure8CErrorOrVACyxGAA14__CurrentErrnoV1x_tcfC
+    // CHECK: define hidden {{.*}}void @"$S20generic_enum_closure8CErrorOrV1xACyxGAA14__CurrentErrnoV_tcfC"
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
     // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !DIExpression())
-    // CHECK: ![[T1:.*]] = !DICompositeType({{.*}}, identifier: "_T020generic_enum_closure8CErrorOrVyACQq_GD")
+    // CHECK: ![[T1:.*]] = !DICompositeType({{.*}}, identifier: "$S20generic_enum_closure8CErrorOrVyACQq_GD")
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope: {{.*}}, type: ![[T1]])
     value = .none
   }

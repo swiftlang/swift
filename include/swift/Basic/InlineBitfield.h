@@ -38,21 +38,26 @@ namespace swift {
   class T##Bitfield { \
     friend class T; \
     uint64_t __VA_ARGS__; \
-    uint64_t : 64 - (C); /* Pad and error if C > 64 */ \
-  }; \
+    uint64_t : 64 - (C); /* Better code gen */ \
+  } T; \
   LLVM_PACKED_END \
-  enum { Num##T##Bits = (C) }
+  enum { Num##T##Bits = (C) }; \
+  static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
 /// Define an bitfield for type 'T' with parent class 'U' and 'C' bits used.
-#define SWIFT_INLINE_BITFIELD(T, U, C, ...) \
+#define SWIFT_INLINE_BITFIELD_TEMPLATE(T, U, C, HC, ...) \
   LLVM_PACKED_START \
   class T##Bitfield { \
     friend class T; \
     uint64_t : Num##U##Bits, __VA_ARGS__; \
-    uint64_t : 64 - (Num##U##Bits + (C)); /* Pad and error if C > 64 */ \
-  }; \
+    uint64_t : 64 - (Num##U##Bits + (HC) + (C)); /* Better code gen */ \
+  } T; \
   LLVM_PACKED_END \
-  enum { Num##T##Bits = Num##U##Bits + (C) }
+  enum { Num##T##Bits = Num##U##Bits + (C) }; \
+  static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
+
+#define SWIFT_INLINE_BITFIELD(T, U, C, ...) \
+  SWIFT_INLINE_BITFIELD_TEMPLATE(T, U, C, 0, __VA_ARGS__)
 
 /// Define a full bitfield for type 'T' that uses all of the remaining bits in
 /// the inline bitfield.
@@ -72,15 +77,13 @@ namespace swift {
     friend class T; \
     enum { NumPadBits = 64 - (Num##U##Bits + (C)) }; \
     uint64_t : Num##U##Bits, __VA_ARGS__; \
-  }; \
+  } T; \
   LLVM_PACKED_END \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
 /// Define an empty bitfield for type 'T'.
 #define SWIFT_INLINE_BITFIELD_EMPTY(T, U) \
   enum { Num##T##Bits = Num##U##Bits }
-
-#define SWIFT_INLINE_BITS(T) T##Bitfield T
 
 // XXX/HACK: templated max() doesn't seem to work in a bitfield size context.
 constexpr unsigned bitmax(unsigned a, unsigned b) {

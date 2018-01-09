@@ -22,6 +22,27 @@ class TrivialDestructor {
 // Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
 sil [_semantics "array.uninitialized"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
 
+sil [_semantics "array.uninitialized"] @adoptStorageSpecialiedForInt : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+
+// CHECK-LABEL: sil @deadarrayWithAdoptStorage : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function 'deadarrayWithAdoptStorage'
+sil @deadarrayWithAdoptStorage : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 3
+  %6 = alloc_ref [tail_elems $Int * %0 : $Builtin.Word] $_ContiguousArrayStorage<Int>
+  %7 = metatype $@thin Array<Int>.Type
+  %8 = function_ref @adoptStorageSpecialiedForInt : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  %9 = apply %8(%6, %0, %7) : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  strong_release %6 : $_ContiguousArrayStorage<Int>
+  %10 = tuple_extract %9 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %11 = tuple_extract %9 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %12 = struct_extract %11 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil @deadarray
 // CHECK-NOT: apply
 // CHECK-NOT: store

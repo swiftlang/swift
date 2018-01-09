@@ -8,13 +8,13 @@
 import Foundation
 
 @objc class Foo : NSObject {
-  // CHECK: define internal void @_T013objc_pointers3FooC16pointerArgumentsySpySiG_Sv1ySPySiG1zs33AutoreleasingUnsafeMutablePointerVyACSgG1wtFTo(%0*, i8*, i64*, i8*, i64*, %0**)
+  // CHECK: define internal void @"$S13objc_pointers3FooC16pointerArguments_1y1z1wySpySiG_SvSPySiGs33AutoreleasingUnsafeMutablePointerVyACSgGtFTo"(%0*, i8*, i64*, i8*, i64*, %0**)
   @objc func pointerArguments(_ x: UnsafeMutablePointer<Int>,
                               y: UnsafeMutableRawPointer,
                               z: UnsafePointer<Int>,
                               w: AutoreleasingUnsafeMutablePointer<Foo?>) {}
 
-  // CHECK: define internal void @_T013objc_pointers3FooC24pointerMetatypeArgumentsys33AutoreleasingUnsafeMutablePointerVyyXlXpG1x_AFyyXlXpSgG1ytFTo(%0*, i8*, i8**, i8**)
+  // CHECK: define internal void @"$S13objc_pointers3FooC24pointerMetatypeArguments1x1yys33AutoreleasingUnsafeMutablePointerVyyXlXpG_AHyyXlXpSgGtFTo"(%0*, i8*, i8**, i8**)
   @objc func pointerMetatypeArguments(x: AutoreleasingUnsafeMutablePointer<AnyClass>,
                                       y: AutoreleasingUnsafeMutablePointer<AnyClass?>) {}
 }

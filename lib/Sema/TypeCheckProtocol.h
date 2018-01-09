@@ -139,7 +139,7 @@ struct InferredTypeWitnessesSolution {
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_USED
 #endif
-  void dump();
+  void dump() const;
 };
 
 class RequirementEnvironment;
@@ -636,12 +636,18 @@ public:
 
   /// Check all of the protocols requirements are actually satisfied by a
   /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
+  ///
+  /// \param failUnsubstituted Whether to fail when the requirements of the
+  /// protocol could not be substituted (e.g., due to missing information).
+  /// When true, emits a diagnostic in such cases; when false, enqueues the
+  /// conformance for later checking.
+  void ensureRequirementsAreSatisfied(bool failUnsubstituted);
 
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
 };
+
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.
@@ -701,6 +707,12 @@ private:
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    ValueDecl *req);
 
+  /// Infer associated type witnesses for the given associated type.
+  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
+                   ConformanceChecker &checker,
+                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+                   AssociatedTypeDecl *assocType);
+
   /// Infer associated type witnesses for all relevant value requirements.
   ///
   /// \param assocTypes The set of associated types we're interested in.
@@ -708,6 +720,11 @@ private:
   inferTypeWitnessesViaValueWitnesses(
     ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
+
+  /// Compute a "fixed" type witness for an associated type, e.g.,
+  /// if the refined protocol requires it to be equivalent to some other
+  /// concrete type.
+  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute the default type witness from an associated type default,
   /// if there is one.
@@ -717,12 +734,30 @@ private:
   /// known to the compiler.
   Type computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
+  /// Compute a type witness without using a specific potential witness,
+  /// e.g., using a fixed type (from a refined protocol), default type
+  /// on an associated type, or deriving the type.
+  ///
+  /// \param allowDerived Whether to allow "derived" type witnesses.
+  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType,
+                                  bool allowDerived);
+
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
 
+  /// Retrieve substitution options with a tentative type witness
+  /// operation that queries the current set of type witnesses.
+  SubstOptions getSubstOptionsWithCurrentTypeWitnesses();
+
   /// Check whether the current set of type witnesses meets the
   /// requirements of the protocol.
-  bool checkCurrentTypeWitnesses();
+  bool checkCurrentTypeWitnesses(
+         const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
+           &valueWitnesses);
+
+  /// Check the current type witnesses against the
+  /// requirements of the given constrained extension.
+  bool checkConstrainedExtension(ExtensionDecl *ext);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.

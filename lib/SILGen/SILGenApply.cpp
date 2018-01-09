@@ -357,7 +357,7 @@ public:
   static Callee forClassMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionList subs,
                                SILLocation l) {
-    auto base = SGF.SGM.Types.getOverriddenVTableEntry(c);
+    auto base = c.getOverriddenVTableEntry();
     auto &baseCI = SGF.getConstantInfo(base);
     auto &derivedCI = SGF.getConstantInfo(c);
     return Callee(Kind::ClassMethod, SGF, c,
@@ -563,7 +563,7 @@ public:
       ManagedValue castValue = borrowedCastToOriginalSelfType(
         SGF, Loc, *borrowedSelf);
 
-      auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
+      auto base = constant->getOverriddenVTableEntry();
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
 
@@ -642,7 +642,7 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::SuperMethod: {
-      auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
+      auto base = constant->getOverriddenVTableEntry();
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -1049,6 +1049,13 @@ public:
     // in an unchecked, ABI-compatible manner. They shouldn't prevent us form
     // forming a complete call.
     visitExpr(e);
+  }
+
+  void visitImplicitlyUnwrappedFunctionConversionExpr(
+      ImplicitlyUnwrappedFunctionConversionExpr *e) {
+    // These are generated for short term use in the type checker.
+    llvm_unreachable(
+        "We should not see ImplicitlyUnwrappedFunctionConversionExpr here");
   }
 
   void visitIdentityExpr(IdentityExpr *e) {
@@ -1615,25 +1622,6 @@ static SILValue emitRawApply(SILGenFunction &SGF,
                          normalBB, errorBB);
     SGF.B.emitBlock(normalBB);
   }
-
-  // Given any guaranteed arguments that are not being passed at +0, insert the
-  // decrement here instead of at the end of scope. Guaranteed just means that
-  // we guarantee the lifetime of the object for the duration of the call.
-  // Be sure to use a CleanupLocation so that unreachable code diagnostics don't
-  // trigger.
-  for (auto i : indices(args)) {
-    if (!inputParams[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
-      continue;
-
-    SILValue argValue = args[i].forward(SGF);
-    SILType argType = argValue->getType();
-    CleanupLocation cleanupLoc = CleanupLocation::get(loc);
-    if (!argType.isAddress())
-      SGF.getTypeLowering(argType).emitDestroyRValue(SGF.B, cleanupLoc, argValue);
-    else
-      SGF.getTypeLowering(argType).emitDestroyAddress(SGF.B, cleanupLoc, argValue);
-  }
-
   return result;
 }
 
@@ -4748,7 +4736,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   }
 
   // Dispatch in a struct/enum or to a final method is always direct.
-  if (!isClassDispatch || decl->isFinal())
+  if (!isClassDispatch)
     return Callee::forDirect(SGF, constant, subs, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,
@@ -4986,28 +4974,10 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
-static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
-                                           bool isDirectUse) {
-  // Members of Objective-C protocols should be dynamically dispatched.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
-    return protoDecl->isObjC();
-
-  // C functions imported as members should be referenced as C functions.
-  if (storage->getGetter()->isImportAsMember())
-    return true;
-  
-  // Otherwise, favor native entry points for direct accesses.
-  if (isDirectUse)
-    return false;
-  
-  return storage->requiresForeignGetterAndSetter();
-}
-
-SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
-  // Use the ObjC entry point
-  return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func)
-    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
+SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage) {
+  auto *getter = storage->getGetter();
+  return SILDeclRef(getter, SILDeclRef::Kind::Func)
+    .asForeign(requiresForeignEntryPoint(getter));
 }
 
 /// Emit a call to a getter.
@@ -5043,10 +5013,10 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   return emission.apply(c);
 }
 
-SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
-  return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func)
-    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
+SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage) {
+  auto *setter = storage->getSetter();
+  return SILDeclRef(setter, SILDeclRef::Kind::Func)
+    .asForeign(requiresForeignEntryPoint(setter));
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
@@ -5109,8 +5079,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 }
 
 SILDeclRef
-SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
-                                            bool isDirectUse) {
+SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
   return SILDeclRef(storage->getMaterializeForSetFunc(),
                     SILDeclRef::Kind::Func);
 }
@@ -5188,8 +5157,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 }
 
 SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
-                                               AccessKind accessKind,
-                                               bool isDirectUse) {
+                                               AccessKind accessKind) {
   FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
   return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }

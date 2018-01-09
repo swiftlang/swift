@@ -84,10 +84,12 @@ extension LazyCollection : Sequence {
     return _base.makeIterator()
   }
 
-  /// Returns a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
+  /// A value less than or equal to the number of elements in the sequence,
+  /// calculated nondestructively.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   @_inlineable
   public var underestimatedCount: Int { return _base.underestimatedCount }
 

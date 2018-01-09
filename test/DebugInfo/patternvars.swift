@@ -33,8 +33,8 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 // which shares the storage with the expression in the switch statement. Make
 // sure we emit a dbg.value once per basic block.
 
-// CHECK: define {{.*}}@_T011patternvars6mangleSayAA13UnicodeScalarVGAE1s_tFA2DcfU_
-// CHECK: %[[VAL:[0-9]+]] = call swiftcc i32 @_T011patternvars13UnicodeScalarV5values6UInt32Vvg(i32 %0)
+// CHECK: define {{.*}}@"$S11patternvars6mangle1sSayAA13UnicodeScalarVGAF_tFA2EcfU_"
+// CHECK: %[[VAL:[0-9]+]] = call swiftcc i32 @"$S11patternvars13UnicodeScalarV5values6UInt32Vvg"(i32 %0)
 // CHECK-NEXT:  call void @llvm.dbg.value(metadata i32 %[[VAL]]
 // CHECK:       ; <label>
 // CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]

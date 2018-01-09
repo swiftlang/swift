@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/TypeDecoder.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -27,6 +28,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -50,18 +52,18 @@ namespace {
     }
   };
 
-  struct TypeMetadataCacheEntry {
+  struct NominalTypeDescriptorCacheEntry {
   private:
     std::string Name;
-    const Metadata *Metadata;
+    const NominalTypeDescriptor *Description;
 
   public:
-    TypeMetadataCacheEntry(const llvm::StringRef name,
-                           const ::Metadata *metadata)
-      : Name(name.str()), Metadata(metadata) {}
+    NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
+                           const NominalTypeDescriptor *description)
+      : Name(name.str()), Description(description) {}
 
-    const ::Metadata *getMetadata(void) {
-      return Metadata;
+    const NominalTypeDescriptor *getDescription() {
+      return Description;
     }
 
     int compareWithKey(llvm::StringRef aName) const {
@@ -76,7 +78,7 @@ namespace {
 } // end anonymous namespace
 
 struct TypeMetadataState {
-  ConcurrentMap<TypeMetadataCacheEntry> Cache;
+  ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   std::vector<TypeMetadataSection> SectionsToScan;
   Mutex SectionsToScanLock;
 
@@ -124,148 +126,224 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
-// copied from ProtocolConformanceRecord::getCanonicalTypeMetadata()
-template<>
-const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
-  switch (getTypeKind()) {
-  case TypeMetadataRecordKind::UniqueDirectType:
-    return getDirectType();
-  case TypeMetadataRecordKind::NonuniqueDirectType: {
-    const ForeignTypeMetadata *FMD =
-        static_cast<const ForeignTypeMetadata *>(getDirectType());
-    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
-  }
-  case TypeMetadataRecordKind::UniqueDirectClass:
-    if (auto *ClassMetadata =
-          static_cast<const ::ClassMetadata *>(getDirectType())) {
-      return getMetadataForClass(ClassMetadata);
-    }
-    else
-      return nullptr;
-  default:
-    return nullptr;
-  }
-}
-
-// returns the type metadata for the type named by typeNode
-const Metadata *
-swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
-                                       const Metadata *metadata,
-                                       const NominalTypeDescriptor *ntd) {
-  if (metadata != nullptr) {
-    assert(ntd == nullptr);
-    ntd = metadata->getNominalTypeDescriptor();
-  }
-
-  if (ntd == nullptr || ntd->Name.get() != typeName)
-    return nullptr;
-
-  // Call the accessor if there is one.
-  if (metadata == nullptr && !ntd->GenericParams.isGeneric()) {
-    if (auto accessFn = ntd->getAccessFunction())
-      metadata = accessFn();
-  }
-
-  return metadata;
-}
-
-// returns the type metadata for the type named by typeName
-static const Metadata *
+// returns the nominal type descriptor for the type named by typeName
+static const NominalTypeDescriptor *
 _searchTypeMetadataRecords(const TypeMetadataState &T,
                            const llvm::StringRef typeName) {
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
-  const Metadata *foundMetadata = nullptr;
-
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
-
-      if (foundMetadata != nullptr)
-        return foundMetadata;
+      if (auto ntd = record.getNominalTypeDescriptor()) {
+        if (ntd->Name.get() == typeName)
+          return ntd;
+      }
     }
   }
 
   return nullptr;
 }
 
-static const Metadata *
-_classByName(const llvm::StringRef typeName) {
-
-  size_t DotPos = typeName.find('.');
-  if (DotPos == llvm::StringRef::npos)
-    return nullptr;
-  if (typeName.find('.', DotPos + 1) != llvm::StringRef::npos)
-    return nullptr;
-
-  Demangle::NodeFactory Factory;
-
-  NodePointer ClassNd = Factory.createNode(Node::Kind::Class);
-  NodePointer ModuleNd = Factory.createNode(Node::Kind::Module,
-                                            typeName.substr(0, DotPos));
-  NodePointer NameNd = Factory.createNode(Node::Kind::Identifier,
-                                          typeName.substr(DotPos + 1));
-  ClassNd->addChild(ModuleNd, Factory);
-  ClassNd->addChild(NameNd, Factory);
-
-  std::string Mangled = mangleNode(ClassNd);
-  StringRef MangledName = Mangled;
-
-  const Metadata *foundMetadata = nullptr;
+static const NominalTypeDescriptor *
+_findNominalTypeDescriptor(llvm::StringRef mangledName) {
+  const NominalTypeDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
-  if (auto Value = T.Cache.find(MangledName))
-    return Value->getMetadata();
+  if (auto Value = T.NominalCache.find(mangledName))
+    return Value->getDescription();
 
   // Check type metadata records
   T.SectionsToScanLock.withLock([&] {
-    foundMetadata = _searchTypeMetadataRecords(T, MangledName);
+    foundNominal = _searchTypeMetadataRecords(T, mangledName);
   });
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
-  if (!foundMetadata)
-    foundMetadata = _searchConformancesByMangledTypeName(MangledName);
+  if (!foundNominal)
+    foundNominal = _searchConformancesByMangledTypeName(mangledName);
 
-  if (foundMetadata) {
-    T.Cache.getOrInsert(MangledName, foundMetadata);
+  if (foundNominal) {
+    T.NominalCache.getOrInsert(mangledName, foundNominal);
   }
 
-#if SWIFT_OBJC_INTEROP
-  // Check for ObjC class
-  // FIXME does this have any value? any ObjC class with a Swift name
-  // should already be registered as a Swift type.
-  if (foundMetadata == nullptr) {
-    std::string prefixedName("_Tt" + typeName.str());
-    foundMetadata = reinterpret_cast<ClassMetadata *>
-      (objc_lookUpClass(prefixedName.c_str()));
-  }
-#endif
-
-  return foundMetadata;
+  return foundNominal;
 }
 
-/// Return the type metadata for a given name, used in the
-/// implementation of _typeByName().
-///
-/// Currently only top-level classes are supported.
+#pragma mark Metadata lookup via mangled name
 
-/// \param typeName The name of a class in the form: <module>.<class>
-/// \return Returns the metadata of the type, if found.
+namespace {
+/// Constructs metadata by decoding a mangled type name, for use with
+/// \c TypeDecoder.
+class DecodedMetadataBuilder {
+public:
+  using BuiltType = const Metadata *;
+  using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
 
-/// internal func _getTypeByName(_ name: UnsafePointer<UInt8>,
-///                              _ nameLength: UInt)  -> Any.Type?
-#define _getTypeByName \
-  MANGLE_SYM(s14_getTypeByNameypXpSgSPys5UInt8VG_SutF)
+  BuiltNominalTypeDecl createNominalTypeDecl(
+                                     const Demangle::NodePointer &node) const {
+    // FIXME: Mangled Objective-C class names should go directly
+    // through objc_lookupClass.
+
+    // Look for a nominal type descriptor based on its mangled name.
+    auto mangledName = Demangle::mangleNode(node);
+    return _findNominalTypeDescriptor(mangledName);
+  }
+
+  BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
+                              BuiltType parent) const {
+    // FIXME: Generic nominal types.
+    if (typeDecl->GenericParams.isGeneric())
+      return BuiltType();
+
+    // Use the access function to compute type metadata.
+    if (auto accessFunction = typeDecl->getAccessFunction()) {
+      return accessFunction();
+    }
+
+    // FIXME: Shouldn't get here? We've hit an unsupported case.
+    return BuiltType();
+  }
+
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
+                                   ArrayRef<BuiltType> genericArgs,
+                                   BuiltType parent) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createBuiltinType(StringRef mangledName) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
+    return swift_getMetatypeMetadata(instance);
+  }
+
+  BuiltType createExistentialMetatypeType(BuiltType instance) const {
+    return swift_getExistentialMetatypeMetadata(instance);
+  }
+
+  BuiltType createProtocolCompositionType(ArrayRef<BuiltType> protocols,
+                                          bool hasExplicitAnyObject) const {
+    // FIXME: Handle protocols and superclasses.
+    if (!protocols.empty()) return BuiltType();
+
+    auto classConstraint =
+      hasExplicitAnyObject ? ProtocolClassConstraint::Class
+                           : ProtocolClassConstraint::Any;
+    return swift_getExistentialTypeMetadata(classConstraint, nullptr, 0,
+                                            nullptr);
+  }
+
+  BuiltType createProtocolType(StringRef mangledName, StringRef moduleName,
+                               StringRef privateDiscriminator,
+                               StringRef name) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createGenericTypeParameterType(unsigned depth,
+                                           unsigned index) const {
+    // FIXME: Implement substitution logic here.
+    return BuiltType();
+  }
+
+  BuiltType createFunctionType(
+                           ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+                           BuiltType result, FunctionTypeFlags flags) const {
+    std::vector<BuiltType> paramTypes;
+    std::vector<uint32_t> paramFlags;
+
+    // Fill in the parameters.
+    paramTypes.reserve(params.size());
+    if (flags.hasParameterFlags())
+      paramFlags.reserve(params.size());
+    for (const auto &param : params) {
+      paramTypes.push_back(param.getType());
+      if (flags.hasParameterFlags())
+        paramFlags.push_back(param.getFlags().getIntValue());
+    }
+
+    return swift_getFunctionTypeMetadata(flags, paramTypes.data(),
+                                         flags.hasParameterFlags()
+                                           ? paramFlags.data()
+                                           : nullptr,
+                                         result);
+  }
+
+  BuiltType createTupleType(ArrayRef<BuiltType> elements,
+                            std::string labels,
+                            bool variadic) const {
+    // TODO: 'variadic' should no longer exist
+    TupleTypeFlags flags(0);
+    if (!labels.empty())
+      flags = flags.withNonConstantLabels(true);
+    return swift_getTupleTypeMetadata(elements.size(), elements.data(),
+                                      labels.empty() ? nullptr : labels.c_str(),
+                                      flags, /*proposedWitnesses=*/nullptr);
+  }
+
+  BuiltType createDependentMemberType(StringRef name, BuiltType base,
+                                      BuiltType protocol) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createUnownedStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createUnmanagedStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createWeakStorageType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+
+  BuiltType createSILBoxType(BuiltType base) const {
+    // FIXME: Implement.
+    return BuiltType();
+  }
+};
+
+}
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata *
-_getTypeByName(const char *typeName, size_t typeNameLength) {
-  llvm::StringRef name(typeName, typeNameLength);
-  return _classByName(name);
+const Metadata * _Nullable
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+
+  Demangler demangler;
+  NodePointer node;
+
+  // Check whether this is the convenience syntax "ModuleName.ClassName".
+  size_t dotPos = typeName.find('.');
+  if (dotPos != llvm::StringRef::npos &&
+      typeName.find('.', dotPos + 1) == llvm::StringRef::npos) {
+    // Form a demangle tree for this class.
+    NodePointer classNode = demangler.createNode(Node::Kind::Class);
+    NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
+                                                  typeName.substr(0, dotPos));
+    NodePointer nameNode = demangler.createNode(Node::Kind::Identifier,
+                                            typeName.substr(dotPos + 1));
+    classNode->addChild(moduleNode, demangler);
+    classNode->addChild(nameNode, demangler);
+
+    node = classNode;
+  } else {
+    // Demangle the type name.
+    node = demangler.demangleType(typeName);
+    if (!node) return nullptr;
+  }
+
+  DecodedMetadataBuilder builder;
+  return Demangle::decodeMangledType(builder, node);
 }

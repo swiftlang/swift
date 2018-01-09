@@ -12,9 +12,9 @@ func marker_2() {}
 func marker_3() {}
 
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A8_no_else{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A8_no_else{{[_0-9a-zA-Z]*}}F
 func if_no_else() {
-  // CHECK:   [[FOO:%.*]] = function_ref @_T016if_while_binding3fooSSSgyF
+  // CHECK:   [[FOO:%.*]] = function_ref @$S16if_while_binding3fooSSSgyF
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.some!enumelt.1: [[YES:bb[0-9]+]], case #Optional.none!enumelt: [[NO:bb[0-9]+]]
   //
@@ -24,7 +24,7 @@ func if_no_else() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : @owned $String):
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
+  // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
   // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
@@ -34,11 +34,11 @@ func if_no_else() {
   // CHECK: [[CONT]]:
   // CHECK-NEXT:   tuple ()
 }
-// CHECK: } // end sil function '_T016if_while_binding0A8_no_else{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$S16if_while_binding0A8_no_else{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A11_else_chainyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A11_else_chainyyF : $@convention(thin) () -> () {
 func if_else_chain() {
-  // CHECK:   [[FOO:%.*]] = function_ref @_T016if_while_binding3foo{{[_0-9a-zA-Z]*}}F
+  // CHECK:   [[FOO:%.*]] = function_ref @$S16if_while_binding3foo{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK-NEXT:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.some!enumelt.1: [[YESX:bb[0-9]+]], case #Optional.none!enumelt: [[NOX:bb[0-9]+]]
   if let x = foo() {
@@ -49,7 +49,7 @@ func if_else_chain() {
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
+  // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
   // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
@@ -80,7 +80,7 @@ func if_else_chain() {
   // CHECK: [[CONT_X]]:
 }
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0B5_loopyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$S16if_while_binding0B5_loopyyF : $@convention(thin) () -> () {
 func while_loop() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   //
@@ -114,7 +114,7 @@ func while_loop() {
 
 // Don't leak alloc_stacks for address-only conditional bindings in 'while'.
 // <rdar://problem/16202294>
-// CHECK-LABEL: sil hidden @_T016if_while_binding0B13_loop_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S16if_while_binding0B13_loop_generic{{[_0-9a-zA-Z]*}}F
 // CHECK:         br [[COND:bb[0-9]+]]
 // CHECK:       [[COND]]:
 // CHECK:         [[X:%.*]] = alloc_stack $T, let, name "x"
@@ -138,7 +138,7 @@ func while_loop_generic<T>(_ source: () -> T?) {
 }
 
 // <rdar://problem/19382942> Improve 'if let' to avoid optional pyramid of doom
-// CHECK-LABEL: sil hidden @_T016if_while_binding0B11_loop_multiyyF
+// CHECK-LABEL: sil hidden @$S16if_while_binding0B11_loop_multiyyF
 func while_loop_multi() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
@@ -174,7 +174,7 @@ func while_loop_multi() {
   // CHECK-NEXT:   return
 }
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A6_multiyyF
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A6_multiyyF
 func if_multi() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECKBUF2:bb.*]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]
   //
@@ -206,7 +206,7 @@ func if_multi() {
   // CHECK-NEXT:   return
 }
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A11_multi_elseyyF
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A11_multi_elseyyF
 func if_multi_else() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECKBUF2:bb.*]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]
   //
@@ -242,7 +242,7 @@ func if_multi_else() {
   // CHECK-NEXT:   return
 }
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A12_multi_whereyyF
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A12_multi_whereyyF
 func if_multi_where() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECKBUF2:bb.*]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]
   //
@@ -279,7 +279,7 @@ func if_multi_where() {
 
 
 // <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviors. They could be unified.
-// CHECK-LABEL: sil hidden @_T016if_while_binding0A16_leading_booleanySiF
+// CHECK-LABEL: sil hidden @$S16if_while_binding0A16_leading_booleanyySiF
 func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
   
@@ -318,7 +318,7 @@ func if_leading_boolean(_ a : Int) {
 class BaseClass {}
 class DerivedClass : BaseClass {}
 
-// CHECK-LABEL: sil hidden @_T016if_while_binding20testAsPatternInIfLetyAA9BaseClassCSgF
+// CHECK-LABEL: sil hidden @$S16if_while_binding20testAsPatternInIfLetyyAA9BaseClassCSgF
 func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: bb0([[ARG:%.*]] : @owned $Optional<BaseClass>):
   // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
@@ -362,7 +362,7 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
 }
 
 // <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
-// CHECK-LABEL: sil hidden @_T016if_while_binding12testCaseBoolySbSgF
+// CHECK-LABEL: sil hidden @$S16if_while_binding12testCaseBoolyySbSgF
 func testCaseBool(_ value : Bool?) {
   // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Bool>):
   // CHECK: switch_enum [[ARG]] : $Optional<Bool>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]
@@ -378,7 +378,7 @@ func testCaseBool(_ value : Bool?) {
   // CHECK:   br [[TRUE_BB:bb[0-9]+]]
   //
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @_T016if_while_binding8marker_1yyF
+  // CHECK:   function_ref @$S16if_while_binding8marker_1yyF
   // CHECK:   br [[CONT_BB]]
   if case true? = value {
     marker_1()
@@ -398,7 +398,7 @@ func testCaseBool(_ value : Bool?) {
   // CHECK:   br [[FALSE2_BB:bb[0-9]+]]
   //
   // CHECK: [[FALSE2_BB]]:
-  // CHECK:   function_ref @_T016if_while_binding8marker_2yyF
+  // CHECK:   function_ref @$S16if_while_binding8marker_2yyF
   // CHECK:   br [[EPILOG_BB]]
 
   // CHECK: [[EPILOG_BB]]:

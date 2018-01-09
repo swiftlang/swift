@@ -861,8 +861,8 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
-  : Decl(DeclKind::Extension, parent),
-    GenericContext(DeclContextKind::ExtensionDecl, parent),
+  : GenericContext(DeclContextKind::ExtensionDecl, parent),
+    Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
     ExtendedType(extendedType),
@@ -1260,34 +1260,25 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  auto nominal = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) return false;
+  if (storage->isDynamic())
+    return true;
 
-  switch (nominal->getKind()) {
-#define DECL(ID, BASE) case DeclKind::ID:
-#define NOMINAL_TYPE_DECL(ID, BASE)
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type!");
+  // Imported declarations behave like they are dynamic, even if they're
+  // not marked as such explicitly.
+  if (storage->isObjC() && storage->hasClangNode())
+    return true;
 
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-    return false;
-
-  case DeclKind::Protocol:
-    return !storage->getDeclContext()->isExtensionContext();
-
-  case DeclKind::Class:
-    // Final properties can always be direct, even in classes.
-    if (storage->isFinal())
+  if (auto *classDecl = dyn_cast<ClassDecl>(storage->getDeclContext())) {
+    if (storage->isFinal() || classDecl->isFinal())
       return false;
-    // Extension properties are statically dispatched, unless they're @objc.
-    if (storage->getDeclContext()->isExtensionContext()
-        && !storage->isObjC())
-      return false;
+
     return true;
   }
-  llvm_unreachable("bad DeclKind");
+
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+    return true;
+
+  return false;
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
@@ -1654,16 +1645,26 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 }
 
 bool swift::conflicting(const OverloadSignature& sig1,
-                        const OverloadSignature& sig2) {
+                        const OverloadSignature& sig2,
+                        bool skipProtocolExtensionCheck) {
   // A member of a protocol extension never conflicts with a member of a
   // protocol.
-  if (sig1.InProtocolExtension != sig2.InProtocolExtension)
+  if (!skipProtocolExtensionCheck &&
+      sig1.InProtocolExtension != sig2.InProtocolExtension)
     return false;
 
   // If the base names are different, they can't conflict.
   if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
     return false;
-  
+
+  // If one is an operator and the other is not, they can't conflict.
+  if (sig1.UnaryOperator != sig2.UnaryOperator)
+    return false;
+
+  // If one is an instance and the other is not, they can't conflict.
+  if (sig1.IsInstanceMember != sig2.IsInstanceMember)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -1671,10 +1672,7 @@ bool swift::conflicting(const OverloadSignature& sig1,
              (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
   }
   
-  return sig1.Name == sig2.Name &&
-         sig1.InterfaceType == sig2.InterfaceType &&
-         sig1.UnaryOperator == sig2.UnaryOperator &&
-         sig1.IsInstanceMember == sig2.IsInstanceMember;
+  return sig1.Name == sig2.Name;
 }
 
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
@@ -1696,8 +1694,15 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
-  /// Translate implicitly unwrapped optionals into strict optionals.
-  if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
+  // Translate implicitly unwrapped optionals into strict optionals.
+  if (auto inOutTy = type->getAs<InOutType>()) {
+    if (auto uncheckedOptOf =
+            inOutTy->getObjectType()
+                ->getImplicitlyUnwrappedOptionalObjectType()) {
+      type = InOutType::get(OptionalType::get(uncheckedOptOf));
+    }
+  } else if (auto uncheckedOptOf =
+                 type->getImplicitlyUnwrappedOptionalObjectType()) {
     type = OptionalType::get(uncheckedOptOf);
   }
 
@@ -1739,16 +1744,17 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   if (curryLevels == 0) {
     // In an initializer, ignore optionality.
     if (isInitializer) {
-      if (auto objectType = type->getAnyOptionalObjectType())
+      if (auto inOutTy = type->getAs<InOutType>()) {
+        if (auto objectType =
+                inOutTy->getObjectType()->getAnyOptionalObjectType()) {
+          type = InOutType::get(objectType);
+        }
+      } else if (auto objectType = type->getAnyOptionalObjectType()) {
         type = objectType;
+      }
     }
 
-    // Translate implicitly unwrapped optionals into strict optionals.
-    if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
-      type = OptionalType::get(uncheckedOptOf);
-    }
-
-    return mapSignatureType(ctx, type);
+    return mapSignatureParamType(ctx, type);
   }
 
   auto funcTy = type->castTo<AnyFunctionType>();
@@ -1791,63 +1797,68 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.Name = getFullName();
   signature.InProtocolExtension
     = getDeclContext()->getAsProtocolExtensionContext();
+  signature.IsInstanceMember = isInstanceMember();
+  signature.IsProperty = isa<VarDecl>(this);
 
-  // Functions, initializers, and de-initializers include their
-  // interface types in their signatures as well as whether they are
-  // instance members.
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
-    signature.InterfaceType =
-        mapSignatureFunctionType(
-            getASTContext(), getInterfaceType(),
-            /*topLevelFunction=*/true,
-            /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
-            /*isInitializer=*/isa<ConstructorDecl>(afd),
-             afd->getNumParameterLists())->getCanonicalType();
-
-    signature.IsInstanceMember = isInstanceMember();
-    // Unary operators also include prefix/postfix.
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      if (func->isUnaryOperator()) {
-        signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
-      }
-    }
-  } else if (isa<SubscriptDecl>(this)) {
-    signature.InterfaceType = getInterfaceType()->getCanonicalType();
-
-    // If the subscript occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
-      if (auto genericSig = ext->getGenericSignature()) {
-        if (auto funcTy = signature.InterfaceType->getAs<AnyFunctionType>()) {
-          signature.InterfaceType
-            = GenericFunctionType::get(genericSig,
-                                       funcTy->getParams(),
-                                       funcTy->getResult(),
-                                       funcTy->getExtInfo())
-                ->getCanonicalType();
-        }
-      }
-    }
-  } else if (isa<VarDecl>(this)) {
-    signature.IsProperty = true;
-    signature.IsInstanceMember = isInstanceMember();
-
-    // If the property occurs within a generic extension context,
-    // consider the generic signature of the extension.
-    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
-      if (auto genericSig = ext->getGenericSignature()) {
-        ASTContext &ctx = getASTContext();
-        signature.InterfaceType
-          = GenericFunctionType::get(genericSig,
-                                     TupleType::getEmpty(ctx),
-                                     TupleType::getEmpty(ctx),
-                                     AnyFunctionType::ExtInfo())
-              ->getCanonicalType();
-      }
+  if (auto func = dyn_cast<FuncDecl>(this)) {
+    if (func->isUnaryOperator()) {
+      signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
   }
 
   return signature;
+}
+
+CanType ValueDecl::getOverloadSignatureType() const {
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
+    return mapSignatureFunctionType(
+                           getASTContext(), getInterfaceType(),
+                           /*topLevelFunction=*/true,
+                           /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
+                           /*isInitializer=*/isa<ConstructorDecl>(afd),
+                           afd->getNumParameterLists())->getCanonicalType();
+  }
+
+  if (isa<SubscriptDecl>(this)) {
+    CanType interfaceType = getInterfaceType()->getCanonicalType();
+
+    // If the subscript declaration occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+    if (!ext) return interfaceType;
+
+    auto genericSig = ext->getGenericSignature();
+    if (!genericSig) return interfaceType;
+
+    if (auto funcTy = interfaceType->getAs<AnyFunctionType>()) {
+      return GenericFunctionType::get(genericSig,
+                                      funcTy->getParams(),
+                                      funcTy->getResult(),
+                                      funcTy->getExtInfo())
+              ->getCanonicalType();
+    }
+
+    return interfaceType;
+  }
+
+  if (isa<VarDecl>(this)) {
+    // If the variable declaration occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+    if (!ext) return CanType();
+
+    auto genericSig = ext->getGenericSignature();
+    if (!genericSig) return CanType();
+
+    ASTContext &ctx = getASTContext();
+    return GenericFunctionType::get(genericSig,
+                                    TupleType::getEmpty(ctx),
+                                    TupleType::getEmpty(ctx),
+                                    AnyFunctionType::ExtInfo())
+             ->getCanonicalType();
+  }
+
+  return CanType();
 }
 
 void ValueDecl::setIsObjC(bool Value) {
@@ -2479,8 +2490,8 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
-    TypeDecl(K, DC, name, nameLoc, inherited),
-    GenericContext(DeclContextKind::GenericTypeDecl, DC) {
+    GenericContext(DeclContextKind::GenericTypeDecl, DC),
+    TypeDecl(K, DC, name, nameLoc, inherited) {
   setGenericParams(GenericParams);
 }
 
@@ -4166,36 +4177,6 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
-/// Return true if this stored property has a getter and
-/// setter that are accessible from Objective-C.
-bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
-  if (auto override = getOverriddenDecl())
-    return override->hasForeignGetterAndSetter();
-
-  if (!isObjC())
-    return false;
-
-  return true;
-}
-
-bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
-  if (isFinal())
-    return false;
-  if (hasAccessorFunctions() && getGetter()->isImportAsMember())
-    return true;
-  if (!hasForeignGetterAndSetter())
-    return false;
-  // Imported accessors are foreign and only have objc entry points.
-  if (hasClangNode())
-    return true;
-  // Otherwise, we only dispatch by @objc if the declaration is dynamic,
-  // NSManaged, or dispatched through an ObjC protocol.
-  return isDynamic()
-    || getAttrs().hasAttribute<NSManagedAttr>()
-    || (isa<ProtocolDecl>(getDeclContext()) && isProtocolRequirement());
-}
-
-
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();
   if (name.empty())
@@ -5566,4 +5547,31 @@ void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
   LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+}
+
+ClangNode Decl::getClangNodeImpl() const {
+  assert(Bits.Decl.FromClang);
+  void * const *ptr = nullptr;
+  switch (getKind()) {
+#define DECL(Id, Parent) \
+  case DeclKind::Id: \
+    ptr = reinterpret_cast<void * const*>(static_cast<const Id##Decl*>(this)); \
+    break;
+#include "swift/AST/DeclNodes.def"
+  }
+  return ClangNode::getFromOpaqueValue(*(ptr - 1));
+}
+
+void Decl::setClangNode(ClangNode Node) {
+  Bits.Decl.FromClang = true;
+  // The extra/preface memory is allocated by the importer.
+  void **ptr = nullptr;
+  switch (getKind()) {
+#define DECL(Id, Parent) \
+  case DeclKind::Id: \
+    ptr = reinterpret_cast<void **>(static_cast<Id##Decl*>(this)); \
+    break;
+#include "swift/AST/DeclNodes.def"
+  }
+  *(ptr - 1) = Node.getOpaqueValue();
 }

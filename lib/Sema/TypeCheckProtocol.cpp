@@ -133,11 +133,10 @@ namespace {
    };
 } // end anonymous namespace
 
-static std::tuple<Type,Type, OptionalAdjustmentKind> 
-getTypesToCompare(ValueDecl *reqt, 
-                  Type reqtType,
-                  Type witnessType,
-                  VarianceKind variance) {  
+static std::tuple<Type, Type, OptionalAdjustmentKind>
+getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
+                  Type witnessType, bool witnessTypeIsIUO,
+                  VarianceKind variance) {
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
@@ -160,6 +159,11 @@ getTypesToCompare(ValueDecl *reqt,
         break;
 
       case OTK_Optional:
+        if (witnessTypeIsIUO) {
+          optAdjustment = OptionalAdjustmentKind::RemoveIUO;
+          break;
+        }
+
         switch (variance) {
         case VarianceKind::None:
         case VarianceKind::Covariant:
@@ -179,6 +183,17 @@ getTypesToCompare(ValueDecl *reqt,
       break;
 
     case OTK_Optional:
+      // When the requirement is an IUO, all is permitted, because we
+      // assume that the user knows more about the signature than we
+      // have information in the protocol.
+      if (reqtTypeIsIUO)
+        break;
+
+      if (witnessTypeIsIUO) {
+        optAdjustment = OptionalAdjustmentKind::IUOToOptional;
+        break;
+      }
+
       switch (witnessOptKind) {
       case OTK_None:
         switch (variance) {
@@ -209,6 +224,15 @@ getTypesToCompare(ValueDecl *reqt,
       // have information in the protocol.
       break;
     }
+  } else {
+    // FIXME: Until IUOs are removed from the type system, make
+    // sure we turn these both into optionals for the purpose of
+    // comparing types since we could be producing IUOs in some
+    // places and optionals in others.
+    if (auto objTy = reqtType->getImplicitlyUnwrappedOptionalObjectType())
+      reqtType = OptionalType::get(objTy);
+    if (auto objTy = witnessType->getImplicitlyUnwrappedOptionalObjectType())
+      witnessType = OptionalType::get(objTy);
   }
 
   return std::make_tuple(reqtType, witnessType, optAdjustment);
@@ -342,6 +366,14 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   }
 
   return false;
+}
+
+static ParameterList *getParameterList(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    return func->getParameterList(func->getDeclContext()->isTypeContext());
+
+  auto subscript = cast<SubscriptDecl>(value);
+  return subscript->getIndices();
 }
 
 RequirementMatch
@@ -491,9 +523,13 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto types = getTypesToCompare(req, reqResultType, 
-                                     witnessResultType,
-                                     VarianceKind::Covariant);
+      auto reqTypeIsIUO =
+          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto witnessTypeIsIUO =
+          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto types =
+          getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
+                            witnessTypeIsIUO, VarianceKind::Covariant);
 
       // Record optional adjustment, if any.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -501,8 +537,10 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types)));
       }
 
-      if (auto result = matchTypes(std::get<0>(types), 
-                                   std::get<1>(types))) {
+      if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
+      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -518,6 +556,12 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, 
                               witnessType);
 
+    ParameterList *witnessParamList = getParameterList(witness);
+    assert(witnessParamList->size() == witnessParams.size());
+
+    ParameterList *reqParamList = getParameterList(req);
+    assert(reqParamList->size() == reqParams.size());
+
     // Match each of the parameters.
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
       // Variadic bits must match.
@@ -531,11 +575,22 @@ swift::matchWitness(
       if (reqParams[i].isInOut() != witnessParams[i].isInOut())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
+      auto reqParamDecl = reqParamList->get(i);
+      auto witnessParamDecl = witnessParamList->get(i);
+
+      auto reqParamTypeIsIUO =
+          reqParamDecl->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto witnessParamTypeIsIUO =
+          witnessParamDecl->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
-      auto types = getTypesToCompare(req, reqParams[i].getType(),
-                                     witnessParams[i].getType(),
-                                     VarianceKind::Contravariant);
+      auto types =
+          getTypesToCompare(req, reqParams[i].getType(), reqParamTypeIsIUO,
+                            witnessParams[i].getType(), witnessParamTypeIsIUO,
+                            VarianceKind::Contravariant);
 
       // Record any optional adjustment that occurred.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -543,9 +598,10 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types), i));
       }
 
-      // Check whether the parameter types match.
-      if (auto result = matchTypes(std::get<0>(types), 
-                                   std::get<1>(types))) {
+      if (!req->isObjC() && reqParamTypeIsIUO != witnessParamTypeIsIUO)
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
+      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -557,15 +613,21 @@ swift::matchWitness(
     }
 
   } else {
-    // Simple case: add the constraint.
-    auto types = getTypesToCompare(req, reqType, witnessType,
-                                   VarianceKind::None);
+    auto reqTypeIsIUO =
+        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto witnessTypeIsIUO =
+        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
+                                   witnessTypeIsIUO, VarianceKind::None);
 
     // Record optional adjustment, if any.
     if (std::get<2>(types) != OptionalAdjustmentKind::None) {
       optionalAdjustments.push_back(
         OptionalAdjustment(std::get<2>(types)));
     }
+
+    if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+      return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return std::move(result.getValue());
@@ -724,8 +786,8 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
   };
 
   // Match a type in the requirement to a type in the witness.
-  auto matchTypes = [&](Type reqType, Type witnessType) 
-                      -> Optional<RequirementMatch> {
+  auto matchTypes = [&](Type reqType,
+                        Type witnessType) -> Optional<RequirementMatch> {
     cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return None;
@@ -1139,6 +1201,8 @@ class swift::MultiConformanceChecker {
   bool isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req);
 public:
   MultiConformanceChecker(TypeChecker &TC): TC(TC){}
+
+  TypeChecker &getTypeChecker() const { return TC; }
 
   /// Add a conformance into the batched checker.
   void addConformance(NormalProtocolConformance *conformance) {
@@ -1898,6 +1962,32 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // Record the type witness.
   Conformance->setTypeWitness(assocType, type, typeDecl);
+
+  // Record type witnesses for any "overridden" associated types.
+  llvm::SetVector<AssociatedTypeDecl *> overriddenAssocTypes;
+  overriddenAssocTypes.insert(assocType->getOverriddenDecls().begin(),
+                              assocType->getOverriddenDecls().end());
+  for (unsigned idx = 0; idx < overriddenAssocTypes.size(); ++idx) {
+    auto overridden = overriddenAssocTypes[idx];
+
+    // Note all of the newly-discovered overridden associated types.
+    overriddenAssocTypes.insert(overridden->getOverriddenDecls().begin(),
+                                overridden->getOverriddenDecls().end());
+
+    // Find the conformance for this overridden protocol.
+    auto overriddenConformance =
+      DC->getParentModule()->lookupConformance(Adoptee,
+                                               overridden->getProtocol());
+    if (!overriddenConformance ||
+        !overriddenConformance->isConcrete())
+      continue;
+
+    auto overriddenRootConformance =
+      overriddenConformance->getConcrete()->getRootNormalConformance();
+    ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
+      .recordTypeWitness(overridden, type, typeDecl,
+                         /*performRedeclarationCheck=*/true);
+  }
 }
 
 bool swift::
@@ -2821,7 +2911,8 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
   addUsedConformances(conformance, visited);
 }
 
-void ConformanceChecker::ensureRequirementsAreSatisfied() {
+void ConformanceChecker::ensureRequirementsAreSatisfied(
+                                                     bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
   // Some other problem stopped the signature being computed.
   if (!proto->isRequirementSignatureComputed()) {
@@ -2848,13 +2939,14 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   class GatherConformancesListener : public GenericRequirementsCheckListener {
     TypeChecker &tc;
-    DeclContext *dc;
+    NormalProtocolConformance *conformance;
     std::function<void(ProtocolConformanceRef)> &writer;
   public:
     GatherConformancesListener(
-                         TypeChecker &tc, DeclContext *dc,
+                         TypeChecker &tc,
+                        NormalProtocolConformance *conformance,
                          std::function<void(ProtocolConformanceRef)> &writer)
-      : tc(tc), dc(dc), writer(writer) { }
+      : tc(tc), conformance(conformance), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
@@ -2886,7 +2978,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
         conformance = *tc.conformsToProtocol(
                          interfaceType,
                          conformance.getRequirement(),
-                         dc,
+                         this->conformance->getDeclContext(),
                          (ConformanceCheckFlags::SuppressDependencyTracking|
                           ConformanceCheckFlags::SkipConditionalRequirements));
 
@@ -2901,7 +2993,18 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
       writer(conformance);
     }
-  } listener(TC, DC, writer);
+
+    bool diagnoseUnsatisfiedRequirement(
+                      const Requirement &req, Type first, Type second,
+                      ArrayRef<ParentConditionalConformance> parents) override {
+      // Invalidate the conformance to suppress further diagnostics.
+      if (conformance->getLoc().isValid()) {
+        conformance->setInvalid();
+      }
+
+      return false;
+    }
+  } listener(TC, Conformance, writer);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -2914,9 +3017,33 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       nullptr,
       ConformanceCheckFlags::Used, &listener);
 
-  // If there were errors, mark the conformance as invalid.
-  if (result != RequirementCheckResult::Success) {
+  switch (result) {
+  case RequirementCheckResult::Success:
+    return;
+
+  case RequirementCheckResult::Failure:
     Conformance->setInvalid();
+    return;
+
+  case RequirementCheckResult::UnsatisfiedDependency:
+    llvm_unreachable("Cannot handle unsatisfied dependencies here");
+
+  case RequirementCheckResult::SubstitutionFailure:
+    // If we're not allowed to fail, record this as a partially-checked
+    // conformance.
+    if (!failUnsubstituted) {
+      TC.PartiallyCheckedConformances.insert(Conformance);
+      return;
+    }
+
+    // Diagnose the failure generically.
+    // FIXME: Would be nice to give some more context here!
+    if (!Conformance->isInvalid()) {
+      TC.diagnose(Loc, diag::type_does_not_conform,
+                  Adoptee, Proto->getDeclaredType());
+      Conformance->setInvalid();
+    }
+    return;
   }
 }
 
@@ -3634,6 +3761,19 @@ void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
   checker.checkAllConformances();
 }
 
+void TypeChecker::checkConformanceRequirements(
+                                     NormalProtocolConformance *conformance) {
+  // If the conformance is already invalid, there's nothing to do here.
+  if (conformance->isInvalid())
+    return;
+
+  conformance->setSignatureConformances({ });
+
+  llvm::SetVector<ValueDecl *> globalMissingWitnesses;
+  ConformanceChecker checker(*this, conformance, globalMissingWitnesses);
+  checker.ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
+}
+
 /// Determine the score when trying to match two identifiers together.
 static unsigned scoreIdentifiers(Identifier lhs, Identifier rhs,
                                  unsigned limit) {
@@ -3912,6 +4052,7 @@ static bool shouldWarnAboutPotentialWitness(
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
+  groupChecker.getTypeChecker().computeAccessLevel(witness);
   if (witness->getFormalAccess() < access) {
     if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
@@ -4377,20 +4518,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         if (auto setter = storageReq->getSetter())
           Context.recordObjCUnsatisfiedOptReq(dc, setter);
       }
-    }
-  }
-
-  // If conditional conformances are disabled, complain about any that
-  // occur.
-  if (!Context.LangOpts.EnableConditionalConformances) {
-    for (auto conformance : conformances) {
-      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
-      if (!normal) continue;
-
-      if (normal->getConditionalRequirements().empty()) continue;
-
-      diagnose(normal->getLoc(), diag::experimental_conditional_conformances,
-               normal->getType(), normal->getProtocol()->getDeclaredType());
     }
   }
 }

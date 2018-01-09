@@ -105,8 +105,13 @@ import Swift
 //    implementations which are used if the instance has extra inhabitants.
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private constant [7 x i8] c"value\00\00"
+// CHECK: @"$S4enum16DynamicSingletonOWV" =
+// CHECK-SAME:   i8* null
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum16DynamicSingletonOwxs" to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum16DynamicSingletonOwxg" to i8*)
+
 // CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [25 x i8] c"4enum16DynamicSingletonO\00"
-// CHECK: @_T04enum16DynamicSingletonOMn = hidden constant <{ {{.*}} i32 }> <{
+// CHECK: @"$S4enum16DynamicSingletonOMn" = hidden constant <{ {{.*}} i32 }> <{
 // CHECK-SAME:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       One payload
 // CHECK-SAME:   i32 1,
@@ -128,16 +133,14 @@ import Swift
 // CHECK-SAME:   i32 1
 // CHECK-SAME: }>
 
-// CHECK: @_T04enum16DynamicSingletonOMP = internal global <{ {{.*}}, [18 x i8*] }> <{
+// CHECK: @"$S4enum16DynamicSingletonOMP" = internal global <{ {{.*}}, %swift.type* }> <{
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
-// CHECK-SAME:   @_T04enum16DynamicSingletonOMn
-// CHECK-SAME:   i8* null
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum16DynamicSingletonOwxs to i8*)
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum16DynamicSingletonOwxg to i8*)
+// CHECK-SAME:   [18 x i8*]* @"$S4enum16DynamicSingletonOWV"
+// CHECK-SAME:   @"$S4enum16DynamicSingletonOMn"
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
-// CHECK: @_T04enum10NoPayloadsOWV = internal constant [18 x i8*] [
+// CHECK: @"$S4enum10NoPayloadsOWV" = internal constant [18 x i8*] [
 // -- ...
 // -- size
 // CHECK-SAME:   i8* inttoptr ([[WORD:i32|i64]] 1 to i8*),
@@ -148,14 +151,14 @@ import Swift
 // -- num extra inhabitants (256 - 3 valid states)
 // CHECK-SAME:   i8* inttoptr ([[WORD]] 253 to i8*)
 // -- storeExtraInhabitant
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum10NoPayloadsOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum10NoPayloadsOwxs" to i8*)
 // -- getExtraInhabitantIndex
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum10NoPayloadsOwxg to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum10NoPayloadsOwxg" to i8*)
 // CHECK-SAME: ]
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
-// CHECK: @_T04enum19SinglePayloadNestedOWV = internal constant [18 x i8*] [
+// CHECK: @"$S4enum19SinglePayloadNestedOWV" = internal constant [18 x i8*] [
 // -- ...
 // -- size
 // CHECK-SAME:   i8* inttoptr ([[WORD]] 1 to i8*),
@@ -166,19 +169,21 @@ import Swift
 // -- num extra inhabitants (253 from payload - 3 empty cases)
 // CHECK-SAME:   i8* inttoptr ([[WORD]] 250 to i8*)
 // -- storeExtraInhabitant
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum19SinglePayloadNestedOwxs to i8*)
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum19SinglePayloadNestedOwxs" to i8*)
 // -- getExtraInhabitantIndex
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum19SinglePayloadNestedOwxg to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum19SinglePayloadNestedOwxg" to i8*)
 // CHECK-SAME: ]
 
-
-// CHECK: @_T04enum20DynamicSinglePayloadOMP = internal global <{ {{.*}}, [18 x i8*] }> <{
-// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
+// CHECK: @"$S4enum20DynamicSinglePayloadOWV" = internal constant [18 x i8*] [
 // CHECK-SAME:   i8* null
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxs to i8*)
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxg to i8*)
+// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxs" to i8*)
+// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxg" to i8*)
 
-// CHECK: @_T04enum18MultiPayloadNestedOWV = internal constant [18 x i8*] [
+// CHECK: @"$S4enum20DynamicSinglePayloadOMP" = internal global <{ {{.*}}, %swift.type* }> <{
+// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
+// CHECK-SAME:   [18 x i8*]* @"$S4enum20DynamicSinglePayloadOWV"
+
+// CHECK: @"$S4enum18MultiPayloadNestedOWV" = internal constant [18 x i8*] [
 // -- size
 // CHECK-32-SAME:   i8* inttoptr ([[WORD]] 5 to i8*),
 // CHECK-64-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
@@ -231,7 +236,7 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-64: entry:
 // CHECK-32: entry:
 entry(%u : $Singleton):
-// CHECK-32:  call %T4enum9SingletonO* @_T04enum9SingletonOWb0_
+// CHECK-32:  call %T4enum9SingletonO* @"$S4enum9SingletonOWb0_"
 // CHECK-64:   br label %[[PREDEST:[0-9]+]]
 // CHECK-32:   br label %[[PREDEST:[0-9]+]]
   switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest
@@ -1111,11 +1116,11 @@ end:
 class C {}
 sil_vtable C {}
 
-sil @_T04enum1CCfD : $@convention(method) (C) -> ()
+sil @$S4enum1CCfD : $@convention(method) (C) -> ()
 
 @objc class OC {}
 sil_vtable OC {}
-sil hidden @_T04enum2OCCACycfcTo : $@convention(thin) (OC) -> OC {
+sil hidden @$S4enum2OCCACycfcTo : $@convention(thin) (OC) -> OC {
 entry(%x : $OC):
   return %x : $OC
 }
@@ -2171,7 +2176,7 @@ entry:
 class D {}
 sil_vtable D {}
 
-sil @_T04enum1DCfD : $@convention(method) (D) -> ()
+sil @$S4enum1DCfD : $@convention(method) (D) -> ()
 
 enum MultiPayloadClasses {
   case x(C)
@@ -2598,7 +2603,7 @@ public enum Result<T, Error: Swift.Error> {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @test_inject_enum_addr_with_bound_generic
 sil @test_inject_enum_addr_with_bound_generic : $@convention(thin) <T> () -> @out Result<T, AnyError> {
 bb0(%0 : $*Result<T, AnyError>):
-// CHECK: call {{.*}} @_T04enum6ResultOMa
+// CHECK: call {{.*}} @"$S4enum6ResultOMa"
 // CHECK: call void @swift_storeEnumTagMultiPayload
   inject_enum_addr %0 : $*Result<T, AnyError>, #Result.success!enumelt.1
   %r = tuple ()
@@ -2682,60 +2687,28 @@ entry(%x : $*MyOptional):
  return %tuple : $()
 }
 
-// -- Fill function for dynamic singleton. The value witness table flags just
-//    get copied over from the element.
+// -- Fill function for dynamic singleton.
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSingleton(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 2
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], [[WORD]] 2
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
-// CHECK:   store i8* [[T0]], i8** [[T1]]
-// CHECK:   [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 3
-// CHECK:   [[T0:%.*]] = bitcast i8** [[VWT]] to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -1
 // CHECK:   store i8* [[T0]], i8** [[T1]]
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
-// CHECK:   [[T_SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_LAYOUT]], i32 0
-// CHECK:   [[T_SIZE:%.*]] = load i8*, i8** [[T_SIZE_ADDR]]
-// CHECK:   store i8* [[T_SIZE]], i8** [[SIZE_ADDR]]
-// CHECK:   [[STRIDE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
-// CHECK:   [[T_STRIDE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_LAYOUT]], i32 2
-// CHECK:   [[T_STRIDE:%.*]] = load i8*, i8** [[T_STRIDE_ADDR]]
-// CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
-// CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_LAYOUT]], i32 1
-// CHECK:   [[T_FLAGS:%.*]] = load i8*, i8** [[T_FLAGS_ADDR]]
-// CHECK:   [[T_FLAGS_INT:%.*]] = ptrtoint i8* [[T_FLAGS]] to [[WORD]]
-// CHECK:   [[T_FLAGS_INT_2:%.*]] = or [[WORD]] [[T_FLAGS_INT]], 2097152
-// CHECK:   [[T_FLAGS_2:%.*]] = inttoptr [[WORD]] [[T_FLAGS_INT_2]] to i8*
-// CHECK:   store i8* [[T_FLAGS_2]], i8** [[FLAGS_ADDR]]
-// -- Test the 'has extra inhabitants' bit and carry over the extra inhabitants
-//    flag if set.
-// CHECK:   [[T_FLAGS_VAL:%.*]] = ptrtoint i8* [[T_FLAGS]] to [[WORD]]
-// CHECK:   [[XI_FLAG:%.*]] = and [[WORD]] [[T_FLAGS_VAL]], 262144
-// CHECK:   [[XI_BIT:%.*]] = icmp ne [[WORD]] [[XI_FLAG]], 0
-// CHECK:   br i1 [[XI_BIT]], label %[[HAS_XI:[0-9]+]], label %[[HAS_NO_XI:[0-9]+]]
-// CHECK: ; <label>:[[HAS_XI]]
-// CHECK:   [[XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 12
-// CHECK:   [[T_XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_LAYOUT]], i32 3
-// CHECK:   [[T_XI_FLAGS:%.*]] = load i8*, i8** [[T_XI_FLAGS_ADDR]]
-// CHECK:   store i8* [[T_XI_FLAGS]], i8** [[XI_FLAGS_ADDR]]
-// CHECK:   br label %[[HAS_NO_XI]]
-// CHECK: ; <label>:[[HAS_NO_XI]]
+// CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
 // CHECK:   ret %swift.type* [[METADATA]]
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSinglePayload(%swift.type_pattern*, i8**) {{.*}} {
-// CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload
+// CHECK:   call void @swift_initEnumMetadataSinglePayload(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]], i32 3)
 
-// CHECK-64-LABEL: define linkonce_odr hidden void @_T04enum17StructWithWeakVarVwxs(%swift.opaque* noalias %dest, i32 %index, %swift.type* %StructWithWeakVar)
+// CHECK-64-LABEL: define linkonce_odr hidden void @"$S4enum17StructWithWeakVarVwxs"(%swift.opaque* noalias %dest, i32 %index, %swift.type* %StructWithWeakVar)
 // -- TODO: some pointless masking here.
 // -- TODO: should use EnumPayload word-chunking.
 // CHECK-64:         %1 = zext i32 %index to i128
@@ -2748,7 +2721,7 @@ entry(%x : $*MyOptional):
 // --                             0x1__0000_0000_0000_0000
 // CHECK-64:         %6 = or i128 %5, 18446744073709551616
 
-// CHECK-LABEL: define linkonce_odr hidden i32 @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwug(%swift.opaque* noalias %value
+// CHECK-LABEL: define linkonce_odr hidden i32 @"$S4enum40MultiPayloadLessThan32BitsWithEmptyCasesOwug"(%swift.opaque* noalias %value
 // CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value to %T4enum40MultiPayloadLessThan32BitsWithEmptyCasesO*
 // CHECK:  [[VAL01:%.*]] = bitcast %T4enum40MultiPayloadLessThan32BitsWithEmptyCasesO* [[VAL00]] to i8*
 // CHECK:  [[VAL02:%.*]] = load {{.*}} [[VAL01]]
@@ -2763,7 +2736,7 @@ entry(%x : $*MyOptional):
 // CHECK:  [[VAL11:%.*]] = select i1 [[VAL10]], i32 [[VAL09]], i32 [[VAL07]]
 // CHECK:  ret i32 [[VAL11]]
 
-// CHECK-LABEL: define linkonce_odr hidden void @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwui(%swift.opaque* noalias %value, i32 %tag
+// CHECK-LABEL: define linkonce_odr hidden void @"$S4enum40MultiPayloadLessThan32BitsWithEmptyCasesOwui"(%swift.opaque* noalias %value, i32 %tag
 // CHECK: entry:
 // CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value
 // CHECK:  [[VAL01:%.*]] = icmp sge i32 %tag, 0

@@ -108,10 +108,6 @@ class LinkEntity {
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
-    /// A function.
-    /// The pointer is a FuncDecl*.
-    Function,
-
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -142,13 +138,6 @@ class LinkEntity {
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
-
-    /// Some other kind of declaration.
-    /// The pointer is a Decl*.
-    Other,
-
-    /// A reflection metadata descriptor for the superclass of a class.
-    ReflectionSuperclassDescriptor,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -249,7 +238,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ReflectionSuperclassDescriptor;
+    return k <= Kind::ProtocolDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -370,14 +359,6 @@ class LinkEntity {
   LinkEntity() = default;
 
 public:
-  static LinkEntity forNonFunction(ValueDecl *decl) {
-    assert(!isFunction(decl));
-
-    LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl);
-    return entity;
-  }
-
   static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
     LinkEntity entity;
     entity.Pointer = decl;
@@ -577,13 +558,6 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformance(
         Kind::ReflectionAssociatedTypeDescriptor, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forReflectionSuperclassDescriptor(const ClassDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::ReflectionSuperclassDescriptor, decl);
     return entity;
   }
 

@@ -157,12 +157,7 @@ namespace swift {
   /// Returns true if common value witnesses were used, false otherwise.
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
-  const Metadata *
-  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
-                                  const Metadata *metadata,
-                                  const NominalTypeDescriptor *ntd);
-
-  const Metadata *
+  const NominalTypeDescriptor *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
 
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
@@ -192,6 +187,8 @@ namespace swift {
     return c;
 #endif
   }
+
+  void *allocateMetadata(size_t size, size_t align);
 
 } // end namespace swift
 

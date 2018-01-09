@@ -769,6 +769,13 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
               TypeMetadataPtrTy->getPointerTo(0),
               Int32Ty->getPointerTo(0),
               TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
+//                                          const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata0, swift_getFunctionTypeMetadata0, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata1(unsigned long flags,
@@ -779,16 +786,6 @@ FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1, DefaultCC,
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
 
-// Metadata *swift_getFunctionTypeMetadata1WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t paramFlags,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata1WithFlags, swift_getFunctionTypeMetadata1WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // Metadata *swift_getFunctionTypeMetadata2(unsigned long flags,
 //                                          const Metadata *arg0,
 //                                          const Metadata *arg1,
@@ -798,19 +795,6 @@ FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2,
         RETURNS(TypeMetadataPtrTy),
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getFunctionTypeMetadata2WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
-//                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata2WithFlags, swift_getFunctionTypeMetadata2WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata3(unsigned long flags,
 //                                          const Metadata *arg0,
@@ -823,21 +807,6 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
              TypeMetadataPtrTy),
         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getFunctionTypeMetadata3WithFlags(unsigned long flags,
-//                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
-//                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
-//                                                   const Metadata *arg2,
-//                                                   const uint32_t flags2,
-//                                                   const Metadata *resultMetadata);
-FUNCTION(GetFunctionMetadata3WithFlags, swift_getFunctionTypeMetadata3WithFlags,
-         DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
 FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, DefaultCC,
@@ -907,11 +876,12 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, DefaultCC,
 // Metadata *swift_getTupleTypeMetadata(size_t numElements,
 //                                      Metadata * const *elts,
 //                                      const char *labels,
+//                                      uint32_t flags,
 //                                      value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
-              Int8PtrTy, WitnessTablePtrTy),
+              Int8PtrTy, Int32Ty, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
@@ -968,37 +938,47 @@ FUNCTION(InitClassMetadataUniversal,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-//                                              TypeLayout * const *fieldTypes,
-//                                              size_t *fieldOffsets,
-//                                              value_witness_table_t *vwtable);
-FUNCTION(InitStructMetadataUniversal,
-         swift_initStructMetadata_UniversalStrategy, DefaultCC,
+// void swift_initStructMetadata(Metadata *structType,
+//                               StructLayoutFlags flags,
+//                               size_t numFields,
+//                               TypeLayout * const *fieldTypes,
+//                               size_t *fieldOffsets);
+FUNCTION(InitStructMetadata,
+         swift_initStructMetadata, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(SizeTy, Int8PtrPtrTy->getPointerTo(),
-              SizeTy->getPointerTo(), WitnessTablePtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0),
+              SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
-//                                                   TypeLayout *payload,
-//                                                   unsigned num_empty_cases);
-FUNCTION(InitEnumValueWitnessTableSinglePayload,
-         swift_initEnumValueWitnessTableSinglePayload,
+// void swift_initEnumMetadataSingleCase(Metadata *enumType,
+//                                       EnumLayoutFlags flags,
+//                                       TypeLayout *payload);
+FUNCTION(InitEnumMetadataSingleCase,
+         swift_initEnumMetadataSingleCase,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(WitnessTablePtrTy, Int8PtrPtrTy, Int32Ty),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_initEnumMetadataMultiPayload(value_witness_table_t *vwt,
-//                                         Metadata *enumType,
+// void swift_initEnumMetadataSinglePayload(Metadata *enumType,
+//                                          EnumLayoutFlags flags,
+//                                          TypeLayout *payload,
+//                                          unsigned num_empty_cases);
+FUNCTION(InitEnumMetadataSinglePayload,
+         swift_initEnumMetadataSinglePayload,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_initEnumMetadataMultiPayload(Metadata *enumType,
 //                                         size_t numPayloads,
 //                                         TypeLayout * const *payloadTypes);
 FUNCTION(InitEnumMetadataMultiPayload,
          swift_initEnumMetadataMultiPayload,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, SizeTy,
-              Int8PtrPtrTy->getPointerTo(0)),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind))
 
 // int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,

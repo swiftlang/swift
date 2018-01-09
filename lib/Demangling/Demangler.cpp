@@ -136,6 +136,10 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
+bool swift::Demangle::isOldFunctionTypeMangling(const char *mangledName) {
+  return mangledName[0] == '_' && mangledName[1] == 'T';
+}
+
 namespace swift {
 namespace Demangle {
 
@@ -149,6 +153,23 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
     Factory.Reallocate(Children, ReservedChildren, 1);
   assert(NumChildren < ReservedChildren);
   Children[NumChildren++] = Child;
+}
+
+void Node::removeChildAt(unsigned Pos, swift::Demangle::NodeFactory &factory) {
+  assert(Pos < NumChildren && "invalid child position!");
+
+  size_t Index = 0;
+  auto *NewChildren = factory.Allocate<NodePointer>(NumChildren - 1);
+  for (unsigned i = 0, n = NumChildren; i != n; ++i) {
+    auto Child = Children[i];
+    if (i != Pos) {
+      NewChildren[Index] = Child;
+      ++Index;
+    } else {
+      --NumChildren;
+    }
+  }
+  Children = NewChildren;
 }
 
 void Node::reverseChildren(size_t StartingAt) {
@@ -257,6 +278,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   if (PrefixLength == 0)
     return nullptr;
 
+  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName.data());
   Pos += PrefixLength;
 
   // If any other prefixes are accepted, please update Mangler::verify.
@@ -355,6 +377,20 @@ NodePointer Demangler::createWithChildren(Node::Kind kind,
   return Nd;
 }
 
+NodePointer Demangler::createWithChildren(Node::Kind kind, NodePointer Child1,
+                                          NodePointer Child2,
+                                          NodePointer Child3,
+                                          NodePointer Child4) {
+  if (!Child1 || !Child2 || !Child3 || !Child4)
+    return nullptr;
+  NodePointer Nd = createNode(kind);
+  Nd->addChild(Child1, *this);
+  Nd->addChild(Child2, *this);
+  Nd->addChild(Child3, *this);
+  Nd->addChild(Child4, *this);
+  return Nd;
+}
+
 NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
   if (!Node)
     return nullptr;
@@ -372,13 +408,22 @@ NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
   return NewNode;
 }
 
+NodePointer Demangler::demangleTypeMangling() {
+  auto Type = popNode(Node::Kind::Type);
+  auto LabelList = popFunctionParamLabels(Type);
+  auto TypeMangling = createNode(Node::Kind::TypeMangling);
+
+  addChild(TypeMangling, LabelList);
+  TypeMangling = addChild(TypeMangling, Type);
+  return TypeMangling;
+}
+
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
-    case 'D': return createWithChild(Node::Kind::TypeMangling,
-                                     popNode(Node::Kind::Type));
+    case 'D': return demangleTypeMangling();
     case 'E': return demangleExtensionContext();
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
@@ -812,12 +857,19 @@ NodePointer Demangler::demangleExtensionContext() {
 NodePointer Demangler::demanglePlainFunction() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Type = popFunctionType(Node::Kind::FunctionType);
+  NodePointer LabelList = popFunctionParamLabels(Type);
+
   if (GenSig) {
     Type = createType(createWithChildren(Node::Kind::DependentGenericType,
                                          GenSig, Type));
   }
-  NodePointer Name = popNode(isDeclName);
-  NodePointer Ctx = popContext();
+
+  auto Name = popNode(isDeclName);
+  auto Ctx = popContext();
+
+  if (LabelList)
+    return createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type);
+
   return createWithChildren(Node::Kind::Function, Ctx, Name, Type);
 }
 
@@ -837,7 +889,104 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
   } else {
     ParamsType = popNode(Node::Kind::Type);
   }
-  return createWithChild(kind, ParamsType);
+
+  NodePointer Node = nullptr;
+  // Store the number of parameters in the argument tuple
+  // node to make it easier to reach it, see `popFunctionParamLabels`.
+  if (ParamsType && kind == Node::Kind::ArgumentTuple) {
+    auto Params = ParamsType->getFirstChild();
+    Node::IndexType NumParams =
+        Params->getKind() == Node::Kind::Tuple ? Params->getNumChildren() : 1;
+    Node = createNode(kind, NumParams);
+  } else {
+    Node = createNode(kind);
+  }
+
+  return addChild(Node, ParamsType);
+}
+
+NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
+  if (!IsOldFunctionTypeMangling && popNode(Node::Kind::EmptyList))
+    return createNode(Node::Kind::LabelList);
+
+  if (!Type || Type->getKind() != Node::Kind::Type)
+    return nullptr;
+
+  auto FuncType = Type->getFirstChild();
+  if (FuncType->getKind() == Node::Kind::DependentGenericType)
+    FuncType = FuncType->getChild(1)->getFirstChild();
+
+  if (FuncType->getKind() != Node::Kind::FunctionType)
+    return nullptr;
+
+  auto ParameterType = FuncType->getFirstChild();
+  if (ParameterType->getKind() == Node::Kind::ThrowsAnnotation)
+    ParameterType = FuncType->getChild(1);
+
+  assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
+  if (ParameterType->getIndex() == 0)
+    return nullptr;
+
+  auto getChildIf =
+      [](NodePointer Node,
+         Node::Kind filterBy) -> std::pair<NodePointer, unsigned> {
+    for (unsigned i = 0, n = Node->getNumChildren(); i != n; ++i) {
+      auto Child = Node->getChild(i);
+      if (Child->getKind() == filterBy)
+        return {Child, i};
+    }
+    return {nullptr, 0};
+  };
+
+  auto getLabel = [&](NodePointer Params, unsigned Idx) -> NodePointer {
+    // Old-style function type mangling has labels as part of the argument.
+    if (IsOldFunctionTypeMangling) {
+      auto Param = Params->getChild(Idx);
+      auto Label = getChildIf(Param, Node::Kind::TupleElementName);
+
+      if (Label.first) {
+        Param->removeChildAt(Label.second, *this);
+        return createNodeWithAllocatedText(Node::Kind::Identifier,
+                                           Label.first->getText());
+      }
+
+      return createNode(Node::Kind::FirstElementMarker);
+    }
+
+    return popNode();
+  };
+
+  auto LabelList = createNode(Node::Kind::LabelList);
+  auto Tuple = ParameterType->getFirstChild()->getFirstChild();
+
+  if (IsOldFunctionTypeMangling &&
+      (!Tuple || Tuple->getKind() != Node::Kind::Tuple))
+    return LabelList;
+
+  bool hasLabels = false;
+  for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
+    auto Label = getLabel(Tuple, i);
+
+    if (!Label)
+      return nullptr;
+
+    if (Label->getKind() != Node::Kind::Identifier &&
+        Label->getKind() != Node::Kind::FirstElementMarker)
+      return nullptr;
+
+    LabelList->addChild(Label, *this);
+    hasLabels |= Label->getKind() != Node::Kind::FirstElementMarker;
+  }
+
+  // Old style label mangling can produce label list without
+  // actual labels, we need to support that case specifically.
+  if (!hasLabels)
+    return createNode(Node::Kind::LabelList);
+
+  if (!IsOldFunctionTypeMangling)
+    LabelList->reverseChildren();
+
+  return LabelList;
 }
 
 NodePointer Demangler::popTuple() {
@@ -1900,20 +2049,21 @@ NodePointer Demangler::demangleFunctionEntity() {
     default: return nullptr;
   }
 
-  NodePointer Child1 = nullptr, Child2 = nullptr;
+  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr;
   switch (Args) {
     case None:
       break;
     case TypeAndMaybePrivateName:
-      Child1 = popNode(Node::Kind::PrivateDeclName);
-      Child2 = popNode(Node::Kind::Type);
+      NameOrIndex = popNode(Node::Kind::PrivateDeclName);
+      ParamType = popNode(Node::Kind::Type);
+      LabelList = popFunctionParamLabels(ParamType);
       break;
     case TypeAndIndex:
-      Child1 = demangleIndexAsNode();
-      Child2 = popNode(Node::Kind::Type);
+      NameOrIndex = demangleIndexAsNode();
+      ParamType = popNode(Node::Kind::Type);
       break;
     case Index:
-      Child1 = demangleIndexAsNode();
+      NameOrIndex = demangleIndexAsNode();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -1921,16 +2071,16 @@ NodePointer Demangler::demangleFunctionEntity() {
     case None:
       break;
     case Index:
-      Entity = addChild(Entity, Child1);
+      Entity = addChild(Entity, NameOrIndex);
       break;
     case TypeAndMaybePrivateName:
-      if (Child1)
-        Entity = addChild(Entity, Child1);
-      Entity = addChild(Entity, Child2);
+      addChild(Entity, LabelList);
+      Entity = addChild(Entity, ParamType);
+      addChild(Entity, NameOrIndex);
       break;
     case TypeAndIndex:
-      Entity = addChild(Entity, Child1);
-      Entity = addChild(Entity, Child2);
+      Entity = addChild(Entity, NameOrIndex);
+      Entity = addChild(Entity, ParamType);
       break;
   }
   return Entity;
@@ -1938,9 +2088,11 @@ NodePointer Demangler::demangleFunctionEntity() {
 
 NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
-  return createWithChildren(Kind, Context, Name, Type);
+  return LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
+                   : createWithChildren(Kind, Context, Name, Type);
 }
 
 NodePointer Demangler::demangleVariable() {
@@ -1951,13 +2103,14 @@ NodePointer Demangler::demangleVariable() {
 NodePointer Demangler::demangleSubscript() {
   NodePointer PrivateName = popNode(Node::Kind::PrivateDeclName);
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Context = popContext();
 
   NodePointer Subscript = createNode(Node::Kind::Subscript);
-  Subscript->addChild(Context, *this);
-  Subscript->addChild(Type, *this);
-  if (PrivateName)
-    Subscript->addChild(PrivateName, *this);
+  Subscript = addChild(Subscript, Context);
+  addChild(Subscript, LabelList);
+  Subscript = addChild(Subscript, Type);
+  addChild(Subscript, PrivateName);
 
   return demangleAccessor(Subscript);
 }

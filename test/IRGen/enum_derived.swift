@@ -17,15 +17,15 @@ enum E {
 
 // Check if the == comparison can be compiled to a simple icmp instruction.
 
-// CHECK-NORMAL-LABEL:define hidden swiftcc i1 @_T012enum_derived1EO02__b1_A7_equalsSbAC_ACtFZ(i8, i8)
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i1 @_T012enum_derived1EO02__b1_A7_equalsSbAC_ACtFZ(i8, i8)
+// CHECK-NORMAL-LABEL:define hidden swiftcc i1 @"$S12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8, i8)
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i1 @"$S12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8, i8)
 // CHECK: %2 = icmp eq i8 %0, %1
 // CHECK: ret i1 %2
 
 // Check if the hashValue getter can be compiled to a simple zext instruction.
 
-// CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @_T012enum_derived1EO9hashValueSivg(i8)
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @_T012enum_derived1EO9hashValueSivg(i8)
+// CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
 // CHECK: [[R:%.*]] = zext i8 %0 to i{{.*}}
 // CHECK: ret i{{.*}} [[R]]
 
@@ -36,8 +36,8 @@ extension def_enum.TrafficLight : Error {}
 
 extension def_enum.Term : Error {}
 
-// CHECK-NORMAL-LABEL: define hidden {{.*}}i64 @_T012enum_derived7PhantomO8rawValues5Int64Vvg(i8, %swift.type* nocapture readnone %T) local_unnamed_addr
-// CHECK-TESTABLE-LABEL: define{{( protected)?}} {{.*}}i64 @_T012enum_derived7PhantomO8rawValues5Int64Vvg(i8, %swift.type* nocapture readnone %T)
+// CHECK-NORMAL-LABEL: define hidden {{.*}}i64 @"$S12enum_derived7PhantomO8rawValues5Int64Vvg"(i8, %swift.type* nocapture readnone %T) local_unnamed_addr
+// CHECK-TESTABLE-LABEL: define{{( protected)?}} {{.*}}i64 @"$S12enum_derived7PhantomO8rawValues5Int64Vvg"(i8, %swift.type* nocapture readnone %T)
 
 enum Phantom<T> : Int64 {
   case Up

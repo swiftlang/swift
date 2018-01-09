@@ -149,10 +149,6 @@ public:
     return mangleConformanceSymbol(Type(), C, "MA");
   }
 
-  std::string mangleReflectionSuperclassDescriptor(const ClassDecl *Decl) {
-    return mangleNominalTypeSymbol(Decl, "MC");
-  }
-
   std::string mangleOutlinedCopyFunction(const GenericTypeDecl *Decl) {
     beginMangling();
     appendAnyGenericType(Decl);

@@ -74,11 +74,11 @@ class OverloadChoice {
     IsDeclViaUnwrappedOptional = 0x02,
     /// Indicates that this declaration was dynamic, turning a
     /// "Decl" kind into "DeclViaDynamic" kind.
-    IsDeclViaDynamic = 0x03
+    IsDeclViaDynamic = 0x03,
   };
 
   /// \brief The base type to be used when referencing the declaration
-  /// along with the two bits above.
+  /// along with the three bits above.
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndDeclKind;
 
   /// We mash together OverloadChoiceKind with tuple indices into a single
@@ -207,7 +207,13 @@ public:
   ValueDecl *getDecl() const {
     return DeclOrKind.get<ValueDecl*>();
   }
-  
+
+  /// Returns true if this is either a decl for an optional that was
+  /// declared as one that can be implicitly unwrapped, or is a
+  /// function-typed decl that has a return value that is implicitly
+  /// unwrapped.
+  bool isImplicitlyUnwrappedValueOrReturnValue() const;
+
   /// Get the name of the overload choice.
   DeclName getName() const;
 

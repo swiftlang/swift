@@ -78,6 +78,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
+    case ImplicitlyUnwrappedValue:
+    case ImplicitlyUnwrappedDisjunctionChoice:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -247,6 +249,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case TypeParameterRequirement:
       out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+      break;
+
+    case ImplicitlyUnwrappedValue:
+      out << "implictly unwrapped value";
+      break;
+
+    case ImplicitlyUnwrappedDisjunctionChoice:
+      out << "implictly unwrapped disjunction choice";
       break;
     }
   }

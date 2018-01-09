@@ -290,6 +290,11 @@ protected:
   StringRef Text;
   size_t Pos = 0;
 
+  /// Mangling style where function type would have
+  /// labels attached to it, instead of having them
+  /// as part of the name.
+  bool IsOldFunctionTypeMangling = false;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
   Vector<unsigned> PendingSubstitutions;
@@ -378,6 +383,9 @@ protected:
                                  NodePointer Child2);
   NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
                                  NodePointer Child2, NodePointer Child3);
+  NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
+                                 NodePointer Child2, NodePointer Child3,
+                                 NodePointer Child4);
   NodePointer createWithPoppedType(Node::Kind kind) {
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
@@ -413,6 +421,7 @@ protected:
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
   NodePointer popFunctionParams(Node::Kind kind);
+  NodePointer popFunctionParamLabels(NodePointer FuncType);
   NodePointer popTuple();
   NodePointer popTypeList();
   NodePointer popProtocol();
@@ -460,6 +469,7 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+  NodePointer demangleTypeMangling();
 
   void dump();
 
@@ -471,7 +481,7 @@ public:
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T0.
+  /// mangling prefix $S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -482,7 +492,7 @@ public:
   /// Demangle the given type and return the parse tree.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T0.
+  /// the mangling prefix $S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.

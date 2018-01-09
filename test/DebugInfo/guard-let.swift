@@ -7,7 +7,7 @@ func use<T>(_ t: T) {}
 
 public func f(_ i : Int?)
 {
-  // CHECK: define {{.*}}@_T04main1fySiSgF
+  // CHECK: define {{.*}}@"$S4main1fyySiSgF"
   // The shadow copy store should not have a location.
   // Note that the store must be in the same scope or else it might defeat
   // livedebugvalues.
@@ -28,7 +28,7 @@ public func f(_ i : Int?)
 
 public func g(_ s : String?)
 {
-  // CHECK2: define {{.*}}@_T04main1gySSSgF
+  // CHECK2: define {{.*}}@"$S4main1gyySSSgF"
   // The shadow copy store should not have a location.
   // CHECK2: getelementptr inbounds {{.*}} %s.debug, {{.*}}, !dbg ![[DBG0:.*]]
   // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g"

@@ -15,4 +15,4 @@ sil public @use_witness : $@convention(thin) () -> () {
 // We used to emit linkonce_odr llvm linkage for this declaration.
 sil_witness_table shared SomeOptions : Equatable module __ObjC
 
-// CHECK: @_T0SC11SomeOptionsVs9EquatableSoWP = external hidden global
+// CHECK: @"$SSC11SomeOptionsVs9EquatableSoWP" = external hidden global

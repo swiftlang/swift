@@ -160,8 +160,6 @@ extension LazySequenceProtocol where Element : Sequence {
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct FlattenCollection<Base>
   where Base : Collection, Base.Element : Collection {
-  // FIXME: swift-3-indexing-model: check test coverage for collection.
-
   @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
 
@@ -359,9 +357,12 @@ extension FlattenCollection : Collection {
 
   @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {
-    // The following line makes sure that distance(from:to:) is invoked on the
+    // The following check makes sure that distance(from:to:) is invoked on the
     // _base at least once, to trigger a _precondition in forward only
     // collections.
+    if end < start {
+      _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
+    }
     var _start: Index
     let _end: Index
     let step: Int
@@ -565,7 +566,7 @@ extension LazyCollectionProtocol
 }
 
 // @available(*, deprecated, renamed: "FlattenCollection.Index")
-public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
+public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
 @available(*, deprecated, renamed: "FlattenCollection.Index")
 public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
 @available(*, deprecated, renamed: "FlattenCollection")

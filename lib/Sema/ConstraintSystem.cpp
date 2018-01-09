@@ -1404,7 +1404,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &refType,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
-  
+
   switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
@@ -1660,9 +1660,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
-
   // Note that we have resolved this overload.
   resolvedOverloadSets
     = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
@@ -1671,6 +1668,19 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               openedFullType,
                                               refType};
+
+  // Update the locator if this is an implicitly unwrapped
+  // value. Processing the bind constraint will generate a new
+  // disjunction constraint that attempts the Optional and if that
+  // doesn't succeed, the underlying type.
+  if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    locator = getConstraintLocator(locator,
+                                   ConstraintLocator::ImplicitlyUnwrappedValue);
+  }
+
+  // Add the type binding constraint.
+  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
@@ -1840,4 +1850,11 @@ DeclName OverloadChoice::getName() const {
   }
   
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
+  // FIXME: Disable new IUO implementation for now.
+  return false;
+  return isDecl() &&
+         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }

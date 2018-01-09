@@ -9,7 +9,7 @@ import gizmo
 sil @use_metatype : $@convention(thin) <T> (@thin T.Type) -> ()
 
 // CHECK-LABEL: define swiftcc void @test(%TSo9InnerTypeC* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
-// CHECK:   [[TMP:%.*]] = call %swift.type* @_T0So9OuterTypeCMa()
+// CHECK:   [[TMP:%.*]] = call %swift.type* @"$SSo9OuterTypeCMa"()
 // CHECK:   call swiftcc void @use_metatype(%swift.type* [[TMP]])
 // CHECK:   ret void
 
@@ -21,7 +21,7 @@ bb0(%0 : $OuterType.InnerType):
   return %3 : $()
 }
 
-// CHECK-LABEL: define {{.*}}%swift.type* @_T0So9OuterTypeCMa()
+// CHECK-LABEL: define {{.*}}%swift.type* @"$SSo9OuterTypeCMa"()
 // CHECK:  [[TMP:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(
 // CHECK:  call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[TMP]])
 // CHECK:  ret

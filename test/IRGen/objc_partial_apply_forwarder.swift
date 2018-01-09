@@ -6,7 +6,7 @@ public class Foo<T> {
 public func use(_: Any) {}
 
 // Don't crash trying to generate IR.
-// CHECK:  define{{.*}}swiftcc void @_T028objc_partial_apply_forwarder13createClosureyAA3FooCyxGcyXl1a_xm1ttlF5localL_yAE1x_tlFTA
+// CHECK:  define{{.*}}swiftcc void @"$S28objc_partial_apply_forwarder13createClosure1a1tyAA3FooCyxGcyXl_xmtlF5localL_1xyAG_tlFTA"
 public func createClosure<T>(a: AnyObject, t: T.Type) -> (Foo<T>) -> () {
   func local(x: Foo<T>) {
     use(a)

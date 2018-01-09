@@ -192,8 +192,16 @@ static bool isNominallySuperclassOf(Type type1, Type type2) {
 /// Determine the relationship between the self types of the given declaration
 /// contexts..
 static std::pair<SelfTypeRelationship, Optional<ProtocolConformanceRef>>
-computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, DeclContext *dc1,
-                            DeclContext *dc2) {
+computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
+                            ValueDecl *decl2) {
+  // If both declarations are operators, even through they
+  // might have Self such types are unrelated.
+  if (decl1->isOperator() && decl2->isOperator())
+    return {SelfTypeRelationship::Unrelated, None};
+
+  auto *dc1 = decl1->getDeclContext();
+  auto *dc2 = decl2->getDeclContext();
+
   // If at least one of the contexts is a non-type context, the two are
   // unrelated.
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
@@ -541,7 +549,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // appropriate constraints. The constraints themselves never fail, but
       // they help deduce type variables that were opened.
       auto selfTypeRelationship =
-          computeSelfTypeRelationship(tc, dc, outerDC1, outerDC2);
+          computeSelfTypeRelationship(tc, dc, decl1, decl2);
       auto relationshipKind = selfTypeRelationship.first;
       auto conformance = selfTypeRelationship.second;
       switch (relationshipKind) {
@@ -635,23 +643,43 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        for (unsigned i = 0; i != numParams2; ++i) {
-          // If there is no corresponding argument in the first
-          // parameter list...
-          if (i >= numParams1) {
-            // We need either a default argument or a variadic
-            // argument for the first declaration to be more
-            // specialized.
-            if (!defaultMapType2[i] &&
-                !params2[i].isVariadic())
+        for (unsigned param1 = 0, param2 = 0; param2 != numParams2; ++param2) {
+          // If there is a default for parameter in the second function
+          // while there are still some parameters left unclaimed in first,
+          // it could only mean that default parameters are intermixed e.g.
+          //
+          // ```swift
+          // func foo(a: Int) {}
+          // func foo(q: String = "", a: Int) {}
+          // ```
+          // or
+          // ```swift
+          // func foo(a: Int, c: Int) {}
+          // func foo(a: Int, b: Int = 0, c: Int) {}
+          // ```
+          // and we shouldn't claim parameter from the first function.
+          if (param1 < numParams1 && numParams1 != numParams2 &&
+              defaultMapType2[param2]) {
+            fewerEffectiveParameters = true;
+            continue;
+          }
+
+          // If we've claimed all of the parameters from first
+          // function, the rest of the parameters in second should
+          // be either default or variadic.
+          if (param1 >= numParams1) {
+            if (!defaultMapType2[param2] && !params2[param2].isVariadic())
               return false;
 
             fewerEffectiveParameters = true;
             continue;
           }
 
-          if (!maybeAddSubtypeConstraint(params1[i], params2[i]))
+          if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
             return false;
+
+          // claim the parameter as used.
+          ++param1;
         }
 
         if (compareTrailingClosureParamsSeparately)
@@ -794,8 +822,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
-      if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
+      if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
+          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         score1 += weight;

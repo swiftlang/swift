@@ -613,6 +613,12 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
+WARNING(deprecated_redecl_by_optionality, none,
+        "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
+        (DeclName, Type, Type))
+NOTE(deprecated_redecl_by_optionality_note, none,
+     "overloading by kind of optional is deprecated and will be removed in a future release", ())
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,none,
@@ -1371,9 +1377,6 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
-ERROR(experimental_conditional_conformances,none,
-      "conditional conformance of %0 to %1 depends on an experimental feature "
-      "(SE-0143)", (Type, Type))
 
 ERROR(protocol_does_not_conform_objc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",

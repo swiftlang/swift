@@ -28,8 +28,8 @@ bb0(%0 : $X):
 }
 
 sil_vtable X {
-  #X.ping!1: _TFC4main1X4pingfS0_FT_T_	// main.X.ping (main.X)() -> ()
-  #X.init!initializer.1: _TFC4main1XcfMS0_FT_S0_	// main.X.init (main.X.Type)() -> main.X
+  #X.ping!1: @_TFC4main1X4pingfS0_FT_T_	// main.X.ping (main.X)() -> ()
+  #X.init!initializer.1: @_TFC4main1XcfMS0_FT_S0_	// main.X.init (main.X.Type)() -> main.X
 }
 
 

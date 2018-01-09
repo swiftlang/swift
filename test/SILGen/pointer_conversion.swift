@@ -20,156 +20,156 @@ func takesConstRawPointer(_ x: UnsafeRawPointer) {}
 func takesOptConstRawPointer(_ x: UnsafeRawPointer?, and: Int) {}
 func takesOptOptConstRawPointer(_ x: UnsafeRawPointer??, and: Int) {}
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion0A9ToPointerySpySiG_SPySiGSvtF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion0A9ToPointeryySpySiG_SPySiGSvtF
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>, [[MRP:%.*]] : $UnsafeMutableRawPointer):
 func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   _ cp: UnsafePointer<Int>, _ mrp: UnsafeMutableRawPointer) {
 
   // There should be no conversion here
   takesMutablePointer(mp)
-  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[MP]])
 
   takesMutableVoidPointer(mp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeMutableRawPointer>
-  // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @_T018pointer_conversion23takesMutableVoidPointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @$S18pointer_conversion23takesMutableVoidPointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE_VOID_POINTER]]
 
   takesMutableRawPointer(mp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeMutableRawPointer>
-  // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointerySvF :
+  // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion22takesMutableRawPointeryySvF :
   // CHECK: apply [[TAKES_MUTABLE_RAW_POINTER]]
 
   takesConstPointer(mp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafePointer<Int>>
-  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_T018pointer_conversion17takesConstPointerySPySiGF
+  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @$S18pointer_conversion17takesConstPointeryySPySiGF
   // CHECK: apply [[TAKES_CONST_POINTER]]
 
   takesConstVoidPointer(mp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeRawPointer>
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_T018pointer_conversion21takesConstVoidPointerySVF
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @$S18pointer_conversion21takesConstVoidPointeryySVF
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 
   takesConstRawPointer(mp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeRawPointer>
-  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesConstRawPointerySVF :
+  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesConstRawPointeryySVF :
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]
 
   takesConstPointer(cp)
-  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_T018pointer_conversion17takesConstPointerySPySiGF
+  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @$S18pointer_conversion17takesConstPointeryySPySiGF
   // CHECK: apply [[TAKES_CONST_POINTER]]([[CP]])
 
   takesConstVoidPointer(cp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafePointer<Int>, UnsafeRawPointer>
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_T018pointer_conversion21takesConstVoidPointerySVF
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @$S18pointer_conversion21takesConstVoidPointeryySVF
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 
   takesConstRawPointer(cp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafePointer<Int>, UnsafeRawPointer>
-  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesConstRawPointerySVF
+  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesConstRawPointeryySVF
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]
 
   takesConstRawPointer(mrp)
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss017_convertPointerToB8Argument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer, UnsafeRawPointer>
-  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesConstRawPointerySVF
+  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesConstRawPointeryySVF
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion14arrayToPointeryyF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion14arrayToPointeryyF
 func arrayToPointer() {
   var ints = [1,2,3]
 
   takesMutablePointer(&ints)
-  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_T0s37_convertMutableArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @$Ss37_convertMutableArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeMutablePointer<Int> on [[OWNER]]
-  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesConstPointer(ints)
-  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafePointer<Int> on [[OWNER]]
-  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_T018pointer_conversion17takesConstPointerySPySiGF
+  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @$S18pointer_conversion17takesConstPointeryySPySiGF
   // CHECK: apply [[TAKES_CONST_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesMutableRawPointer(&ints)
-  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_T0s37_convertMutableArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @$Ss37_convertMutableArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutableRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on [[OWNER]]
-  // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointerySvF :
+  // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion22takesMutableRawPointeryySvF :
   // CHECK: apply [[TAKES_MUTABLE_RAW_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesConstRawPointer(ints)
-  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesConstRawPointerySVF :
+  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesConstRawPointeryySVF :
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesOptConstPointer(ints, and: sideEffect1())
-  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafePointer<Int> on [[OWNER]]
   // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEPENDENT]]
-  // CHECK: [[TAKES_OPT_CONST_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesOptConstPointerySPySiGSg_Si3andtF :
+  // CHECK: [[TAKES_OPT_CONST_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesOptConstPointer_3andySPySiGSg_SitF :
   // CHECK: apply [[TAKES_OPT_CONST_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion15stringToPointerySSF 
+// CHECK-LABEL: sil hidden @$S18pointer_conversion15stringToPointeryySSF
 func stringToPointer(_ s: String) {
   takesConstVoidPointer(s)
-  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_T018pointer_conversion21takesConstVoidPointerySV{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @$S18pointer_conversion21takesConstVoidPointeryySV{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesConstRawPointer(s)
-  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesConstRawPointerySV{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion20takesConstRawPointeryySV{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
 
   takesOptConstRawPointer(s, and: sideEffect1())
-  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
   // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEPENDENT]]
-  // CHECK: [[TAKES_OPT_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion23takesOptConstRawPointerySVSg_Si3andtF :
+  // CHECK: [[TAKES_OPT_CONST_RAW_POINTER:%.*]] = function_ref @$S18pointer_conversion23takesOptConstRawPointer_3andySVSg_SitF :
   // CHECK: apply [[TAKES_OPT_CONST_RAW_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion14inoutToPointeryyF 
+// CHECK-LABEL: sil hidden @$S18pointer_conversion14inoutToPointeryyF 
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box ${ var Int }
@@ -177,9 +177,9 @@ func inoutToPointer() {
   takesMutablePointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>({{%.*}}, [[POINTER]])
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE]]
 
   var logicalInt: Int {
@@ -187,31 +187,31 @@ func inoutToPointer() {
     set { }
   }
   takesMutablePointer(&logicalInt)
-  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
+  // CHECK: [[GETTER:%.*]] = function_ref @$S18pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
   // CHECK: apply [[GETTER]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE]]
-  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
+  // CHECK: [[SETTER:%.*]] = function_ref @$S18pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
   // CHECK: apply [[SETTER]]
 
   takesMutableRawPointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer>({{%.*}}, [[POINTER]])
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE]]
 
   takesMutableRawPointer(&logicalInt)
-  // CHECK: [[GETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
+  // CHECK: [[GETTER:%.*]] = function_ref @$S18pointer_conversion14inoutToPointeryyF10logicalIntL_Sivg
   // CHECK: apply [[GETTER]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer>
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_MUTABLE]]
-  // CHECK: [[SETTER:%.*]] = function_ref @_T018pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
+  // CHECK: [[SETTER:%.*]] = function_ref @$S18pointer_conversion14inoutToPointeryyF10logicalIntL_Sivs
   // CHECK: apply [[SETTER]]
 }
 
@@ -221,7 +221,7 @@ func takesPlusOnePointer(_ x: UnsafeMutablePointer<C>) {}
 func takesPlusZeroPointer(_ x: AutoreleasingUnsafeMutablePointer<C>) {}
 func takesPlusZeroOptionalPointer(_ x: AutoreleasingUnsafeMutablePointer<C?>) {}
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion19classInoutToPointeryyF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion19classInoutToPointeryyF
 func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box ${ var C }
@@ -229,9 +229,9 @@ func classInoutToPointer() {
   takesPlusOnePointer(&c)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
-  // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_T018pointer_conversion19takesPlusOnePointer{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @$S18pointer_conversion19takesPlusOnePointer{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[TAKES_PLUS_ONE]]
 
   takesPlusZeroPointer(&c)
@@ -240,9 +240,9 @@ func classInoutToPointer() {
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
   // CHECK: store [[UNOWNED]] to [trivial] [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
-  // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @_T018pointer_conversion20takesPlusZeroPointerys026AutoreleasingUnsafeMutableF0VyAA1CCGF
+  // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @$S18pointer_conversion20takesPlusZeroPointeryys026AutoreleasingUnsafeMutableF0VyAA1CCGF
   // CHECK: apply [[TAKES_PLUS_ZERO]]
   // CHECK: [[UNOWNED_OUT:%.*]] = load [trivial] [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
@@ -255,14 +255,14 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] @_T018pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden [thunk] @$S18pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(_ x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}
 }
 
 // rdar://problem/21505805
-// CHECK-LABEL: sil hidden @_T018pointer_conversion22functionInoutToPointeryyF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion22functionInoutToPointeryyF
 func functionInoutToPointer() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
   var f: () -> () = {}
@@ -273,47 +273,47 @@ func functionInoutToPointer() {
 }
 
 // rdar://problem/31781386
-// CHECK-LABEL: sil hidden @_T018pointer_conversion20inoutPointerOrderingyyF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion20inoutPointerOrderingyyF
 func inoutPointerOrdering() {
   // CHECK: [[ARRAY_BOX:%.*]] = alloc_box ${ var Array<Int> }
   // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_BOX]] :
   // CHECK: store {{.*}} to [init] [[ARRAY]]
   var array = [Int]()
 
-  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK: [[SIDE2:%.*]] = function_ref @_T018pointer_conversion11sideEffect2SiyF
+  // CHECK: [[SIDE2:%.*]] = function_ref @$S18pointer_conversion11sideEffect2SiyF
   // CHECK: [[RESULT2:%.*]] = apply [[SIDE2]]()
   // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ARRAY]] : $*Array<Int>
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointerySpySiG_Si3andtF
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer_3andySpySiG_SitF
   // CHECK: apply [[TAKES_MUTABLE]]({{.*}}, [[RESULT2]])
   // CHECK: strong_unpin
   // CHECK: end_access [[ACCESS]]
   takesMutablePointer(&array[sideEffect1()], and: sideEffect2())
 
-  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK: [[SIDE2:%.*]] = function_ref @_T018pointer_conversion11sideEffect2SiyF
+  // CHECK: [[SIDE2:%.*]] = function_ref @$S18pointer_conversion11sideEffect2SiyF
   // CHECK: [[RESULT2:%.*]] = apply [[SIDE2]]()
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARRAY]] : $*Array<Int>
-  // CHECK: [[TAKES_CONST:%.*]] = function_ref @_T018pointer_conversion17takesConstPointerySPySiG_Si3andtF
+  // CHECK: [[TAKES_CONST:%.*]] = function_ref @$S18pointer_conversion17takesConstPointer_3andySPySiG_SitF
   // CHECK: apply [[TAKES_CONST]]({{.*}}, [[RESULT2]])
   // CHECK: end_access [[ACCESS]]
   takesConstPointer(&array[sideEffect1()], and: sideEffect2())
 }
 
 // rdar://problem/31542269
-// CHECK-LABEL: sil hidden @_T018pointer_conversion20optArrayToOptPointerySaySiGSg5array_tF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion20optArrayToOptPointer5arrayySaySiGSg_tF
 func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   [[BORROW:%.*]] = begin_borrow %0
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
-  // CHECK:   [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
   // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
   // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_BB]]:
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgumentyXlSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -323,7 +323,7 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafePointer<Int>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafePointer<Int>>, [[OWNER:%.*]] : $Optional<AnyObject>):
   // CHECK:   [[OPTDEP:%.*]] = mark_dependence [[OPTPTR]] : $Optional<UnsafePointer<Int>> on [[OWNER]]
-  // CHECK:   [[TAKES:%.*]] = function_ref @_T018pointer_conversion20takesOptConstPointerySPySiGSg_Si3andtF
+  // CHECK:   [[TAKES:%.*]] = function_ref @$S18pointer_conversion20takesOptConstPointer_3andySPySiGSg_SitF
   // CHECK:   apply [[TAKES]]([[OPTDEP]], [[RESULT1]])
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]
@@ -335,11 +335,11 @@ func optArrayToOptPointer(array: [Int]?) {
   takesOptConstPointer(array, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion013optOptArrayTodD7PointerySaySiGSgSg5array_tF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion013optOptArrayTodD7Pointer5arrayySaySiGSgSg_tF
 func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[BORROW:%.*]] = begin_borrow %0
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
-  // CHECK:   [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
   // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
   // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
@@ -352,7 +352,7 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]:
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgumentyXlSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -366,7 +366,7 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   br [[SOME_CONT_BB:bb[0-9]+]]([[OPTOPTPTR]] : $Optional<Optional<UnsafePointer<Int>>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_CONT_BB]]([[OPTOPTPTR:%.*]] : $Optional<Optional<UnsafePointer<Int>>>, [[OWNER:%.*]] : $Optional<AnyObject>):
   // CHECK:   [[OPTOPTDEP:%.*]] = mark_dependence [[OPTOPTPTR]] : $Optional<Optional<UnsafePointer<Int>>> on [[OWNER]]
-  // CHECK:   [[TAKES:%.*]] = function_ref @_T018pointer_conversion08takesOptD12ConstPointerySPySiGSgSg_Si3andtF
+  // CHECK:   [[TAKES:%.*]] = function_ref @$S18pointer_conversion08takesOptD12ConstPointer_3andySPySiGSgSg_SitF
   // CHECK:   apply [[TAKES]]([[OPTOPTDEP]], [[RESULT1]])
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]
@@ -382,17 +382,17 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   takesOptOptConstPointer(array, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion21optStringToOptPointerySSSg6string_tF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion21optStringToOptPointer6stringySSSg_tF
 func optStringToOptPointer(string: String?) {
   // CHECK:   [[BORROW:%.*]] = begin_borrow %0
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
-  // CHECK:   [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
   // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
   // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_BB]]:
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgumentyXlSg_xtSSs01_F0RzlF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -402,7 +402,7 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafeRawPointer>, [[OWNER:%.*]] : $Optional<AnyObject>):
   // CHECK:   [[OPTDEP:%.*]] = mark_dependence [[OPTPTR]] : $Optional<UnsafeRawPointer> on [[OWNER]]
-  // CHECK:   [[TAKES:%.*]] = function_ref @_T018pointer_conversion23takesOptConstRawPointerySVSg_Si3andtF
+  // CHECK:   [[TAKES:%.*]] = function_ref @$S18pointer_conversion23takesOptConstRawPointer_3andySVSg_SitF
   // CHECK:   apply [[TAKES]]([[OPTDEP]], [[RESULT1]])
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]
@@ -414,11 +414,11 @@ func optStringToOptPointer(string: String?) {
   takesOptConstRawPointer(string, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @_T018pointer_conversion014optOptStringTodD7PointerySSSgSg6string_tF
+// CHECK-LABEL: sil hidden @$S18pointer_conversion014optOptStringTodD7Pointer6stringySSSgSg_tF
 func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   [[BORROW:%.*]] = begin_borrow %0
   // CHECK:   [[COPY:%.*]] = copy_value [[BORROW]]
-  // CHECK:   [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK:   [[SIDE1:%.*]] = function_ref @$S18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
   // CHECK:   [[T0:%.*]] = select_enum [[COPY]]
   //   FIXME: this should really go somewhere that will make nil, not some(nil)
@@ -432,7 +432,7 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]:
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgumentyXlSg_xtSSs01_F0RzlF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @$Ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -446,7 +446,7 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   br [[SOME_CONT_BB:bb[0-9]+]]([[OPTOPTPTR]] : $Optional<Optional<UnsafeRawPointer>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_CONT_BB]]([[OPTOPTPTR:%.*]] : $Optional<Optional<UnsafeRawPointer>>, [[OWNER:%.*]] : $Optional<AnyObject>):
   // CHECK:   [[OPTOPTDEP:%.*]] = mark_dependence [[OPTOPTPTR]] : $Optional<Optional<UnsafeRawPointer>> on [[OWNER]]
-  // CHECK:   [[TAKES:%.*]] = function_ref @_T018pointer_conversion08takesOptD15ConstRawPointerySVSgSg_Si3andtF
+  // CHECK:   [[TAKES:%.*]] = function_ref @$S18pointer_conversion08takesOptD15ConstRawPointer_3andySVSgSg_SitF
   // CHECK:   apply [[TAKES]]([[OPTOPTDEP]], [[RESULT1]])
   // CHECK:   destroy_value [[OWNER]]
   // CHECK:   end_borrow [[BORROW]]

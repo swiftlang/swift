@@ -104,6 +104,7 @@ public:
       DEF_COL(ID::SILUndef, RED)
       DEF_COL(ID::SILBasicBlock, GREEN)
       DEF_COL(ID::SSAValue, MAGENTA)
+      DEF_COL(ID::Null, YELLOW)
     }
     OS.resetColor();
     OS.changeColor(Color);
@@ -128,6 +129,7 @@ void SILPrintContext::ID::print(raw_ostream &OS) {
     return;
   case ID::SILBasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
+  case ID::Null: OS << "<<NULL OPERAND>>"; return;
   }
   OS << Number;
 }
@@ -509,10 +511,10 @@ public:
   }
 
   SILValuePrinterInfo getIDAndType(SILValue V) {
-    return {Ctx.getID(V), V->getType()};
+    return {Ctx.getID(V), V ? V->getType() : SILType()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
-    return {Ctx.getID(V), V->getType(), V.getOwnershipKind()};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -1081,7 +1083,11 @@ public:
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
                [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee()->getType();
+    *this << ") : ";
+    if (auto callee = AI->getCallee())
+      *this << callee->getType();
+    else
+      *this << "<<NULL CALLEE>>";
   }
 
   void visitApplyInst(ApplyInst *AI) {
@@ -1756,7 +1762,9 @@ public:
   void visitEndLifetimeInst(EndLifetimeInst *ELI) {
     *this << getIDAndType(ELI->getOperand());
   }
-
+  void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
+    *this << getIDAndType(CBOI->getOperand());
+  }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
@@ -2645,7 +2653,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
     }
-    OS << entry.Implementation->getName();
+    OS << '@' << entry.Implementation->getName();
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:
       break;
@@ -2824,8 +2832,8 @@ void SILDefaultWitnessTable::dump() const {
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << getHash() << " {\t// " << demangleSymbol(getName())
-     << "\n";
+     << " " << QuotedString(getPGOFuncName()) << " " << getHash() << " {\t// "
+     << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())
     std::sort(MappedRegions.begin(), MappedRegions.end(),
               [](const MappedRegion &LHS, const MappedRegion &RHS) {
@@ -2975,6 +2983,9 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
 }
 
 ID SILPrintContext::getID(const SILNode *node) {
+  if (node == nullptr)
+    return {ID::Null, ~0U};
+
   if (isa<SILUndef>(node))
     return {ID::SILUndef, 0};
   

@@ -1171,7 +1171,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
-          if (!isa<ParenType>(func1Input.getPointer()))
+          if (!func1Input->hasParenSugar())
             func2Input = paren2->getUnderlyingType();
         }
       }
@@ -1521,6 +1521,49 @@ ConstraintSystem::SolutionKind ConstraintSystem::matchTypesBindTypeVar(
     return SolutionKind::Solved;
   }
 
+  // If we're binding an optional type, or function type that has an
+  // optional result type, this may be the result of an IUO
+  // declaration. These are candidates for creating a disjunction.
+  bool isOptional = false;
+  if (type->getRValueType()->getAnyOptionalObjectType()) {
+    isOptional = true;
+  } else if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    auto resultTy = fnTy->getResult();
+    while (resultTy->is<AnyFunctionType>())
+      resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+    // FIXME: work-around the fact that doesStorageProduceLValue returns true
+    // for
+    //        #selector(getter: NSMenuItem.action)
+    resultTy = resultTy->getRValueType();
+
+    if (resultTy->getAnyOptionalObjectType()) {
+      isOptional = true;
+    }
+  }
+
+  if (isOptional) {
+    SmallVector<LocatorPathElt, 4> path;
+    locator.getLocatorParts(path);
+
+    // Find the last element that is either an indication we need to
+    // create a disjunction, or an indication that we already have.
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() == ConstraintLocator::ImplicitlyUnwrappedValue ||
+                 elt.getKind() ==
+                     ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice;
+        });
+
+    // If we need to create a disjunction for this value, do so.
+    if (last != path.rend() &&
+        last->getKind() == ConstraintLocator::ImplicitlyUnwrappedValue) {
+      buildDisjunctionForImplicitlyUnwrappedOptional(
+          typeVar, type, getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+  }
+
   assignFixedType(typeVar, type);
 
   return SolutionKind::Solved;
@@ -1562,8 +1605,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
     // If the types are obviously equivalent, we're done.
-    if (isa<ParenType>(type1.getPointer()) ==
-          isa<ParenType>(type2.getPointer()) &&
+    if (type1->hasParenSugar() == type2->hasParenSugar() &&
         type1->isEqual(type2))
       return SolutionKind::Solved;
   } else {
@@ -1747,8 +1789,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (isArgumentTupleMatch &&
       !isSwiftVersion3) {
     if (!typeVar1 && !typeVar2) {
-      if (isa<ParenType>(type1.getPointer()) !=
-          isa<ParenType>(type2.getPointer())) {
+      if (type1->hasParenSugar() != type2->hasParenSugar()) {
         return SolutionKind::Error;
       }
     }
@@ -1965,8 +2006,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // For non-argument tuples, we can do the same conversion but not
       // to a tuple with varargs.
       if (!type1->is<LValueType>() &&
-          ((tuple2->getNumElements() == 1 &&
-            !tuple2->getElement(0).isVararg()) ||
+          (tuple2->hasParenSema(/*allowName*/true) ||
            (kind >= ConstraintKind::Conversion &&
             tuple2->getElementForScalarInit() >= 0 &&
             (isArgumentTupleConversion ||
@@ -2902,57 +2942,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                     ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
   Type baseObjTy = baseTy->getRValueType();
-
-  // Dig out the instance type and figure out what members of the instance type
-  // we are going to see.
-  bool isMetatype = false;
-  bool isModule = false;
-  bool hasInstanceMembers = false;
-  bool hasInstanceMethods = false;
-  bool hasStaticMembers = false;
   Type instanceTy = baseObjTy;
-  if (baseObjTy->is<ModuleType>()) {
-    hasStaticMembers = true;
-    isModule = true;
-  } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
-    instanceTy = baseObjMeta->getInstanceType();
-    isMetatype = true;
-    if (baseObjMeta->is<ExistentialMetatypeType>()) {
-      // An instance of an existential metatype is a concrete type conforming
-      // to the existential, say Self. Instance members of the concrete type
-      // have type Self -> T -> U, but we don't know what Self is at compile
-      // time so we cannot refer to them. Static methods are fine, on the other
-      // hand -- we already know that they do not have Self or associated type
-      // requirements, since otherwise we would not be able to refer to the
-      // existential metatype in the first place.
-      hasStaticMembers = true;
-    } else if (instanceTy->isExistentialType()) {
-      // A protocol metatype has instance methods with type P -> T -> U, but
-      // not instance properties or static members -- the metatype value itself
-      // doesn't give us a witness so there's no static method to bind.
-      hasInstanceMethods = true;
-    } else {
-      // Metatypes of nominal types and archetypes have instance methods and
-      // static members, but not instance properties.
-      // FIXME: partial application of properties
-      hasInstanceMethods = true;
-      hasStaticMembers = true;
-    }
 
-    // If we're at the root of an unevaluated context, we can
-    // reference instance members on the metatype.
-    if (memberLocator &&
-        UnevaluatedRootExprs.count(memberLocator->getAnchor())) {
-      hasInstanceMembers = true;
-    }
-  } else {
-    // Otherwise, we can access all instance members.
-    hasInstanceMembers = true;
-    hasInstanceMethods = true;
+  if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
+    instanceTy = baseObjMeta->getInstanceType();
   }
 
-  bool isExistential = instanceTy->isExistentialType();
-  
   if (instanceTy->isTypeVariableOrMember() ||
       instanceTy->is<UnresolvedType>()) {
     MemberLookupResult result;
@@ -3023,7 +3018,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   /// Determine whether the given declaration has compatible argument
   /// labels.
-  auto hasCompatibleArgumentLabels = [&](ValueDecl *decl) -> bool {
+  auto hasCompatibleArgumentLabels = [&argumentLabels](Type baseObjTy,
+                                                       ValueDecl *decl) -> bool {
     if (!argumentLabels)
       return true;
 
@@ -3032,9 +3028,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the member lookup binding the first level.  But there are cases where
     // we can get an unapplied declaration reference back.
     unsigned parameterDepth;
-    if (isModule) {
+    if (baseObjTy->is<ModuleType>()) {
       parameterDepth = 0;
-    } else if (isMetatype && decl->isInstanceMember()) {
+    } else if (baseObjTy->is<AnyMetatypeType>() && decl->isInstanceMember()) {
       parameterDepth = 0;
     } else {
       parameterDepth = 1;
@@ -3063,18 +3059,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
   }
 
-  // The set of directly accessible types, which is only used when
-  // we're performing dynamic lookup into an existential type.
-  bool isDynamicLookup = instanceTy->isAnyObject();
-
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
-  Type bridgedClass;
   Type bridgedType;
-  if (instanceTy->getAnyNominal() == TC.Context.getStringDecl()) {
+  if (baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
     if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
-      bridgedClass = classType;
-      bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
+      bridgedType = classType;
     }
   }
   bool labelMismatch = false;
@@ -3095,9 +3085,56 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (!decl->hasInterfaceType())
       return;
 
+    // Dig out the instance type and figure out what members of the instance type
+    // we are going to see.
+    auto baseTy = candidate.getBaseType();
+    auto baseObjTy = baseTy->getRValueType();
+
+    bool hasInstanceMembers = false;
+    bool hasInstanceMethods = false;
+    bool hasStaticMembers = false;
+    Type instanceTy = baseObjTy;
+    if (baseObjTy->is<ModuleType>()) {
+      hasStaticMembers = true;
+    } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
+      instanceTy = baseObjMeta->getInstanceType();
+      if (baseObjMeta->is<ExistentialMetatypeType>()) {
+        // An instance of an existential metatype is a concrete type conforming
+        // to the existential, say Self. Instance members of the concrete type
+        // have type Self -> T -> U, but we don't know what Self is at compile
+        // time so we cannot refer to them. Static methods are fine, on the other
+        // hand -- we already know that they do not have Self or associated type
+        // requirements, since otherwise we would not be able to refer to the
+        // existential metatype in the first place.
+        hasStaticMembers = true;
+      } else if (instanceTy->isExistentialType()) {
+        // A protocol metatype has instance methods with type P -> T -> U, but
+        // not instance properties or static members -- the metatype value itself
+        // doesn't give us a witness so there's no static method to bind.
+        hasInstanceMethods = true;
+      } else {
+        // Metatypes of nominal types and archetypes have instance methods and
+        // static members, but not instance properties.
+        // FIXME: partial application of properties
+        hasInstanceMethods = true;
+        hasStaticMembers = true;
+      }
+
+      // If we're at the root of an unevaluated context, we can
+      // reference instance members on the metatype.
+      if (memberLocator &&
+          UnevaluatedRootExprs.count(memberLocator->getAnchor())) {
+        hasInstanceMembers = true;
+      }
+    } else {
+      // Otherwise, we can access all instance members.
+      hasInstanceMembers = true;
+      hasInstanceMethods = true;
+    }
+
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
-    if (!hasCompatibleArgumentLabels(decl)) {
+    if (!hasCompatibleArgumentLabels(baseObjTy, decl)) {
       labelMismatch = true;
       result.addUnviable(candidate, MemberLookupResult::UR_LabelMismatch);
       return;
@@ -3105,7 +3142,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
-    if (isExistential) {
+    if (instanceTy->isExistentialType()) {
       if (auto *proto = decl->getDeclContext()
               ->getAsProtocolOrProtocolExtensionContext()) {
         if (!proto->isAvailableInExistential(decl)) {
@@ -3144,10 +3181,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If the underlying type of a typealias is fully concrete, it is legal
     // to access the type with a protocol metatype base.
-    } else if (isExistential &&
+    } else if (instanceTy->isExistentialType() &&
                isa<TypeAliasDecl>(decl) &&
-               !cast<TypeAliasDecl>(decl)->getInterfaceType()->getCanonicalType()
-                  ->hasTypeParameter()) {
+               !cast<TypeAliasDecl>(decl)->getInterfaceType()->hasTypeParameter()) {
 
       /* We're OK */
 
@@ -3161,8 +3197,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If we have an rvalue base, make sure that the result isn't 'mutating'
     // (only valid on lvalues).
-    if (!isMetatype &&
-        !baseTy->is<LValueType>() && decl->isInstanceMember()) {
+    if (!baseTy->is<AnyMetatypeType>() &&
+        !baseTy->is<LValueType>() &&
+        decl->isInstanceMember()) {
       if (auto *FD = dyn_cast<FuncDecl>(decl))
         if (FD->isMutating()) {
           result.addUnviable(candidate,
@@ -3191,7 +3228,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                                bool isUnwrappedOptional) -> OverloadChoice {
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
-    if (isDynamicLookup) {
+    if (instanceTy->isAnyObject()) {
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
       
       // We found this declaration via dynamic lookup, record it as such.
@@ -3205,16 +3242,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     
     // If we got the choice by unwrapping an optional type, unwrap the base
     // type.
-    Type ovlBaseTy = baseTy;
     if (isUnwrappedOptional) {
-      ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
+      auto ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
                                     ->getInstanceType()
                                     ->getAnyOptionalObjectType());
       return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                          functionRefKind);
     }
-    
-    return OverloadChoice(ovlBaseTy, cand, functionRefKind);
+
+    return OverloadChoice(baseTy, cand, functionRefKind);
   };
   
   // Add all results from this lookup.
@@ -3227,8 +3263,8 @@ retry_after_fail:
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
-  if (bridgedType && !isMetatype) {
-    LookupResult &bridgedLookup = lookupMember(bridgedClass, memberName);
+  if (bridgedType) {
+    LookupResult &bridgedLookup = lookupMember(bridgedType, memberName);
     ModuleDecl *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
@@ -3256,7 +3292,8 @@ retry_after_fail:
   // through optional types.
   //
   // FIXME: The short-circuit here is lame.
-  if (result.ViableCandidates.empty() && isMetatype &&
+  if (result.ViableCandidates.empty() &&
+      baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
       if (objectType->mayHaveMembers()) {

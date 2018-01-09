@@ -205,3 +205,5 @@ _T0So13SKPhysicsBodyCSC7CGPointVSC8CGVectorVSpy10ObjectiveC8ObjCBoolVGIxxyyy_Abd
 _T04main1_yyF ---> _()
 _T03abc6testitySiFTm ---> testit(_:)
 _T04main4TestCACSi1x_tc6_PRIV_Llfc ---> Test.init(x:)
+_$S3abc6testityySiFTm ---> testit(_:)
+_$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> Test.init(x:)

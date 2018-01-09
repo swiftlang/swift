@@ -134,6 +134,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       OutputFilename(OutputFilename),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
@@ -303,8 +304,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
-      RelativeAddressTy,
-      Int32Ty
+      RelativeAddressTy
     });
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);

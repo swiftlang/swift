@@ -87,17 +87,17 @@ func literals() {
   var f:SillyConstUTF16String = "foobar"
   var non_ascii:SillyConstUTF16String = "foobarö"
 }
-// CHECK-LABEL: sil hidden @_T011expressions8literalsyyF
+// CHECK-LABEL: sil hidden @$S11expressions8literalsyyF
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
 // CHECK: [[CONST_STRING_LIT:%.*]] = const_string_literal utf8 "foobar"
 // CHECK: [[METATYPE:%.*]] = metatype $@thin SillyConstUTF16String.Type
-// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: [[FUN:%.*]] = function_ref @$S11expressions21SillyConstUTF16StringV08_builtincE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: apply [[FUN]]([[CONST_STRING_LIT]], [[METATYPE]]) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: [[CONST_UTF16STRING_LIT:%.*]] = const_string_literal utf16 "foobarö"
-// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincdE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: [[FUN:%.*]] = function_ref @$S11expressions21SillyConstUTF16StringV08_builtincdE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 // CHECK: apply [[FUN]]([[CONST_UTF16STRING_LIT]], {{.*}}) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 
 func bar(_ x: Int) {}
@@ -107,22 +107,22 @@ func call_one() {
   bar(42);
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions8call_oneyyF
+// CHECK-LABEL: sil hidden @$S11expressions8call_oneyyF
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int) -> ()
+// CHECK: [[BAR:%[0-9]+]] = function_ref @$S11expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int) -> ()
 // CHECK: apply [[BAR]]([[FORTYTWO_CONVERTED]])
 
 func call_two() {
   bar(42, 219)
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions8call_twoyyF
+// CHECK-LABEL: sil hidden @$S11expressions8call_twoyyF
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
 // CHECK: [[TWONINETEEN:%[0-9]+]] = integer_literal {{.*}} 219
 // CHECK: [[TWONINETEEN_CONVERTED:%[0-9]+]] = apply {{.*}}([[TWONINETEEN]], {{.*}})
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Int) -> ()
+// CHECK: [[BAR:%[0-9]+]] = function_ref @$S11expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Int) -> ()
 // CHECK: apply [[BAR]]([[FORTYTWO_CONVERTED]], [[TWONINETEEN_CONVERTED]])
 
 func tuples() {
@@ -131,7 +131,7 @@ func tuples() {
   var T1 : (a: Int16, b: Int) = (b : 42, a : 777)
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions6tuplesyyF
+// CHECK-LABEL: sil hidden @$S11expressions6tuplesyyF
 
 
 class C {
@@ -144,11 +144,11 @@ class C {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions7classesyyF
+// CHECK-LABEL: sil hidden @$S11expressions7classesyyF
 func classes() {
-  // CHECK: function_ref @_T011expressions1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
+  // CHECK: function_ref @$S11expressions1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
   var a = C()
-  // CHECK: function_ref @_T011expressions1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick C.Type) -> @owned C
+  // CHECK: function_ref @$S11expressions1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick C.Type) -> @owned C
   var b = C(x: 0)
 }
 
@@ -162,11 +162,11 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions7structsyyF
+// CHECK-LABEL: sil hidden @$S11expressions7structsyyF
 func structs() {
-  // CHECK: function_ref @_T011expressions1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S.Type) -> S
+  // CHECK: function_ref @$S11expressions1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S.Type) -> S
   var a = S()
-  // CHECK: function_ref @_T011expressions1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thin S.Type) -> S
+  // CHECK: function_ref @$S11expressions1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thin S.Type) -> S
   var b = S(x: 0)
 }
 
@@ -186,40 +186,40 @@ struct SomeStruct {
   func a() {}
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions5callsyyF
-// CHECK: [[METHOD:%[0-9]+]] = function_ref @_T011expressions10SomeStructV1a{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout SomeStruct) -> ()
+// CHECK-LABEL: sil hidden @$S11expressions5callsyyF
+// CHECK: [[METHOD:%[0-9]+]] = function_ref @$S11expressions10SomeStructV1a{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout SomeStruct) -> ()
 // CHECK: apply [[METHOD]]({{.*}})
 func calls() {
   var a : SomeStruct
   a.a()
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions11module_path{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions11module_path{{[_0-9a-zA-Z]*}}F
 func module_path() -> Int {
   return FooBar.x
-  // CHECK: [[x_GET:%[0-9]+]] = function_ref @_T06FooBar1xSivau
+  // CHECK: [[x_GET:%[0-9]+]] = function_ref @$S6FooBar1xSivau
   // CHECK-NEXT: apply [[x_GET]]()
 }
 
 func default_args(_ x: Int, y: Int = 219, z: Int = 20721) {}
 
-// CHECK-LABEL: sil hidden @_T011expressions19call_default_args_1{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions19call_default_args_1{{[_0-9a-zA-Z]*}}F
 func call_default_args_1(_ x: Int) {
   default_args(x)
-  // CHECK: [[YFUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A0_
+  // CHECK: [[YFUNC:%[0-9]+]] = function_ref @$S11expressions12default_args{{[_0-9a-zA-Z]*}}A0_
   // CHECK: [[Y:%[0-9]+]] = apply [[YFUNC]]()
-  // CHECK: [[ZFUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A1_
+  // CHECK: [[ZFUNC:%[0-9]+]] = function_ref @$S11expressions12default_args{{[_0-9a-zA-Z]*}}A1_
   // CHECK: [[Z:%[0-9]+]] = apply [[ZFUNC]]()
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S11expressions12default_args{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]({{.*}}, [[Y]], [[Z]])
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions19call_default_args_2{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions19call_default_args_2{{[_0-9a-zA-Z]*}}F
 func call_default_args_2(_ x: Int, z: Int) {
   default_args(x, z:z)
-  // CHECK: [[DEFFN:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A0_
+  // CHECK: [[DEFFN:%[0-9]+]] = function_ref @$S11expressions12default_args{{[_0-9a-zA-Z]*}}A0_
   // CHECK-NEXT: [[C219:%[0-9]+]] = apply [[DEFFN]]()
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S11expressions12default_args{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: apply [[FUNC]]({{.*}}, [[C219]], {{.*}})
 }
 
@@ -227,7 +227,7 @@ struct Generic<T> {
   var mono_member:Int
   var typevar_member:T
 
-  // CHECK-LABEL: sil hidden @_T011expressions7GenericV13type_variable{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$S11expressions7GenericV13type_variable{{[_0-9a-zA-Z]*}}F
   mutating
   func type_variable() -> T.Type {
     return T.self
@@ -235,17 +235,17 @@ struct Generic<T> {
     // CHECK: return [[METATYPE]]
   }
 
-  // CHECK-LABEL: sil hidden @_T011expressions7GenericV19copy_typevar_member{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$S11expressions7GenericV19copy_typevar_member{{[_0-9a-zA-Z]*}}F
   mutating
   func copy_typevar_member(_ x: Generic<T>) {
     typevar_member = x.typevar_member
   }
 
-  // CHECK-LABEL: sil hidden @_T011expressions7GenericV12class_method{{[_0-9a-zA-Z]*}}FZ
+  // CHECK-LABEL: sil hidden @$S11expressions7GenericV12class_method{{[_0-9a-zA-Z]*}}FZ
   static func class_method() {}
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions18generic_member_ref{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions18generic_member_ref{{[_0-9a-zA-Z]*}}F
 func generic_member_ref<T>(_ x: Generic<T>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $*Generic<T>):
   return x.mono_member
@@ -253,7 +253,7 @@ func generic_member_ref<T>(_ x: Generic<T>) -> Int {
   // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions24bound_generic_member_ref{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions24bound_generic_member_ref{{[_0-9a-zA-Z]*}}F
 func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   var x = x
   // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $Generic<Unicode.Scalar>):
@@ -262,7 +262,7 @@ func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions6coerce{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions6coerce{{[_0-9a-zA-Z]*}}F
 func coerce(_ x: Int32) -> Int64 {
   return 0
 }
@@ -273,26 +273,26 @@ class B {
 class D : B {
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions8downcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(_ x: B) -> D {
   return x as! D
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $D
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions6upcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions6upcast{{[_0-9a-zA-Z]*}}F
 func upcast(_ x: D) -> B {
   return x
   // CHECK: upcast %{{[0-9]+}} : ${{.*}} to $B
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions14generic_upcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions14generic_upcast{{[_0-9a-zA-Z]*}}F
 func generic_upcast<T : B>(_ x: T) -> B {
   return x
   // CHECK: upcast %{{.*}} to $B
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions16generic_downcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions16generic_downcast{{[_0-9a-zA-Z]*}}F
 func generic_downcast<T : B>(_ x: T, y: B) -> T {
   return y as! T
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $T
@@ -301,14 +301,14 @@ func generic_downcast<T : B>(_ x: T, y: B) -> T {
 
 // TODO: generic_downcast
 
-// CHECK-LABEL: sil hidden @_T011expressions15metatype_upcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions15metatype_upcast{{[_0-9a-zA-Z]*}}F
 func metatype_upcast() -> B.Type {
   return D.self
   // CHECK: metatype $@thick D
   // CHECK-NEXT: upcast
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions19interpolated_string{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions19interpolated_string{{[_0-9a-zA-Z]*}}F
 func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
 }
@@ -332,7 +332,7 @@ protocol Mincible {
 protocol Bendable { }
 protocol Wibbleable { }
 
-// CHECK-LABEL: sil hidden @_T011expressions20archetype_member_ref{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions20archetype_member_ref{{[_0-9a-zA-Z]*}}F
 func archetype_member_ref<T : Runcible>(_ x: T) {
   var x = x
   x.free_method()
@@ -353,7 +353,7 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   // CHECK-NEXT: apply
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions22existential_member_ref{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions22existential_member_ref{{[_0-9a-zA-Z]*}}F
 func existential_member_ref(_ x: Mincible) {
   x.free_method()
   // CHECK: open_existential_addr
@@ -393,7 +393,7 @@ struct Hat<T> : Runcible {
 
   func free_method() -> Int {}
 
-  // CHECK-LABEL: sil hidden @_T011expressions3HatV17associated_method{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$S11expressions3HatV17associated_method{{[_0-9a-zA-Z]*}}F
   mutating
   func associated_method() -> U.Type {
     return U.self
@@ -404,20 +404,20 @@ struct Hat<T> : Runcible {
   static func static_method() {}
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions7erasure{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions7erasure{{[_0-9a-zA-Z]*}}F
 func erasure(_ x: Spoon) -> Mincible {
   return x
   // CHECK: init_existential_addr
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions19declref_to_metatypeAA5SpoonVmyF
+// CHECK-LABEL: sil hidden @$S11expressions19declref_to_metatypeAA5SpoonVmyF
 func declref_to_metatype() -> Spoon.Type {
   return Spoon.self
   // CHECK: metatype $@thin Spoon.Type
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions27declref_to_generic_metatype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions27declref_to_generic_metatype{{[_0-9a-zA-Z]*}}F
 func declref_to_generic_metatype() -> Generic<UnicodeScalar>.Type {
   // FIXME parsing of T<U> in expression context
   typealias GenericChar = Generic<UnicodeScalar>
@@ -430,7 +430,7 @@ func float(_ x: Float) {}
 
 func tuple() -> (Int, Float) { return (1, 1.0) }
 
-// CHECK-LABEL: sil hidden @_T011expressions13tuple_element{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions13tuple_element{{[_0-9a-zA-Z]*}}F
 func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box ${ var (Int, Float) }
@@ -455,12 +455,12 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: apply {{.*}}([[ONE]])
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions10containers{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions10containers{{[_0-9a-zA-Z]*}}F
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 
-// CHECK-LABEL: sil hidden @_T011expressions7if_expr{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S11expressions7if_expr{{[_0-9a-zA-Z]*}}F
 func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
@@ -583,7 +583,7 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
-// CHECK-LABEL: sil hidden @_T011expressions21implodeRecursiveTupleySi_Sit_SitSgF
+// CHECK-LABEL: sil hidden @$S11expressions21implodeRecursiveTupleyySi_Sit_SitSgF
 // CHECK: bb0(%0 : @trivial $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 

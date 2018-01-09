@@ -33,10 +33,10 @@ sil_vtable C {}
 // \ CHECK:   i8* null
 // \ CHECK: }
 
-//   CHECK: @_T05class1CCMf = internal global <{ {{.*}} }> <{
-// \ CHECK:   void ([[C_CLASS]]*)* @_T05class1CCfD,
-// \ CHECK:   i8** @_T0BoWV,
-// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_T05class1CCMm to i64),
+//   CHECK: @"$S5class1CCMf" = internal global <{ {{.*}} }> <{
+// \ CHECK:   void ([[C_CLASS]]*)* @"$S5class1CCfD",
+// \ CHECK:   i8** @"$SBoWV",
+// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @"$S5class1CCMm" to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$__TtCs12_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* null,
@@ -44,24 +44,24 @@ sil_vtable C {}
 // \ CHECK: }>
 
 // Destroying destructor
-// CHECK: define{{( protected)?}} swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself) {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc [[REF]]* @"$S5class1CCfd"([[C_CLASS]]* swiftself) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
-sil @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
+sil @$S5class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
 // Deallocating destructor
-// CHECK: define{{( protected)?}} swiftcc void @_T05class1CCfD([[C_CLASS]]* swiftself)
-sil @_T05class1CCfD : $@convention(method) (@owned C) -> () {
+// CHECK: define{{( protected)?}} swiftcc void @"$S5class1CCfD"([[C_CLASS]]* swiftself)
+sil @$S5class1CCfD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   // CHECK-NEXT: entry
-  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself %0)
+  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @"$S5class1CCfd"([[C_CLASS]]* swiftself %0)
   // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
-  %1 = function_ref @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
+  %1 = function_ref @$S5class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
   %2 = apply %1(%0) : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %3
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
@@ -137,12 +137,12 @@ sil public_external @alloc_RequiredBase : $@convention(method) (@thick RequiredB
 sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {
-  #NonRequiredBase.init!initializer.1: init_NonRequiredBase
+  #NonRequiredBase.init!initializer.1: @init_NonRequiredBase
 }
 
 sil_vtable RequiredBase {
-  #NonRequiredBase.init!initializer.1: init_RequiredBase
-  #RequiredBase.init!allocator.1: alloc_RequiredBase
+  #NonRequiredBase.init!initializer.1: @init_RequiredBase
+  #RequiredBase.init!allocator.1: @alloc_RequiredBase
 }
 
 // rdar://problem/19902523

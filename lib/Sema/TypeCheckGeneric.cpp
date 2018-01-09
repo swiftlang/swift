@@ -876,6 +876,13 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
 
+    // Set the IUO attribute on the decl if this was declared with !.
+    if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto *forceAttr =
+          new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
+      ctor->getAttrs().add(forceAttr);
+    }
+
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
@@ -1305,6 +1312,13 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       if (kind != RequirementKind::Layout) {
         rawSecondType = rawReq.getSecondType();
         secondType = req.getSecondType();
+      }
+
+      // Don't do further checking on error types.
+      if (firstType->hasError() || (secondType && secondType->hasError())) {
+        // Another requirement will fail later; just continue.
+        valid = false;
+        continue;
       }
 
       bool requirementFailure = false;

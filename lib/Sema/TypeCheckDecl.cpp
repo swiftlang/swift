@@ -899,6 +899,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // Compare this signature against the signature of other
   // declarations with the same name.
   OverloadSignature currentSig = current->getOverloadSignature();
+  CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
@@ -912,6 +913,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+      continue;
+
+    // Check whether the overload signatures conflict (ignoring the type for
+    // now).
+    auto otherSig = other->getOverloadSignature();
+    if (!conflicting(currentSig, otherSig))
       continue;
 
     // Validate the declaration.
@@ -946,8 +953,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       break;
     }
 
+    // Get the overload signature type.
+    CanType otherSigType = other->getOverloadSignatureType();
+
     // If there is another conflict, complain.
-    if (conflicting(currentSig, other->getOverloadSignature())) {
+    if (currentSigType == otherSigType ||
+        currentSig.Name.isCompoundName() != otherSig.Name.isCompoundName()) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
       if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
@@ -969,6 +980,63 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
             other->getDeclContext()->getModuleScopeContext());
         if (otherFile && otherFile->isSIB())
           continue;
+      }
+
+      // Signatures are the same, but interface types are not. We must
+      // have a type that we've massaged as part of signature
+      // interface type generation. If it's a result of remapping a
+      // function parameter from 'inout T!' to 'inout T?', emit a
+      // warning that these overloads are deprecated and will no
+      // longer be supported in the future.
+      if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
+        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
+          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
+          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
+          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
+            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
+            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
+          }
+
+          if (currFnTy && otherFnTy) {
+            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
+            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
+
+            if (currParams.size() == otherParams.size()) {
+              auto diagnosed = false;
+              for (unsigned i : indices(currParams)) {
+                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
+                  auto currParamTy = currParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  auto otherParamTy = otherParams[i]
+                    .getType()
+                    ->getAs<InOutType>()
+                    ->getObjectType();
+                  OptionalTypeKind currOTK;
+                  OptionalTypeKind otherOTK;
+                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
+                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
+                  if (currOTK != OTK_None && otherOTK != OTK_None &&
+                      currOTK != otherOTK) {
+                    tc.diagnose(current, diag::deprecated_redecl_by_optionality,
+                                current->getFullName(), currParamTy,
+                                otherParamTy);
+                    tc.diagnose(other, diag::invalid_redecl_prev,
+                                other->getFullName());
+                    tc.diagnose(current,
+                                diag::deprecated_redecl_by_optionality_note);
+                    diagnosed = true;
+                    break;
+                  }
+                }
+              }
+
+              if (diagnosed)
+                break;
+            }
+          }
+        }
       }
 
       // If the conflicting declarations have non-overlapping availability and,
@@ -1182,14 +1250,12 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
-    assert(!D->isDynamic());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
   }
 }
 
 void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isDynamic()) {
-    assert(!D->isFinal());
     D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
 }
@@ -2499,6 +2565,10 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
     return;
 
+  // The presence of 'dynamic' blocks the inference of 'dynamic'.
+  if (D->isDynamic())
+    return;
+
   // Only 'objc' declarations use 'dynamic'.
   if (!D->isObjC() || D->hasClangNode())
     return;
@@ -2507,16 +2577,16 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     (D->getOverriddenDecl() &&
      D->getOverriddenDecl()->hasClangNode());
 
-  // Only introduce 'dynamic' on declarations...
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
-  if (!isa<ExtensionDecl>(D->getDeclContext())) {
-    // ...and in classes on decls marked @NSManaged.
-    if (!isNSManaged && !overridesImportedMethod)
-      return;
-  }
 
-  // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
-  if (D->isDynamic() || D->isFinal())
+  bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
+
+  // We only infer 'dynamic' in these three cases.
+  if (!isExtension && !isNSManaged && !overridesImportedMethod)
+    return;
+
+  // The presence of 'final' blocks the inference of 'dynamic'.
+  if (D->isFinal() && !isNSManaged)
     return;
 
   // Variables declared with 'let' cannot be 'dynamic'.
@@ -4346,6 +4416,13 @@ public:
       synthesizeSetterForMutableAddressedStorage(SD, TC);
     }
 
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     TC.checkDeclAttributes(SD);
   }
 
@@ -4846,14 +4923,6 @@ public:
     return cast<VarDecl>(accessor)->getTypeLoc();
   }
 
-  static bool functionHasImplicitlyUnwrappedResult(FuncDecl *FD) {
-    if (FD->isAccessor() && !FD->isGetter())
-      return false;
-
-    auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
-    return TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional;
-  }
-
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
     TC.checkForForbiddenPrefix(FD);
 
@@ -4877,10 +4946,13 @@ public:
       return true;
     }
 
-    if (functionHasImplicitlyUnwrappedResult(FD)) {
-      auto &C = FD->getASTContext();
-      FD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    if (!FD->isAccessor() || FD->isGetter()) {
+      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
+      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+        auto &C = FD->getASTContext();
+        FD->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      }
     }
 
     return false;
@@ -5415,8 +5487,7 @@ public:
 
     // If this is a class member, mark it final if the class is final.
     if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (cls->isFinal() && !FD->isAccessor() &&
-          !FD->isFinal() && !FD->isDynamic()) {
+      if (cls->isFinal() && !FD->isFinal()) {
         makeFinal(TC.Context, FD);
       }
       // static func declarations in classes are synonyms
@@ -5553,12 +5624,10 @@ public:
   }
 
   static bool
-  diagnoseMismatchedOptionals(TypeChecker &TC,
-                              const ValueDecl *member,
-                              const ParameterList *params,
-                              TypeLoc resultTL,
+  diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
+                              const ParameterList *params, TypeLoc resultTL,
                               const ValueDecl *parentMember,
-                              Type owningTy,
+                              const ParameterList *parentParams, Type owningTy,
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
@@ -5568,15 +5637,18 @@ public:
       parentTy = parentTy->getResult()->castTo<FunctionType>();
 
     // Check the parameter types.
-    auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
+    auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
       Type paramTy = decl->getType();
+      Type parentParamTy = parentDecl->getType();
+
       if (!paramTy || !parentParamTy)
         return;
 
       OptionalTypeKind paramOTK;
       (void)paramTy->getAnyOptionalObjectType(paramOTK);
       if (paramOTK == OTK_Optional)
-        return;
+        if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+          return;
 
       OptionalTypeKind parentOTK;
       (void)parentParamTy->getAnyOptionalObjectType(parentOTK);
@@ -5594,6 +5666,10 @@ public:
             return;
           break;
         case OTK_Optional:
+          if (parentDecl->getAttrs()
+                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+            if (!treatIUOResultAsError)
+              return;
           break;
         }
 
@@ -5616,7 +5692,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(TL.getType().getPointer()))
+      if (TL.getType()->hasParenSugar())
         return;
 
       TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -5637,17 +5713,11 @@ public:
         .fixItInsertAfter(TL.getSourceRange().End, ")");
     };
 
-    auto parentInput = parentTy->getInput();
-    
-    if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
-      // FIXME: If we ever allow argument reordering, this is incorrect.
-      ArrayRef<ParamDecl*> sharedParams = params->getArray();
-      sharedParams = sharedParams.slice(0, parentTupleInput->getNumElements());
-      for_each(sharedParams, parentTupleInput->getElementTypes(), checkParam);
-    } else {
-      // Otherwise, the parent has a single parameter with no label.
-      checkParam(params->get(0), parentInput);
-    }
+    // FIXME: If we ever allow argument reordering, this is incorrect.
+    ArrayRef<ParamDecl *> sharedParams = params->getArray();
+    ArrayRef<ParamDecl *> sharedParentParams = parentParams->getArray();
+    assert(sharedParams.size() == sharedParentParams.size());
+    for_each(sharedParams, sharedParentParams, checkParam);
 
     if (!resultTL.getTypeRepr())
       return emittedError;
@@ -5685,7 +5755,7 @@ public:
         return;
 
       // Allow silencing this warning using parens.
-      if (isa<ParenType>(resultTy.getPointer()))
+      if (resultTy->hasParenSugar())
         return;
 
       TC.diagnose(resultTL.getSourceRange().Start,
@@ -6262,11 +6332,10 @@ public:
         TypeLoc resultTL;
         if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
           resultTL = methodAsFunc->getBodyResultTypeLoc();
-        emittedMatchError |=
-            diagnoseMismatchedOptionals(TC, method,
-                                        method->getParameterList(1), resultTL,
-                                        matchDecl, owningTy,
-                                        mayHaveMismatchedOptionals);
+        emittedMatchError |= diagnoseMismatchedOptionals(
+            TC, method, method->getParameterList(1), resultTL, matchDecl,
+            cast<AbstractFunctionDecl>(matchDecl)->getParameterList(1),
+            owningTy, mayHaveMismatchedOptionals);
       }
     } else if (auto subscript =
                  dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
@@ -6289,12 +6358,11 @@ public:
         emittedMatchError = true;
 
       } else if (mayHaveMismatchedOptionals) {
-        emittedMatchError |=
-            diagnoseMismatchedOptionals(TC, subscript,
-                                        subscript->getIndices(),
-                                        subscript->getElementTypeLoc(),
-                                        matchDecl, owningTy,
-                                        mayHaveMismatchedOptionals);
+        emittedMatchError |= diagnoseMismatchedOptionals(
+            TC, subscript, subscript->getIndices(),
+            subscript->getElementTypeLoc(), matchDecl,
+            cast<SubscriptDecl>(matchDecl)->getIndices(), owningTy,
+            mayHaveMismatchedOptionals);
       }
     } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
       auto propertyTy = property->getInterfaceType();
@@ -7203,6 +7271,12 @@ public:
 
     inferDynamic(TC.Context, CD);
 
+    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto &C = CD->getASTContext();
+      CD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     TC.checkDeclAttributes(CD);
   }
 
@@ -7744,7 +7818,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // class is final, or if it was declared with 'let'.
       if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
         if (cls->isFinal() || VD->isLet()) {
-          if (!VD->isFinal() && !VD->isDynamic()) {
+          if (!VD->isFinal()) {
             makeFinal(Context, VD);
           }
         }

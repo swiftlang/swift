@@ -46,7 +46,7 @@ equivalenceExplanation = """\
 
 extension Sequence {
   /// Returns a sequence of pairs (*n*, *x*), where *n* represents a
-  /// consecutive integer starting at zero, and *x* represents an element of
+  /// consecutive integer starting at zero and *x* represents an element of
   /// the sequence.
   ///
   /// This example enumerates the characters of the string "Swift" and prints
@@ -734,6 +734,37 @@ extension Sequence {
   /// transformation produces an optional value.
   ///
   /// In this example, note the difference in the result of using `map` and
+  /// `compactMap` with a transformation that returns an optional `Int` value.
+  ///
+  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
+  ///
+  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
+  ///     // [1, 2, nil, nil, 5]
+  ///
+  ///     let flatMapped: [Int] = possibleNumbers.compactMap { str in Int(str) }
+  ///     // [1, 2, 5]
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  ///   sequence as its argument and returns an optional value.
+  /// - Returns: An array of the non-`nil` results of calling `transform`
+  ///   with each element of the sequence.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
+  ///   and *n* is the length of the result.
+  @_inlineable
+  public func compactMap<ElementOfResult>(
+    _ transform: (Element) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
+    return try _compactMap(transform)
+  }
+
+  /// Returns an array containing the non-`nil` results of calling the given
+  /// transformation with each element of this sequence.
+  ///
+  /// Use this method to receive an array of nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// In this example, note the difference in the result of using `map` and
   /// `flatMap` with a transformation that returns an optional `Int` value.
   ///
   ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
@@ -751,11 +782,12 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @_inlineable
+  @inline(__always)
+  @available(*, deprecated, renamed: "compactMap(_:)")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
-    return try _flatMap(transform)
+    return try _compactMap(transform)
   }
 
   // The implementation of flatMap accepting a closure with an optional result.
@@ -763,7 +795,7 @@ extension Sequence {
   // overloads.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func _flatMap<ElementOfResult>(
+  public func _compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []

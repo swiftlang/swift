@@ -213,10 +213,6 @@ struct OverloadSignature {
   /// The full name of the declaration.
   DeclName Name;
 
-  /// The interface type of the declaration, when relevant to the
-  /// overload signature.
-  CanType InterfaceType;
-
   /// The kind of unary operator.
   UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
 
@@ -231,11 +227,15 @@ struct OverloadSignature {
 };
 
 /// Determine whether two overload signatures conflict.
-bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
+bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
+                 bool skipProtocolExtensionCheck = false);
 
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
@@ -587,34 +587,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     NumberOfVTableEntries : 2
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Decl);
-    SWIFT_INLINE_BITS(PatternBindingDecl);
-    SWIFT_INLINE_BITS(EnumCaseDecl);
-    SWIFT_INLINE_BITS(ValueDecl);
-    SWIFT_INLINE_BITS(AbstractStorageDecl);
-    SWIFT_INLINE_BITS(AbstractFunctionDecl);
-    SWIFT_INLINE_BITS(VarDecl);
-    SWIFT_INLINE_BITS(ParamDecl);
-    SWIFT_INLINE_BITS(EnumElementDecl);
-    SWIFT_INLINE_BITS(FuncDecl);
-    SWIFT_INLINE_BITS(ConstructorDecl);
-    SWIFT_INLINE_BITS(TypeDecl);
-    SWIFT_INLINE_BITS(GenericTypeParamDecl);
-    SWIFT_INLINE_BITS(TypeAliasDecl);
-    SWIFT_INLINE_BITS(NominalTypeDecl);
-    SWIFT_INLINE_BITS(ProtocolDecl);
-    SWIFT_INLINE_BITS(ClassDecl);
-    SWIFT_INLINE_BITS(StructDecl);
-    SWIFT_INLINE_BITS(EnumDecl);
-    SWIFT_INLINE_BITS(AssociatedTypeDecl);
-    SWIFT_INLINE_BITS(PrecedenceGroupDecl);
-    SWIFT_INLINE_BITS(ImportDecl);
-    SWIFT_INLINE_BITS(ExtensionDecl);
-    SWIFT_INLINE_BITS(IfConfigDecl);
-    SWIFT_INLINE_BITS(MissingMemberDecl);
   } Bits;
 
   // Storage for the declaration attributes.
@@ -649,18 +621,11 @@ protected:
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
-  ClangNode getClangNodeImpl() const {
-    assert(Bits.Decl.FromClang);
-    return ClangNode::getFromOpaqueValue(
-        *(reinterpret_cast<void * const*>(this) - 1));
-  }
+  /// \brief Get the Clang node associated with this declaration.
+  ClangNode getClangNodeImpl() const;
 
   /// \brief Set the Clang node associated with this declaration.
-  void setClangNode(ClangNode Node) {
-    Bits.Decl.FromClang = true;
-    // Extra memory is allocated for this.
-    *(reinterpret_cast<void **>(this) - 1) = Node.getOpaqueValue();
-  }
+  void setClangNode(ClangNode Node);
 
   void updateClangNode(ClangNode node) {
     assert(hasClangNode());
@@ -1383,8 +1348,10 @@ public:
   }
 };
 
-class GenericContext : public DeclContext {
-private:
+// A private class for forcing exact field layout.
+class _GenericContext {
+// Not really public. See GenericContext.
+public:
   GenericParamList *GenericParams = nullptr;
 
   /// The trailing where clause.
@@ -1399,13 +1366,15 @@ private:
   /// environment will be lazily loaded.
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
+};
 
+class GenericContext : private _GenericContext, public DeclContext {
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 protected:
   GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : DeclContext(Kind, Parent) { }
+    : _GenericContext(), DeclContext(Kind, Parent) { }
 
 public:
   /// \brief Retrieve the set of parameters to a generic context, or null if
@@ -1452,6 +1421,8 @@ public:
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
 };
+static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
+              sizeof(GenericContext), "Please add fields to _GenericContext");
 
 /// Describes what kind of name is being imported.
 ///
@@ -1560,7 +1531,7 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl final : public Decl, public GenericContext,
+class ExtensionDecl final : public GenericContext, public Decl,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
@@ -1976,13 +1947,13 @@ private:
 /// This, among other things, makes it easier to distinguish between local
 /// top-level variables (which are not live past the end of the statement) and
 /// global variables.
-class TopLevelCodeDecl : public Decl, public DeclContext {
+class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
 
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : Decl(DeclKind::TopLevelCode, Parent),
-      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+      Decl(DeclKind::TopLevelCode, Parent),
       Body(Body) {}
 
   BraceStmt *getBody() const { return Body; }
@@ -2276,8 +2247,12 @@ public:
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
 
-  /// Compute the overload signature for this declaration.
+  /// Compute the untyped overload signature for this declaration.
   OverloadSignature getOverloadSignature() const;
+
+  /// Retrieve the type used to describe this entity for the purposes of
+  /// overload resolution.
+  CanType getOverloadSignatureType() const;
 
   /// Returns true if the decl requires Objective-C interop.
   ///
@@ -2397,7 +2372,7 @@ public:
 
 /// A type declaration that can have generic parameters attached to it.  Because
 /// it has these generic parameters, it is always a DeclContext.
-class GenericTypeDecl : public TypeDecl, public GenericContext {
+class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
@@ -4272,14 +4247,6 @@ public:
   /// only valid on a declaration with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
-  /// Return true if this storage can (but doesn't have to) be accessed with
-  /// Objective-C-compatible getters and setters.
-  bool hasForeignGetterAndSetter() const;
-
-  /// Return true if this storage *must* be accessed with Objective-C-compatible
-  /// getters and setters.
-  bool requiresForeignGetterAndSetter() const;
-
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
   ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
@@ -4734,7 +4701,7 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl, public GenericContext {
+class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
@@ -4743,8 +4710,8 @@ public:
   SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
-      GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);
@@ -4826,7 +4793,7 @@ public:
 };
 
 /// \brief Base class for function-like declarations.
-class AbstractFunctionDecl : public ValueDecl, public GenericContext {
+class AbstractFunctionDecl : public GenericContext, public ValueDecl {
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -4886,8 +4853,8 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
-      : ValueDecl(Kind, Parent, Name, NameLoc),
-        GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+        ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);

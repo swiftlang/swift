@@ -33,17 +33,29 @@ template <typename Runtime> struct TargetEnumMetadata;
 using EnumMetadata = TargetEnumMetadata<InProcess>;
 struct TypeLayout;
 
-/// \brief Initialize the value witness table for a generic, single-payload
-///        enum instance.
+/// \brief Initialize the type metadata for a single-case enum type.
 ///
-/// \param vwtable - pointer to the instantiated but uninitialized value
-///                  witness table for the enum.
+/// \param enumType - pointer to the instantiated but uninitialized metadata
+///                   for the enum.
+/// \param flags - flags controlling the layout
+/// \param payload - type metadata for the payload of the enum.
+SWIFT_RUNTIME_EXPORT
+void swift_initEnumMetadataSingleCase(EnumMetadata *enumType,
+                                      EnumLayoutFlags flags,
+                                      const TypeLayout *payload);
+
+/// \brief Initialize the type metadata for a single-payload enum type.
+///
+/// \param enumType - pointer to the instantiated but uninitialized metadata
+///                   for the enum.
+/// \param flags - flags controlling the layout
 /// \param payload - type metadata for the payload case of the enum.
 /// \param emptyCases - the number of empty cases in the enum.
 SWIFT_RUNTIME_EXPORT
-void swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
-                                                  const TypeLayout *payload,
-                                                  unsigned emptyCases);
+void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
+                                         EnumLayoutFlags flags,
+                                         const TypeLayout *payload,
+                                         unsigned emptyCases);
 
 /// \brief Faster variant of the above which avoids digging into the enum type
 /// metadata when the caller already has the payload information handy.
@@ -81,11 +93,11 @@ void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                      unsigned emptyCases)
   SWIFT_CC(RegisterPreservingCC);
 
-/// \brief Initialize the value witness table for a generic, multi-payload
+/// \brief Initialize the type metadata for a generic, multi-payload
 ///        enum instance.
 SWIFT_RUNTIME_EXPORT
-void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
-                                        EnumMetadata *enumType,
+void swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
+                                        EnumLayoutFlags flags,
                                         unsigned numPayloads,
                                         const TypeLayout * const *payloadTypes);
 

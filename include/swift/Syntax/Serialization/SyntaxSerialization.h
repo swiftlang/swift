@@ -69,6 +69,7 @@ struct ObjectTraits<syntax::TriviaPiece> {
       case syntax::TriviaKind::Formfeed:
       case syntax::TriviaKind::Newline:
       case syntax::TriviaKind::CarriageReturn:
+      case syntax::TriviaKind::CarriageReturnLineFeed:
       case syntax::TriviaKind::Backtick:
         out.mapRequired("value", value.Count);
         break;
@@ -95,6 +96,7 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
     out.enumCase(value, "Formfeed", syntax::TriviaKind::Formfeed);
     out.enumCase(value, "Newline", syntax::TriviaKind::Newline);
     out.enumCase(value, "CarriageReturn", syntax::TriviaKind::CarriageReturn);
+    out.enumCase(value, "CarriageReturnLineFeed", syntax::TriviaKind::CarriageReturnLineFeed);
     out.enumCase(value, "LineComment", syntax::TriviaKind::LineComment);
     out.enumCase(value, "BlockComment", syntax::TriviaKind::BlockComment);
     out.enumCase(value, "DocLineComment", syntax::TriviaKind::DocLineComment);
@@ -140,6 +142,7 @@ struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
     switch (value.Kind) {
+      case tok::contextual_keyword:
       case tok::integer_literal:
       case tok::floating_literal:
       case tok::string_literal:
@@ -152,6 +155,7 @@ struct ObjectTraits<TokenDescription> {
       case tok::oper_prefix:
       case tok::dollarident:
       case tok::comment:
+      case tok::string_segment:
         out.mapRequired("text", value.Text);
         break;
       default:

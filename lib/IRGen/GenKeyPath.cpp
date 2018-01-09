@@ -903,11 +903,11 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         } else {
           idKind = KeyPathComponentHeader::VTableOffset;
           auto dc = declRef.getDecl()->getDeclContext();
-          if (isa<ClassDecl>(dc)) {
-            auto overridden = getSILTypes().getOverriddenVTableEntry(declRef);
+          if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
+            auto overridden = declRef.getOverriddenVTableEntry();
             auto declaringClass =
               cast<ClassDecl>(overridden.getDecl()->getDeclContext());
-            auto &metadataLayout = getMetadataLayout(declaringClass);
+            auto &metadataLayout = getClassMetadataLayout(declaringClass);
             // FIXME: Resilience. We don't want vtable layout to be ABI, so this
             // should be encoded as a reference to the method dispatch thunk
             // instead.

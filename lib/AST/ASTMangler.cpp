@@ -388,7 +388,12 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
     bindGenericParameters(DC);
   DeclCtx = DC;
 
-  appendType(Ty);
+  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
+    appendFunction(fnType, false);
+  } else {
+    appendType(Ty);
+  }
+
   appendOperator("D");
   return finalize();
 }
@@ -729,9 +734,8 @@ void ASTMangler::appendType(Type type) {
       return appendSugaredType<ParenType>(type);
     case TypeKind::ArraySlice: /* fallthrough */
     case TypeKind::Optional:
-      return appendSugaredType<SyntaxSugarType>(type);
     case TypeKind::Dictionary:
-      return appendSugaredType<DictionaryType>(type);
+      return appendSugaredType<SyntaxSugarType>(type);
 
     case TypeKind::ImplicitlyUnwrappedOptional: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
@@ -1446,6 +1450,32 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   addSubstitution(key.getPointer());
 }
 
+void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
+  // Append parameter labels right before the signature/type.
+  auto parameters = fn->getParams();
+  auto firstLabel = std::find_if(
+                  parameters.begin(), parameters.end(),
+                  [&](AnyFunctionType::Param param) { return param.hasLabel(); });
+
+  if (firstLabel != parameters.end()) {
+    for (auto param : parameters) {
+      auto label = param.getLabel();
+      if (!label.empty())
+        appendIdentifier(label.str());
+      else
+        appendOperator("_");
+    }
+  } else if (parameters.size() > 0) {
+    appendOperator("y");
+  }
+
+  if (isFunctionMangling) {
+    appendFunctionSignature(fn);
+  } else {
+    appendFunctionType(fn);
+  }
+}
+
 void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
@@ -1500,7 +1530,7 @@ void ASTMangler::appendFunctionInputType(
     // it as a single type dropping sugar.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendTypeListElement(param.getLabel(), type, param.getParameterFlags());
+      appendTypeListElement(Identifier(), type, param.getParameterFlags());
       break;
     }
 
@@ -1512,7 +1542,7 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(param.getLabel(), param.getType(),
+      appendTypeListElement(Identifier(), param.getType(),
                             param.getParameterFlags());
       appendListSeparator(isFirstParam);
     }
@@ -1849,11 +1879,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    if (isFunctionMangling) {
-      appendFunctionSignature(FuncTy);
-    } else {
-      appendFunctionType(FuncTy);
-    }
+    appendFunction(FuncTy, isFunctionMangling);
   } else {
     appendType(type);
   }

@@ -30,9 +30,6 @@ using namespace swift;
 /// Get the method dispatch mechanism for a method.
 MethodDispatch
 swift::getMethodDispatch(AbstractFunctionDecl *method) {
-  // Final methods can be statically referenced.
-  if (method->isFinal())
-    return MethodDispatch::Static;
   // Some methods are forced to be statically dispatched.
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
@@ -41,22 +38,22 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   if (method->isImportAsMember())
     return MethodDispatch::Static;
 
-  // If this declaration is in a class but not marked final, then it is
-  // always dynamically dispatched.
   auto dc = method->getDeclContext();
-  if (isa<ClassDecl>(dc))
-    return MethodDispatch::Class;
 
-  // Class extension methods are only dynamically dispatched if they're
-  // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
   if (dc->getAsClassOrClassExtensionContext()) {
-    if (method->hasClangNode())
-      return MethodDispatch::Class;
-    if (auto fd = dyn_cast<FuncDecl>(method)) {
-      if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
-        return MethodDispatch::Class;
-    }
     if (method->isDynamic())
+      return MethodDispatch::Class;
+
+    // Final methods can be statically referenced.
+    if (method->isFinal())
+      return MethodDispatch::Static;
+
+    // Members defined directly inside a class are dynamically dispatched.
+    if (isa<ClassDecl>(dc))
+      return MethodDispatch::Class;
+
+    // Imported class methods are dynamically dispatched.
+    if (method->isObjC() && method->hasClangNode())
       return MethodDispatch::Class;
   }
 
@@ -79,151 +76,30 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
   return false;
 }
 
-/// FIXME: merge requiresForeignEntryPoint() into getMethodDispatch() and add
-/// an ObjectiveC case to the MethodDispatch enum.
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
+  assert(!isa<AbstractStorageDecl>(vd));
+
+  if (vd->isDynamic())
+    return true;
+
+  if (vd->isObjC() && isa<ProtocolDecl>(vd->getDeclContext()))
+    return true;
+
   if (vd->isImportAsMember())
     return true;
 
-  // Final functions never require ObjC dispatch.
-  if (vd->isFinal())
-    return false;
-
-  if (requiresForeignToNativeThunk(vd))
+  if (vd->hasClangNode())
     return true;
 
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-  
     // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter())
-      return requiresForeignEntryPoint(fd->getAccessorStorageDecl());
-
-    return fd->isDynamic();
-  }
-
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    if (cd->hasClangNode())
-      return true;
-
-    return cd->isDynamic();
-  }
-
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresForeignGetterAndSetter();
-
-  return vd->isDynamic();
-}
-
-/// TODO: We should consult the cached LoweredLocalCaptures the SIL
-/// TypeConverter calculates, but that would require plumbing SILModule&
-/// through every SILDeclRef constructor. Since this is only used to determine
-/// "natural uncurry level", and "uncurry level" is a concept we'd like to
-/// phase out, it's not worth it.
-static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
-                                    llvm::DenseSet<AnyFunctionRef> &visited) {
-  if (!AFR.getCaptureInfo().hasLocalCaptures())
-    return false;
-  
-  // Scan for local, non-function captures.
-  bool functionCapturesToRecursivelyCheck = false;
-  auto addFunctionCapture = [&](AnyFunctionRef capture) {
-    if (visited.find(capture) == visited.end())
-      functionCapturesToRecursivelyCheck = true;
-  };
-  for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
-    if (!capture.getDecl()->getDeclContext()->isLocalContext())
-      continue;
-    // We transitively capture a local function's captures.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
-      addFunctionCapture(func);
-      continue;
-    }
-    // We may either directly capture properties, or capture through their
-    // accessors.
-    if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
-      switch (var->getStorageKind()) {
-      case VarDecl::StoredWithTrivialAccessors:
-        llvm_unreachable("stored local variable with trivial accessors?");
-
-      case VarDecl::InheritedWithObservers:
-        llvm_unreachable("inherited local variable?");
-
-      case VarDecl::StoredWithObservers:
-      case VarDecl::Addressed:
-      case VarDecl::AddressedWithTrivialAccessors:
-      case VarDecl::AddressedWithObservers:
-      case VarDecl::ComputedWithMutableAddress:
-        // Directly capture storage if we're supposed to.
-        if (capture.isDirect())
-          return true;
-
-        // Otherwise, transitively capture the accessors.
-        LLVM_FALLTHROUGH;
-
-      case VarDecl::Computed:
-        addFunctionCapture(var->getGetter());
-        if (auto setter = var->getSetter())
-          addFunctionCapture(setter);
-        continue;
-      
-      case VarDecl::Stored:
+    if (fd->isGetterOrSetter()) {
+      auto *asd = fd->getAccessorStorageDecl();
+      if (asd->isObjC() && asd->hasClangNode())
         return true;
-      }
-    }
-    // Anything else is directly captured.
-    return true;
-  }
-  
-  // Recursively consider function captures, since we didn't have any direct
-  // captures.
-  auto captureHasLocalCaptures = [&](AnyFunctionRef capture) -> bool {
-    if (visited.insert(capture).second)
-      return hasLoweredLocalCaptures(capture, visited);
-    return false;
-  };
-  
-  if (functionCapturesToRecursivelyCheck) {
-    for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
-      if (!capture.getDecl()->getDeclContext()->isLocalContext())
-        continue;
-      if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
-        if (captureHasLocalCaptures(func))
-          return true;
-        continue;
-      }
-      if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
-        switch (var->getStorageKind()) {
-        case VarDecl::StoredWithTrivialAccessors:
-          llvm_unreachable("stored local variable with trivial accessors?");
-          
-        case VarDecl::InheritedWithObservers:
-          llvm_unreachable("inherited local variable?");
-          
-        case VarDecl::StoredWithObservers:
-        case VarDecl::Addressed:
-        case VarDecl::AddressedWithTrivialAccessors:
-        case VarDecl::AddressedWithObservers:
-        case VarDecl::ComputedWithMutableAddress:
-          assert(!capture.isDirect() && "should have short circuited out");
-          // Otherwise, transitively capture the accessors.
-          LLVM_FALLTHROUGH;
-          
-        case VarDecl::Computed:
-          if (captureHasLocalCaptures(var->getGetter()))
-            return true;
-          if (auto setter = var->getSetter())
-            if (captureHasLocalCaptures(setter))
-              return true;
-          continue;
-        
-        case VarDecl::Stored:
-          llvm_unreachable("should have short circuited out");
-        }
-      }
-      llvm_unreachable("should have short circuited out");
     }
   }
-  
+
   return false;
 }
 
@@ -842,6 +718,18 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
+  SILDeclRef cur = *this, next = *this;
+  do {
+    cur = next;
+    if (cur.requiresNewVTableEntry())
+      return cur;
+    next = cur.getNextOverriddenVTableEntry();
+  } while (next);
+
+  return cur;
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {

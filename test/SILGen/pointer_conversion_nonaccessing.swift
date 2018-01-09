@@ -7,58 +7,58 @@
 
 var global = 0
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing6testEqSbSV3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing6testEq3ptrSbSV_tF
 func testEq(ptr: UnsafeRawPointer) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global == ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing7testNeqSbSV3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing7testNeq3ptrSbSV_tF
 func testNeq(ptr: UnsafeRawPointer) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global != ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing6testEqSbSv3ptr_tF 
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing6testEq3ptrSbSv_tF
 func testEq(ptr: UnsafeMutableRawPointer) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global == ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing7testNeqSbSv3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing7testNeq3ptrSbSv_tF
 func testNeq(ptr: UnsafeMutableRawPointer) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global != ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing6testEqSbSPySiG3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing6testEq3ptrSbSPySiG_tF
 func testEq(ptr: UnsafePointer<Int>) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global == ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing7testNeqSbSPySiG3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing7testNeq3ptrSbSPySiG_tF
 func testNeq(ptr: UnsafePointer<Int>) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global != ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing6testEqSbSpySiG3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing6testEq3ptrSbSpySiG_tF
 func testEq(ptr: UnsafeMutablePointer<Int>) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global == ptr
 }
 
-// CHECK-LABEL: sil hidden @_T031pointer_conversion_nonaccessing7testNeqSbSpySiG3ptr_tF
+// CHECK-LABEL: sil hidden @$S31pointer_conversion_nonaccessing7testNeq3ptrSbSpySiG_tF
 func testNeq(ptr: UnsafeMutablePointer<Int>) -> Bool {
-  // CHECK: [[T0:%.*]] = global_addr @_T031pointer_conversion_nonaccessing6globalSiv
+  // CHECK: [[T0:%.*]] = global_addr @$S31pointer_conversion_nonaccessing6globalSiv
   // CHECK: address_to_pointer [[T0]]
   return &global != ptr
 }

@@ -259,14 +259,6 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
-                             RecursiveTypeProperties::BitWidth,
-    /// Kind - The discriminator that indicates what subclass of type this is.
-    Kind : bitmax(NumTypeKindBits,8),
-
-    Properties : RecursiveTypeProperties::BitWidth
-  );
-
   /// Returns true if the given type is a sugared type.
   ///
   /// Only intended for use in compile-time assertions.
@@ -277,24 +269,40 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
+  enum { NumAFTExtInfoBits = 7 };
+  enum { NumSILExtInfoBits = 6 };
+  union { uint64_t OpaqueBits;
+
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
+                             RecursiveTypeProperties::BitWidth,
+    /// Kind - The discriminator that indicates what subclass of type this is.
+    Kind : bitmax(NumTypeKindBits,8),
+
+    Properties : RecursiveTypeProperties::BitWidth
+  );
+
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
     /// Whether there is an original type.
     HasOriginalType : 1
   );
 
+  SWIFT_INLINE_BITFIELD(SugarType, TypeBase, 1,
+    HasCachedType : 1
+  );
+
   enum { NumFlagBits = 5 };
-  SWIFT_INLINE_BITFIELD(ParenType, TypeBase, NumFlagBits,
+  SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
   );
 
-  enum { NumAFTExtInfoBits = 7 };
-  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+10,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfo : NumAFTExtInfoBits,
 
-    NumParams : 10
+    : NumPadBits,
+    NumParams : 16
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
@@ -317,7 +325,6 @@ protected:
     GraphIndex : 29
   );
 
-  enum { NumSILExtInfoBits = 6 };
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
     ExtInfo : NumSILExtInfoBits,
     CalleeConvention : 3,
@@ -366,20 +373,6 @@ protected:
     GenericArgCount : 32
   );
 
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(TypeBase);
-    SWIFT_INLINE_BITS(ErrorType);
-    SWIFT_INLINE_BITS(ParenType);
-    SWIFT_INLINE_BITS(AnyFunctionType);
-    SWIFT_INLINE_BITS(TypeVariableType);
-    SWIFT_INLINE_BITS(ArchetypeType);
-    SWIFT_INLINE_BITS(SILFunctionType);
-    SWIFT_INLINE_BITS(SILBoxType);
-    SWIFT_INLINE_BITS(AnyMetatypeType);
-    SWIFT_INLINE_BITS(ProtocolCompositionType);
-    SWIFT_INLINE_BITS(TupleType);
-    SWIFT_INLINE_BITS(BoundGenericType);
   } Bits;
 
 protected:
@@ -411,7 +404,7 @@ public:
   bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
 
 private:
-  void computeCanonicalType();
+  CanType computeCanonicalType();
 
 public:
   /// getCanonicalType - Return the canonical version of this type, which has
@@ -419,9 +412,9 @@ public:
   CanType getCanonicalType() {
     if (isCanonical())
       return CanType(this);
-    if (!hasCanonicalTypeComputed())
-      computeCanonicalType();
-    return CanType(CanonicalType.get<TypeBase*>());
+    if (hasCanonicalTypeComputed())
+      return CanType(CanonicalType.get<TypeBase*>());
+    return computeCanonicalType();
   }
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
@@ -457,7 +450,9 @@ public:
   template <typename T>
   T *getAs() {
     static_assert(!isSugaredType<T>(), "getAs desugars types");
-    return dyn_cast<T>(getDesugaredType());
+    auto Ty = getDesugaredType();
+    SWIFT_ASSUME(Ty != nullptr);
+    return dyn_cast<T>(Ty);
   }
 
   template <typename T>
@@ -490,6 +485,9 @@ public:
   
   /// Is this the 'Any' type?
   bool isAny();
+
+  /// Does the type have outer parenthesis?
+  bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
@@ -1033,11 +1031,81 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
+/// AnyGenericType - This abstract class helps types ensure that fields
+/// exist at the same offset in memory to improve code generation of the
+/// compiler itself.
+class AnyGenericType : public TypeBase {
+  friend class NominalOrBoundGenericNominalType;
+
+  /// TheDecl - This is the TypeDecl which declares the given type. It
+  /// specifies the name and other useful information about this type.
+  union {
+    GenericTypeDecl *GenDecl;
+    NominalTypeDecl *NomDecl;
+  };
+
+  /// \brief The type of the parent, in which this type is nested.
+  Type Parent;
+
+  template <typename... Args>
+  AnyGenericType(NominalTypeDecl *TheDecl, Type Parent, Args &&...args)
+    : TypeBase(std::forward<Args>(args)...), NomDecl(TheDecl), Parent(Parent) {}
+
+protected:
+  template <typename... Args>
+  AnyGenericType(GenericTypeDecl *TheDecl, Type Parent, Args &&...args)
+    : TypeBase(std::forward<Args>(args)...), GenDecl(TheDecl), Parent(Parent) {}
+
+public:
+
+  /// \brief Returns the declaration that declares this type.
+  GenericTypeDecl *getDecl() const { return GenDecl; }
+
+  /// \brief Returns the type of the parent of this type. This will
+  /// be null for top-level types or local types, and for non-generic types
+  /// will simply be the same as the declared type of the declaration context
+  /// of TheDecl. For types nested within generic types, however, this will
+  /// involve \c BoundGenericType nodes that provide context for the nested
+  /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
+  /// represented as a NominalType with Dictionary<String, Int> as its parent
+  /// type.
+  Type getParent() const { return Parent; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyGenericType &&
+           T->getKind() <= TypeKind::Last_AnyGenericType;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(AnyGenericType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+END_CAN_TYPE_WRAPPER(AnyGenericType, Type)
+
+/// NominalOrBoundGenericNominal - This abstract class helps types ensure that
+/// fields exist at the same offset in memory to improve code generation of the
+/// compiler itself.
+class NominalOrBoundGenericNominalType : public AnyGenericType {
+public:
+  template <typename... Args>
+  NominalOrBoundGenericNominalType(Args &&...args)
+    : AnyGenericType(std::forward<Args>(args)...) {}
+
+  /// \brief Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const { return NomDecl; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_NominalOrBoundGenericNominalType &&
+           T->getKind() <= TypeKind::Last_NominalOrBoundGenericNominalType;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
+
 /// ErrorType - This represents a type that was erroneously constructed.  This
 /// is produced when parsing types and when name binding type aliases, and is
 /// installed in declaration that use these erroneous types.  All uses of a
 /// declaration of invalid type should be ignored and not re-diagnosed.
-class ErrorType : public TypeBase {
+class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType,
@@ -1397,13 +1465,62 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
   
+/// An abstract type for all sugared types to make getDesugaredType() fast by
+/// sharing field offsets and logic for the fast path.
+class SugarType : public TypeBase {
+  // The state of this union is known via Bits.SugarType.HasCachedType so that
+  // we can avoid masking the pointer on the fast path.
+  union {
+    TypeBase *UnderlyingType;
+    const ASTContext *Context;
+  };
+
+protected:
+  // Sugar types are never canonical.
+  SugarType(TypeKind K, const ASTContext *ctx,
+            RecursiveTypeProperties properties)
+      : TypeBase(K, nullptr, properties), Context(ctx) {
+    Bits.SugarType.HasCachedType = false;
+  }
+
+  // Sugar types are never canonical.
+  SugarType(TypeKind K, Type type, RecursiveTypeProperties properties)
+      : TypeBase(K, nullptr, properties), UnderlyingType(type.getPointer()) {
+    Bits.SugarType.HasCachedType = true;
+  }
+
+  void setUnderlyingType(Type type) {
+    assert(!Bits.SugarType.HasCachedType && "Cached type already set");
+    Bits.SugarType.HasCachedType = true;
+    UnderlyingType = type.getPointer();
+  }
+
+public:
+  /// Remove one level of top-level sugar from this type.
+  Type getSinglyDesugaredTypeSlow();
+  TypeBase *getSinglyDesugaredType() const {
+    if (LLVM_LIKELY(Bits.SugarType.HasCachedType))
+      return UnderlyingType;
+    auto Ty = const_cast<SugarType*>(this);
+    return Ty->getSinglyDesugaredTypeSlow().getPointer();
+  }
+
+  static bool classof(const TypeBase *T) {
+    if (TypeKind::Last_Type == TypeKind::Last_SugarType)
+      return T->getKind() >= TypeKind::First_SugarType;
+    return T->getKind() >= TypeKind::First_SugarType &&
+           T->getKind() <= TypeKind::Last_SugarType;
+  }
+};
+
 /// NameAliasType - An alias type is a name for another type, just like a
 /// typedef in C.
-class NameAliasType : public TypeBase {
+class NameAliasType : public SugarType {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) 
-    : TypeBase(TypeKind::NameAlias, nullptr, RecursiveTypeProperties()),
+    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
+                RecursiveTypeProperties()),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
@@ -1412,9 +1529,6 @@ public:
 
   using TypeBase::setRecursiveProperties;
    
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
@@ -1497,22 +1611,17 @@ public:
 };
 
 /// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public TypeBase {
-  Type UnderlyingType;
-
+class ParenType : public SugarType {
   friend class ASTContext;
   
   ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
             ParameterTypeFlags flags);
 
 public:
-  Type getUnderlyingType() const { return UnderlyingType; }
+  Type getUnderlyingType() const { return getSinglyDesugaredType(); }
 
   static ParenType *get(const ASTContext &C, Type underlying,
                         ParameterTypeFlags flags = {});
-
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
 
   /// Get the parameter flags
   ParameterTypeFlags getParameterFlags() const {
@@ -1644,6 +1753,16 @@ public:
     return static_cast<bool>(Bits.TupleType.HasInOutElement);
   }
   
+  /// Returns true if this tuple has parenthesis semantics.
+  bool hasParenSema(bool allowName = false) const {
+    auto Fields = getElements();
+    if (Fields.size() != 1 || Fields[0].isVararg())
+     return false;
+    if (allowName)
+      return true;
+    return !Fields[0].hasName();
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Tuple;
@@ -1677,36 +1796,18 @@ END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic type where the type arguments have
 /// not yet been resolved.
-class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  GenericTypeDecl *TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
-
+class UnboundGenericType : public AnyGenericType,
+    public llvm::FoldingSetNode {
 private:
   UnboundGenericType(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C,
                      RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::UnboundGeneric,
-               (!Parent || Parent->isCanonical())? &C : nullptr,
-               properties | RecursiveTypeProperties::HasUnboundGeneric),
-      TheDecl(TheDecl), Parent(Parent) { }
+    : AnyGenericType(TheDecl, Parent, TypeKind::UnboundGeneric,
+                     (!Parent || Parent->isCanonical()) ? &C : nullptr,
+                     properties | RecursiveTypeProperties::HasUnboundGeneric) {}
 
 public:
   static UnboundGenericType* get(GenericTypeDecl *TheDecl, Type Parent,
                                  const ASTContext &C);
-
-  /// \brief Returns the declaration that declares this type.
-  GenericTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the bound type Dictionary<String, Int>.Inner would be
-  /// represented as an UnboundGenericType with Dictionary<String, Int> as its
-  /// parent type.
-  Type getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
@@ -1719,20 +1820,15 @@ public:
     return T->getKind() == TypeKind::UnboundGeneric;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
-END_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnboundGenericType, AnyGenericType)
 
 inline CanType getAsCanType(const Type &type) { return CanType(type); }
 typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
 
 /// BoundGenericType - An abstract class for applying a generic type to the
 /// given type arguments.
-class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  NominalTypeDecl *TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
+class BoundGenericType : public NominalOrBoundGenericNominalType,
+    public llvm::FoldingSetNode {
   
   /// Retrieve the intrusive pointer storage from the subtype
   const Type *getTrailingObjectsPointer() const;
@@ -1750,26 +1846,13 @@ public:
   static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
                                ArrayRef<Type> GenericArgs);
 
-  /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the bound type Dictionary<String, Int>.Inner<Int> would be
-  /// represented as a BoundGenericType with Dictionary<String, Int> as its
-  /// parent type.
-  Type getParent() const { return Parent; }
-
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const {
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, getGenericArgs());
+    Profile(ID, getDecl(), getParent(), getGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -1780,12 +1863,11 @@ public:
            T->getKind() <= TypeKind::Last_BoundGenericType;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
   CanTypeArrayRef getGenericArgs() const {
     return CanTypeArrayRef(getPointer()->getGenericArgs());
   }
-END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
+END_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
 
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
@@ -1893,36 +1975,16 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericType)
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
 /// different names. Nominal types are always canonical.
-class NominalType : public TypeBase {
-  /// TheDecl - This is the TypeDecl which declares the given type. It
-  /// specifies the name and other useful information about this type.
-  NominalTypeDecl * const TheDecl;
-
-  /// \brief The type of the parent, in which this type is nested.
-  Type Parent;
+class NominalType : public NominalOrBoundGenericNominalType {
 
 protected:
   NominalType(TypeKind K, const ASTContext *C, NominalTypeDecl *TheDecl,
               Type Parent, RecursiveTypeProperties properties)
-    : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
-               properties),
-      TheDecl(TheDecl), Parent(Parent) { }
+    : NominalOrBoundGenericNominalType(TheDecl, Parent, K,
+               (!Parent || Parent->isCanonical())? C : nullptr, properties) {}
 
 public:
   static NominalType *get(NominalTypeDecl *D, Type Parent, const ASTContext &C);
-
-  /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
-
-  /// \brief Returns the type of the parent of this type. This will
-  /// be null for top-level types or local types, and for non-generic types
-  /// will simply be the same as the declared type of the declaration context
-  /// of TheDecl. For types nested within generic types, however, this will
-  /// involve \c BoundGenericType nodes that provide context for the nested
-  /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
-  /// represented as a NominalType with Dictionary<String, Int> as its parent
-  /// type.
-  Type getParent() const { return Parent; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1930,9 +1992,7 @@ public:
            T->getKind() <= TypeKind::Last_NominalType;
   }
 };
-BEGIN_CAN_TYPE_WRAPPER(NominalType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
-END_CAN_TYPE_WRAPPER(NominalType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
 class EnumType : public NominalType, public llvm::FoldingSetNode {
@@ -3928,40 +3988,59 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
 
-/// A type with a special syntax that is always sugar for a library type.
+/// A type with a special syntax that is always sugar for a library type. The
+/// library type may have multiple base types. For unary syntax sugar, see
+/// UnarySyntaxSugarType.
 ///
-/// The prime examples are arrays ([T] -> Array<T>) and
-/// optionals (T? -> Optional<T>).
-class SyntaxSugarType : public TypeBase {
-  Type Base;
-  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
-
+/// The prime examples are:
+/// Arrays: [T] -> Array<T>
+/// Optionals: T? -> Optional<T>
+/// Dictionaries: [K : V]  -> Dictionary<K, V>
+class SyntaxSugarType : public SugarType {
 protected:
   // Syntax sugar types are never canonical.
-  SyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
+  SyntaxSugarType(TypeKind K, const ASTContext &ctx,
                   RecursiveTypeProperties properties)
-    : TypeBase(K, nullptr, properties), Base(base), ImplOrContext(&ctx) {}
+    : SugarType(K, &ctx, properties) {}
 
 public:
-  Type getBaseType() const {
-    return Base;
-  }
-
-  TypeBase *getSinglyDesugaredType();
-
-  Type getImplementationType();
+  Type getImplementationType() const { return getSinglyDesugaredType(); }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SyntaxSugarType &&
            T->getKind() <= TypeKind::Last_SyntaxSugarType;
   }
 };
+
+/// A type with a special syntax that is always sugar for a library type that
+/// wraps a single other type.
+///
+/// The prime examples are arrays ([T] -> Array<T>) and
+/// optionals (T? -> Optional<T>).
+class UnarySyntaxSugarType : public SyntaxSugarType {
+  Type Base;
+
+protected:
+  UnarySyntaxSugarType(TypeKind K, const ASTContext &ctx, Type base,
+                       RecursiveTypeProperties properties)
+    : SyntaxSugarType(K, ctx, properties), Base(base) {}
+
+public:
+  Type getBaseType() const {
+    return Base;
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_UnarySyntaxSugarType &&
+           T->getKind() <= TypeKind::Last_UnarySyntaxSugarType;
+  }
+};
   
 /// The type [T], which is always sugar for a library type.
-class ArraySliceType : public SyntaxSugarType {
+class ArraySliceType : public UnarySyntaxSugarType {
   ArraySliceType(const ASTContext &ctx, Type base,
                  RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::ArraySlice, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::ArraySlice, ctx, base, properties) {}
 
 public:
   /// Return a uniqued array slice type with the specified base type.
@@ -3973,10 +4052,10 @@ public:
 };
 
 /// The type T?, which is always sugar for a library type.
-class OptionalType : public SyntaxSugarType {
+class OptionalType : public UnarySyntaxSugarType {
   OptionalType(const ASTContext &ctx,Type base,
                RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::Optional, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::Optional, ctx, base, properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
@@ -3999,10 +4078,11 @@ public:
 };
 
 /// The type T!, which is always sugar for a library type.
-class ImplicitlyUnwrappedOptionalType : public SyntaxSugarType {
+class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
   ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base, properties) {}
+    : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
+                           properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
@@ -4020,17 +4100,16 @@ public:
 /// \code
 /// var dict: [String : Int] = ["hello" : 0, "world" : 1]
 /// \endcode
-class DictionaryType : public TypeBase {
+class DictionaryType : public SyntaxSugarType {
   Type Key;
   Type Value;
-  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
 
 protected:
   // Syntax sugar types are never canonical.
   DictionaryType(const ASTContext &ctx, Type key, Type value,
                  RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Dictionary, nullptr, properties), 
-      Key(key), Value(value), ImplOrContext(&ctx) {}
+    : SyntaxSugarType(TypeKind::Dictionary, ctx, properties), 
+      Key(key), Value(value) {}
 
 public:
   /// Return a uniqued dictionary type with the specified key and value types.
@@ -4038,10 +4117,6 @@ public:
 
   Type getKeyType() const { return Key; }
   Type getValueType() const { return Value; }
-
-  TypeBase *getSinglyDesugaredType();
-
-  Type getImplementationType();
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Dictionary;
@@ -4962,12 +5037,8 @@ inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
 }
 
 inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
-  if (auto nomTy = dyn_cast<NominalType>(*this))
-    return nomTy->getDecl();
-
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return boundTy->getDecl();
-  
+  if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
+    return Ty->getDecl();
   return nullptr;
 }
 
@@ -4976,13 +5047,7 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
-  if (auto classType = getAs<NominalType>()) {
-    return classType->getParent();
-  } else if (auto unboundType = getAs<UnboundGenericType>()) {
-    return unboundType->getParent();
-  } else {
-    return castTo<BoundGenericType>()->getParent();
-  }
+  return castTo<AnyGenericType>()->getParent();
 }
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
@@ -5051,11 +5116,7 @@ inline CanType CanType::getWithoutSpecifierTypeImpl(CanType type) {
 }
 
 inline CanType CanType::getNominalParent() const {
-  if (auto classType = dyn_cast<NominalType>(*this)) {
-    return classType.getParent();
-  } else {
-    return cast<BoundGenericType>(*this).getParent();
-  }
+  return cast<NominalOrBoundGenericNominalType>(*this).getParent();
 }
   
 inline Type TupleTypeElt::getVarargBaseTy() const {
@@ -5104,6 +5165,17 @@ inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
     return ty->getTrailingObjects<Type>();
   llvm_unreachable("Unhandled BoundGenericType!");
 }
+
+inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getParams();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
+}
   
 /// \brief If this is a method in a type or extension thereof, compute
 /// and return a parameter to be used for the 'self' argument.  The type of
@@ -5131,6 +5203,12 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
   : Depth(p->getDepth()), Index(p->getIndex()) { }
+
+inline TypeBase *TypeBase::getDesugaredType() {
+  if (!isa<SugarType>(this))
+    return this;
+  return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
+}
 
 } // end namespace swift
 

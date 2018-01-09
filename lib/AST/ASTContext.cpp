@@ -194,8 +194,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
-  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
+  /// func _combineHashValues(Int, Int) -> Int
+  FuncDecl *CombineHashValuesDecl = nullptr;
 
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
@@ -1048,9 +1048,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
-  if (Impl.MixForSynthesizedHashValueDecl)
-    return Impl.MixForSynthesizedHashValueDecl;
+FuncDecl *ASTContext::getCombineHashValuesDecl() const {
+  if (Impl.CombineHashValuesDecl)
+    return Impl.CombineHashValuesDecl;
 
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
@@ -1066,8 +1066,8 @@ FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
   };
 
   auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_mixForSynthesizedHashValue", resolver, callback);
-  Impl.MixForSynthesizedHashValueDecl = decl;
+      *this, "_combineHashValues", resolver, callback);
+  Impl.CombineHashValuesDecl = decl;
   return decl;
 }
 
@@ -3243,9 +3243,8 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    ArrayRef<Type> genericArgs,
                                    const ASTContext *context,
                                    RecursiveTypeProperties properties)
-  : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent)
-{
+    : NominalOrBoundGenericNominalType(theDecl, parent, theKind, context,
+                                       properties) {
   Bits.BoundGenericType.GenericArgCount = genericArgs.size();
   // Subtypes are required to provide storage for the generic arguments
   std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
@@ -3605,17 +3604,6 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
-ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
-  switch (getKind()) {
-  case TypeKind::Function:
-    return cast<FunctionType>(this)->getParams();
-  case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getParams();
-  default:
-    llvm_unreachable("Undefined function type");
-  }
-}
-
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
@@ -3953,6 +3941,13 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              && "interface type of result should not contain error types");
       assert(!getErrorResult().getType()->hasArchetype()
              && "interface type of result should not contain context archetypes");
+    }
+  }
+  for (auto result : getResults()) {
+    (void)result;
+    if (auto *FnType = result.getType()->getAs<SILFunctionType>()) {
+      assert(!FnType->isNoEscape() &&
+             "Cannot return an @noescape function type");
     }
   }
 #endif

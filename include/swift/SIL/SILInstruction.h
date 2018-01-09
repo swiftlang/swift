@@ -1061,22 +1061,17 @@ public:
   }
 };
 
-/// A template base class for instructions that take a single regular SILValue
-/// operand, a set of type dependent operands and has no result
-/// or a single value result. The operands are tail allocated after the
-/// instruction. Further trailing data can be allocated as well if
-/// TRAILING_TYPES are provided.
+/// A template base class for instructions that a variable number of SILValue
+/// operands, and has zero or one value results. The operands are tail allocated
+/// after the instruction. Further trailing data can be allocated as well if
+/// OtherTrailingTypes are provided.
 template<SILInstructionKind Kind,
          typename Derived,
          typename Base,
          typename... OtherTrailingTypes>
-class UnaryInstructionWithTypeDependentOperandsBase
+class InstructionBaseWithTrailingOperands
     : public InstructionBase<Kind, Base>,
       protected llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...> {
-
-  unsigned getNumOperandsStorage() const {
-    return SILInstruction::Bits.UIWTDOB.NumOperands;
-  }
 
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
@@ -1088,54 +1083,112 @@ protected:
 
 public:
   template <typename... Args>
-  UnaryInstructionWithTypeDependentOperandsBase(
-      SILDebugLocation debugLoc, SILValue operand,
-      ArrayRef<SILValue> typeDependentOperands,
-      Args &&...args)
-        : InstructionBase<Kind, Base>(debugLoc, std::forward<Args>(args)...) {
-    SILInstruction::Bits.UIWTDOB.NumOperands = 1 + typeDependentOperands.size();
+  InstructionBaseWithTrailingOperands(ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size();
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           operand, typeDependentOperands);
+                                           Operands);
+  }
+
+  template <typename... Args>
+  InstructionBaseWithTrailingOperands(SILValue Operand0,
+                                      ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size() + 1;
+    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                           Operand0, Operands);
+  }
+
+  template <typename... Args>
+  InstructionBaseWithTrailingOperands(SILValue Operand0,
+                                      SILValue Operand1,
+                                      ArrayRef<SILValue> Operands,
+                                      Args &&...args)
+        : InstructionBase<Kind, Base>(std::forward<Args>(args)...) {
+    SILInstruction::Bits.IBWTO.NumOperands = Operands.size() + 2;
+    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                           Operand0, Operand1, Operands);
   }
 
   // Destruct tail allocated objects.
-  ~UnaryInstructionWithTypeDependentOperandsBase() {
-    Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = getNumOperandsStorage(); i < end; ++i) {
+  ~InstructionBaseWithTrailingOperands() {
+    Operand *Operands = TrailingObjects::template getTrailingObjects<Operand>();
+    auto end = SILInstruction::Bits.IBWTO.NumOperands;
+    for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
     }
   }
 
-  size_t numTrailingObjects(
-    typename TrailingObjects::template OverloadToken<Operand>) const {
-    return getNumOperandsStorage();
+  size_t numTrailingObjects(typename TrailingObjects::template
+                            OverloadToken<Operand>) const {
+    return SILInstruction::Bits.IBWTO.NumOperands;
   }
-
-  unsigned getNumTypeDependentOperands() const {
-    return getNumOperandsStorage() - 1;
-  }
-
-  SILValue getOperand() const { return getAllOperands()[0].get(); }
-  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
-
-  Operand &getOperandRef() { return getAllOperands()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(getNumOperandsStorage())};
+            SILInstruction::Bits.IBWTO.NumOperands};
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(getNumOperandsStorage())};
+            SILInstruction::Bits.IBWTO.NumOperands};
+  }
+};
+
+/// A template base class for instructions that take a single regular SILValue
+/// operand, a set of type dependent operands and has no result
+/// or a single value result. The operands are tail allocated after the
+/// instruction. Further trailing data can be allocated as well if
+/// TRAILING_TYPES are provided.
+template<SILInstructionKind Kind,
+         typename Derived,
+         typename Base,
+         typename... OtherTrailingTypes>
+class UnaryInstructionWithTypeDependentOperandsBase
+    : public InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                                 OtherTrailingTypes...> {
+protected:
+  friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                             OtherTrailingTypes...>;
+
+  typedef InstructionBaseWithTrailingOperands<
+      Kind, Derived, Operand, OtherTrailingTypes...> TrailingObjects;
+
+public:
+  template <typename... Args>
+  UnaryInstructionWithTypeDependentOperandsBase(SILDebugLocation debugLoc,
+                                       SILValue operand,
+                                       ArrayRef<SILValue> typeDependentOperands,
+                                       Args &&...args)
+      : InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                            OtherTrailingTypes...>(
+                                              operand, typeDependentOperands,
+                                              debugLoc,
+                                              std::forward<Args>(args)...) {}
+
+  unsigned getNumTypeDependentOperands() const {
+    return this->getAllOperands().size() - 1;
+  }
+
+  SILValue getOperand() const {
+    return this->getAllOperands()[0].get();
+  }
+  void setOperand(SILValue V) {
+    this->getAllOperands()[0].set(V);
+  }
+
+  Operand &getOperandRef() {
+    return this->getAllOperands()[0];
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(1);
+    return this->getAllOperands().slice(1);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(1);
+    return this->getAllOperands().slice(1);
   }
 };
 
@@ -1282,6 +1335,9 @@ public:
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
+///
+/// The first NumTailTypes operands are counts for the tail allocated
+/// elements, the remaining operands are opened archetype operands.
 class AllocRefInstBase : public AllocationInst {
 protected:
 
@@ -1289,19 +1345,11 @@ protected:
                    SILDebugLocation DebugLoc,
                    SILType ObjectType,
                    bool objc, bool canBeOnStack,
-                   ArrayRef<SILType> ElementTypes,
-                   ArrayRef<SILValue> AllOperands);
+                   ArrayRef<SILType> ElementTypes);
 
-  /// The first NumTailTypes operands are counts for the tail allocated
-  /// elements, the remaining operands are opened archetype operands.
-  TailAllocatedOperandList<0> Operands;
-
-  SILType *getTypeStorage() {
-    return reinterpret_cast<SILType*>(Operands.asArray().end());
-  }
-
+  SILType *getTypeStorage();
   const SILType *getTypeStorage() const {
-    return reinterpret_cast<const SILType*>(Operands.asArray().end());
+    return const_cast<AllocRefInstBase*>(this)->getTypeStorage();
   }
 
   unsigned getNumTailTypes() const {
@@ -1333,13 +1381,8 @@ public:
     return getAllOperands().slice(0, getNumTailTypes());
   }
 
-  ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
-  }
+  ArrayRef<Operand> getAllOperands() const;
+  MutableArrayRef<Operand> getAllOperands();
   
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
   bool isObjC() const {
@@ -1353,8 +1396,11 @@ public:
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
 class AllocRefInst final
-    : public InstructionBase<SILInstructionKind::AllocRefInst,
-                             AllocRefInstBase> {
+    : public InstructionBaseWithTrailingOperands<
+                                               SILInstructionKind::AllocRefInst,
+                                               AllocRefInst,
+                                               AllocRefInstBase, SILType> {
+  friend AllocRefInstBase;
   friend SILBuilder;
 
   AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
@@ -1362,10 +1408,11 @@ class AllocRefInst final
                bool objc, bool canBeOnStack,
                ArrayRef<SILType> ElementTypes,
                ArrayRef<SILValue> AllOperands)
-      : InstructionBase(DebugLoc, ObjectType, objc,
-                        canBeOnStack, ElementTypes, AllOperands) {
-    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
-                  "subclass has extra storage");
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
+                        objc, canBeOnStack, ElementTypes) {
+    assert(AllOperands.size() >= ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
   }
 
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
@@ -1392,8 +1439,11 @@ public:
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
 class AllocRefDynamicInst final
-    : public InstructionBase<SILInstructionKind::AllocRefDynamicInst,
-                             AllocRefInstBase> {
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::AllocRefDynamicInst,
+                                        AllocRefDynamicInst,
+                                        AllocRefInstBase, SILType> {
+  friend AllocRefInstBase;
   friend SILBuilder;
 
   AllocRefDynamicInst(SILDebugLocation DebugLoc,
@@ -1401,9 +1451,11 @@ class AllocRefDynamicInst final
                       bool objc,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
-      : InstructionBase(DebugLoc, ty, objc, false, ElementTypes, AllOperands) {
-    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
-                  "subclass has extra storage");
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
+                                            false, ElementTypes) {
+    assert(AllOperands.size() >= ElementTypes.size() + 1);
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
   }
 
   static AllocRefDynamicInst *
@@ -1453,13 +1505,10 @@ public:
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
 class AllocBoxInst final
-    : public InstructionBase<SILInstructionKind::AllocBoxInst,
-                             AllocationInst>,
-      private llvm::TrailingObjects<AllocBoxInst, Operand, char> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                           SILInstructionKind::AllocBoxInst,
+                                           AllocBoxInst, AllocationInst, char> {
   friend SILBuilder;
-
-  unsigned NumOperands;
 
   TailAllocatedDebugVariable VarInfo;
 
@@ -1472,18 +1521,7 @@ class AllocBoxInst final
                               SILOpenedArchetypesState &OpenedArchetypes,
                               SILDebugVariable Var);
 
-  size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
 public:
-  ~AllocBoxInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-  
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
@@ -1502,14 +1540,6 @@ public:
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
-
   ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();
   }
@@ -1525,12 +1555,10 @@ public:
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
 class AllocExistentialBoxInst final
-    : public InstructionBase<SILInstructionKind::AllocExistentialBoxInst,
-                             AllocationInst>,
-      private llvm::TrailingObjects<AllocExistentialBoxInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                   SILInstructionKind::AllocExistentialBoxInst,
+                                   AllocExistentialBoxInst, AllocationInst> {
   friend SILBuilder;
-  unsigned NumOperands;
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
@@ -1538,7 +1566,10 @@ class AllocExistentialBoxInst final
                           CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           ArrayRef<SILValue> TypeDependentOperands,
-                          SILFunction *Parent);
+                          SILFunction *Parent)
+    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+                                          ExistentialType.getObjectType()),
+      ConcreteType(ConcreteType), Conformances(Conformances) {}
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
@@ -1546,27 +1577,12 @@ class AllocExistentialBoxInst final
          SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~AllocExistentialBoxInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   CanType getFormalConcreteType() const { return ConcreteType; }
 
   SILType getExistentialType() const { return getType(); }
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {getTrailingObjects<Operand>(), NumOperands};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {getTrailingObjects<Operand>(), NumOperands};
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -2604,27 +2620,14 @@ public:
 
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
-class BuiltinInst
-    : public InstructionBase<SILInstructionKind::BuiltinInst,
-                             SingleValueInstruction> {
+class BuiltinInst final
+    : public InstructionBaseWithTrailingOperands<
+                                   SILInstructionKind::BuiltinInst, BuiltinInst,
+                                   SingleValueInstruction, Substitution> {
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
-  
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions;
-  
-  /// The value arguments to the builtin.
-  TailAllocatedOperandList<0> Operands;
-  
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution*>(Operands.asArray().end());
-  }
-  const Substitution *getSubstitutionsStorage() const {
-    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
-  }
 
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
               SubstitutionList Substitutions, ArrayRef<SILValue> Args);
@@ -2670,29 +2673,23 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return NumSubstitutions != 0;
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
   }
 
   /// Return the type parameters to the builtin.
   SubstitutionList getSubstitutions() const {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   /// Return the type parameters to the builtin.
   MutableArrayRef<Substitution> getSubstitutions() {
-    return {getSubstitutionsStorage(), NumSubstitutions};
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
   }
   
   /// The arguments to the builtin.
-  ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
-  }
-  /// The arguments to the builtin.
-  MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
-  }
-  /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
-    return Operands.asValueArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 };
   
@@ -2837,9 +2834,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   StringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                     Encoding encoding, SILType ty);
 
@@ -2849,11 +2843,14 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {getTrailingObjects<char>(), Length};
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.StringLiteralInst.Length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.StringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
@@ -2881,9 +2878,6 @@ public:
   };
 
 private:
-  unsigned Length;
-  Encoding TheEncoding;
-
   ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
                          Encoding encoding, SILType ty);
 
@@ -2893,10 +2887,15 @@ private:
 
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
-  StringRef getValue() const { return {getTrailingObjects<char>(), Length}; }
+  StringRef getValue() const {
+    return {getTrailingObjects<char>(),
+            SILInstruction::Bits.ConstStringLiteralInst.Length};
+  }
 
   /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const { return TheEncoding; }
+  Encoding getEncoding() const {
+    return Encoding(SILInstruction::Bits.ConstStringLiteralInst.TheEncoding);
+  }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
@@ -3517,17 +3516,16 @@ public:
 /// MarkFunctionEscape - Represents the escape point of set of variables due to
 /// a function definition which uses the variables.  This is only valid in Raw
 /// SIL.
-class MarkFunctionEscapeInst
-    : public InstructionBase<SILInstructionKind::MarkFunctionEscapeInst,
-                             NonValueInstruction> {
+class MarkFunctionEscapeInst final
+    : public InstructionBaseWithTrailingOperands<
+                                  SILInstructionKind::MarkFunctionEscapeInst,
+                                  MarkFunctionEscapeInst, NonValueInstruction> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Private constructor.  Because this is variadic, object creation goes
   /// through 'create()'.
-  MarkFunctionEscapeInst(SILDebugLocation DebugLoc,
-                         ArrayRef<SILValue> Elements);
+  MarkFunctionEscapeInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elements)
+    : InstructionBaseWithTrailingOperands(Elements, DebugLoc) {}
 
   /// Construct a MarkFunctionEscapeInst.
   static MarkFunctionEscapeInst *create(SILDebugLocation DebugLoc,
@@ -3537,16 +3535,13 @@ class MarkFunctionEscapeInst
 public:
   /// The elements referenced by this instruction.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// The elements referenced by this instruction.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// Define the start or update to a symbolic variable value (for loadable
@@ -3767,22 +3762,14 @@ public:
 /// Binds memory at the raw pointer %0 to type $T with enough capacity
 /// to hold $1 values.
 class BindMemoryInst final :
-    public InstructionBase<SILInstructionKind::BindMemoryInst,
-                           NonValueInstruction>,
-    protected llvm::TrailingObjects<BindMemoryInst, Operand> {
-
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingObjects;
-  friend TrailingObjects;
-  using TrailingObjects::totalSizeToAlloc;
-
+    public InstructionBaseWithTrailingOperands<
+                                          SILInstructionKind::BindMemoryInst,
+                                          BindMemoryInst, NonValueInstruction> {
   friend SILBuilder;
 
   enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
 
   SILType BoundType;
-
-  // Fixed operands + opened archetype operands.
-  unsigned NumOperands;
 
   static BindMemoryInst *create(
     SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
@@ -3790,45 +3777,23 @@ class BindMemoryInst final :
 
   BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
                  SILType BoundType,
-                 ArrayRef<SILValue> TypeDependentOperands);
+                 ArrayRef<SILValue> TypeDependentOperands)
+    : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
+                                          Loc), BoundType(BoundType) {}
 
 public:
-  // Destruct tail allocated objects.
-  ~BindMemoryInst() {
-    Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
 
   SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
 
-  SILType getBoundType() const { return BoundType ; }
-
-  // Implement llvm::TrailingObjects.
-  size_t numTrailingObjects(
-    typename TrailingObjects::template OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
+  SILType getBoundType() const { return BoundType; }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(2);
+    return getAllOperands().slice(NumFixedOpers);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(2);
+    return getAllOperands().slice(NumFixedOpers);
   }
 };
 
@@ -4093,6 +4058,18 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
+/// Extract the heap object reference from a BridgeObject.
+class ClassifyBridgeObjectInst
+  : public UnaryInstructionBase<SILInstructionKind::ClassifyBridgeObjectInst,
+                                SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  ClassifyBridgeObjectInst(SILDebugLocation DebugLoc, SILValue Operand,
+                           SILType Ty)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
 
 /// Extract the heap object reference from a BridgeObject.
@@ -4382,12 +4359,10 @@ class UnconditionalCheckedCastValueInst final
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst
-    : public InstructionBase<SILInstructionKind::StructInst,
-                             SingleValueInstruction> {
+class StructInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::StructInst,
+                                           StructInst, SingleValueInstruction> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
@@ -4401,16 +4376,13 @@ class StructInst
 public:
   /// The elements referenced by this StructInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// The elements referenced by this StructInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SILValue getFieldValue(const VarDecl *V) const {
     return getOperandForField(V)->get();
@@ -4694,19 +4666,19 @@ class StrongUnpinInst
 ///
 /// This instruction can only appear at the end of a gobal variable's
 /// static initializer list.
-class ObjectInst
-    : public InstructionBase<SILInstructionKind::ObjectInst,
-                             SingleValueInstruction> {
+class ObjectInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::ObjectInst,
+                                                 ObjectInst,
+                                                 SingleValueInstruction> {
   friend SILBuilder;
-
-  unsigned NumBaseElements;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
   ObjectInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements, unsigned NumBaseElements);
+            ArrayRef<SILValue> Elements, unsigned NumBaseElements)
+    : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty) {
+      SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
+  }
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -4716,41 +4688,38 @@ class ObjectInst
 public:
   /// All elements referenced by this ObjectInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// All elements referenced by this ObjectInst.
   OperandValueArrayRef getAllElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 
   /// The elements which initialize the stored properties of the object itself.
   OperandValueArrayRef getBaseElements() const {
-    return Operands.getDynamicValuesAsArray().slice(0, NumBaseElements);
+    return OperandValueArrayRef(getAllOperands().slice(0,
+                              SILInstruction::Bits.ObjectInst.NumBaseElements));
   }
 
   /// The elements which initialize the tail allocated elements.
   OperandValueArrayRef getTailElements() const {
-    return Operands.getDynamicValuesAsArray().slice(NumBaseElements);
+    return OperandValueArrayRef(getAllOperands().slice(
+                              SILInstruction::Bits.ObjectInst.NumBaseElements));
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst
-    : public InstructionBase<SILInstructionKind::TupleInst,
-                             SingleValueInstruction> {
+class TupleInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::TupleInst,
+                                                  TupleInst,
+                                                  SingleValueInstruction> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<0> Operands;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
-  TupleInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements);
+  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems)
+    : InstructionBaseWithTrailingOperands(Elems, DebugLoc, Ty) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -4759,12 +4728,12 @@ class TupleInst
 public:
   /// The elements referenced by this TupleInst.
   MutableArrayRef<Operand> getElementOperands() {
-    return Operands.getDynamicAsArray();
+    return getAllOperands();
   }
 
   /// The elements referenced by this TupleInst.
   OperandValueArrayRef getElements() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands());
   }
 
   /// Return the i'th value referenced by this TupleInst.
@@ -4776,9 +4745,6 @@ public:
     assert(operand->getUser() == this);
     return operand->getOperandNumber();
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   TupleType *getTupleType() const {
     return getType().getSwiftRValueType()->castTo<TupleType>();
@@ -4960,38 +4926,39 @@ public:
   }
 };
 
-// Base class of all select instructions like select_enum, select_value, etc.
-// The template parameter represents a type of case values to be compared
-// with the operand of a select instruction.
+// Abstract base class of all select instructions like select_enum,
+// select_value, etc. The template parameter represents a type of case values
+// to be compared with the operand of a select instruction.
+//
+// Subclasses must provide tail allocated storage.
+// The first operand is the operand of select_xxx instruction. The rest of
+// the operands are the case values and results of a select instruction.
 template <class Derived, class T>
 class SelectInstBase : public SingleValueInstruction {
-protected:
-  unsigned NumCases : 31;
-  unsigned HasDefault : 1;
-
-  /// The first operand is the operand of select_xxx instruction. The rest of
-  /// the operands are the case values and results of a select instruction.
-  TailAllocatedOperandList<1> Operands;
-
 public:
-  SelectInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc,
-                 SILType type, unsigned numCases, bool hasDefault,
-                 ArrayRef<SILValue> operands, SILValue operand)
-      : SingleValueInstruction(kind, DebugLoc, type), NumCases(numCases),
-        HasDefault(hasDefault), Operands(this, operands, operand) {}
+  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type)
+      : SingleValueInstruction(kind, Loc, type) {}
 
-  SILValue getOperand() const { return Operands[0].get(); }
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const {
+    return static_cast<const Derived *>(this)->getAllOperands();
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return static_cast<Derived *>(this)->getAllOperands();
+  }
 
-  std::pair<T, SILValue> getCase(unsigned i) {
+  std::pair<T, SILValue> getCase(unsigned i) const {
     return static_cast<const Derived *>(this)->getCase(i);
   }
 
-  unsigned getNumCases() const { return NumCases; }
+  unsigned getNumCases() const {
+    return static_cast<const Derived *>(this)->getNumCases();
+  }
 
-  bool hasDefault() const { return HasDefault; }
+  bool hasDefault() const {
+    return static_cast<const Derived *>(this)->hasDefault();
+  }
 
   SILValue getDefaultResult() const {
     return static_cast<const Derived *>(this)->getDefaultResult();
@@ -5006,19 +4973,19 @@ class SelectEnumInstBase
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
   
-  EnumElementDecl **getCaseBuf() {
-    return reinterpret_cast<EnumElementDecl**>(Operands.asArray().end());
-  }
-  EnumElementDecl * const* getCaseBuf() const {
-    return reinterpret_cast<EnumElementDecl* const*>(Operands.asArray().end());
+  EnumElementDecl **getEnumElementDeclStorage();
+  EnumElementDecl * const* getEnumElementDeclStorage() const {
+    return const_cast<SelectEnumInstBase*>(this)->getEnumElementDeclStorage();
   }
 
 protected:
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
-                     SILType type, SILValue enumValue, SILValue defaultValue,
-                     ArrayRef<std::pair<EnumElementDecl *, SILValue>> cases,
+                     SILType type, bool defaultValue,
                      Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                     ProfileCounter DefaultCount);
+                     ProfileCounter DefaultCount)
+      : SelectInstBase(kind, debugLoc, type) {
+    SILInstruction::Bits.SelectEnumInstBase.HasDefault = defaultValue;
+  }
   template <typename SELECT_ENUM_INST>
   static SELECT_ENUM_INST *
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
@@ -5029,12 +4996,16 @@ protected:
                    ProfileCounter DefaultCount);
 
 public:
+  ArrayRef<Operand> getAllOperands() const;
+  MutableArrayRef<Operand> getAllOperands();
+
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
   SILValue getEnumOperand() const { return getOperand(); }
   
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
-    return std::make_pair(getCaseBuf()[i], Operands[i+1].get());
+    return std::make_pair(getEnumElementDeclStorage()[i],
+                          getAllOperands()[i+1].get());
   }
   
   /// Return the value that will be used as the result for the specified enum
@@ -5052,9 +5023,17 @@ public:
   /// \brief If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
+  bool hasDefault() const {
+    return SILInstruction::Bits.SelectEnumInstBase.HasDefault;
+  }
+
   SILValue getDefaultResult() const {
-    assert(HasDefault && "doesn't have a default");
-    return Operands[NumCases + 1].get();
+    assert(hasDefault() && "doesn't have a default");
+    return getAllOperands().back().get();
+  }
+
+  unsigned getNumCases() const {
+    return getAllOperands().size() - 1 - hasDefault();
   }
 
   /// If there is a single case that returns a literal "true" value (an
@@ -5067,21 +5046,29 @@ public:
 };
   
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumInst
-    : public InstructionBase<SILInstructionKind::SelectEnumInst,
-                             SelectEnumInstBase> {
+class SelectEnumInst final
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::SelectEnumInst,
+                                        SelectEnumInst,
+                                        SelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
 
 private:
   friend SelectEnumInstBase;
 
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                 SILValue DefaultValue,
-                 ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                 bool DefaultValue,
+                 ArrayRef<SILValue> CaseValues,
+                 ArrayRef<EnumElementDecl *> CaseDecls,
                  Optional<ArrayRef<ProfileCounter>> CaseCounts,
                  ProfileCounter DefaultCount)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
-                        CaseCounts, DefaultCount) {}
+      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
+                                            bool(DefaultValue), CaseCounts,
+                                            DefaultCount) {
+    assert(CaseValues.size() - DefaultValue == CaseDecls.size());
+    std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
+                            getTrailingObjects<EnumElementDecl *>());
+  }
   static SelectEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
@@ -5091,20 +5078,28 @@ private:
 };
 
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumAddrInst
-    : public InstructionBase<SILInstructionKind::SelectEnumAddrInst,
-                             SelectEnumInstBase> {
+class SelectEnumAddrInst final
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::SelectEnumAddrInst,
+                                        SelectEnumAddrInst,
+                                        SelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
   friend SelectEnumInstBase;
 
   SelectEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-      SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+      bool DefaultValue,
+      ArrayRef<SILValue> CaseValues,
+      ArrayRef<EnumElementDecl *> CaseDecls,
       Optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount)
-      : InstructionBase(DebugLoc, Type, Operand, DefaultValue, CaseValues,
-                        CaseCounts, DefaultCount) {}
+      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
+                                            bool(DefaultValue), CaseCounts,
+                                            DefaultCount) {
+    assert(CaseValues.size() - DefaultValue == CaseDecls.size());
+    std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
+                            getTrailingObjects<EnumElementDecl *>());
+  }
   static SelectEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
@@ -5114,82 +5109,77 @@ class SelectEnumAddrInst
 };
 
 /// Select on a value of a builtin integer type.
-class SelectValueInst
-    : public InstructionBase<SILInstructionKind::SelectValueInst,
-                             SelectInstBase<SelectValueInst, SILValue>> {
+///
+/// There is 'the' operand, followed by pairs of operands for each case,
+/// followed by an optional default operand.
+class SelectValueInst final
+    : public InstructionBaseWithTrailingOperands<
+                                    SILInstructionKind::SelectValueInst,
+                                    SelectValueInst,
+                                    SelectInstBase<SelectValueInst, SILValue>> {
   friend SILBuilder;
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults);
+                  ArrayRef<SILValue> CaseValuesAndResults)
+      : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
+                                            DebugLoc, Type) {}
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILFunction &F);
 
-  OperandValueArrayRef getCaseBuf() const {
-    return Operands.getDynamicValuesAsArray();
-  }
-
 public:
-  ~SelectValueInst();
-
   std::pair<SILValue, SILValue>
   getCase(unsigned i) const {
-    assert(i < NumCases && "case out of bounds");
-    return {getCaseBuf()[i*2], getCaseBuf()[i*2+1]};
+    auto cases = getAllOperands().slice(1);
+    return {cases[i*2].get(), cases[i*2+1].get()};
+  }
+
+  unsigned getNumCases() const {
+    // Ignore the first non-case operand.
+    auto count = getAllOperands().size() - 1;
+    // This implicitly ignore the optional default operand.
+    return count / 2;
+  }
+
+  bool hasDefault() const {
+    // If the operand count is even, then we have a default value.
+    return (getAllOperands().size() & 1) == 0;
   }
 
   SILValue getDefaultResult() const {
-    assert(HasDefault && "doesn't have a default");
-    return getCaseBuf()[NumCases*2];
+    assert(hasDefault() && "doesn't have a default");
+    return getAllOperands().back().get();
   }
 };
 
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst final
-    : public InstructionBase<SILInstructionKind::MetatypeInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<MetatypeInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                         SILInstructionKind::MetatypeInst,
+                                         MetatypeInst, SingleValueInstruction> {
   friend SILBuilder;
-
-  unsigned _getNumOperands() const {
-    return SILInstruction::Bits.MetatypeInst.NumOperands;
-  };
 
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
-               ArrayRef<SILValue> TypeDependentOperands);
+               ArrayRef<SILValue> TypeDependentOperands)
+    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+                                          Metatype) {}
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F,
                               SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~MetatypeInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = _getNumOperands(); i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
-  }
-
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
+    return getAllOperands();
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), _getNumOperands() };
+    return getAllOperands();
   }
 };
 
@@ -5488,29 +5478,20 @@ class ObjCSuperMethodInst
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
 class WitnessMethodInst final
-    : public InstructionBase<SILInstructionKind::WitnessMethodInst,
-                             MethodInst>,
-      llvm::TrailingObjects<WitnessMethodInst, Operand> {
-  friend TrailingObjects;
+    : public InstructionBaseWithTrailingOperands<
+                                          SILInstructionKind::WitnessMethodInst,
+                                          WitnessMethodInst, MethodInst> {
   friend SILBuilder;
 
   CanType LookupType;
   ProtocolConformanceRef Conformance;
 
-  unsigned getNumOperands() const {
-    return SILInstruction::Bits.WitnessMethodInst.NumOperands;
-  }
-
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
-      : InstructionBase(DebugLoc, Ty, Member),
-        LookupType(LookupType), Conformance(Conformance) {
-    SILInstruction::Bits.WitnessMethodInst.NumOperands =
-      TypeDependentOperands.size();
-    TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           TypeDependentOperands);
-  }
+      : InstructionBaseWithTrailingOperands(TypeDependentOperands,
+                                            DebugLoc, Ty, Member),
+        LookupType(LookupType), Conformance(Conformance) {}
 
   /// Create a witness method call of a protocol requirement, passing in a lookup
   /// type and conformance.
@@ -5530,13 +5511,6 @@ class WitnessMethodInst final
          SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  ~WitnessMethodInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = getNumOperands(); i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
     return getMember().getDecl()->getDeclContext()
@@ -5545,20 +5519,12 @@ public:
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
-  ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
-  }
-
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
+    return getAllOperands();
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return { getTrailingObjects<Operand>(), getNumOperands() };
+    return getAllOperands();
   }
 };
 
@@ -5757,8 +5723,6 @@ class InitExistentialRefInst final
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
          SILOpenedArchetypesState &OpenedArchetypes);
-
-  //size_t numTrailingObjects(OverloadToken<Operand>) const { return NumOperands; }
 
 public:
   CanType getFormalConcreteType() const {
@@ -6048,6 +6012,13 @@ public:
   SILValue getValue() const { return Operands[Value].get(); }
   SILValue getBase() const { return Operands[Base].get(); }
 
+  void setValue(SILValue newVal) {
+    Operands[Value].set(newVal);
+  }
+  void setBase(SILValue newVal) {
+    Operands[Base].set(newVal);
+  }
+  
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
@@ -6606,17 +6577,17 @@ public:
 ///
 /// This is a terminator because the caller can abort the coroutine,
 /// e.g. if an error is thrown and an unwind is provoked.
-class YieldInst
-  : public InstructionBase<SILInstructionKind::YieldInst,
-                           TermInst> {
+class YieldInst final
+  : public InstructionBaseWithTrailingOperands<SILInstructionKind::YieldInst,
+                                               YieldInst, TermInst> {
   friend SILBuilder;
 
   SILSuccessor DestBBs[2];
 
-  TailAllocatedOperandList<0> Operands;
-
   YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
-            SILBasicBlock *normalBB, SILBasicBlock *unwindBB);
+            SILBasicBlock *normalBB, SILBasicBlock *unwindBB)
+    : InstructionBaseWithTrailingOperands(yieldedValues, loc),
+      DestBBs{{this, normalBB}, {this, unwindBB}} {}
 
   static YieldInst *create(SILDebugLocation loc,
                            ArrayRef<SILValue> yieldedValues,
@@ -6648,11 +6619,8 @@ public:
   SILBasicBlock *getUnwindBB() const { return DestBBs[1]; }
 
   OperandValueArrayRef getYieldedValues() const {
-    return Operands.asValueArray();
+    return OperandValueArrayRef(getAllOperands());
   }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;
@@ -6660,17 +6628,17 @@ public:
 };
 
 /// BranchInst - An unconditional branch.
-class BranchInst
-    : public InstructionBase<SILInstructionKind::BranchInst,
-                             TermInst> {
+class BranchInst final
+    : public InstructionBaseWithTrailingOperands<SILInstructionKind::BranchInst,
+                                                 BranchInst, TermInst> {
   friend SILBuilder;
 
   SILSuccessor DestBB;
-  // FIXME: probably needs dynamic adjustment
-  TailAllocatedOperandList<0> Operands;
 
   BranchInst(SILDebugLocation DebugLoc, SILBasicBlock *DestBB,
-             ArrayRef<SILValue> Args);
+             ArrayRef<SILValue> Args)
+    : InstructionBaseWithTrailingOperands(Args, DebugLoc),
+      DestBB(this, DestBB) {}
 
   /// Construct a BranchInst that will branch to the specified block.
   /// The destination block must take no parameters.
@@ -6687,29 +6655,31 @@ public:
   SILBasicBlock *getDestBB() const { return DestBB; }
 
   /// The arguments for the destination BB.
-  OperandValueArrayRef getArgs() const { return Operands.asValueArray(); }
+  OperandValueArrayRef getArgs() const {
+    return OperandValueArrayRef(getAllOperands());
+  }
 
   SuccessorListTy getSuccessors() {
     return SuccessorListTy(&DestBB, 1);
   }
 
-  unsigned getNumArgs() const { return Operands.size(); }
-  SILValue getArg(unsigned i) const { return Operands[i].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  unsigned getNumArgs() const { return getAllOperands().size(); }
+  SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
 };
 
 /// A conditional branch.
-class CondBranchInst
-    : public InstructionBase<SILInstructionKind::CondBranchInst,
-                             TermInst> {
+class CondBranchInst final
+    : public InstructionBaseWithTrailingOperands<
+                                             SILInstructionKind::CondBranchInst,
+                                             CondBranchInst,
+                                             TermInst> {
   friend SILBuilder;
 
 public:
   enum {
     /// The operand index of the condition value used for the branch.
-    ConditionIdx
+    ConditionIdx,
+    NumFixedOpers,
   };
   enum {
     // Map branch targets to block successor indices.
@@ -6719,12 +6689,15 @@ public:
 private:
   SILSuccessor DestBBs[2];
   /// The number of arguments for the True branch.
-  unsigned NumTrueArgs;
+  unsigned getNumTrueArgs() const {
+    return SILInstruction::Bits.CondBranchInst.NumTrueArgs;
+  }
   /// The number of arguments for the False branch.
-  unsigned NumFalseArgs;
+  unsigned getNumFalseArgs() const {
+    return getAllOperands().size() - NumFixedOpers -
+        SILInstruction::Bits.CondBranchInst.NumTrueArgs;
+  }
 
-  /// The first argument is the condition; the rest are BB arguments.
-  TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
@@ -6747,9 +6720,9 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return Operands[ConditionIdx].get(); }
+  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
   void setCondition(SILValue newCondition) {
-    Operands[ConditionIdx].set(newCondition);
+    getAllOperands()[ConditionIdx].set(newCondition);
   }
 
   SuccessorListTy getSuccessors() {
@@ -6767,17 +6740,31 @@ public:
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 
   /// Get the arguments to the true BB.
-  OperandValueArrayRef getTrueArgs() const;
+  OperandValueArrayRef getTrueArgs() const {
+    return OperandValueArrayRef(getTrueOperands());
+  }
   /// Get the arguments to the false BB.
-  OperandValueArrayRef getFalseArgs() const;
+  OperandValueArrayRef getFalseArgs() const {
+    return OperandValueArrayRef(getFalseOperands());
+  }
 
   /// Get the operands to the true BB.
-  ArrayRef<Operand> getTrueOperands() const;
-  MutableArrayRef<Operand> getTrueOperands();
+  ArrayRef<Operand> getTrueOperands() const {
+    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
+  }
+  MutableArrayRef<Operand> getTrueOperands() {
+    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
+  }
 
   /// Get the operands to the false BB.
-  ArrayRef<Operand> getFalseOperands() const;
-  MutableArrayRef<Operand> getFalseOperands();
+  ArrayRef<Operand> getFalseOperands() const {
+    // The remaining arguments are 'false' operands.
+    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+  MutableArrayRef<Operand> getFalseOperands() {
+    // The remaining arguments are 'false' operands.
+    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
@@ -6789,7 +6776,7 @@ public:
   bool isTrueOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
            "OpIndex must be an index for an actual operand");
-    if (NumTrueArgs == 0)
+    if (getNumTrueArgs() == 0)
       return false;
 
     auto Operands = getTrueOperands();
@@ -6801,7 +6788,7 @@ public:
   bool isFalseOperandIndex(unsigned OpIndex) const {
     assert(OpIndex < getNumOperands() &&
            "OpIndex must be an index for an actual operand");
-    if (NumFalseArgs == 0)
+    if (getNumFalseArgs() == 0)
       return false;
 
     auto Operands = getFalseOperands();
@@ -6820,18 +6807,14 @@ public:
                            unsigned ArgIndex) const;
 
   void swapSuccessors();
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// A switch on a value of a builtin type.
-class SwitchValueInst
-    : public InstructionBase<SILInstructionKind::SwitchValueInst,
-                             TermInst> {
+class SwitchValueInst final
+    : public InstructionBaseWithTrailingOperands<
+                                      SILInstructionKind::SwitchValueInst,
+                                      SwitchValueInst, TermInst, SILSuccessor> {
   friend SILBuilder;
-
-  TailAllocatedOperandList<1> Operands;
 
   SwitchValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                   SILBasicBlock *DefaultBB, ArrayRef<SILValue> Cases,
@@ -6844,16 +6827,15 @@ class SwitchValueInst
   //   destinations for each case, ending with the default destination if
   //   present.
 
-
   OperandValueArrayRef getCaseBuf() const {
-    return Operands.getDynamicValuesAsArray();
+    return OperandValueArrayRef(getAllOperands().slice(1));
   }
 
   SILSuccessor *getSuccessorBuf() {
-    return reinterpret_cast<SILSuccessor*>(Operands.asArray().end());
+    return getTrailingObjects<SILSuccessor>();
   }
   const SILSuccessor *getSuccessorBuf() const {
-    return reinterpret_cast<const SILSuccessor *>(Operands.asArray().end());
+    return getTrailingObjects<SILSuccessor>();
   }
 
   static SwitchValueInst *
@@ -6865,10 +6847,7 @@ public:
   /// Clean up tail-allocated successor records for the switch cases.
   ~SwitchValueInst();
 
-  SILValue getOperand() const { return Operands[0].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
 
   SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
@@ -6876,7 +6855,7 @@ public:
   }
 
   unsigned getNumCases() const {
-    return SILInstruction::Bits.SwitchValueInst.NumCases;
+    return getAllOperands().size() - 1;
   }
   std::pair<SILValue, SILBasicBlock*>
   getCase(unsigned i) const {
@@ -7796,6 +7775,60 @@ public:
 inline DestructureTupleInst *DestructureTupleResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();
   return cast<DestructureTupleInst>(Parent);
+}
+
+inline SILType *AllocRefInstBase::getTypeStorage() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getTrailingObjects<SILType>();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getTrailingObjects<SILType>();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline ArrayRef<Operand> AllocRefInstBase::getAllOperands() const {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline MutableArrayRef<Operand> AllocRefInstBase::getAllOperands() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<AllocRefInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<AllocRefDynamicInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled AllocRefInstBase subclass");
+}
+
+inline ArrayRef<Operand> SelectEnumInstBase::getAllOperands() const {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+}
+
+inline MutableArrayRef<Operand> SelectEnumInstBase::getAllOperands() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getAllOperands();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getAllOperands();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+}
+
+inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
+  // If the size of the subclasses are equal, then all of this compiles away.
+  if (auto I = dyn_cast<SelectEnumInst>(this))
+    return I->getTrailingObjects<EnumElementDecl*>();
+  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
+    return I->getTrailingObjects<EnumElementDecl*>();
+  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
 }
 
 } // end swift namespace

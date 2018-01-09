@@ -188,9 +188,9 @@ Lexer::Lexer(const LangOptions &Options,
     .StartsWith("\xEF\xBB\xBF", 3)
     .Default(0);
 
-  // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
-  // on byte order), throw it away.
-  CurPtr = BufferStart + BOMLength;
+  // Keep information about existance of UTF-8 BOM for transparency source code
+  // editing with libSyntax.
+  CurPtr = BufferStart;
   ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
@@ -271,6 +271,19 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
 }
 
+void Lexer::formEscapedIdentifierToken(const char *TokStart) {
+  assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
+  assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
+  assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    LeadingTrivia.push_back(TriviaPiece::backtick());
+    assert(TrailingTrivia.size() == 0 && "TrailingTrivia is empty here");
+    TrailingTrivia.push_back(TriviaPiece::backtick());
+  }
+  formToken(tok::identifier, TokStart);
+  NextToken.setEscapedIdentifier(true);
+}
+
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   const char *Ptr = getBufferPtrForSourceLoc(Loc);
   // Skip whitespace backwards until we hit a newline.  This is needed to
@@ -278,7 +291,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
   while (Ptr >= ContentStart + 1) {
     char C = Ptr[-1];
     if (C == ' ' || C == '\t') {
-      Ptr--;
+      --Ptr;
       continue;
     }
     if (C == 0) {
@@ -286,11 +299,11 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
       // completion token.
       if (Ptr - 1 == CodeCompletionPtr)
         break;
-      Ptr--;
+      --Ptr;
       continue;
     }
     if (C == '\n' || C == '\r') {
-      Ptr--;
+      --Ptr;
       break;
     }
     break;
@@ -598,13 +611,13 @@ void Lexer::lexHash() {
 
   // NOTE: legacy punctuator.  Remove in the future.
   if (*CurPtr == ']') { // #]
-     CurPtr++;
+     ++CurPtr;
      return formToken(tok::r_square_lit, TokStart);
   }
   
   // Allow a hashbang #! line at the beginning of the file.
   if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
-    CurPtr--;
+    --CurPtr;
     if (BufferID != SourceMgr.getHashbangBufferID())
       diagnose(CurPtr, diag::lex_hashbang_not_allowed);
     skipHashbang(/*EatNewline=*/true);
@@ -839,8 +852,9 @@ void Lexer::lexDollarIdent() {
   const char *tokStart = CurPtr-1;
   assert(*tokStart == '$');
 
-  // In a SIL function body, '$' is a token by itself.
-  if (InSILBody)
+  // In a SIL function body, '$' is a token by itself, except it's a SIL global
+  // name. SIL global identifiers may start with a '$', e.g. @$S1m3fooyyF.
+  if (InSILBody && NextToken.getKind() != tok::at_sign)
     return formToken(tok::sil_dollar, tokStart);
 
   bool isAllDigits = true;
@@ -868,7 +882,7 @@ void Lexer::lexDollarIdent() {
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
   if (!isAllDigits) {
-    if (!LangOpts.EnableDollarIdentifiers)
+    if (!LangOpts.EnableDollarIdentifiers && !InSILBody)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,
@@ -1153,7 +1167,7 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
       continue;
     case '\r':
       if (*TmpPtr == '\n')
-        TmpPtr++;
+        ++TmpPtr;
       LLVM_FALLTHROUGH;
     case '\n':
       CurPtr = TmpPtr;
@@ -1423,7 +1437,7 @@ static StringRef getStringLiteralContent(const Token &Str) {
 static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
   size_t offset = 0;
   while (offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
-    offset++;
+    ++offset;
   }
   
   return offset;
@@ -1445,7 +1459,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       continue;
     case '\n':
     case '\r': {
-      start++;
+      ++start;
       auto startLoc = Lexer::getSourceLoc(start);
       auto string = StringRef(start, end - start);
 
@@ -1654,7 +1668,7 @@ void Lexer::lexStringLiteral() {
     // If this is the end of string, we are done.  If it is a normal character
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
-      CurPtr++;
+      ++CurPtr;
       if (wasErroneous)
         return formToken(tok::unknown, TokStart);
 
@@ -1770,8 +1784,7 @@ void Lexer::lexEscapedIdentifier() {
     // If we have the terminating "`", it's an escaped identifier.
     if (*CurPtr == '`') {
       ++CurPtr;
-      formToken(tok::identifier, Quote);
-      NextToken.setEscapedIdentifier(true);
+      formEscapedIdentifierToken(Quote);
       return;
     }
   }
@@ -1779,8 +1792,7 @@ void Lexer::lexEscapedIdentifier() {
   // Special case; allow '`$`'.
   if (Quote[1] == '$' && Quote[2] == '`') {
     CurPtr = Quote + 3;
-    formToken(tok::identifier, Quote);
-    NextToken.setEscapedIdentifier(true);
+    formEscapedIdentifierToken(Quote);
     return;
   }
 
@@ -1890,7 +1902,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       bool stripNewline = IsEscapedNewline ||
         (IsFirstSegment && BytesPtr - 1 == Bytes.begin());
       if (CurChar == '\r' && *BytesPtr == '\n')
-        BytesPtr++;
+        ++BytesPtr;
       if (*BytesPtr != '\r' && *BytesPtr != '\n')
         BytesPtr += IndentToStrip;
       if (IsLastSegment && BytesPtr == Bytes.end())
@@ -1925,7 +1937,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case ' ': case '\t': case '\n': case '\r':
       if (maybeConsumeNewlineEscape(BytesPtr, -1)) {
         IsEscapedNewline = true;
-        BytesPtr--;
+        --BytesPtr;
       }
       continue;
 
@@ -2036,7 +2048,20 @@ void Lexer::lexImpl() {
     LeadingTrivia.clear();
     TrailingTrivia.clear();
   }
-  NextToken.setAtStartOfLine(CurPtr == ContentStart);
+  if (CurPtr == BufferStart) {
+    if (BufferStart < ContentStart) {
+      size_t BOMLen = ContentStart - BufferStart;
+      assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
+      if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+        // Add UTF-8 BOM to LeadingTrivia.
+        LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
+      }
+      CurPtr += BOMLen;
+    }
+    NextToken.setAtStartOfLine(true);
+  } else {
+    NextToken.setAtStartOfLine(false);
+  }
 
   // Remember where we started so that we can find the comment range.
   LastCommentBlockStart = CurPtr;
@@ -2119,6 +2144,8 @@ Restart:
 
   case '\n':
   case '\r':
+    assert(TriviaRetention != TriviaRetentionMode::WithTrivia &&
+           "newlines should be eaten by lexTrivia as LeadingTrivia");
     NextToken.setAtStartOfLine(true);
     goto Restart;  // Skip whitespace.
 
@@ -2147,7 +2174,7 @@ Restart:
 
     // Otherwise, this is the real end of the buffer.  Put CurPtr back into
     // buffer bounds.
-    CurPtr--;
+    --CurPtr;
     // Return EOF.
     return formToken(tok::eof, TokStart);
 
@@ -2287,7 +2314,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   return L.peekNextToken();
 }
 
-void Lexer::lexTrivia(syntax::TriviaList &Pieces, bool IsForTrailingTrivia) {
+void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
   if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
     return;
 
@@ -2298,46 +2325,34 @@ Restart:
   // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
   switch (*CurPtr++) {
   case '\n':
+    if (IsForTrailingTrivia)
+      break;
+    NextToken.setAtStartOfLine(true);
+    Pieces.appendOrSquash(TriviaPiece::newlines(1));
+    goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
-    LLVM_FALLTHROUGH;
-  case ' ':
-  case '\t':
-  case '\v':
-  case '\f': {
-    auto Char = CurPtr[-1];
-    // Consume consective same characters.
-    while (*CurPtr == Char)
+    if (CurPtr[0] == '\n') {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
       ++CurPtr;
-
-    auto Length = CurPtr - TriviaStart;
-    switch (Char) {
-    case ' ':
-      Pieces.push_back(TriviaPiece::spaces(Length));
-      break;
-    case '\n':
-      // FIXME: CR+LF shoud form one trivia piece
-      Pieces.push_back(TriviaPiece::newlines(Length));
-      break;
-    case '\r':
-      Pieces.push_back(TriviaPiece::carriageReturns(Length));
-      break;
-    case '\t':
-      Pieces.push_back(TriviaPiece::tabs(Length));
-      break;
-    case '\v':
-      Pieces.push_back(TriviaPiece::verticalTabs(Length));
-      break;
-    case '\f':
-      Pieces.push_back(TriviaPiece::formfeeds(Length));
-      break;
-    default:
-      llvm_unreachable("Invalid character for whitespace trivia");
+    } else {
+      Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
     }
     goto Restart;
-  }
+  case ' ':
+    Pieces.appendOrSquash(TriviaPiece::spaces(1));
+    goto Restart;
+  case '\t':
+    Pieces.appendOrSquash(TriviaPiece::tabs(1));
+    goto Restart;
+  case '\v':
+    Pieces.appendOrSquash(TriviaPiece::verticalTabs(1));
+    goto Restart;
+  case '\f':
+    Pieces.appendOrSquash(TriviaPiece::formfeeds(1));
+    goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
       // Don't lex comments as trailing trivias (for now).

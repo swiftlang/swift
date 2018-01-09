@@ -188,7 +188,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
     
     @discardableResult
     fileprivate func insert(_ character: Unicode.Scalar) -> (inserted: Bool, memberAfterInsert: Unicode.Scalar) {
-        insert(charactersIn: character..<Unicode.Scalar(character.value + 1)!)
+        insert(charactersIn: character...character)
         // TODO: This should probably return the truth, but figuring it out requires two calls into NSCharacterSet
         return (true, character)
     }
@@ -204,7 +204,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
     fileprivate func remove(_ character: Unicode.Scalar) -> Unicode.Scalar? {
         // TODO: Add method to CFCharacterSet to do this in one call
         let result : Unicode.Scalar? = contains(character) ? character : nil
-        remove(charactersIn: character..<Unicode.Scalar(character.value + 1)!)
+        remove(charactersIn: character...character)
         return result
     }
     

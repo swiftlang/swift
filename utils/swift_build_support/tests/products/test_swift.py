@@ -56,6 +56,7 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
             enable_sil_ownership=False,
+            enable_guaranteed_normal_arguments=False,
             force_optimized_typechecker=False)
 
         # Setup shell
@@ -86,6 +87,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(set(swift.cmake_options), set([
                          '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
                          '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                         '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
                          '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
 
     def test_swift_runtime_tsan(self):
@@ -95,11 +97,12 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(set(swift.cmake_options),
-                         set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
-                              '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                              '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
-                              '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
+        flags_set = set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
+                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                         '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
+                         '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE'])
+        self.assertEqual(set(swift.cmake_options), flags_set)
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"
@@ -284,6 +287,18 @@ class SwiftTestCase(unittest.TestCase):
             ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
+
+    def test_swift_guaranteed_normal_arguments_flags(self):
+        self.args.enable_guaranteed_normal_arguments = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=TRUE'],
+            [x for x in swift.cmake_options
+             if 'SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS' in x])
 
     def test_force_optimized_typechecker_flags(self):
         self.args.force_optimized_typechecker = True

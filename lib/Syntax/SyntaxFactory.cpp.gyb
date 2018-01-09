@@ -91,7 +91,15 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
 % for node in SYNTAX_NODES:
 %     if node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}: {
+%       if node.collection_element_choices:
+%         element_checks = []
+%         for choice in node.collection_element_choices:
+%           element_checks.append("Member.getKind() == SyntaxKind::%s" % choice)
+%         all_checks = ' || '.join(element_checks)
+    return ${all_checks};
+%       else:
     return Member.is<${node.collection_element_type}>();
+%       end
   }
 %     end
 % end
@@ -110,50 +118,13 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
     static std::pair<bool, std::function<bool(const Syntax&)>>
       ChildrenConditions[${child_count}] = {
 %    for child in node.children:
+%       check = check_child_condition(child)
 %       if child.is_optional:
 %         option = "true"
 %       else:
 %         option = "false"
-%       if child.token_choices:
-        {   ${option},
-            [](const Syntax &S) {
-              // check ${child.name}.
-              if (auto Tok = S.getAs<TokenSyntax>()) {
-                auto Kind = Tok->getTokenKind();
-%           tok_checks = []
-%           for choice in child.token_choices:
-%             tok_checks.append("Kind == tok::%s" % choice.kind)
-%           end
-%           all_checks = ' || '.join(tok_checks)
-                return ${all_checks};
-              }
-              return false;
-            }
-        },
-%       elif child.text_choices:
-        {   ${option},
-            [](const Syntax &S) {
-              // check ${child.name}.
-              if (auto Tok = S.getAs<TokenSyntax>()) {
-                auto Text = Tok->getText();
-%           tok_checks = []
-%           for choice in child.text_choices:
-%             tok_checks.append("Text == \"%s\"" % choice)
-%           end
-%           all_checks = ' || '.join(tok_checks)
-                return ${all_checks};
-              }
-              return false;
-            }
-        },
-%       else:
-        {   ${option},
-            [](const Syntax &S) {
-              // check ${child.name}.
-              return S.getAs<${child.type_name}>().hasValue();
-            }
-        },
 %       end
+        {   ${option}, ${check} },
 %    end
     };
     Optional<Syntax> Parameters[${child_count}];
@@ -202,6 +173,8 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 % elif node.is_syntax_collection():
       std::vector<${node.collection_element_type}> Parts;
       for (auto &E: Elements) {
+        if (!canServeAsCollectionMember(SyntaxKind::${node.syntax_kind}, E))
+          return None;
         if (auto P = E.getAs<${node.collection_element_type}>()) {
           Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
         } else {

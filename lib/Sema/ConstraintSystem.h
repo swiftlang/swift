@@ -2331,6 +2331,79 @@ public: // FIXME: public due to statics in CSSimplify.cpp
                           ConstraintLocatorBuilder locator);
 
 public:
+  /// Given a function type where the eventual result type is an optional,
+  /// where "eventual result type" is defined as:
+  ///   1. The result type is an optional
+  ///   2. The result type is a function type with an eventual result
+  ///      type that is an optional.
+  ///
+  /// return the same function type but with the eventual result type
+  /// replaced by its underlying type.
+  ///
+  /// i.e. return (S) -> T for (S) -> T?
+  //       return (X) -> () -> Y for (X) -> () -> Y?
+  Type replaceFinalResultTypeWithUnderlying(AnyFunctionType *fnTy) {
+    auto resultTy = fnTy->getResult();
+    if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
+      resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
+    else
+      resultTy =
+          resultTy->getWithoutSpecifierType()->getAnyOptionalObjectType();
+
+    assert(resultTy);
+
+    if (auto *genericFn = fnTy->getAs<GenericFunctionType>()) {
+      return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                      genericFn->getParams(), resultTy,
+                                      genericFn->getExtInfo());
+    }
+
+    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getExtInfo());
+  }
+
+  // Build a disjunction for the choices between an Optional type and
+  // it's underlying type. We'll make the choice of the Optional
+  // preferred, and select that if the expression type-checks
+  // appropriately with that type.
+  void buildDisjunctionForImplicitlyUnwrappedOptional(
+      TypeVariableType *tv, Type type, ConstraintLocator *locator) {
+
+    // Get a locator based on the anchor expression so that it's easy to
+    // regenerate the same locator for lookup when applying the results.
+    auto *disjunctionLocator = getConstraintLocator(
+        locator->getAnchor(),
+        ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+
+    // Create the constraint to bind to the optional type and make it
+    // the favored choice.
+    auto *bindToOptional = Constraint::create(*this, ConstraintKind::Bind, tv,
+                                              type, disjunctionLocator);
+    bindToOptional->setFavored();
+
+    Type underlyingType;
+    if (auto *fnTy = type->getAs<AnyFunctionType>())
+      underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
+    else
+      underlyingType =
+          type->getWithoutSpecifierType()->getAnyOptionalObjectType();
+
+    assert(underlyingType);
+
+    if (type->is<LValueType>())
+      underlyingType = LValueType::get(underlyingType);
+    assert(!type->is<InOutType>());
+
+    auto *bindToUnderlying = Constraint::create(
+        *this, ConstraintKind::Bind, tv, underlyingType, disjunctionLocator);
+
+    llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
+                                                  bindToUnderlying};
+
+    // Create the disjunction
+    addDisjunctionConstraint(choices, disjunctionLocator, RememberChoice);
+  }
+
+
   /// \brief Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);

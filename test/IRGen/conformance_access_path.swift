@@ -13,7 +13,7 @@ public protocol Validatable {}
 extension Validatable {
     public func tested() {}
 
-    // CHECK-LABEL: define{{.*}}_T023conformance_access_path11ValidatablePAAE6testedyqd__m2by_t9InputTypeQyd__RszAA15ValidationSuiteRd__lF
+    // CHECK-LABEL: define{{.*}}$S23conformance_access_path11ValidatablePAAE6tested2byyqd__m_t9InputTypeQyd__RszAA15ValidationSuiteRd__lF
     public func tested<S: ValidationSuite>(by suite: S.Type) where S.InputType == Self {
       // CHECK:   [[S_AS_VALIDATION_SUITE:%[0-9]+]] = load i8*, i8** %S.ValidationSuite
       // CHECK-NEXT:   [[S_VALIDATOR_BASE:%.*]] = bitcast i8* [[S_AS_VALIDATION_SUITE]] to i8**

@@ -92,7 +92,11 @@ extension String : StringProtocol, RangeReplaceableCollection {
     return _characters.index(after: i)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index value immediately before `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     return _characters.index(before: i)
@@ -438,24 +442,30 @@ extension Sequence {
 
 extension Collection {
   @_inlineable // FIXME(sil-serialize-all)
+  public func compactMap(
+    _ transform: (Element) throws -> String?
+  ) rethrows -> [String] {
+    return try _compactMap(transform)
+  }
+
+  @available(*, deprecated, renamed: "compactMap(_:)")
+  @inline(__always)
   public func flatMap(
     _ transform: (Element) throws -> String?
   ) rethrows -> [String] {
-    return try _flatMap(transform)
+    return try _compactMap(transform)
   }
 }
 //===----------------------------------------------------------------------===//
 
-extension String {
+extension Sequence where Element == String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
-  public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
-    where S.Iterator.Element == String {
-      fatalError()
+  public static func + (lhs: Self, rhs: String) -> Never {
+    fatalError()
   }
 
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
-  public static func + <S : Sequence>(lhs: String, rhs: S) -> Never
-    where S.Iterator.Element == String {
-      fatalError()
+  public static func + (lhs: String, rhs: Self) -> Never {
+    fatalError()
   }
 }

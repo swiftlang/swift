@@ -110,6 +110,7 @@ namespace irgen {
   class EnumMetadataLayout;
   class ExplosionSchema;
   class FixedTypeInfo;
+  class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
   class HeapLayout;
@@ -413,6 +414,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Is the current target using the Darwin pre-stable ABI's class marker bit?
+  bool UseDarwinPreStableABIBit = true;
+
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
@@ -664,10 +668,12 @@ public:
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
-  NominalMetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  MetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  NominalMetadataLayout &getNominalMetadataLayout(NominalTypeDecl *decl);
   StructMetadataLayout &getMetadataLayout(StructDecl *decl);
-  ClassMetadataLayout &getMetadataLayout(ClassDecl *decl);
+  ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
+  ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
 private:
   TypeConverter &Types;

@@ -18,7 +18,7 @@ extension C : P {
 class D {
 }
 
-// CHECK-COFF-NOT: @_T04main1CCMf = {{.*}}, section "__DATA,__objc_data, regular"
+// CHECK-COFF-NOT: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-COFF: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section ".objc_protolist$B"
 // CHECK-COFF: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section ".objc_protorefs$B"
 // CHECK-COFF: @"OBJC_CLASS_REF_$_I" = {{.*}}, section ".objc_classrefs$B"
@@ -27,7 +27,7 @@ class D {
 // CHECK-COFF: @objc_categories = {{.*}}, section ".objc_catlist$B"
 // CHECK-COFF: @objc_non_lazy_classes = {{.*}}, section ".objc_nlclslist$B"
 
-// CHECK-ELF-NOT: @_T04main1CCMf = {{.*}}, section "__DATA,__objc_data, regular"
+// CHECK-ELF-NOT: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-ELF: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section "objc_protolist"
 // CHECK-ELF: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section "objc_protorefs", align 8
 // CHECK-ELF: @"OBJC_CLASS_REF_$_I" = {{.*}}, section "objc_classrefs", align 8
@@ -36,7 +36,7 @@ class D {
 // CHECK-ELF: @objc_categories = {{.*}}, section "objc_catlist"
 // CHECK-ELF: @objc_non_lazy_classes = {{.*}}, section "objc_nlclslist", align 8
 
-// CHECK-MACHO: @_T04main1CCMf = {{.*}}, section "__DATA,__objc_data, regular"
+// CHECK-MACHO: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-MACHO: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section "__DATA,__objc_protolist,coalesced,no_dead_strip"
 // CHECK-MACHO: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
 // CHECK-MACHO: @"OBJC_CLASS_REF_$_I" = {{.*}}, section "__DATA,__objc_classrefs,regular,no_dead_strip"

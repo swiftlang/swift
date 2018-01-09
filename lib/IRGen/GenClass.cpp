@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -170,12 +171,6 @@ namespace {
     //   - or has a field with resilient layout.
     bool ClassMetadataRequiresDynamicInitialization = false;
 
-    // Does the superclass have a fixed number of stored properties?
-    // If not, and the class has generally-dependent layout, we have to
-    // access stored properties through an indirect offset into the field
-    // offset vector.
-    bool ClassHasFixedFieldCount = true;
-
     // Does the class have a fixed size up until the current point?
     // If not, we have to access stored properties either ivar offset globals,
     // or through the field offset vector, based on whether the layout has
@@ -253,6 +248,9 @@ namespace {
       if (theClass->isGenericContext())
         ClassMetadataRequiresDynamicInitialization = true;
 
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
+        ClassMetadataRequiresDynamicInitialization = true;
+
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
@@ -298,16 +296,6 @@ namespace {
 
           // If the superclass is resilient to us, we cannot statically
           // know the layout of either its instances or its class objects.
-          //
-          // FIXME: We need to implement indirect field/vtable entry access
-          // before we can enable this
-          if (IGM.Context.LangOpts.EnableClassResilience) {
-            ClassHasFixedFieldCount = false;
-          } else {
-            addFieldsForClass(superclass, superclassType);
-            NumInherited = Elements.size();
-          }
-
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -402,16 +390,7 @@ namespace {
 
       // If layout depends on generic parameters, we have to load the
       // offset from the class metadata.
-
-      // If the layout of the class metadata is statically known, then
-      // there should be a fixed offset to the right offset.
-      if (ClassHasFixedFieldCount) {
-        return FieldAccess::ConstantIndirect;
-      }
-
-      // Otherwise, the offset of the offset is stored in a global variable
-      // that will be set up by the runtime.
-      return FieldAccess::NonConstantIndirect;
+      return FieldAccess::ConstantIndirect;
     }
   };
 } // end anonymous namespace
@@ -2349,17 +2328,3 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
   auto &layout = selfTI.getClassLayout(IGM, selfType);
   return layout.MetadataRequiresDynamicInitialization;
 }
-
-bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
-                                                       CanType conformingType) {
-  NominalTypeDecl *nom = conformingType->getAnyNominal();
-  auto *clas = dyn_cast<ClassDecl>(nom);
-  if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
-    return true;
-
-  if (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))
-    return true;
-
-  return false;
-}
-

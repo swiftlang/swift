@@ -1106,6 +1106,7 @@ private:
       case SyntaxStructureKind::ObjectLiteralExpression:
         return "object-literal-expression";
       case SyntaxStructureKind::TupleExpression: return "tuple";
+      case SyntaxStructureKind::ClosureExpression: return "closure";
     }
     llvm_unreachable("unhandled tag?");
   }
