@@ -14,4 +14,11 @@
 - (NSString*) doSomething;
 @end
 
+@protocol FooProto <NSObject>
+@end
 
+@protocol SomeGenericClass <FooProto>
+@property (nonatomic, nullable, readonly, strong) NSString *version;
+- (NSString*) doSomething;
+- (id) doSomething2 : (NSArray<NSString*>*) arr;
+@end
