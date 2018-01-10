@@ -2844,7 +2844,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     if (ResultNotUsed) {
-      SILBuilder B(Inst);
+      SILBuilderWithScope B(Inst);
       B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
       if (DestroyDestInst)
         EraseInstAction(DestroyDestInst);
