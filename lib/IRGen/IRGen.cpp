@@ -762,6 +762,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
+      IGM.emitSwiftProtocols();
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
@@ -943,7 +944,11 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Okay, emit any definitions that we suddenly need.
   irgen.emitLazyDefinitions();
 
+  irgen.emitSwiftProtocols();
+
   irgen.emitProtocolConformances();
+
+  irgen.emitTypeMetadataRecords();
 
   irgen.emitReflectionMetadataVersion();
 
