@@ -799,6 +799,85 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       expectEqual(type(of: decoded), Employee.self, "Expected decoded value to be of type Employee; got \(type(of: decoded)) instead.")
   }
 
+  // MARK: - Encoder State
+  // SR-6078
+  func testEncoderStateThrowOnEncode() {
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+
+      func encode(to encoder: Encoder) throws {
+        // This approximates a subclass calling into its superclass, where the superclass encodes a value that might throw.
+        // The key here is that getting the superEncoder creates a referencing encoder.
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+
+        // Pushing a nested container on leaves the referencing encoder with multiple containers.
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The structure that would be encoded here looks like
+    //
+    //   [[[Float.infinity]]]
+    //
+    // The wrapper asks for an unkeyed container ([^]), gets a super encoder, and creates a nested container into that ([[^]]).
+    // We then encode an array into that ([[[^]]]), which happens to be a value that causes us to throw an error.
+    //
+    // The issue at hand reproduces when you have a referencing encoder (superEncoder() creates one) that has a container on the stack (unkeyedContainer() adds one) that encodes a value going through box_() (Array does that) that encodes something which throws (Float.infinity does that).
+    // When reproducing, this will cause a test failure via fatalError().
+    _ = try? JSONEncoder().encode(ReferencingEncoderWrapper([Float.infinity]))
+  }
+
+  func testEncoderStateThrowOnEncodeCustomDate() {
+    // This test is identical to testEncoderStateThrowOnEncode, except throwing via a custom Date closure.
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+      func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The closure needs to push a container before throwing an error to trigger.
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .custom({ _, encoder in
+      let _ = encoder.unkeyedContainer()
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    _ = try? encoder.encode(ReferencingEncoderWrapper(Date()))
+  }
+
+  func testEncoderStateThrowOnEncodeCustomData() {
+    // This test is identical to testEncoderStateThrowOnEncode, except throwing via a custom Data closure.
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+      func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The closure needs to push a container before throwing an error to trigger.
+    let encoder = JSONEncoder()
+    encoder.dataEncodingStrategy = .custom({ _, encoder in
+      let _ = encoder.unkeyedContainer()
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    _ = try? encoder.encode(ReferencingEncoderWrapper(Data()))
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -1439,5 +1518,8 @@ JSONEncoderTests.test("testInterceptDecimal") { TestJSONEncoder().testInterceptD
 JSONEncoderTests.test("testInterceptURL") { TestJSONEncoder().testInterceptURL() }
 JSONEncoderTests.test("testTypeCoercion") { TestJSONEncoder().testTypeCoercion() }
 JSONEncoderTests.test("testDecodingConcreteTypeParameter") { TestJSONEncoder().testDecodingConcreteTypeParameter() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncode") { TestJSONEncoder().testEncoderStateThrowOnEncode() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomDate") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomDate() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomData") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomData() }
 runAllTests()
 #endif
