@@ -903,10 +903,10 @@ var anyHashable: AnyHashable = 0
 
 // CHECK-LABEL: $S21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$S21bridged_casts_folding11anyHashables03AnyE0Vv
-// CHECK: function_ref @$Ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
-// CHECK-NEXT: apply %3(%1)
-// CHECK-NEXT: destroy_addr %1
+// CHECK: [[FUNC:%.*]] = function_ref @$Ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
+// CHECK-NEXT: apply [[FUNC]]([[GLOBAL]])
 // CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to $NSObjectSubclass
+// CHECK: } // end sil function '$S21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF'
 @inline(never)
 public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {
   return anyHashable as! NSObjectSubclass

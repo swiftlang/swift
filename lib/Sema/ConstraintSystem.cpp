@@ -1669,17 +1669,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
-  // Update the locator if this is an implicitly unwrapped
-  // value. Processing the bind constraint will generate a new
-  // disjunction constraint that attempts the Optional and if that
-  // doesn't succeed, the underlying type.
   if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
-    locator = getConstraintLocator(locator,
-                                   ConstraintLocator::ImplicitlyUnwrappedValue);
+    // Build the disjunction to attempt binding both T? and T (or
+    // function returning T? and function returning T).
+    buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType, locator);
+  } else {
+    // Add the type binding constraint.
+    addConstraint(ConstraintKind::Bind, boundType, refType, locator);
   }
-
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
