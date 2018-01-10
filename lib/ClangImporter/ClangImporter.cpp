@@ -2339,6 +2339,31 @@ ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
   }
 }
 
+void ClangImporter::lookupSynthesizedTypeDecl(
+    StringRef rawName, ClangTypeKind kind, StringRef discriminator,
+    llvm::function_ref<void(TypeDecl*)> receiver) {
+  if (discriminator == ERROR_ENUM_MANGLING_KEY ||
+      discriminator == ERROR_ENUM_ANON_MANGLING_KEY) {
+    auto underlyingKind = ClangTypeKind::Tag;
+    if (discriminator == ERROR_ENUM_ANON_MANGLING_KEY)
+      underlyingKind = ClangTypeKind::Typedef;
+    lookupTypeDecl(rawName, underlyingKind,
+                   [this, receiver] (const TypeDecl *foundType) {
+      auto *enumDecl =
+          dyn_cast_or_null<clang::EnumDecl>(foundType->getClangDecl());
+      if (!enumDecl)
+        return;
+      if (!Impl.getEnumInfo(enumDecl).isErrorEnum())
+        return;
+      auto *enclosingType =
+          dyn_cast<NominalTypeDecl>(foundType->getDeclContext());
+      if (!enclosingType)
+        return;
+      receiver(enclosingType);
+    });
+  }
+}
+
 void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {

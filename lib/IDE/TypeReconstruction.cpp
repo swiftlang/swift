@@ -57,6 +57,23 @@ CompareFunctionTypes(const AnyFunctionType *f, const AnyFunctionType *g,
                      bool *input_matches = nullptr,
                      bool *output_matches = nullptr);
 
+static Optional<ClangTypeKind>
+GetClangTypeKindFromSwiftKind(DeclKind decl_kind) {
+  Optional<ClangTypeKind> clangTypeKind;
+  switch (decl_kind) {
+  case DeclKind::Class:
+    return ClangTypeKind::ObjCClass;
+  case DeclKind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case DeclKind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case DeclKind::Struct:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 class DeclsLookupSource {
 public:
   typedef SmallVectorImpl<ValueDecl *> ValueDecls;
@@ -152,23 +169,8 @@ public:
         if (!swift_clang_importer)
           return;
 
-        Optional<ClangTypeKind> clangTypeKind;
-        switch (decl_kind) {
-        case DeclKind::Class:
-          clangTypeKind = ClangTypeKind::ObjCClass;
-          break;
-        case DeclKind::Protocol:
-          clangTypeKind = ClangTypeKind::ObjCProtocol;
-          break;
-        case DeclKind::TypeAlias:
-          clangTypeKind = ClangTypeKind::Typedef;
-          break;
-        case DeclKind::Struct:
-          clangTypeKind = ClangTypeKind::Tag;
-          break;
-        default:
-          break;
-        }
+        Optional<ClangTypeKind> clangTypeKind =
+            GetClangTypeKindFromSwiftKind(decl_kind);
         if (clangTypeKind) {
           swift_clang_importer->lookupTypeDecl(name.getIdentifier().str(),
                                                clangTypeKind.getValue(),
@@ -223,14 +225,40 @@ public:
     return;
   }
 
-  void lookupMember(DeclName id, Identifier priv_decl_id, ValueDecls &result) {
-    if (_type == LookupKind::Decl)
-      return lookupMember(_decl, id, priv_decl_id, result);
-    if (_type == LookupKind::SwiftModule)
-      return lookupMember(_module, id, priv_decl_id, result);
-    if (_type == LookupKind::Extension)
-      return lookupMember(_extension._decl, id, priv_decl_id, result);
-    return;
+  void lookupMember(DeclName id, Identifier priv_decl_id,
+                    Optional<DeclKind> decl_kind,
+                    ValueDecls &result) {
+    switch (_type) {
+    case LookupKind::SwiftModule:
+      lookupMember(_module, id, priv_decl_id, result);
+      return;
+    case LookupKind::ClangImporter: {
+      if (!decl_kind)
+        return;
+
+      auto *importer = static_cast<ClangImporter *>(
+          _clang_crawler._ast->getClangModuleLoader());
+      Optional<ClangTypeKind> clang_kind =
+          GetClangTypeKindFromSwiftKind(decl_kind.getValue());
+      if (clang_kind) {
+        importer->lookupSynthesizedTypeDecl(id.getBaseIdentifier().str(),
+                                            clang_kind.getValue(),
+                                            priv_decl_id.str(),
+                                            [&result](TypeDecl *found) {
+          result.push_back(found);
+        });
+      }
+      return;
+    }
+    case LookupKind::Decl:
+      lookupMember(_decl, id, priv_decl_id, result);
+      return;
+    case LookupKind::Extension:
+      lookupMember(_extension._decl, id, priv_decl_id, result);
+      return;
+    case LookupKind::Invalid:
+      return;
+    }
   }
 
   void lookupMember(DeclContext *decl_ctx, DeclName id, Identifier priv_decl_id,
@@ -491,7 +519,8 @@ static bool FindFirstNamedDeclWithKind(
         DeclsLookupSource lookup(
             DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
         SmallVector<ValueDecl *, 4> decls;
-        lookup.lookupMember(name, GetIdentifier(ast, priv_decl_id), decls);
+        lookup.lookupMember(name, GetIdentifier(ast, priv_decl_id), decl_kind,
+                            decls);
 
         if (FilterDeclsForKind(decl_kind, decls, result))
           return true;
@@ -500,9 +529,8 @@ static bool FindFirstNamedDeclWithKind(
   } else if (result._module) {
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(
-          name, ast->getIdentifier(priv_decl_id.getValue().c_str()),
-          decls);
+      result._module.lookupMember(name, GetIdentifier(ast, priv_decl_id),
+                                  decl_kind, decls);
     else
       result._module.lookupByMangledName(name, decl_kind, decls);
     if (FilterDeclsForKind(decl_kind, decls, result))
@@ -527,7 +555,8 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
         DeclsLookupSource lookup(
             DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
         SmallVector<ValueDecl *, 4> decls;
-        lookup.lookupMember(name, GetIdentifier(ast, priv_decl_id), decls);
+        lookup.lookupMember(name, GetIdentifier(ast, priv_decl_id),
+                            /*decl_kind*/None, decls);
         if (decls.empty()) {
           result._error = stringWithFormat(
               "no decl found in '%s' (DeclKind=%u)",
@@ -580,8 +609,9 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
     ModuleDecl::AccessPathTy access_path;
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(name,
-          ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
+      result._module.lookupMember(
+          name, ast->getIdentifier(priv_decl_id.getValue().c_str()),
+          /*decl_kind*/None, decls);
     else
       result._module.lookupValue(access_path, name, NLKind::QualifiedLookup,
                                  decls);

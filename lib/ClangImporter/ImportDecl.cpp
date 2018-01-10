@@ -2689,6 +2689,17 @@ namespace {
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
+          StringRef nameForMangling;
+          StringRef discriminatorForMangling;
+          if (decl->getDeclName().isEmpty()) {
+            nameForMangling = decl->getTypedefNameForAnonDecl()->getName();
+            discriminatorForMangling = ERROR_ENUM_ANON_MANGLING_KEY;
+          } else {
+            nameForMangling = decl->getName();
+            discriminatorForMangling = ERROR_ENUM_MANGLING_KEY;
+          }
+          errorWrapper->getAttrs().add(new (C) CustomTypeNameManglingAttr(C.getIdentifier(nameForMangling), C.getIdentifier(discriminatorForMangling)));
+
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
                                       {KnownProtocolKind::BridgedStoredNSError});

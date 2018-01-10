@@ -31,6 +31,10 @@ class MacroInfo;
 namespace swift {
 namespace importer {
 
+// This spelling matches the Clang attribute.
+static const char ERROR_ENUM_MANGLING_KEY[] = "ns_error_domain";
+static const char ERROR_ENUM_ANON_MANGLING_KEY[] = "ns_error_domain__anon";
+
 /// Describes how a particular C enumeration type will be imported
 /// into Swift. All of the possibilities have the same storage
 /// representation, but can be used in different ways.

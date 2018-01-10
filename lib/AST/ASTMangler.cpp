@@ -598,9 +598,20 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  if (decl->isOperator()) {
-    auto name = decl->getBaseName().getIdentifier().str();
-    appendIdentifier(translateOperator(name));
+  DeclBaseName name;
+
+  auto *customNameAttr =
+      decl->getAttrs().getAttribute<CustomTypeNameManglingAttr>();
+
+  if (customNameAttr)
+    name = customNameAttr->Name;
+  else
+    name = decl->getBaseName();
+
+  assert(!name.isSpecial() && "Cannot print special names");
+
+  if (name.isOperator()) {
+    appendIdentifier(translateOperator(name.getIdentifier().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -612,9 +623,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         appendOperator("oi");
         break;
     }
-  } else if (decl->hasName()) {
-    assert(!decl->getBaseName().isSpecial() && "Cannot print special names");
-    appendIdentifier(decl->getBaseName().getIdentifier().str());
+  } else if (!name.empty()) {
+    appendIdentifier(name.getIdentifier().str());
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -633,7 +643,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
 
-  StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
+  StringRef privateDiscriminator;
+  if (customNameAttr)
+    privateDiscriminator = customNameAttr->Discriminator.str();
+  else
+    privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
   if (!privateDiscriminator.empty()) {
     appendIdentifier(privateDiscriminator.str());
     return appendOperator("LL");

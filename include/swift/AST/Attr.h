@@ -1200,6 +1200,23 @@ public:
   }
 };
 
+/// Directly controls the mangled name of this type --- not the entire symbol,
+/// just the name part.
+class CustomTypeNameManglingAttr : public DeclAttribute {
+public:
+  CustomTypeNameManglingAttr(Identifier name, Identifier discriminator)
+    : DeclAttribute(DAK_CustomTypeNameMangling, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      Name(name), Discriminator(discriminator) {}
+
+  const Identifier Name;
+  const Identifier Discriminator;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_CustomTypeNameMangling;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
