@@ -538,7 +538,7 @@ public:
   /// The set of values that must be sent to the accelerator.
   SmallPtrSet<SILValue, 8> valuesToSend;
 
-  /// Set of all of the __tfop_send calls that silence copy-in warnings.
+  /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
 
   /// These are the results of tensor values that should be returned by the
@@ -596,7 +596,7 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
     if (auto *callee = dyn_cast<FunctionRefInst>(apply->getCallee()))
-      if (callee->getReferencedFunction()->getName().contains("__tfop_send")) {
+      if (callee->getReferencedFunction()->getName().contains("__tf_send")) {
         explicitCopyMarkers.insert(apply);
         return;
       }
@@ -621,7 +621,7 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(user))
     if (auto *fn = dyn_cast<FunctionRefInst>(apply->getCallee()))
-      if (fn->getReferencedFunction()->getName().contains("__tfop_receive")) {
+      if (fn->getReferencedFunction()->getName().contains("__tf_receive")) {
         explicitCopyMarkers.insert(apply);
         return false;
       }
