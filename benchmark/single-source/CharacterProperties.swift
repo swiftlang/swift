@@ -27,8 +27,21 @@ public let CharacterPropertiesFetch = BenchmarkInfo(
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
+  tags: [.validation, .api, .String],
+  setUpFunction: { run_CharacterPropertiesStashed(1) },
+  tearDownFunction: nil)
+
+public let CharacterPropertiesStashedMemo = BenchmarkInfo(
+  name: "CharacterPropertiesStashedMemo",
+  runFunction: run_CharacterPropertiesStashedMemo,
   tags: [.validation, .api, .String])
 
+public let CharacterPropertiesPrecomputed = BenchmarkInfo(
+  name: "CharacterPropertiesPrecomputed",
+  runFunction: run_CharacterPropertiesPrecomputed,
+  tags: [.validation, .api, .String],
+  setUpFunction: { run_CharacterPropertiesPrecomputed(1) },
+  tearDownFunction: nil)
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -109,6 +122,240 @@ func isCapitalizedStashed(_ c: Character) -> Bool {
   return capitalizedLetters.contains(c.firstScalar)
 }
 
+// Memoize the stashed set
+var controlCharactersMemo = Set<UInt32>()
+func isControlStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if controlCharactersMemo.contains(scalar.value) { return true }
+  if controlCharacters.contains(scalar) {
+    controlCharactersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var alphanumericsMemo = Set<UInt32>()
+func isAlphanumericStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if alphanumericsMemo.contains(scalar.value) { return true }
+  if alphanumerics.contains(scalar) {
+    alphanumericsMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var lowercaseLettersMemo = Set<UInt32>()
+func isLowercaseStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if lowercaseLettersMemo.contains(scalar.value) { return true }
+  if lowercaseLetters.contains(scalar) {
+    lowercaseLettersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var punctuationCharactersMemo = Set<UInt32>()
+func isPunctuationStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if punctuationCharactersMemo.contains(scalar.value) { return true }
+  if punctuationCharacters.contains(scalar) {
+    punctuationCharactersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var whitespacesMemo = Set<UInt32>()
+func isWhitespaceStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if whitespacesMemo.contains(scalar.value) { return true }
+  if whitespaces.contains(scalar) {
+    whitespacesMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var lettersMemo = Set<UInt32>()
+func isLetterStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if lettersMemo.contains(scalar.value) { return true }
+  if letters.contains(scalar) {
+    lettersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var uppercaseLettersMemo = Set<UInt32>()
+func isUppercaseStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if uppercaseLettersMemo.contains(scalar.value) { return true }
+  if uppercaseLetters.contains(scalar) {
+    uppercaseLettersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var decimalDigitsMemo = Set<UInt32>()
+func isDecimalStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if decimalDigitsMemo.contains(scalar.value) { return true }
+  if decimalDigits.contains(scalar) {
+    decimalDigitsMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var newlinesMemo = Set<UInt32>()
+func isNewlineStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if newlinesMemo.contains(scalar.value) { return true }
+  if newlines.contains(scalar) {
+    newlinesMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+var capitalizedLettersMemo = Set<UInt32>()
+func isCapitalizedStashedMemo(_ c: Character) -> Bool {
+  let scalar = c.firstScalar
+  if capitalizedLettersMemo.contains(scalar.value) { return true }
+  if capitalizedLetters.contains(scalar) {
+    capitalizedLettersMemo.insert(scalar.value)
+    return true
+  }
+  return false
+}
+
+// Precompute whole scalar set
+var controlCharactersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if controlCharacters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isControlPrecomputed(_ c: Character) -> Bool {
+  return controlCharactersPrecomputed.contains(c.firstScalar.value)
+}
+var alphanumericsPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if alphanumerics.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isAlphanumericPrecomputed(_ c: Character) -> Bool {
+  return alphanumericsPrecomputed.contains(c.firstScalar.value)
+}
+var lowercaseLettersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if lowercaseLetters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isLowercasePrecomputed(_ c: Character) -> Bool {
+  return lowercaseLettersPrecomputed.contains(c.firstScalar.value)
+}
+var punctuationCharactersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if punctuationCharacters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isPunctuationPrecomputed(_ c: Character) -> Bool {
+  return punctuationCharactersPrecomputed.contains(c.firstScalar.value)
+}
+var whitespacesPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if whitespaces.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isWhitespacePrecomputed(_ c: Character) -> Bool {
+  return whitespacesPrecomputed.contains(c.firstScalar.value)
+}
+var lettersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if letters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isLetterPrecomputed(_ c: Character) -> Bool {
+  return lettersPrecomputed.contains(c.firstScalar.value)
+}
+var uppercaseLettersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if uppercaseLetters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isUppercasePrecomputed(_ c: Character) -> Bool {
+  return uppercaseLettersPrecomputed.contains(c.firstScalar.value)
+}
+var decimalDigitsPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if decimalDigits.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isDecimalPrecomputed(_ c: Character) -> Bool {
+  return decimalDigitsPrecomputed.contains(c.firstScalar.value)
+}
+var newlinesPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if newlines.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isNewlinePrecomputed(_ c: Character) -> Bool {
+  return newlinesPrecomputed.contains(c.firstScalar.value)
+}
+var capitalizedLettersPrecomputed: Set<UInt32> = {
+  var result = Set<UInt32>()
+  for i in 0...0x0010_FFFF {
+    guard let scalar = UnicodeScalar(i) else { continue }
+    if capitalizedLetters.contains(scalar) {
+      result.insert(scalar.value)
+    }
+  }
+  return result
+}()
+func isCapitalizedPrecomputed(_ c: Character) -> Bool {
+  return capitalizedLettersPrecomputed.contains(c.firstScalar.value)
+}
+
 // Compute on the fly
 //
 // TODO: If UnicodeScalars ever exposes category, etc., implement the others!
@@ -132,7 +379,7 @@ let workload = """
 
 @inline(never)
 public func run_CharacterPropertiesFetch(_ N: Int) {
-  for _ in 1...N {
+  for _ in 1...N*10 {
     for c in workload {
         blackHole(isControl(c))
         blackHole(isAlphanumeric(c))
@@ -150,7 +397,7 @@ public func run_CharacterPropertiesFetch(_ N: Int) {
 
 @inline(never)
 public func run_CharacterPropertiesStashed(_ N: Int) {
-  for _ in 1...N {
+  for _ in 1...N*10 {
     for c in workload {
         blackHole(isControlStashed(c))
         blackHole(isAlphanumericStashed(c))
@@ -165,6 +412,44 @@ public func run_CharacterPropertiesStashed(_ N: Int) {
     }
   }
 }
+
+@inline(never)
+public func run_CharacterPropertiesStashedMemo(_ N: Int) {
+  for _ in 1...N*10 {
+    for c in workload {
+        blackHole(isControlStashedMemo(c))
+        blackHole(isAlphanumericStashedMemo(c))
+        blackHole(isLowercaseStashedMemo(c))
+        blackHole(isPunctuationStashedMemo(c))
+        blackHole(isWhitespaceStashedMemo(c))
+        blackHole(isLetterStashedMemo(c))
+        blackHole(isUppercaseStashedMemo(c))
+        blackHole(isDecimalStashedMemo(c))
+        blackHole(isNewlineStashedMemo(c))
+        blackHole(isCapitalizedStashedMemo(c))
+    }
+  }
+}
+
+@inline(never)
+public func run_CharacterPropertiesPrecomputed(_ N: Int) {
+  for _ in 1...N*10 {
+    for c in workload {
+        blackHole(isControlPrecomputed(c))
+        blackHole(isAlphanumericPrecomputed(c))
+        blackHole(isLowercasePrecomputed(c))
+        blackHole(isPunctuationPrecomputed(c))
+        blackHole(isWhitespacePrecomputed(c))
+        blackHole(isLetterPrecomputed(c))
+        blackHole(isUppercasePrecomputed(c))
+        blackHole(isDecimalPrecomputed(c))
+        blackHole(isNewlinePrecomputed(c))
+        blackHole(isCapitalizedPrecomputed(c))
+    }
+  }
+}
+
+
 
 // TODO: run_CharacterPropertiesComputed
 

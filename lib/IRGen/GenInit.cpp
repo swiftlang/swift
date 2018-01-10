@@ -24,13 +24,12 @@
 #include "llvm/IR/Module.h"
 
 #include "DebugTypeInfo.h"
-#include "Explosion.h"
-#include "GenHeap.h"
 #include "GenTuple.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "FixedTypeInfo.h"
+#include "Temporary.h"
 
 using namespace swift;
 using namespace irgen;
@@ -82,4 +81,18 @@ void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
+}
+
+void TemporarySet::destroyAll(IRGenFunction &IGF) const {
+  assert(!hasBeenCleared() && "destroying a set that's been cleared?");
+
+  // Deallocate all the temporaries.
+  for (auto &temporary : reversed(Stack)) {
+    temporary.destroy(IGF);
+  }
+}
+
+void Temporary::destroy(IRGenFunction &IGF) const {
+  auto &ti = IGF.getTypeInfo(Type);
+  ti.deallocateStack(IGF, Addr, Type);
 }

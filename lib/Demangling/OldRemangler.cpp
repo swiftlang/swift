@@ -1849,6 +1849,11 @@ void Remangler::mangleOutlinedBridgedMethod(Node *node) {
   mangleSingleChildNode(node);
 }
 
+void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
+  Out << "TC";
+  mangleChildNodes(node);
+}
+
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
   Out << "TK";
   mangleChildNodes(node);

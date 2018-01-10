@@ -129,6 +129,10 @@ std::string LinkEntity::mangleAsString() const {
                   getProtocolConformance(), assocConf.first, assocConf.second);
     }
 
+    case Kind::CoroutineContinuationPrototype:
+      return mangler.mangleCoroutineContinuationPrototype(
+                                              cast<SILFunctionType>(getType()));
+
       // An Objective-C class reference reference. The symbol is private, so
       // the mangling is unimportant; it should just be readable in LLVM IR.
     case Kind::ObjCClassRef: {

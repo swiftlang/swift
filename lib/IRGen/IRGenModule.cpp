@@ -872,6 +872,10 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
+llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
+  return llvm::ConstantExpr::getBitCast(ptr, Int8PtrTy);
+}
+
 static void appendEncodedName(raw_ostream &os, StringRef name) {
   if (clang::isValidIdentifier(name)) {
     os << "_" << name;

@@ -1409,6 +1409,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);
+    case 'C': {
+      NodePointer type = popNode(Node::Kind::Type);
+      return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
+    }
     case 'V': {
       NodePointer Base = popNode(isEntity);
       NodePointer Derived = popNode(isEntity);

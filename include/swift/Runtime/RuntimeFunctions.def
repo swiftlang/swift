@@ -1301,6 +1301,15 @@ FUNCTION(ProtocolAddProtocol, protocol_addProtocol, C_CC,
          ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(Malloc, malloc, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy),
+         NO_ATTRS)
+FUNCTION(Free, free, C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         NO_ATTRS)
+
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, _Block_copy, C_CC,
          RETURNS(ObjCBlockPtrTy),

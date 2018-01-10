@@ -307,6 +307,7 @@ private:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
+    case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
@@ -1412,6 +1413,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::CoroutineContinuationPrototype:
+    Printer << "coroutine continuation prototype for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ValueWitness:
