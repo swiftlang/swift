@@ -385,7 +385,7 @@ struct StructLoweringState {
   SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
   // All debug instructions.
   // to be modified *only if* the operands are used in "real" instructions
-  SmallVector<SILInstruction *, 16> debugInstsToMod;
+  SmallVector<DebugValueInst *, 16> debugInstsToMod;
 
   StructLoweringState(SILFunction *F, irgen::IRGenModule &Mod)
       : F(F), Mod(Mod) {}
@@ -1860,7 +1860,7 @@ static void rewriteFunction(StructLoweringState &pass,
     instr->getParent()->erase(instr);
   }
 
-  for (SILInstruction *instr : pass.debugInstsToMod) {
+  for (DebugValueInst *instr : pass.debugInstsToMod) {
     assert(instr->getAllOperands().size() == 1 &&
            "Debug instructions have one operand");
     for (Operand &operand : instr->getAllOperands()) {
@@ -1875,7 +1875,8 @@ static void rewriteFunction(StructLoweringState &pass,
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
         SILBuilderWithScope debugBuilder(instr);
-        debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand);
+        debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
+                                          instr->getVarInfo());
         instr->getParent()->erase(instr);
       }
     }
