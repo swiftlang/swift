@@ -2365,8 +2365,9 @@ public:
   // it's underlying type. We'll make the choice of the Optional
   // preferred, and select that if the expression type-checks
   // appropriately with that type.
-  void buildDisjunctionForImplicitlyUnwrappedOptional(
-      TypeVariableType *tv, Type type, ConstraintLocator *locator) {
+  void
+  buildDisjunctionForImplicitlyUnwrappedOptional(Type boundTy, Type type,
+                                                 ConstraintLocator *locator) {
 
     // Get a locator based on the anchor expression so that it's easy to
     // regenerate the same locator for lookup when applying the results.
@@ -2376,8 +2377,8 @@ public:
 
     // Create the constraint to bind to the optional type and make it
     // the favored choice.
-    auto *bindToOptional = Constraint::create(*this, ConstraintKind::Bind, tv,
-                                              type, disjunctionLocator);
+    auto *bindToOptional = Constraint::create(
+        *this, ConstraintKind::Bind, boundTy, type, disjunctionLocator);
     bindToOptional->setFavored();
 
     Type underlyingType;
@@ -2393,8 +2394,9 @@ public:
       underlyingType = LValueType::get(underlyingType);
     assert(!type->is<InOutType>());
 
-    auto *bindToUnderlying = Constraint::create(
-        *this, ConstraintKind::Bind, tv, underlyingType, disjunctionLocator);
+    auto *bindToUnderlying =
+        Constraint::create(*this, ConstraintKind::Bind, boundTy, underlyingType,
+                           disjunctionLocator);
 
     llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
                                                   bindToUnderlying};
