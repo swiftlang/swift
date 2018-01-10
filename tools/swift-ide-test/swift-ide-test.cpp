@@ -3007,6 +3007,14 @@ int main(int argc, char *argv[]) {
 
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  if (options::DisableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = false;
+  } else if (options::EnableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = true;
+  } else if (!options::Triple.empty()) {
+    InitInvok.getLangOptions().EnableObjCInterop =
+        llvm::Triple(options::Triple).isOSDarwin();
+  }
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
@@ -3019,14 +3027,6 @@ int main(int argc, char *argv[]) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
-  }
-  if (options::DisableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = false;
-  } else if (options::EnableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = true;
-  } else {
-    InitInvok.getLangOptions().EnableObjCInterop =
-        llvm::Triple(InitInvok.getTargetTriple()).isOSDarwin();
   }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
