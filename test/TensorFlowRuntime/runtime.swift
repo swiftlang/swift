@@ -51,7 +51,7 @@ func runProgram(_ progName: String,
 
   let program = _TFCStartTensorProgram(graphProto.utf8Start,
                                        graphProto.utf8CodeUnitCount,
-                                       UnsafePointer<CTensorHandle>(inputTensors),
+                                       inputTensors,
                                        inputTensors.count,
                                        /*number of output tensors*/1)
   let outputBuffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 1)
@@ -72,6 +72,29 @@ func runProgram(_ progName: String,
   print("Program \(progName) produced a tensor.")
 
   return [resultTensor]
+}
+
+// 0 input and output tensors.
+func runConst() {
+  /* The corresponding Swift program:
+   func testTestorExample() {
+     let x = Tensor<Float>(2.0)
+   }
+   */
+  let graphProto: StaticString = "\n\u{0E}\n\u{0C}the_function\u{1A}V\n%op._T03e2e17testTestorExampleyyF.9.13\u{12}\u{05}Const*\u{19}\n\u{05}value\u{12}\u{10}B\u{0E}\u{08}\u{01}\u{12}\u{04}\u{12}\u{02}\u{08}\u{01}*\u{04}\0\0\0@*\u{0B}\n\u{05}dtype\u{12}\u{02}0\u{01}"
+
+  let program = _TFCStartTensorProgram(graphProto.utf8Start,
+                                       graphProto.utf8CodeUnitCount,
+                                       /*inputTensors=*/[],
+                                       /*inputTensors.count=*/0,
+                                       /*number of output tensors*/0)
+
+  // Even though there is no output tensor, we create outputBuffer via
+  // UnsafeMutablePointer.allocate(). The generated SIL code differs from what
+  // TF compiler would generate.
+  let outputBuffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 0)
+  _TFCFinishTensorProgram(program, outputBuffer, 0)
+  outputBuffer.deallocate()
 }
 
 func runTanh() {
@@ -108,6 +131,10 @@ func runAdd(shouldAbort: Bool) {
   if (!shouldAbort) {
       checkFloatValueNear(outputTensors[0], 1.2+3.4)
   }
+}
+
+RuntimeTests.test("Runtime/BasicConstTest") {
+  runConst()
 }
 
 RuntimeTests.test("Runtime/BasicTanhTest") {
