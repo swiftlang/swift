@@ -187,6 +187,44 @@
                 "swift-xcode-playground-support": "swift-4.0-branch",
                 "ninja": "release"
             }
+        },
+        "swift-5.0-branch" : {
+            "aliases": ["swift-5.0-branch"],
+            "repos": {
+                "llvm": "swift-4.1-branch",
+                "clang": "swift-4.1-branch",
+                "swift": "swift-5.0-branch",
+                "lldb": "swift-5.0-branch",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-4.1-branch",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
+            }
+        },
+        "master-llvm-swift5-transition" : {
+            "aliases": ["master-llvm-swift5-transition","llvm-swift5-transition"],
+            "repos": {
+                "llvm": "swift-5.0-branch",
+                "clang": "swift-5.0-branch",
+                "swift": "master-llvm-swift5-transition",
+                "lldb": "llvm-swift5-transition",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-5.0-branch",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release"
+            }
         }
     }
 }
