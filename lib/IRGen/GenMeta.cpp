@@ -5521,6 +5521,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   auto var = cast<llvm::GlobalVariable>(
           getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
   var->setConstant(true);
+
+  // Note that we emitted this protocol.
+  SwiftProtocols.push_back(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

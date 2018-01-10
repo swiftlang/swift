@@ -24,6 +24,7 @@
   __attribute__((__visibility__("hidden"))) extern const char __stop_##name;
 
 extern "C" {
+DECLARE_SWIFT_SECTION(swift5_protocols)
 DECLARE_SWIFT_SECTION(swift5_protocol_conformances)
 DECLARE_SWIFT_SECTION(swift5_type_metadata)
 
@@ -52,6 +53,7 @@ static void swift_image_constructor() {
       nullptr,
       nullptr,
 
+      SWIFT_SECTION_RANGE(swift5_protocols),
       SWIFT_SECTION_RANGE(swift5_protocol_conformances),
       SWIFT_SECTION_RANGE(swift5_type_metadata),
 
