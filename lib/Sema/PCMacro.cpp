@@ -287,6 +287,9 @@ public:
   
   DeferStmt *transformDeferStmt(DeferStmt *DS) {
     if (auto *FD = DS->getTempDecl()) {
+      // Temporarily unmark the DeferStmt's FuncDecl as implicit so it is
+      // transformed (as typically implicit Decls are skipped by the
+      // transformer).
       auto Implicit = FD->isImplicit();
       FD->setImplicit(false);
       auto *D = transformDecl(FD);
