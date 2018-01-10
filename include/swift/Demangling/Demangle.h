@@ -235,6 +235,11 @@ inline bool isMangledName(llvm::StringRef mangledName) {
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
 bool isSwiftSymbol(llvm::StringRef mangledName);
 
+/// Returns true if the mangledName starts with the swift mangling prefix.
+///
+/// This includes the old (<= swift 3.x) mangling prefix "_T".
+bool isSwiftSymbol(const char *mangledName);
+
 /// Drops the Swift mangling prefix from the given mangled name, if there is
 /// one.
 ///
