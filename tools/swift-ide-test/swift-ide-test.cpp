@@ -1091,6 +1091,7 @@ private:
       case SyntaxStructureKind::TypeAlias: return "typealias";
       case SyntaxStructureKind::Subscript: return "subscript";
       case SyntaxStructureKind::AssociatedType: return "associatedtype";
+      case SyntaxStructureKind::GenericTypeParam: return "generic-param";
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::ForEachStatement: return "foreach";
       case SyntaxStructureKind::WhileStatement: return "while";

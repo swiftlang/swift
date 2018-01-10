@@ -487,8 +487,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
 
-  case tok::pound_keyPath:
-    return parseExprKeyPathObjC();
   case tok::backslash:
     return parseExprKeyPath();
 
@@ -1465,6 +1463,8 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   ParserResult<Expr> Result;
   switch (Tok.getKind()) {
+  case tok::pound_keyPath:
+    return parseExprKeyPathObjC();
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
@@ -2264,8 +2264,10 @@ Expr *Parser::parseExprIdentifier() {
   
   Expr *E;
   if (D == nullptr) {
-    if (name.getBaseName().isEditorPlaceholder())
+    if (name.getBaseName().isEditorPlaceholder()) {
+      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
       return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
+    }
 
     auto refKind = DeclRefKind::Ordinary;
     E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
@@ -2294,7 +2296,6 @@ Expr *Parser::parseExprIdentifier() {
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
                                          Identifier PlaceholderId) {
-  SyntaxParsingContext TmpContext(SyntaxContext, SyntaxKind::UnknownExpr);
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 

@@ -194,20 +194,21 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
   TypeRefBuilder Builder;
 
-  auto P1 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P2 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P3 = Builder.createProtocolType(ABCD, MyModule, "", Shmrotocol);
-  auto P4 = Builder.createProtocolType(XYZ, Shmodule, "", MyProtocol);
+  Optional<std::string> P1 = ABC;
+  Optional<std::string> P2 = ABC;
+  Optional<std::string> P3 = ABCD;
+  Optional<std::string> P4 = XYZ;
 
   EXPECT_EQ(P1, P2);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P3, P4);
 
-  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC3 = Builder.createProtocolCompositionType({P1, P2, P2}, false);
-  auto Any = Builder.createProtocolCompositionType({}, false);
+  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC3 =
+    Builder.createProtocolCompositionType({P1, P2, P2}, nullptr, false);
+  auto Any = Builder.createProtocolCompositionType({}, nullptr, false);
 
   EXPECT_EQ(PC1, PC2);
   EXPECT_NE(PC2, PC3);
@@ -258,8 +259,8 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
-  auto P1 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P2 = Builder.createProtocolType(ABCD, Shmodule, "", MyProtocol);
+  Optional<std::string> P1 = ABC;
+  Optional<std::string> P2 = ABCD;
 
   auto DM1 = Builder.createDependentMemberType("Index", N1, P1);
   auto DM2 = Builder.createDependentMemberType("Index", N1, P1);

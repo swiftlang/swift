@@ -1448,13 +1448,12 @@ class CopyForwardingPass : public SILFunctionTransform
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
-class TempRValueOptPass : public SILFunctionTransform
-{
+class TempRValueOptPass : public SILFunctionTransform {
   AliasAnalysis *AA = nullptr;
 
-  static bool collectLoads(SILInstruction *CurrentInst,
-                           SingleValueInstruction *addr,
-                           llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts);
+  static bool collectLoads(Operand *UserOp, SILInstruction *UserInst,
+                           SingleValueInstruction *Addr,
+                           llvm::SmallPtrSetImpl<SILInstruction *> &LoadInsts);
 
   bool checkNoSourceModification(CopyAddrInst *copyInst,
                        const llvm::SmallPtrSetImpl<SILInstruction *> &useInsts);
@@ -1510,9 +1509,9 @@ void TempRValueOptPass::run() {
 
 /// Transitively explore all data flow uses of the given \p address until
 /// reaching a load or returning false.
-bool TempRValueOptPass::
-collectLoads(SILInstruction *user, SingleValueInstruction *address,
-             llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+bool TempRValueOptPass::collectLoads(
+    Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
+    llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
   if (user->getParent() != address->getParent())
@@ -1523,45 +1522,57 @@ collectLoads(SILInstruction *user, SingleValueInstruction *address,
   // destroy the source. This way, we know that the destroy_addr instructions
   // that we recorded cover all the temporary's lifetime termination points.
   //
-  // Currently this includes address projections and loads.
+  // Currently this includes address projections, loads, and in_guaranteed uses
+  // by an apply.
   //
   // TODO: handle non-destructive projections of enums
   // (unchecked_take_enum_data_addr of Optional is nondestructive.)
   switch (user->getKind()) {
-    default:
-      DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
-      return false;
+  default:
+    DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
+    return false;
 
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst: {
-      // Transitively look through projections on stack addresses.
-      auto proj = cast<SingleValueInstruction>(user);
-      for (auto *useOper : proj->getUses()) {
-        if (!collectLoads(useOper->getUser(), proj, loadInsts))
-          return false;
-      }
+  case SILInstructionKind::ApplyInst: {
+    auto *AI = cast<ApplyInst>(user);
+    auto Convention = AI->getArgumentConvention(userOp->getOperandNumber() - 1);
+    if (Convention.isGuaranteedConvention()) {
+      loadInsts.insert(AI);
       return true;
     }
-
-    case SILInstructionKind::LoadInst:
-    case SILInstructionKind::LoadBorrowInst: {
-      // Loads are the end of the data flow chain. The users of the load can't
-      // access the temporary storage.
-      loadInsts.insert(user);
-      return true;
-    }
-
-    case SILInstructionKind::CopyAddrInst: {
-      // copy_addr which read from the temporary are like loads.
-      // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
-      auto *copyFromTmp = cast<CopyAddrInst>(user);
-      if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
-        DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
+    DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy is source"
+                       << *user);
+    return false;
+  }
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst: {
+    // Transitively look through projections on stack addresses.
+    auto proj = cast<SingleValueInstruction>(user);
+    for (auto *projUseOper : proj->getUses()) {
+      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, loadInsts))
         return false;
-      }
-      loadInsts.insert(copyFromTmp);
-      return true;
     }
+    return true;
+  }
+
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::LoadBorrowInst: {
+    // Loads are the end of the data flow chain. The users of the load can't
+    // access the temporary storage.
+    loadInsts.insert(user);
+    return true;
+  }
+
+  case SILInstructionKind::CopyAddrInst: {
+    // copy_addr which read from the temporary are like loads.
+    // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
+    auto *copyFromTmp = cast<CopyAddrInst>(user);
+    if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
+      DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
+      return false;
+    }
+    loadInsts.insert(copyFromTmp);
+    return true;
+  }
   }
 }
 
@@ -1627,7 +1638,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
       continue;
 
-    if (!collectLoads(user, tempObj, loadInsts))
+    if (!collectLoads(useOper, user, tempObj, loadInsts))
       return false;
   }
 
@@ -1654,6 +1665,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     case SILInstructionKind::TupleElementAddrInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::ApplyInst:
       use->set(copyInst->getSrc());
       break;
 

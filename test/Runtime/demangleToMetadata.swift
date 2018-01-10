@@ -78,12 +78,27 @@ DemangleToMetadataTests.test("metatype types") {
 
 func f2_any_anyobject(_: Any, _: AnyObject) { }
 
+class C { }
+
+protocol P1 { }
+protocol P2 { }
+
+func f1_composition(_: P1 & P2) { }
+func f1_composition_anyobject(_: AnyObject & P1) { }
+func f1_composition_superclass(_: C & P1 & P2) { }
+
 DemangleToMetadataTests.test("existential types") {
   // Any, AnyObject
   expectEqual(type(of: f2_any_anyobject), _typeByMangledName("yyyp_yXltc")!)
 
-  // FIXME: References to protocols.
-  // FIXME: References to superclass.
+  // References to protocols.
+  expectEqual(type(of: f1_composition), _typeByMangledName("yy4main2P1_4main2P2pc")!)
+
+  // Reference to protocol with AnyObject.
+  expectEqual(type(of: f1_composition_anyobject), _typeByMangledName("yy4main2P1_Xlc")!)
+
+  // References to superclass.
+  expectEqual(type(of: f1_composition_superclass), _typeByMangledName("yy4main2P1_4main2P2AA1CCXcc")!)
 }
 
 DemangleToMetadataTests.test("existential metatype types") {
@@ -92,6 +107,12 @@ DemangleToMetadataTests.test("existential metatype types") {
 
   // AnyObject
   expectEqual(type(of: AnyObject.self), _typeByMangledName("yXlm")!)
+
+  // References to metatype of protocols.
+  expectEqual(type(of: (P1 & P2).self), _typeByMangledName("4main2P1_4main2P2pm")!)
+
+  // References to metatype involving protocols and superclass.
+  expectEqual(type(of: (C & P1 & P2).self), _typeByMangledName("4main2P1_4main2P2AA1CCXcm")!)
 }
 
 struct S {
@@ -99,8 +120,6 @@ struct S {
 }
 
 enum E { case e }
-
-class C { }
 
 DemangleToMetadataTests.test("nominal types") {
   // Simple Struct

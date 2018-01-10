@@ -1202,6 +1202,14 @@ FUNCTION(Once, swift_once, DefaultCC,
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
          ATTRS())
 
+// void swift_registerProtocols(const ProtocolRecord *begin,
+//                              const ProtocolRecord *end)
+FUNCTION(RegisterProtocols,
+         swift_registerProtocols, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolRecordPtrTy, ProtocolRecordPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
 //                                         const ProtocolConformanceRecord *end)
 FUNCTION(RegisterProtocolConformances,

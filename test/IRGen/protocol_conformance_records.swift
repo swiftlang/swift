@@ -7,6 +7,13 @@ public protocol Runcible {
   func runce()
 }
 
+// CHECK-LABEL: @"\01l_protocols" = private constant [
+
+// CHECK: %swift.protocolref {
+// CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
+// CHECK-SAME: %swift.protocolref {
+// CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
+
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
 
 // CHECK:         %swift.protocol_conformance {

@@ -39,6 +39,7 @@ using namespace Demangle;
 #include <objc/objc.h>
 #endif
 
+#pragma mark Nominal type descriptor cache
 // Type Metadata Cache.
 
 namespace {
@@ -172,6 +173,133 @@ _findNominalTypeDescriptor(llvm::StringRef mangledName) {
   return foundNominal;
 }
 
+#pragma mark Protocol descriptor cache
+namespace {
+  struct ProtocolSection {
+    const ProtocolRecord *Begin, *End;
+
+    const ProtocolRecord *begin() const {
+      return Begin;
+    }
+    const ProtocolRecord *end() const {
+      return End;
+    }
+  };
+
+  struct ProtocolDescriptorCacheEntry {
+  private:
+    std::string Name;
+    const ProtocolDescriptor *Description;
+
+  public:
+    ProtocolDescriptorCacheEntry(const llvm::StringRef name,
+                                 const ProtocolDescriptor *description)
+      : Name(name.str()), Description(description) {}
+
+    const ProtocolDescriptor *getDescription() {
+      return Description;
+    }
+
+    int compareWithKey(llvm::StringRef aName) const {
+      return aName.compare(Name);
+    }
+
+    template <class... T>
+    static size_t getExtraAllocationSize(T &&... ignored) {
+      return 0;
+    }
+  };
+
+  struct ProtocolMetadataState {
+    ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
+    std::vector<ProtocolSection> SectionsToScan;
+    Mutex SectionsToScanLock;
+
+    ProtocolMetadataState() {
+      SectionsToScan.reserve(16);
+      initializeProtocolLookup();
+    }
+  };
+
+  static Lazy<ProtocolMetadataState> Protocols;
+}
+
+static void
+_registerProtocols(ProtocolMetadataState &C,
+                   const ProtocolRecord *begin,
+                   const ProtocolRecord *end) {
+  ScopedLock guard(C.SectionsToScanLock);
+  C.SectionsToScan.push_back(ProtocolSection{begin, end});
+}
+
+void swift::addImageProtocolsBlockCallback(const void *protocols,
+                                           uintptr_t protocolsSize) {
+  assert(protocolsSize % sizeof(ProtocolRecord) == 0 &&
+         "protocols section not a multiple of ProtocolRecord");
+
+  // If we have a section, enqueue the protocols for lookup.
+  auto protocolsBytes = reinterpret_cast<const char *>(protocols);
+  auto recordsBegin
+    = reinterpret_cast<const ProtocolRecord *>(protocols);
+  auto recordsEnd
+    = reinterpret_cast<const ProtocolRecord *>(protocolsBytes + protocolsSize);
+
+  // Conformance cache should always be sufficiently initialized by this point.
+  _registerProtocols(Protocols.unsafeGetAlreadyInitialized(),
+                     recordsBegin, recordsEnd);
+}
+
+void swift::swift_registerProtocols(const ProtocolRecord *begin,
+                                    const ProtocolRecord *end) {
+  auto &C = Protocols.get();
+  _registerProtocols(C, begin, end);
+}
+
+static const ProtocolDescriptor *
+_searchProtocolRecords(const ProtocolMetadataState &C,
+                       const llvm::StringRef protocolName){
+  unsigned sectionIdx = 0;
+  unsigned endSectionIdx = C.SectionsToScan.size();
+  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
+    auto &section = C.SectionsToScan[sectionIdx];
+    for (const auto &record : section) {
+      if (auto protocol = record.Protocol.getPointer()) {
+        // Drop the "S$" prefix from the protocol record. It's not used in
+        // the type itself.
+        StringRef foundProtocolName = protocol->Name;
+        assert(foundProtocolName.startswith("$S"));
+        foundProtocolName = foundProtocolName.drop_front(2);
+        if (foundProtocolName == protocolName)
+          return protocol;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+static const ProtocolDescriptor *
+_findProtocolDescriptor(llvm::StringRef mangledName) {
+  const ProtocolDescriptor *foundProtocol = nullptr;
+  auto &T = Protocols.get();
+
+  // Look for an existing entry.
+  // Find the bucket for the metadata entry.
+  if (auto Value = T.ProtocolCache.find(mangledName))
+    return Value->getDescription();
+
+  // Check type metadata records
+  T.SectionsToScanLock.withLock([&] {
+    foundProtocol = _searchProtocolRecords(T, mangledName);
+  });
+
+  if (foundProtocol) {
+    T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
+  }
+
+  return foundProtocol;
+}
+
 #pragma mark Metadata lookup via mangled name
 
 namespace {
@@ -181,6 +309,7 @@ class DecodedMetadataBuilder {
 public:
   using BuiltType = const Metadata *;
   using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
+  using BuiltProtocolDecl = const ProtocolDescriptor *;
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
@@ -190,6 +319,12 @@ public:
     // Look for a nominal type descriptor based on its mangled name.
     auto mangledName = Demangle::mangleNode(node);
     return _findNominalTypeDescriptor(mangledName);
+  }
+
+  BuiltProtocolDecl createProtocolDecl(
+                                    const Demangle::NodePointer &node) const {
+    auto mangledName = Demangle::mangleNode(node);
+    return _findProtocolDescriptor(mangledName);
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
@@ -227,23 +362,13 @@ public:
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
-  BuiltType createProtocolCompositionType(ArrayRef<BuiltType> protocols,
-                                          bool hasExplicitAnyObject) const {
-    // FIXME: Handle protocols and superclasses.
-    if (!protocols.empty()) return BuiltType();
-
-    auto classConstraint =
-      hasExplicitAnyObject ? ProtocolClassConstraint::Class
-                           : ProtocolClassConstraint::Any;
-    return swift_getExistentialTypeMetadata(classConstraint, nullptr, 0,
-                                            nullptr);
-  }
-
-  BuiltType createProtocolType(StringRef mangledName, StringRef moduleName,
-                               StringRef privateDiscriminator,
-                               StringRef name) const {
-    // FIXME: Implement.
-    return BuiltType();
+  BuiltType createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
+                                          BuiltType superclass,
+                                          bool isClassBound) const {
+    auto classConstraint = isClassBound ? ProtocolClassConstraint::Class
+                                        : ProtocolClassConstraint::Any;
+    return swift_getExistentialTypeMetadata(classConstraint, superclass,
+                                            protocols.size(), protocols.data());
   }
 
   BuiltType createGenericTypeParameterType(unsigned depth,
@@ -288,7 +413,7 @@ public:
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
-                                      BuiltType protocol) const {
+                                      BuiltProtocolDecl protocol) const {
     // FIXME: Implement.
     return BuiltType();
   }

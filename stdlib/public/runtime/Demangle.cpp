@@ -243,16 +243,21 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         continue;
       }
 
-      // FIXME: We have to dig through a ridiculous number of nodes to get
-      // to the Protocol node here.
-      protocolNode = protocolNode->getChild(0); // Global -> TypeMangling
-      protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
-      protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
-      protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
-      protocolNode = protocolNode->getChild(0); // TypeList -> Type
-      
-      assert(protocolNode->getKind() == Node::Kind::Type);
-      assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+      // Dig out the protocol node.
+      // Global -> (Protocol|TypeMangling)
+      protocolNode = protocolNode->getChild(0);
+      if (protocolNode->getKind() == Node::Kind::TypeMangling) {
+        protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+        protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+        protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+        protocolNode = protocolNode->getChild(0); // TypeList -> Type
+
+        assert(protocolNode->getKind() == Node::Kind::Type);
+        assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+      } else {
+        assert(protocolNode->getKind() == Node::Kind::Protocol);
+      }
+
       type_list->addChild(protocolNode, Dem);
     }
 

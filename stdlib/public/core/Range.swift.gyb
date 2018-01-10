@@ -1209,6 +1209,7 @@ extension Strideable where Stride: SignedInteger {
 
 // FIXME: replace this with a computed var named `...` when the language makes
 // that possible.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum UnboundedRange_ {
   @_inlineable // FIXME(sil-serialize-all)
   public static postfix func ... (_: UnboundedRange_) -> () {
