@@ -171,18 +171,8 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (CD->getEffectiveAccess()) {
-  case AccessLevel::Open:
+  if (isDeclVisibleExternally(CD, &M))
     return false;
-  case AccessLevel::Public:
-  case AccessLevel::Internal:
-    if (!M.isWholeModule())
-      return false;
-    break;
-  case AccessLevel::FilePrivate:
-  case AccessLevel::Private:
-    break;
-  }
 
   // Take the ClassHierarchyAnalysis into account.
   // If a given class has no subclasses and
@@ -192,19 +182,6 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
   // of devirtualization.
   if (CHA) {
     if (!CHA->hasKnownDirectSubclasses(CD)) {
-      switch (CD->getEffectiveAccess()) {
-      case AccessLevel::Open:
-        return false;
-      case AccessLevel::Public:
-      case AccessLevel::Internal:
-        if (!M.isWholeModule())
-          return false;
-        break;
-      case AccessLevel::FilePrivate:
-      case AccessLevel::Private:
-        break;
-      }
-
       return true;
     }
   }

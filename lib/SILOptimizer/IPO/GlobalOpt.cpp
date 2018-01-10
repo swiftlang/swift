@@ -911,16 +911,7 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   // Use access specifiers from the declarations,
   // if possible.
   if (auto *Decl = SILG->getDecl()) {
-    switch (Decl->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return false;
-    case AccessLevel::Internal:
-      return !SILG->getModule().isWholeModule();
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      return true;
-    }
+    return isDeclVisibleExternally(Decl, &SILG->getModule());
   }
 
   if (SILG->getLinkage() == SILLinkage::Private)

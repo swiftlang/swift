@@ -257,18 +257,8 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (CD->getEffectiveAccess()) {
-  case AccessLevel::Open:
+  if (isDeclVisibleExternally(CD, &AI.getModule()))
     return false;
-  case AccessLevel::Public:
-  case AccessLevel::Internal:
-    if (!AI.getModule().isWholeModule())
-      return false;
-    break;
-  case AccessLevel::FilePrivate:
-  case AccessLevel::Private:
-    break;
-  }
 
   // This is a private or a module internal class.
   //

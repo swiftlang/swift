@@ -158,18 +158,12 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property
                      << "' by its constant initializer\n");
 
-  auto PropertyAccess = Property->getEffectiveAccess();
-  auto TypeAccess = Ty->getEffectiveAccess();
   auto CanRemove = false;
 
   // Check if a given let property can be removed, because it
   // is not accessible elsewhere. This can happen if this property
   // is private or if it is internal and WMO mode is used.
-  if (TypeAccess <= AccessLevel::FilePrivate ||
-      PropertyAccess <= AccessLevel::FilePrivate
-      || ((TypeAccess <= AccessLevel::Internal ||
-          PropertyAccess <= AccessLevel::Internal) &&
-          Module->isWholeModule())) {
+  if (!isDeclVisibleExternally(Ty, Module) || !isDeclVisibleExternally(Property, Module)) {
     CanRemove = true;
     DEBUG(llvm::dbgs() << "Storage for property '" << *Property
                        << "' can be eliminated\n");
@@ -310,10 +304,7 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     // it is a whole module compilation. In this case, no external initializer
     // may exist.
     for (auto SP : Ty->getStoredProperties()) {
-      auto storedPropertyAccess = SP->getEffectiveAccess();
-      if (storedPropertyAccess <= AccessLevel::FilePrivate ||
-          (storedPropertyAccess <= AccessLevel::Internal &&
-           Module->isWholeModule())) {
+      if (!isDeclVisibleExternally(SP, Module)) {
        DEBUG(llvm::dbgs() << "Property " << *Property
                        << " cannot be set externally\n");
        return false;
