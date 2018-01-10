@@ -2345,7 +2345,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
     sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift5_protos";
+    sectionName = "swift5_protocols";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
