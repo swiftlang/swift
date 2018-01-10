@@ -39,6 +39,7 @@ using namespace Demangle;
 #include <objc/objc.h>
 #endif
 
+#pragma mark Nominal type descriptor cache
 // Type Metadata Cache.
 
 namespace {
@@ -170,6 +171,14 @@ _findNominalTypeDescriptor(llvm::StringRef mangledName) {
   }
 
   return foundNominal;
+}
+
+
+#pragma mark Protocol descriptor cache
+
+void swift::swift_registerProtocols(const ProtocolRecord *begin,
+                                    const ProtocolRecord *end) {
+  // FIXME: Implement.
 }
 
 #pragma mark Metadata lookup via mangled name

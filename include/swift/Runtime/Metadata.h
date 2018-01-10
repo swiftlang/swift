@@ -2580,6 +2580,17 @@ public:
 };
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
 
+/// The structure of a protocol reference record.
+template <typename Runtime>
+struct TargetProtocolRecord {
+  /// The protocol referenced.
+  ///
+  /// The remaining low bit is reserved for future use.
+  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
+    Protocol;
+};
+using ProtocolRecord = TargetProtocolRecord<InProcess>;
+
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -3040,6 +3051,11 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
+
+/// Register a block of protocol records for dynamic lookup.
+SWIFT_RUNTIME_EXPORT
+void swift_registerProtocols(const ProtocolRecord *begin,
+                             const ProtocolRecord *end);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT

@@ -552,7 +552,8 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
-  if (ProtocolConformances.empty()
+  if (SwiftProtocols.empty()
+      && ProtocolConformances.empty()
       && RuntimeResolvableTypes.empty()
       && (!ObjCInterop || (ObjCProtocols.empty() &&
                            ObjCClasses.empty() &&
@@ -657,6 +658,27 @@ void IRGenModule::emitRuntimeRegistration() {
       CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
   }
+
+  // Register Swift protocols if we added any.
+  if (!SwiftProtocols.empty()) {
+    llvm::Constant *protocols = emitSwiftProtocols();
+
+    llvm::Constant *beginIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, 0),
+    };
+    auto begin = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, protocols, beginIndices);
+    llvm::Constant *endIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, SwiftProtocols.size()),
+    };
+    auto end = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, protocols, endIndices);
+
+    RegIGF.Builder.CreateCall(getRegisterProtocolsFn(), {begin, end});
+  }
+
   // Register Swift protocol conformances if we added any.
   if (!ProtocolConformances.empty()) {
 
@@ -944,6 +966,12 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *Nominal) {
     IGM.emitProtocolDecl(pd);
   } else {
     llvm_unreachable("should not have enqueued a class decl here!");
+  }
+}
+
+void IRGenerator::emitSwiftProtocols() {
+  for (auto &m : *this) {
+    m.second->emitSwiftProtocols();
   }
 }
 
@@ -2279,6 +2307,57 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
                                                 RelativeAddressTy);
 
   return relativeAddr;
+}
+
+/// Emit the protocol descriptors list and return it.
+llvm::Constant *IRGenModule::emitSwiftProtocols() {
+  if (SwiftProtocols.empty())
+    return nullptr;
+
+  // Define the global variable for the protocol list.
+  ConstantInitBuilder builder(*this);
+  auto recordsArray = builder.beginArray(ProtocolRecordTy);
+
+  for (auto *protocol : SwiftProtocols) {
+    auto record = recordsArray.beginStruct(ProtocolRecordTy);
+
+    // Relative reference to the protocol descriptor.
+    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
+                  LinkEntity::forProtocolDescriptor(protocol),
+                  getPointerAlignment(), ProtocolDescriptorStructTy);
+    record.addRelativeAddress(descriptorRef);
+
+    record.finishAndAddTo(recordsArray);
+  }
+
+  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+  // resolve relocations relative to it.
+
+  auto var = recordsArray.finishAndCreateGlobal(
+                                            "\x01l_protocols",
+                                            Alignment(4),
+                                            /*isConstant*/ true,
+                                            llvm::GlobalValue::PrivateLinkage);
+
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = "swift5_protos";
+    break;
+  case llvm::Triple::COFF:
+    sectionName = ".sw5prt$B";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit protocols for "
+                     "the selected object format.");
+  }
+
+  var->setSection(sectionName);
+  addUsedGlobal(var);
+  return var;
 }
 
 /// Emit the protocol conformance list and return it.
