@@ -487,8 +487,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
 
-  case tok::pound_keyPath:
-    return parseExprKeyPathObjC();
   case tok::backslash:
     return parseExprKeyPath();
 
@@ -1465,6 +1463,8 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   ParserResult<Expr> Result;
   switch (Tok.getKind()) {
+  case tok::pound_keyPath:
+    return parseExprKeyPathObjC();
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);

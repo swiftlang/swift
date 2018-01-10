@@ -59,6 +59,17 @@ func testKeyPath(a: A, b: B) {
   // Property of String property (which looks on NSString)
   let _: String = #keyPath(A.propString.URLsInText)
 
+  // String property with a suffix
+  let _: String = #keyPath(A.propString).description
+  let _ = #keyPath(A.propString).split(separator: ".")
+  func keyPathSwitch(keyPath: String?) {
+    switch keyPath {
+    case (#keyPath(A.propString))?: break
+    case #keyPath(A.propString)?: break
+    default: break
+    } 
+  }
+
   // Array property (make sure we look at the array element).
   let _: String = #keyPath(A.propArray)
   let _: String = #keyPath(A.propArray.URLsInText)
