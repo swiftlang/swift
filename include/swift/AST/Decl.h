@@ -58,6 +58,7 @@ namespace swift {
   class LiteralExpr;
   class BraceStmt;
   class DeclAttributes;
+  class GenericContext;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -846,6 +847,9 @@ public:
 
     return getClangNodeImpl().getAsMacro();
   }
+
+  /// \brief Return the GenericContext if the Decl has one.
+  const GenericContext *getAsGenericContext() const;
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
@@ -6482,6 +6486,41 @@ inline bool Decl::isPotentiallyOverridable() const {
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
   : Depth(d->getDepth()), Index(d->getIndex()) { }
+
+inline const GenericContext *Decl::getAsGenericContext() const {
+  switch (getKind()) {
+  default: return nullptr;
+#define DECL(Id, Parent) // See previous line
+#define GENERIC_DECL(Id, Parent) \
+  case DeclKind::Id: \
+    return static_cast<const Id##Decl*>(this);
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline bool DeclContext::classof(const Decl *D) {
+  switch (D->getKind()) { //
+  default: return false;
+#define DECL(ID, PARENT) // See previous line
+#define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
+  // XXX -- ModuleDecl is not defined in Decl.h, but because DeclContexts
+  // preface decls in memory, any DeclContext type will due.
+  const DeclContext *DC = static_cast<const ExtensionDecl*>(D);
+  switch (D->getKind()) {
+  default: llvm_unreachable("Not a DeclContext");
+#define DECL(ID, PARENT) // See previous line
+#define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    return const_cast<DeclContext *>(DC);
+  }
+}
 
 } // end namespace swift
 
