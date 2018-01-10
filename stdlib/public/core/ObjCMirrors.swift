@@ -55,6 +55,7 @@ struct _ObjCMirror : _Mirror {
     return _getObjCSummary(data)
   }
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var quickLookObject: PlaygroundQuickLook? {
     let object = _swift_ClassMirror_quickLookObject(data)
     return _getClassPlaygroundQuickLook(object)
@@ -91,6 +92,7 @@ struct _ObjCSuperMirror : _Mirror {
     return _getObjCSummary(data)
   }
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var quickLookObject: PlaygroundQuickLook? {
     let object = _swift_ClassMirror_quickLookObject(data)
     return _getClassPlaygroundQuickLook(object)

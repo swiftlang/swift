@@ -162,6 +162,7 @@ internal struct _OpaqueMirror : _Mirror {
   internal var summary: String { return data.summary }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -215,6 +216,7 @@ internal struct _TupleMirror : _Mirror {
   internal var summary: String { return "(\(count) elements)" }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -263,6 +265,7 @@ internal struct _StructMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -327,6 +330,7 @@ internal struct _EnumMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -361,6 +365,7 @@ internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
+@available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
 internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
 ) -> PlaygroundQuickLook? {
@@ -433,6 +438,7 @@ internal struct _ClassMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
     let object = _swift_ClassMirror_quickLookObject(data)
@@ -481,6 +487,7 @@ internal struct _ClassSuperMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -522,6 +529,7 @@ internal struct _MetatypeMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   internal var quickLookObject: PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?

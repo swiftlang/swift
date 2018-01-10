@@ -232,6 +232,7 @@ extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
 
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .point(Double(x), Double(y))
   }
@@ -299,6 +300,7 @@ extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .size(Double(width), Double(height))
   }
@@ -436,6 +438,7 @@ extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
+  @available(swift, deprecated: 3, obsoleted: 5, message: "PlaygroundQuickLook is being removed in Swift 5.0, including the Swift 3 and 4 compatibility modes; please remove or conditionalize usage on Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .rectangle(
       Double(origin.x), Double(origin.y),
