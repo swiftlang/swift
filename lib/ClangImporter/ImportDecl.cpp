@@ -7347,14 +7347,17 @@ void ClangImporter::Implementation::importAttributes(
     if (FD->getNumParams() == 1 &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")))
-      if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>())
+          FD->getName().endswith("Autorelease")) &&
+        !FD->getAttr<clang::SwiftNameAttr>()) {
+      if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {
           auto attr = AvailableAttr::createPlatformAgnostic(C,
             "Core Foundation objects are automatically memory managed");
           MappedDecl->getAttrs().add(attr);
           return;
         }
+      }
+    }
   }
 
   // Hack: mark any method named "print" with less than two parameters as
