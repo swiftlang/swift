@@ -466,4 +466,10 @@ EXPR_NODES = [
              Child('Name', kind='ObjcName'),
              Child('RightParen', kind='RightParenToken'),
          ]),
+
+    # <#content#>
+    Node('EditorPlaceholderExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='IdentifierToken'),
+         ]),
 ]

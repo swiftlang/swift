@@ -34,11 +34,11 @@
   * KeyPathExpr
   * KeyPathDotExpr
   * InOutExpr
+  * EditorPlaceholderExpr
 
 ### In-progress (UnknownExpr):
   * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
-  * EditorPlaceholderExpr
 
 ### Not-started (UnknownExpr):
   * UnresolvedSpecializeExpr
