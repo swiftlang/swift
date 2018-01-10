@@ -2586,7 +2586,8 @@ struct TargetProtocolRecord {
   /// The protocol referenced.
   ///
   /// The remaining low bit is reserved for future use.
-  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
+  RelativeIndirectablePointerIntPair<TargetProtocolDescriptor<Runtime>,
+                                     /*reserved=*/bool>
     Protocol;
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
