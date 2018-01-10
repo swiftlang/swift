@@ -140,15 +140,6 @@ public:
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
-  /// Returns the type of a constant reference.
-  SILType getConstantType(SILDeclRef constant);
-  
-  /// Returns the calling convention for a function.
-  SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef constant) {
-    return getConstantType(constant).getAs<SILFunctionType>()
-      ->getRepresentation();
-  }
-
   /// Get the function for a SILDeclRef, or return nullptr if it hasn't been
   /// emitted yet.
   SILFunction *getEmittedFunction(SILDeclRef constant,
