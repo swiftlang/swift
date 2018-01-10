@@ -94,6 +94,7 @@ class MetadataReader {
 public:
   using BuiltType = typename BuilderType::BuiltType;
   using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
@@ -333,40 +334,49 @@ public:
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
-      std::vector<BuiltType> Members;
+
       bool HasExplicitAnyObject = false;
-
-      if (Exist->Flags.hasSuperclassConstraint()) {
-        // The superclass is stored after the list of protocols.
-        auto SuperclassType = readTypeFromMetadata(
-          Exist->Protocols[Exist->Protocols.NumProtocols]);
-        if (!SuperclassType) return BuiltType();
-        Members.push_back(SuperclassType);
-      }
-
       if (Exist->isClassBounded())
         HasExplicitAnyObject = true;
 
+      BuiltType SuperclassType = BuiltType();
+      if (Exist->Flags.hasSuperclassConstraint()) {
+        // The superclass is stored after the list of protocols.
+        SuperclassType = readTypeFromMetadata(
+                                              Exist->Protocols[Exist->Protocols.NumProtocols]);
+        if (!SuperclassType) return BuiltType();
+
+        HasExplicitAnyObject = true;
+      }
+
+      std::vector<BuiltProtocolDecl> Protocols;
       for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
         if (!ProtocolDescriptor)
           return BuiltType();
 
-        std::string MangledName;
+        std::string MangledNameStr;
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
-                                MangledName))
+                                MangledNameStr))
           return BuiltType();
+
+        StringRef MangledName =
+          Demangle::dropSwiftManglingPrefix(MangledNameStr);
+
         Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleSymbolAsNode(MangledName);
-        auto Protocol = decodeMangledType(Demangled);
+        auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+        if (!Demangled)
+          return BuiltType();
+
+        auto Protocol = Builder.createProtocolDecl(Demangled);
         if (!Protocol)
           return BuiltType();
 
-        Members.push_back(Protocol);
+        Protocols.push_back(Protocol);
       }
       auto BuiltExist = Builder.createProtocolCompositionType(
-        Members, HasExplicitAnyObject);
+        Protocols, SuperclassType, HasExplicitAnyObject);
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }
