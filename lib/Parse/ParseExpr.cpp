@@ -2264,8 +2264,10 @@ Expr *Parser::parseExprIdentifier() {
   
   Expr *E;
   if (D == nullptr) {
-    if (name.getBaseName().isEditorPlaceholder())
+    if (name.getBaseName().isEditorPlaceholder()) {
+      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
       return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
+    }
 
     auto refKind = DeclRefKind::Ordinary;
     E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
@@ -2294,7 +2296,6 @@ Expr *Parser::parseExprIdentifier() {
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
                                          Identifier PlaceholderId) {
-  SyntaxParsingContext TmpContext(SyntaxContext, SyntaxKind::UnknownExpr);
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 

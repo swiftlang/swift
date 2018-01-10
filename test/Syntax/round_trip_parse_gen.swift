@@ -224,6 +224,7 @@ func postfix() {
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
   _ = foo(&d)
+  _ = <#Placeholder#> + <#T##(Int) -> Int#>
 }
 
 #if blah
