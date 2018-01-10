@@ -72,9 +72,6 @@ namespace swift {
       return Mod;
     }
 
-    /// Get the name of the transform.
-    llvm::StringRef getName() { return PassKindName(getPassKind()); }
-
     /// Get the transform's (command-line) tag.
     llvm::StringRef getTag() { return PassKindTag(getPassKind()); }
 
