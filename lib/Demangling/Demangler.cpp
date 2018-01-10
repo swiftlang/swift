@@ -282,11 +282,11 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   if (nextIf("_Tt"))
     return demangleObjCTypeName();
 
-  unsigned PrefixLength = getManglingPrefixLength(MangledName.data());
+  unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
     return nullptr;
 
-  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName.data());
+  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
   Pos += PrefixLength;
 
   // If any other prefixes are accepted, please update Mangler::verify.
