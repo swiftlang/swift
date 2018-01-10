@@ -103,6 +103,7 @@ extension LazySequenceProtocol {
 
 /// A position in the base collection of a `LazyPrefixWhileCollection` or the
 /// end of that collection.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> {
   case index(Base.Index)
   case pastEnd
