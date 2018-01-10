@@ -13,6 +13,7 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
 internal enum _ClosedRangeIndexRepresentation<Bound>
   where
