@@ -490,7 +490,16 @@ extension _PlistEncoder {
 
         // The value should request a container from the _PlistEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            try value.encode(to: self)
+        } catch let error {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
 
         // The top container should be a new container.
         guard self.storage.count > depth else {

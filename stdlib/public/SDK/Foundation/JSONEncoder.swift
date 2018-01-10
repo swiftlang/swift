@@ -722,6 +722,7 @@ extension _JSONEncoder {
         switch self.options.dateEncodingStrategy {
         case .deferredToDate:
             // Must be called with a surrounding with(pushedKey:) call.
+            // Dates encode as single-value objects; this can't both throw and push a container, so no need to catch the error.
             try date.encode(to: self)
             return self.storage.popContainer()
 
@@ -743,7 +744,16 @@ extension _JSONEncoder {
 
         case .custom(let closure):
             let depth = self.storage.count
-            try closure(date, self)
+            do {
+                try closure(date, self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
 
             guard self.storage.count > depth else {
                 // The closure didn't encode anything. Return the default keyed container.
@@ -759,7 +769,19 @@ extension _JSONEncoder {
         switch self.options.dataEncodingStrategy {
         case .deferredToData:
             // Must be called with a surrounding with(pushedKey:) call.
-            try data.encode(to: self)
+            let depth = self.storage.count
+            do {
+                try data.encode(to: self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                // This shouldn't be possible for Data (which encodes as an array of bytes), but it can't hurt to catch a failure.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
+
             return self.storage.popContainer()
 
         case .base64:
@@ -767,7 +789,16 @@ extension _JSONEncoder {
 
         case .custom(let closure):
             let depth = self.storage.count
-            try closure(data, self)
+            do {
+                try closure(data, self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
 
             guard self.storage.count > depth else {
                 // The closure didn't encode anything. Return the default keyed container.
@@ -801,7 +832,16 @@ extension _JSONEncoder {
 
         // The value should request a container from the _JSONEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            try value.encode(to: self)
+        } catch {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
 
         // The top container should be a new container.
         guard self.storage.count > depth else {
