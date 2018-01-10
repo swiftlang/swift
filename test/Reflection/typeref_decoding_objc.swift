@@ -78,5 +78,6 @@
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (class __ObjC.Bundle)
-// CHECK-NEXT: (protocol __ObjC.NSCoding)
+// CHECK-NEXT: (protocol_composition
+// CHECK-NEXT:   (protocol __ObjC.NSCoding))
 // CHECK-NEXT: - Metadata sources:

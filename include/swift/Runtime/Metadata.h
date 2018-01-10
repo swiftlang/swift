@@ -2936,7 +2936,7 @@ const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
-                                 const ProtocolDescriptor **protocols)
+                                 const ProtocolDescriptor * const *protocols)
     SWIFT_CC(RegisterPreservingCC);
 
 /// \brief Perform a copy-assignment from one existential container to another.

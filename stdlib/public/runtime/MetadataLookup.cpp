@@ -181,6 +181,7 @@ class DecodedMetadataBuilder {
 public:
   using BuiltType = const Metadata *;
   using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
+  using BuiltProtocolDecl = const ProtocolDescriptor *;
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
@@ -190,6 +191,13 @@ public:
     // Look for a nominal type descriptor based on its mangled name.
     auto mangledName = Demangle::mangleNode(node);
     return _findNominalTypeDescriptor(mangledName);
+  }
+
+  BuiltProtocolDecl createProtocolDecl(
+                                    const Demangle::NodePointer &node) const {
+    // FIXME: Implement.
+
+    return BuiltProtocolDecl();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
@@ -227,23 +235,13 @@ public:
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
-  BuiltType createProtocolCompositionType(ArrayRef<BuiltType> protocols,
-                                          bool hasExplicitAnyObject) const {
-    // FIXME: Handle protocols and superclasses.
-    if (!protocols.empty()) return BuiltType();
-
-    auto classConstraint =
-      hasExplicitAnyObject ? ProtocolClassConstraint::Class
-                           : ProtocolClassConstraint::Any;
-    return swift_getExistentialTypeMetadata(classConstraint, nullptr, 0,
-                                            nullptr);
-  }
-
-  BuiltType createProtocolType(StringRef mangledName, StringRef moduleName,
-                               StringRef privateDiscriminator,
-                               StringRef name) const {
-    // FIXME: Implement.
-    return BuiltType();
+  BuiltType createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
+                                          BuiltType superclass,
+                                          bool isClassBound) const {
+    auto classConstraint = isClassBound ? ProtocolClassConstraint::Class
+                                        : ProtocolClassConstraint::Any;
+    return swift_getExistentialTypeMetadata(classConstraint, superclass,
+                                            protocols.size(), protocols.data());
   }
 
   BuiltType createGenericTypeParameterType(unsigned depth,
@@ -288,7 +286,7 @@ public:
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
-                                      BuiltType protocol) const {
+                                      BuiltProtocolDecl protocol) const {
     // FIXME: Implement.
     return BuiltType();
   }
