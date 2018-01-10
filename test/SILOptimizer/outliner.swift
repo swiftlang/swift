@@ -140,3 +140,17 @@ public func dontCrash<T: Proto>(x : Gizmo2<T>) {
   print(s)
 
 }
+
+public func dontCrash2(_ c: SomeGenericClass) -> Bool {
+  guard let str = c.version else {
+      return false
+  }
+  guard let str2 = c.doSomething() else {
+      return false
+  }
+
+  let arr = [ "foo", "bar"]
+  c.doSomething2(arr)
+
+  return true
+}
