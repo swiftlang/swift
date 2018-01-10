@@ -27,7 +27,8 @@ public struct _TFCRuntimeConfig {
 }
 
 // The C type is TF_Status*
-public typealias CTFStatus = OpaquePointer
+typealias CTFStatus = OpaquePointer
+public typealias CTensor = OpaquePointer
 
 @_versioned
 func checkOk(_ s: CTFStatus?) {
@@ -242,4 +243,17 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
   TF_DeleteStatus(status)
   TF_DeleteTensor(tensor)
   return cTensorHandle!
+}
+
+/// This function creates a host tensor by copying contents from the tensor
+/// represented by the tensor handle.
+/// NOTE: The result needs to be released using `TF_DeleteTensor()`.
+@_inlineable
+@_silgen_name("_swift_tfc_CreateHostTensorCopy")
+public func _TFCCreateHostTensorCopy(_ cHandle: CTensorHandle) -> CTensor {
+  let status = TF_NewStatus()
+  let cTensor = TFE_TensorHandleResolve(cHandle, status)
+  checkOk(status)
+  TF_DeleteStatus(status)
+  return cTensor!
 }
