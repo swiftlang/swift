@@ -139,6 +139,11 @@ bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
+bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
+  StringRef mangledNameRef(mangledName, 4);
+  return isSwiftSymbol(mangledNameRef);
+}
+
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
   return mangledName.size() >= 2 && mangledName[0] == '_' &&
       mangledName[1] == 'T';
