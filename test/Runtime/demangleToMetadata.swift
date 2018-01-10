@@ -84,6 +84,7 @@ protocol P1 { }
 protocol P2 { }
 
 func f1_composition(_: P1 & P2) { }
+func f1_composition_anyobject(_: AnyObject & P1) { }
 func f1_composition_superclass(_: C & P1 & P2) { }
 
 DemangleToMetadataTests.test("existential types") {
@@ -92,6 +93,9 @@ DemangleToMetadataTests.test("existential types") {
 
   // References to protocols.
   expectEqual(type(of: f1_composition), _typeByMangledName("yy4main2P1_4main2P2pc")!)
+
+  // Reference to protocol with AnyObject.
+  expectEqual(type(of: f1_composition_anyobject), _typeByMangledName("yy4main2P1_Xlc")!)
 
   // References to superclass.
   expectEqual(type(of: f1_composition_superclass), _typeByMangledName("yy4main2P1_4main2P2AA1CCXcc")!)
