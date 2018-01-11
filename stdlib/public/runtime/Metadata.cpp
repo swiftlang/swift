@@ -890,11 +890,12 @@ void performBasicLayout(BasicLayout &layout,
 } // end anonymous namespace
 
 const TupleTypeMetadata *
-swift::swift_getTupleTypeMetadata(size_t numElements,
+swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
                                   const Metadata * const *elements,
                                   const char *labels,
-                                  TupleTypeFlags flags,
                                   const ValueWitnessTable *proposedWitnesses) {
+  auto numElements = flags.getNumElements();
+
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
   if (numElements == 0) return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
@@ -1009,8 +1010,8 @@ swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1 };
-  return swift_getTupleTypeMetadata(2, elts, labels, TupleTypeFlags(0),
-                                    proposedWitnesses);
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(2),
+                                    elts, labels, proposedWitnesses);
 }
 
 const TupleTypeMetadata *
@@ -1019,8 +1020,8 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1, elt2 };
-  return swift_getTupleTypeMetadata(3, elts, labels, TupleTypeFlags(0),
-                                    proposedWitnesses);
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(3),
+                                    elts, labels, proposedWitnesses);
 }
 
 /***************************************************************************/
