@@ -69,6 +69,8 @@ private:
 
   void addConformances(DeclContext *DC);
 
+  void addDispatchThunk(SILDeclRef declRef);
+
 public:
   TBDGenVisitor(StringSet &symbols, const llvm::Triple &triple,
                 const UniversalLinkageInfo &universalLinkInfo,

@@ -266,7 +266,8 @@ PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback
   return enumerateGenericSignatureRequirements(Generics, callback);
 }
 
-void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
+void PolymorphicConvention::
+enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
   enumerateRequirements([&](GenericRequirement requirement) {
     if (requirement.Protocol) {
       if (!Fulfillments.getWitnessTable(requirement.TypeParameter,
@@ -589,8 +590,9 @@ void EmitPolymorphicParameters::bindParameterSources(const GetParameterFn &getPa
   }
 }
 
-void EmitPolymorphicParameters::bindParameterSource(SILParameterInfo param, unsigned paramIndex,
-                         const GetParameterFn &getParameter) {
+void EmitPolymorphicParameters::
+bindParameterSource(SILParameterInfo param, unsigned paramIndex,
+                    const GetParameterFn &getParameter) {
   // Ignore indirect parameters for now.  This is potentially dumb.
   if (IGF.IGM.silConv.isSILIndirect(param))
     return;
@@ -3077,31 +3079,37 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
 
 FunctionPointer
 irgen::emitWitnessMethodValue(IRGenFunction &IGF,
-                              CanType baseTy,
-                              llvm::Value **baseMetadataCache,
-                              SILDeclRef member,
-                              ProtocolConformanceRef conformance,
-                              CanSILFunctionType fnType) {
-  auto fn = cast<AbstractFunctionDecl>(member.getDecl());
-  auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
+                              llvm::Value *wtable,
+                              SILDeclRef member) {
+  auto *fn = cast<AbstractFunctionDecl>(member.getDecl());
+  auto proto = cast<ProtocolDecl>(fn->getDeclContext());
 
-  assert(conformance.getRequirement() == fnProto);
-
-  // Find the witness table.
-  llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
-                                            conformance);
+  assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
 
   // Find the witness we're interested in.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(conformance.getRequirement());
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto);
   auto index = fnProtoInfo.getFunctionIndex(fn);
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
+  auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(member);
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
-                                         signature.getType()->getPointerTo());
+                                           signature.getType()->getPointerTo());
 
   return FunctionPointer(witnessFnPtr, signature);
+}
+
+FunctionPointer
+irgen::emitWitnessMethodValue(IRGenFunction &IGF,
+                              CanType baseTy,
+                              llvm::Value **baseMetadataCache,
+                              SILDeclRef member,
+                              ProtocolConformanceRef conformance) {
+  llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
+                                            conformance);
+
+  return emitWitnessMethodValue(IGF, wtable, member);
 }
 
 Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {

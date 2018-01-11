@@ -88,6 +88,11 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   addSymbol(declRef.mangle());
 }
 
+void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
+  auto entity = LinkEntity::forDispatchThunk(declRef);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -288,7 +293,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   // The below symbols are only emitted if the class is resilient.
-  if (CD->hasFixedLayout())
+  if (CD->hasFixedLayout(SwiftModule, ResilienceExpansion::Minimal))
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
@@ -304,7 +309,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
     void addMethod(SILDeclRef method) {
       if (method.getDecl()->getDeclContext() == CD)
-        TBD.addSymbol(method.mangle(SILDeclRef::ManglingKind::SwiftDispatchThunk));
+        TBD.addDispatchThunk(method);
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -338,8 +343,20 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
 }
 
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
-  if (!PD->isObjC())
+  if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
+
+    if (!PD->hasFixedLayout(SwiftModule, ResilienceExpansion::Minimal)) {
+      for (auto *member : PD->getMembers()) {
+        if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+          addDispatchThunk(SILDeclRef(funcDecl));
+        }
+        if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
+          addDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+        }
+      }
+    }
+  }
 
 #ifndef NDEBUG
   // There's no (currently) relevant information about members of a protocol at

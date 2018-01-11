@@ -5524,6 +5524,18 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
+
+  // If the protocol is resilient, emit dispatch thunks.
+  if (isResilient(protocol, ResilienceExpansion::Minimal)) {
+    for (auto *member : protocol->getMembers()) {
+      if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(funcDecl));
+      }
+      if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+      }
+    }
+  }
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.
@@ -5555,5 +5567,5 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
   // The instance type field of MetatypeMetadata is immediately after
   // the isa field.
   return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
-                                     IGF.IGM.TypeMetadataPtrTy);
+                                              IGF.IGM.TypeMetadataPtrTy);
 }
