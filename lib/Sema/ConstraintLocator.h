@@ -129,8 +129,6 @@ public:
     TypeParameterRequirement,
     /// \brief Locator for a binding from an IUO disjunction choice.
     ImplicitlyUnwrappedDisjunctionChoice,
-    /// \brief A result of an expressoin involving dynamic lookup.
-    DynamicLookupResult,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -164,7 +162,6 @@ public:
     case Witness:
     case OpenedGeneric:
     case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
       return 0;
 
     case GenericArgument:
@@ -228,7 +225,6 @@ public:
     case ConditionalRequirement:
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
       return 0;
 
     case FunctionArgument:
