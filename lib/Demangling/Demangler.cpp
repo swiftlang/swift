@@ -392,7 +392,7 @@ NodePointer Demangler::demangleTypeMangling() {
   auto TypeMangling = createNode(Node::Kind::TypeMangling);
 
   addChild(TypeMangling, LabelList);
-  addChild(TypeMangling, Type);
+  TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
 
@@ -908,8 +908,12 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   auto LabelList = createNode(Node::Kind::LabelList);
   for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
     auto Label = popNode();
-    assert(Label && (Label->getKind() == Node::Kind::Identifier ||
-                     Label->getKind() == Node::Kind::FirstElementMarker));
+    if (!Label)
+      return nullptr;
+    if (Label->getKind() != Node::Kind::Identifier &&
+        Label->getKind() != Node::Kind::FirstElementMarker)
+      return nullptr;
+
     LabelList->addChild(Label, *this);
   }
 
@@ -1999,16 +2003,16 @@ NodePointer Demangler::demangleFunctionEntity() {
     case None:
       break;
     case Index:
-      addChild(Entity, NameOrIndex);
+      Entity = addChild(Entity, NameOrIndex);
       break;
     case TypeAndMaybePrivateName:
       addChild(Entity, LabelList);
-      addChild(Entity, ParamType);
+      Entity = addChild(Entity, ParamType);
       addChild(Entity, NameOrIndex);
       break;
     case TypeAndIndex:
-      addChild(Entity, NameOrIndex);
-      addChild(Entity, ParamType);
+      Entity = addChild(Entity, NameOrIndex);
+      Entity = addChild(Entity, ParamType);
       break;
   }
   return Entity;
@@ -2035,9 +2039,9 @@ NodePointer Demangler::demangleSubscript() {
   NodePointer Context = popContext();
 
   NodePointer Subscript = createNode(Node::Kind::Subscript);
-  addChild(Subscript, Context);
+  Subscript = addChild(Subscript, Context);
   addChild(Subscript, LabelList);
-  addChild(Subscript, Type);
+  Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
 
   return demangleAccessor(Subscript);
