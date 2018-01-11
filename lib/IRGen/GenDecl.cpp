@@ -1301,10 +1301,27 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::CoroutineContinuationPrototype:
     return SILLinkage::PublicExternal;
 
+  case Kind::FieldOffset: {
+    auto *varDecl = cast<VarDecl>(getDecl());
+
+    auto linkage = getDeclLinkage(varDecl);
+
+    // Resilient classes don't expose field offset symbols.
+    if (!cast<ClassDecl>(varDecl->getDeclContext())->hasFixedLayout()) {
+      assert(linkage != FormalLinkage::PublicNonUnique &&
+             linkage != FormalLinkage::HiddenNonUnique &&
+            "Cannot have a resilient class with non-unique linkage");
+
+      if (linkage == FormalLinkage::PublicUnique)
+        linkage = FormalLinkage::HiddenUnique;
+    }
+
+    return getSILLinkage(linkage, forDefinition);
+  }
+
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
-  case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
