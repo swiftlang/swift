@@ -33,13 +33,13 @@ func owned_arguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) 
 // CHECK-LABEL: sil hidden @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
 func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
-  // CHECK: [[CLO_1:%[0-9]+]] = function_ref @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU_
+  // CHECK: [[CLO_1:%[0-9]+]] = function_ref @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_
   // CHECK: {{%.*}} = apply [[CLO_1]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   _ = {
     return shared_arguments(trivial: trivial, value: value, ref: ref)
   }()
   
-  // CHECK: [[CLO_2:%[0-9]+]] = function_ref @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
+  // CHECK: [[CLO_2:%[0-9]+]] = function_ref @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[CLO_2]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   _ = {
     return owned_arguments(trivial: trivial, value: value, ref: ref)
@@ -49,36 +49,36 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
   
   // ======== FIRST CLOSURE ==========
 
-  // CHECK-LABEL: sil private @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
+  // CHECK-LABEL: sil private @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[SHARED_CALL:%[0-9]+]] = function_ref @$S6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[SHARED_CALL]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
-  // CHECK: } // end sil function '$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU_'
+  // CHECK: } // end sil function '$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_'
   
   // ======== SECOND CLOSURE ==========
   
-  // CHECK-LABEL:  sil private @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () {
+  // CHECK-LABEL:  sil private @$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () {
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[COPY_BORROW_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_BORROW_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
   // CHECK: [[OWNED_CALL:%[0-9]+]] = function_ref @$S6shared15owned_arguments7trivial5value3refySi_AA14ValueAggregateVAA03RefH0CtF : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[OWNED_CALL]]([[TRIVIAL_VAL]], [[COPY_BORROW_VALUE_VAL]], [[COPY_BORROW_REF_VAL]]) : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
-  // CHECK: } // end sil function '$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyycfU0_'
+  // CHECK: } // end sil function '$S6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_'
 }
 
-// CHECK-LABEL: sil hidden @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtcF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
+// CHECK-LABEL: sil hidden @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
 func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __shared RefAggregate) -> Void) {
   // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : @owned $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
-  // CHECK: [[OWNED_THUNK:%[0-9]+]] = function_ref @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtcFySi_AdFtcfU_ : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
+  // CHECK: [[OWNED_THUNK:%[0-9]+]] = function_ref @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEFySi_AdFtXEfU_ : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[OWNED_THUNK]]
   // CHECK: [[THICK_OWNED_THUNK:%[0-9]+]] = thin_to_thick_function [[CONVERT]] : $@convention(thin) @noescape (Int, @owned ValueAggregate, @owned RefAggregate) -> () to $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
   // CHECK: [[GUARANTEED_TO_OWNED_THUNK:%[0-9]+]] =  function_ref @$SSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIgygg_TR : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @guaranteed @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: [[APPLIED_THUNK:%[0-9]+]] = partial_apply [callee_guaranteed] [[GUARANTEED_TO_OWNED_THUNK]]([[THICK_OWNED_THUNK]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @guaranteed @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[APPLIED_THUNK]]
-  // CHECK: [[RECUR_FN:%[0-9]+]] = function_ref @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtcF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
+  // CHECK: [[RECUR_FN:%[0-9]+]] = function_ref @$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK: {{%.*}} = apply [[RECUR_FN]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK: destroy_value [[UNUSED_FUNC]] : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
-  // CHECK: } // end sil function '$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtcF'
+  // CHECK: } // end sil function '$S6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEF'
   
   // ======== REABSTRACTION THUNK =========
   
@@ -92,19 +92,19 @@ func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __
   return shared_to_owned_conversion { (trivial : Int, val : ValueAggregate, ref : RefAggregate) in }
 }
 
-// CHECK-LABEL: sil hidden @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtcF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
+// CHECK-LABEL: sil hidden @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
 func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Void) {
   // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : @owned $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
-  // CHECK: [[SHARED_THUNK:%[0-9]+]] = function_ref @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtcFySih_ADhAFhtcfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
+  // CHECK: [[SHARED_THUNK:%[0-9]+]] = function_ref @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEFySih_ADhAFhtXEfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[SHARED_THUNK]]
   // CHECK: [[THICK_SHARED_THUNK:%[0-9]+]] = thin_to_thick_function [[CONVERT]] : $@convention(thin) @noescape (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () to $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: [[OWNED_TO_GUARANTEED_THUNK:%[0-9]+]] = function_ref @$SSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIgyxx_TR : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate, @guaranteed @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK: [[APPLIED_THUNK:%[0-9]+]] = partial_apply [callee_guaranteed] [[OWNED_TO_GUARANTEED_THUNK]]([[THICK_SHARED_THUNK]]) : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate, @guaranteed @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[APPLIED_THUNK]]
-  // CHECK: [[RECUR_FN:%[0-9]+]] = function_ref @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtcF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
+  // CHECK: [[RECUR_FN:%[0-9]+]] = function_ref @$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: {{%.*}} = apply [[RECUR_FN]]([[CONVERT]]) : $@convention(thin) (@owned @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: destroy_value [[UNUSED_FUNC]] : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
-  // CHECK: } // end sil function '$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtcF'
+  // CHECK: } // end sil function '$S6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEF'
 
   // ======== REABSTRACTION THUNK =========
 

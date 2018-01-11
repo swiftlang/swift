@@ -526,12 +526,12 @@ func testNoescape() {
 // CHECK-LABEL: functions.testNoescape() -> ()
 // CHECK-NEXT: sil hidden @$S9functions12testNoescapeyyF : $@convention(thin) () -> ()
 // CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
-// CHECK-NEXT: function_ref @$S9functions12testNoescapeyyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()
+// CHECK-NEXT: function_ref @$S9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: closure #1 () -> () in functions.testNoescape() -> ()
-// CHECK-NEXT: sil private @$S9functions12testNoescapeyyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private @$S9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 
 
@@ -551,10 +551,10 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden @$S9functions13testNoescape2yyF : $@convention(thin) () -> () {
 
 // CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
-// CHECK-NEXT: sil private @$S9functions13testNoescape2yyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private @$S9functions13testNoescape2yyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
-// CHECK-NEXT: sil private @$S9functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private @$S9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
   case Left(T)
