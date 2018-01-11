@@ -1841,7 +1841,7 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // program.  We haven't actually created that yet, so we create a placeholder
   // and RAUW it later.
   auto programPlaceholder =
-    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
+    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::Bytes);
   auto program = wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(),
                               B, loc);
 
@@ -2253,7 +2253,7 @@ public:
       SILBuilder B(tensorProgram.programPlaceholder);
       auto data = B.createStringLiteral(fn->getLocation(),
                                         StringRef(bytes.data(), bytes.size()),
-                                        StringLiteralInst::Encoding::UTF8);
+                                        StringLiteralInst::Encoding::Bytes);
       auto len = B.createIntegerLiteral(fn->getLocation(),
                               tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
