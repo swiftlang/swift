@@ -2196,26 +2196,6 @@ Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
   return nullptr;
 }
 
-Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
-                                     StringRef mangledName,
-                                     std::string &error) {
-  Demangle::Context DemangleCtx;
-  auto node = DemangleCtx.demangleTypeAsNode(mangledName);
-  VisitNodeResult result;
-
-  if (node)
-    VisitNode(&Ctx, node, result);
-  error = result._error;
-  if (error.empty() && result._types.size() == 1) {
-    return result._types.front().getPointer();
-  } else {
-    error = stringWithFormat("type for typename '%s' was not found",
-                             mangledName);
-    return Type();
-  }
-  return Type();
-}
-
 Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
                                        StringRef mangledName,
                                        std::string &error) {
