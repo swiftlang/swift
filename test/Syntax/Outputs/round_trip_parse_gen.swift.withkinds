@@ -356,5 +356,9 @@ func keypath<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
 func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ObjectLiteralExpr>
   #fileLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
   #colorLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
-  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr>
+  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><PoundColumnExpr>
+  #column</PoundColumnExpr><PoundFileExpr>
+  #file</PoundFileExpr><PoundFunctionExpr>
+  #function</PoundFunctionExpr><PoundDsohandleExpr>
+  #dsohandle</PoundDsohandleExpr>
 }</CodeBlock></FunctionDecl>

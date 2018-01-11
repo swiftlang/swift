@@ -125,6 +125,12 @@ EXPR_NODES = [
              Child('PoundFunction', kind='PoundFunctionToken'),
          ]),
 
+    # A #dsohandle expression.
+    Node('PoundDsohandleExpr', kind='Expr',
+         children=[
+             Child('PoundDsohandle', kind='PoundDsohandleToken'),
+         ]),
+
     # symbolic-reference-expression -> identifier generic-argument-clause?
     Node('SymbolicReferenceExpr', kind='Expr',
          children=[
