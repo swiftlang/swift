@@ -690,12 +690,19 @@ using ParameterFlags = TargetParameterTypeFlags<uint32_t>;
 template <typename int_type>
 class TargetTupleTypeFlags {
   enum : int_type {
-    NonConstantLabelsMask    = 1 << 0,
+    NumElementsMask = 0x0000FFFFU,
+    NonConstantLabelsMask = 0x01000000U,
   };
   int_type Data;
 
 public:
+  constexpr TargetTupleTypeFlags() : Data(0) {}
   constexpr TargetTupleTypeFlags(int_type Data) : Data(Data) {}
+
+  constexpr TargetTupleTypeFlags
+  withNumElements(unsigned numElements) const {
+    return TargetTupleTypeFlags((Data & ~NumElementsMask) | numElements);
+  }
 
   constexpr TargetTupleTypeFlags<int_type> withNonConstantLabels(
                                              bool hasNonConstantLabels) const {
@@ -703,6 +710,8 @@ public:
                         (Data & NonConstantLabelsMask) |
                           (hasNonConstantLabels ? NonConstantLabelsMask : 0));
   }
+
+  unsigned getNumElements() const { return Data & NumElementsMask; }
 
   bool hasNonConstantLabels() const { return Data & NonConstantLabelsMask; }
 

@@ -498,12 +498,12 @@ public:
                             std::string labels,
                             bool variadic) const {
     // TODO: 'variadic' should no longer exist
-    TupleTypeFlags flags(0);
+    auto flags = TupleTypeFlags(0).withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(elements.size(), elements.data(),
+    return swift_getTupleTypeMetadata(flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
-                                      flags, /*proposedWitnesses=*/nullptr);
+                                      /*proposedWitnesses=*/nullptr);
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
