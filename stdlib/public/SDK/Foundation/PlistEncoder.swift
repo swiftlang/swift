@@ -1764,20 +1764,15 @@ extension _PlistDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        let decoded: T
         if type == Date.self || type == NSDate.self {
-            guard let date = try self.unbox(value, as: Date.self) else { return nil }
-            decoded = date as! T
+            return try self.unbox(value, as: Date.self) as? T
         } else if type == Data.self || type == NSData.self {
-            guard let data = try self.unbox(value, as: Data.self) else { return nil }
-            decoded = data as! T
+            return try self.unbox(value, as: Data.self) as? T
         } else {
             self.storage.push(container: value)
-            decoded = try type.init(from: self)
-            self.storage.popContainer()
+            defer { self.storage.popContainer() }
+            return try type.init(from: self)
         }
-
-        return decoded
     }
 }
 
