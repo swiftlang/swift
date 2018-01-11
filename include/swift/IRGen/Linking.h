@@ -90,9 +90,6 @@ class LinkEntity {
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
-    // These fields appear in the FieldOffset kind.
-    IsIndirectShift = 8, IsIndirectMask = 0x0100,
-
     // These fields appear in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
     IsPatternShift = 10, IsPatternMask = 0x0400,
@@ -395,12 +392,9 @@ public:
     return entity;
   }
 
-  static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
+  static LinkEntity forFieldOffset(VarDecl *decl) {
     LinkEntity entity;
-    entity.Pointer = decl;
-    entity.SecondaryPointer = nullptr;
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::FieldOffset))
-                | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect));
+    entity.setForDecl(Kind::FieldOffset, decl);
     return entity;
   }
 
@@ -669,11 +663,6 @@ public:
   }
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
-  }
-
-  bool isOffsetIndirect() const {
-    assert(getKind() == Kind::FieldOffset);
-    return LINKENTITY_GET_FIELD(Data, IsIndirect);
   }
 
   /// Determine whether this entity will be weak-imported.

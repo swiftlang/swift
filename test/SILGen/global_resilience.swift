@@ -15,9 +15,9 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 @_fixed_layout public var myFixedLayoutGlobal = MyEmptyStruct()
 
-// Mutable addressor for resilient global (should not be public?)
+// Mutable addressor for resilient global
 
-// CHECK-LABEL: sil [global_init] @$S17global_resilience13myEmptyGlobalAA02MyD6StructVvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden [global_init] @$S17global_resilience13myEmptyGlobalAA02MyD6StructVvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:         global_addr @$S17global_resilience13myEmptyGlobalAA02MyD6StructVv
 // CHECK:         return
 
