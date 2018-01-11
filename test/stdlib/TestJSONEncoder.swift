@@ -878,6 +878,40 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _ = try? encoder.encode(ReferencingEncoderWrapper(Data()))
   }
 
+  // MARK: - Decoder State
+  // SR-6048
+  func testDecoderStateThrowOnDecode() {
+    // The container stack here starts as [[1,2,3]]. Attempting to decode as [String] matches the outer layer (Array), and begins decoding the array.
+    // Once Array decoding begins, 1 is pushed onto the container stack ([[1,2,3], 1]), and 1 is attempted to be decoded as String. This throws a .typeMismatch, but the container is not popped off the stack.
+    // When attempting to decode [Int], the container stack is still ([[1,2,3], 1]), and 1 fails to decode as [Int].
+    let json = "[1,2,3]".data(using: .utf8)!
+    let _ = try! JSONDecoder().decode(EitherDecodable<[String], [Int]>.self, from: json)
+  }
+
+  func testDecoderStateThrowOnDecodeCustomDate() {
+    // This test is identical to testDecoderStateThrowOnDecode, except we're going to fail because our closure throws an error, not because we hit a type mismatch.
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom({ decoder in
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    let json = "{\"value\": 1}".data(using: .utf8)!
+    let _ = try! decoder.decode(EitherDecodable<TopLevelWrapper<Date>, TopLevelWrapper<Int>>.self, from: json)
+  }
+
+  func testDecoderStateThrowOnDecodeCustomData() {
+    // This test is identical to testDecoderStateThrowOnDecode, except we're going to fail because our closure throws an error, not because we hit a type mismatch.
+    let decoder = JSONDecoder()
+    decoder.dataDecodingStrategy = .custom({ decoder in
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    let json = "{\"value\": 1}".data(using: .utf8)!
+    let _ = try! decoder.decode(EitherDecodable<TopLevelWrapper<Data>, TopLevelWrapper<Int>>.self, from: json)
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -1470,6 +1504,20 @@ fileprivate struct DoubleNaNPlaceholder : Codable, Equatable {
   }
 }
 
+fileprivate enum EitherDecodable<T : Decodable, U : Decodable> : Decodable {
+  case t(T)
+  case u(U)
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    do {
+      self = .t(try container.decode(T.self))
+    } catch {
+      self = .u(try container.decode(U.self))
+    }
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
@@ -1521,5 +1569,8 @@ JSONEncoderTests.test("testDecodingConcreteTypeParameter") { TestJSONEncoder().t
 JSONEncoderTests.test("testEncoderStateThrowOnEncode") { TestJSONEncoder().testEncoderStateThrowOnEncode() }
 JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomDate") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomDate() }
 JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomData") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomData() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecode") { TestJSONEncoder().testDecoderStateThrowOnDecode() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomDate") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomDate() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomData") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomData() }
 runAllTests()
 #endif
