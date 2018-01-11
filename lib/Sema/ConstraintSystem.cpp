@@ -1850,7 +1850,7 @@ DeclName OverloadChoice::getName() const {
 }
 
 bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
-  // FIXME: Disable new IUO implementation for now.
+  // FIXME: Disable parts of the new IUO implementation for now.
   return false;
   return isDecl() &&
          getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
