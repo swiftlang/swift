@@ -43,10 +43,7 @@ namespace driver {
   /// The Compilation is responsible for generating this file before running
   /// the Job this info is attached to.
   struct FilelistInfo {
-    enum WhichFiles : bool {
-      Input,
-      Output
-    };
+    enum class WhichFiles : unsigned { Input, PrimaryInputs, Output };
 
     StringRef path;
     types::ID type;
