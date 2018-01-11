@@ -72,7 +72,7 @@ enum class PartialInitializationKind {
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
-static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
+static void LowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
                                    PartialInitializationKind isInitialization) {
   DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
                      << "]: " << *Inst << "\n");
@@ -2185,6 +2185,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (Term->isFunctionExiting()) {
       B.setInsertionPoint(Term);
+      B.setCurrentDebugScope(Term->getDebugScope());
       B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
@@ -2226,7 +2227,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
         continue;
 
       APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
-      updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, B);
+      SILBuilderWithScope SB(Use.Inst);
+      updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, SB);
       continue;
     }
 
