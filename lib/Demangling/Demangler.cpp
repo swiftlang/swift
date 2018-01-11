@@ -56,12 +56,13 @@ static bool isContext(Node::Kind kind) {
   }
 }
 
-static bool isNominal(Node::Kind kind) {
+static bool isAnyGeneric(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::Structure:
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::TypeAlias:
       return true;
     default:
       return false;
@@ -588,7 +589,7 @@ NodePointer Demangler::demangleStandardSubstitution() {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
-      return createNode(Node::Kind::Module, MANGLING_MODULE_C);
+      return createNode(Node::Kind::Module, MANGLING_MODULE_CLANG_IMPORTER);
     case 'g': {
       NodePointer OptionalTy =
         createType(createWithChildren(Node::Kind::BoundGenericEnum,
@@ -770,9 +771,9 @@ NodePointer Demangler::popTypeAndGetChild() {
   return Ty->getFirstChild();
 }
 
-NodePointer Demangler::popTypeAndGetNominal() {
+NodePointer Demangler::popTypeAndGetAnyGeneric() {
   NodePointer Child = popTypeAndGetChild();
-  if (Child && isNominal(Child->getKind()))
+  if (Child && isAnyGeneric(Child->getKind()))
     return Child;
   return nullptr;
 }
@@ -860,7 +861,7 @@ NodePointer Demangler::demangleAnyGenericType(Node::Kind kind) {
 NodePointer Demangler::demangleExtensionContext() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Module = popModule();
-  NodePointer Type = popTypeAndGetNominal();
+  NodePointer Type = popTypeAndGetAnyGeneric();
   NodePointer Ext = createWithChildren(Node::Kind::Extension, Module, Type);
   if (GenSig)
     Ext = addChild(Ext, GenSig);
@@ -1068,7 +1069,7 @@ NodePointer Demangler::demangleBoundGenericType() {
     if (!popNode(Node::Kind::FirstElementMarker))
       return nullptr;
   }
-  NodePointer Nominal = popTypeAndGetNominal();
+  NodePointer Nominal = popTypeAndGetAnyGeneric();
   NodePointer NTy = createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
   addSubstitution(NTy);
   return NTy;
@@ -1266,7 +1267,7 @@ NodePointer Demangler::demangleMetatype() {
                              popProtocolConformance());
     case 'C': {
       NodePointer Ty = popNode(Node::Kind::Type);
-      if (!Ty || !isNominal(Ty->getChild(0)->getKind()))
+      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
         return nullptr;
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));

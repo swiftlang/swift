@@ -2618,7 +2618,8 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << " "
+           << Error << "\n";
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
@@ -2643,7 +2644,8 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << " " << error
+           << "\n";
   }
 };
 

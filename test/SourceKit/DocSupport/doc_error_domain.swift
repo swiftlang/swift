@@ -28,5 +28,5 @@
 
 // CHECK:             key.kind: source.lang.swift.decl.var.static,
 // CHECK-NEXT:        key.name: "errFirst",
-// CHECK-NEXT:        key.usr: "s:SC7MyErrorV8errFirstAB4CodeOvpZ",
+// CHECK-NEXT:        key.usr: "s:SC7MyErrorV8errFirstSo0aB4CodeVvpZ",
 // CHECK-NEXT:        This is first error.

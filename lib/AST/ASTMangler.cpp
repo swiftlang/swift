@@ -1171,28 +1171,36 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  auto clangDecl = decl->getClangDecl();
-
-  // Classes and protocols implemented in Objective-C have a special context
-  // mangling.
-  //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCInterfaceDecl>(clangDecl) ||
-           isa<clang::TypedefDecl>(clangDecl));
-    return appendOperator("So");
-  }
-
-  if (isa<ProtocolDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCProtocolDecl>(clangDecl));
-    return appendOperator("So");
-  }
-
   // Declarations provided by a C module have a special context mangling.
+  //   known-context ::= 'So'
+  //
+  // Also handle top-level imported declarations that don't have corresponding
+  // Clang decls. Check getKind() directly to avoid a layering dependency.
   //   known-context ::= 'SC'
-  // Do a dance to avoid a layering dependency.
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
-    if (file->getKind() == FileUnitKind::ClangModule)
+    if (file->getKind() == FileUnitKind::ClangModule) {
+      if (decl->getClangDecl())
+        return appendOperator("So");
       return appendOperator("SC");
+    }
+  }
+
+  // Nested types imported from C should also get use the special "So" context.
+  if (isa<TypeDecl>(decl)) {
+    if (auto *clangDecl = cast_or_null<clang::NamedDecl>(decl->getClangDecl())){
+      bool hasNameForLinkage;
+      if (auto *tagDecl = dyn_cast<clang::TagDecl>(clangDecl))
+        hasNameForLinkage = tagDecl->hasNameForLinkage();
+      else
+        hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
+      if (hasNameForLinkage) {
+        auto *clangDC = clangDecl->getDeclContext();
+        assert(clangDC->getRedeclContext()->isTranslationUnit() &&
+               "non-top-level Clang types not supported yet");
+        (void)clangDC;
+        return appendOperator("So");
+      }
+    }
   }
 
   // Just mangle the decl's DC.
@@ -1392,7 +1400,7 @@ void ASTMangler::appendModule(const ModuleDecl *module) {
   StringRef ModName = module->getName().str();
   if (ModName == MANGLING_MODULE_OBJC)
     return appendOperator("So");
-  if (ModName == MANGLING_MODULE_C)
+  if (ModName == MANGLING_MODULE_CLANG_IMPORTER)
     return appendOperator("SC");
 
   appendIdentifier(ModName);
@@ -1401,7 +1409,11 @@ void ASTMangler::appendModule(const ModuleDecl *module) {
 /// Mangle the name of a protocol as a substitution candidate.
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol) {
   appendContextOf(protocol);
-  appendDeclName(protocol);
+  auto *clangDecl = protocol->getClangDecl();
+  if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))
+    appendIdentifier(clangProto->getName());
+  else
+    appendDeclName(protocol);
 }
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
@@ -1425,28 +1437,73 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return;
 
   appendContextOf(decl);
-  appendDeclName(decl);
 
-  switch (decl->getKind()) {
-  default:
-    llvm_unreachable("not a nominal type");
+  // Always use Clang names for imported Clang declarations, unless they don't
+  // have one.
+  auto tryAppendClangName = [this](const clang::Decl *clangDecl) -> bool {
+    auto *namedDecl = dyn_cast_or_null<clang::NamedDecl>(clangDecl);
+    if (!namedDecl)
+      return false;
 
-  case DeclKind::TypeAlias:
-    appendOperator("a");
-    break;
-  case DeclKind::Protocol:
-    appendOperator("P");
-    break;
-  case DeclKind::Class:
-    appendOperator("C");
-    break;
-  case DeclKind::Enum:
-    appendOperator("O");
-    break;
-  case DeclKind::Struct:
-    appendOperator("V");
-    break;
+    // Use an anonymous enum's enclosing typedef for the mangled name, if
+    // present. This matches C++'s rules for linkage names of tag declarations.
+    if (namedDecl->getDeclName().isEmpty())
+      if (auto *tagDecl = dyn_cast<clang::TagDecl>(namedDecl))
+        if (auto *typedefDecl = tagDecl->getTypedefNameForAnonDecl())
+          namedDecl = typedefDecl;
+
+    if (namedDecl->getDeclName().isEmpty())
+      return false;
+
+    appendIdentifier(namedDecl->getName());
+
+    // The important distinctions to maintain here are Objective-C's various
+    // namespaces: protocols, tags (struct/enum/union), and unqualified names.
+    // We continue to mangle "class" the standard Swift way because it feels
+    // weird to call that an alias, but they're really in the same namespace.
+    if (isa<clang::ObjCInterfaceDecl>(namedDecl)) {
+      appendOperator("C");
+    } else if (isa<clang::ObjCProtocolDecl>(namedDecl)) {
+      appendOperator("P");
+    } else if (isa<clang::TagDecl>(namedDecl)) {
+      // Note: This includes enums, but that's okay. A Clang enum is not always
+      // imported as a Swift enum.
+      appendOperator("V");
+    } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+      appendOperator("a");
+    } else {
+      llvm_unreachable("unknown imported Clang type");
+    }
+
+    return true;
+  };
+
+  if (!tryAppendClangName(decl->getClangDecl())) {
+    appendDeclName(decl);
+
+    switch (decl->getKind()) {
+    default:
+      llvm_unreachable("not a nominal type");
+
+    case DeclKind::TypeAlias:
+      appendOperator("a");
+      break;
+    case DeclKind::Protocol:
+      appendOperator("P");
+      break;
+    case DeclKind::Class:
+      appendOperator("C");
+      break;
+    case DeclKind::Enum:
+      appendOperator("O");
+      break;
+    case DeclKind::Struct:
+      appendOperator("V");
+      break;
+    }
   }
+
   addSubstitution(key.getPointer());
 }
 
@@ -1993,10 +2050,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
 void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
   GenericSignature *contextSig = nullptr;
-  Mod = conformance->getDeclContext()->getParentModule();
-  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
-    auto topLevelContext =
+  auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
+  Mod = topLevelContext->getParentModule();
+
+  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
     appendContextOf(behaviorStorage);
     FileUnit *fileUnit = cast<FileUnit>(topLevelContext);
     appendIdentifier(
@@ -2007,7 +2065,19 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     auto conformingType = conformance->getType();
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
-    appendModule(conformance->getDeclContext()->getParentModule());
+
+    bool needsModule = true;
+    if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+      if (file->getKind() == FileUnitKind::ClangModule) {
+        if (conformance->getProtocol()->hasClangNode())
+          appendOperator("So");
+        else
+          appendOperator("SC");
+        needsModule = false;
+      }
+    }
+    if (needsModule)
+      appendModule(Mod);
 
     contextSig =
       conformingType->getAnyNominal()->getGenericSignatureOfContext();

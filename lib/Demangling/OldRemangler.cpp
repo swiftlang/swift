@@ -427,7 +427,7 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
     case Node::Kind::Module:
       SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
       SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
-      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_CLANG_IMPORTER, "SC");
       break;
     case Node::Kind::Structure:
       if (isInSwiftModule(node)) {
