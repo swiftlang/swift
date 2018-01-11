@@ -5243,13 +5243,22 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
-  auto fnType = i->getType().castTo<SILFunctionType>();
+  if (IGM.isResilient(conformance.getRequirement(),
+                      ResilienceExpansion::Maximal)) {
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
+    auto fnType = IGM.getSILTypes().getConstantFunctionType(member);
+    auto sig = IGM.getSignature(fnType);
+    auto fn = FunctionPointer::forDirect(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
 
   // It would be nice if this weren't discarded.
   llvm::Value *baseMetadataCache = nullptr;
 
   auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
-                                   member, conformance, fnType);
+                                   member, conformance);
   
   setLoweredFunctionPointer(i, fn);
 }

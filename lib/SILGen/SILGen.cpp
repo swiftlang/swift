@@ -118,13 +118,13 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
-    SILFunctionConventions fnConv(funcInfo, SGM.M);
+    auto funcTy = SGM.Types.getConstantFunctionType(c);
+    SILFunctionConventions fnConv(funcTy, SGM.M);
 
     if (inputTypes) {
       auto toSILType = [&SGM](Type ty) { return SGM.getLoweredType(ty); };
       if (fnConv.hasIndirectSILResults()
-          || funcInfo->getNumParameters() != inputTypes->size()
+          || funcTy->getNumParameters() != inputTypes->size()
           || !std::equal(
                  fnConv.getParameterSILTypes().begin(),
                  fnConv.getParameterSILTypes().end(),
@@ -443,10 +443,6 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                           topLevelType, nullptr, Loc, IsBare, IsNotTransparent,
                           IsNotSerialized, ProfileCounter(), IsNotThunk,
                           SubclassScope::NotApplicable);
-}
-
-SILType SILGenModule::getConstantType(SILDeclRef constant) {
-  return Types.getConstantType(constant);
 }
 
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,

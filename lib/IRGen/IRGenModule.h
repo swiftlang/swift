@@ -1046,6 +1046,11 @@ public:
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
 
+  llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
+                                         ForDefinition_t forDefinition);
+
+  llvm::Function *emitDispatchThunk(SILDeclRef declRef);
+
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
