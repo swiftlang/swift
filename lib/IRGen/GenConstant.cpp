@@ -54,6 +54,8 @@ llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
                                                 StringLiteralInst *SLI) {
   switch (SLI->getEncoding()) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(SLI->getValue());
 

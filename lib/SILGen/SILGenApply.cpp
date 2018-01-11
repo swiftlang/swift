@@ -1520,8 +1520,10 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     TypeElts = TypeEltsArray;
     break;
 
+  // SWIFT_ENABLE_TENSORFLOW.
+  case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::ObjCSelector:
-    llvm_unreachable("Objective-C selectors cannot be formed here");
+    llvm_unreachable("these cannot be formed here");
   }
 
   CanType ty =

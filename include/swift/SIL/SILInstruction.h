@@ -2892,6 +2892,7 @@ class StringLiteralInst final
 
 public:
   enum class Encoding {
+    Bytes,   // SWIFT_ENABLE_TENSORFLOW
     UTF8,
     UTF16,
     /// UTF-8 encoding of an Objective-C selector.
