@@ -879,7 +879,7 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, DefaultCC,
 //                                      value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(Int32Ty, TypeMetadataPtrTy->getPointerTo(0),
+         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 

@@ -691,7 +691,7 @@ template <typename int_type>
 class TargetTupleTypeFlags {
   enum : int_type {
     NumElementsMask = 0x0000FFFFU,
-    NonConstantLabelsMask = 0x01000000U,
+    NonConstantLabelsMask = 0x00010000U,
   };
   int_type Data;
 
@@ -707,7 +707,7 @@ public:
   constexpr TargetTupleTypeFlags<int_type> withNonConstantLabels(
                                              bool hasNonConstantLabels) const {
     return TargetTupleTypeFlags<int_type>(
-                        (Data & NonConstantLabelsMask) |
+                        (Data & ~NonConstantLabelsMask) |
                           (hasNonConstantLabels ? NonConstantLabelsMask : 0));
   }
 
@@ -728,7 +728,7 @@ public:
     return Data != other.Data;
   }
 };
-using TupleTypeFlags = TargetTupleTypeFlags<uint32_t>;
+using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.

@@ -1010,7 +1010,7 @@ swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1 };
-  return swift_getTupleTypeMetadata(TupleTypeFlags(0).withNumElements(2),
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(2),
                                     elts, labels, proposedWitnesses);
 }
 
@@ -1020,7 +1020,7 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1, elt2 };
-  return swift_getTupleTypeMetadata(TupleTypeFlags(0).withNumElements(3),
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(3),
                                     elts, labels, proposedWitnesses);
 }
 

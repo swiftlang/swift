@@ -690,7 +690,7 @@ namespace {
         TupleTypeFlags flags =
           TupleTypeFlags().withNumElements(elements.size());
         llvm::Value *args[] = {
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
+          llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
           pointerToFirst,
           getTupleLabelsString(IGF.IGM, type),
           llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
@@ -1667,7 +1667,7 @@ namespace {
           TupleTypeFlags().withNumElements(elements.size());
 
         llvm::Value *args[] = {
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
+          llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
           pointerToFirst,
           // labels don't matter for layout
           llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy),

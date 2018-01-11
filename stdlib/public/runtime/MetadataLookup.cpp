@@ -498,7 +498,7 @@ public:
                             std::string labels,
                             bool variadic) const {
     // TODO: 'variadic' should no longer exist
-    auto flags = TupleTypeFlags(0).withNumElements(elements.size());
+    auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
     return swift_getTupleTypeMetadata(flags, elements.data(),
