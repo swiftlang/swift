@@ -3023,9 +3023,9 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// object (if indirect).
 ///
 /// The result is always a GlobalValue.
-Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect,
+Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forFieldOffset(var, isIndirect);
+  LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
                                  forDefinition);
