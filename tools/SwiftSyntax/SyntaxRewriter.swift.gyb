@@ -2,8 +2,6 @@
   from gyb_syntax_support import *
   # -*- mode: Swift -*-
   # Ignore the following admonition it applies to the resulting .swift file only
-  def is_visitable(node):
-    return not node.is_base() and not node.collection_element
 }%
 //// Automatically Generated From SyntaxFactory.swift.gyb.
 //// Do Not Edit Directly!
