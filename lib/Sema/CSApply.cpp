@@ -2956,7 +2956,7 @@ namespace {
                               { },
                               expr->getRBracketLoc(),
                               /*HasTrailingClosure=*/false,
-                              /*Implicit=*/false,
+                              /*Implicit=*/true,
                               argType);
 
       cs.cacheExprTypes(arg);
