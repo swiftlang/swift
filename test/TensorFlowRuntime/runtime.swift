@@ -42,15 +42,41 @@ func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
   TF_DeleteTensor(out_t)
 }
 
+func decodeHex(_ string: String) -> [UInt8] {
+  func charToByte(_ c: String) -> UInt8 {
+    return c.utf8.first! // swift makes char processing grotty. :-(
+  }
+
+  func hexToInt(_ c : UInt8) -> UInt8 {
+    switch c {
+    case charToByte("0")...charToByte("9"): return c - charToByte("0")
+    case charToByte("a")...charToByte("f"): return c - charToByte("a") + 10
+    case charToByte("A")...charToByte("F"): return c - charToByte("A") + 10
+    default: fatalError("invalid hexadecimal character")
+    }
+  }
+
+  var result: [UInt8] = []
+
+  assert(string.count & 1 == 0, "must get a pair of hexadecimal characters")
+  var it = string.utf8.makeIterator()
+  while let byte1 = it.next() {
+    let byte2 = it.next()!  // we know we have an even byte length.
+    result.append((hexToInt(byte1) << 4) | hexToInt(byte2))
+  }
+
+  return result
+}
+
 func runProgram(_ progName: String,
-  _ graphProto: StaticString,
+  _ graphProtoInHex: String,
   _ inputTensors: [CTensorHandle],
   shouldAbort: Bool = false
 ) -> [CTensorHandle] {
-  print("The input graph of program \(progName) has \(graphProto.utf8CodeUnitCount) bytes.")
-
-  let program = _TFCStartTensorProgram(graphProto.utf8Start,
-                                       graphProto.utf8CodeUnitCount,
+  let graphProto = decodeHex(graphProtoInHex)
+  print("The input graph of program \(progName) has \(graphProto.count) bytes.")
+  let program = _TFCStartTensorProgram(graphProto,
+                                       graphProto.count,
                                        inputTensors,
                                        inputTensors.count,
                                        /*number of output tensors*/1)
@@ -100,12 +126,12 @@ func runConst() {
 func runTanh() {
   /* The corresponding Swift program:
    func g() {
-     let a = Tensor1D<Float>(1,2,3)
-     let c = a.tanh()
+     let b = Tensor1D<Float>(1)
+     let a = tanh(b)
      print(c)
    }
    */
-  let graphProto: StaticString = "\n4\n\u{0C}the_function\u{12}\t\n\u{05}arg_0\u{18}\u{01}\u{1A}\u{19}\n\u{15}op__t04main1gyyf_11_6\u{18}\u{01}\u{1A}-\n\u{15}op._T04main1gyyF.11.6\u{12}\u{04}Tanh\u{1A}\u{05}arg_0*\u{07}\n\u{01}T\u{12}\u{02}0\u{01}\"2\n\u{15}op__t04main1gyyf_11_6\u{12}\u{19}op._T04main1gyyF.11.6:y:0"
+  let graphProto = "0A3B0A0C7468655F66756E6374696F6E12090A056172675F3018011A200A1C6F705F5F743032743239746573745F74616E687979665F31325F313318011A340A1C6F702E5F543032743239746573745F74616E687979462E31322E3133120454616E681A056172675F302A070A01541202300122400A1C6F705F5F743032743239746573745F74616E687979665F31325F313312206F702E5F543032743239746573745F74616E687979462E31322E31333A793A30"
 
   let outputTensors = runProgram("Tanh", graphProto, [createFloatTensorHandle(1.2)])
 
@@ -115,13 +141,12 @@ func runTanh() {
 func runAdd(shouldAbort: Bool) {
   /* The corresponding Swift program:
   func f() {
-    let a = Tensor1D<Float>(1,2,3)
-    let b = Tensor1D<Float>(1,2,4)
-    let c = a+b
-    print(c)
+    let b = Tensor1D<Float>(1,2,3)
+    let c = Tensor1D<Float>(1,2,4)
+    let a = b+c
   }
   */
-  let graphProto: StaticString = "\nE\n\u{0C}the_function\u{12}\t\n\u{05}arg_0\u{18}\u{01}\u{12}\t\n\u{05}arg_1\u{18}\u{01}\u{1A}\u{1F}\n\u{1B}op__t04main8test_addyyf_4_6\u{18}\u{01}\u{1A}9\n\u{1B}op._T04main8test_addyyF.4.6\u{12}\u{03}Add\u{1A}\u{05}arg_0\u{1A}\u{05}arg_1*\u{07}\n\u{01}T\u{12}\u{02}0\u{01}\">\n\u{1B}op__t04main8test_addyyf_4_6\u{12}\u{1F}op._T04main8test_addyyF.4.6:z:0"
+  let graphProto = "0A440A0C7468655F66756E6374696F6E12090A056172675F30180112090A056172675F3118011A1E0A1A6F705F5F743032743238746573745F6164647979665F345F313318011A380A1A6F702E5F543032743238746573745F6164647979462E342E313312034164641A056172675F301A056172675F312A070A015412023001223C0A1A6F705F5F743032743238746573745F6164647979665F345F3133121E6F702E5F543032743238746573745F6164647979462E342E31333A7A3A30"
 
   let outputTensors = runProgram("Add", graphProto,
                                  [createFloatTensorHandle(1.2),
@@ -135,6 +160,12 @@ func runAdd(shouldAbort: Bool) {
 
 RuntimeTests.test("Runtime/BasicConstTest") {
   runConst()
+}
+
+RuntimeTests.test("Runtime/DecodeHexTest") {
+  assert(decodeHex("01FF") == [1, 255])
+  assert(decodeHex("8001") == [128, 1])
+  assert(decodeHex("80a1bcd3") == [128, 161, 188, 211])
 }
 
 RuntimeTests.test("Runtime/BasicTanhTest") {
