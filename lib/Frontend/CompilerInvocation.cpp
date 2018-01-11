@@ -700,6 +700,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   Opts.VerifyExclusivity = Args.hasArg(OPT_verify_exclusivity);
+  //!!!
+  Opts.VerifyExclusivity = true;
   if (Opts.shouldOptimize() && !Opts.VerifyExclusivity)
     Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
