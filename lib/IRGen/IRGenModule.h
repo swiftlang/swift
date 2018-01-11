@@ -1051,8 +1051,7 @@ public:
 
   llvm::Function *emitDispatchThunk(SILDeclRef declRef);
 
-  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
-                               ForDefinition_t forDefinition);
+  Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);

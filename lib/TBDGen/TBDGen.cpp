@@ -274,13 +274,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
     auto var = dyn_cast<VarDecl>(value);
     auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
-    if (hasFieldOffset) {
-      // FIXME: a field only has one sort of offset, but it is moderately
-      // non-trivial to compute which one. Including both is less painful than
-      // missing the correct one (for now), so we do that.
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
-    }
+    if (hasFieldOffset)
+      addSymbol(LinkEntity::forFieldOffset(var));
 
     // The non-allocating forms of the destructors.
     if (auto dtor = dyn_cast<DestructorDecl>(value)) {

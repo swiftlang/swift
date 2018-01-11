@@ -74,10 +74,10 @@ public:
     return finalize();
   }
 
-  std::string mangleFieldOffsetFull(const ValueDecl *Decl, bool isIndirect) {
+  std::string mangleFieldOffset(const ValueDecl *Decl) {
     beginMangling();
     appendEntity(Decl);
-    appendOperator("Wv", isIndirect ? "i" : "d");
+    appendOperator("Wvd");
     return finalize();
   }
 

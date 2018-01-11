@@ -389,8 +389,9 @@ static SILFunction *getCalleeFunction(
   if (CalleeFunction->isTransparent() == IsNotTransparent)
     return nullptr;
 
-  if (F->isSerialized() && !CalleeFunction->hasValidLinkageForFragileRef()) {
-    if (!CalleeFunction->hasValidLinkageForFragileInline()) {
+  if (F->isSerialized() &&
+      !CalleeFunction->hasValidLinkageForFragileInline()) {
+    if (!CalleeFunction->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << F->getName() << "\n";
       llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
       llvm_unreachable("Should never be inlining a resilient function into "
