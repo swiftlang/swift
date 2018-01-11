@@ -324,7 +324,24 @@ public:
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
     auto mangledName = Demangle::mangleNode(node);
-    return _findProtocolDescriptor(mangledName);
+
+    // Look for a Swift protocol with this mangled name.
+    if (auto protocol = _findProtocolDescriptor(mangledName))
+      return protocol;
+
+#if SWIFT_OBJC_INTEROP
+    // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
+    // is used for Objective-C entities.
+    std::string objcMangledName =
+      "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
+    if (auto protocol = objc_getProtocol(objcMangledName.c_str())) {
+      auto description = (ProtocolDescriptor *)(protocol);
+      assert(objcMangledName == description->Name);
+      return description;
+    }
+#endif
+
+    return nullptr;
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
@@ -365,8 +382,20 @@ public:
   BuiltType createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                           BuiltType superclass,
                                           bool isClassBound) const {
-    auto classConstraint = isClassBound ? ProtocolClassConstraint::Class
-                                        : ProtocolClassConstraint::Any;
+    // Determine whether we have a class bound.
+    ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
+    if (isClassBound || superclass) {
+      classConstraint = ProtocolClassConstraint::Class;
+    } else {
+      for (auto protocol : protocols) {
+        if (protocol->Flags.getClassConstraint()
+              == ProtocolClassConstraint::Class) {
+          classConstraint = ProtocolClassConstraint::Class;
+          break;
+        }
+      }
+    }
+
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
   }
