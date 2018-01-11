@@ -30,6 +30,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
+#include <functional>
 #include <vector>
 
 using namespace swift;
@@ -345,6 +346,20 @@ namespace {
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
 public:
+  /// Callback used to handle the substitution of a generic parameter for
+  /// its metadata.
+  using SubstGenericParameterFn =
+    std::function<const Metadata *(unsigned depth, unsigned index)>;
+
+private:
+  /// Substitute
+  SubstGenericParameterFn substGenericParameter;
+
+public:
+  DecodedMetadataBuilder(SubstGenericParameterFn substGenericParameter
+                           = nullptr)
+    : substGenericParameter(substGenericParameter) { }
+
   using BuiltType = const Metadata *;
 
   struct BuiltNominalTypeDecl :
@@ -467,7 +482,10 @@ public:
 
   BuiltType createGenericTypeParameterType(unsigned depth,
                                            unsigned index) const {
-    // FIXME: Implement substitution logic here.
+    // Use the callback, when provided.
+    if (substGenericParameter)
+      return substGenericParameter(depth, index);
+
     return BuiltType();
   }
 
@@ -537,7 +555,10 @@ public:
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+                           size_t numberOfLevels,
+                           size_t *parametersPerLevel,
+                           const Metadata * const *flatSubstitutions) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
 
   Demangler demangler;
@@ -563,6 +584,20 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
     if (!node) return nullptr;
   }
 
-  DecodedMetadataBuilder builder;
+  DecodedMetadataBuilder builder(
+    [&](unsigned depth, unsigned index) -> const Metadata * {
+      if (depth >= numberOfLevels)
+        return nullptr;
+
+      if (index >= parametersPerLevel[depth])
+        return nullptr;
+
+      unsigned flatIndex = index;
+      for (unsigned i = 0; i < depth; ++i)
+        flatIndex += parametersPerLevel[i];
+
+      return flatSubstitutions[flatIndex];
+  });
+
   return Demangle::decodeMangledType(builder, node);
 }

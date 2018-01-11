@@ -150,5 +150,12 @@ DemangleToMetadataTests.test("nominal types") {
   expectEqual(type(of: C()), _typeByMangledName("main.C")!)
 }
 
+DemangleToMetadataTests.test("substitutions") {
+  // Type parameter substitutions.
+  expectEqual(type(of: (1, 3.14159, "Hello")),
+    _typeByMangledName("yyx_q_qd__t",
+      substitutions: [[Int.self, Double.self], [String.self]])!)
+}
+
 runAllTests()
 
