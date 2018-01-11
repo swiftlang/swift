@@ -1514,6 +1514,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type openedFullType;
 
   bool isDynamicResult = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  bool createdDynamicResultDisjunction = false;
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -1592,7 +1593,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // selecting between options for refType, which is either
         // Optional or a function type returning Optional.
         assert(boundType->hasTypeVariable());
-        Type ty = boundType.transform([this](Type elTy) -> Type {
+        ty = boundType.transform([this](Type elTy) -> Type {
           if (auto *tv = dyn_cast<TypeVariableType>(elTy.getPointer())) {
             return createTypeVariable(tv->getImpl().getLocator(),
                                       tv->getImpl().getRawOptions());
@@ -1606,10 +1607,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
       buildDisjunctionForDynamicLookupResult(
-          boundType, ImplicitlyUnwrappedOptionalType::get(ty->getRValueType()),
+          boundType, OptionalType::get(ty->getRValueType()),
           locator);
 
+      // We store an Optional of the originally resolved type in the
+      // overload set.
       refType = ImplicitlyUnwrappedOptionalType::get(refType->getRValueType());
+      createdDynamicResultDisjunction = true;
     }
 
     // If the declaration is unavailable, note that in the score.
@@ -1699,13 +1703,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               refType};
 
   // We created appropriate disjunctions for dynamic result above.
-  if (!isDynamicResult && choice.isImplicitlyUnwrappedValueOrReturnValue()) {
-    // Build the disjunction to attempt binding both T? and T (or
-    // function returning T? and function returning T).
-    buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType, locator);
-  } else {
-    // Add the type binding constraint.
-    addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+  if (!createdDynamicResultDisjunction) {
+    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+      // Build the disjunction to attempt binding both T? and T (or
+      // function returning T? and function returning T).
+      buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
+                                                     locator);
+    } else {
+      // Add the type binding constraint.
+      addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+    }
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
