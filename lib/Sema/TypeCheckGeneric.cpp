@@ -541,9 +541,10 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     // If this is a materializeForSet, infer requirements from the
     // storage type instead, since it's not part of the accessor's
     // type signature.
-    if (fn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+    auto accessor = dyn_cast<AccessorDecl>(fn);
+    if (accessor && accessor->isMaterializeForSet()) {
       if (builder) {
-        auto *storage = fn->getAccessorStorageDecl();
+        auto *storage = accessor->getStorage();
         if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(storage)) {
           auto source =
             GenericSignatureBuilder::FloatingRequirementSource::forInferred(
@@ -953,9 +954,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
 
   // We get bogus errors here with generic subscript materializeForSet.
-  if (!isa<FuncDecl>(func) ||
-      cast<FuncDecl>(func)->getAccessorKind() !=
-        AccessorKind::IsMaterializeForSet)
+  if (!isa<AccessorDecl>(func) ||
+      !cast<AccessorDecl>(func)->isMaterializeForSet())
     checkReferencedGenericParams(func, sig, *this);
 }
 

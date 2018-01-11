@@ -119,8 +119,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
-                                       TypeChecker &TC) {
+static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
+                                           TypeChecker &TC) {
   SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the getter.
@@ -158,10 +158,12 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto storageInterfaceType = getTypeOfStorage(storage, true);
 
-  auto getter = FuncDecl::create(
-      TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
+  auto getter = AccessorDecl::create(
+      TC.Context, loc, /*AccessorKeywordLoc*/ loc,
+      AccessorKind::IsGetter, AddressorKind::NotAddressor, storage,
+      staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      /*GenericParams=*/nullptr,
       getterParams, TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
   getter->setImplicit();
@@ -179,9 +181,9 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   return getter;
 }
 
-static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
-                                       ParamDecl *&valueDecl,
-                                       TypeChecker &TC) {
+static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
+                                           ParamDecl *&valueDecl,
+                                           TypeChecker &TC) {
   SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the setter.
@@ -209,11 +211,12 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
-  FuncDecl *setter = FuncDecl::create(
-      TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      params, TypeLoc::withoutLoc(setterRetTy),
+  auto setter = AccessorDecl::create(
+      TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
+      AccessorKind::IsSetter, AddressorKind::NotAddressor, storage,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, params, TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
 
@@ -294,9 +297,9 @@ static void maybeMarkTransparent(FuncDecl *accessor,
   accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
-static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
-                                                  FuncDecl *setter,
-                                                  TypeChecker &TC) {
+static AccessorDecl *
+createMaterializeForSetPrototype(AbstractStorageDecl *storage,
+                                 FuncDecl *setter, TypeChecker &TC) {
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
 
@@ -340,10 +343,11 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
     genericParams = subscript->getGenericParams();
 
-  auto *materializeForSet = FuncDecl::create(
-      ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(),
+  auto *materializeForSet = AccessorDecl::create(
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
+      AccessorKind::IsMaterializeForSet, AddressorKind::NotAddressor, storage,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       (genericParams
        ? genericParams->clone(DC)
        : nullptr),
@@ -455,7 +459,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
 
 /// Build a reference to the subscript index variables for this subscript
 /// accessor.
-static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
+static Expr *buildSubscriptIndexReference(ASTContext &ctx,
+                                          AccessorDecl *accessor) {
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
@@ -520,9 +525,10 @@ namespace {
 
   /// A reference to storage from within an accessor.
   class AccessorStorageReferenceContext : public StorageReferenceContext {
-    FuncDecl *Accessor;
+    AccessorDecl *Accessor;
   public:
-    AccessorStorageReferenceContext(FuncDecl *accessor) : Accessor(accessor) {}
+    AccessorStorageReferenceContext(AccessorDecl *accessor)
+      : Accessor(accessor) {}
     ~AccessorStorageReferenceContext() override = default;
 
     VarDecl *getSelfDecl() const override {
@@ -575,7 +581,7 @@ static Expr *buildStorageReference(
                                  DeclNameLoc(), IsImplicit, semantics);
 }
 
-static Expr *buildStorageReference(FuncDecl *accessor,
+static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    AccessSemantics semantics,
                                    SelfAccessorKind selfAccessorKind,
@@ -586,7 +592,7 @@ static Expr *buildStorageReference(FuncDecl *accessor,
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
 /// superclass getter.  Otherwise, we do a direct load of the value.
-static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
+static Expr *createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                               AbstractStorageDecl *storage,
                                                       TypeChecker &TC) {
   return buildStorageReference(accessor, storage,
@@ -690,7 +696,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 ///
 /// If the property is an override, we call the superclass setter.
 /// Otherwise, we do a direct store of the value.
-static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
+static void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
                                                       Expr *value,
                                                AbstractStorageDecl *storage,
                                                SmallVectorImpl<ASTNode> &body,
@@ -718,7 +724,7 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
 /// which is not an override of a base class property, it performs a direct
 /// storage load.  For an override of a base member property, it chains up to
 /// super.
-static void synthesizeTrivialGetter(FuncDecl *getter,
+static void synthesizeTrivialGetter(AccessorDecl *getter,
                                     AbstractStorageDecl *storage,
                                     TypeChecker &TC) {
   auto &ctx = TC.Context;
@@ -736,7 +742,7 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
 }
 
 /// Synthesize the body of a trivial setter.
-static void synthesizeTrivialSetter(FuncDecl *setter,
+static void synthesizeTrivialSetter(AccessorDecl *setter,
                                     AbstractStorageDecl *storage,
                                     VarDecl *valueVar,
                                     TypeChecker &TC) {
@@ -793,10 +799,10 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   auto *DC = storage->getDeclContext();
 
   // Create the getter.
-  auto *getter = createGetterPrototype(storage, TC);
+  AccessorDecl *getter = createGetterPrototype(storage, TC);
 
   // Create the setter.
-  FuncDecl *setter = nullptr;
+  AccessorDecl *setter = nullptr;
   ParamDecl *setterValueParam = nullptr;
   if (doesStorageNeedSetter(storage))
     setter = createSetterPrototype(storage, setterValueParam, TC);
@@ -1389,7 +1395,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, ParamLists,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
@@ -1680,8 +1685,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       && !dc->getDeclaredInterfaceType()->hasReferenceSemantics();
 
     auto makeBehaviorAccessors = [&]{
-      FuncDecl *getter;
-      FuncDecl *setter = nullptr;
+      AccessorDecl *getter;
+      AccessorDecl *setter = nullptr;
       if (valueProp && valueProp->getGetter()) {
         getter = createGetterPrototype(var, TC);
         // The getter is mutating if the behavior implementation is, unless
@@ -1818,7 +1823,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
 
-    FuncDecl *materializeForSet = nullptr;
+    AccessorDecl *materializeForSet = nullptr;
     if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
       materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
 

@@ -144,9 +144,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
         // Grab one of the accessors, and then use that to pull out which of the
         // getter or setter will have the appropriate linkage.
         FuncDecl *witnessWithRelevantLinkage;
-        switch (cast<FuncDecl>(members[0])->getAccessorKind()) {
-        case AccessorKind::NotAccessor:
-          llvm_unreachable("must be an accessor");
+        switch (cast<AccessorDecl>(members[0])->getAccessorKind()) {
         case AccessorKind::IsGetter:
         case AccessorKind::IsAddressor:
           witnessWithRelevantLinkage = witnessVD->getGetter();
@@ -175,11 +173,11 @@ void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
 }
 
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
-  if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+  if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
     // Accessors also appear nested inside the storage decl, which we treat as
     // the canonical location, so skip if we've got an accessor that isn't
     // inside the var decl.
-    if (FD->getAccessorStorageDecl() && !InsideAbstractStorageDecl)
+    if (!InsideAbstractStorageDecl)
       return;
   }
 

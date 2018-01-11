@@ -103,9 +103,9 @@ public:
 } // anonymous namespace
 
 UIdent UIdentVisitor::visitFuncDecl(const FuncDecl *D) {
-  if (D->isAccessor()) {
-    return SwiftLangSupport::getUIDForAccessor(D->getAccessorStorageDecl(),
-                                               D->getAccessorKind(),
+  if (auto AD = dyn_cast<AccessorDecl>(D)) {
+    return SwiftLangSupport::getUIDForAccessor(AD->getStorage(),
+                                               AD->getAccessorKind(),
                                                IsRef);
   }
 
@@ -212,8 +212,6 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::NotAccessor:
-    llvm_unreachable("expected accessor");
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   case AccessorKind::IsGetter:

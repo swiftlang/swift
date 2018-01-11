@@ -2113,9 +2113,9 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     return Flags(Flags::Kind::Init); // 'init' is considered static
 
   auto kind = [&] {
-    switch (cast<FuncDecl>(fn)->getAccessorKind()) {
-    case AccessorKind::NotAccessor:
-      return Flags::Kind::Method;
+    auto accessor = dyn_cast<AccessorDecl>(fn);
+    if (!accessor) return Flags::Kind::Method;
+    switch (accessor->getAccessorKind()) {
     case AccessorKind::IsGetter:
       return Flags::Kind::Getter;
     case AccessorKind::IsSetter:

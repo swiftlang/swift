@@ -1199,9 +1199,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
     unsigned Case = ~0;
     DeclBaseName MethodName;
-    if (FD && FD->isAccessor()) {
-      MethodName = FD->getAccessorStorageDecl()->getBaseName();
-      Case = isa<SubscriptDecl>(FD->getAccessorStorageDecl()) ? 2 : 1;
+    if (auto accessor = dyn_cast_or_null<AccessorDecl>(FD)) {
+      MethodName = accessor->getStorage()->getBaseName();
+      Case = isa<SubscriptDecl>(accessor->getStorage()) ? 2 : 1;
     } else if (FD && FD->isOperator()) {
       MethodName = FD->getName();
       Case = 3;
@@ -1570,8 +1570,8 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     if (!shouldEmitError(Inst)) return true;
 
     DeclBaseName Name;
-    if (Method->isAccessor())
-      Name = Method->getAccessorStorageDecl()->getBaseName();
+    if (auto accessor = dyn_cast<AccessorDecl>(Method))
+      Name = accessor->getStorage()->getBaseName();
     else
       Name = Method->getName();
 
@@ -1584,7 +1584,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
                     ? BeforeSuperInit
                     : BeforeSelfInit));
     diagnose(Module, Inst->getLoc(), diag::self_use_before_fully_init,
-             Name, Method->isAccessor(), Kind);
+             Name, isa<AccessorDecl>(Method), Kind);
 
     if (SuperInitDone)
       noteUninitializedMembers(Use);

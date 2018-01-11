@@ -23,7 +23,7 @@
 namespace swift {
   class Decl;
   class DeclRefExpr;
-  class FuncDecl;
+  class AccessorDecl;
   class NominalTypeDecl;
   class PatternBindingDecl;
   class Type;
@@ -163,27 +163,27 @@ ValueDecl *deriveDecodable(TypeChecker &tc,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
 
-/// Declare a getter for a derived property.
-FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
-                                       Decl *parentDecl,
-                                       NominalTypeDecl *typeDecl,
-                                       Type propertyInterfaceType,
-                                       Type propertyContextType,
-                                       bool isStatic,
-                                       bool isFinal);
-
-/// Declare a read-only property with an existing getter.
+/// Declare a read-only property.
 std::pair<VarDecl *, PatternBindingDecl *>
-declareDerivedReadOnlyProperty(TypeChecker &tc,
-                               Decl *parentDecl,
-                               NominalTypeDecl *typeDecl,
-                               Identifier name,
-                               Type propertyInterfaceType,
-                               Type propertyContextType,
-                               FuncDecl *getterDecl,
-                               bool isStatic,
-                               bool isFinal);
+declareDerivedProperty(TypeChecker &tc,
+                       Decl *parentDecl,
+                       NominalTypeDecl *typeDecl,
+                       Identifier name,
+                       Type propertyInterfaceType,
+                       Type propertyContextType,
+                       bool isStatic,
+                       bool isFinal);
 
+/// Add a getter to a derived property.  The property becomes read-only.
+AccessorDecl *addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
+                                                 VarDecl *property,
+                                                 Type propertyContextType);
+
+/// Declare a getter for a derived property.
+/// The getter will not be added to the property yet.
+AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
+                                           VarDecl *property,
+                                           Type propertyContextType);
 
 /// Build a reference to the 'self' decl of a derived function.
 DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

@@ -1478,7 +1478,7 @@ namespace {
             loc, addressor, substitutions, std::move(args.base), IsSuper,
             IsDirectAccessorUse, std::move(args.subscripts), SubstFieldType);
       }
-      switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+      switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
       case AddressorKind::NotAddressor:
         llvm_unreachable("not an addressor!");
 

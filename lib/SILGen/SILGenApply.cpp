@@ -5205,7 +5205,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
 
   SILValue pointer;
   ManagedValue owner;
-  switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
   case AddressorKind::NotAddressor:
     llvm_unreachable("not an addressor!");
   case AddressorKind::Unsafe:
@@ -5238,7 +5238,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                               /*isInvariant*/ false);
 
   // Mark dependence as necessary.
-  switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
+  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
   case AddressorKind::NotAddressor:
     llvm_unreachable("not an addressor!");
   case AddressorKind::Unsafe:

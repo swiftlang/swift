@@ -49,10 +49,9 @@ FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
 
       // If a property or subscript is @_inlineable, the accessors are
       // @_inlineable also.
-      if (auto FD = dyn_cast<FuncDecl>(AFD))
-        if (auto *ASD = FD->getAccessorStorageDecl())
-          if (ASD->getAttrs().getAttribute<InlineableAttr>())
-            return FragileFunctionKind::Inlineable;
+      if (auto accessor = dyn_cast<AccessorDecl>(AFD))
+        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
+          return FragileFunctionKind::Inlineable;
     }
   }
 

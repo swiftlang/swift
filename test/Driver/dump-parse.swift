@@ -40,7 +40,7 @@ enum TrailingSemi {
 
   // CHECK-LABEL: (subscript_decl trailing_semi
   // CHECK-NOT:   (func_decl trailing_semi 'anonname={{.*}}' getter_for=subscript(_:)
-  // CHECK:       (func_decl 'anonname={{.*}}' getter_for=subscript(_:)
+  // CHECK:       (accessor_decl 'anonname={{.*}}' getter_for=subscript(_:)
   subscript(x: Int) -> Int {
     // CHECK-LABEL: (pattern_binding_decl trailing_semi
     // CHECK-NOT:   (var_decl trailing_semi "y"

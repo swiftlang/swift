@@ -300,7 +300,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool WalkGenerics = AFD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams() &&
         // accessor generics are visited from the storage decl
-        (!isa<FuncDecl>(AFD) || !cast<FuncDecl>(AFD)->isAccessor());
+        !isa<AccessorDecl>(AFD);
 
     if (WalkGenerics) {
       visitGenericParamList(AFD->getGenericParams());
@@ -311,7 +311,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
-      if (!FD->isAccessor())
+      if (!isa<AccessorDecl>(FD))
         if (doIt(FD->getBodyResultTypeLoc()))
           return true;
 

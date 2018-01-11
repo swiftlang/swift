@@ -36,8 +36,8 @@ static bool isUnmapped(ASTNode N) {
     if (!AFD->getBody())
       return true;
 
-    if (auto *fd = dyn_cast<FuncDecl>(AFD))
-      if (fd->isImplicit() && fd->isGetter())
+    if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+      if (accessor->isImplicit() && accessor->isGetter())
         return false;
   }
 

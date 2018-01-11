@@ -1751,6 +1751,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
+  case DeclKind::Accessor:
     // Handled in SIL.
     return;
 
@@ -3070,6 +3071,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Var:
     case DeclKind::Subscript:
     case DeclKind::Func:
+    case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
     case DeclKind::EnumCase:

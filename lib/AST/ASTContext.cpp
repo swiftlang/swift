@@ -2234,32 +2234,33 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   if (isa<DestructorDecl>(member))
     return { 2 + member->isImplicit(), member->getFullName() };
 
-  auto func = cast<FuncDecl>(member);
-  switch (func->getAccessorKind()) {
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsDidSet:
-  case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsWillSet:
-    llvm_unreachable("Not an Objective-C entry point");
+  if (auto accessor = dyn_cast<AccessorDecl>(member)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::IsWillSet:
+      llvm_unreachable("Not an Objective-C entry point");
 
-  case AccessorKind::IsGetter:
-    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
-      return { 5, var->getFullName() };
+    case AccessorKind::IsGetter:
+      if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
+        return { 5, var->getFullName() };
 
-    return { 6, Identifier() };
+      return { 6, Identifier() };
 
-  case AccessorKind::IsSetter:
-    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
-      return { 7, var->getFullName() };
-    return { 8, Identifier() };
+    case AccessorKind::IsSetter:
+      if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
+        return { 7, var->getFullName() };
+      return { 8, Identifier() };
+    }
 
-  case AccessorKind::NotAccessor:
-    // Normal method.
-    return { 4, func->getFullName() };
+    llvm_unreachable("Unhandled AccessorKind in switch.");
   }
 
-  llvm_unreachable("Unhandled AccessorKind in switch.");
+  // Normal method.
+  auto func = cast<FuncDecl>(member);
+  return { 4, func->getFullName() };
 }
 
 bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
@@ -2603,9 +2604,8 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
                      ->getDeclaredInterfaceType());
     const ValueDecl *overriddenDecl = overriddenMethod;
     if (overriddenMethod->isImplicit())
-      if (auto func = dyn_cast<FuncDecl>(overriddenMethod))
-        if (auto storage = func->getAccessorStorageDecl())
-          overriddenDecl = storage;
+      if (auto accessor = dyn_cast<AccessorDecl>(overriddenMethod))
+        overriddenDecl = accessor->getStorage();
     Diags.diagnose(overriddenDecl, diag::objc_declared_here,
                    overriddenDiagInfo.first, overriddenDiagInfo.second);
 
@@ -2646,13 +2646,8 @@ static void removeValidObjCConflictingMethods(
                                  if (method->isInvalid())
                                    return true;
 
-                                 if (auto func = dyn_cast<FuncDecl>(method)) {
-                                   if (func->isAccessor()) {
-                                     return func->getAccessorStorageDecl()
-                                             ->isInvalid();
-                                   }
-
-                                   return false;
+                                 if (auto ad = dyn_cast<AccessorDecl>(method)) {
+                                   return ad->getStorage()->isInvalid();
                                  } 
                                  
                                  if (auto ctor 
@@ -2770,9 +2765,8 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
       const ValueDecl *originalDecl = originalMethod;
       if (originalMethod->isImplicit())
-        if (auto func = dyn_cast<FuncDecl>(originalMethod))
-          if (auto storage = func->getAccessorStorageDecl())
-            originalDecl = storage;
+        if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
+          originalDecl = accessor->getStorage();
 
       if (diagInfo == origDiagInfo) {
         Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
@@ -2872,28 +2866,19 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    selector,
                    protocolName);
 
-    /// Local function to determine if the given declaration is an accessor.
-    auto isAccessor = [](ValueDecl *decl) -> bool {
-      if (auto func = dyn_cast<FuncDecl>(decl))
-        return func->isAccessor();
-
-      return false;
-    };
-
     // Fix the name of the witness, if we can.
     if (req->getFullName() != conflicts[0]->getFullName() &&
         req->getKind() == conflicts[0]->getKind() &&
-        isAccessor(req) == isAccessor(conflicts[0])) {
+        isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
       // They're of the same kind: fix the name.
       unsigned kind;
       if (isa<ConstructorDecl>(req))
         kind = 1;
-      else if (auto func = dyn_cast<FuncDecl>(req)) {
-        if (func->isAccessor())
-          kind = isa<SubscriptDecl>(func->getAccessorStorageDecl()) ? 3 : 2;
-        else
-          kind = 0;
-      } else {
+      else if (auto accessor = dyn_cast<AccessorDecl>(req))
+        kind = isa<SubscriptDecl>(accessor->getStorage()) ? 3 : 2;
+      else if (isa<FuncDecl>(req))
+        kind = 0;
+      else {
         llvm_unreachable("unhandled @objc declaration kind");
       }
 

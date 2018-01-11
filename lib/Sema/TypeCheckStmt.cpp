@@ -145,8 +145,8 @@ namespace {
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
     DeclName name = AFD->getFullName();
     if (!name) {
-      if (auto *method = dyn_cast<FuncDecl>(AFD)) {
-        name = method->getAccessorStorageDecl()->getFullName();
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        name = accessor->getStorage()->getFullName();
       }
     }
     return name;

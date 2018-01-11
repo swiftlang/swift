@@ -618,7 +618,6 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
                      StaticSpellingKind::KeywordStatic,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
                      TypeLoc::withoutLoc(boolTy),
@@ -1059,6 +1058,11 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
 
+  VarDecl *hashValueDecl =
+    new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+                    /*IsCaptureList*/false, SourceLoc(),
+                    C.Id_hashValue, intType, parentDC);
+
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
 
   ParameterList *params[] = {
@@ -1066,14 +1070,13 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
     ParameterList::createEmpty(C)
   };
 
-  FuncDecl *getterDecl =
-      FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                       /*FuncLoc=*/SourceLoc(),
-                       Identifier(), /*NameLoc=*/SourceLoc(),
-                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                       /*AccessorKeywordLoc=*/SourceLoc(),
-                       /*GenericParams=*/nullptr, params,
-                       TypeLoc::withoutLoc(intType), parentDC);
+  AccessorDecl *getterDecl = AccessorDecl::create(C,
+      /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+      AccessorKind::IsGetter, AddressorKind::NotAddressor, hashValueDecl,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, params,
+      TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(bodySynthesizer);
 
@@ -1100,10 +1103,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   if (typeDecl->hasClangNode())
     tc.Context.addExternalDecl(getterDecl);
 
-  // Create the property.
-  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
-                                           /*IsCaptureList*/false, SourceLoc(),
-                                           C.Id_hashValue, intType, parentDC);
+  // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
