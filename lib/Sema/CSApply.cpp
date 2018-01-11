@@ -1064,6 +1064,21 @@ namespace {
           }
         }
 
+        if (isDynamic) {
+          // Rewrite for implicit unwrapping if the solution requires it.
+          auto *dynamicLocator =
+              cs.getConstraintLocator(memberLocator.withPathElement(
+                  ConstraintLocator::DynamicLookupResult));
+
+          if (solution.getDisjunctionChoice(dynamicLocator)) {
+            auto *forceValue =
+                new (context) ForceValueExpr(ref, ref->getEndLoc());
+            auto optTy = cs.getType(forceValue->getSubExpr());
+            cs.setType(forceValue, optTy->getAnyOptionalObjectType());
+            ref = forceValue;
+          }
+        }
+
         // We also need to handle the implicitly unwrap of the result
         // of the called function if that's the type checking solution
         // we ended up with.

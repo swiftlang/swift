@@ -114,7 +114,7 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
     case Kind::FieldOffset:
-      return mangler.mangleFieldOffsetFull(getDecl(), isOffsetIndirect());
+      return mangler.mangleFieldOffset(getDecl());
 
     case Kind::DirectProtocolWitnessTable:
       return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());

@@ -3571,9 +3571,7 @@ namespace {
         unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
         auto access = FieldLayout.AllFieldAccesses[fieldIndex];
         if (access == FieldAccess::NonConstantDirect) {
-          Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop,
-                                                         /*indirect*/ false,
-                                                         ForDefinition);
+          Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop, ForDefinition);
 
           // We can't use emitClassFieldOffset() here because that creates
           // an invariant load, which could be hoisted above the point
@@ -3611,8 +3609,7 @@ namespace {
           //
           // TODO: Don't emit the symbol if field has a fixed offset and size
           // in all resilience domains
-          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ false,
-                                                     ForDefinition);
+          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, ForDefinition);
           auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
           offsetVar->setInitializer(fieldOffsetOrZero);
 
@@ -3624,24 +3621,6 @@ namespace {
 
         case FieldAccess::ConstantIndirect:
           // No global variable is needed.
-          break;
-
-        case FieldAccess::NonConstantIndirect:
-          // Emit a global variable storing an offset into the field offset
-          // vector within the class metadata. This access pattern is used
-          // when the field offset depends on generic parameters. As above,
-          // the Objective-C runtime will slide the field offsets within the
-          // class metadata to adjust for the superclass size.
-          //
-          // TODO: This isn't plumbed through all the way yet.
-          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ true,
-                                                     ForDefinition);
-          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-          offsetVar->setConstant(false);
-          auto offset = getClassFieldOffsetOffset(IGM, Target, prop).getValue();
-          auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-          offsetVar->setInitializer(offsetVal);
-
           break;
         }
       }

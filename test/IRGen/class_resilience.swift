@@ -7,13 +7,13 @@
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
-// CHECK: @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = {{(protected )?}}global [[INT]] 0
-// CHECK: @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd" = {{(protected )?}}global [[INT]] 0
+// CHECK: @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
+// CHECK: @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd" = hidden global [[INT]] 0
 
-// CHECK: @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd" = {{(protected )?}}global [[INT]] 0
-// CHECK: @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd" = {{(protected )?}}global [[INT]] 0
+// CHECK: @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd" = hidden global [[INT]] 0
+// CHECK: @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd" = hidden global [[INT]] 0
 
-// CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = {{(protected )?}}global [[INT]] {{8|16}}
+// CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[INT]] 0
 
@@ -21,11 +21,11 @@
 
 // CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}constant [[INT]] {{52|80}}
 
-// CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd" = {{(protected )?}}constant [[INT]] {{8|16}}
-// CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd" = {{(protected )?}}constant [[INT]] {{12|20}}
+// CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd" = hidden constant [[INT]] {{8|16}}
+// CHECK: @"$S16class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|20}}
 
-// CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd" = {{(protected )?}}constant [[INT]] {{8|16}}
-// CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd" = {{(protected )?}}constant [[INT]] {{12|24}}
+// CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd" = hidden constant [[INT]] {{8|16}}
+// CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|24}}
 
 // CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [36 x i8] c"16class_resilience14ResilientChildC\00"
 // CHECK: [[RESILIENTCHILD_FIELDS:@.*]] = private constant [7 x i8] c"field\00\00"
