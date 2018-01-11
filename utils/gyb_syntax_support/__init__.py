@@ -98,5 +98,6 @@ def create_node_map():
     """
     return {node.syntax_kind: node for node in SYNTAX_NODES}
 
+
 def is_visitable(node):
     return not node.is_base() and not node.collection_element
