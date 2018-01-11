@@ -2242,6 +2242,32 @@ public:
     Error
   };
 
+  class TypeMatchResult {
+    SolutionKind Kind;
+
+  public:
+    inline bool isSuccess() const { return Kind == SolutionKind::Solved; }
+    inline bool isFailure() const { return Kind == SolutionKind::Error; }
+    inline bool isAmbiguous() const { return Kind == SolutionKind::Unsolved; }
+
+    static TypeMatchResult success(ConstraintSystem &cs) {
+      return {SolutionKind::Solved};
+    }
+
+    static TypeMatchResult failure(ConstraintSystem &cs,
+                                   ConstraintLocatorBuilder location) {
+      return {SolutionKind::Error};
+    }
+
+    static TypeMatchResult ambiguous(ConstraintSystem &cs) {
+      return {SolutionKind::Unsolved};
+    }
+
+    operator SolutionKind() { return Kind; }
+  private:
+    TypeMatchResult(SolutionKind result) : Kind(result) {}
+  };
+
   /// \brief Compute the rvalue type of the given expression, which is the
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
@@ -2249,44 +2275,44 @@ public:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
-  SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                               ConstraintKind kind, TypeMatchOptions flags,
-                               ConstraintLocatorBuilder locator);
+  TypeMatchResult matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
   ///
   /// \returns the result of performing the scalar-to-tuple conversion.
-  SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                       ConstraintKind kind,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
+  TypeMatchResult matchScalarToTupleTypes(Type type1, TupleType *tuple2,
+                                          ConstraintKind kind,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
-  SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                  ConstraintKind kind, TypeMatchOptions flags,
-                                  ConstraintLocatorBuilder locator);
+  TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                     ConstraintKind kind, TypeMatchOptions flags,
+                                     ConstraintLocatorBuilder locator);
   
   /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
   /// parameter types of two function types.
-  SolutionKind matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
-                                       ArrayRef<AnyFunctionType::Param> type2,
-                                       Type argType, Type paramType,
-                                       ConstraintKind kind,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
+  TypeMatchResult matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
+                                          ArrayRef<AnyFunctionType::Param> type2,
+                                          Type argType, Type paramType,
+                                          ConstraintKind kind,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
   
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
-  SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    TypeMatchOptions flags,
-                                    ConstraintLocatorBuilder locator);
+  TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
+                                       TypeMatchOptions flags,
+                                       ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
   /// refer to the same declaration via their generic arguments.
-  SolutionKind matchDeepEqualityTypes(Type type1, Type type2,
-                                      ConstraintLocatorBuilder locator);
+  TypeMatchResult matchDeepEqualityTypes(Type type1, Type type2,
+                                         ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
@@ -2295,18 +2321,18 @@ public:
   /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
   /// but when matching the instance type of a metatype with the instance type
   /// of an existential metatype, since we want an actual conformance check.
-  SolutionKind matchExistentialTypes(Type type1, Type type2,
-                                     ConstraintKind kind,
-                                     TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator);
+  TypeMatchResult matchExistentialTypes(Type type1, Type type2,
+                                        ConstraintKind kind,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  SolutionKind
+  TypeMatchResult
   matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
                         ConstraintKind kind, TypeMatchOptions flags,
                         ConstraintLocatorBuilder locator,
-                        std::function<SolutionKind()> formUnsolvedResult);
+                        std::function<TypeMatchResult()> formUnsolvedResult);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
@@ -2326,9 +2352,21 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
-                          TypeMatchOptions flags,
-                          ConstraintLocatorBuilder locator);
+  TypeMatchResult matchTypes(Type type1, Type type2, ConstraintKind kind,
+                             TypeMatchOptions flags,
+                             ConstraintLocatorBuilder locator);
+
+  TypeMatchResult getTypeMatchSuccess() {
+    return TypeMatchResult::success(*this);
+  }
+
+  TypeMatchResult getTypeMatchFailure(ConstraintLocatorBuilder locator) {
+    return TypeMatchResult::failure(*this, locator);
+  }
+
+  TypeMatchResult getTypeMatchAmbiguous() {
+    return TypeMatchResult::ambiguous(*this);
+  }
 
 public:
   /// Given a function type where the eventual result type is an optional,
