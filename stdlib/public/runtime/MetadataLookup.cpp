@@ -22,9 +22,11 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
@@ -302,19 +304,60 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
 
 #pragma mark Metadata lookup via mangled name
 
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static Optional<StringRef> getObjCClassOrProtocolName(
+                                           const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+#endif
+
 namespace {
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
 public:
   using BuiltType = const Metadata *;
-  using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
+
+  struct BuiltNominalTypeDecl :
+    llvm::PointerUnion<const NominalTypeDescriptor *, const Metadata *>
+  {
+    using PointerUnion::PointerUnion;
+
+    explicit operator bool() const { return !isNull(); }
+  };
+
   using BuiltProtocolDecl = const ProtocolDescriptor *;
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
-    // FIXME: Mangled Objective-C class names should go directly
-    // through objc_lookupClass.
+#if SWIFT_OBJC_INTEROP
+    // If we have an Objective-C class name, call into the Objective-C
+    // runtime to find them.
+    if (auto objcClassName = getObjCClassOrProtocolName(node)) {
+      auto objcClass = objc_getClass(objcClassName->str().c_str());
+      return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
+    }
+#endif
 
     // Look for a nominal type descriptor based on its mangled name.
     auto mangledName = Demangle::mangleNode(node);
@@ -323,12 +366,42 @@ public:
 
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
+#if SWIFT_OBJC_INTEROP
+    // If we have an Objective-C class name, call into the Objective-C
+    // runtime to find them.
+    if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
+      return (ProtocolDescriptor *)objc_getProtocol(
+                                              objcProtocolName->str().c_str());
+    }
+#endif
+
     auto mangledName = Demangle::mangleNode(node);
-    return _findProtocolDescriptor(mangledName);
+
+    // Look for a Swift protocol with this mangled name.
+    if (auto protocol = _findProtocolDescriptor(mangledName))
+      return protocol;
+
+#if SWIFT_OBJC_INTEROP
+    // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
+    // is used for Objective-C entities.
+    std::string objcMangledName =
+      "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
+    if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
+      return (ProtocolDescriptor *)protocol;
+#endif
+
+    return nullptr;
   }
 
-  BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
+  BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
+    // If we already have metadata, return it.
+    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
+      return metadata;
+
+    // Otherwise, we have a nominal type descriptor.
+    auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
+
     // FIXME: Generic nominal types.
     if (typeDecl->GenericParams.isGeneric())
       return BuiltType();
@@ -365,8 +438,20 @@ public:
   BuiltType createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                           BuiltType superclass,
                                           bool isClassBound) const {
-    auto classConstraint = isClassBound ? ProtocolClassConstraint::Class
-                                        : ProtocolClassConstraint::Any;
+    // Determine whether we have a class bound.
+    ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
+    if (isClassBound || superclass) {
+      classConstraint = ProtocolClassConstraint::Class;
+    } else {
+      for (auto protocol : protocols) {
+        if (protocol->Flags.getClassConstraint()
+              == ProtocolClassConstraint::Class) {
+          classConstraint = ProtocolClassConstraint::Class;
+          break;
+        }
+      }
+    }
+
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
   }
