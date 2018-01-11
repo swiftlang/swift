@@ -104,6 +104,8 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
     }
     case SILInstructionKind::StringLiteralInst:
       switch (cast<StringLiteralInst>(I)->getEncoding()) {
+        // SWIFT_ENABLE_TENSORFLOW
+        case StringLiteralInst::Encoding::Bytes:
         case StringLiteralInst::Encoding::UTF8:
         case StringLiteralInst::Encoding::UTF16:
           return true;

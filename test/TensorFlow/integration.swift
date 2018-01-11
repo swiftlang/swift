@@ -29,7 +29,7 @@ public func testTensor() {
 // CHECK: sil @{{.*}}testTensor{{.*}} : $@convention(thin) () -> () {
 
 // Graph lowering fails on testTensor because it requires send and receive instructions.
-// CHECK: string_literal utf8 ""
+// CHECK: string_literal bytes ""
 // CHECK-NEXT:  integer_literal $Builtin.Int64, 0
 // CHECK-NOT: = apply
 
@@ -65,7 +65,7 @@ public func testScalar(f: Float) {
 // CHECK: sil @{{.*}}testScalar{{.*}} : $@convention(thin) (Float) -> () {
 
 // Graph lowering succeeds on this function
-// CHECK: string_literal utf8 "{{.....}}
+// CHECK: string_literal bytes "{{.....}}
 // CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
 
 // StartTensorProgram is called with one input tensor
