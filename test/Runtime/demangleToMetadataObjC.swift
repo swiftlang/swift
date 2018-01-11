@@ -36,5 +36,9 @@ DemangleToMetadataTests.test("Objective-C protocols") {
   expectEqual(type(of: f1_composition_NSCoding), _typeByMangledName("yySo8NSCoding_pc")!)
 }
 
+DemangleToMetadataTests.test("Classes that don't exist") {
+  expectNil(_typeByMangledName("4main4BoomC"))
+}
+
 runAllTests()
 
