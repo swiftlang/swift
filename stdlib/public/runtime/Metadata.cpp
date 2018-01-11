@@ -2350,6 +2350,21 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   return witnessTables[i];
 }
 
+#ifndef NDEBUG
+/// Determine whether any of the given protocols is class-bound.
+static bool anyProtocolIsClassBound(
+                                size_t numProtocols,
+                                const ProtocolDescriptor * const *protocols) {
+  for (unsigned i = 0; i != numProtocols; ++i) {
+    if (protocols[i]->Flags.getClassConstraint()
+          == ProtocolClassConstraint::Class)
+      return true;
+  }
+
+  return false;
+}
+#endif
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
@@ -2364,6 +2379,11 @@ swift::swift_getExistentialTypeMetadata(
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
   // a globally stable ordering that's consistent across modules.
 
+  // Ensure that the "class constraint" bit is set whenever we have a
+  // superclass or a one of the protocols is class-bound.
+  assert(classConstraint == ProtocolClassConstraint::Class ||
+         (!superclassConstraint &&
+          !anyProtocolIsClassBound(numProtocols, protocols)));
   ExistentialCacheEntry::Key key = {
     superclassConstraint, classConstraint, numProtocols, protocols
   };

@@ -2145,7 +2145,7 @@ struct TargetProtocolDescriptor {
   
   /// The list of protocols this protocol refines.
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
-  InheritedProtocols;
+    InheritedProtocols;
   
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
