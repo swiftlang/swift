@@ -469,7 +469,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF)) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags)) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
