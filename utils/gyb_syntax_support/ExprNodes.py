@@ -472,4 +472,17 @@ EXPR_NODES = [
          children=[
              Child('Identifier', kind='IdentifierToken'),
          ]),
+    # #fileLiteral(a, b, c)
+    Node('ObjectLiteralExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'PoundColorLiteralToken',
+                       'PoundFileLiteralToken',
+                       'PoundImageLiteralToken',
+                   ]),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Arguments', kind='FunctionCallArgumentList'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
 ]

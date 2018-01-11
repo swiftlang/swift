@@ -3129,6 +3129,8 @@ ParserResult<Expr>
 Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                bool isExprBasic,
                                StringRef NewName) {
+  SyntaxParsingContext ObjectLiteralContext(SyntaxContext,
+                                            SyntaxKind::ObjectLiteralExpr);
   auto PoundTok = Tok;
   SourceLoc PoundLoc = consumeToken();
   // Parse a tuple of args
