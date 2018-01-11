@@ -35,9 +35,9 @@
   * KeyPathDotExpr
   * InOutExpr
   * EditorPlaceholderExpr
+  * ObjectLiteralExpr
 
 ### In-progress (UnknownExpr):
-  * ObjectLiteralExpr
   * MagicIdentifierLiteralExpr
 
 ### Not-started (UnknownExpr):

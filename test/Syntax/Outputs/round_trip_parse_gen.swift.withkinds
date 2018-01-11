@@ -351,4 +351,10 @@ func keypath<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<SubscriptExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr>.a.b</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ObjcKeyPathExpr>#keyPath(<ObjcNamePiece>a.</ObjcNamePiece><ObjcNamePiece>b.</ObjcNamePiece><ObjcNamePiece>c</ObjcNamePiece>)</ObjcKeyPathExpr></SequenceExpr>
+}</CodeBlock></FunctionDecl><FunctionDecl>
+
+func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ObjectLiteralExpr>
+  #fileLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
+  #colorLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
+  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr>
 }</CodeBlock></FunctionDecl>
