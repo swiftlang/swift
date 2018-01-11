@@ -2004,9 +2004,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
   AbstractionPattern origType = getAbstractionPattern(value);
   CanType substType = lvalueType->getCanonicalType();
 
-  // Remove a layer of l-value type if present.
-  if (auto substLVType = dyn_cast<LValueType>(substType))
-    substType = substLVType.getObjectType();
+  assert(!isa<LValueType>(substType));
 
   // Look through reference storage on the original type.
   auto origRefType = origType.getAs<ReferenceStorageType>();
@@ -2061,7 +2059,7 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
-    if (srcType == mappedType || isa<LValueType>(srcType))
+    if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
 
