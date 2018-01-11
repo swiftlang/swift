@@ -2277,9 +2277,8 @@ extension _JSONDecoder {
         switch self.options.dateDecodingStrategy {
         case .deferredToDate:
             self.storage.push(container: value)
-            let date = try Date(from: self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+            return try Date(from: self)
 
         case .secondsSince1970:
             let double = try self.unbox(value, as: Double.self)!
@@ -2311,9 +2310,8 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let date = try closure(self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+            return try closure(self)
         }
     }
 
@@ -2323,9 +2321,8 @@ extension _JSONDecoder {
         switch self.options.dataDecodingStrategy {
         case .deferredToData:
             self.storage.push(container: value)
-            let data = try Data(from: self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+            return try Data(from: self)
 
         case .base64:
             guard let string = value as? String else {
@@ -2340,9 +2337,8 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let data = try closure(self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+            return try closure(self)
         }
     }
 
@@ -2359,13 +2355,10 @@ extension _JSONDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        let decoded: T
         if type == Date.self || type == NSDate.self {
-            guard let date = try self.unbox(value, as: Date.self) else { return nil }
-            decoded = date as! T
+            return try self.unbox(value, as: Date.self) as? T
         } else if type == Data.self || type == NSData.self {
-            guard let data = try self.unbox(value, as: Data.self) else { return nil }
-            decoded = data as! T
+            return try self.unbox(value, as: Data.self) as? T
         } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
@@ -2376,17 +2369,14 @@ extension _JSONDecoder {
                                                                         debugDescription: "Invalid URL string."))
             }
 
-            decoded = (url as! T)
+            return url as! T
         } else if type == Decimal.self || type == NSDecimalNumber.self {
-            guard let decimal = try self.unbox(value, as: Decimal.self) else { return nil }
-            decoded = decimal as! T
+            return try self.unbox(value, as: Decimal.self) as? T
         } else {
             self.storage.push(container: value)
-            decoded = try type.init(from: self)
-            self.storage.popContainer()
+            defer { self.storage.popContainer() }
+            return try type.init(from: self)
         }
-
-        return decoded
     }
 }
 

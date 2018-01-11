@@ -234,11 +234,8 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     }
 
     struct Throwing : Encodable {
-      private enum EncodingError : Error {
-        case foo
-      }
-
       func encode(to encoder: Encoder) throws {
+        enum EncodingError : Error { case foo }
         throw EncodingError.foo
       }
     }
@@ -259,6 +256,13 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     // The issue at hand reproduces when you have a referencing encoder (superEncoder() creates one) that has a container on the stack (unkeyedContainer() adds one) that encodes a value going through box_() (Array does that) that encodes something which throws (Throwing does that).
     // When reproducing, this will cause a test failure via fatalError().
     _ = try? PropertyListEncoder().encode(Wrapper([Throwing()]))
+  }
+
+  // MARK: - Encoder State
+  // SR-6048
+  func testDecoderStateThrowOnDecode() {
+    let plist = try! PropertyListEncoder().encode([1,2,3])
+    let _ = try! PropertyListDecoder().decode(EitherDecodable<[String], [Int]>.self, from: plist)
   }
 
   // MARK: - Helper Functions
@@ -772,6 +776,22 @@ fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T 
   }
 }
 
+fileprivate enum EitherDecodable<T : Decodable, U : Decodable> : Decodable {
+  case t(T)
+  case u(U)
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if let t = try? container.decode(T.self) {
+      self = .t(t)
+    } else if let u = try? container.decode(U.self) {
+      self = .u(u)
+    } else {
+      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Data was neither \(T.self) nor \(U.self).")
+    }
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
@@ -796,5 +816,6 @@ PropertyListEncoderTests.test("testInterceptDate") { TestPropertyListEncoder().t
 PropertyListEncoderTests.test("testTypeCoercion") { TestPropertyListEncoder().testTypeCoercion() }
 PropertyListEncoderTests.test("testDecodingConcreteTypeParameter") { TestPropertyListEncoder().testDecodingConcreteTypeParameter() }
 PropertyListEncoderTests.test("testEncoderStateThrowOnEncode") { TestPropertyListEncoder().testEncoderStateThrowOnEncode() }
+PropertyListEncoderTests.test("testDecoderStateThrowOnDecode") { TestPropertyListEncoder().testDecoderStateThrowOnDecode() }
 runAllTests()
 #endif
