@@ -312,7 +312,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             ProfileCounter entryCount) {
 
   auto name = constant.mangle();
-  auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
+  auto constantType = Types.getConstantFunctionType(constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = lookUpFunction(name)) {

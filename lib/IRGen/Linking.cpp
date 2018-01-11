@@ -17,6 +17,7 @@
 #include "swift/IRGen/Linking.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Compiler.h"
@@ -24,6 +25,7 @@
 
 using namespace swift;
 using namespace irgen;
+using namespace Mangle;
 
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
@@ -56,6 +58,24 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 std::string LinkEntity::mangleAsString() const {
   IRGenMangler mangler;
   switch (getKind()) {
+    case Kind::DispatchThunk:
+      return mangler.mangleEntity(getDecl(), /*isCurried=*/false,
+                                  ASTMangler::SymbolKind::SwiftDispatchThunk);
+
+    case Kind::DispatchThunkInitializer:
+      return mangler.mangleConstructorEntity(
+          cast<ConstructorDecl>(getDecl()),
+          /*isAllocating=*/false,
+          /*isCurried=*/false,
+          ASTMangler::SymbolKind::SwiftDispatchThunk);
+
+    case Kind::DispatchThunkAllocator:
+      return mangler.mangleConstructorEntity(
+          cast<ConstructorDecl>(getDecl()),
+          /*isAllocating=*/true,
+          /*isCurried=*/false,
+          ASTMangler::SymbolKind::SwiftDispatchThunk);
+
     case Kind::ValueWitness:
       return mangler.mangleValueWitness(getType(), getValueWitness());
 
