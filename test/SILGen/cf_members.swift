@@ -39,7 +39,7 @@ public func foo(_ x: Double) {
   z = makeMetatype().init(value: x)
 
   // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSC7Struct1V5valueABSd_tcfCTcTO
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo10IAMStruct1V5valueABSd_tcfCTcTO
   // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
   // CHECK: [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
@@ -68,7 +68,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@\$SSC7Struct1V9translate7radiansABSd_tFTcTO]]
+  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@\$SSo10IAMStruct1V9translate7radiansABSd_tFTcTO]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
@@ -105,7 +105,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSC7Struct1V5scaleyABSdFTcTO
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo10IAMStruct1V5scaleyABSdFTcTO
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
@@ -115,7 +115,7 @@ public func foo(_ x: Double) {
   // CHECK: destroy_value [[F_COPY]]
   // CHECK: end_borrow [[BORROWED_F]] from [[F]]
   z = f(x)
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSC7Struct1V5scaleyABSdFTcTO
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo10IAMStruct1V5scaleyABSdFTcTO
   // CHECK: thin_to_thick_function [[THUNK]]
   let g = Struct1.scale
   // CHECK:  [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
@@ -161,7 +161,7 @@ public func foo(_ x: Double) {
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
   // CHECK: [[SELF:%.*]] = metatype
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSC7Struct1V12staticMethods5Int32VyFZTcTO
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo10IAMStruct1V12staticMethods5Int32VyFZTcTO
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
   // CHECK: [[BORROWED_I:%.*]] = begin_borrow [[I]]
   // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
@@ -238,37 +238,37 @@ public func foo(_ x: Double) {
 }
 // CHECK: } // end sil function '$S10cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V5valueABSd_tcfCTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V5valueABSd_tcfCTO
 // CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V9translate7radiansABSd_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V9translate7radiansABSd_tFTO
 // CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V5scaleyABSdFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V5scaleyABSdFTO
 // CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V12staticMethods5Int32VyFZTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V12staticMethods5Int32VyFZTO
 // CHECK:       bb0([[SELF:%.*]] : @trivial $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V13selfComesLast1xySd_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V13selfComesLast1xySd_tFTO
 // CHECK:       bb0([[X:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSC7Struct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTO
 // CHECK:       bb0([[X:%.*]] : @trivial $Int32, [[Y:%.*]] : @trivial $Float, [[Z:%.*]] : @trivial $Double, [[SELF:%.*]] : @trivial $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])

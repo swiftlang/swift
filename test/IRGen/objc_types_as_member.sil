@@ -8,7 +8,7 @@ import gizmo
 
 sil @use_metatype : $@convention(thin) <T> (@thin T.Type) -> ()
 
-// CHECK-LABEL: define swiftcc void @test(%TSo9InnerTypeC* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define swiftcc void @test(%TSo014OuterTypeInnerB0C* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK:   [[TMP:%.*]] = call %swift.type* @"$SSo9OuterTypeCMa"()
 // CHECK:   call swiftcc void @use_metatype(%swift.type* [[TMP]])
 // CHECK:   ret void

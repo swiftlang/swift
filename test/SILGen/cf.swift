@@ -65,10 +65,10 @@ protocol Impedance {
 
 extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$SSC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC11CCImpedanceV4realSdvg
-// CHECK-LABEL: sil private [transparent] [thunk] @$SSC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC11CCImpedanceV4imagSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSo11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo11CCImpedanceV4realSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSo11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo11CCImpedanceV4imagSdvg
 
 class MyMagnetism : CCMagnetismModel {
   // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator

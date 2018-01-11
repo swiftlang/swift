@@ -26,7 +26,7 @@ _TtGSqSS_ ---> Swift.String?
 _TtGSQSS_ ---> Swift.String!
 _TtGVs10DictionarySSSi_ ---> [Swift.String : Swift.Int]
 _TtVs7CString ---> Swift.CString
-_TtCSo8NSObject ---> __ObjC.NSObject
+_TtCSo8NSObject ---> __C.NSObject
 _TtO6Monads6Either ---> Monads.Either
 _TtbSiSu ---> @convention(block) (Swift.Int) -> Swift.UInt
 _TtcSiSu ---> @convention(c) (Swift.Int) -> Swift.UInt
@@ -79,15 +79,15 @@ _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-_TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+_TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-_T0SC3fooS2d_SdtFTO ---> {T:_T0SC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+_T0SC3fooS2d_SdtFTO ---> {T:_T0SC3fooS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 __$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-__$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+__$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 $S3foo3barC3bas3zimyAaEC_tFTo ---> {T:$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-$SSC3fooyS2d_SdtFTO ---> {T:$SSC3fooyS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+$SSC3fooyS2d_SdtFTO ---> {T:$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -125,7 +125,7 @@ _TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for foo.bar : foo
 _TWIC3foo3barS_8barrableS_ ---> {C} instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
 _TWtC3foo3barS_8barrableS_4fred ---> {C} associated type metadata accessor for fred in foo.bar : foo.barrable in foo
 _TWTC3foo3barS_8barrableS_4fredS_6thomas ---> {C} associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
-_TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
+_TFSCg5greenVSC5Color ---> __C_Synthesized.green.getter : __C_Synthesized.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> default argument 0 of t.f(i: Swift.Int, s: Swift.String) -> ()
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> default argument 1 of t.f(i: Swift.Int, s: Swift.String) -> ()
 _TFSqcfT_GSqx_ ---> Swift.Optional.init() -> A?
@@ -175,8 +175,8 @@ _TFCF5types1gFT1bSb_T_L0_10Collection3zimfT_T_ ---> zim() -> () in Collection #2
 _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> closure #1 () -> Swift.Int in capture_promotion.test_capture_promotion() -> () -> Swift.Int with unmangled suffix "_promote0"
 _TFIVs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _arguments : [Swift.String] in variable initialization expression of Swift._Process with unmangled suffix "U_FT_GSaSS_"
 _TFIvVs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> closure #1 () -> [Swift.String] in variable initialization expression of Swift._Process._arguments : [Swift.String]
-_TFCSo1AE ---> __ObjC.A.__ivar_destroyer
-_TFCSo1Ae ---> __ObjC.A.__ivar_initializer
+_TFCSo1AE ---> __C.A.__ivar_destroyer
+_TFCSo1Ae ---> __C.A.__ivar_initializer
 _TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 _T013call_protocol1CCAA1PA2aDP3fooSiyFTW ---> {T:} protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 _TFC12dynamic_self1X1ffT_DS0_ ---> dynamic_self.X.f() -> Self
@@ -267,8 +267,8 @@ _$S8mangling14varargsVsArray3arr1nySaySiGd_SStF ---> mangling.varargsVsArray(arr
 _$S8mangling14varargsVsArray3arrySid_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
 _$S8mangling14varargsVsArray3arrySaySiGd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> ()
 _T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5IndexQZAFRtzsAcERpzAE_AEQZAIRSs15UnsignedInteger8Iterator_7ElementRPzAE_AlMQZANRS13EncodedScalar_AlMQY_AORSr0_lE13CharacterViewVyxq__G ---> (extension in Swift):Swift._UnicodeViews<A, B><A, B where A: Swift.RandomAccessCollection, B: Swift.UnicodeEncoding, A.Index == A.SubSequence.Index, A.SubSequence: Swift.RandomAccessCollection, A.SubSequence == A.SubSequence.SubSequence, A.Iterator.Element: Swift.UnsignedInteger, A.Iterator.Element == A.SubSequence.Iterator.Element, A.SubSequence.Iterator.Element == B.EncodedScalar.Iterator.Element>.CharacterView
-_T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __ObjC.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation) -> Swift.Bool
-_$S10Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiySbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __ObjC.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation) -> Swift.Bool
+_T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool
+_$S10Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiySbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool
 _T04main1_yyF ---> main._() -> ()
 _T04test6testitSiyt_tF ---> test.testit(()) -> Swift.Int
 _$S4test6testitySiyt_tF ---> test.testit(()) -> Swift.Int
@@ -285,12 +285,12 @@ _$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int)
 _T0SqWy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
-_T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __ObjC.UITextField.text.getter : Swift.String?
-_T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __ObjC.UITextField.text.getter : Swift.String?
-_T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __ObjC.Gizmo.doSomething([Swift.String]!) -> Any!
-_T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __ObjC.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
-_$SSo5GizmoC11doSomethingySQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __ObjC.Gizmo.doSomething([Swift.String]!) -> Any!
-_$SSo5GizmoC12modifyString_10withNumber0D6FoobarSQySSGAF_SiSQyypGtFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __ObjC.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
+_T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __C.UITextField.text.getter : Swift.String?
+_T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __C.UITextField.text.getter : Swift.String?
+_T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __C.Gizmo.doSomething([Swift.String]!) -> Any!
+_T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __C.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
+_$SSo5GizmoC11doSomethingySQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __C.Gizmo.doSomething([Swift.String]!) -> Any!
+_$SSo5GizmoC12modifyString_10withNumber0D6FoobarSQySSGAF_SiSQyypGtFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __C.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
 _T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test
 _T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfC ---> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69).init() -> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69)
 _T0D ---> _T0D
@@ -303,3 +303,5 @@ _T0iW ---> _T0iW
 _S$iW ---> _S$iW
 _T0s5print_9separator10terminatoryypfC ---> _T0s5print_9separator10terminatoryypfC
 _S$s5print_9separator10terminatoryypfC ---> _S$s5print_9separator10terminatoryypfC
+_T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness for Swift.Hashable.hashValue.getter : Swift.Int in conformance __C.GenericOption : Swift.Hashable in __C_Synthesized
+_T0So11CrappyColorVs16RawRepresentableSCMA --> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
