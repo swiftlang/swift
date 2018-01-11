@@ -715,4 +715,8 @@ def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
 
+def verify_exclusivity : Flag<["-"], "verify-exclusivity">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Verify the access markers used to enforce exclusivity.">;
+
 include "FrontendOptions.td"
