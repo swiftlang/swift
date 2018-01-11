@@ -352,3 +352,9 @@ func keypath() {
   _ = \.a.b
   _ = #keyPath(a.b.c)
 }
+
+func objectLiterals() {
+  #fileLiteral(a)
+  #colorLiteral(a, b)
+  #imageLiteral(a, b, c)
+}
