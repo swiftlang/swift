@@ -16,8 +16,8 @@ extension NSReferencePoint: Pointable {}
 // Make sure synthesized materializeForSet and its callbacks have shared linkage
 // for properties imported from Clang
 
-// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC7NSPointV1xSfvm
-// CHECK-LABEL: sil shared [transparent] [serializable] @$SSC7NSPointV1ySfvm
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo7NSPointV1xSfvm
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo7NSPointV1ySfvm
 
 // CHECK-LABEL: sil shared [serializable] @$SSo16NSReferencePointC1xSfvmytfU_
 // CHECK-LABEL: sil shared [serializable] @$SSo16NSReferencePointC1xSfvm

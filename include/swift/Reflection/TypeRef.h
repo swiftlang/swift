@@ -226,6 +226,7 @@ public:
   bool isEnum() const;
   bool isClass() const;
   bool isProtocol() const;
+  bool isAlias() const;
 
   bool isErrorProtocol() const {
     return MangledName == "s5ErrorP";

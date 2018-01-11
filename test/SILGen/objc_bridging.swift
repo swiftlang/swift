@@ -515,7 +515,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging15bridgeCFunction{{.*}}F
 func bridgeCFunction() -> (String?) -> (String?) {
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSC18NSStringFromStringySQySSGABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo18NSStringFromStringySQySSGABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]
   return NSStringFromString
