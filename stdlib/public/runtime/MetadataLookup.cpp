@@ -22,6 +22,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -302,6 +303,33 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
 
 #pragma mark Metadata lookup via mangled name
 
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static Optional<StringRef> getObjCClassOrProtocolName(
+                                           const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+#endif
+
 namespace {
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
@@ -323,6 +351,15 @@ public:
 
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
+#if SWIFT_OBJC_INTEROP
+    // If we have an Objective-C class name, call into the Objective-C
+    // runtime to find them.
+    if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
+      return (ProtocolDescriptor *)objc_getProtocol(
+                                              objcProtocolName->str().c_str());
+    }
+#endif
+
     auto mangledName = Demangle::mangleNode(node);
 
     // Look for a Swift protocol with this mangled name.
@@ -334,11 +371,8 @@ public:
     // is used for Objective-C entities.
     std::string objcMangledName =
       "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
-    if (auto protocol = objc_getProtocol(objcMangledName.c_str())) {
-      auto description = (ProtocolDescriptor *)(protocol);
-      assert(objcMangledName == description->Name);
-      return description;
-    }
+    if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
+      return (ProtocolDescriptor *)protocol;
 #endif
 
     return nullptr;

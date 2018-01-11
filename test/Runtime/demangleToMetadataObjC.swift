@@ -26,5 +26,11 @@ DemangleToMetadataTests.test("@objc protocols") {
               _typeByMangledName("yy4main2P1_pc")!)
 }
 
+func f1_composition_NSCoding(_: NSCoding) { }
+
+DemangleToMetadataTests.test("Objective-C protocols") {
+  expectEqual(type(of: f1_composition_NSCoding), _typeByMangledName("yySo8NSCoding_pc")!)
+}
+
 runAllTests()
 
