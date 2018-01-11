@@ -2887,10 +2887,9 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 ///   where the entrypoint is just being used to unique the metadata.
 SWIFT_RUNTIME_EXPORT
 const TupleTypeMetadata *
-swift_getTupleTypeMetadata(size_t numElements,
+swift_getTupleTypeMetadata(TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
-                           TupleTypeFlags flags,
                            const ValueWitnessTable *proposedWitnesses);
 
 SWIFT_RUNTIME_EXPORT
