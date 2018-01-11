@@ -138,9 +138,18 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto ntd = record.getNominalTypeDescriptor()) {
-        if (ntd->Name.get() == typeName)
-          return ntd;
+      switch (record.getTypeKind()) {
+      case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+        if (auto ntd = record.getNominalTypeDescriptor()) {
+          if (ntd->Name.get() == typeName)
+            return ntd;
+        }
+        break;
+
+      case TypeMetadataRecordKind::IndirectObjCClass:
+      case TypeMetadataRecordKind::Reserved:
+        break;
       }
     }
   }

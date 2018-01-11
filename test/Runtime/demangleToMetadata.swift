@@ -69,6 +69,10 @@ DemangleToMetadataTests.test("function types") {
 
   // Mix-and-match.
   expectEqual(type(of: f2_variadic_inout), _typeByMangledName("yyytd_ytztc")!)
+
+  // A function type that hasn't been built before.
+  expectEqual("(Int, Float, Double, String, Character, UInt, Bool) -> ()",
+    String(describing: _typeByMangledName("yySi_SfSdSSs9CharacterVSuSbtc")!))
 }
 
 DemangleToMetadataTests.test("metatype types") {
@@ -82,6 +86,7 @@ class C { }
 
 protocol P1 { }
 protocol P2 { }
+protocol P3 { }
 
 func f1_composition(_: P1 & P2) { }
 func f1_composition_anyobject(_: AnyObject & P1) { }
@@ -99,6 +104,9 @@ DemangleToMetadataTests.test("existential types") {
 
   // References to superclass.
   expectEqual(type(of: f1_composition_superclass), _typeByMangledName("yy4main2P1_4main2P2AA1CCXcc")!)
+
+  // Demangle an existential type that hasn't been seen before.
+  expectEqual("P1 & P2 & P3", String(describing: _typeByMangledName("4main2P1_4main2P24main2P3p")!))
 }
 
 DemangleToMetadataTests.test("existential metatype types") {
