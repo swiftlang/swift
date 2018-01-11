@@ -357,4 +357,8 @@ func objectLiterals() {
   #fileLiteral(a)
   #colorLiteral(a, b)
   #imageLiteral(a, b, c)
+  #column
+  #file
+  #function
+  #dsohandle
 }
