@@ -67,7 +67,7 @@ ZipTests.test("Sequence") {
   }
 }
 
-ZipTests.test("Collection") {
+ZipTests.test("Collections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
@@ -90,6 +90,50 @@ ZipTests.test("Collection") {
       subSequenceType: Slice<Collection>.self,
       indexType: Collection.Index.self,
       indicesType: DefaultIndices<Collection>.self)
+      
+    let expected = [("one",1),("two",2),("three",3),("four",4)]
+    let left = ["one", "two", "three", "four"]
+    let right = 1...4
+    
+    checkCollection(expected,
+      zip(MinimalCollection(elements: left), MinimalCollection(elements: right)),
+      sameValue: { $0 == $1 }
+    )
+  }
+}
+
+ZipTests.test("RandomAccessCollections") {
+  typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+    return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
+  }
+
+  for test in zipTests {
+    let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    let other = MinimalRandomAccessCollection<OpaqueValue<Int32>>(
+      elements: test.other.map(OpaqueValue.init))
+    var result = zip(s, other)
+
+    typealias Sequence = Zip2Sequence<
+      MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+    typealias Collection = Zip2Collection<
+      MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+    expectCollectionAssociatedTypes(
+      collectionType: Collection.self,
+      iteratorType: Sequence.Iterator.self,
+      subSequenceType: Slice<Collection>.self,
+      indexType: Collection.Index.self,
+      indicesType: DefaultIndices<Collection>.self)
+      
+    let expected = [("one",1),("two",2),("three",3),("four",4)]
+    let left = ["one", "two", "three", "four"]
+    let right = 1...4
+    
+    checkRandomAccessCollection(expected,
+      zip(MinimalRandomAccessCollection(elements: left), MinimalRandomAccessCollection(elements: right)),
+      sameValue: { $0 == $1 }
+    )
   }
 }
 
@@ -116,5 +160,6 @@ ZipTests.test("Collection.count") {
   expectEqual(zip(0..<1,0..<2).count, 1)
   expectEqual(zip(0..<2,0..<2).count, 2)
 }
+
 
 runAllTests()
