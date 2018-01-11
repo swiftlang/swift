@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
@@ -336,13 +337,27 @@ namespace {
 class DecodedMetadataBuilder {
 public:
   using BuiltType = const Metadata *;
-  using BuiltNominalTypeDecl = const NominalTypeDescriptor *;
+
+  struct BuiltNominalTypeDecl :
+    llvm::PointerUnion<const NominalTypeDescriptor *, const Metadata *>
+  {
+    using PointerUnion::PointerUnion;
+
+    explicit operator bool() const { return !isNull(); }
+  };
+
   using BuiltProtocolDecl = const ProtocolDescriptor *;
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
-    // FIXME: Mangled Objective-C class names should go directly
-    // through objc_lookupClass.
+#if SWIFT_OBJC_INTEROP
+    // If we have an Objective-C class name, call into the Objective-C
+    // runtime to find them.
+    if (auto objcClassName = getObjCClassOrProtocolName(node)) {
+      auto objcClass = objc_getClass(objcClassName->str().c_str());
+      return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
+    }
+#endif
 
     // Look for a nominal type descriptor based on its mangled name.
     auto mangledName = Demangle::mangleNode(node);
@@ -378,8 +393,15 @@ public:
     return nullptr;
   }
 
-  BuiltType createNominalType(BuiltNominalTypeDecl typeDecl,
+  BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
+    // If we already have metadata, return it.
+    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
+      return metadata;
+
+    // Otherwise, we have a nominal type descriptor.
+    auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
+
     // FIXME: Generic nominal types.
     if (typeDecl->GenericParams.isGeneric())
       return BuiltType();
