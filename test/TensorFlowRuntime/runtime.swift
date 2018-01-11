@@ -43,25 +43,20 @@ func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
 }
 
 func decodeHex(_ string: String) -> [UInt8] {
-  func charToByte(_ c: String) -> UInt8 {
-    return c.utf8.first! // swift makes char processing grotty. :-(
-  }
-
   func hexToInt(_ c : UInt8) -> UInt8 {
     switch c {
-    case charToByte("0")...charToByte("9"): return c - charToByte("0")
-    case charToByte("a")...charToByte("f"): return c - charToByte("a") + 10
-    case charToByte("A")...charToByte("F"): return c - charToByte("A") + 10
+    case UInt8(ascii: "0")...UInt8(ascii: "9"): return c - UInt8(ascii: "0")
+    case UInt8(ascii: "a")...UInt8(ascii: "f"): return c - UInt8(ascii: "a") + 10
+    case UInt8(ascii: "A")...UInt8(ascii: "F"): return c - UInt8(ascii: "A") + 10
     default: fatalError("invalid hexadecimal character")
     }
   }
 
   var result: [UInt8] = []
-
   assert(string.count & 1 == 0, "must get a pair of hexadecimal characters")
   var it = string.utf8.makeIterator()
-  while let byte1 = it.next() {
-    let byte2 = it.next()!  // we know we have an even byte length.
+  while let byte1 = it.next(),
+        let byte2 = it.next() {  // we know we have an even byte length.
     result.append((hexToInt(byte1) << 4) | hexToInt(byte2))
   }
 
