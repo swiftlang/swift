@@ -221,9 +221,7 @@ bool SILDeclRef::isImplicit() const {
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (getAbstractClosureExpr()) {
-    if (isSerialized())
-      return SILLinkage::Shared;
-    return SILLinkage::Private;
+    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   }
 
   // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
@@ -239,9 +237,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
     if (!isForeign && moduleContext->isLocalContext()) {
-      if (isSerialized())
-        return SILLinkage::Shared;
-      return SILLinkage::Private;
+      return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
     }
     moduleContext = moduleContext->getParent();
   }
@@ -255,20 +251,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     case AccessLevel::FilePrivate:
       return maybeAddExternal(SILLinkage::Private);
 
-    default:
+    case AccessLevel::Internal:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       return SILLinkage::Shared;
-    }
-  }
-
-  // ivar initializers and destroyers are completely contained within the class
-  // from which they come, and never get seen externally.
-  if (isIVarInitializerOrDestroyer()) {
-    switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
-    default:
-      return maybeAddExternal(SILLinkage::Hidden);
     }
   }
 
@@ -285,6 +271,14 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
+  bool neverPublic = false;
+
+  // ivar initializers and destroyers are completely contained within the class
+  // from which they come, and never get seen externally.
+  if (isIVarInitializerOrDestroyer()) {
+    neverPublic = true;
+  }
+
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
     // If the property is public, the initializer needs to be public, because
@@ -297,32 +291,26 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (d->getEffectiveAccess() == AccessLevel::Public)
       return maybeAddExternal(SILLinkage::Public);
 
-    d = cast<NominalTypeDecl>(d->getDeclContext());
-
     // Otherwise, use the visibility of the type itself, because even if the
     // property is private, we might reference the initializer from another
     // file.
-    switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
-
-    default:
-      return maybeAddExternal(SILLinkage::Hidden);
-    }
+    d = cast<NominalTypeDecl>(d->getDeclContext());
+    neverPublic = true;
   }
 
-  // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+    return maybeAddExternal(SILLinkage::Private);
 
-    case AccessLevel::Internal:
+  case AccessLevel::Internal:
+    return maybeAddExternal(SILLinkage::Hidden);
+
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    if (neverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
-
-    default:
-      return maybeAddExternal(SILLinkage::Public);
+    return maybeAddExternal(SILLinkage::Public);
   }
 }
 
