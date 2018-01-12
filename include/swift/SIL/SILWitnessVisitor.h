@@ -136,10 +136,12 @@ public:
     asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
-  void visitFuncDecl(FuncDecl *func) {
+  void visitAccessorDecl(AccessorDecl *func) {
     // Accessors are emitted by visitAbstractStorageDecl, above.
-    if (func->isAccessor())
-      return;
+  }
+
+  void visitFuncDecl(FuncDecl *func) {
+    assert(!isa<AccessorDecl>(func));
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 

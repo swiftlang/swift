@@ -70,23 +70,19 @@ static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
   
   auto stringTy = C.getStringDecl()->getDeclaredType();
 
-  // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 stringTy, stringTy,
-                                                 /*isStatic=*/true,
-                                                 /*isFinal=*/true);
-  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
-  
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_nsErrorDomain,
-                                     stringTy, stringTy,
-                                     getterDecl, /*isStatic=*/true,
-                                     /*isFinal=*/true);
-  
+    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_nsErrorDomain,
+                             stringTy, stringTy, /*isStatic=*/true,
+                             /*isFinal=*/true);
+
+  // Define the getter.
+  auto getterDecl =
+    addGetterToReadOnlyDerivedProperty(tc, propDecl, stringTy);
+  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);

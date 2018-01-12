@@ -1440,7 +1440,7 @@ void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
 
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
-  if (method->isAccessor())
+  if (isa<AccessorDecl>(method))
     return false;
 
   return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();

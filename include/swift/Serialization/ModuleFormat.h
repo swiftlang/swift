@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 391; // Last change: normal protocol conformance
+const uint16_t VERSION_MINOR = 392; // Last change: accessor decls
 
 using DeclIDField = BCFixed<31>;
 
@@ -981,9 +981,36 @@ namespace decls_block {
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
-    DeclIDField,  // AccessorStorageDecl
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
+    AccessLevelField, // access level
+    BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // default argument resilience expansion
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
+    // The record is trailed by:
+    // - its _silgen_name, if any
+    // - its generic parameters, if any
+    // - body parameter patterns
+  >;
+
+  // TODO: remove the unnecessary FuncDecl components here
+  using AccessorLayout = BCRecordLayout<
+    ACCESSOR_DECL,
+    DeclContextIDField,  // context decl
+    BCFixed<1>,   // implicit?
+    BCFixed<1>,   // is 'static' or 'class'?
+    StaticSpellingKindField, // spelling of 'static' or 'class'
+    BCFixed<1>,   // explicitly objc?
+    SelfAccessKindField,   // self access kind
+    BCFixed<1>,   // has dynamic self?
+    BCFixed<1>,   // has forced static dispatch?
+    BCFixed<1>,   // throws?
+    GenericEnvironmentIDField, // generic environment
+    TypeIDField,  // interface type
+    DeclIDField,  // overridden function
+    DeclIDField,  // AccessorStorageDecl
+    AccessorKindField, // accessor kind
     AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot

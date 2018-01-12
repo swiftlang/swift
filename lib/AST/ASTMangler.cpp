@@ -44,8 +44,6 @@ using namespace swift::Mangle;
 static StringRef getCodeForAccessorKind(AccessorKind kind,
                                         AddressorKind addressorKind) {
   switch (kind) {
-  case AccessorKind::NotAccessor:
-    llvm_unreachable("bad accessor kind!");
   case AccessorKind::IsGetter:
     return "g";
   case AccessorKind::IsSetter:
@@ -2025,12 +2023,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
-    auto accessorKind = func->getAccessorKind();
-    if (accessorKind != AccessorKind::NotAccessor)
-      return appendAccessorEntity(
-          getCodeForAccessorKind(accessorKind, func->getAddressorKind()),
-          func->getAccessorStorageDecl(), decl->isStatic());
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    return appendAccessorEntity(
+        getCodeForAccessorKind(accessor->getAccessorKind(),
+                               accessor->getAddressorKind()),
+        accessor->getStorage(), accessor->isStatic());
   }
 
   if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl))

@@ -831,12 +831,12 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
-    FuncDecl *Get = nullptr;
-    FuncDecl *Set = nullptr;
-    FuncDecl *Addressor = nullptr;
-    FuncDecl *MutableAddressor = nullptr;
-    FuncDecl *WillSet = nullptr;
-    FuncDecl *DidSet = nullptr;
+    AccessorDecl *Get = nullptr;
+    AccessorDecl *Set = nullptr;
+    AccessorDecl *Addressor = nullptr;
+    AccessorDecl *MutableAddressor = nullptr;
+    AccessorDecl *WillSet = nullptr;
+    AccessorDecl *DidSet = nullptr;
 
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
@@ -852,6 +852,7 @@ public:
                        ParameterList *Indices,
                        TypeLoc ElementTy,
                        ParsedAccessors &accessors,
+                       AbstractStorageDecl *storage,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
@@ -860,6 +861,7 @@ public:
                    ParameterList *Indices,
                    TypeLoc ElementTy,
                    ParsedAccessors &accessors,
+                   AbstractStorageDecl *storage,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,

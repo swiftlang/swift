@@ -293,7 +293,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 }
 static StringRef getAccessorKindString(AccessorKind value) {
   switch (value) {
-    case AccessorKind::NotAccessor: return "notAccessor";
     case AccessorKind::IsGetter: return "getter";
     case AccessorKind::IsSetter: return "setter";
     case AccessorKind::IsWillSet: return "willSet";
@@ -1009,21 +1008,27 @@ namespace {
         OS << '\n';
         printRec(Body);
       }
-     }
+    }
 
-    void visitFuncDecl(FuncDecl *FD) {
-      printCommonAFD(FD, "func_decl");
+    void printCommonFD(FuncDecl *FD, const char *type) {
+      printCommonAFD(FD, type);
       if (FD->isStatic())
         OS << " type";
-      if (auto *ASD = FD->getAccessorStorageDecl()) {
-        OS << " " << getAccessorKindString(FD->getAccessorKind());
-        OS << "_for=" << ASD->getFullName();
-      }
+    }
 
+    void visitFuncDecl(FuncDecl *FD) {
+      printCommonFD(FD, "func_decl");
       printAbstractFunctionDecl(FD);
-
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
-     }
+    }
+
+    void visitAccessorDecl(AccessorDecl *AD) {
+      printCommonFD(AD, "accessor_decl");
+      OS << " " << getAccessorKindString(AD->getAccessorKind());
+      OS << "_for=" << AD->getStorage()->getFullName();
+      printAbstractFunctionDecl(AD);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");

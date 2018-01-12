@@ -540,10 +540,9 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
       // If a property or subscript is @_inlineable, the accessors are
       // @_inlineable also.
-      if (auto FD = dyn_cast<FuncDecl>(AFD))
-        if (auto *ASD = FD->getAccessorStorageDecl())
-          if (ASD->getAttrs().getAttribute<InlineableAttr>())
-            return ResilienceExpansion::Minimal;
+      if (auto accessor = dyn_cast<AccessorDecl>(AFD))
+        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
+          return ResilienceExpansion::Minimal;
     }
   }
 

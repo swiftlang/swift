@@ -178,7 +178,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*FuncLoc=*/SourceLoc(),
                              Name, /*NameLoc=*/SourceLoc(),
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                             /*AccessorKeywordLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
@@ -244,7 +243,6 @@ getBuiltinGenericFunction(Identifier Id,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
                                /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                               /*AccessorKeywordLoc=*/SourceLoc(),
                                GenericParams, paramList,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     

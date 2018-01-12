@@ -3430,7 +3430,8 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
 
 /// This function creates an accessor function (with no body) for a computed
 /// property or subscript.
-static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
+static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
+                                    ParameterList *param,
                                     GenericParamList *GenericParams,
                                     ParameterList *Indices,
                                     TypeLoc ElementTy,
@@ -3438,6 +3439,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
                                     AddressorKind addressorKind,
+                                    AbstractStorageDecl *storage,
                                     Parser *P, SourceLoc AccessorKeywordLoc) {
   // First task, set up the value argument list.  This is the "newValue" name
   // (for setters) followed by the index list (for subscripts).  For
@@ -3509,31 +3511,27 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   TypeLoc ReturnType;
 
   // Start the function.
-  auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
-                             /*FIXME FuncLoc=*/DeclLoc, Identifier(),
-                             /*NameLoc=*/DeclLoc, /*Throws=*/false,
-                             /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
-                             (GenericParams
-                              ? GenericParams->clone(P->CurDeclContext)
-                              : nullptr),
-                             Params, ReturnType,
-                             P->CurDeclContext);
+  auto *D = AccessorDecl::create(P->Context,
+                                 /*FIXME FuncLoc=*/DeclLoc,
+                                 AccessorKeywordLoc,
+                                 Kind, addressorKind, storage,
+                                 StaticLoc, StaticSpellingKind::None,
+                                 /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                 (GenericParams
+                                  ? GenericParams->clone(P->CurDeclContext)
+                                  : nullptr),
+                                 Params, ReturnType,
+                                 P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
   // non-mutating.
   switch (Kind) {
   case AccessorKind::IsAddressor:
-    D->setAddressorKind(addressorKind);
-    break;
-
   case AccessorKind::IsGetter:
     break;
 
   case AccessorKind::IsMutableAddressor:
-    D->setAddressorKind(addressorKind);
-    LLVM_FALLTHROUGH;
-
   case AccessorKind::IsSetter:
   case AccessorKind::IsWillSet:
   case AccessorKind::IsDidSet:
@@ -3542,7 +3540,6 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
     break;
 
   case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::NotAccessor:
     llvm_unreachable("not parseable accessors");
   }
 
@@ -3702,7 +3699,6 @@ static AddressorKind getMutableAddressorKind(Token &tok) {
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               AddressorKind addressorKind) {
   switch (accessorKind) {
-  case AccessorKind::NotAccessor: llvm_unreachable("invalid");
   case AccessorKind::IsGetter: return "getter";
   case AccessorKind::IsSetter: return "setter";
   case AccessorKind::IsDidSet: return "didSet";
@@ -3734,7 +3730,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorKind accessorKind,
                                        AddressorKind addressorKind,
                                        bool isSubscript,
-                                       FuncDecl *previousDecl) {
+                                       AccessorDecl *previousDecl) {
   // Different addressor safety kinds still count as the same addressor.
   if (previousDecl->getAddressorKind() != addressorKind) {
     assert(accessorKind == AccessorKind::IsAddressor ||
@@ -3780,6 +3776,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              GenericParamList *GenericParams,
                              ParameterList *Indices,
                              TypeLoc ElementTy, ParsedAccessors &accessors,
+                             AbstractStorageDecl *storage,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
@@ -3800,7 +3797,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       parseAccessorAttributes(Attributes);
       AccessorKind Kind;
       AddressorKind addressorKind = AddressorKind::NotAddressor;
-      FuncDecl **TheDeclPtr;
+      AccessorDecl **TheDeclPtr;
       SourceLoc AccessorKeywordLoc = Tok.getLoc();
       if (Tok.isContextualKeyword("get")) {
         Kind = AccessorKind::IsGetter;
@@ -3830,7 +3827,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         Tok.setKind(tok::contextual_keyword);
       }
 
-      FuncDecl *&TheDecl = *TheDeclPtr;
+      AccessorDecl *&TheDecl = *TheDeclPtr;
       SourceLoc Loc = consumeToken();
 
       // Have we already parsed this kind of clause?
@@ -3854,8 +3851,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNameParams,
                                    GenericParams, Indices, ElementTy,
-                                   StaticLoc, Flags, Kind, addressorKind, this,
-                                   AccessorKeywordLoc);
+                                   StaticLoc, Flags, Kind, addressorKind,
+                                   storage, this, AccessorKeywordLoc);
       TheDecl->getAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
@@ -3899,7 +3896,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     bool isImplicitGet = false;
     AccessorKind Kind;
     AddressorKind addressorKind = AddressorKind::NotAddressor;
-    FuncDecl **TheDeclPtr;
+    AccessorDecl **TheDeclPtr;
     SourceLoc AccessorKeywordLoc =  Tok.getLoc();
     if (Tok.isContextualKeyword("get")) {
       Kind = AccessorKind::IsGetter;
@@ -3956,7 +3953,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Consume the contextual keyword, if present.
     SourceLoc Loc = isImplicitGet ? VarLBLoc : consumeToken();
 
-    FuncDecl *&TheDecl = *TheDeclPtr;
+    AccessorDecl *&TheDecl = *TheDeclPtr;
 
     // Have we already parsed this kind of clause?
     if (TheDecl) {
@@ -3997,8 +3994,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Set up a function declaration.
     TheDecl = createAccessorFunc(Loc, ValueNamePattern,
                                  GenericParams, Indices, ElementTy,
-                                 StaticLoc, Flags, Kind, addressorKind, this,
-                                 AccessorKeywordLoc);
+                                 StaticLoc, Flags, Kind, addressorKind,
+                                 storage, this, AccessorKeywordLoc);
     TheDecl->getAttrs() = Attributes;
 
     // Parse the body, if any.
@@ -4051,13 +4048,14 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
                          GenericParamList *GenericParams,
                          ParameterList *Indices,
                          TypeLoc ElementTy, ParsedAccessors &accessors,
+                         AbstractStorageDecl *storage,
                          SourceLoc StaticLoc,
                          SmallVectorImpl<Decl *> &Decls) {
   SyntaxParsingContext AccessorsCtx(SyntaxContext, SyntaxKind::AccessorBlock);
   accessors.LBLoc = consumeToken(tok::l_brace);
   SourceLoc LastValidLoc = accessors.LBLoc;
   bool Invalid = parseGetSetImpl(Flags, GenericParams, Indices, ElementTy,
-                                 accessors, LastValidLoc, StaticLoc,
+                                 accessors, storage, LastValidLoc, StaticLoc,
                                  accessors.LBLoc, Decls);
 
   // Collect all explicit accessors to a list.
@@ -4125,7 +4123,6 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 
   // Fill in the result type.
   switch (kind) {
-  case AccessorKind::NotAccessor:
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("should never be seen here");
 
@@ -4168,18 +4165,35 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
-  // name. Complain if that isn't what we got.
+  // name. Complain if that isn't what we got. But for recovery purposes,
+  // make an effort to look through other things anyway.
   VarDecl *PrimaryVar = nullptr;
+  bool primaryVarIsWellFormed = true;
   {
-    Pattern *PrimaryPattern = pattern;
-    if (auto *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
-      PrimaryPattern = Typed->getSubPattern();
-    if (auto *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
-      PrimaryVar = Named->getDecl();
+    Pattern *cur = pattern;
+    TypedPattern *previousTyped = nullptr;
+    while (true) {
+      if (auto typed = dyn_cast<TypedPattern>(cur)) {
+        if (previousTyped) primaryVarIsWellFormed = false;
+        previousTyped = typed;
+        cur = typed->getSubPattern();
+      } else if (auto paren = dyn_cast<ParenPattern>(cur)) {
+        primaryVarIsWellFormed = false;
+        cur = paren->getSubPattern();
+      } else if (auto var = dyn_cast<VarPattern>(cur)) {
+        primaryVarIsWellFormed = false;
+        cur = var->getSubPattern();
+      } else {
+        break;
+      }
+    }
+
+    if (auto named = dyn_cast<NamedPattern>(cur)) {
+      PrimaryVar = named->getDecl();
     }
   }
 
-  if (!PrimaryVar) {
+  if (!PrimaryVar || !primaryVarIsWellFormed) {
     diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
   } else {
@@ -4193,10 +4207,36 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
 
+  // Create a fake VarDecl and PBD so that we don't have to weaken the
+  // formation rule that an AccessorDecl always has a VarDecl.
+  VarDecl *storage = PrimaryVar;
+  if (!storage) {
+    storage = new (Context) VarDecl(StaticLoc.isValid(),
+                                    VarDecl::Specifier::Var,
+                                    /*is capture list*/ false,
+                                    VarLoc, Identifier(), Type(),
+                                    CurDeclContext);
+    storage->setImplicit(true);
+    storage->setInvalid(true);
+
+    Pattern *pattern =
+      new (Context) TypedPattern(new (Context) NamedPattern(storage),
+                                 TypeLoc::withoutLoc(ErrorType::get(Context)));
+    PatternBindingEntry entry(pattern, /*init*/ nullptr, /*initDC*/ nullptr);
+    auto binding = PatternBindingDecl::create(Context, StaticLoc,
+                                              StaticSpellingKind::None,
+                                              VarLoc, entry, CurDeclContext);
+    binding->setInvalid(true);
+    storage->setParentPatternBinding(binding);
+
+    Decls.push_back(binding);
+    Decls.push_back(storage);
+  }
+
   // Parse getter and setter.
   ParsedAccessors accessors;
   if (parseGetSet(Flags, /*GenericParams=*/nullptr,
-                  /*Indices=*/nullptr, TyLoc, accessors, StaticLoc,
+                  /*Indices=*/nullptr, TyLoc, accessors, storage, StaticLoc,
                   Decls))
     Invalid = true;
 
@@ -4254,12 +4294,12 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      const DeclAttributes &attrs,
                                      TypeLoc elementTy, ParameterList *indices,
                                      SmallVectorImpl<Decl *> &decls) {
-  auto flagInvalidAccessor = [&](FuncDecl *&func) {
+  auto flagInvalidAccessor = [&](AccessorDecl *&func) {
     if (func) {
       func->setInvalid();
     }
   };
-  auto ignoreInvalidAccessor = [&](FuncDecl *&func) {
+  auto ignoreInvalidAccessor = [&](AccessorDecl *&func) {
     if (func) {
       flagInvalidAccessor(func);
 
@@ -4279,11 +4319,11 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   // Create an implicit accessor declaration.
   auto createImplicitAccessor =
   [&](AccessorKind kind, AddressorKind addressorKind,
-      ParameterList *argList) -> FuncDecl* {
+      ParameterList *argList) -> AccessorDecl* {
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
                                        staticLoc, flags, kind, addressorKind,
-                                       &P, SourceLoc());
+                                       storage, &P, SourceLoc());
     accessor->setImplicit();
     decls.push_back(accessor);
     return accessor;
@@ -4961,7 +5001,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              /*AccessorKeywordLoc=*/SourceLoc(),
                               nullptr, BodyParams, FuncRetTy,
                               CurDeclContext);
 
@@ -5748,7 +5787,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   } else {
     if (parseGetSet(Flags, GenericParams,
                     Indices.get(), ElementTy.get(),
-                    accessors, /*StaticLoc=*/SourceLoc(), Decls))
+                    accessors, Subscript, /*StaticLoc=*/SourceLoc(), Decls))
       Status.setIsParseError();
   }
 

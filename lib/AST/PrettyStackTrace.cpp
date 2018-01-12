@@ -47,39 +47,36 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
     if (named->hasName()) {
       out << '\'' << named->getFullName() << '\'';
       hasPrintedName = true;
-    } else if (auto *fn = dyn_cast<FuncDecl>(named)) {
-      if (auto *ASD = fn->getAccessorStorageDecl()) {
-        if (ASD->hasName()) {
-          switch (fn->getAccessorKind()) {
-          case AccessorKind::NotAccessor:
-            llvm_unreachable("Isn't an accessor?");
-          case AccessorKind::IsGetter:
-            out << "getter";
-            break;
-          case AccessorKind::IsSetter:
-            out << "setter";
-            break;
-          case AccessorKind::IsWillSet:
-            out << "willset";
-            break;
-          case AccessorKind::IsDidSet:
-            out << "didset";
-            break;
-          case AccessorKind::IsMaterializeForSet:
-            out << "materializeForSet";
-            break;
-          case AccessorKind::IsAddressor:
-            out << "addressor";
-            break;
-          case AccessorKind::IsMutableAddressor:
-            out << "mutableAddressor";
-            break;
-          }
-          
-          out << " for " << ASD->getFullName();
-          hasPrintedName = true;
-          loc = ASD->getStartLoc();
+    } else if (auto *accessor = dyn_cast<AccessorDecl>(named)) {
+      auto ASD = accessor->getStorage();
+      if (ASD->hasName()) {
+        switch (accessor->getAccessorKind()) {
+        case AccessorKind::IsGetter:
+          out << "getter";
+          break;
+        case AccessorKind::IsSetter:
+          out << "setter";
+          break;
+        case AccessorKind::IsWillSet:
+          out << "willset";
+          break;
+        case AccessorKind::IsDidSet:
+          out << "didset";
+          break;
+        case AccessorKind::IsMaterializeForSet:
+          out << "materializeForSet";
+          break;
+        case AccessorKind::IsAddressor:
+          out << "addressor";
+          break;
+        case AccessorKind::IsMutableAddressor:
+          out << "mutableAddressor";
+          break;
         }
+
+        out << " for " << ASD->getFullName();
+        hasPrintedName = true;
+        loc = ASD->getStartLoc();
       }
     }
   } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {

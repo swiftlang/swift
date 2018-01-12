@@ -360,10 +360,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
-      if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
-        // Add attributes for e.g. computed properties.
-        addFunctionAttributes(F, StorageDecl->getAttrs(), *this);
+    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+      auto *storage = accessor->getStorage();
+      // Add attributes for e.g. computed properties.
+      addFunctionAttributes(F, storage->getAttrs(), *this);
     }
     addFunctionAttributes(F, decl->getAttrs(), *this);
   }
