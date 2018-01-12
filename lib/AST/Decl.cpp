@@ -1275,7 +1275,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
     return true;
   }
 
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
     return true;
 
   return false;

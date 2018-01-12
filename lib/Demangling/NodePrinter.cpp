@@ -1043,7 +1043,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     print(Type);
 
-    if (auto isVariadic = getChildIf(Node, Node::Kind::VariadicMarker))
+    if (getChildIf(Node, Node::Kind::VariadicMarker))
       Printer << "...";
     return nullptr;
   }
