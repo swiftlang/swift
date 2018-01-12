@@ -205,7 +205,7 @@ public protocol _NSStringCore : _NSCopying /* _NSFastEnumeration */ {
   // NSString subclass.
 
   @objc(length)
-  func length() -> UInt
+  var length: Int { get }
 
   @objc(characterAtIndex:)
   func character(at index: Int) -> UInt16
@@ -269,8 +269,8 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
 
   @_inlineable
   @objc(length)
-  public func length() -> UInt {
-    return UInt(bitPattern: _guts.count)
+  public var length: Int {
+    return _guts.count
   }
 
   @_inlineable
@@ -366,4 +366,18 @@ extension String {
     return _stdlib_binary_bridgeToObjectiveCImpl()
   }
 }
+
+#else // !_runtime(_ObjC)
+
+@_fixed_layout // FIXME(sil-serialize-all)
+public class _SwiftNativeNSString {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+  @_inlineable // FIXME(sil-serialize-all)
+  deinit {}
+}
+
+public protocol _NSStringCore: class {}
+
 #endif

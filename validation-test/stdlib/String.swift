@@ -41,17 +41,16 @@ extension String {
   var unusedCapacity: Int {
     return Swift.max(0, _guts.capacity - _guts.count)
   }
-  var bufferID: UnsafeRawPointer? {
+  var bufferID: ObjectIdentifier? {
     return _rawIdentifier()
   }
-  func _rawIdentifier() -> UnsafeRawPointer? {
-    guard let object = _guts._underlyingCocoaString else { return nil }
-    return unsafeBitCast(object, to: UnsafeRawPointer.self)
+  func _rawIdentifier() -> ObjectIdentifier? {
+    return _guts._objectIdentifier
   }
 }
 
 extension Substring {
-  var bufferID: UnsafeRawPointer? {
+  var bufferID: ObjectIdentifier? {
     return _wholeString.bufferID
   }
 }
@@ -900,7 +899,7 @@ StringTests.test("stringGutsReserve")
     let isUnique = base._guts.isUniqueNative()
     let startedUnique =
       startedNative &&
-      base._guts._underlyingCocoaString != nil &&
+      base._guts._objectIdentifier != nil &&
       isUnique
     
     base.reserveCapacity(0)
@@ -947,8 +946,9 @@ func makeStringGuts(_ base: String) -> _StringGuts {
   x.reserveCapacity(base._guts.count * 3 / 2)
   let capacity = x.capacity
   x.append(base._guts)
-  // Widening the guts should not make it lose its capacity
-  expectEqual(x.capacity, capacity)
+  // Widening the guts should not make it lose its capacity,
+  // but the allocator may decide to get more storage.
+  expectGE(x.capacity, capacity)
   return x
 }
 

@@ -82,13 +82,23 @@ extension Unicode {
   }
 }
 
+#if _runtime(_ObjC)
+#if arch(i386) || arch(arm)
+    private let stringHashOffset = Int(bitPattern: 0x88dd_cc21)
+#else
+    private let stringHashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
+#endif // arch(i386) || arch(arm)
+#endif // _runtime(_ObjC)
+
 extension _UnmanagedString where CodeUnit == UInt8 {
-  // Don't call this directly; use _StringGuts._computeHashValue().
   @_versioned
   @inline(never) // Hide the CF dependency
-  internal func _computeASCIIHashValue() -> Int {
+  internal func computeHashValue() -> Int {
 #if _runtime(_ObjC)
-    return _stdlib_CFStringHashCString(OpaquePointer(self.start), self.count)
+    let hash = _stdlib_CFStringHashCString(OpaquePointer(start), count)
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    return stringHashOffset ^ hash
 #else
     return Unicode.hashASCII(self.buffer)
 #endif // _runtime(_ObjC)
@@ -96,65 +106,67 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 }
 
 extension _UnmanagedString where CodeUnit == UTF16.CodeUnit {
-  // Don't call this directly; use _StringGuts._computeHashValue().
   @_versioned
   @inline(never) // Hide the CF dependency
-  internal func _computeUTF16HashValue() -> Int {
+  internal func computeHashValue() -> Int {
 #if _runtime(_ObjC)
     let temp = _NSContiguousString(_StringGuts(self))
-    return temp._unsafeWithNotEscapedSelfPointer {
+    let hash = temp._unsafeWithNotEscapedSelfPointer {
       return _stdlib_NSStringHashValuePointer($0, isASCII: false)
     }
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    return stringHashOffset ^ hash
 #else
-    return Unicode.hashUTF16(self.utf16Buffer)
+    return Unicode.hashUTF16(self.buffer)
 #endif // _runtime(_ObjC)
   }
 }
 
-#if arch(i386) || arch(arm)
-    private let stringHashOffset = Int(bitPattern: 0x88dd_cc21)
+extension _UnmanagedOpaqueString {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func computeHashValue() -> Int {
+#if _runtime(_ObjC)
+    // TODO: ranged hash?
+    let hash = _stdlib_NSStringHashValue(cocoaSlice(), isASCII: false)
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    return stringHashOffset ^ hash
 #else
-    private let stringHashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
-#endif // arch(i386) || arch(arm)
+    // FIXME: Streaming hash
+    let p = UnsafeMutablePointer<UTF16.CodeUnit>.allocate(capacity: count)
+    defer { p.deallocate(capacity: count) }
+    let buffer = UnsafeMutableBufferPointer(start: p, count: count)
+    _copy(into: buffer)
+    return Unicode.hashUTF16(UnsafeBufferPointer(buffer))
+#endif
+  }
+}
 
 extension _StringGuts {
   @_versioned
   @inline(never) // Hide the CF dependency
   internal func _computeHashValue() -> Int {
-    let hash: Int
-    if isASCII {
-      hash = _unmanagedASCIIView._computeASCIIHashValue()
-    } else if _slowPath(_isOpaque) {
-      hash = _stdlib_NSStringHashValue(_asOpaque().object, isASCII: false)
-    } else {
-      hash = _unmanagedUTF16View._computeUTF16HashValue()
+    if _slowPath(_isOpaque) {
+      return _asOpaque().computeHashValue()
     }
-    _fixLifetime(self)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-    // If we have a contiguous string then we can use the stack optimization.
-    return stringHashOffset ^ hash
+    if isASCII {
+      return _unmanagedASCIIView.computeHashValue()
+    }
+    return _unmanagedUTF16View.computeHashValue()
   }
 
   @_versioned
   @inline(never) // Hide the CF dependency
   internal func _computeHashValue(_ range: Range<Int>) -> Int {
-    let hash: Int
-    if isASCII {
-      hash = _unmanagedASCIIView[range]._computeASCIIHashValue()
-    } else if _slowPath(_isOpaque) {
-      // TODO: ranged hash?
-      hash = _stdlib_NSStringHashValue(
-        _asOpaque()[range].cocoaSlice(),
-        isASCII: false)
-    } else {
-      hash = _unmanagedUTF16View[range]._computeUTF16HashValue()
+    if _slowPath(_isOpaque) {
+      return _asOpaque()[range].computeHashValue()
     }
-    _fixLifetime(self)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-    // If we have a contiguous string then we can use the stack optimization.
-    return stringHashOffset ^ hash
+    if isASCII {
+      return _unmanagedASCIIView[range].computeHashValue()
+    }
+    return _unmanagedUTF16View[range].computeHashValue()
   }
 }
 

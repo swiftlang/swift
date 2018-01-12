@@ -4,9 +4,9 @@
 import StdlibUnittest
 
 extension String {
-  var bufferID: UInt {
-    guard let object = _guts._underlyingCocoaString else { return 0 }
-    return unsafeBitCast(object, to: UInt.self)
+  var bufferID: Int {
+    guard let id = _guts._objectIdentifier else { return 0 }
+    return id.hashValue
   }
 }
 
