@@ -75,7 +75,9 @@ public class Horse {
   _ = h.gallop
 }
 
-@_versioned class Base {
+@_versioned
+@_fixed_layout
+class Base {
   @_versioned
   @_inlineable
   init(horse: Horse) {}
@@ -87,7 +89,9 @@ public class Horse {
 // Make sure the synthesized delegating initializer is inlineable also
 
 // CHECK-LABEL: sil [serialized] @$S20inlineable_attribute7DerivedC5horseAcA5HorseC_tcfc : $@convention(method) (@owned Horse, @owned Derived) -> @owned Derived
-@_versioned class Derived : Base {
+@_versioned
+@_fixed_layout
+class Derived : Base {
   // Allow @_inlineable deinits
   @_inlineable deinit {}
 }

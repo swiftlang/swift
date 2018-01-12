@@ -55,7 +55,7 @@
 @_silgen_name("unknown")
 public func unknown() -> ()
 
-// FIXME: Why does it need to be public?
+@_fixed_layout
 public struct X {
   @_inlineable
   public func test() {
