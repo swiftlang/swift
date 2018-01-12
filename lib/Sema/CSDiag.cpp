@@ -2471,6 +2471,12 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
+static bool isOptionSetType(Type fromType, const ConstraintSystem &CS) {
+  return conformsToKnownProtocol(fromType,
+                                 KnownProtocolKind::OptionSet,
+                                 CS);
+}
+
 /// Attempts to add fix-its for these two mistakes:
 ///
 /// - Passing an integer where a type conforming to RawRepresentable is
@@ -2540,6 +2546,12 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   };
 
   if (conformsToKnownProtocol(fromType, kind, CS)) {
+    if (isOptionSetType(toType, CS) &&
+        isa<IntegerLiteralExpr>(expr) &&
+        cast<IntegerLiteralExpr>(expr)->getDigitsText() == "0") {
+      diag.fixItReplace(expr->getSourceRange(), "[]");
+      return true;
+    }
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
