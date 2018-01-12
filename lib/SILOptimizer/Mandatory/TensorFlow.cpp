@@ -203,14 +203,10 @@ bool TensorOpInfo::decode() {
       return decode();
     }
 
-  StringRef mangledName;
-
   // Tensor operations are builtin instructions.
-  if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
-    mangledName = bi->getName().str();
-  } else {
-    return false;
-  }
+  auto *builtinInst = dyn_cast<BuiltinInst>(inst);
+  if (!builtinInst) return false;
+  StringRef mangledName = builtinInst->getName().str();
 
   // If the name is valid, it isn't an op.
   StringRef typeDescriptorStr;
@@ -258,35 +254,35 @@ bool TensorOpInfo::decode() {
 
   for (auto opInfo : operandDescriptors) {
     switch (opInfo) {
-      case OpCommand::Tensor: {
-        auto op = getNextOperand();
-        if (!op || !isTensorHandle(op->getType().getSwiftRValueType())) {
-          diagInvalid("expected " +
-                      llvm::utostr(nextOperand-2) + " to be a tensor");
-          return false;
-        }
-        break;
+    case OpCommand::Tensor: {
+      auto op = getNextOperand();
+      if (!op || !isTensorHandle(op->getType().getSwiftRValueType())) {
+        diagInvalid("expected " +
+                    llvm::utostr(nextOperand-2) + " to be a tensor");
+        return false;
       }
-      case OpCommand::AddDType: {
-        auto op = getNextOperand();
-        if (!op || !isa<MetatypeInst>(op)) {
-          diagInvalid("metatype expected for 'd' operand");
-          return false;
-        }
-        break;
+      break;
+    }
+    case OpCommand::AddDType: {
+      auto op = getNextOperand();
+      if (!op || !isa<MetatypeInst>(op)) {
+        diagInvalid("metatype expected for 'd' operand");
+        return false;
       }
-      case OpCommand::Constant: {
-        // If this requires a constant value and doesn't have one (i.e., it's a
-        // variable), then we handle this as valid, but as a non-TensorOp.  The
-        // value will be computed on the host and be sent over.
-        auto op = getNextOperand();
-        if (!op) return false;
+      break;
+    }
+    case OpCommand::Constant: {
+      // If this requires a constant value and doesn't have one (i.e., it's a
+      // variable), then we handle this as valid, but as a non-TensorOp.  The
+      // value will be computed on the host and be sent over.
+      auto op = getNextOperand();
+      if (!op) return false;
 
-        // If it isn't a literal, don't treat it like a tensor op.
-        if (!getTensorConstantOperand(op))
-          return false;
-        break;
-      }
+      // If it isn't a literal, don't treat it like a tensor op.
+      if (!getTensorConstantOperand(op))
+        return false;
+      break;
+    }
     }
   }
 
