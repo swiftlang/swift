@@ -1335,9 +1335,16 @@ namespace {
       Type lastTensorType;
       auto locator = CS.getConstraintLocator(expr);
 
+      auto constraintStartPtr = constraintStr.data();
+
       // Loop over all of the argument constraints, building the expected list
       // of parameter types.
-      for (auto ch : constraintStr.take_front(colonLoc)) {
+      // FIXME: Move this constraint parsing logic into TensorFlow.cpp, and move
+      // that part of TensorFlow.cpp into the AST module.
+      auto inputConstraints = constraintStr.take_front(colonLoc);
+      while (!inputConstraints.empty()) {
+        char ch = inputConstraints.front();
+        inputConstraints = inputConstraints.drop_front();
         switch (ch) {
         case 't': {   // TensorHandle<T> with an unbound T.
           Type openedType =
@@ -1358,10 +1365,12 @@ namespace {
           break;
         }
         default:
-          // TODO: Point to the exact character in question using
-          // getAdvancedLocOrInvalid.
-          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
-                      "unknown constraint character: " + std::string(1, ch));
+          auto charLoc =
+            constraints->getLoc()
+              .getAdvancedLoc(inputConstraints.data()-constraintStartPtr);
+          tc.diagnose(charLoc, diag::invalid_tfop,
+                      "unknown constraint character: '" + std::string(1, ch) +
+                      "'");
           return nullptr;
         }
       }
@@ -1371,7 +1380,26 @@ namespace {
       auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
                        CS.getType(expr->getArg()), desiredArgTypes,
-                       CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+                       CS.getConstraintLocator(expr,
+                                         ConstraintLocator::ApplyArgument));
+
+      /// Check to see if lastTensorType is inferrable.  Emit a diagnostic and
+      /// return true if not.  If so, fill in lastTensorType.
+      auto checkLastTensorType = [&]() -> bool {
+        // We need to have either a tensor input, a metatype value.
+        if (lastTensorType)
+          return false;
+
+        if (!lastMetaTypeElementType) {
+          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
+                      "no way to infer result element type");
+          return true;
+        }
+
+        lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
+                                               {lastMetaTypeElementType});
+        return false;
+      };
 
       // FIXME: Apply type constraints to the input operands to check the
       // constraint string.  Until we implement this, people can just implement
@@ -1385,7 +1413,7 @@ namespace {
         char ch = resultConstraints.front();
         resultConstraints = resultConstraints.drop_front();
         switch (ch) {
-        case 't':
+        case 't':   // Result is a tensor.
           // If the result type is explicit, parse it.
           // FIXME: Generalize this.
           if (resultConstraints.startswith("<bool>")) {
@@ -1397,23 +1425,18 @@ namespace {
             continue;
           }
 
-          // We need to have either a tensor input, a metatype value.
-          if (!lastTensorType) {
-            if (!lastMetaTypeElementType) {
-              tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
-                          "no way to infer result element type");
-              return nullptr;
-            }
-
-            lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
-                                                   {lastMetaTypeElementType});
-          }
+          if (checkLastTensorType())
+            return nullptr;
           resultTypes.push_back(TupleTypeElt(lastTensorType));
           break;
         default:
-          // TODO: Point to the exact character in question.
-          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
-                      "unknown constraint character: " + std::string(1, ch));
+          // Point to the exact character in question.
+          auto charLoc =
+            constraints->getLoc()
+              .getAdvancedLoc(resultConstraints.data()-constraintStartPtr);
+          tc.diagnose(charLoc, diag::invalid_tfop,
+                      "unknown constraint character: '" + std::string(1, ch) +
+                      "'");
           return nullptr;
         }
       }

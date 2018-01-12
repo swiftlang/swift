@@ -44,6 +44,20 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
 }
 
+/// Given a decl for a struct that has a single field (typically because it is
+/// known to be a standard library type like Int or Float), return the canonical
+/// type of the single member, asserting and aborting if we get something
+/// unexpected.
+static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
+  auto fieldIt = decl->getStoredProperties().begin();
+  assert(fieldIt != decl->getStoredProperties().end() &&
+         "Struct should have one member");
+  auto fieldType = (*fieldIt++)->getType()->getCanonicalType();
+  assert(fieldIt == decl->getStoredProperties().end() &&
+         "Struct should have one member");
+  return fieldType;
+}
+
 static bool isOverflowCheckingIntegerOp(SILInstruction *inst) {
   auto *BI = dyn_cast<BuiltinInst>(inst);
   if (!BI) return false;
@@ -1677,9 +1691,8 @@ static SILValue createSomeIntegerValue(intmax_t value, SILBuilder &B,
                                        SILLocation loc,
                                        NominalTypeDecl *integerDecl,
                                        IntegerLiteralInst **ILI = nullptr) {
-  auto intFieldType = (*integerDecl->getStoredProperties().begin())->getType();
-  auto intFieldSILType =
-    SILType::getPrimitiveObjectType(intFieldType->getCanonicalType());
+  auto intFieldType = getSingleElementDeclFieldType(integerDecl);
+  auto intFieldSILType = SILType::getPrimitiveObjectType(intFieldType);
 
   auto literal = B.createIntegerLiteral(loc, intFieldSILType, value);
 
@@ -1722,7 +1735,7 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
 
   auto dtypeType = fnRef->getFunctionType()->getParameters()[1].getType();
   auto dtypeDecl = dtypeType->getAnyNominal();
-  auto dtypeFieldType = (*dtypeDecl->getStoredProperties().begin())->getType();
+  auto dtypeFieldType = getSingleElementDeclFieldType(dtypeDecl);
 
   // The internal type is something like UInt32.  Create it now.
   auto dtype = createSomeIntegerValue(dtypeVal, B, loc,
@@ -1824,6 +1837,8 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
 
   // This assumes that the first member of TensorHandle is the CTensorHandle.
   auto tensorHandleDecl = ctx.getTensorHandleDecl();
+  assert(getSingleElementDeclFieldType(tensorHandleDecl) &&
+         "TensorHandle should have exactly one field");
   auto tensorHandleMember = *tensorHandleDecl->getStoredProperties().begin();
 
   // Ownership markers for CTensorHandle accesses.
@@ -2009,7 +2024,6 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
 
     B.createStore(result.getLoc(), newValue, fieldAddress,
                   storeOwnership);
-
 
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
