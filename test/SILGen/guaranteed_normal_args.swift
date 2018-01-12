@@ -57,7 +57,7 @@ struct Buffer {
   }
 }
 
-typealias AnyObject = Builtin.AnyObject
+public typealias AnyObject = Builtin.AnyObject
 
 protocol Protocol {
   associatedtype AssocType
@@ -97,6 +97,10 @@ extension FakeDictionary : Sequence {
   public func makeIterator() -> FakeDictionaryIterator<Key, Value> {
     return FakeDictionaryIterator(self)
   }
+}
+
+public struct Unmanaged<Instance : AnyObject> {
+  internal unowned(unsafe) var _value: Instance
 }
 
 ///////////
@@ -196,5 +200,17 @@ extension FakeDictionary {
     for x in self {
       result.append(x)
     }
+  }
+}
+
+extension Unmanaged {
+  // Just make sure that we do not crash on this.
+  func unsafeGuaranteedTest<Result>(
+    _ body: (Instance) -> Result
+  ) -> Result {
+    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
+    let result = body(guaranteedInstance)
+    Builtin.unsafeGuaranteedEnd(token)
+    return result
   }
 }
