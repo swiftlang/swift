@@ -2686,6 +2686,8 @@ namespace {
           errorWrapper->computeType();
           errorWrapper->setValidationStarted();
           errorWrapper->setAccess(AccessLevel::Public);
+          errorWrapper->getAttrs().add(
+            new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
