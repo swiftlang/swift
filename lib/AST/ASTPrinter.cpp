@@ -509,7 +509,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printType(T);
   }
 
-  void printTypeLoc(const TypeLoc &TL) {
+  void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
     if (CurrentType && TL.getType()) {
       printTransformedType(TL.getType());
       return;
@@ -517,13 +517,21 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
-    if (willUseTypeReprPrinting(TL, CurrentType, Options)) {
+    if (willUseTypeReprPrinting(TL, CurrentType, options)) {
       if (auto repr = TL.getTypeRepr())
-        repr->print(Printer, Options);
+        repr->print(Printer, options);
       return;
     }
 
-    TL.getType().print(Printer, Options);
+    TL.getType().print(Printer, options);
+  }
+
+  void printTypeLoc(const TypeLoc &TL) { printTypeLocWithOptions(TL, Options); }
+
+  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL) {
+    PrintOptions options = Options;
+    options.PrintOptionalAsImplicitlyUnwrapped = true;
+    printTypeLocWithOptions(TL, options);
   }
 
   void printContextIfNeeded(const Decl *decl) {
@@ -2199,7 +2207,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     auto tyLoc = decl->getTypeLoc();
     if (!tyLoc.getTypeRepr())
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
-    printTypeLoc(tyLoc);
+
+    if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
+    else
+      printTypeLoc(tyLoc);
   }
 
   printAccessors(decl);
@@ -2275,7 +2287,10 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   for (unsigned i = 0; i < numParens; ++i)
     Printer << "(";
-  printTypeLoc(TheTypeLoc);
+  if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
+  else
+    printTypeLoc(TheTypeLoc);
   for (unsigned i = 0; i < numParens; ++i)
     Printer << ")";
 
@@ -2527,7 +2542,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
         Printer << " -> ";
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-        printTypeLoc(ResultTyLoc);
+        if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+          printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
+        else
+          printTypeLoc(ResultTyLoc);
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
       if (decl->isGeneric())
@@ -2642,7 +2660,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   TypeLoc elementTy = decl->getElementTypeLoc();
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
-  printTypeLoc(elementTy);
+  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    printTypeLocForImplicitlyUnwrappedOptional(elementTy);
+  else
+    printTypeLoc(elementTy);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   if (decl->isGeneric())
     if (auto *genericSig = decl->getGenericSignature())
@@ -3779,12 +3800,33 @@ public:
   }
 
   void visitOptionalType(OptionalType *T) {
+    auto printAsIUO = Options.PrintOptionalAsImplicitlyUnwrapped;
+
+    // Printing optionals with a trailing '!' applies only to
+    // top-level optionals, not to any nested within.
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        false;
     printWithParensIfNotSimple(T->getBaseType());
-    Printer << "?";
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        printAsIUO;
+
+    if (printAsIUO)
+      Printer << "!";
+    else
+      Printer << "?";
   }
 
   void visitImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalType *T) {
+    auto printAsIUO = Options.PrintOptionalAsImplicitlyUnwrapped;
+
+    // Printing optionals with a trailing '!' applies only to
+    // top-level optionals, not to any nested within.
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        false;
     printWithParensIfNotSimple(T->getBaseType());
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        printAsIUO;
+
     Printer <<  "!";
   }
 
