@@ -1407,8 +1407,8 @@ namespace {
     assert(decl && "switch_enum operand is not an enum");
 
     // FIXME: Get expansion from SILFunction
-    if (!decl->hasFixedLayout(inst->getModule().getSwiftModule(),
-                              ResilienceExpansion::Maximal))
+    if (decl->isResilient(inst->getModule().getSwiftModule(),
+                          ResilienceExpansion::Maximal))
       return nullptr;
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;

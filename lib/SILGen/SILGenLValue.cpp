@@ -1081,8 +1081,8 @@ namespace {
 
       // If the declaration is in a different resilience domain, we have
       // to use materializeForSet.
-      if (!decl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                SGF.F.getResilienceExpansion()))
+      if (decl->isResilient(SGF.SGM.M.getSwiftModule(),
+                            SGF.F.getResilienceExpansion()))
         return true;
 
       // If the declaration is dynamically dispatched through a class,

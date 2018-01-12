@@ -1761,8 +1761,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     }
 
     // FIXME: Get expansion from SILFunction
-    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                 ResilienceExpansion::Maximal)) {
+    if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
+                               ResilienceExpansion::Maximal)) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {
@@ -1989,8 +1989,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
       enumDecl = SGF.getASTContext().getOptionalDecl();
     }
 
-    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                 SGF.F.getResilienceExpansion())) {
+    // FIXME: Get expansion from SILFunction
+    if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
+                               SGF.F.getResilienceExpansion())) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {

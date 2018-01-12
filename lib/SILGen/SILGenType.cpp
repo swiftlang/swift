@@ -67,8 +67,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
     // If the override is defined in a class from a different resilience
     // domain, don't emit the vtable entry.
-    if (!derivedClass->hasFixedLayout(M.getSwiftModule(),
-                                      ResilienceExpansion::Maximal)) {
+    if (derivedClass->isResilient(M.getSwiftModule(),
+                                  ResilienceExpansion::Maximal)) {
       return None;
     }
   }
@@ -171,7 +171,7 @@ class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
-  bool hasFixedLayout;
+  bool isResilient;
 
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
@@ -181,7 +181,7 @@ public:
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass) {
-    hasFixedLayout = theClass->hasFixedLayout();
+    isResilient = theClass->isResilient();
   }
 
   void emitVTable() {
@@ -231,8 +231,8 @@ public:
 
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
-    // Only public, fixed-layout classes should be serialized.
-    if (classIsPublic && theClass->hasFixedLayout())
+    // Only public, fixed-layout classes should have serialized vtables.
+    if (classIsPublic && !theClass->isResilient())
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -268,7 +268,7 @@ public:
     // class is resilient.
     auto *func = cast<AbstractFunctionDecl>(member.getDecl());
     if (func->getDeclContext() == theClass) {
-      if (!hasFixedLayout &&
+      if (isResilient &&
           func->getEffectiveAccess() >= AccessLevel::Public) {
         SGM.emitDispatchThunk(member);
       }
@@ -813,7 +813,7 @@ public:
     // Build a default witness table if this is a protocol.
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
       if (!protocol->isObjC() &&
-          !protocol->hasFixedLayout())
+          protocol->isResilient())
         SGM.emitDefaultWitnessTable(protocol);
       return;
     }

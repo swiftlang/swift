@@ -288,7 +288,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   // The below symbols are only emitted if the class is resilient.
-  if (CD->hasFixedLayout(SwiftModule, ResilienceExpansion::Minimal))
+  if (!CD->isResilient(SwiftModule, ResilienceExpansion::Minimal))
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
@@ -341,7 +341,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (!PD->hasFixedLayout(SwiftModule, ResilienceExpansion::Minimal)) {
+    if (PD->isResilient(SwiftModule, ResilienceExpansion::Minimal)) {
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));

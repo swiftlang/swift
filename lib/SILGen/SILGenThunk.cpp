@@ -108,8 +108,8 @@ static bool shouldUseDispatchThunk(SILDeclRef constant,
   auto *classDecl = cast<ClassDecl>(afd->getDeclContext());
 
   // Resilient classes in other resilience domains use dispatch thunks.
-  return !classDecl->hasFixedLayout(M.getSwiftModule(),
-                                    F->getResilienceExpansion());
+  return classDecl->isResilient(M.getSwiftModule(),
+                                F->getResilienceExpansion());
 }
 
 SILValue SILGenFunction::emitClassMethodRef(SILLocation loc,
