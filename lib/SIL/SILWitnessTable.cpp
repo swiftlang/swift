@@ -175,7 +175,7 @@ bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance) 
   auto protocolIsPublic =
       conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
   auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
-  return nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
+  return !nominal->isResilient() && protocolIsPublic && typeIsPublic;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

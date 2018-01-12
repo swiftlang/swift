@@ -757,10 +757,10 @@ namespace {
       printCommon((ValueDecl *)NTD, Name, Color);
 
       if (NTD->hasInterfaceType()) {
-        if (NTD->hasFixedLayout())
-          OS << " @_fixed_layout";
-        else
+        if (NTD->isResilient())
           OS << " @_resilient_layout";
+        else
+          OS << " @_fixed_layout";
       }
     }
 
