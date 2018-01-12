@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name witness_same_type -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name witness_same_type -enable-sil-ownership -emit-ir %s
@@ -13,7 +13,7 @@ struct X {}
 
 // Ensure that the protocol witness for requirements with same-type constraints
 // is set correctly. <rdar://problem/16369105>
-// CHECK-LABEL: sil private [transparent] [thunk] @$S17witness_same_type3FooVAA7FooableA2aDP3foo1x3BarQzqd___tAaDRd__AHQyd__AIRSlFTW : $@convention(witness_method: Fooable) <τ_0_0 where τ_0_0 : Fooable, τ_0_0.Bar == X> (@in τ_0_0, @in_guaranteed Foo) -> @out X
+// CHECK-LABEL: sil private [transparent] [thunk] @$S17witness_same_type3FooVAA7FooableA2aDP3foo1x3BarQzqd___tAaDRd__AHQyd__AIRSlFTW : $@convention(witness_method: Fooable) <τ_0_0 where τ_0_0 : Fooable, τ_0_0.Bar == X> (@in_guaranteed τ_0_0, @in_guaranteed Foo) -> @out X
 struct Foo: Fooable {
   typealias Bar = X
 

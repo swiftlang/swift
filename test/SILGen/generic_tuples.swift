@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name generic_tuples -emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
@@ -9,7 +9,6 @@ func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"
 // CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
 // CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_1]]
-// CHECK-NEXT: destroy_addr [[XVAR]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 

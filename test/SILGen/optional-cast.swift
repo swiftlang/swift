@@ -1,28 +1,23 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class A {}
 class B : A {}
 
-// CHECK-LABEL: sil hidden @$S4main3fooyyAA1ACSgF : $@convention(thin) (@owned Optional<A>) -> () {
-// CHECK:    bb0([[ARG:%.*]] : @owned $Optional<A>):
+// CHECK-LABEL: sil hidden @$S4main3fooyyAA1ACSgF : $@convention(thin) (@guaranteed Optional<A>) -> () {
+// CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<A>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
-// CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:      [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:      [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
-// CHECK:      switch_enum [[ARG_COPY_COPY]] : $Optional<A>, case #Optional.some!enumelt.1: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
+// CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:      switch_enum [[ARG_COPY]] : $Optional<A>, case #Optional.some!enumelt.1: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
 //
 // CHECK:    [[NOT_PRESENT]]:
-// CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:      br [[NOT_PRESENT_FINISH:bb[0-9]+]]
 //
 //   If so, pull the value out and check whether it's a B.
-// CHECK:    [[IS_PRESENT]]([[IS_PRESENT_ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[IS_PRESENT_ARG]]
-// CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]] : $Optional<A>, #Optional.some!enumelt.1
+// CHECK:    [[IS_PRESENT]]([[VAL:%.*]] :
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
@@ -40,13 +35,12 @@ class B : A {}
 //
 //   Finish the present path.
 // CHECK:    [[CONT]]:
-// CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT: br [[RETURN_BB:bb[0-9]+]]
 //
 //   Finish.
 // CHECK:    [[RETURN_BB]]:
 // CHECK-NEXT: destroy_value [[X]]
-// CHECK-NEXT: destroy_value [[ARG]]
+// CHECK-NOT: destroy_value [[ARG]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 //
@@ -58,57 +52,40 @@ func foo(_ y : A?) {
   var x = (y as? B)
 }
 
-// CHECK-LABEL: sil hidden @$S4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
-// CHECK:    bb0([[ARG:%.*]] : @owned $Optional<Optional<Optional<Optional<A>>>>):
+// CHECK-LABEL: sil hidden @$S4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@guaranteed Optional<Optional<Optional<Optional<A>>>>) -> () {
+// CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<Optional<Optional<Optional<A>>>>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // -- Check for some(...)
-// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK-NEXT: [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
-// CHECK-NEXT: switch_enum [[ARG_COPY_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
+// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: switch_enum [[ARG_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_1]]:
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_0:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(...)).
-// CHECK:    [[P]]([[P_ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[P_ARG]]
-// CHECK-NEXT: [[VALUE_OOOA:%.*]] = unchecked_enum_data [[ARG_COPY]]
-// CHECK-NEXT: [[VALUE_OOOA_COPY:%.*]] = copy_value [[VALUE_OOOA]]
-// CHECK-NEXT: switch_enum [[VALUE_OOOA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_2:bb[0-9]+]]
+// CHECK:    [[P]]([[VALUE_OOOA:%.*]] :
+// CHECK-NEXT: switch_enum [[VALUE_OOOA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_2:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_2]]:
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_0]]
 //
 //   If so, drill down another level and check for some(some(some(...))).
-// CHECK:    [[PP]]([[PP_ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[PP_ARG]]
-// CHECK-NEXT: [[VALUE_OOA:%.*]] = unchecked_enum_data [[VALUE_OOOA]]
-// CHECK-NEXT: [[VALUE_OOA_COPY:%.*]] = copy_value [[VALUE_OOA]]
-// CHECK-NEXT: switch_enum [[VALUE_OOA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
+// CHECK:    [[PP]]([[VALUE_OOA:%.*]] :
+// CHECK-NEXT: switch_enum [[VALUE_OOA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_3]]:
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_1:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(some(some(...)))).
-// CHECK:    [[PPP]]([[PPP_ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[PPP_ARG]]
-// CHECK-NEXT: [[VALUE_OA:%.*]] = unchecked_enum_data [[VALUE_OOA]]
-// CHECK-NEXT: [[VALUE_OA_COPY:%.*]] = copy_value [[VALUE_OA]]
-// CHECK-NEXT: switch_enum [[VALUE_OA_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
+// CHECK:    [[PPP]]([[VALUE_OA:%.*]] :
+// CHECK-NEXT: switch_enum [[VALUE_OA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_4]]:
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   br [[FINISH_NIL_2:bb[0-9]+]]
 //
 //   If so, pull out the A and check whether it's a B.
-// CHECK:    [[PPPP]]([[PPPP_ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[PPPP_ARG]]
-// CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[VALUE_OA]]
+// CHECK:    [[PPPP]]([[VAL:%.*]] :
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
 //   If so, inject it back into an optional.
@@ -125,17 +102,13 @@ func foo(_ y : A?) {
 //
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : @owned $Optional<B>):
-// CHECK-NEXT: [[VAL_COPY:%.*]] = copy_value [[VAL]]
-// CHECK-NEXT: switch_enum [[VAL_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[HAVE_B:bb[0-9]+]], case #Optional.none!enumelt: [[FINISH_NIL_4:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[VAL]] : ${{.*}}, case #Optional.some!enumelt.1: [[HAVE_B:bb[0-9]+]], case #Optional.none!enumelt: [[FINISH_NIL_4:bb[0-9]+]]
 //
 // CHECK:    [[FINISH_NIL_4]]:
-// CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:      br [[FINISH_NIL_0]]
 //
-// CHECK:    [[HAVE_B]](
-// CHECK:      [[UNWRAPPED_VAL:%.*]] = unchecked_enum_data [[VAL]]
+// CHECK:    [[HAVE_B]]([[UNWRAPPED_VAL:%.*]] :
 // CHECK:      [[REWRAPPED_VAL:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[UNWRAPPED_VAL]]
-// CHECK:      end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:      br [[DONE_DEPTH0:bb[0-9]+]]
 //
 // CHECK:    [[DONE_DEPTH0]](
@@ -148,7 +121,7 @@ func foo(_ y : A?) {
 // CHECK: br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
 // CHECK-NEXT: destroy_value [[X]]
-// CHECK-NEXT: destroy_value %0
+// CHECK-NOT: destroy_value %0
 // CHECK:      return
 //
 //   On various failure paths, set OOB := nil.
@@ -170,16 +143,13 @@ func bar(_ y : A????) {
 }
 
 
-// CHECK-LABEL: sil hidden @$S4main3bazyyyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> () {
-// CHECK:       bb0([[ARG:%.*]] : @owned $Optional<AnyObject>):
+// CHECK-LABEL: sil hidden @$S4main3bazyyyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> () {
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK-NEXT:    [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
-// CHECK:         switch_enum [[ARG_COPY_COPY]]
-// CHECK:       bb1:
-// CHECK:         [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]]
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         switch_enum [[ARG_COPY]]
+// CHECK:       bb2([[VAL:%.*]] : @owned $AnyObject):
 // CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT:    checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 // CHECK:       [[IS_B]]([[CASTED_VALUE:%.*]] : @owned $B):
@@ -204,11 +174,10 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
 }
 
 // CHECK-LABEL: sil hidden @$S4main07opt_to_B10_referenceyAA1CCSgAEF
-// CHECK:  bb0([[ARG:%.*]] : @owned $Optional<C>):
+// CHECK:  bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
-// CHECK:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:    [[RESULT:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:    destroy_value [[ARG]]
+// CHECK:    [[RESULT:%.*]] = copy_value [[ARG]]
+// CHECK-NOT:    destroy_value [[ARG]]
 // CHECK:    return [[RESULT]] : $Optional<C>
 // CHECK: } // end sil function '$S4main07opt_to_B10_referenceyAA1CCSgAEF'
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
@@ -217,7 +186,7 @@ func opt_to_opt_reference(_ x : C!) -> C? { return x }
 // CHECK:       bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
 // CHECK-NEXT:  copy_addr %1 to [initialization] %0
-// CHECK-NEXT:  destroy_addr %1
+// CHECK-NOT:  destroy_addr %1
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
 class C {}
@@ -227,9 +196,7 @@ public struct TestAddressOnlyStruct<T> {
   
   // CHECK-LABEL: sil hidden @$S4main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $TestAddressOnlyStruct<T>):
-  // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPBUF]]
-  // CHECK: apply {{.*}}<T>([[TMPBUF]], %1)
+  // CHECK: apply {{.*}}<T>(%0, %1)
   func testCall(_ a : T!) {
     f(a)
   }

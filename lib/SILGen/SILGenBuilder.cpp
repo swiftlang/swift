@@ -901,3 +901,22 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
   return cloner.clone(cast);
 }
+
+ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
+                                                      ManagedValue original,
+                                                      SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
+  if (!result)
+    return ManagedValue();
+  original.forward(SGF);
+  return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
+                                                          ManagedValue original,
+                                                          SILType type) {
+  SILValue result =
+      SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
+  return ManagedValue::forUnmanaged(result);
+}

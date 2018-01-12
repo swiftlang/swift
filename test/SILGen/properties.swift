@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend -module-name properties -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
@@ -106,15 +106,12 @@ func physical_struct_lvalue(_ c: Int) {
   // CHECK: assign %0 to [[YADDR]]
 }
 
-// CHECK-LABEL: sil hidden @$S10properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Ref, Int) -> ()
+// CHECK-LABEL: sil hidden @$S10properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Ref, Int) -> ()
 // CHECK: bb0([[ARG0:%.*]] : $Ref,
  func physical_class_lvalue(_ r: Ref, a: Int) {
     r.y = a
-   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-   // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_ARG0]] : $Ref, #Ref.y!setter.1
-   // CHECK: apply [[FN]](%1, [[BORROWED_ARG0]]) : $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-   // CHECK: destroy_value [[ARG0]] : $Ref
+   // CHECK: [[FN:%[0-9]+]] = class_method [[ARG0]] : $Ref, #Ref.y!setter.1
+   // CHECK: apply [[FN]](%1, [[ARG0]]) : $@convention(method) (Int, @guaranteed Ref) -> ()
   }
 
 
@@ -122,20 +119,17 @@ func physical_struct_lvalue(_ c: Int) {
 func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: bb0([[ARG1:%.*]] : $RefSubclass, [[ARG2:%.*]] : $Int):
   r.y = a
-  // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]] : $RefSubclass
+  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
   // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
   // CHECK: destroy_value [[R_SUP]]
-  // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   r.w = a
 
-  // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
-  // CHECK: apply [[FN]](%1, [[BORROWED_ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
-  // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
-  // CHECK: destroy_value [[ARG1]]
+  // CHECK: [[FN:%[0-9]+]] = class_method [[ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
+  // CHECK: apply [[FN]](%1, [[ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
+  // CHECK-NOT: destroy_value [[ARG1]]
+  // CHECK: } // end sil function '$S10properties24physical_subclass_lvalue{{[_0-9a-zA-Z]*}}F'
 }
   
 
@@ -380,15 +374,12 @@ func physical_inout(_ x: Int) {
 /* TODO check writeback to more complex logical prop, check that writeback
  * reuses temporaries */
 
-// CHECK-LABEL: sil hidden @$S10properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Val, Int) -> Float
+// CHECK-LABEL: sil hidden @$S10properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Val, Int) -> Float
 // CHECK: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(_ v: Val, i: Int) -> Float {
   return v[i]
-  // CHECK: [[BORROWED_VVAL:%.*]] = begin_borrow [[VVAL]]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV{{[_0-9a-zA-Z]*}}ig
-  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[BORROWED_VVAL]]) : $@convention(method) (Int, @guaranteed Val)
-  // CHECK: end_borrow [[BORROWED_VVAL]] from [[VVAL]]
-  // CHECK: destroy_value [[VVAL]]
+  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]]) : $@convention(method) (Int, @guaranteed Val)
   // CHECK: return [[RET]]
 }
 
@@ -932,35 +923,27 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @$S10properties12genericPropsyyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
+// CHECK-LABEL: sil hidden @$S10properties12genericPropsyyAA12GenericClassCySSGF : $@convention(thin) (@guaranteed GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   class_method [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
-  // CHECK:   apply {{.*}}<String>({{.*}}, [[BORROWED_ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
   let _ = x.x
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   class_method [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
-  // CHECK:   apply {{.*}}<String>([[BORROWED_ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
-  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   apply {{.*}}<String>([[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
   let _ = x.y
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[ARG]] : $GenericClass<String>, #GenericClass.z
   // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[Z]] : $*String
   // CHECK:   destroy_value [[LOADED_Z]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   destroy_value [[ARG]]
+  // CHECK-NOT:   destroy_value [[ARG]]
   let _ = x.z
 }
 
 // CHECK-LABEL: sil hidden @$S10properties28genericPropsInGenericContext{{[_0-9a-zA-Z]*}}F
 func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<U>, #GenericClass.z
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[ARG]] : $GenericClass<U>, #GenericClass.z
   // CHECK:   copy_addr [[Z]] {{.*}} : $*U
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.z
 }
 

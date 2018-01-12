@@ -141,7 +141,8 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &SGF,
 
   if (requireIsOptionalNativeObject(SGF, loc, subs[0].getReplacement())) {
     // Unpinning takes responsibility for the +1 handle.
-    SGF.B.createStrongUnpin(loc, args[0].forward(SGF), SGF.B.getDefaultAtomicity());
+    SGF.B.createStrongUnpin(loc, args[0].ensurePlusOne(SGF, loc).forward(SGF),
+                            SGF.B.getDefaultAtomicity());
   }
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
@@ -293,7 +294,7 @@ static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
 
   TemporaryInitialization init(addr, CleanupHandle::invalid());
   SGF.emitExprInto(args[0], &init);
-  
+
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
@@ -544,14 +545,16 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (!fromTL.isAddress() || !toTL.isAddress()) { 
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
+  // TODO: Fix this API.
+  if (!fromTL.isAddress() || !toTL.isAddress()) {
+    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return ManagedValue(refCast, args[0].getCleanup());
+      return refCast;
     }
   }
+
   // We are either casting between address-only types, or cannot promote to a
   // cast of reference values.
   //
@@ -563,7 +566,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].forward(SGF);
+  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -636,16 +639,17 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
         });
   }
   // Create the appropriate bitcast based on the source and dest types.
-  auto &in = args[0];
-  SILValue out = SGF.B.createUncheckedBitCast(loc, in.getValue(),
-                                              toTL.getLoweredType());
+  ManagedValue in = args[0];
+  SILType resultTy = toTL.getLoweredType();
+  if (resultTy.isTrivial(SGF.getModule()))
+    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
 
-  // If the cast reduces to unchecked_ref_cast, then the source and dest
-  // have identical cleanup, so just forward the cleanup as an optimization.
-  if (isa<UncheckedRefCastInst>(out))
-    return ManagedValue(out, in.getCleanup());
+  // If we can perform a ref cast, just return.
+  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
+    return refCast;
 
   // Otherwise leave the original cleanup and retain the cast value.
+  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
   return SGF.emitManagedRetain(loc, out, toTL);
 }
 

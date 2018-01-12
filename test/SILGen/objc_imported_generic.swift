@@ -1,4 +1,4 @@
-// REQUIRES: plus_one_runtime
+// REQUIRES: plus_zero_runtime
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -emit-silgen %s -enable-sil-ownership | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
@@ -27,9 +27,8 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C24MethodOnAnyObjectChained1o1byXlSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
-// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
 // CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -52,9 +51,8 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C19PropertyOnAnyObject1o1byXlSgSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
-// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
 // CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -83,9 +81,9 @@ public func genericBlockBridging<T: Ansible>(x: GenericClass<T>) {
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C13BlockBridging{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @$SxxIeyBya_xxIegxo_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @$SxxIeyBya_xxIeggo_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         partial_apply [callee_guaranteed] [[BLOCK_TO_FUNC]]<T>
-// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @$SxxIegxo_xxIeyBya_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @$SxxIeggo_xxIeyBya_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T>
 
 // CHECK-LABEL: sil @$S21objc_imported_generic20arraysOfGenericParam{{[_0-9a-zA-Z]*}}F
