@@ -4309,6 +4309,11 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
 
   if (withTypes && PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType()->getInOutObjectType());
+
+  // FIXME: We should clone the entire attribute list.
+  if (PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    getAttrs().add(new (PD->getASTContext())
+                       ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
 }
 
 
