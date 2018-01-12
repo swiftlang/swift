@@ -40,7 +40,7 @@ public struct GenericStruct<T : Proto> {
 
 // CHECK-32-LABEL: define{{.*}} swiftcc void @_T015generic_structs13GenericStructVACyxGycfC
 // CHECK-32:  [[TYPE:%.*]] =  call %swift.type* @_T015generic_structs13GenericStructVMa(%swift.type* %T, i8** %T.Proto)
-// CHECK-32:  [[PTR:%.*]] = bitcast %swift.type* %8 to i32*
+// CHECK-32:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to i32*
 // CHECK-32:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds i32, i32* [[PTR]], i32 2
 // CHECK-32:  [[FIELDOFFSET:%.*]] = getelementptr inbounds i32, i32* [[FIELDOFFSETS]], i32 2
 // CHECK-32:  [[OFFSET:%.*]] = load i32, i32* [[FIELDOFFSET]]
@@ -50,7 +50,7 @@ public struct GenericStruct<T : Proto> {
 
 // CHECK-64-LABEL: define{{.*}} swiftcc void @_T015generic_structs13GenericStructVACyxGycfC
 // CHECK-64:  [[TYPE:%.*]] =  call %swift.type* @_T015generic_structs13GenericStructVMa(%swift.type* %T, i8** %T.Proto)
-// CHECK-64:  [[PTR:%.*]] = bitcast %swift.type* %8 to i64*
+// CHECK-64:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to i64*
 // CHECK-64:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds i64, i64* [[PTR]], i64 2
 // CHECK-64:  [[FIELDOFFSET:%.*]] = getelementptr inbounds i64, i64* [[FIELDOFFSETS]], i32 2
 // CHECK-64:  [[OFFSET:%.*]] = load i64, i64* [[FIELDOFFSET]]
