@@ -5490,7 +5490,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   }
 
   SILDefaultWitnessTable *defaultWitnesses = nullptr;
-  if (!protocol->hasFixedLayout())
+  if (protocol->isResilient())
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
   ConstantInitBuilder initBuilder(*this);

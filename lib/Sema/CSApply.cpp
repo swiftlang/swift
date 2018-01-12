@@ -208,8 +208,8 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
     return false;
 
   // If the storage is resilient, we cannot access it directly at all.
-  if (!member->hasFixedLayout(DC->getParentModule(),
-                              DC->getResilienceExpansion()))
+  if (member->isResilient(DC->getParentModule(),
+                          DC->getResilienceExpansion()))
     return false;
 
   return true;

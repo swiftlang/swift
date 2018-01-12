@@ -922,7 +922,7 @@ namespace {
 static bool isResilientConformance(const NormalProtocolConformance *conformance) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
-  if (conformance->getProtocol()->hasFixedLayout())
+  if (!conformance->getProtocol()->isResilient())
     return false;
 
   // If the protocol is in the same module as the conformance, we're

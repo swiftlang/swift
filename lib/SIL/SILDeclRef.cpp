@@ -300,7 +300,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // The global addressor is never public for resilient globals.
   if (kind == Kind::GlobalAccessor) {
-    if (!cast<VarDecl>(d)->hasFixedLayout()) {
+    if (cast<VarDecl>(d)->isResilient()) {
       neverPublic = true;
     }
   }

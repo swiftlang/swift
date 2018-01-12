@@ -1283,7 +1283,7 @@ namespace {
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(structType);
 
       // Classify the type according to its stored properties.
@@ -1313,7 +1313,7 @@ namespace {
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(enumType);
 
       // If the whole enum is indirect, we lower it as if all payload
@@ -2526,8 +2526,8 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    assert(structDecl->hasFixedLayout(Module.getSwiftModule(),
-                                      ResilienceExpansion::Minimal) &&
+    assert(!structDecl->isResilient(Module.getSwiftModule(),
+                                    ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
@@ -2553,8 +2553,8 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
-    assert(enumDecl->hasFixedLayout(Module.getSwiftModule(),
-                                    ResilienceExpansion::Minimal) &&
+    assert(!enumDecl->isResilient(Module.getSwiftModule(),
+                                  ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;
