@@ -214,6 +214,57 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       expectEqual(type(of: decoded), Employee.self, "Expected decoded value to be of type Employee; got \(type(of: decoded)) instead.")
   }
 
+  // MARK: - Encoder State
+  // SR-6078
+  func testEncoderStateThrowOnEncode() {
+    struct Wrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+
+      func encode(to encoder: Encoder) throws {
+        // This approximates a subclass calling into its superclass, where the superclass encodes a value that might throw.
+        // The key here is that getting the superEncoder creates a referencing encoder.
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+
+        // Pushing a nested container on leaves the referencing encoder with multiple containers.
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    struct Throwing : Encodable {
+      func encode(to encoder: Encoder) throws {
+        enum EncodingError : Error { case foo }
+        throw EncodingError.foo
+      }
+    }
+
+    // The structure that would be encoded here looks like
+    //
+    //   <array>
+    //     <array>
+    //       <array>
+    //         [throwing]
+    //       </array>
+    //     </array>
+    //   </array>
+    //
+    // The wrapper asks for an unkeyed container ([^]), gets a super encoder, and creates a nested container into that ([[^]]).
+    // We then encode an array into that ([[[^]]]), which happens to be a value that causes us to throw an error.
+    //
+    // The issue at hand reproduces when you have a referencing encoder (superEncoder() creates one) that has a container on the stack (unkeyedContainer() adds one) that encodes a value going through box_() (Array does that) that encodes something which throws (Throwing does that).
+    // When reproducing, this will cause a test failure via fatalError().
+    _ = try? PropertyListEncoder().encode(Wrapper([Throwing()]))
+  }
+
+  // MARK: - Encoder State
+  // SR-6048
+  func testDecoderStateThrowOnDecode() {
+    let plist = try! PropertyListEncoder().encode([1,2,3])
+    let _ = try! PropertyListDecoder().decode(EitherDecodable<[String], [Int]>.self, from: plist)
+  }
+
   // MARK: - Helper Functions
   private var _plistEmptyDictionaryBinary: Data {
     return Data(base64Encoded: "YnBsaXN0MDDQCAAAAAAAAAEBAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAJ")!
@@ -725,6 +776,22 @@ fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T 
   }
 }
 
+fileprivate enum EitherDecodable<T : Decodable, U : Decodable> : Decodable {
+  case t(T)
+  case u(U)
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if let t = try? container.decode(T.self) {
+      self = .t(t)
+    } else if let u = try? container.decode(U.self) {
+      self = .u(u)
+    } else {
+      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Data was neither \(T.self) nor \(U.self).")
+    }
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
@@ -748,5 +815,7 @@ PropertyListEncoderTests.test("testInterceptData") { TestPropertyListEncoder().t
 PropertyListEncoderTests.test("testInterceptDate") { TestPropertyListEncoder().testInterceptDate() }
 PropertyListEncoderTests.test("testTypeCoercion") { TestPropertyListEncoder().testTypeCoercion() }
 PropertyListEncoderTests.test("testDecodingConcreteTypeParameter") { TestPropertyListEncoder().testDecodingConcreteTypeParameter() }
+PropertyListEncoderTests.test("testEncoderStateThrowOnEncode") { TestPropertyListEncoder().testEncoderStateThrowOnEncode() }
+PropertyListEncoderTests.test("testDecoderStateThrowOnDecode") { TestPropertyListEncoder().testDecoderStateThrowOnDecode() }
 runAllTests()
 #endif
