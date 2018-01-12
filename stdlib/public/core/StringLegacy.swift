@@ -54,6 +54,7 @@ extension String {
       self = repeatedValue
     } else {
       precondition(count > 0, "Negative count not allowed")
+      defer { _fixLifetime(repeatedValue) }
       if _slowPath(repeatedValue._guts._isOpaque) {
         let opaque = repeatedValue._guts._asOpaque()
         self.init(_StringGuts(opaque._repeated(count)))

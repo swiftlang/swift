@@ -126,7 +126,7 @@ extension _StringGuts {
       return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(l, r))
     }
 #else
-    switch (_guts.isASCII, rhs._guts.isASCII) {
+    switch (left.isASCII, right.isASCII) {
     case (true, false):
       let l = left._unmanagedASCIIView[leftRange]
       let r = right._unmanagedUTF16View[rightRange]
@@ -135,7 +135,8 @@ extension _StringGuts {
           r.start, Int32(r.count)))
     case (false, true):
       // Just invert it and recurse for this case.
-      return -rhs._compareDeterministicUnicodeCollation(self)
+      return -_compareDeterministicUnicodeCollation(
+        right, rightRange, to: left, leftRange)
     case (false, false):
       let l = left._unmanagedUTF16View[leftRange]
       let r = right._unmanagedUTF16View[rightRange]

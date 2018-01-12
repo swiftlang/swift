@@ -113,6 +113,7 @@ struct _StringObject {
 // payload is:
 //   isNative: the native StringStorage object
 //   isCocoa: the Cocoa object
+//   isOpaque & !isCocoa: the _OpaqueString object
 //   isUnmanaged: the pointer to code units
 //   isSmall: opaque bits used for inline storage // TODO: use them!
 //
@@ -245,6 +246,7 @@ extension _StringObject {
     }
   }
 
+#if _runtime(_ObjC)
   @_versioned
   @_inlineable
   internal // TODO: private!
@@ -256,6 +258,19 @@ extension _StringObject {
         !_usesNativeSwiftReferenceCounting(
           type(of: Builtin.reinterpretCast(referenceBits) as AnyObject)))
       return Builtin.reinterpretCast(referenceBits)
+    }
+  }
+#endif
+
+  @_versioned
+  @_inlineable
+  internal // TODO: private!
+  var asOpaqueObject: _OpaqueString {
+    @inline(__always)
+    get {
+      _sanityCheck(isOpaque)
+      let object = Builtin.reinterpretCast(referenceBits) as AnyObject
+      return object as! _OpaqueString
     }
   }
 
@@ -630,6 +645,7 @@ extension _StringObject {
       isSingleByte: isSingleByte)
   }
 
+#if _runtime(_ObjC)
   @_versioned
   @_inlineable
   @inline(__always)
@@ -642,9 +658,22 @@ extension _StringObject {
       isContiguous: isContiguous,
       isSingleByte: isSingleByte)
   }
+#else
+  @_versioned
+  @_inlineable
+  @inline(__always)
+  internal
+  init<S: _OpaqueString>(opaqueString: S) {
+    self.init(
+      _someObject: opaqueString,
+      isCocoa: false,
+      isContiguous: false,
+      isSingleByte: false)
+  }
+#endif
 
-#if arch(i386) || arch(arm)
-  // FIXME Small strings aren't implemented on 32-bit platforms yet
+#if arch(i386) || arch(arm) || !_runtime(_ObjC)
+  // FIXME Small strings aren't implemented on 32-bit or non-ObjC platforms yet
 #else
   @_versioned
   @_inlineable

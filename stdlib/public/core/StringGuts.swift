@@ -1,4 +1,15 @@
-// TODO
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import SwiftShims
 
 //
@@ -164,11 +175,13 @@ extension _StringGuts {
     return _object.isNative
   }
 
+#if _runtime(_ObjC)
   @_inlineable
   public // @testable
   var _isCocoa: Bool {
     return _object.isCocoa
   }
+#endif
 
   @_inlineable
   public // @testable
@@ -244,7 +257,27 @@ extension _StringGuts {
       otherBits: UInt(bitPattern: storage.count))
 #endif
   }
+}
 
+extension _StringGuts {
+  @_inlineable
+  @inline(__always)
+  public // @testable
+  init() {
+#if arch(i386) || arch(arm)
+    self.init(
+      object: _StringObject(),
+      otherBits: 0,
+      extraBits: UInt(bitPattern: _emptyStringBase))
+#else
+    self.init(object: _StringObject(), otherBits: 0)
+#endif
+    _invariantCheck()
+  }
+}
+
+#if _runtime(_ObjC)
+extension _StringGuts {
   //
   // HACK HACK HACK: Work around for ARC :-(
   //  @inline(never) // Hide CF dependency
@@ -293,21 +326,6 @@ extension _StringGuts {
     return _UnmanagedString(start: start, count: _cocoaCount)
   }
 
-  @_inlineable
-  @inline(__always)
-  public // @testable
-  init() {
-#if arch(i386) || arch(arm)
-    self.init(
-      object: _StringObject(),
-      otherBits: 0,
-      extraBits: UInt(bitPattern: _emptyStringBase))
-#else
-    self.init(object: _StringObject(), otherBits: 0)
-#endif
-    _invariantCheck()
-  }
-
   @inline(never)
   @_versioned
   internal
@@ -344,7 +362,31 @@ extension _StringGuts {
       _sanityCheck(_object.isContiguous)
     }
   }
+}
+#else // !_runtime(_ObjC)
+extension _StringGuts {
+  @_versioned
+  @_inlineable
+  internal
+  var _opaqueCount: Int {
+    @inline(__always) get {
+      _sanityCheck(_object.isOpaque)
+      return Int(bitPattern: _otherBits)
+    }
+  }
 
+  @inline(never)
+  @_versioned
+  internal
+  init<S: _OpaqueString>(opaqueString: S) {
+    self.init(
+      object: _StringObject(opaqueString: opaqueString),
+      otherBits: UInt(bitPattern: opaqueString.length))
+  }
+}
+#endif // _runtime(_ObjC)
+
+extension _StringGuts {
   @_versioned
   @_inlineable
   internal var _unmanagedRawStart: UnsafeRawPointer {
@@ -403,7 +445,10 @@ extension _StringGuts {
     _sanityCheck(_unmanagedCount == s.count)
     _invariantCheck()
   }
+}
 
+#if _runtime(_ObjC)
+extension _StringGuts {
   //
   // NOTE: For now, small strings are tagged cocoa strings
   //
@@ -439,6 +484,7 @@ extension _StringGuts {
 #endif
   }
 }
+#endif // _runtime(_ObjC)
 
 extension _StringGuts {
   @_versioned
@@ -461,10 +507,14 @@ extension _StringGuts {
       } else if _object.isNative {
         return _object.nativeStorage(of: UInt8.self).unmanagedView
       } else {
+#if _runtime(_ObjC)
         _sanityCheck(_object.isContiguousCocoa)
         return _asContiguousCocoa(of: UInt8.self)
-      }
+#else
+        Builtin.unreachable()
 #endif
+      }
+#endif // arch(i386) || arch(arm)
     }
   }
 
@@ -488,14 +538,37 @@ extension _StringGuts {
       } else if _object.isNative {
         return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
       } else {
+#if _runtime(_ObjC)
         _sanityCheck(_object.isContiguousCocoa)
         return _asContiguousCocoa(of: UTF16.CodeUnit.self)
-      }
+#else
+        Builtin.unreachable()
 #endif
+      }
+#endif // arch(i386) || arch(arm)
     }
   }
 }
 
+extension _StringGuts {
+  @_versioned
+  @_inlineable
+  internal
+  var _isOpaque: Bool {
+    @inline(__always)
+    get { return _object.isOpaque }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
+  var _isContiguous: Bool {
+    @inline(__always)
+    get { return _object.isContiguous }
+  }
+}
+
+#if _runtime(_ObjC)
 extension _StringGuts {
   /// Return an NSString instance containing a slice of this string.
   /// The returned object may contain unmanaged pointers into the
@@ -523,23 +596,6 @@ extension _StringGuts {
       _StringGuts(_asUnmanaged(of: UTF16.CodeUnit.self)))
   }
 
-  @_versioned
-  @_inlineable
-  internal
-  var _isOpaque: Bool {
-    @inline(__always)
-    get { return _object.isOpaque }
-  }
-
-  @_versioned
-  @_inlineable
-  internal
-  var _isContiguous: Bool {
-    @inline(__always)
-    get { return _object.isContiguous }
-  }
-
-
   /// Return an NSString instance containing a slice of this string.
   /// The returned object may contain unmanaged pointers into the
   /// storage of this string; you are responsible for ensuring that
@@ -550,13 +606,10 @@ extension _StringGuts {
   func _ephemeralCocoaString(_ range: Range<Int>) -> _CocoaString {
     if _slowPath(_isOpaque) {
       return _asOpaque()[range].cocoaSlice()
-    } else {
-      return _NSContiguousString(_unmanaged: self, range: range)
     }
+    return _NSContiguousString(_unmanaged: self, range: range)
   }
-}
 
-extension _StringGuts {
   public // @testable
   var _underlyingCocoaString: _CocoaString? {
     if _object.isNative {
@@ -568,7 +621,29 @@ extension _StringGuts {
     if _object.isSmall {
       return _taggedCocoaObject
     }
+    return nil
+  }
+}
+#endif
 
+extension _StringGuts {
+  /// Return the object identifier for the reference counted heap object
+  /// referred to by this string (if any). This is useful for testing allocation
+  /// behavior.
+  public // @testable
+  var _objectIdentifier: ObjectIdentifier? {
+    if _object.isNative {
+      return ObjectIdentifier(_object.nativeRawStorage)
+    }
+#if _runtime(_ObjC)
+    if _object.isCocoa {
+      return ObjectIdentifier(_object.asCocoaObject)
+    }
+#else
+    if _object.isOpaque {
+      return ObjectIdentifier(_object.asOpaqueObject)
+    }
+#endif
     return nil
   }
 }
@@ -577,13 +652,17 @@ extension _StringGuts {
   @inline(never)
   @_versioned
   internal func _asOpaque() -> _UnmanagedOpaqueString {
+#if _runtime(_ObjC)
     if _object.isSmall {
       return _UnmanagedOpaqueString(
         _taggedCocoaObject, count: _taggedCocoaCount)
     }
-
     _sanityCheck(_object.isNoncontiguousCocoa)
     return _UnmanagedOpaqueString(_object.asCocoaObject, count: _cocoaCount)
+#else
+    _sanityCheck(_object.isOpaque)
+    return _UnmanagedOpaqueString(_object.asOpaqueObject, count: _opaqueCount)
+#endif
   }
 }
 
@@ -625,12 +704,25 @@ internal func internalDumpHex(_ x: Bool, newline: Bool = true) {
 }
 
 extension _StringGuts {
+  // FIXME: Remove
   public func _dump() {
     print("_StringGuts(", terminator: "")
     internalDumpHex(rawBits.0, newline: false)
     print(" ", terminator: "")
     internalDumpHex(rawBits.1, newline: false)
     print(": ", terminator: "")
+    _dumpContents()
+    if isASCII {
+      print(" <ascii>", terminator: "")
+    }
+    else {
+      print(" <utf16>", terminator: "")
+    }
+    print(")")
+  }
+
+  // FIXME: Remove
+  internal func _dumpContents() {
     if _object.isNative {
       let storage = _object.nativeRawStorage
       print("native ", terminator: "")
@@ -641,7 +733,10 @@ extension _StringGuts {
       print(storage.count, terminator: "")
       print("/", terminator: "")
       print(storage.capacity, terminator: "")
-    } else if _object.isCocoa {
+      return
+    }
+#if _runtime(_ObjC)
+    if _object.isCocoa {
       print("cocoa ", terminator: "")
       internalDumpHex(_object.asCocoaObject, newline: false)
       print(" start: ", terminator: "")
@@ -652,26 +747,34 @@ extension _StringGuts {
       }
       print(" count: ", terminator: "")
       print(_cocoaCount, terminator: "")
-    } else if _object.isUnmanaged {
+      return
+    }
+#else
+    if _object.isOpaque {
+      print("opaque ", terminator: "")
+      internalDumpHex(_object.asOpaqueObject, newline: false)
+      print(" count: ", terminator: "")
+      print(_opaqueCount, terminator: "")
+      return
+    }
+#endif
+    if _object.isUnmanaged {
       print("unmanaged ", terminator: "")
       internalDumpHex(_unmanagedRawStart, newline: false)
       print(" count: ", terminator: "")
       print(_unmanagedCount, terminator: "")
-    } else if _object.isSmall {
+      return
+    }
+#if _runtime(_ObjC)
+    if _object.isSmall {
       print("small cocoa ", terminator: "")
       internalDumpHex(_taggedCocoaObject, newline: false)
       print(" count: ", terminator: "")
       print(_taggedCocoaCount, terminator: "")
-    } else {
-      print("error", terminator: "")
+      return
     }
-    if isASCII {
-      print(" <ascii>", terminator: "")
-    }
-    else {
-      print(" <utf16>", terminator: "")
-    }
-    print(")")
+#endif
+    print("error", terminator: "")
   }
 }
 
@@ -679,6 +782,35 @@ extension _StringGuts {
 // String API helpers
 //
 extension _StringGuts {
+  // Return a contiguous _StringGuts with the same contents as this one.
+  // Use the existing guts if possible; otherwise copy the string into a
+  // new buffer.
+  @_versioned
+  internal
+  func _extractContiguous<CodeUnit>(
+    of codeUnit: CodeUnit.Type = CodeUnit.self
+  ) -> _StringGuts
+  where CodeUnit : FixedWidthInteger & UnsignedInteger {
+    if _fastPath(
+      _object.isContiguous && CodeUnit.bitWidth == _object.bitWidth) {
+      return self
+    }
+    let count = self.count
+    return _StringGuts(_copyToNativeStorage(of: CodeUnit.self, from: 0..<count))
+  }
+
+  @_versioned
+  internal
+  func _extractContiguousUTF16() -> _StringGuts {
+    return _extractContiguous(of: UTF16.CodeUnit.self)
+  }
+
+  @_versioned
+  internal
+  func _extractContiguousASCII() -> _StringGuts {
+    return _extractContiguous(of: UInt8.self)
+  }
+
   // Return a native storage object with the same contents as this string.
   // Use the existing buffer if possible; otherwise copy the string into a
   // new buffer.
@@ -692,7 +824,7 @@ extension _StringGuts {
       return _object.nativeStorage()
     }
     let count = self.count
-    return _copyToNativeStorage(from: 0..<count)
+    return _copyToNativeStorage(of: CodeUnit.self, from: 0..<count)
   }
 
   @_specialize(where CodeUnit == UInt8)
@@ -840,11 +972,18 @@ extension _StringGuts {
   @_inlineable
   public // @testable
   var count: Int {
+#if _runtime(_ObjC)
     if _slowPath(_object.isSmall) {
       return _taggedCocoaCount
-    } else if _slowPath(_object.isCocoa) {
+    }
+    if _slowPath(_object.isCocoa) {
       return _cocoaCount
     }
+#else
+    if _slowPath(_object.isOpaque) {
+      return _asOpaque().count
+    }
+#endif
     _sanityCheck(Int(self._otherBits) >= 0)
     return Int(bitPattern: self._otherBits)
   }
@@ -1003,13 +1142,10 @@ extension _StringGuts {
       self = other
       return
     }
+    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
       self.append(other._asOpaque())
-      return
-    }
-
-    defer { _fixLifetime(other) }
-    if other.isASCII {
+    } else if other.isASCII {
       self.append(other._unmanagedASCIIView)
     } else {
       self.append(other._unmanagedUTF16View)
@@ -1025,13 +1161,10 @@ extension _StringGuts {
       self = other
       return
     }
+    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
       self.append(other._asOpaque()[range])
-      return
-    }
-
-    defer { _fixLifetime(other) }
-    if other.isASCII {
+    } else if other.isASCII {
       self.append(other._unmanagedASCIIView[range])
     } else {
       self.append(other._unmanagedUTF16View[range])
@@ -1281,5 +1414,27 @@ extension _SwiftStringStorage {
     }
     _sanityCheck(p == end)
     return hadError
+  }
+}
+
+extension String {
+  // FIXME: Remove. Still used by swift-corelibs-foundation
+  @available(*, deprecated, renamed: "_guts")
+  public var _core: _StringGuts {
+    return _guts
+  }
+}
+
+extension _StringGuts {
+  // FIXME: Remove. Still used by swift-corelibs-foundation
+  @available(*, deprecated)
+  public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
+    return UnsafeMutablePointer(mutating: _unmanagedASCIIView.start)
+  }
+
+  // FIXME: Remove. Still used by swift-corelibs-foundation
+  @available(*, deprecated)
+  public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
+    return UnsafeMutablePointer(mutating: _unmanagedUTF16View.start)
   }
 }
