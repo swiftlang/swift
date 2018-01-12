@@ -5138,11 +5138,17 @@ public:
     }
 
     // Look through optional types.
-    if (auto attrRepr = dyn_cast<OptionalTypeRepr>(typeRepr)) {
+    TypeRepr *base = nullptr;
+    if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
+      base = optRepr->getBase();
+    else if (auto *optRepr =
+                 dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
+      base = optRepr->getBase();
+
+    if (base) {
       // But only one level.
       if (optionalDepth != 0) return false;
-      return checkDynamicSelfReturn(func, attrRepr->getBase(),
-                                    optionalDepth + 1);
+      return checkDynamicSelfReturn(func, base, optionalDepth + 1);
     }
 
     // Check whether we have a simple identifier type.
