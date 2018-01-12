@@ -5738,10 +5738,43 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       return true;
 
     if (!lhsType->isEqual(rhsType)) {
-      diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
-               overloadName, lhsType, rhsType)
-      .highlight(lhsExpr->getSourceRange())
+      auto diag = diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
+                           overloadName, lhsType, rhsType);
+      diag.highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
+
+      auto tryFixIts = [&]() -> bool {
+        if (calleeInfo.size() != 1)
+          return false;
+
+        auto candidate = calleeInfo[0];
+        auto *fnType = candidate.getUncurriedFunctionType();
+        if (!fnType)
+          return false;
+
+        auto params = fnType->getParams();
+        if (params.size() != 2)
+          return false;
+
+        auto lhsCandidate = params[0].getType();
+        auto rhsCandidate = params[1].getType();
+        auto lhsIsCandidate = lhsType->isEqual(lhsCandidate);
+        auto rhsIsCandidate = rhsType->isEqual(rhsCandidate);
+
+        if (!lhsIsCandidate && !rhsIsCandidate)
+          return false;
+
+        if (!lhsIsCandidate)
+          return tryIntegerCastFixIts(diag, CS, lhsType, lhsCandidate, lhsExpr);
+
+        if (!rhsIsCandidate)
+          return tryIntegerCastFixIts(diag, CS, rhsType, rhsCandidate, rhsExpr);
+
+        return false;
+      };
+
+      tryFixIts();
+
     } else {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,
                overloadName, lhsType)
