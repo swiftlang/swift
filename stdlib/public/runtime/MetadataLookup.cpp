@@ -437,49 +437,7 @@ public:
 
   using BuiltProtocolDecl = const ProtocolDescriptor *;
 
-  /// Strip generic arguments from the "spine" of a reference to a nominal
-  /// type.
-  Demangle::NodePointer stripGenericArgsFromContext(
-                                    const Demangle::NodePointer &node) const {
-    switch (node->getKind()) {
-    case Demangle::Node::Kind::BoundGenericClass:
-    case Demangle::Node::Kind::BoundGenericEnum:
-    case Demangle::Node::Kind::BoundGenericStructure:
-      // Bound generic types have a 'Type' node under them, whose child is
-      // the non-generic reference. If we don't see that structure, do nothing.
-      if (node->getNumChildren() < 2 ||
-          node->getChild(0)->getKind() != Demangle::Node::Kind::Type ||
-          node->getChild(0)->getNumChildren() < 1)
-        return node;
-
-      // Strip generic arguments from that child, then return it.
-      return stripGenericArgsFromContext(node->getChild(0)->getChild(0));
-
-    case Demangle::Node::Kind::Class:
-    case Demangle::Node::Kind::Enum:
-    case Demangle::Node::Kind::Structure: {
-      if (node->getNumChildren() < 2)
-        return node;
-
-      auto newContext = stripGenericArgsFromContext(node->getChild(0));
-      if (newContext == node->getChild(0)) return node;
-
-      auto newNode = demangler.createNode(node->getKind());
-      newNode->addChild(newContext, demangler);
-      for (unsigned i = 1, n = node->getNumChildren(); i != n; ++i)
-        newNode->addChild(node->getChild(i), demangler);
-      return newNode;
-    }
-
-    case Demangle::Node::Kind::Module:
-      // Modules terminate the recursion.
-      return node;
-
-    default:
-      // FIXME: Handle local contexts.
-      return node;
-    }
-  }
+  Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
@@ -492,13 +450,8 @@ public:
     }
 #endif
 
-    // Remove the generic arguments, turning bound generic nodes into
-    // their non-generic counterparts for the purpose of finding the
-    // descriptor.
-    auto descriptorNode = stripGenericArgsFromContext(node);
-
     // Look for a nominal type descriptor based on its mangled name.
-    auto mangledName = Demangle::mangleNode(descriptorNode);
+    auto mangledName = Demangle::mangleNode(node);
     return _findNominalTypeDescriptor(mangledName);
   }
 
@@ -617,11 +570,9 @@ public:
                                                           allGenericArgs[2]);
 
     default:
-      break;
+      // FIXME: Implement.
+      return BuiltType();
     }
-
-    // FIXME: Implement.
-    return BuiltType();
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {

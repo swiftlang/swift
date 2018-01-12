@@ -27,6 +27,11 @@
 namespace swift {
 namespace Demangle {
 
+/// Strip generic arguments from the "spine" of a context node, producing a
+/// bare context to be used in (e.g.) forming nominal type descriptors.
+NodePointer stripGenericArgsFromContextNode(const NodePointer &node,
+                                            NodeFactory &factory);
+
 /// Describe a function parameter, parameterized on the type
 /// representation.
 template <typename BuiltType>
@@ -471,12 +476,18 @@ private:
     // in addition to a reference to the parent type. The
     // mangled name already includes the module and parent
     // types, if any.
+    Demangle::NodePointer nominalNode = node;
     if (moduleOrParentType->getKind() != NodeKind::Module) {
       parent = decodeMangledType(moduleOrParentType);
       if (!parent) return false;
+
+      // Remove any generic arguments from the context node, producing a
+      // node that reference the nominal type declaration.
+      nominalNode =
+        stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
     }
 
-    typeDecl = Builder.createNominalTypeDecl(node);
+    typeDecl = Builder.createNominalTypeDecl(nominalNode);
     if (!typeDecl) return false;
 
     return true;

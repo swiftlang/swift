@@ -83,6 +83,7 @@ public:
 /// just finds and builds things in the AST.
 class RemoteASTTypeBuilder {
   ASTContext &Ctx;
+  Demangle::NodeFactory Factory;
 
   /// The notional context in which we're writing and type-checking code.
   /// Created lazily.
@@ -122,6 +123,8 @@ public:
     return Result<T>::emplaceFailure(defaultFailureKind,
                std::forward<DefaultFailureArgTys>(defaultFailureArgs)...);
   }
+
+  Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
   Type createBuiltinType(const std::string &mangledName) {
     // TODO
