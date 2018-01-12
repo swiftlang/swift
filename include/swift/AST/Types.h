@@ -573,6 +573,12 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
+  /// \brief Determine whether this type can dynamically be an optional type.
+  ///
+  /// \param includeExistential Whether an existential type should be considered
+  /// such a type.
+  bool canDynamicallyBeOptionalType(bool includeExistential);
+
   /// Determine whether this type contains a type parameter somewhere in it.
   bool hasTypeParameter() {
     return getRecursiveProperties().hasTypeParameter();
@@ -4996,6 +5002,14 @@ inline bool TypeBase::isOpenedExistentialWithError() {
             openedExistentialType->isExistentialWithError());
   }
   return false;
+}
+
+inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
+  CanType T = getCanonicalType();
+  auto isArchetypeOrExistential = isa<ArchetypeType>(T) ||
+    (includeExistential && T.isExistentialType());
+
+  return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
 inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
