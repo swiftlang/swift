@@ -171,5 +171,24 @@ DemangleToMetadataTests.test("substitutions") {
     _typeByMangledName("x_6Assoc14main2P4PQz6Assoc24main2P4PQzt", substitutions: [[S.self]])!)
 }
 
+enum EG<T, U> { case a }
+
+class CG3<T, U, V> { }
+
+DemangleToMetadataTests.test("simple generic specializations") {
+  expectEqual([Int].self, _typeByMangledName("SaySiG")!)
+  expectEqual(EG<Int, String>.self, _typeByMangledName("4main2EGOySiSSG")!)
+  expectEqual(CG3<Int, Double, String>.self, _typeByMangledName("4main3CG3CySiSdSSG")!)
+}
+
+extension EG {
+  struct NestedSG<V> { }
+}
+
+DemangleToMetadataTests.test("nested generic specializations") {
+  // FIXME: Will equal EG<Int, String>.NestedSG<Double>.self
+  expectNil(_typeByMangledName("4main2EGO8NestedSGVySiSS_SdG"))
+}
+
 runAllTests()
 

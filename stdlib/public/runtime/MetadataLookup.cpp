@@ -499,9 +499,57 @@ public:
     return BuiltType();
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl metadataOrTypeDecl,
                                    ArrayRef<BuiltType> genericArgs,
                                    BuiltType parent) const {
+    // Cannot specialize metadata.
+    if (metadataOrTypeDecl.is<const Metadata *>())
+      return BuiltType();
+
+    // The target nominal type descriptor must be for a generic type.
+    auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
+    if (!typeDecl->GenericParams.isGeneric())
+      return BuiltType();
+
+    // FIXME: Unnecessary limitation on depth.
+    if (typeDecl->GenericParams.NestingDepth > 1)
+      return BuiltType();
+
+    // FIXME: Need to evaluate generic requirements. For now, bail out if
+    // there are any.
+    if (typeDecl->GenericParams.NumGenericRequirements>
+          typeDecl->GenericParams.NumPrimaryParams)
+      return BuiltType();
+
+    // FIXME: We don't want the number of "primary" parameters, we want the
+    // number of parameters as written.
+    if (typeDecl->GenericParams.NumPrimaryParams != genericArgs.size())
+      return BuiltType();
+
+    // Call the access function.
+    auto accessFunction = typeDecl->getAccessFunction();
+    switch (typeDecl->GenericParams.NumPrimaryParams) {
+    case 1:
+      using GenericMetadataAccessFunction1 = const Metadata *(const void *);
+      return ((GenericMetadataAccessFunction1 *)accessFunction)(genericArgs[0]);
+
+    case 2:
+      using GenericMetadataAccessFunction2 =
+        const Metadata *(const void *, const void *);
+      return ((GenericMetadataAccessFunction2 *)accessFunction)(genericArgs[0],
+                                                                genericArgs[1]);
+
+    case 3:
+      using GenericMetadataAccessFunction3 =
+        const Metadata *(const void *, const void *, const void *);
+      return ((GenericMetadataAccessFunction3 *)accessFunction)(genericArgs[0],
+                                                                genericArgs[1],
+                                                                genericArgs[2]);
+
+    default:
+      break;
+    }
+
     // FIXME: Implement.
     return BuiltType();
   }

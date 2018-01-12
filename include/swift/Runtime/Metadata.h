@@ -1029,7 +1029,7 @@ struct GenericContextDescriptor {
   /// to NumGenericRequirements; it counts only the type parameters
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
-  
+
   // TODO: add meaningful descriptions of the generic requirements.
 };
 
