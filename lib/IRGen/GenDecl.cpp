@@ -1307,7 +1307,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto linkage = getDeclLinkage(varDecl);
 
     // Resilient classes don't expose field offset symbols.
-    if (!cast<ClassDecl>(varDecl->getDeclContext())->hasFixedLayout()) {
+    if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
              linkage != FormalLinkage::HiddenNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
@@ -3409,7 +3409,7 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  return !D->hasFixedLayout(getSwiftModule(), expansion);
+  return D->isResilient(getSwiftModule(), expansion);
 }
 
 // The most general resilience expansion where the given declaration is visible.

@@ -4040,7 +4040,7 @@ public:
         TC.checkDeclCircularity(nominal);
       }
       if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-        if (!protocol->hasFixedLayout())
+        if (protocol->isResilient())
           TC.inferDefaultWitnesses(protocol);
       }
     }

@@ -1318,9 +1318,9 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
       if (isPolymorphic(var))
         return AccessSemantics::Ordinary;
 
-      // If the property does not have a fixed layout from the given context,
+      // If the property is resilient from the given context,
       // we cannot do direct access.
-      if (!var->hasFixedLayout(UseDC->getParentModule(), expansion))
+      if (var->isResilient(UseDC->getParentModule(), expansion))
         return AccessSemantics::Ordinary;
 
       // We know enough about the property to perform direct access.
@@ -1410,7 +1410,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // This is done by using DirectToStorage semantics above, with the
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
-      if (!hasFixedLayout())
+      if (isResilient())
         return AccessStrategy::DirectToAccessor;
 
       if (storageKind == StoredWithObservers ||
@@ -1479,46 +1479,46 @@ bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::hasFixedLayout() const {
+bool AbstractStorageDecl::isResilient() const {
   // If we're in a nominal type, just query the type.
   auto *dc = getDeclContext();
 
   if (dc->isTypeContext()) {
     auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
     if (nominalDecl == nullptr)
-      return true;
-    return nominalDecl->hasFixedLayout();
+      return false;
+    return nominalDecl->isResilient();
   }
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
                             /*respectVersionedAttr=*/true).isPublic())
-    return true;
+    return false;
 
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return true;
+    return false;
 
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
-    return false;
-  case ResilienceStrategy::Default:
     return true;
+  case ResilienceStrategy::Default:
+    return false;
   }
 
   llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
-bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
-                                         ResilienceExpansion expansion) const {
+bool AbstractStorageDecl::isResilient(ModuleDecl *M,
+                                      ResilienceExpansion expansion) const {
   switch (expansion) {
   case ResilienceExpansion::Minimal:
-    return hasFixedLayout();
+    return isResilient();
   case ResilienceExpansion::Maximal:
-    return hasFixedLayout() || M == getModuleContext();
+    return isResilient() && M != getModuleContext();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -2273,44 +2273,44 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   return 0;
 }
 
-bool NominalTypeDecl::hasFixedLayout() const {
+bool NominalTypeDecl::isResilient() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
                             /*respectVersionedAttr=*/true).isPublic())
-    return true;
+    return false;
 
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return true;
+    return false;
 
   // Structs and enums imported from C *always* have a fixed layout.
   // We know their size, and pass them as values in SIL and IRGen.
   if (hasClangNode())
-    return true;
+    return false;
 
   // @objc enums and protocols always have a fixed layout.
   if ((isa<EnumDecl>(this) || isa<ProtocolDecl>(this)) && isObjC())
-    return true;
+    return false;
 
   // Otherwise, access via indirect "resilient" interfaces.
   switch (getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
-    return false;
-  case ResilienceStrategy::Default:
     return true;
+  case ResilienceStrategy::Default:
+    return false;
   }
 
   llvm_unreachable("Unhandled ResilienceStrategy in switch.");
 }
 
-bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
-                                     ResilienceExpansion expansion) const {
+bool NominalTypeDecl::isResilient(ModuleDecl *M,
+                                  ResilienceExpansion expansion) const {
   switch (expansion) {
   case ResilienceExpansion::Minimal:
-    return hasFixedLayout();
+    return isResilient();
   case ResilienceExpansion::Maximal:
-    return hasFixedLayout() || M == getModuleContext();
+    return isResilient() && M != getModuleContext();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -5393,7 +5393,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // and the constructor is either inlinable or defined in another module.
   if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
     if (getResilienceExpansion() == ResilienceExpansion::Minimal &&
-        !NTD->hasFixedLayout()) {
+        NTD->isResilient()) {
       Kind = BodyInitKind::Delegating;
 
     } else if (isa<ExtensionDecl>(getDeclContext())) {
@@ -5401,7 +5401,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       // Prior to Swift 5, cross-module initializers were permitted to be
       // non-delegating. However, if the struct isn't fixed-layout, we have to
       // be delegating because, well, we don't know the layout.
-      if (!NTD->hasFixedLayout() ||
+      if (NTD->isResilient() ||
           containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
         if (containingModule != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;

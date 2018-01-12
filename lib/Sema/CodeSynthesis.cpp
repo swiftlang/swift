@@ -275,7 +275,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
 
   // Accessors for stored properties of resilient types are not
   // @_transparent.
-  if (!nominalDecl->hasFixedLayout())
+  if (nominalDecl->isResilient())
     return;
 
   // Accessors for protocol storage requirements are never @_transparent
@@ -1841,7 +1841,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
   if (!dc->isTypeContext()) {
     // Fixed-layout global variables don't get accessors.
-    if (var->hasFixedLayout())
+    if (!var->isResilient())
       return;
 
   // In a protocol context, variables written as just "var x : Int" or

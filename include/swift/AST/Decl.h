@@ -2787,19 +2787,13 @@ public:
   
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  /// \brief Does this declaration expose a fixed layout to all resilience
-  /// domains?
-  ///
-  /// For structs, this means clients can assume the number and order of
-  /// stored properties will not change.
-  ///
-  /// For enums, this means clients can assume the number and order of
-  /// cases will not change.
-  bool hasFixedLayout() const;
+  /// \brief Do we need to use resilient access patterns outside of this type's
+  /// resilience domain?
+  bool isResilient() const;
 
-  /// \brief Does this declaration expose a fixed layout to the given
-  /// module?
-  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+  /// \brief Do we need to use resilient access patterns when accessing this
+  /// type from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.
@@ -4293,17 +4287,13 @@ public:
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind) const;
 
-  /// \brief Does this declaration expose a fixed layout to all resilience
-  /// domains?
-  ///
-  /// Roughly speaking, this means we can make assumptions about whether
-  /// the storage is stored or computed, and if stored, the precise access
-  /// pattern to be used.
-  bool hasFixedLayout() const;
+  /// \brief Do we need to use resilient access patterns outside of this type's
+  /// resilience domain?
+  bool isResilient() const;
 
-  /// \brief Does this declaration expose a fixed layout to the given
-  /// module?
-  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+  /// \brief Do we need to use resilient access patterns when accessing this
+  /// type from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Does the storage use a behavior?
   bool hasBehavior() const {
