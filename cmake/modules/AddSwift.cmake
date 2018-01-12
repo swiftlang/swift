@@ -313,6 +313,10 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if (SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
+    list(APPEND result "-Xfrontend" "-enable-guaranteed-normal-arguments")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
