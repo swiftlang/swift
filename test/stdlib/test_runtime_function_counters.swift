@@ -63,7 +63,7 @@ public func length<T>(_ l: List<T>) -> Int {
 // we get back onto a real reference (or if 64-bit gets off of a real
 // reference), then drop adjust the optionality of the following check.
 //
-/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}{{(, {{[0-9a-fA-Fx]+)?}}]
+/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}{{(, [0-9a-fA-Fx]+)?}}]
 
 /// Dictionary has one reference
 /// CHECK: Dictionary<Int, Int>: [{{[0-9a-fA-Fx]+}}]
