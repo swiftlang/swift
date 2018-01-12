@@ -228,7 +228,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 
     case DeclKind::TypeAlias:
     case DeclKind::Var:
-    case DeclKind::Func: {
+    case DeclKind::Func:
+    case DeclKind::Accessor: {
       auto *VD = cast<ValueDecl>(D);
       if (!VD->hasName())
         break;

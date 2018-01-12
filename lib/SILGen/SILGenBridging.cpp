@@ -1358,9 +1358,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     auto decl = thunk.getDecl();
 
     // For an accessor, look at the storage declaration's attributes.
-    if (auto func = dyn_cast<FuncDecl>(decl)) {
-      if (func->isAccessor())
-        decl = func->getAccessorStorageDecl();
+    if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+      decl = accessor->getStorage();
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {

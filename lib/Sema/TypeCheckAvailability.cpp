@@ -137,14 +137,12 @@ private:
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForWalkOfDecl(Decl *D) {
-    if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isAccessor()) {
-        // Use TRC of the storage rather the current TRC when walking this
-        // function.
-        auto it = StorageContexts.find(FD->getAccessorStorageDecl());
-        if (it != StorageContexts.end()) {
-          return it->second;
-        }
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      // Use TRC of the storage rather the current TRC when walking this
+      // function.
+      auto it = StorageContexts.find(accessor->getStorage());
+      if (it != StorageContexts.end()) {
+        return it->second;
       }
     }
     
@@ -951,12 +949,10 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
 /// to suggest an @available fixit, or the original declaration
 /// if no such related declaration exists.
 static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
-  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
     // Suggest @available Fix-Its on property rather than individual
     // accessors.
-    if (FD->isAccessor()) {
-      D = FD->getAccessorStorageDecl();
-    }
+    D = accessor->getStorage();
   }
 
   return abstractSyntaxDeclForAvailableAttribute(D);
@@ -1359,12 +1355,12 @@ void TypeChecker::diagnosePotentialUnavailability(
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
-    FuncDecl *Accessor, SourceRange ReferenceRange,
+    AccessorDecl *Accessor, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
     bool ForInout) {
   assert(Accessor->isGetterOrSetter());
 
-  AbstractStorageDecl *ASD = Accessor->getAccessorStorageDecl();
+  AbstractStorageDecl *ASD = Accessor->getStorage();
   DeclName Name = ASD->getFullName();
 
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
@@ -1425,10 +1421,10 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
     }
 
     // If we are in an accessor, check to see if the associated
-    // property is matches the predicate.
-    auto *FD = dyn_cast<FuncDecl>(D);
-    if (FD && FD->isAccessor() && Pred(FD->getAccessorStorageDecl())) {
-      return true;
+    // property matches the predicate.
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      if (Pred(accessor->getStorage()))
+        return true;
     }
 
     DC = DC->getParent();
@@ -2407,7 +2403,7 @@ private:
 
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
   /// Returns true if a diagnostic was emitted.
-  void diagAccessorAvailability(FuncDecl *D, SourceRange ReferenceRange,
+  void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 bool ForInout) const {
     if (!D) {

@@ -143,11 +143,9 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     bool Parsed = false;
-    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-      if (FD->isAccessor()) {
-        TheParser.parseAccessorBodyDelayed(AFD);
-        Parsed = true;
-      }
+    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+      TheParser.parseAccessorBodyDelayed(AFD);
+      Parsed = true;
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);

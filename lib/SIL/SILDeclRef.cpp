@@ -91,10 +91,10 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   if (vd->hasClangNode())
     return true;
 
-  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
     // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter()) {
-      auto *asd = fd->getAccessorStorageDecl();
+    if (accessor->isGetterOrSetter()) {
+      auto *asd = accessor->getStorage();
       if (asd->isObjC() && asd->hasClangNode())
         return true;
     }
@@ -187,7 +187,7 @@ bool SILDeclRef::isClangImported() const {
       return !isForeign;
 
     if (auto *FD = dyn_cast<FuncDecl>(d))
-      if (FD->isAccessor() ||
+      if (isa<AccessorDecl>(FD) ||
           isa<NominalTypeDecl>(d->getDeclContext()))
         return !isForeign;
   }
@@ -356,9 +356,11 @@ FuncDecl *SILDeclRef::getFuncDecl() const {
 }
 
 bool SILDeclRef::isSetter() const {
-  if (!hasFuncDecl())
+  if (!hasDecl())
     return false;
-  return getFuncDecl()->isSetter();
+  if (auto accessor = dyn_cast<AccessorDecl>(getDecl()))
+    return accessor->isSetter();
+  return false;
 }
 
 AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
@@ -697,13 +699,13 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
       return SILDeclRef();
     }
     
-    if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
-      if (auto *asd = ovFD->getAccessorStorageDecl()) {
-        if (asd->hasClangNode())
-          return SILDeclRef();
-        if (asd->isDynamic())
-          return SILDeclRef();
-      }
+    if (auto *accessor = dyn_cast<AccessorDecl>(overridden.getDecl())) {
+      auto *asd = accessor->getStorage();
+      if (asd->hasClangNode())
+        return SILDeclRef();
+      if (asd->isDynamic())
+        return SILDeclRef();
+    }
 
     // If we overrode a decl from an extension, it won't be in a vtable
     // either. This can occur for extensions to ObjC classes.

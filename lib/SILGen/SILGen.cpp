@@ -488,8 +488,9 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool hasSILBody(FuncDecl *fd) {
-  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-    return !isa<ProtocolDecl>(fd->getDeclContext());
+  if (auto accessor = dyn_cast<AccessorDecl>(fd))
+    if (accessor->isMaterializeForSet())
+      return !isa<ProtocolDecl>(accessor->getDeclContext());
 
   return fd->getBody(/*canSynthesize=*/false);
 }
@@ -724,8 +725,9 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
       PrettyStackTraceSILFunction X("silgen emitFunction", f);
-      if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-        SILGenFunction(*this, *f).emitMaterializeForSet(fd);
+      auto accessor = dyn_cast<AccessorDecl>(fd);
+      if (accessor && accessor->isMaterializeForSet())
+        SILGenFunction(*this, *f).emitMaterializeForSet(accessor);
       else
         SILGenFunction(*this, *f).emitFunction(fd);
       postEmitFunction(constant, f);
