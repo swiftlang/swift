@@ -189,7 +189,7 @@ public:
     case ImplodeKind::Unmanaged:
       return v.getUnmanagedValue();
     case ImplodeKind::Forward:
-      return v.forward(SGF);
+      return v.ensurePlusOne(SGF, l).forward(SGF);
     case ImplodeKind::Copy:
       return v.copyUnmanaged(SGF, l).forward(SGF);
     }
@@ -242,7 +242,10 @@ public:
       llvm_unreachable("address-only types always managed!");
 
     case ImplodeKind::Forward:
-      v.forwardInto(SGF, l, address);
+      // If a value is forwarded into, we require the value to be at +1. If the
+      // the value is already at +1, we just forward. Otherwise, we perform the
+      // copy.
+      v.ensurePlusOne(SGF, l).forwardInto(SGF, l, address);
       break;
 
     case ImplodeKind::Copy:
@@ -510,10 +513,9 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
-  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
+  // *NOTE* Inside implodeTupleValues, we copy our values if they are not at +1.
   SILValue result
     = implodeTupleValues<ImplodeKind::Forward>(values, SGF, type, l);
-
   makeUsed();
   return result;
 }
@@ -522,8 +524,9 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
                                              SILType storageType,
                                              SILLocation l) && {
   assert(isComplete() && "rvalue is not complete");
-  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
-  SILValue result = std::move(*this).forwardAsSingleValue(SGF, l);
+  // Conversions must always be done at +1.
+  SILValue result =
+    std::move(*this).ensurePlusOne(SGF, l).forwardAsSingleValue(SGF, l);
   return SGF.emitConversionFromSemanticValue(l, result, storageType);
 }
 
