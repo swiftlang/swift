@@ -18,6 +18,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -30,6 +31,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
 #include "ImageInspection.h"
+#include <functional>
 #include <vector>
 
 using namespace swift;
@@ -341,10 +343,83 @@ static Optional<StringRef> getObjCClassOrProtocolName(
 #endif
 
 namespace {
+
+/// Find the offset of the protocol requirement for an associated type with
+/// the given name in the given protocol descriptor.
+Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
+                                            StringRef name) {
+  // Only Swift protocols have associated types.
+  if (!protocol->Flags.isSwift()) return None;
+
+  // If we don't have associated type names, there's nothing to do.
+  const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
+  if (!associatedTypeNamesPtr) return None;
+
+  // Look through the list of associated type names.
+  StringRef associatedTypeNames(associatedTypeNamesPtr);
+  unsigned matchingAssocTypeIdx = 0;
+  bool found = false;
+  while (!associatedTypeNames.empty()) {
+    auto split = associatedTypeNames.split(' ');
+    if (split.first == name) {
+      found = true;
+      break;
+    }
+
+    ++matchingAssocTypeIdx;
+    associatedTypeNames = split.second;
+  }
+
+  if (!found) return None;
+
+  // We have a match on the Nth associated type; go find the Nth associated
+  // type requirement.
+  unsigned currentAssocTypeIdx = 0;
+  unsigned numRequirements = protocol->NumRequirements;
+  const ProtocolRequirement *requirements = protocol->Requirements.get();
+  for (unsigned reqIdx = 0; reqIdx != numRequirements; ++reqIdx) {
+    if (requirements[reqIdx].Flags.getKind() !=
+        ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
+      continue;
+
+    if (currentAssocTypeIdx == matchingAssocTypeIdx)
+      return reqIdx;
+
+    ++currentAssocTypeIdx;
+  }
+
+  swift_runtime_unreachable("associated type names don't line up");
+}
+
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
 public:
+  /// Callback used to handle the substitution of a generic parameter for
+  /// its metadata.
+  using SubstGenericParameterFn =
+    std::function<const Metadata *(unsigned depth, unsigned index)>;
+
+  /// Callback used to handle the lookup of dependent member types.
+  using LookupDependentMemberFn =
+    std::function<const Metadata *(const Metadata *base, StringRef assocType,
+                                   const ProtocolDescriptor *protocol)>;
+
+private:
+  /// Substitute generic parameters.
+  SubstGenericParameterFn substGenericParameter;
+
+  /// Lookup dependent member types.
+  LookupDependentMemberFn lookupDependentMember;
+
+public:
+  DecodedMetadataBuilder(SubstGenericParameterFn substGenericParameter
+                           = nullptr,
+                         LookupDependentMemberFn lookupDependentMember
+                           = nullptr)
+    : substGenericParameter(substGenericParameter),
+      lookupDependentMember(lookupDependentMember) { }
+
   using BuiltType = const Metadata *;
 
   struct BuiltNominalTypeDecl :
@@ -467,7 +542,10 @@ public:
 
   BuiltType createGenericTypeParameterType(unsigned depth,
                                            unsigned index) const {
-    // FIXME: Implement substitution logic here.
+    // Use the callback, when provided.
+    if (substGenericParameter)
+      return substGenericParameter(depth, index);
+
     return BuiltType();
   }
 
@@ -508,7 +586,9 @@ public:
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
-    // FIXME: Implement.
+    if (lookupDependentMember)
+      return lookupDependentMember(base, name, protocol);
+
     return BuiltType();
   }
 
@@ -537,7 +617,10 @@ public:
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+                           size_t numberOfLevels,
+                           size_t *parametersPerLevel,
+                           const Metadata * const *flatSubstitutions) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
 
   Demangler demangler;
@@ -563,6 +646,36 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength) {
     if (!node) return nullptr;
   }
 
-  DecodedMetadataBuilder builder;
+  DecodedMetadataBuilder builder(
+    [&](unsigned depth, unsigned index) -> const Metadata * {
+      if (depth >= numberOfLevels)
+        return nullptr;
+
+      if (index >= parametersPerLevel[depth])
+        return nullptr;
+
+      unsigned flatIndex = index;
+      for (unsigned i = 0; i < depth; ++i)
+        flatIndex += parametersPerLevel[i];
+
+      return flatSubstitutions[flatIndex];
+    },
+    [](const Metadata *base, StringRef assocType,
+       const ProtocolDescriptor *protocol) -> const Metadata * {
+      // Look for a conformance of the base type to the protocol.
+      auto witnessTable = swift_conformsToProtocol(base, protocol);
+      if (!witnessTable) return nullptr;
+
+      // Look for the named associated type within the protocol.
+      auto assocTypeReqIndex = findAssociatedTypeByName(protocol, assocType);
+      if (!assocTypeReqIndex) return nullptr;
+
+      // Call the associated type access function.
+      using AssociatedTypeAccessFn =
+        const Metadata *(*)(const Metadata *base, const WitnessTable *);
+      return ((const AssociatedTypeAccessFn *)witnessTable)[*assocTypeReqIndex]
+                (base, witnessTable);
+    });
+
   return Demangle::decodeMangledType(builder, node);
 }

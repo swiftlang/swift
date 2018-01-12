@@ -427,6 +427,18 @@ Objective-C ``Protocol`` objects. The layout is as follows:
     a value of conforming type.
   * **Bit 31** is set by the Objective-C runtime when it has done its
     initialization of the protocol record. It is unused by the Swift runtime.
+- **Number of mandatory requirements** is stored as a 16-bit integer after
+  the flags. It specifies the number of requirements that do not have default
+  implementations.
+- **Number of requirements** is stored as a 16-bit integer after the flags. It
+  specifies the total number of requirements for the protocl.
+- **Requirements pointer** stored as a 32-bit relative pointer to an array
+  of protocol requirements. The number of elements in the array is specified
+  by the preceding 16-bit integer.
+- **Associated type names** stored as a 32-bit relative pointer to a
+  null-terminated string. The string contains the names of the associated
+  types, in the order they apparent in the requirements list, separated by
+  spaces.
 
 
 Protocol Conformance Records

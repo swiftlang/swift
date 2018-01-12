@@ -199,7 +199,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,                // flags
     Int16Ty,                // mandatory requirement count
     Int16Ty,                // total requirement count
-    Int32Ty                 // requirements array
+    Int32Ty,                // requirements array
+    RelativeAddressTy       // associated type names
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
