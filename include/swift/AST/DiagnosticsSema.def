@@ -3703,7 +3703,8 @@ ERROR(versioned_dynamic_not_supported,none,
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
   "an '@_inlineable' function|" \
-  "a default argument value}"
+  "a default argument value|" \
+  "a property initializer in a '@_fixed_layout' type}"
 
 ERROR(local_type_in_inlineable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",

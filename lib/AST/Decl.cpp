@@ -2273,7 +2273,7 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   return 0;
 }
 
-bool NominalTypeDecl::isResilient() const {
+bool NominalTypeDecl::isFormallyResilient() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
@@ -2293,7 +2293,18 @@ bool NominalTypeDecl::isResilient() const {
   if ((isa<EnumDecl>(this) || isa<ProtocolDecl>(this)) && isObjC())
     return false;
 
-  // Otherwise, access via indirect "resilient" interfaces.
+  // Otherwise, the declaration behaves as if it was accessed via indirect
+  // "resilient" interfaces, even if the module is not built with resilience.
+  return true;
+}
+
+bool NominalTypeDecl::isResilient() const {
+  // If we're not formally resilient, don't check the module resilience
+  // strategy.
+  if (!isFormallyResilient())
+    return false;
+
+  // Otherwise, check the module.
   switch (getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return true;
