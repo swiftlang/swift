@@ -2173,6 +2173,10 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
   void *getDefaultWitness(unsigned index) const {
     return Requirements.get()[index].DefaultImplementation.get();
   }
@@ -2190,7 +2194,8 @@ struct TargetProtocolDescriptor {
       Flags(Flags),
       NumMandatoryRequirements(0),
       NumRequirements(0),
-      Requirements(nullptr)
+      Requirements(nullptr),
+      AssociatedTypeNames(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
