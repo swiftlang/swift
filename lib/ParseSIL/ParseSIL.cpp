@@ -1211,14 +1211,14 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
   return false;
 }
 
-static AccessorKind getAccessorKind(StringRef ident) {
-  return llvm::StringSwitch<AccessorKind>(ident)
+static Optional<AccessorKind> getAccessorKind(StringRef ident) {
+  return llvm::StringSwitch<Optional<AccessorKind>>(ident)
            .Case("getter", AccessorKind::IsGetter)
            .Case("setter", AccessorKind::IsSetter)
            .Case("addressor", AccessorKind::IsAddressor)
            .Case("mutableAddressor", AccessorKind::IsMutableAddressor)
            .Case("materializeForSet", AccessorKind::IsMaterializeForSet)
-           .Default(AccessorKind::NotAccessor);
+           .Default(None);
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
@@ -1269,16 +1269,15 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       auto IdLoc = P.Tok.getLoc();
       if (parseSILIdentifier(Id, diag::expected_sil_constant))
         return true;
-      AccessorKind accessorKind;
+      Optional<AccessorKind> accessorKind;
       if (!ParseState && Id.str() == "func") {
         Kind = SILDeclRef::Kind::Func;
         ParseState = 1;
       } else if (!ParseState &&
-                 (accessorKind = getAccessorKind(Id.str()))
-                    != AccessorKind::NotAccessor) {
+                 (accessorKind = getAccessorKind(Id.str())).hasValue()) {
         auto storageDecl = dyn_cast<AbstractStorageDecl>(VD);
         auto accessor = (storageDecl
-                           ? storageDecl->getAccessorFunction(accessorKind)
+                           ? storageDecl->getAccessorFunction(*accessorKind)
                            : nullptr);
         if (!accessor) {
           P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
@@ -1289,7 +1288,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // Update values for this accessor kind.
         for (unsigned I = 0, E = values.size(); I < E; I++)
           if (auto otherDecl = dyn_cast<AbstractStorageDecl>(values[I]))
-            if (auto otherAccessor = otherDecl->getAccessorFunction(accessorKind))
+            if (auto otherAccessor =
+                  otherDecl->getAccessorFunction(*accessorKind))
               values[I] = otherAccessor;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {

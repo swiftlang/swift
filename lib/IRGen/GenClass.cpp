@@ -1513,7 +1513,7 @@ namespace {
       
       // getters and setters funcdecls will be handled by their parent
       // var/subscript.
-      if (method->isAccessor()) return;
+      if (isa<AccessorDecl>(method)) return;
 
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
@@ -1600,21 +1600,18 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
-      auto func = dyn_cast<FuncDecl>(method);
-      if (!func)
+      auto accessor = dyn_cast<AccessorDecl>(method);
+      if (!accessor)
         return emitObjCMethodDescriptor(IGM, descriptors, method);
 
-      switch (func->getAccessorKind()) {
-      case AccessorKind::NotAccessor:
-        return emitObjCMethodDescriptor(IGM, descriptors, method);
-
+      switch (accessor->getAccessorKind()) {
       case AccessorKind::IsGetter:
         return emitObjCGetterDescriptor(IGM, descriptors,
-                                        func->getAccessorStorageDecl());
+                                        accessor->getStorage());
 
       case AccessorKind::IsSetter:
         return emitObjCSetterDescriptor(IGM, descriptors,
-                                        func->getAccessorStorageDecl());
+                                        accessor->getStorage());
 
       case AccessorKind::IsWillSet:
       case AccessorKind::IsDidSet:

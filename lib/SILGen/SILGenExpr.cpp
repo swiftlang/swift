@@ -1153,7 +1153,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                                       substFormalType, C);
   }
 
-  switch (cast<FuncDecl>(accessor.getDecl())->getAddressorKind()) {
+  switch (cast<AccessorDecl>(accessor.getDecl())->getAddressorKind()) {
   case AddressorKind::NotAddressor: llvm_unreachable("inconsistent");
   case AddressorKind::Unsafe:
     // Nothing to do.

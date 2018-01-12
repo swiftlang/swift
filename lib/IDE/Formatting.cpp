@@ -339,7 +339,7 @@ public:
     //  { <- We add no indentation here.
     //    return 0
     //  }
-    if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
+    if (auto FD = dyn_cast_or_null<AccessorDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
         if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
           return false;

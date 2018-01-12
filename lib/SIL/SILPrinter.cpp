@@ -278,39 +278,41 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<anonymous function>";
   } else if (kind == SILDeclRef::Kind::Func) {
     auto *FD = cast<FuncDecl>(getDecl());
-    switch (FD->getAccessorKind()) {
-    case AccessorKind::IsWillSet:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!willSet";
-      break;
-    case AccessorKind::IsDidSet:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!didSet";
-      break;
-    case AccessorKind::NotAccessor:
+    auto accessor = dyn_cast<AccessorDecl>(FD);
+    if (!accessor) {
       printValueDecl(FD, OS);
       isDot = false;
-      break;
-    case AccessorKind::IsGetter:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!getter";
-      break;
-    case AccessorKind::IsSetter:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!setter";
-      break;
-    case AccessorKind::IsMaterializeForSet:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!materializeForSet";
-      break;
-    case AccessorKind::IsAddressor:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!addressor";
-      break;
-    case AccessorKind::IsMutableAddressor:
-      printValueDecl(FD->getAccessorStorageDecl(), OS);
-      OS << "!mutableAddressor";
-      break;
+    } else {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsWillSet:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!willSet";
+        break;
+      case AccessorKind::IsDidSet:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!didSet";
+        break;
+      case AccessorKind::IsGetter:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!getter";
+        break;
+      case AccessorKind::IsSetter:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!setter";
+        break;
+      case AccessorKind::IsMaterializeForSet:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!materializeForSet";
+        break;
+      case AccessorKind::IsAddressor:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!addressor";
+        break;
+      case AccessorKind::IsMutableAddressor:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!mutableAddressor";
+        break;
+      }
     }
   } else {
     printValueDecl(getDecl(), OS);
@@ -2584,9 +2586,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D)) &&
           !D->isImplicit()) {
-        if (auto *FD = dyn_cast<FuncDecl>(D))
-          if (FD->isAccessor())
-            continue;
+        if (isa<AccessorDecl>(D))
+          continue;
         D->print(OS, Options);
         OS << "\n\n";
       }

@@ -243,9 +243,8 @@ private:
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
         continue;
-      if (auto FD = dyn_cast<FuncDecl>(VD))
-        if (FD->isAccessor())
-          continue;
+      if (isa<AccessorDecl>(VD))
+        continue;
       if (!AllowDelayed && delayedMembers.count(VD)) {
         os << "// '" << VD->getFullName() << "' below\n";
         continue;
@@ -696,9 +695,8 @@ private:
       printAvailability(AFD);
     }
 
-    if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->isAccessor()) {
-      printSwift3ObjCDeprecatedInference(
-                              cast<FuncDecl>(AFD)->getAccessorStorageDecl());
+    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+      printSwift3ObjCDeprecatedInference(accessor->getStorage());
     } else {
       printSwift3ObjCDeprecatedInference(AFD);
     }

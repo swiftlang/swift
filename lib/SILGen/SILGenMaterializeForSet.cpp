@@ -232,7 +232,7 @@ struct MaterializeForSetEmitter {
   AbstractionPattern RequirementStoragePattern;
   SILType RequirementStorageType;
 
-  FuncDecl *Witness;
+  AccessorDecl *Witness;
   AbstractStorageDecl *WitnessStorage;
   AbstractionPattern WitnessStoragePattern;
   SubstitutionList WitnessSubs;
@@ -260,14 +260,14 @@ struct MaterializeForSetEmitter {
 
 private:
   MaterializeForSetEmitter(
-      SILGenModule &SGM, SILLinkage linkage, FuncDecl *witness,
+      SILGenModule &SGM, SILLinkage linkage, AccessorDecl *witness,
       SubstitutionList subs, GenericEnvironment *genericEnv,
       Type selfInterfaceType, Type selfType,
       SILFunctionTypeRepresentation callbackRepresentation,
       Optional<ProtocolConformanceRef> witnessMethodConformance)
       : SGM(SGM), Linkage(linkage), RequirementStorage(nullptr),
         RequirementStoragePattern(AbstractionPattern::getInvalid()),
-        Witness(witness), WitnessStorage(witness->getAccessorStorageDecl()),
+        Witness(witness), WitnessStorage(witness->getStorage()),
         WitnessStoragePattern(AbstractionPattern::getInvalid()),
         WitnessSubs(subs), GenericEnv(genericEnv),
         SelfInterfaceType(selfInterfaceType->getCanonicalType()),
@@ -305,12 +305,12 @@ public:
   static MaterializeForSetEmitter
   forWitnessThunk(SILGenModule &SGM, ProtocolConformanceRef conformance,
                   SILLinkage linkage, Type selfInterfaceType, Type selfType,
-                  GenericEnvironment *genericEnv, FuncDecl *requirement,
-                  FuncDecl *witness, SubstitutionList witnessSubs) {
+                  GenericEnvironment *genericEnv, AccessorDecl *requirement,
+                  AccessorDecl *witness, SubstitutionList witnessSubs) {
     MaterializeForSetEmitter emitter(
         SGM, linkage, witness, witnessSubs, genericEnv, selfInterfaceType,
         selfType, SILFunctionTypeRepresentation::WitnessMethod, conformance);
-    emitter.RequirementStorage = requirement->getAccessorStorageDecl();
+    emitter.RequirementStorage = requirement->getStorage();
 
     // Determine the desired abstraction pattern of the storage type
     // in the requirement and the witness.
@@ -329,7 +329,7 @@ public:
 
   static MaterializeForSetEmitter
   forConcreteImplementation(SILGenModule &SGM,
-                            FuncDecl *witness,
+                            AccessorDecl *witness,
                             SubstitutionList witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
@@ -1003,7 +1003,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
 bool SILGenFunction::maybeEmitMaterializeForSetThunk(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     Type selfInterfaceType, Type selfType, GenericEnvironment *genericEnv,
-    FuncDecl *requirement, FuncDecl *witness, SubstitutionList witnessSubs) {
+    AccessorDecl *requirement, AccessorDecl *witness,
+    SubstitutionList witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(
@@ -1018,8 +1019,8 @@ bool SILGenFunction::maybeEmitMaterializeForSetThunk(
 }
 
 /// Emit a concrete implementation of materializeForSet.
-void SILGenFunction::emitMaterializeForSet(FuncDecl *decl) {
-  assert(decl->getAccessorKind() == AccessorKind::IsMaterializeForSet);
+void SILGenFunction::emitMaterializeForSet(AccessorDecl *decl) {
+  assert(decl->isMaterializeForSet());
 
   MagicFunctionName = SILGenModule::getMagicFunctionName(decl);
 

@@ -330,6 +330,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // For other kinds of values, check if we already reported a decl
       // with the same signature.
 
+      case DeclKind::Accessor:
       case DeclKind::Func: {
         auto FD = cast<FuncDecl>(D);
         assert(FD->getImplicitSelfDecl() && "should not find free functions");

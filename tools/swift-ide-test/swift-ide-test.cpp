@@ -2142,37 +2142,34 @@ public:
       OS << Name;
       return;
     }
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      if (auto *ASD = FD->getAccessorStorageDecl()) {
-        switch (FD->getAccessorKind()) {
-        case AccessorKind::NotAccessor:
-          llvm_unreachable("is not an accessor?");
-        case AccessorKind::IsGetter:
-          OS << "<getter for ";
-          break;
-        case AccessorKind::IsSetter:
-          OS << "<setter for ";
-          break;
-        case AccessorKind::IsWillSet:
-          OS << "<willSet for ";
-          break;
-        case AccessorKind::IsDidSet:
-          OS << "<didSet for ";
-          break;
-        case AccessorKind::IsAddressor:
-          OS << "<addressor for ";
-          break;
-        case AccessorKind::IsMutableAddressor:
-          OS << "<mutableAddressor for ";
-          break;
-        case AccessorKind::IsMaterializeForSet:
-          OS << "<materializeForSet for ";
-          break;
-        }
-        printDeclName(ASD);
-        OS << ">";
-        return;
+    if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+      auto *storage = accessor->getStorage();
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+        OS << "<getter for ";
+        break;
+      case AccessorKind::IsSetter:
+        OS << "<setter for ";
+        break;
+      case AccessorKind::IsWillSet:
+        OS << "<willSet for ";
+        break;
+      case AccessorKind::IsDidSet:
+        OS << "<didSet for ";
+        break;
+      case AccessorKind::IsAddressor:
+        OS << "<addressor for ";
+        break;
+      case AccessorKind::IsMutableAddressor:
+        OS << "<mutableAddressor for ";
+        break;
+      case AccessorKind::IsMaterializeForSet:
+        OS << "<materializeForSet for ";
+        break;
       }
+      printDeclName(storage);
+      OS << ">";
+      return;
     }
     OS << "<anonymous>";
   }
