@@ -89,7 +89,6 @@ internal func _collectAllReferencesInsideObjectImpl(
 
 // This is a namespace for runtime functions related to management
 // of runtime function counters.
-@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _RuntimeFunctionCounters {
 #if os(Windows) && arch(x86_64)
@@ -228,8 +227,6 @@ extension _RuntimeFunctionCountersStats {
 // counters. This type should not be used directly. You should use its
 // wrappers GlobalRuntimeFunctionCountersState and
 // ObjectRuntimeFunctionCountersState instead.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
   /// Reserve enough space for 64 elements.
   typealias Counters =
@@ -420,7 +417,6 @@ extension _RuntimeFunctionCountersStats {
 
 /// This type should be used to collect statistics about the global runtime
 /// function pointers.
-@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _GlobalRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
   var state = _RuntimeFunctionCountersState()
@@ -458,7 +454,6 @@ struct _GlobalRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 
 /// This type should be used to collect statistics about object runtime
 /// function pointers.
-@_fixed_layout // FIXME(sil-serialize-all)
 public // @testable
 struct _ObjectRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
   var state = _RuntimeFunctionCountersState()

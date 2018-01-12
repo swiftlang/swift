@@ -494,6 +494,21 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
           ->getDefaultArgumentResilienceExpansion();
     }
 
+    // Stored property initializer contexts use minimal resilience expansion
+    // if the type is formally fixed layout.
+    if (isa<PatternBindingInitializer>(dc)) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(dc->getParent())) {
+        if (!NTD->getFormalAccessScope(/*useDC=*/nullptr,
+                                       /*respectVersionedAttr=*/true).isPublic())
+          return ResilienceExpansion::Maximal;
+
+        if (NTD->isFormallyResilient())
+          return ResilienceExpansion::Maximal;
+
+        return ResilienceExpansion::Minimal;
+      }
+    }
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
       // If the function is a nested function, we will serialize its body if
       // we serialize the parent's body.
