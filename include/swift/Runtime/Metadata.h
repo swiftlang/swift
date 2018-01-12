@@ -2173,6 +2173,10 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
   void *getDefaultWitness(unsigned index) const {
     return Requirements.get()[index].DefaultImplementation.get();
   }

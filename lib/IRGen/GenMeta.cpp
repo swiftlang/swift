@@ -5277,6 +5277,7 @@ namespace {
     IRGenModule &IGM;
     ConstantStructBuilder &B;
     ProtocolDecl *Protocol;
+    std::string AssociatedTypeNames;
     SILDefaultWitnessTable *DefaultWitnesses;
 
   public:
@@ -5294,6 +5295,7 @@ namespace {
       addSize();
       addFlags();
       addRequirements();
+      addAssociatedTypeNames();
 
       B.suggestType(IGM.ProtocolDescriptorStructTy);
     }
@@ -5416,6 +5418,13 @@ namespace {
         if (info.DefaultImpl) numDefaultWitnesses++;
 #endif
 
+        // Add the associated type name to the list.
+        if (entry.isAssociatedType()) {
+          if (!AssociatedTypeNames.empty())
+            AssociatedTypeNames += ' ';
+          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
+        }
+
         reqt.finishAndAddTo(reqtsArray);
       }
 
@@ -5482,6 +5491,15 @@ namespace {
       }
 
       return nullptr;
+    }
+
+    void addAssociatedTypeNames() {
+      llvm::Constant *global = nullptr;
+      if (!AssociatedTypeNames.empty()) {
+        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
+                                           /*willBeRelativelyAddressed=*/true);
+      }
+      B.addRelativeAddressOrNull(global);
     }
   };
 } // end anonymous namespace
