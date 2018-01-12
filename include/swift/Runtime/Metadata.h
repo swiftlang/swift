@@ -930,6 +930,21 @@ public:
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
 
+  /// Retrieve the generic arguments of this type, if it has any.
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
+  getGenericArgs() const {
+    auto description = getNominalTypeDescriptor();
+    if (!description)
+      return nullptr;
+
+    if (!description->GenericParams.hasGenericRequirements())
+      return nullptr;
+
+    auto asWords = reinterpret_cast<
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
+    return (asWords + description->GenericParams.getOffset(this));
+  }
+
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
   /// the type is not a class (or not a class with a class object).
@@ -1853,17 +1868,6 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
     return metadata->getKind() == MetadataKind::Struct
       || metadata->getKind() == MetadataKind::Enum
       || metadata->getKind() == MetadataKind::Optional;
-  }
-  
-  /// Retrieve the generic arguments of this type.
-  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
-  getGenericArgs() const {
-    if (!Description->GenericParams.hasGenericRequirements())
-      return nullptr;
-
-    auto asWords = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return (asWords + Description->GenericParams.getOffset(this));
   }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {

@@ -185,9 +185,27 @@ extension EG {
   struct NestedSG<V> { }
 }
 
+extension C {
+  enum Nested<T, U> {
+    case a
+
+    struct Innermore {
+      struct Innermost<V> { }
+    }
+  }
+}
+
+class CG2<T, U> {
+  class Inner<V> { }
+}
+
 DemangleToMetadataTests.test("nested generic specializations") {
-  // FIXME: Will equal EG<Int, String>.NestedSG<Double>.self
-  expectNil(_typeByMangledName("4main2EGO8NestedSGVySiSS_SdG"))
+  expectEqual(EG<Int, String>.NestedSG<Double>.self,
+    _typeByMangledName("4main2EGO8NestedSGVySiSS_SdG")!)
+  expectEqual(C.Nested<Int, String>.Innermore.Innermost<Double>.self,
+    _typeByMangledName("4main1CC6NestedO9InnermoreV9InnermostVy_SiSS__SdG")!)
+  expectEqual(CG2<Int, String>.Inner<Double>.self,
+    _typeByMangledName("4main3CG2C5InnerCySiSS_SdG")!)
 }
 
 runAllTests()

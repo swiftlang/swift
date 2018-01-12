@@ -406,6 +406,9 @@ public:
                                    const ProtocolDescriptor *protocol)>;
 
 private:
+  /// The demangler we'll use when building new nodes.
+  Demangler &demangler;
+
   /// Substitute generic parameters.
   SubstGenericParameterFn substGenericParameter;
 
@@ -413,11 +416,13 @@ private:
   LookupDependentMemberFn lookupDependentMember;
 
 public:
-  DecodedMetadataBuilder(SubstGenericParameterFn substGenericParameter
+  DecodedMetadataBuilder(Demangler &demangler,
+                         SubstGenericParameterFn substGenericParameter
                            = nullptr,
                          LookupDependentMemberFn lookupDependentMember
                            = nullptr)
-    : substGenericParameter(substGenericParameter),
+    : demangler(demangler),
+      substGenericParameter(substGenericParameter),
       lookupDependentMember(lookupDependentMember) { }
 
   using BuiltType = const Metadata *;
@@ -432,6 +437,50 @@ public:
 
   using BuiltProtocolDecl = const ProtocolDescriptor *;
 
+  /// Strip generic arguments from the "spine" of a reference to a nominal
+  /// type.
+  Demangle::NodePointer stripGenericArgsFromContext(
+                                    const Demangle::NodePointer &node) const {
+    switch (node->getKind()) {
+    case Demangle::Node::Kind::BoundGenericClass:
+    case Demangle::Node::Kind::BoundGenericEnum:
+    case Demangle::Node::Kind::BoundGenericStructure:
+      // Bound generic types have a 'Type' node under them, whose child is
+      // the non-generic reference. If we don't see that structure, do nothing.
+      if (node->getNumChildren() < 2 ||
+          node->getChild(0)->getKind() != Demangle::Node::Kind::Type ||
+          node->getChild(0)->getNumChildren() < 1)
+        return node;
+
+      // Strip generic arguments from that child, then return it.
+      return stripGenericArgsFromContext(node->getChild(0)->getChild(0));
+
+    case Demangle::Node::Kind::Class:
+    case Demangle::Node::Kind::Enum:
+    case Demangle::Node::Kind::Structure: {
+      if (node->getNumChildren() < 2)
+        return node;
+
+      auto newContext = stripGenericArgsFromContext(node->getChild(0));
+      if (newContext == node->getChild(0)) return node;
+
+      auto newNode = demangler.createNode(node->getKind());
+      newNode->addChild(newContext, demangler);
+      for (unsigned i = 1, n = node->getNumChildren(); i != n; ++i)
+        newNode->addChild(node->getChild(i), demangler);
+      return newNode;
+    }
+
+    case Demangle::Node::Kind::Module:
+      // Modules terminate the recursion.
+      return node;
+
+    default:
+      // FIXME: Handle local contexts.
+      return node;
+    }
+  }
+
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
 #if SWIFT_OBJC_INTEROP
@@ -443,8 +492,13 @@ public:
     }
 #endif
 
+    // Remove the generic arguments, turning bound generic nodes into
+    // their non-generic counterparts for the purpose of finding the
+    // descriptor.
+    auto descriptorNode = stripGenericArgsFromContext(node);
+
     // Look for a nominal type descriptor based on its mangled name.
-    auto mangledName = Demangle::mangleNode(node);
+    auto mangledName = Demangle::mangleNode(descriptorNode);
     return _findNominalTypeDescriptor(mangledName);
   }
 
@@ -479,72 +533,88 @@ public:
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
-    // If we already have metadata, return it.
-    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
-      return metadata;
-
-    // Otherwise, we have a nominal type descriptor.
-    auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
-
-    // FIXME: Generic nominal types.
-    if (typeDecl->GenericParams.isGeneric())
-      return BuiltType();
-
-    // Use the access function to compute type metadata.
-    if (auto accessFunction = typeDecl->getAccessFunction()) {
-      return accessFunction();
-    }
-
-    // FIXME: Shouldn't get here? We've hit an unsupported case.
-    return BuiltType();
+    // Treat nominal type creation the same way as generic type creation,
+    // but with no generic arguments at this level.
+    return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
   BuiltType createBoundGenericType(BuiltNominalTypeDecl metadataOrTypeDecl,
                                    ArrayRef<BuiltType> genericArgs,
                                    BuiltType parent) const {
+    // If we already have metadata, return it.
+    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
+      return metadata;
+
     // Cannot specialize metadata.
     if (metadataOrTypeDecl.is<const Metadata *>())
       return BuiltType();
 
-    // The target nominal type descriptor must be for a generic type.
     auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
-    if (!typeDecl->GenericParams.isGeneric())
-      return BuiltType();
 
-    // FIXME: Unnecessary limitation on depth.
-    if (typeDecl->GenericParams.NestingDepth > 1)
-      return BuiltType();
+    // Gather all of the generic arguments.
+    // FIXME: Need to also gather generic requirements.
+    std::vector<BuiltType> allGenericArgsVec;
+    ArrayRef<BuiltType> allGenericArgs;
+    if (typeDecl->GenericParams.NestingDepth > 1) {
+      if (!parent) return BuiltType();
 
-    // FIXME: Need to evaluate generic requirements. For now, bail out if
-    // there are any.
-    if (typeDecl->GenericParams.NumGenericRequirements>
-          typeDecl->GenericParams.NumPrimaryParams)
-      return BuiltType();
+      // Dig out the parent nominal descriptor.
+      auto parentNominal = parent->getNominalTypeDescriptor();
+      if (!parentNominal) return BuiltType();
+
+      // Copy over the generic arguments from the parent.
+      unsigned numParentGenericArgs =
+        parentNominal->GenericParams.NumPrimaryParams;
+
+      if (numParentGenericArgs > 0) {
+        auto parentGenericArgs = parent->getGenericArgs();
+        allGenericArgsVec.insert(
+                               allGenericArgsVec.end(),
+                               parentGenericArgs,
+                               parentGenericArgs + numParentGenericArgs);
+      }
+
+      // Add the generic arguments for this type.
+      allGenericArgsVec.insert(allGenericArgsVec.end(),
+                               genericArgs.begin(), genericArgs.end());
+      allGenericArgs = allGenericArgsVec;
+    } else {
+      // Only one level of generic arguments to consider.
+      allGenericArgs = genericArgs;
+    }
 
     // FIXME: We don't want the number of "primary" parameters, we want the
     // number of parameters as written.
-    if (typeDecl->GenericParams.NumPrimaryParams != genericArgs.size())
+    if (typeDecl->GenericParams.NumPrimaryParams != allGenericArgs.size())
       return BuiltType();
 
     // Call the access function.
     auto accessFunction = typeDecl->getAccessFunction();
-    switch (typeDecl->GenericParams.NumPrimaryParams) {
+    if (!accessFunction) return BuiltType();
+
+    switch (allGenericArgs.size()) {
+    case 0:
+      return accessFunction();
+
     case 1:
       using GenericMetadataAccessFunction1 = const Metadata *(const void *);
-      return ((GenericMetadataAccessFunction1 *)accessFunction)(genericArgs[0]);
+      return ((GenericMetadataAccessFunction1 *)accessFunction)(
+                                                          allGenericArgs[0]);
 
     case 2:
       using GenericMetadataAccessFunction2 =
         const Metadata *(const void *, const void *);
-      return ((GenericMetadataAccessFunction2 *)accessFunction)(genericArgs[0],
-                                                                genericArgs[1]);
+      return ((GenericMetadataAccessFunction2 *)accessFunction)(
+                                                          allGenericArgs[0],
+                                                          allGenericArgs[1]);
 
     case 3:
       using GenericMetadataAccessFunction3 =
         const Metadata *(const void *, const void *, const void *);
-      return ((GenericMetadataAccessFunction3 *)accessFunction)(genericArgs[0],
-                                                                genericArgs[1],
-                                                                genericArgs[2]);
+      return ((GenericMetadataAccessFunction3 *)accessFunction)(
+                                                          allGenericArgs[0],
+                                                          allGenericArgs[1],
+                                                          allGenericArgs[2]);
 
     default:
       break;
@@ -694,7 +764,7 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
     if (!node) return nullptr;
   }
 
-  DecodedMetadataBuilder builder(
+  DecodedMetadataBuilder builder(demangler,
     [&](unsigned depth, unsigned index) -> const Metadata * {
       if (depth >= numberOfLevels)
         return nullptr;
