@@ -37,6 +37,8 @@ class SyntaxASTMap;
 
 namespace syntax {
 
+struct SyntaxVisitor;
+
 template <typename SyntaxNode>
 SyntaxNode make(RC<RawSyntax> Raw) {
   auto Data = SyntaxData::make(Raw);
@@ -172,6 +174,10 @@ public:
     // Trivially true.
     return true;
   }
+
+  /// Recursively visit this node.
+  void accept(SyntaxVisitor &Visitor);
+
   // TODO: hasSameStructureAs ?
 };
 
