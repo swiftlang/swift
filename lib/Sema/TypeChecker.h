@@ -2297,7 +2297,8 @@ public:
     Transparent,
     InlineAlways,
     Inlineable,
-    DefaultArgument
+    DefaultArgument,
+    PropertyInitializer
   };
 
   /// Given that \p DC is within a fragile context for some reason, describe

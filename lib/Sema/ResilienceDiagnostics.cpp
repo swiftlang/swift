@@ -26,8 +26,10 @@ using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
     if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(DC))
-      if (DAI->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        return FragileFunctionKind::DefaultArgument;
+      return FragileFunctionKind::DefaultArgument;
+
+    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+      return FragileFunctionKind::PropertyInitializer;
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // If the function is a nested function, we will serialize its body if
