@@ -12,6 +12,16 @@ protocol Assocked {
 
 struct Universal : P, Q {}
 
+// CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc TwoAssoc ThreeAssoc\00"
+// CHECK: @"$S23associated_type_witness18HasThreeAssocTypesMp" =
+// CHECK-SAME: [[ASSOC_TYPE_NAMES]] to i64
+
+protocol HasThreeAssocTypes {
+  associatedtype OneAssoc
+  associatedtype TwoAssoc
+  associatedtype ThreeAssoc
+}
+
 //   Witness table access functions for Universal : P and Universal : Q.
 // CHECK-LABEL: define hidden i8** @"$S23associated_type_witness9UniversalVAA1PAAWa"()
 // CHECK:         ret i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S23associated_type_witness9UniversalVAA1PAAWP", i32 0, i32 0)
@@ -83,6 +93,7 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    i16 1,
 //    Relative reference to protocol
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.protocol* @"$S23associated_type_witness8AssockedMp" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 2) to i64)) to i32
+
 //    Relative reference to witness table template
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([3 x i8*]* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAWP" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 3) to i64)) to i32),
 //    No instantiator function

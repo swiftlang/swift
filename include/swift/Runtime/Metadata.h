@@ -2194,7 +2194,8 @@ struct TargetProtocolDescriptor {
       Flags(Flags),
       NumMandatoryRequirements(0),
       NumRequirements(0),
-      Requirements(nullptr)
+      Requirements(nullptr),
+      AssociatedTypeNames(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
