@@ -3,6 +3,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
+// FIXME: This test fails occassionally in CI with invalid json.
+// REQUIRES: disabled
+
 import StdlibUnittest
 import Foundation
 import SwiftSyntax
