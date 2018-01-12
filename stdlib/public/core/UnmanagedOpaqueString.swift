@@ -10,11 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol _OpaqueString: class {
+  var length: Int { get }
+  func character(at index: Int) -> UInt16
+
+  // FIXME: This is not an NSString method; I'd like to use
+  // `getCharacters(_:,range:)`, but it would be weird to define
+  // `_SwiftNSRange` without an Objective-C runtime.
+  func copyCodeUnits(
+    from range: Range<Int>,
+    into dest: UnsafeMutablePointer<UInt16>)
+}
+
 @_versioned
 @_fixed_layout
 internal struct _UnmanagedOpaqueString {
+#if _runtime(_ObjC) // FIXME unify
   @_versioned
   unowned(unsafe) let object: _CocoaString
+#else
+  @_versioned
+  unowned(unsafe) let object: _OpaqueString
+#endif
 
   @_versioned
   let range: Range<Int>
@@ -22,6 +39,7 @@ internal struct _UnmanagedOpaqueString {
   @_versioned
   let isSlice: Bool
 
+#if _runtime(_ObjC) // FIXME unify
   @_inlineable
   @_versioned
   init(_ object: _CocoaString, range: Range<Int>, isSlice: Bool) {
@@ -41,6 +59,26 @@ internal struct _UnmanagedOpaqueString {
   init(_ object: _CocoaString, count: Int) {
     self.init(object, range: 0..<count, isSlice: false)
   }
+#else
+  @_inlineable
+  @_versioned
+  init(_ object: _OpaqueString, range: Range<Int>, isSlice: Bool) {
+    self.object = object
+    self.range = range
+    self.isSlice = isSlice
+  }
+
+  @inline(never)
+  init(_ object: _OpaqueString) {
+    self.init(object, count: object.length)
+  }
+
+  @_inlineable
+  @_versioned
+  init(_ object: _OpaqueString, count: Int) {
+    self.init(object, range: 0..<count, isSlice: false)
+  }
+#endif
 }
 
 extension _UnmanagedOpaqueString : Sequence {
@@ -63,14 +101,16 @@ extension _UnmanagedOpaqueString : Sequence {
   struct Iterator : IteratorProtocol {
     internal typealias Element = UTF16.CodeUnit
 
+#if _runtime(_ObjC) // FIXME unify
     @_versioned
     internal let _object: _CocoaString
+#else
+    @_versioned
+    internal let _object: _OpaqueString
+#endif
 
     @_versioned
-    internal let _endIndex: Int
-
-    @_versioned
-    internal var _nextIndex: Int
+    internal var _range: Range<Int>
 
     @_versioned
     internal var _buffer = _FixedArray16<Element>()
@@ -82,8 +122,7 @@ extension _UnmanagedOpaqueString : Sequence {
     @_versioned
     init(_ string: _UnmanagedOpaqueString, startingAt start: Int) {
       self._object = string.object
-      self._endIndex = string.range.upperBound
-      self._nextIndex = start
+      self._range = start..<string.range.upperBound
     }
 
     @_inlineable
@@ -95,27 +134,27 @@ extension _UnmanagedOpaqueString : Sequence {
         _bufferIndex += 1
         return result
       }
-      if _slowPath(_nextIndex == _endIndex) { return nil }
+      if _slowPath(_range.isEmpty) { return nil }
       return _nextOnSlowPath()
     }
 
-    @_inlineable
     @_versioned
+    @inline(never)
     mutating func _nextOnSlowPath() -> Element {
       // Fill buffer
-      _sanityCheck(_nextIndex < _endIndex)
-      let end = Swift.min(_nextIndex + _buffer.capacity, _endIndex)
-      unowned(unsafe) let object = _object
-      _buffer.count = end - _nextIndex
+      _sanityCheck(!_range.isEmpty)
+      let end = Swift.min(
+        _range.lowerBound + _buffer.capacity,
+        _range.upperBound)
+      let r: Range<Int> = _range.lowerBound..<end
+      let opaque = _UnmanagedOpaqueString(_object, range: r, isSlice: true)
+      _buffer.count = r.count
       _buffer.withUnsafeMutableBufferPointer { b in
-        _sanityCheck(b.count == end - _nextIndex)
-        _cocoaStringCopyCharacters(
-          from: object,
-          range: _nextIndex..<end,
-          into: b.baseAddress!)
+        _sanityCheck(b.count == r.count)
+        opaque._copy(into: b)
       }
       _bufferIndex = 1
-      _nextIndex = end
+      _range = r.upperBound ..< _range.upperBound
       _fixLifetime(_object)
       return _buffer[0]
     }
@@ -178,7 +217,11 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
   subscript(position: Index) -> UTF16.CodeUnit {
     _sanityCheck(position._value >= range.lowerBound)
     _sanityCheck(position._value < range.upperBound)
+#if _runtime(_ObjC) // FIXME unify
     return _cocoaStringSubscript(object, position._value)
+#else
+    return object.character(at: position._value)
+#endif
   }
 
   @_versioned
@@ -240,7 +283,11 @@ extension _UnmanagedOpaqueString : _StringVariant {
   @_inlineable // FIXME(sil-serialize-all)
   subscript(offset: Int) -> UTF16.CodeUnit {
     _sanityCheck(offset >= 0 && offset < count)
+#if _runtime(_ObjC) // FIXME unify
     return _cocoaStringSubscript(object, range.lowerBound + offset)
+#else
+    return object.character(at: range.lowerBound + offset)
+#endif
   }
 
   @_versioned
@@ -262,10 +309,14 @@ extension _UnmanagedOpaqueString : _StringVariant {
   ) {
     _sanityCheck(dest.count >= range.count)
     guard range.count > 0 else { return }
+#if _runtime(_ObjC) // FIXME unify
     _cocoaStringCopyCharacters(
       from: object,
       range: range,
       into: dest.baseAddress!)
+#else
+    object.copyCodeUnits(from: range, into: dest.baseAddress!)
+#endif
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -280,10 +331,12 @@ extension _UnmanagedOpaqueString : _StringVariant {
     _sanityCheck(dest.count >= range.count)
     guard range.count > 0 else { return }
     let d = UnsafeMutableRawPointer(dest.baseAddress!)
-    _cocoaStringCopyCharacters(
-      from: object,
-      range: range,
-      into: d.assumingMemoryBound(to: UTF16.CodeUnit.self))
+      .assumingMemoryBound(to: UTF16.CodeUnit.self)
+#if _runtime(_ObjC) // FIXME unify
+    _cocoaStringCopyCharacters(from: object, range: range, into: d)
+#else
+    object.copyCodeUnits(from: range, into: d)
+#endif
   }
 
   @_versioned // FIXME(sil-serialize-all)
@@ -323,6 +376,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 }
 
+#if _runtime(_ObjC)
 extension _UnmanagedOpaqueString {
   @_versioned
   @inline(never)
@@ -333,3 +387,4 @@ extension _UnmanagedOpaqueString {
     return _cocoaStringSlice(object, range)
   }
 }
+#endif

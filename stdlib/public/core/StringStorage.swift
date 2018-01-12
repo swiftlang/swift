@@ -81,6 +81,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     return UnsafeMutableRawPointer(start)
   }
 
+#if _runtime(_ObjC)
   // NSString API
 
   @objc(initWithCoder:)
@@ -89,8 +90,8 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   }
 
   @objc(length)
-  public func length() -> UInt {
-    return UInt(count)
+  public var length: Int {
+    return count
   }
 
   @objc(characterAtIndex:)
@@ -132,6 +133,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     // reference will make the instance non-unique.
     return self
   }
+#endif // _runtime(_ObjC)
 }
 
 extension _SwiftStringStorage {
@@ -243,10 +245,11 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    if other.isASCII {
-      _appendInPlace(other._unmanagedASCIIView[range])
-    } else if _slowPath(other._isOpaque) {
+    defer { _fixLifetime(other) }
+    if _slowPath(other._isOpaque) {
       _appendInPlace(other._asOpaque()[range])
+    } else if other.isASCII {
+      _appendInPlace(other._unmanagedASCIIView[range])
     } else {
       _appendInPlace(other._unmanagedUTF16View[range])
     }
@@ -256,10 +259,11 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
-    if other.isASCII {
-      _appendInPlace(other._unmanagedASCIIView)
-    } else if _slowPath(other._isOpaque) {
+    defer { _fixLifetime(other) }
+    if _slowPath(other._isOpaque) {
       _appendInPlace(other._asOpaque())
+    } else if other.isASCII {
+      _appendInPlace(other._unmanagedASCIIView)
     } else {
       _appendInPlace(other._unmanagedUTF16View)
     }
