@@ -396,6 +396,12 @@ CodeCompletionKeywords("code-completion-keywords",
                        llvm::cl::cat(Category),
                        llvm::cl::init(true));
 
+static llvm::cl::opt<bool>
+CodeCompletionComments("code-completion-comments",
+                       llvm::cl::desc("Include comments in code completion results"),
+                       llvm::cl::cat(Category),
+                       llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -671,7 +677,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SecondSourceFileName,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
-                            bool CodeCompletionKeywords) {
+                            bool CodeCompletionKeywords,
+                            bool CodeCompletionComments) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
     llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -712,7 +719,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
       new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords));
+          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments));
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
@@ -2961,7 +2968,8 @@ int main(int argc, char *argv[]) {
     }
 
     ide::PrintingCodeCompletionConsumer Consumer(
-        llvm::outs(), options::CodeCompletionKeywords);
+        llvm::outs(), options::CodeCompletionKeywords,
+        options::CodeCompletionComments);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3153,7 +3161,8 @@ int main(int argc, char *argv[]) {
                                 options::SecondSourceFilename,
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
-                                options::CodeCompletionKeywords);
+                                options::CodeCompletionKeywords,
+                                options::CodeCompletionComments);
     break;
 
   case ActionType::REPLCodeCompletion:
