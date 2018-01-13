@@ -5514,6 +5514,11 @@ void PrintingCodeCompletionConsumer::handleResults(
     Result->getCompletionString()->getName(NameOs);
     OS << "; name=" << Name;
 
+    StringRef comment = Result->getBriefDocComment();
+    if (IncludeComments && !comment.empty()) {
+      OS << "; comment=" << comment;
+    }
+
     OS << "\n";
   }
   OS << "End completions\n";
