@@ -2466,6 +2466,11 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
                                          const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          CommandOutput *Output) const {
+
+  // Avoid a redundant output path with the following test:
+  if (Output->getPrimaryOutputType() == types::TY_SwiftModuleFile)
+    return;
+
   // FIXME: dmu temp hack to get timings
   // is the right way to do something here or to vectorize the OutputMap?
   if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) {

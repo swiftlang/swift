@@ -26,6 +26,7 @@ void CommandOutput::addAdditionalOutputForType(types::ID type,
                                                StringRef OutputFilename) {
   // FIXME: dmu called multiple times for same type for BatchMode
   // xxx uses an additional lookup, should not
+  assert(type != PrimaryOutputType && "avoid redundancy");
   if (AdditionalOutputsMap.count(type) == 0)
     AdditionalOutputsMap[type] = std::vector<std::string>();
   else
