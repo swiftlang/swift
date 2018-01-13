@@ -1,0 +1,108 @@
+// RUN: %target-run-simple-swift
+// REQUIRES: executable_test
+//
+// Tensor API tests.
+
+import TensorFlow
+import StdlibUnittest
+
+var TensorTests = TestSuite("Tensor")
+
+@inline(never)
+func testInitializers() {
+  let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
+  expectEqual(Array(x.elements.contiguousView),
+    [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
+}
+TensorTests.test("Initializers", testInitializers)
+
+@inline(never)
+func testFactoryInitializers() {
+  let x = Tensor<Float>.ones(shape: [1, 10])
+  expectEqual(Array(x.elements.contiguousView),
+    Array(repeating: 1, count: 10))
+}
+TensorTests.test("FactoryInitializers", testFactoryInitializers)
+
+@inline(never)
+func testSimpleMath() {
+  let x = Tensor<Float>([1.2, 1.2])
+  let y = tanh(x)
+  // TODO: Check result. Currently crashing because of rank/shape getters
+  // expectTrue(y.elements - 0.833655 < 0.000001)
+}
+TensorTests.test("SimpleMath", testSimpleMath)
+
+@inline(never)
+func testMultiOpMath() {
+  let x = Tensor<Float>([1.2, 1.2])
+  let y = Tensor<Float>([4.3, 4.3])
+  let sum = x + y
+  let squared = sum * sum
+  let expsqr = exp(squared)
+  // TODO: Check result
+}
+TensorTests.test("testMultiOpMath", testMultiOpMath)
+
+@inline(never)
+func testXWPlusB() {
+  // Shape: 4
+  let x = Tensor([1.0, 2.0, 2.0, 1.0])
+  // Shape: 2 x 4
+  let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
+  // Shape: 2
+  let b = Tensor([0.5, 0.5])
+  // Do xW+b!
+  _ = x ⊗ w + b
+  // TODO: Check result
+}
+TensorTests.test("testXWPlusB", testXWPlusB)
+
+@inline(never)
+func testXORInference() {
+  func xor(_ x: Double, _ y: Double) -> Double {
+    // FIXME: If params are declared outside of `xor`, it would crash.
+    // 2 x 4
+    let w1 = Tensor([[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
+                     [-1.83523219, -0.51167348, 0.15490439, 1.91018065]])
+    // 1 x 4
+    let b1 = Tensor([[2.54353216, 0.25132703, -0.16503136, -0.85754058]])
+    // 4 x 1
+    let w2 = Tensor([[ 3.04350065], [ 0.35590511], [-0.3252157 ], [ 3.49349223]])
+    // 1 x 1
+    let b2 = Tensor([[-0.74635993]])
+
+    let x = Tensor([[x, y]])
+    let o1 = tanh(x ⊗ w1 + b1)
+    let y = tanh(o1 ⊗ w2 + b2)
+    return y.elements.contiguousView[0] // TODO: use better scalar getter
+  }
+  expectLT(abs(xor(0.0, 0.0) - 0.0), 0.1)
+  expectLT(abs(xor(0.0, 1.0) - 1.0), 0.1)
+  expectLT(abs(xor(1.0, 0.0) - 1.0), 0.1)
+  expectLT(abs(xor(1.0, 1.0) - 0.0), 0.1)
+}
+TensorTests.test("XORInference", testXORInference)
+
+// FIXME: GraphGen crashes due to function being multi-BB when
+// partitioning `rank` and `shape` getters.
+//
+// @inline(never)
+// func testRankGetter() {
+//   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+//   expectEqual(x.rank, 2)
+//   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+//   expectEqual(y.rank, 7)
+// }
+// TensorTests.test("RankGetter", testRankGetter)
+//
+// @inline(never)
+// func testShapeGetter() {
+//   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+//   expectEqual(x.shape, [2, 3])
+//   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+//   expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
+// }
+// TensorTests.test("ShapeGetter", testShapeGetter)
+
+runAllTests()

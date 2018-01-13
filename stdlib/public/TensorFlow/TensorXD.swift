@@ -21,7 +21,9 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
   public static var rank: Int { return 1 }
 
   @_inlineable
-  public var rank: Int { return Tensor1D.rank }
+  public var shape: Shape {
+    return underlyingTensor.shape[0]
+  }
 
   @_versioned
   @_inlineable
@@ -37,21 +39,11 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
 
   @_inlineable
   public init(identicallyRanked other: Tensor<Element>) {
-    // Assertion disabled because "x.rank" causes a copy of X 
+    // Assertion disabled because "x.rank" causes a copy of X
     // back to the host.  TODO(clattner): need a better way of
     // exposing rank information in our model.
     //assert(other.rank == Tensor1D.rank)
     self.init(underlying: other)
-  }
-
-  @_inlineable
-  public var shape: Int {
-    return underlyingTensor.shape[0]
-  }
-
-  @_inlineable
-  public var count: Int {
-    return shape
   }
 }
 
@@ -69,16 +61,19 @@ extension Tensor1D : ExpressibleByArrayLiteral {
 
 // Initializers
 public extension Tensor1D {
-  /// Perform an element conversion from Tensor1D<U> to Tensor1D<Element>.
+  /// Perform an element-wise type conversion from `Tensor1D<T>`.
   @_inlineable
-  public init<U>(_ other: Tensor1D<U>) {
-    self.init(underlying: Tensor(other.underlyingTensor))
+  public init?<T>(_ other: Tensor1D<T>) {
+    guard let tensor = Tensor<Element>(other.underlyingTensor) else {
+      return nil
+    }
+    self.init(underlying: tensor)
   }
 
   /// values initializer, takes an array of values.
   @_inlineable
   init(_ elements: [Element]) {
-    underlyingTensor = Tensor<Element>(elements)
+    self.init(underlying: Tensor<Element>(elements))
   }
 
   /// values initializer, takes a vararg list of values.
@@ -86,13 +81,6 @@ public extension Tensor1D {
   init(_ elements: Element...) {
     self.init(elements)
   }
-
-#if true  // FIXME: temporary until the partitioner can handle arrays.
-  @_inlineable
-  init(_ value: Element) {
-    underlyingTensor = Tensor(value)
-  }
-#endif
 }
 
 public extension Tensor1D where Element : Numeric {
@@ -146,6 +134,12 @@ public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
   @_inlineable
   public var rank: Int { return Tensor2D.rank }
 
+  @_inlineable
+  public var shape: Shape {
+    let dynamicShape = underlyingTensor.shape
+    return (dynamicShape[0], dynamicShape[1])
+  }
+
   @_versioned
   internal init(underlying: Tensor<Element>) {
     self.underlyingTensor = underlying
@@ -154,18 +148,13 @@ public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
   @_inlineable
   public init?(_ other: Tensor<Element>) {
     guard other.rank == Tensor2D.rank else { return nil }
-    self.underlyingTensor = other
-  }
-
-  @_inlineable
-  public init(identicallyRanked other: Tensor<Element>) {
-    assert(other.rank == Tensor2D.rank)
     self.init(underlying: other)
   }
 
   @_inlineable
-  public var shape: (Int, Int) {
-    return (underlyingTensor.shape[0], underlyingTensor.shape[1])
+  public init(identicallyRanked other: Tensor<Element>) {
+    // FIXME: Check ranks
+    self.init(underlying: other)
   }
 }
 
@@ -183,17 +172,27 @@ extension Tensor2D : ExpressibleByArrayLiteral {
 
 // Initializers.
 public extension Tensor2D {
-  /// Perform an element conversion from TensorXD<U> to TensorXD<Element>.
+  /// Perform an element-wise type conversion from `Tensor2D<T>`.
   @_inlineable
-  init<U>(_ other: Tensor2D<U>) {
-    self.init(underlying: Tensor(other.underlyingTensor))
+  public init?<T>(_ other: Tensor1D<T>) {
+    guard let tensor = Tensor<Element>(other.underlyingTensor) else {
+      return nil
+    }
+    self.init(underlying: tensor)
   }
 
   /// values initializer, takes an array of values.
   @_inlineable
   init(_ elements: [[Element]]) {
-    underlyingTensor = Tensor<Element>(elements)
+    self.init(underlying: Tensor<Element>(elements))
   }
+
+#if true  // FIXME: temporary until the partitioner can handle arrays.
+  @_inlineable
+  init(_ value: Element) {
+    underlyingTensor = Tensor(value)
+  }
+#endif
 }
 
 public extension Tensor2D where Element : Numeric {
@@ -255,8 +254,8 @@ public extension Tensor2D {
 // this is too onerous in practice, we can pick other approaches.
 public extension Tensor1D {
   @_inlineable
-  var broadcast: Tensor2D<Element> {
-    return Tensor2D(underlying: underlyingTensor.broadcast(toRank: 2))
+  func rankLifted() -> Tensor2D<Element> {
+    return Tensor2D(underlying: underlyingTensor.rankLifted(by: 1))
   }
 }
 
