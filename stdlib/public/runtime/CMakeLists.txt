@@ -37,7 +37,9 @@ set(swift_runtime_objc_sources
     SwiftValue.mm
     Reflection.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
+    )
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp
