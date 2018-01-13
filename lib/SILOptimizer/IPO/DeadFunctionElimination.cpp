@@ -122,14 +122,6 @@ protected:
     if (F->isGlobalInit())
       return true;
 
-    // public_external functions are never SIL serialized or emitted by IRGen.
-    if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()))
-      return false;
-
-    // [serialized] functions should always be SIL serialized.
-    if (F->isSerialized())
-      return true;
-
     return false;
   }
 
