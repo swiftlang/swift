@@ -122,19 +122,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
   }
 }
 
-void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
-  addSymbol(SILDeclRef(VD));
-  visitMembers(VD);
-}
-
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
-  if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
-    // Accessors also appear nested inside the storage decl, which we treat as
-    // the canonical location, so skip if we've got an accessor that isn't
-    // inside the var decl.
-    if (!InsideAbstractStorageDecl)
-      return;
-  }
+  addSymbol(SILDeclRef(AFD));
 
   // Default arguments (of public functions) are public symbols, as the default
   // values are computed at the call site.
@@ -151,17 +140,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
       index++;
     }
   }
-
-  visitValueDecl(AFD);
 }
 
-void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
-  assert(!InsideAbstractStorageDecl &&
-         "unexpected nesting of abstract storage decls");
-  InsideAbstractStorageDecl = true;
-  visitMembers(ASD);
-  InsideAbstractStorageDecl = false;
-}
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
@@ -174,8 +154,6 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
-
-  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -194,7 +172,8 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   // There are symbols associated with any protocols this type conforms to.
   addConformances(NTD);
 
-  visitMembers(NTD);
+  for (auto member : NTD->getMembers())
+    visit(member);
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
@@ -287,7 +266,8 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     addConformances(ED);
   }
 
-  visitMembers(ED);
+  for (auto member : ED->getMembers())
+    visit(member);
 }
 
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
