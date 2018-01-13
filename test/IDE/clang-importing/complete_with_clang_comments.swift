@@ -1,6 +1,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP -code-completion-comments=true \
 // RUN:    -import-objc-header %S/Inputs/bridge.h -I %S/Inputs/somemod1 -I %S/Inputs/somemod2 | %FileCheck %s -check-prefix=CHECK-TOP
 
+// REQUIRES: objc_interop
+
 import somemod2
 
 #^TOP^#
