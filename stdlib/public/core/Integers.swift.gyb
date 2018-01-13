@@ -2043,7 +2043,7 @@ extension BinaryInteger {
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
 public protocol FixedWidthInteger :
-  BinaryInteger, Randomizable, LosslessStringConvertible, _BitwiseOperations
+  BinaryInteger, LosslessStringConvertible, _BitwiseOperations
   where Magnitude : FixedWidthInteger
 {
   /// The number of bits used for the underlying binary representation of
@@ -2306,6 +2306,34 @@ ${assignmentOperatorComment(x.operator, False)}
 
   % end
 }
+
+% for Range in ['CountableRange', 'CountableClosedRange']:
+
+extension FixedWidthInteger
+where Self.Magnitude : FixedWidthInteger & UnsignedInteger {
+
+  /// Returns a random representation of this integer within the range.
+  ///
+  /// - Parameter range: A ${Range} to determine the bounds to get a random value
+  ///   from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random integer.
+  /// - Returns: A random representation of this integer.
+  public static func random(
+    in range: ${Range}<Self>,
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Self {
+%   if 'Closed' not in Range:
+    _precondition(
+      range.lowerBound != range.upperBound,
+      "Can't get random value with lowerBound == upperBound"
+    )
+%   end
+    return range.random()!
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 //===--- Operators on FixedWidthInteger -----------------------------------===//
@@ -2631,47 +2659,6 @@ ${operatorComment('&' + x.operator, True)}
   }
 %   end
 % end
-}
-
-%{
-  bitSizes = [8, 16, 32, 64]
-}%
-
-extension FixedWidthInteger {
-  /// Returns a random representation of this integer.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   the random integer
-  /// - Returns: A random representation of this integer conforming to `Randomizable`
-  ///
-  /// The range of this random integer is from the integer's min to the integer's
-  /// max.
-  @_inlineable
-  public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
-    switch bitWidth {
-% for bitSize in bitSizes:
-    case ${bitSize}:
-      return Self.init(truncatingIfNeeded: generator.next(UInt${bitSize}.self))
-% end
-    default:
-      return Self.init(truncatingIfNeeded: generator.next())
-    }
-  }
-}
-
-extension FixedWidthInteger where Self: UnsignedInteger {
-  /// Returns a random representation of this integer.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   the random integer
-  /// - Returns: A random representation of this integer conforming to `Randomizable`
-  ///
-  /// The range of this random integer is from the integer's min to the integer's
-  /// max.
-  @_inlineable
-  public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
-    return generator.next(Self.self)
-  }
 }
 
 //===----------------------------------------------------------------------===//

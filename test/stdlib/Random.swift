@@ -6,13 +6,13 @@ import StdlibUnittest
 let RandomTests = TestSuite("Random")
 
 RandomTests.test("random numbers") {
-  let randomNumber1 = Int.random()
-  let randomNumber2 = Int.random()
+  let randomNumber1 = Int.random(in: .min ... .max)
+  let randomNumber2 = Int.random(in: .min ... .max)
   expectTrue(randomNumber1 != randomNumber2)
 
-  let randomDouble1 = Double.random()
+  let randomDouble1 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble1 < 1 && randomDouble1 > 0)
-  let randomDouble2 = Double.random()
+  let randomDouble2 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble1 < 1 && randomDouble2 > 0)
   expectTrue(randomDouble1 != randomDouble2)
 }

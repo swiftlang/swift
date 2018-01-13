@@ -779,23 +779,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
 
   /// Returns a random element from this collection.
   ///
-  /// This uses the default random number generator provided by the standard library.
-  /// A good example of this is getting a random greeting from an array:
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20"
-  func random() -> Element?
-
-  /// Returns a random element from this collection.
-  ///
   /// - Parameter generator: The random number generator to use when getting
   ///   a random element.
   /// - Returns: A random element from this collection.
@@ -812,7 +795,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20"
-  func random<T: RandomNumberGenerator>(using generator: T) -> Element?
+  func random(using generator: RandomNumberGenerator) -> Element?
 
   @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
@@ -1029,7 +1012,10 @@ extension Collection {
 
   /// Returns a random element from this collection.
   ///
-  /// This uses the default random number generator provided by the standard library.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element from this collection.
+  ///
   /// A good example of this is getting a random greeting from an array:
   ///
   ///     let greetings = ["hi", "hey", "hello", "hola"]
@@ -1041,38 +1027,16 @@ extension Collection {
   ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
-  ///     // Could print "20"
+  ///     // Could print "20", perhaps
   @_inlineable
-  public func random() -> Element? {
-    return self.random(using: Random.default)
-  }
-
-  /// Returns a random element from this collection.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element from this collection.
-  ///
-  /// A good example of this is getting a random greeting from an array:
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20"
-  @_inlineable
-  public func random<T: RandomNumberGenerator>(using generator: T) -> Element? {
+  public func random(
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Element? {
     guard !isEmpty else { return nil }
     let random = generator.next(upperBound: UInt(self.count))
     let index = self.index(
       self.startIndex,
-      offsetBy: Int(random),
-      limitedBy: self.endIndex
+      offsetBy: numericCast(random)
     )
     return self[index!]
   }

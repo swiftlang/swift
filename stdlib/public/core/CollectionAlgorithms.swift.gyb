@@ -222,22 +222,12 @@ extension MutableCollection where Self : BidirectionalCollection {
 extension ${Self} {
   /// Returns the elements of the ${sequenceKind}, shuffled.
   ///
-  /// - Returns: A shuffled array of this ${sequenceKind}'s elements.
-  ///
-  /// This uses the default random number generator provided by the standard library.
-  @_inlineable
-  public func shuffled() -> [Element] {
-    return self.shuffled(using: Random.default)
-  }
-
-  /// Returns the elements of the ${sequenceKind}, shuffled.
-  ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the ${sequenceKind}.
   /// - Returns: A shuffled array of this ${sequenceKind}'s elements.
   @_inlineable
-  public func shuffled<T: RandomNumberGenerator>(
-    using generator: T
+  public func shuffled(
+    using generator: RandomNumberGenerator = Random.default
   ) -> [Element] {
     var result = ContiguousArray(self)
     result.shuffle(using: generator)
@@ -245,24 +235,14 @@ extension ${Self} {
   }
 }
 
-% end
-
 extension MutableCollection {
-  /// Shuffles the collection in place.
-  ///
-  /// This uses the default random number generator provided by the standard library.
-  @_inlineable
-  public mutating func shuffle() {
-    self.shuffle(using: Random.default)
-  }
-
   /// Shuffles the collection in place.
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
   @_inlineable
-  public mutating func shuffle<T: RandomNumberGenerator>(
-    using generator: T
+  public mutating func shuffle(
+    using generator: RandomNumberGenerator = Random.default
   ) {
     guard count > 1 else { return }
     var amount = count
@@ -271,16 +251,8 @@ extension MutableCollection {
       guard amount != random else { continue }
       amount -= 1
       swapAt(
-        index(
-          startIndex,
-          offsetBy: amount,
-          limitedBy: endIndex
-        )!,
-        index(
-          startIndex,
-          offsetBy: Int(random),
-          limitedBy: endIndex
-        )!
+        index(startIndex, offsetBy: amount),
+        index(startIndex, offsetBy: numericCast(random))
       )
     }
   }
@@ -289,10 +261,6 @@ extension MutableCollection {
 //===----------------------------------------------------------------------===//
 // sorted()
 //===----------------------------------------------------------------------===//
-
-% for Self in ['Sequence', 'MutableCollection']:
-
-% sequenceKind = 'sequence' if 'Sequence' in Self else 'collection'
 
 extension ${Self} where Element : Comparable {
   /// Returns the elements of the ${sequenceKind}, sorted.

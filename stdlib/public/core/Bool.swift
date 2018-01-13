@@ -60,7 +60,7 @@
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
 @_fixed_layout
-public struct Bool : Randomizable {
+public struct Bool {
   @_versioned
   internal var _value: Builtin.Int1
 
@@ -94,8 +94,10 @@ public struct Bool : Randomizable {
   ///   random Boolean.
   /// - Returns: A random Boolean.
   @_inlineable
-  public static func random<T: RandomNumberGenerator>(using generator: T) -> Bool {
-    let random = Int8.random(using: generator)
+  public static func random(
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Bool {
+    let random = Int8.random(in: 0 ... 1, using: generator)
     return self.init(Builtin.trunc_Int8_Int1(random._value))
   }
 }

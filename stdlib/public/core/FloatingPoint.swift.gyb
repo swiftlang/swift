@@ -1435,8 +1435,7 @@ extension FloatingPoint {
 /// the standard library by `Float`, `Double`, and `Float80` where available.
 ///
 /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-public protocol BinaryFloatingPoint:
-  FloatingPoint, ExpressibleByFloatLiteral, Randomizable {
+public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
   /// A type that represents the encoded significand of a value.
   associatedtype RawSignificand: UnsignedInteger
@@ -2099,22 +2098,6 @@ extension BinaryFloatingPoint {
     return true
   }
 
-  /// Returns a random representation of this floating point.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   the random floating point
-  /// - Returns: A random representation of this floating point conforming to
-  ///   `Randomizable`
-  ///
-  /// The range of this random floating point is from 0 to 1 exclusive
-  @_inlineable
-  public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
-    let bits = MemoryLayout<Self>.size * 8
-    let fraction = bits - Self.exponentBitCount
-    let random = generator.next(UInt64.self) >> (bits - fraction)
-    return Self.init(random) / Self.init(1 << fraction)
-  }
-
   /*  TODO: uncomment these default implementations when it becomes possible
       to use them.
   //  TODO: The following comparison implementations are not quite correct for
@@ -2152,6 +2135,39 @@ extension BinaryFloatingPoint {
   }
   */
 }
+
+% for Range in ['Range', 'ClosedRange']:
+
+extension BinaryFloatingPoint
+where Self.RawSignificand : FixedWidthInteger
+      Self.RawSignificand.Stride : SignedInteger
+      Self.RawSignificand.Magnitude : UnsignedInteger & FixedWidthInteger,
+      Self.RawSignificand.Magnitude == Self.RawSignificand.Magnitude.Magnitude {
+
+  /// Returns a random representation of this floating point within the range.
+  ///
+  /// - Parameter range: A ${Range} to determine the bounds to get a random value
+  ///   from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random floating point.
+  /// - Returns: A random representation of this floating point.
+  @_inlineable
+  public static func random(
+    in range: ${Range}<Self>,
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Self {
+%   if 'Closed' not in Range:
+    _precondition(
+      range.lowerBound != range.upperBound,
+      "Can't get random value with lowerBound == upperBound"
+    )
+%   end
+    return range.random()!
+  }
+
+}
+
+% end
 
 /// Returns the absolute value of `x`.
 @_inlineable // FIXME(sil-serialize-all)
