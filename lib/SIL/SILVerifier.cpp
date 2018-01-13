@@ -4537,9 +4537,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
         if (isSerialized()) {
-          assert((!isLessVisibleThan(F->getLinkage(), getLinkage()) ||
-                  (F->isSerialized() &&
-                   hasSharedVisibility(F->getLinkage()))) &&
+          assert(F->hasValidLinkageForFragileRef() &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }
@@ -4566,15 +4564,18 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getWitness();
-    // FIXME
-    #if 0
-    assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
+
+#if 0
+    // FIXME: For now, all default witnesses are private.
+    assert(F->hasValidLinkageForFragileRef() &&
            "Default witness tables should not reference "
            "less visible functions.");
-    #endif
+#endif
+
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
     auto *witnessSelfProtocol = F->getLoweredFunctionType()
         ->getDefaultWitnessMethodProtocol();
     assert(witnessSelfProtocol == getProtocol() &&
