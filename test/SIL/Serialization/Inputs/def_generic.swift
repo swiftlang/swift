@@ -1,3 +1,4 @@
+@_fixed_layout
 public class A<T> {
   typealias Element = T
   @_versioned

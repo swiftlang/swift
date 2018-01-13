@@ -1565,9 +1565,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
 
-    // An inlinable constructor in a class must always be delegating.
+    // An inlinable constructor in a class must always be delegating,
+    // unless the class is formally '@_fixed_layout'.
     if (!isDelegating &&
-        ClassD->isResilient() &&
+        ClassD->isFormallyResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),
