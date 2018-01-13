@@ -1083,21 +1083,13 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
-    //
-    // Exception: When compiling OnoneSupport anything can reference anything,
-    // because the bodies of functions are never SIL serialized, but
-    // specializations are exposed as public symbols in the produced object
-    // files. For the same reason, KeepAsPublic functions (i.e. specializations)
-    // can refer to anything or can be referenced from any other function.
-    if (!F.getModule().isOptimizedOnoneSupportModule() &&
-        !(F.isKeepAsPublic() || RefF->isKeepAsPublic())) {
-      if (F.isSerialized()) {
-        require((SingleFunction && RefF->isExternalDeclaration()) ||
-                    RefF->hasValidLinkageForFragileRef(),
-                "function_ref inside fragile function cannot "
-                "reference a private or hidden symbol");
-      }
+    if (F.isSerialized()) {
+      require((SingleFunction && RefF->isExternalDeclaration()) ||
+              RefF->hasValidLinkageForFragileRef(),
+              "function_ref inside fragile function cannot "
+              "reference a private or hidden symbol");
     }
+
     verifySILFunctionType(fnType);
   }
 

@@ -171,11 +171,6 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Set if the function should be preserved and changed to public linkage
-  /// during dead function elimination. This is used for some generic
-  /// pre-specialization.
-  unsigned KeepAsPublic : 1;
-
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
@@ -286,10 +281,6 @@ public:
   /// You have to do that yourself
   void rewriteLoweredTypeUnsafe(CanSILFunctionType newType) {
     LoweredType = newType;
-  }
-
-  bool canBeDeleted() const {
-    return !getRefCount() && !isZombie() && !isKeepAsPublic();
   }
 
   /// Return the number of entities referring to this function (other
@@ -595,9 +586,6 @@ public:
   /// called within the addressor.
   bool isGlobalInit() const { return GlobalInitFlag; }
   void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
-
-  bool isKeepAsPublic() const { return KeepAsPublic; }
-  void setKeepAsPublic(bool keep) { KeepAsPublic = keep; }
 
   /// Return whether this function has a foreign implementation which can
   /// be emitted on demand.
