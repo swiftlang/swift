@@ -19,11 +19,11 @@ import CTensorFlow
 // The C type is TF_TensorHandle*
 public typealias CTensorHandle = OpaquePointer
 
-/// TensorHandle<T> is the type used by "ops" and the #tfop() syntax
+/// TensorHandle<Element> is the type used by "ops" and the #tfop() syntax
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
-public final class TensorHandle<T: TensorElementProtocol> {
+public final class TensorHandle<Element: TensorElementProtocol> {
   // This is the underlying "TF_TensorHandle*" which this TensorHandle
   // represents.
   //
@@ -41,15 +41,23 @@ public final class TensorHandle<T: TensorElementProtocol> {
   }
 }
 
-public extension TensorHandle {
-  var rank: Int {
-    return Int(TFE_TensorHandleNumDims(cTensorHandle))
+extension TensorHandle {
+  @_versioned
+  @inline(never)
+  func makeHostCopy() -> ShapedArray<Element> {
+    let status = TF_NewStatus()
+    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    return ShapedArray(moving: cTensor!)
   }
 
-  var shape: [Int] {
-    return (0..<rank).map { dimIndex in
-      Int(TFE_TensorHandleDim(cTensorHandle, Int32(dimIndex)))
-    }
+  convenience init(copyingFromCTensor cTensor: CTensor) {
+    let status = TF_NewStatus()
+    let cHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    self.init(cTensorHandle: cHandle!)
   }
 }
 
