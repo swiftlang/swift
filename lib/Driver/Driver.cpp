@@ -2129,7 +2129,14 @@ static void addAuxiliaryOutputs(Compilation &C, CommandOutput &output,
       // auxiliaries named foo.swiftmodule and foo.d not foo.swift.swiftmodule
       // or foo.swift.d. So we have to trim one extension (.o) and then replace
       // the remaining one (.swift).
-      llvm::sys::path::replace_extension(path, "");
+
+      // FIXME: (dmu) This causes the test: Driver/merge-module.swift
+      // to fail, by causing the driver to pass
+      // -emit-objc-header-path sdk.h instead of sdk.foo.h.
+      // Is the test wrong??
+      // Add a test for batch-mode for now, ugh!
+      if (OI.CompilerMode == OutputInfo::Mode::BatchModeCompile)
+        llvm::sys::path::replace_extension(path, "");
       llvm::sys::path::replace_extension(path,
                                          types::getTypeTempSuffix(outputType));
       output.addAdditionalOutputForType(outputType, path);
