@@ -6200,6 +6200,9 @@ public:
   Identifier getName() const { return name; }
   
   static bool classof(const Decl *D) {
+    // Workaround: http://llvm.org/PR35906
+    if (DeclKind::Last_Decl == DeclKind::Last_OperatorDecl)
+      return D->getKind() >= DeclKind::First_OperatorDecl;
     return D->getKind() >= DeclKind::First_OperatorDecl
         && D->getKind() <= DeclKind::Last_OperatorDecl;
   }
