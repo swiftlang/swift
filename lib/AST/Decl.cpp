@@ -5482,8 +5482,8 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // always delegating. This occurs if the struct type is not fixed layout,
   // and the constructor is either inlinable or defined in another module.
   if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
-    if (getResilienceExpansion() == ResilienceExpansion::Minimal &&
-        NTD->isResilient()) {
+    if (NTD->isFormallyResilient() &&
+        getResilienceExpansion() == ResilienceExpansion::Minimal) {
       Kind = BodyInitKind::Delegating;
 
     } else if (isa<ExtensionDecl>(getDeclContext())) {

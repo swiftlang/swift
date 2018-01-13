@@ -6,6 +6,7 @@
 // - it happens before the performance inlining and thus preserves @_semantics functions
 // - it happens after generic specialization
 
+@_fixed_layout
 public struct Int {
   @_inlineable
   public init() {}
@@ -23,6 +24,7 @@ public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
   return a._getCapacity()
 }
 
+@_fixed_layout
 public struct Array<T> {
   @_inlineable
   public init() {}
