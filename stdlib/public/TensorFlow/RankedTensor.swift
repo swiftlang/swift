@@ -17,7 +17,6 @@ infix operator ⊗ : MultiplicationPrecedence
 /// of the implementation logic for these types (which just wrap Tensor anyway)
 /// and allow writing rank-generic code over the TensorXD types.
 public protocol RankedTensor {
-
   associatedtype Element : TensorElementProtocol
   associatedtype Shape
 
@@ -33,17 +32,34 @@ public protocol RankedTensor {
   /// Tensor of same rank, but Bool element type.
   associatedtype BoolTensor : RankedTensor where BoolTensor.Element == Bool
 
-  /// Returns the rank of the Tensor - the number of dimensions
-  /// it has.
-  var rank: Int { get }
+  /// Returns the rank of the Tensor - the number of dimensions it has.
+  static var rank: Int { get }
 
   /// Returns the shape of the Tensor
   var shape: Shape { get }
 
-  /// Returns the type erased Tensor held by the RankedTensor.
+  /// Returns the rank erased Tensor held by the RankedTensor.
   var underlyingTensor: Tensor<Element> { get }
 }
 
+/// Array initializers
+public extension RankedTensor {
+  /// Convert from a ShapedArray to the specified RankedTensor. This fails
+  /// when the ShapedArray has the wrong rank.
+  init?(_ other: ShapedArray<Element>) {
+    self.init(Tensor(other))
+  }
+
+  /// Convert from a ShapedArray to the specified RankedTensor when there is
+  /// some static information that tells us that it is of the correct rank
+  /// already.
+  init(identicallyRanked other: ShapedArray<Element>) {
+    self.init(identicallyRanked: Tensor(other))
+  }
+}
+
+/// Memory transfer markers
+/// TODO: Remove when send/receive semantics gets revisited.
 public extension RankedTensor {
   /// Indicate that this tensor is being moved to the accelerator.
   @_inlineable
@@ -58,7 +74,14 @@ public extension RankedTensor {
   }
 }
 
-// Slicing
+/// Common properties
+public extension RankedTensor {
+  var rank: Int {
+    return Self.rank
+  }
+}
+
+/// Slicing
 public extension RankedTensor {
   @_inlineable
   subscript(bounds: Range<Int>) -> Self {
@@ -89,6 +112,11 @@ public extension RankedTensor where Element : Numeric {
   @_inlineable
   static func +(lhs: Element, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs + rhs.underlyingTensor)
+  }
+
+  @_inlineable
+  static prefix func -(rhs: Self) -> Self {
+    return Self(identicallyRanked: -rhs.underlyingTensor)
   }
 
   @_inlineable
@@ -204,8 +232,6 @@ public extension RankedTensor {
   }
 }
 
-#if false // TODO: Enable this when Tensor's can summarize themselves.
-
 /// Make "print(someTensor)" print a pretty form of the tensor.
 extension RankedTensor {
   public var description: String {
@@ -213,11 +239,9 @@ extension RankedTensor {
   }
 }
 
-// Make Tensors show up nicely in the Xcode Playground results sidebar.
+/// Make Tensors show up nicely in the Xcode Playground results sidebar.
 extension RankedTensor {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
 }
-
-#endif

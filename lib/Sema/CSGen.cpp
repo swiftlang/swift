@@ -1423,6 +1423,13 @@ namespace {
                                                   {boolType});
             resultTypes.push_back(TupleTypeElt(resolved));
             continue;
+          } else if (resultConstraints.startswith("<int32>")) {
+            resultConstraints = resultConstraints.drop_front(strlen("<int32>"));
+            auto int32Type = tc.Context.getInt32Decl()->getDeclaredType();
+            auto resolved = BoundGenericType::get(tensorHandle, nullptr,
+                                                  {int32Type});
+            resultTypes.push_back(TupleTypeElt(resolved));
+            continue;
           }
 
           if (checkLastTensorType())
