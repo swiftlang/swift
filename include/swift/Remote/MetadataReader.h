@@ -166,6 +166,10 @@ private:
   StoredPointer IndexedClassesCountPointer;
   StoredPointer LastIndexedClassesCount = 0;
 
+  Demangle::NodeFactory Factory;
+
+  Demangle::NodeFactory &getNodeFactory() { return Factory; }
+
 public:
   BuilderType Builder;
 

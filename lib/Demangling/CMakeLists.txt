@@ -8,5 +8,6 @@ add_swift_library(swiftDemangling STATIC
   OldRemangler.cpp
   Punycode.cpp
   Remangler.cpp
+  TypeDecoder.cpp
   )
 

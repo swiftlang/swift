@@ -185,6 +185,8 @@ public:
     return TR;
   }
 
+  Demangle::NodeFactory &getNodeFactory() { return Dem; }
+
   ///
   /// Factory methods for all TypeRef kinds
   ///
