@@ -97,52 +97,26 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
         normalConformance);
-    auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
-                                    SILLinkage witnessLinkage) {
+    auto addSymbolIfNecessary = [&](SILDeclRef declRef) {
+      auto witnessLinkage = declRef.getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
-        addSymbol(Mangler.mangleWitnessThunk(normalConformance, valueReq));
+        addSymbol(Mangler.mangleWitnessThunk(normalConformance,
+                                             declRef.getDecl()));
       }
     };
     normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
                                                         Witness witness) {
       if (isa<AbstractFunctionDecl>(valueReq)) {
-        auto witnessLinkage =
-            SILDeclRef(witness.getDecl()).getLinkage(ForDefinition);
-        addSymbolIfNecessary(valueReq, witnessLinkage);
-      } else if (auto VD = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        // A var or subscript decl needs extra special handling: the things that
-        // end up in the witness table are the accessors, but the compiler only
-        // talks about the actual storage decl in the conformance, so we have to
-        // manually walk over the members, having pulled out something that will
-        // have the right linkage.
-        auto witnessVD = cast<AbstractStorageDecl>(witness.getDecl());
-
-        SmallVector<Decl *, 4> members;
-        VD->getAllAccessorFunctions(members);
-
-        // Grab one of the accessors, and then use that to pull out which of the
-        // getter or setter will have the appropriate linkage.
-        FuncDecl *witnessWithRelevantLinkage;
-        switch (cast<AccessorDecl>(members[0])->getAccessorKind()) {
-        case AccessorKind::IsGetter:
-        case AccessorKind::IsAddressor:
-          witnessWithRelevantLinkage = witnessVD->getGetter();
-          break;
-        case AccessorKind::IsSetter:
-        case AccessorKind::IsWillSet:
-        case AccessorKind::IsDidSet:
-        case AccessorKind::IsMaterializeForSet:
-        case AccessorKind::IsMutableAddressor:
-          witnessWithRelevantLinkage = witnessVD->getSetter();
-          break;
-        }
-        auto witnessLinkage =
-            SILDeclRef(witnessWithRelevantLinkage).getLinkage(ForDefinition);
-        for (auto member : members) {
-          addSymbolIfNecessary(cast<ValueDecl>(member), witnessLinkage);
-        }
+        addSymbolIfNecessary(SILDeclRef(valueReq));
+      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        if (auto *getter = storage->getGetter())
+          addSymbolIfNecessary(SILDeclRef(getter));
+        if (auto *setter = storage->getGetter())
+          addSymbolIfNecessary(SILDeclRef(setter));
+        if (auto *materializeForSet = storage->getMaterializeForSetFunc())
+          addSymbolIfNecessary(SILDeclRef(materializeForSet));
       }
     });
   }
