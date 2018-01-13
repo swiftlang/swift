@@ -171,5 +171,42 @@ DemangleToMetadataTests.test("substitutions") {
     _typeByMangledName("x_6Assoc14main2P4PQz6Assoc24main2P4PQzt", substitutions: [[S.self]])!)
 }
 
+enum EG<T, U> { case a }
+
+class CG3<T, U, V> { }
+
+DemangleToMetadataTests.test("simple generic specializations") {
+  expectEqual([Int].self, _typeByMangledName("SaySiG")!)
+  expectEqual(EG<Int, String>.self, _typeByMangledName("4main2EGOySiSSG")!)
+  expectEqual(CG3<Int, Double, String>.self, _typeByMangledName("4main3CG3CySiSdSSG")!)
+}
+
+extension EG {
+  struct NestedSG<V> { }
+}
+
+extension C {
+  enum Nested<T, U> {
+    case a
+
+    struct Innermore {
+      struct Innermost<V> { }
+    }
+  }
+}
+
+class CG2<T, U> {
+  class Inner<V> { }
+}
+
+DemangleToMetadataTests.test("nested generic specializations") {
+  expectEqual(EG<Int, String>.NestedSG<Double>.self,
+    _typeByMangledName("4main2EGO8NestedSGVySiSS_SdG")!)
+  expectEqual(C.Nested<Int, String>.Innermore.Innermost<Double>.self,
+    _typeByMangledName("4main1CC6NestedO9InnermoreV9InnermostVy_SiSS__SdG")!)
+  expectEqual(CG2<Int, String>.Inner<Double>.self,
+    _typeByMangledName("4main3CG2C5InnerCySiSS_SdG")!)
+}
+
 runAllTests()
 
