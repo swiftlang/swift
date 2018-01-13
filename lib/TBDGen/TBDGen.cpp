@@ -62,30 +62,11 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
-  bool isPrivate = !hasPublicVisibility(declRef.getLinkage(ForDefinition));
-  // Even private methods of open classes (specifically, private methods that
-  // are in the vtable) have public symbols, because external subclasses
-  // currently need to refer to them by symbol for their own vtable.
-  switch (declRef.getSubclassScope()) {
-  case SubclassScope::External:
-    // Unlike the "truly" public things, private things have public symbols
-    // unconditionally, even if they're theoretically SIL only.
-    if (isPrivate) {
-      isPrivate = false;
-    }
-    break;
-  case SubclassScope::Internal:
-  case SubclassScope::NotApplicable:
-    break;
-  }
-  if (isPrivate)
-    return;
-
-  // FIXME: this includes too many symbols. There are some that are considered
-  // SIL-only, but it isn't obvious how to determine this (e.g. it seems that
-  // many, but not all, transparent functions result in object-file symbols)
-
-  addSymbol(declRef.mangle());
+  auto linkage = effectiveLinkageForClassMember(
+    declRef.getLinkage(ForDefinition),
+    declRef.getSubclassScope());
+  if (linkage == SILLinkage::Public)
+    addSymbol(declRef.mangle());
 }
 
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
