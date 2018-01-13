@@ -1697,7 +1697,7 @@ static void VisitNodeInOut(
   VisitNodeResult type_result;
   VisitNode(ast, cur_node->getFirstChild(), type_result);
   if (type_result._types.size() == 1 && type_result._types[0]) {
-    result._types.push_back(Type(LValueType::get(type_result._types[0])));
+    result._types.push_back(Type(InOutType::get(type_result._types[0])));
   } else {
     result._error = "couldn't resolve referent type";
   }
@@ -2194,26 +2194,6 @@ Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
     return nullptr;
   }
   return nullptr;
-}
-
-Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
-                                     StringRef mangledName,
-                                     std::string &error) {
-  Demangle::Context DemangleCtx;
-  auto node = DemangleCtx.demangleTypeAsNode(mangledName);
-  VisitNodeResult result;
-
-  if (node)
-    VisitNode(&Ctx, node, result);
-  error = result._error;
-  if (error.empty() && result._types.size() == 1) {
-    return result._types.front().getPointer();
-  } else {
-    error = stringWithFormat("type for typename '%s' was not found",
-                             mangledName);
-    return Type();
-  }
-  return Type();
 }
 
 Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
