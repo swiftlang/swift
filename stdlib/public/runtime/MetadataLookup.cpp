@@ -18,6 +18,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Reflection/Records.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -36,12 +37,33 @@
 
 using namespace swift;
 using namespace Demangle;
+using namespace reflection;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
 #endif
+
+template <typename T> struct DescriptorCacheEntry {
+private:
+  std::string Name;
+  const T *Description;
+
+public:
+  DescriptorCacheEntry(const llvm::StringRef name, const T *description)
+      : Name(name.str()), Description(description) {}
+
+  const T *getDescription() { return Description; }
+
+  int compareWithKey(llvm::StringRef aName) const {
+    return aName.compare(Name);
+  }
+
+  template <class... T> static size_t getExtraAllocationSize(T &&... ignored) {
+    return 0;
+  }
+};
 
 #pragma mark Nominal type descriptor cache
 // Type Metadata Cache.
@@ -274,32 +296,8 @@ namespace {
     }
   };
 
-  struct ProtocolDescriptorCacheEntry {
-  private:
-    std::string Name;
-    const ProtocolDescriptor *Description;
-
-  public:
-    ProtocolDescriptorCacheEntry(const llvm::StringRef name,
-                                 const ProtocolDescriptor *description)
-      : Name(name.str()), Description(description) {}
-
-    const ProtocolDescriptor *getDescription() {
-      return Description;
-    }
-
-    int compareWithKey(llvm::StringRef aName) const {
-      return aName.compare(Name);
-    }
-
-    template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
-      return 0;
-    }
-  };
-
   struct ProtocolMetadataState {
-    ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
+    ConcurrentMap<DescriptorCacheEntry<ProtocolDescriptor>> ProtocolCache;
     std::vector<ProtocolSection> SectionsToScan;
     Mutex SectionsToScanLock;
 
@@ -386,6 +384,50 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
   }
 
   return foundProtocol;
+}
+
+#pragma Type field descriptors cache
+namespace {
+struct FieldMetadataSection {
+  const FieldDescriptor *Begin, *End;
+  const FieldDescriptor *begin() const { return Begin; }
+  const FieldDescriptor *end() const { return End; }
+};
+
+struct TypeFieldMetadataState {
+  ConcurrentMap<DescriptorCacheEntry<FieldDescriptor>> FieldCache;
+  std::vector<FieldMetadataSection> SectionsToScan;
+  Mutex SectionsToScanLock;
+
+  TypeFieldMetadataState() {
+    SectionsToScan.reserve(16);
+    initializeTypeFieldLookup();
+  }
+};
+
+static Lazy<TypeFieldMetadataState> TypeFields;
+} // namespace
+
+static void _registerTypeFields(TypeFieldMetadataState &C,
+                                const FieldDescriptor *begin,
+                                const FieldDescriptor *end) {
+  ScopedLock guard(C.SectionsToScanLock);
+  C.SectionsToScan.push_back(FieldMetadataSection{begin, end});
+}
+
+void swift::addImageTypeFieldDescriptorBlockCallback(const void *fields,
+                                                     uintptr_t size) {
+  assert(size % sizeof(FieldDescriptor) == 0 &&
+         "fields section not a multiple of FieldDescriptor");
+
+  // If we have a section, enqueue the protocols for lookup.
+  auto fieldBytes = reinterpret_cast<const char *>(fields);
+  auto recordsB = reinterpret_cast<const FieldDescriptor *>(fields);
+  auto recordsE = reinterpret_cast<const FieldDescriptor *>(fieldBytes + size);
+
+  // Type field cache should always be sufficiently initialized by this point.
+  _registerTypeFields(TypeFields.unsafeGetAlreadyInitialized(), recordsB,
+                      recordsE);
 }
 
 #pragma mark Metadata lookup via mangled name
