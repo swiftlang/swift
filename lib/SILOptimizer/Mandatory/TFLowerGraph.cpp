@@ -471,6 +471,7 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
 
   // Right now we only support lowering graphs that are a single basic block.
   if (fn->getBlocks().size() != 1) {
+    assert(fn->hasLocation() && "Function does not have location");
     graphGen.internalError(fn->getLocation(),
              "TFLowerGraph can only handle single basic block programs");
     return {};

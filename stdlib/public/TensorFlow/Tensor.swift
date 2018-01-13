@@ -24,67 +24,6 @@
 
 import CTensorFlow
 
-/// `LocalTensorBuffer` is a reference-counted wrapper for C `TF_Tensor*`, used
-/// as the underlying storage in `LocalTensor`.
-final class LocalTensorBuffer<Element : TensorElementProtocol> {
-  let cTensor: CTensor
-
-  /// Initialize a local tensor buffer from a C `TF_Tensor*` value and takes
-  /// ownership of the value
-  init(cTensor: CTensor) {
-    self.cTensor = cTensor
-  }
-
-  deinit {
-    TF_DeleteTensor(cTensor)
-  }
-}
-
-/// Unsafe address accessor
-extension LocalTensorBuffer {
-  func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) throws -> R) rethrows -> R {
-    return try body(
-      TF_TensorData(cTensor).assumingMemoryBound(to: Element.self))
-  }
-}
-
-/// Basic properties
-extension LocalTensorBuffer {
-  var rank: Int {
-    return Int(TF_NumDims(cTensor))
-  }
-
-  var shape: [Int] {
-    return (0..<TF_NumDims(cTensor)).map { dimIndex in
-      Int(TF_Dim(cTensor, dimIndex))
-    }
-  }
-
-  var count: Int {
-    return (0..<Int32(rank)).reduce(1) { count, nextDimIndex in
-      count * Int(TF_Dim(cTensor, nextDimIndex))
-    }
-  }
-
-  var byteCount: Int {
-    return Int(TF_TensorByteSize(cTensor))
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Tensor protocol
-//===----------------------------------------------------------------------===//
-
-public protocol TensorProtocol {
-  associatedtype Shape
-  var rank: Int { get }
-  var shape: Shape { get }
-
-  func toHost() -> Self
-  func toDevice() -> Self
-}
-
 //===----------------------------------------------------------------------===//
 // Tensor type
 //===----------------------------------------------------------------------===//
@@ -101,22 +40,6 @@ public struct Tensor<Element : TensorElementProtocol> {
 }
 
 //===----------------------------------------------------------------------===//
-// Shape and rank accessors
-//===----------------------------------------------------------------------===//
-
-extension Tensor : TensorProtocol {
-  @_inlineable
-  public var rank: Int {
-    return handle.rank
-  }
-
-  @_inlineable
-  public var shape: [Int] {
-    return handle.shape
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Compiler intrinsics
 //===----------------------------------------------------------------------===//
 //
@@ -129,30 +52,28 @@ extension Tensor : TensorProtocol {
 // known functions".
 
 @_versioned @inline(never)
-@_silgen_name("__tf_send") // Magic name, not a TF op!
+@_silgen_name("__tf_send")
 func _TFSend<T>(_ handle: TensorHandle<T>) -> TensorHandle<T> {
   return handle
 }
 
 @_versioned @inline(never)
-@_silgen_name("__tf_receive") // Magic name, not a TF op!
+@_silgen_name("__tf_receive")
 func _TFReceive<T>(_ handle: TensorHandle<T>) -> TensorHandle<T> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_scalarize")
-func _TFScalarize<T>(_ handle: TensorHandle<T>) -> T {
-  fatalError("""
-    This is to be cleared away by the compiler, not to be run. There must be a
-    compiler bug.
-    """)
+func _TFScalarize<T>(_ handle: TensorHandle<T>) -> T? {
+  return handle.makeHostCopy().scalar
 }
 
 //===----------------------------------------------------------------------===//
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
 
+/// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
   /// Indicate that this tensor is being moved to the accelerator.
   @_inlineable
@@ -174,7 +95,7 @@ public extension Tensor {
 public extension Tensor {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
   @inline(never) // make @_inlineable when implemented.
-  init<FromType>(_ other: Tensor<FromType>) {
+  init?<FromType>(_ other: Tensor<FromType>) {
     fatalError("FIXME: Implement element conversion")
   }
 
@@ -282,12 +203,35 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
+// Properties
+//===----------------------------------------------------------------------===//
+
+public extension Tensor {
+  @_inlineable
+  var shape: [Int] {
+    return shapeTensor.elements.contiguousView.map(Int.init)
+  }
+
+  @_inlineable
+  var rank: Int {
+    // TODO: Optimize when we have rank-collapsing scalar getters
+    return Int(rankTensor.elements.scalar!)
+  }
+
+  @_inlineable
+  var totalElementCount: Int {
+    // TODO: Optimize when we have rank-collapsing scalar getters
+    return Int(totalElementCountTensor.elements.scalar!)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Factory methods for numeric tensors
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Element : Numeric {
   /// Zero initializer, takes a list of dimensions.
-  @inline(never) // make @_inlineable when implemented.
+  @_inlineable
   static func zeros(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 0)
   }
@@ -299,7 +243,7 @@ public extension Tensor where Element : Numeric {
   }
 
   /// Ones initializer, takes a list of dimensions.
-  @inline(never) // make @_inlineable when implemented.
+  @_inlineable
   static func ones(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 1)
   }
@@ -330,28 +274,6 @@ public extension Tensor where Element : FloatingPoint {
     shape: [Int], mean: Double = 0, stddev: Double = 1
   ) -> Tensor {
     fatalError("FIXME: implement randomNormal")
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Subscript indexing
-//===----------------------------------------------------------------------===//
-
-public extension Tensor {
-  /// Returns a subdimensional tensor at the specified list of indices.
-  /// - Todo: If possible, this should be defined as an op, to be run on the
-  /// accelerator.
-  subscript(indices: Int...) -> Tensor {
-    fatalError("FIXME: implement subscript to tensor")
-  }
-
-  // Slicing out a range of elements.
-  // TODO: begin/end are vectors in general.
-  // tfop_slice(tensor, begin, end) -> tensor
-  subscript(bounds: Range<Int>) -> Tensor {
-    fatalError("""
-      FIXME: implement slice \(bounds.lowerBound) ... \(bounds.upperBound)
-      """)
   }
 }
 
@@ -393,20 +315,26 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
+  @_inlineable
+  var isScalar: Bool {
+    return rank == 0
+  }
+
   /// Returns the underlying scalar from a 0-ranked Tensor.
   /// - precondition: Tensor is 0-ranked.
   @_inlineable
-  var scalar: Element {
-    precondition(rank == 0, "Rank must be zero")
-    return _TFScalarize(handle)
+  var scalar: Element? {
+    return Element(self)
   }
 }
 
 public extension TensorElementProtocol {
   @_inlineable
   init?(_ tensor: Tensor<Self>) {
-    guard tensor.rank == 0 else { return nil }
-    self = _TFScalarize(tensor.handle)
+    guard let scalar = _TFScalarize(tensor.handle) else {
+      return nil
+    }
+    self = scalar
   }
 }
 
@@ -414,19 +342,27 @@ public extension TensorElementProtocol {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// TODO: When TensorHandle can produce a summary, we should wire this in.
-#if false
 /// Make "print(someTensor)" print a pretty form of the tensor.
 extension Tensor : CustomStringConvertible {
   public var description: String {
-    return handle.description
+    fatalError("Unimplemented")
   }
 }
 
 // Make Tensors show up nicely in the Xcode Playground results sidebar.
 extension Tensor : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return handle.customPlaygroundQuickLook
+    fatalError("Unimplemented")
   }
 }
-#endif
+
+//===----------------------------------------------------------------------===//
+// Array conversion
+//===----------------------------------------------------------------------===//
+
+public extension Tensor {
+  @_inlineable
+  var elements: ShapedArray<Element> {
+    return handle.makeHostCopy()
+  }
+}

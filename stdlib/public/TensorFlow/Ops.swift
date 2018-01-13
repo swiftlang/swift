@@ -61,21 +61,39 @@
 // this operator, though it is defensible to use a variety of other ones as well.
 infix operator ⊗ : MultiplicationPrecedence
 
+// TODO:
+// - Unify Tensor and RankedTensor ops with protocol mechanism.
+// - Consider explicit broadcasting for elementwise binary ops when
+//   scalarization and rank getter are implemented.
+//
+
 /// Arithmetic Operators.
-public extension Tensor /*: Numeric*/ where Element : Numeric {
+extension Tensor /*: Numeric*/ where Element : Numeric {
   @_inlineable
-  static func +(lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func +(lhs: Tensor, rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Add", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
+  public static func -(lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Tensor(#tfop("Sub", "tt:t", lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  public static func *(lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Tensor(#tfop("Mul", "tt:t", lhs.handle, rhs.handle))
+  }
+}
+
+public extension Tensor where Element : Numeric {
+  @_inlineable
   static func +(lhs: Tensor, rhs: Element) -> Tensor {
-    return lhs + rhs.broadcast(toRank: lhs.rank)
+    return lhs + Tensor(rhs)
   }
 
   @_inlineable
   static func +(lhs: Element, rhs: Tensor) -> Tensor {
-    return lhs.broadcast(toRank: rhs.rank) + rhs
+    return Tensor(lhs) + rhs
   }
 
   @_inlineable
@@ -84,18 +102,18 @@ public extension Tensor /*: Numeric*/ where Element : Numeric {
   }
 
   @_inlineable
-  static func -(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Sub", "tt:t", lhs.handle, rhs.handle))
+  static prefix func -(rhs: Tensor) -> Tensor {
+    return Tensor(#tfop("Neg", "t:t", rhs.handle))
   }
 
   @_inlineable
   static func -(lhs: Tensor, rhs: Element) -> Tensor {
-    return lhs - rhs.broadcast(toRank: lhs.rank)
+    return lhs - Tensor(rhs)
   }
 
   @_inlineable
   static func -(lhs: Element, rhs: Tensor) -> Tensor {
-    return lhs.broadcast(toRank: rhs.rank) - rhs
+    return Tensor(lhs) - rhs
   }
 
   @_inlineable
@@ -109,18 +127,13 @@ public extension Tensor /*: Numeric*/ where Element : Numeric {
   }
 
   @_inlineable
-  static func *(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Mul", "tt:t", lhs.handle, rhs.handle))
-  }
-
-  @_inlineable
   static func *(lhs: Element, rhs: Tensor) -> Tensor {
-    return lhs.broadcast(toRank: rhs.rank) * rhs
+    return Tensor(lhs) * rhs
   }
 
   @_inlineable
   static func *(lhs: Tensor, rhs: Element) -> Tensor {
-    return lhs * rhs.broadcast(toRank: lhs.rank)
+    return lhs * Tensor(rhs)
   }
 
   @_inlineable
@@ -130,12 +143,12 @@ public extension Tensor /*: Numeric*/ where Element : Numeric {
 
   @_inlineable
   static func /(lhs: Tensor, rhs: Element) -> Tensor {
-    return lhs / rhs.broadcast(toRank: lhs.rank)
+    return lhs / Tensor(rhs)
   }
 
   @_inlineable
   static func /(lhs: Element, rhs: Tensor) -> Tensor {
-    return lhs.broadcast(toRank: rhs.rank) / rhs
+    return Tensor(lhs) / rhs
   }
 
   @_inlineable
@@ -151,7 +164,7 @@ public extension Tensor /*: Numeric*/ where Element : Numeric {
   /// Matrix multiplication
   @_inlineable
   func dot(_ other: Tensor) -> Tensor {
-    return Tensor(#tfop("Dot", "tt:t", self.handle, other.handle))
+    return Tensor(#tfop("MatMul", "tt:t", self.handle, other.handle))
   }
 
   @_inlineable
@@ -161,12 +174,12 @@ public extension Tensor /*: Numeric*/ where Element : Numeric {
 
   @_inlineable
   static func ⊗ (lhs: Element, rhs: Tensor) -> Tensor {
-    return lhs.broadcast(toRank: rhs.rank) ⊗ rhs
+    return Tensor(lhs) ⊗ rhs
   }
 
   @_inlineable
   static func ⊗ (lhs: Tensor, rhs: Element) -> Tensor {
-    return lhs ⊗ rhs.broadcast(toRank: lhs.rank)
+    return lhs ⊗ Tensor(rhs)
   }
 
   @inline(never) // make @_inlinable when implemented.
@@ -248,12 +261,12 @@ public extension Tensor /*: Comparable*/ where Element : Comparable {
 
   @_inlineable
   static func < (lhs: Tensor, rhs: Element) -> Tensor<Bool> {
-    return lhs < rhs.broadcast(toRank: lhs.rank)
+    return lhs < Tensor(rhs)
   }
 
   @_inlineable
   static func < (lhs: Element, rhs: Tensor) -> Tensor<Bool> {
-    return lhs.broadcast(toRank: rhs.rank) < rhs
+    return Tensor(lhs) < rhs
   }
 }
 
@@ -265,12 +278,12 @@ public extension Tensor /*: Equatable*/ where Element : Equatable {
 
   @_inlineable
   static func == (lhs: Tensor, rhs: Element) -> Tensor<Bool> {
-      return lhs == rhs.broadcast(toRank: lhs.rank)
+    return lhs == Tensor(rhs)
   }
 
   @_inlineable
   static func == (lhs: Element, rhs: Tensor) -> Tensor<Bool> {
-      return lhs.broadcast(toRank: rhs.rank) == rhs
+    return Tensor(lhs) == rhs
   }
 }
 
@@ -402,5 +415,39 @@ public extension Tensor2D where Element : Numeric {
     lhs: Tensor1D<Element>, rhs: Tensor2D<Element>
   ) -> Tensor1D<Element> {
     return Tensor1D(underlying: lhs.underlyingTensor.dot(rhs.underlyingTensor))
+  }
+}
+
+public extension Tensor {
+  @_inlineable
+  var shapeTensor: Tensor<Int32> {
+    return Tensor<Int32>(#tfop("Shape", "t:t<int32>", handle))
+  }
+
+  @_inlineable
+  var rankTensor: Tensor<Int32> {
+    return Tensor<Int32>(#tfop("Rank", "t:t<int32>", handle))
+  }
+
+  @_inlineable
+  var totalElementCountTensor: Tensor<Int32> {
+    return Tensor<Int32>(#tfop("Size", "t:t<int32>", handle))
+  }
+}
+
+/// Slicing
+public extension Tensor {
+  /// Returns a subdimensional tensor at the specified list of indices.
+  /// - Todo: If possible, this should be defined as an op, to be run on the
+  /// accelerator.
+  subscript(indices: Int...) -> Tensor {
+    fatalError("FIXME: implement subscript to tensor")
+  }
+
+  // Slicing out a range of elements.
+  // TODO: begin/end are vectors in general.
+  // tfop_slice(tensor, begin, end) -> tensor
+  subscript(bounds: Range<Int>) -> Tensor {
+    fatalError("FIXME: implement subscript to tensor")
   }
 }
