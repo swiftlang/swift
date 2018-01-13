@@ -41,12 +41,6 @@
 using namespace swift;
 
 #if SWIFT_OBJC_INTEROP
-// Declare the debugQuickLookObject selector.
-@interface DeclareSelectors
-
-- (id)debugQuickLookObject;
-@end
-
 // mangled Swift._SwiftObject
 #define SwiftObject _TtCs12_SwiftObject
 @class SwiftObject;
@@ -893,22 +887,6 @@ void swift_ObjCMirror_subscript(String *outString,
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
   abort();
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-id
-swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
-                                  const Metadata *type) {
-  id object = [*reinterpret_cast<const id *>(value) retain];
-  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
-  if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
-    id quickLookObject = [object debugQuickLookObject];
-    [quickLookObject retain];
-    [object release];
-    return quickLookObject;
-  }
-
-  return object;
 }
 
 #endif

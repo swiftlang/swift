@@ -323,24 +323,6 @@ internal func _getClassCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ClassMirror_subscript")
 internal func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
-#if _runtime(_ObjC)
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_ClassMirror_quickLookObject")
-public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
-internal func _swift_NSObject_isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
-  return _swift_NSObject_isImpl(object, kindOf: `class` as AnyObject)
-}
-
-#endif
-
 @_versioned
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct _ClassMirror : _Mirror {
