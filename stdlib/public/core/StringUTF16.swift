@@ -445,13 +445,6 @@ extension String.UTF16View : CustomReflectable {
   }
 }
 
-extension String.UTF16View : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
-
 extension String.UTF16View.Indices : BidirectionalCollection {
   public typealias Index = String.UTF16View.Index
   public typealias Indices = String.UTF16View.Indices

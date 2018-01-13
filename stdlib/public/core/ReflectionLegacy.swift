@@ -59,9 +59,6 @@ public protocol _Mirror {
   /// A string description of `value`.
   var summary: String { get }
 
-  /// A rich representation of `value` for an IDE, or `nil` if none is supplied.
-  var quickLookObject: PlaygroundQuickLook? { get }
-
   /// How `value` should be presented in an IDE.
   var disposition: _MirrorDisposition { get }
 }
@@ -154,9 +151,6 @@ internal struct _OpaqueMirror : _Mirror {
   internal var summary: String { return data.summary }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var disposition: _MirrorDisposition { return .aggregate }
 }
 
@@ -208,9 +202,6 @@ internal struct _TupleMirror : _Mirror {
   internal var summary: String { return "(\(count) elements)" }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var disposition: _MirrorDisposition { return .tuple }
 }
 
@@ -255,9 +246,6 @@ internal struct _StructMirror : _Mirror {
   internal var summary: String {
     return _typeName(valueType)
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var disposition: _MirrorDisposition { return .`struct` }
@@ -322,9 +310,6 @@ internal struct _EnumMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var disposition: _MirrorDisposition { return .`enum` }
 }
 
@@ -352,45 +337,6 @@ internal func _swift_NSObject_isImpl(_ object: AnyObject, kindOf: AnyObject) -> 
 @_versioned // FIXME(sil-serialize-all)
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
   return _swift_NSObject_isImpl(object, kindOf: `class` as AnyObject)
-}
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func _getClassPlaygroundQuickLook(
-  _ object: AnyObject
-) -> PlaygroundQuickLook? {
-  if _is(object, kindOf: "NSNumber") {
-    let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
-    switch UInt8(number.objCType[0]) {
-    case UInt8(ascii: "d"):
-      return .double(number.doubleValue)
-    case UInt8(ascii: "f"):
-      return .float(number.floatValue)
-    case UInt8(ascii: "Q"):
-      return .uInt(number.unsignedLongLongValue)
-    default:
-      return .int(number.longLongValue)
-    }
-  } else if _is(object, kindOf: "NSAttributedString") {
-    return .attributedString(object)
-  } else if _is(object, kindOf: "NSImage") ||
-            _is(object, kindOf: "UIImage") ||
-            _is(object, kindOf: "NSImageView") ||
-            _is(object, kindOf: "UIImageView") ||
-            _is(object, kindOf: "CIImage") ||
-            _is(object, kindOf: "NSBitmapImageRep") {
-    return .image(object)
-  } else if _is(object, kindOf: "NSColor") ||
-            _is(object, kindOf: "UIColor") {
-    return .color(object)
-  } else if _is(object, kindOf: "NSBezierPath") ||
-            _is(object, kindOf: "UIBezierPath") {
-    return .bezierPath(object)
-  } else if _is(object, kindOf: "NSString") {
-    return .text(_forceBridgeFromObjectiveC(object, String.self))
-  }
-
-  return .none
 }
 
 #endif
@@ -426,16 +372,6 @@ internal struct _ClassMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal var summary: String {
     return _typeName(valueType)
-  }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? {
-#if _runtime(_ObjC)
-    let object = _swift_ClassMirror_quickLookObject(data)
-    return _getClassPlaygroundQuickLook(object)
-#else
-    return nil
-#endif
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -478,9 +414,6 @@ internal struct _ClassSuperMirror : _Mirror {
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var disposition: _MirrorDisposition { return .`class` }
 }
 
@@ -518,9 +451,6 @@ internal struct _MetatypeMirror : _Mirror {
   internal var summary: String {
     return _typeName(data._loadValue(ofType: Any.Type.self))
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?
   @_inlineable // FIXME(sil-serialize-all)

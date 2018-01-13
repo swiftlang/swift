@@ -57,11 +57,6 @@ struct _ObjCMirror : _Mirror {
     return _getObjCSummary(data)
   }
   @_inlineable // FIXME(sil-serialize-all)
-  public var quickLookObject: PlaygroundQuickLook? {
-    let object = _swift_ClassMirror_quickLookObject(data)
-    return _getClassPlaygroundQuickLook(object)
-  }
-  @_inlineable // FIXME(sil-serialize-all)
   public var disposition: _MirrorDisposition { return .objCObject }
 }
 
@@ -92,11 +87,6 @@ struct _ObjCSuperMirror : _Mirror {
   @_inlineable // FIXME(sil-serialize-all)
   public var summary: String {
     return _getObjCSummary(data)
-  }
-  @_inlineable // FIXME(sil-serialize-all)
-  public var quickLookObject: PlaygroundQuickLook? {
-    let object = _swift_ClassMirror_quickLookObject(data)
-    return _getClassPlaygroundQuickLook(object)
   }
   @_inlineable // FIXME(sil-serialize-all)
   public var disposition: _MirrorDisposition { return .objCObject }

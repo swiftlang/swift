@@ -849,18 +849,6 @@ Reflection.test("NSObject is properly CustomDebugStringConvertible") {
   expectEqual(String(reflecting: object), object.debugDescription)
 }
 
-Reflection.test("NSRange QuickLook") {
-  let rng = NSRange(location:Int.min, length:5)
-  let ql = PlaygroundQuickLook(reflecting: rng)
-  switch ql {
-  case .range(let loc, let len):
-    expectEqual(loc, Int64(Int.min))
-    expectEqual(len, 5)
-  default:
-    expectUnreachable("PlaygroundQuickLook for NSRange did not match Range")
-  }
-}
-
 class SomeSubclass : SomeClass {}
 
 var ObjCConformsToProtocolTestSuite = TestSuite("ObjCConformsToProtocol")

@@ -142,12 +142,6 @@ dump(barrable)
 print("second verse same as the first:")
 dump(barrable)
 
-// CHECK-NEXT: Logical: true
-switch true.customPlaygroundQuickLook {
-  case .bool(let x): print("Logical: \(x)")
-  default: print("wrong quicklook type")
-}
-
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements
 // CHECK-NEXT: 1

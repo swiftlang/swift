@@ -632,13 +632,6 @@ extension String.UTF8View : CustomReflectable {
   }
 }
 
-extension String.UTF8View : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
-
 // backward compatibility for index interchange.  
 extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)

@@ -994,21 +994,6 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var summary: String {
-    let selfType = "${Self}"
-    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(summary)
-  }
-}
-
 extension Int {
   /// Creates a new value with the bit pattern of the given pointer.
   ///

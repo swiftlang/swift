@@ -13,42 +13,6 @@
 import Foundation
 @_exported import AppKit
 
-extension NSCursor : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
-    return .image(image)
-  }
-}
-
-internal struct _NSViewQuickLookState {
-  static var views = Set<NSView>()
-}
-
-extension NSView : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
-    // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
-    // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
-    // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
-    // until you run out of stack and crash
-    // This code checks that we aren't trying to log the same view recursively - and if so just returns
-    // an empty view, which is probably a safer option than crashing
-    // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
-    if _NSViewQuickLookState.views.contains(self) {
-      return .view(NSImage())
-    } else {
-      _NSViewQuickLookState.views.insert(self)
-      let result: PlaygroundQuickLook
-      if let b = bitmapImageRepForCachingDisplay(in: bounds) {
-        cacheDisplay(in: bounds, to: b)
-        result = .view(b)
-      } else {
-        result = .view(NSImage())
-      }
-      _NSViewQuickLookState.views.remove(self)
-      return result
-    }
-  }
-}
-
 // Overlays for variadics.
 
 public extension NSGradient {

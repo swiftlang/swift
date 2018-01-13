@@ -111,9 +111,3 @@ extension NSString {
     self.init(string: aString as String)
   }
 }
-
-extension NSString : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(self as String)
-  }
-}

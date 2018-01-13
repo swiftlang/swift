@@ -409,24 +409,6 @@ ${SelfName}TestSuite.test("customMirror") {
 #endif
 }
 
-${SelfName}TestSuite.test("customPlaygroundQuickLook") {
-  // Ensure that the custom playground quicklook works properly, including when
-  // the raw value is greater than Int.max
-  let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = ${SelfType}(bitPattern: reallyBigInt)!
-  if case let .text(desc) = ptr.customPlaygroundQuickLook {
-#if arch(i386) || arch(arm)
-    expectEqual("${SelfName}(0xFFFFFFFF80000000)", desc)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-    expectEqual("${SelfName}(0x8000000000000000)", desc)
-#else
-    fatalError("Unimplemented")
-#endif
-  } else {
-    expectTrue(false)
-  }
-}
-
 ${SelfName}TestSuite.test("Comparable") {
   var addresses: [UInt] = [
     0x00000001,

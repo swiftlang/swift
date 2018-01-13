@@ -225,42 +225,6 @@ public extension UIAlertView {
 }
 #endif
 
-#if !os(watchOS)
-internal struct _UIViewQuickLookState {
-  static var views = Set<UIView>()
-}
-
-extension UIView : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
-    if _UIViewQuickLookState.views.contains(self) {
-      return .view(UIImage())
-    } else {
-      _UIViewQuickLookState.views.insert(self)
-      // in case of an empty rectangle abort the logging
-      if (bounds.size.width == 0) || (bounds.size.height == 0) {
-        return .view(UIImage())
-      }
-
-      UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
-      // UIKit is about to update this to be optional, so make it work
-      // with both older and newer SDKs. (In this context it should always
-      // be present.)
-      let ctx: CGContext! = UIGraphicsGetCurrentContext()
-      UIColor(white:1.0, alpha:0.0).set()
-      ctx.fill(bounds)
-      layer.render(in: ctx)
-
-      let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
-
-      UIGraphicsEndImageContext()
-
-      _UIViewQuickLookState.views.remove(self)
-      return .view(image)
-    }
-  }
-}
-#endif
-
 extension UIColor : _ExpressibleByColorLiteral {
   @nonobjc public required convenience init(_colorLiteralRed red: Float,
                                             green: Float,

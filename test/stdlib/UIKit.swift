@@ -147,25 +147,6 @@ UIKitTests.test("UILayoutPriority") {
 }
 #endif
 
-#if !os(watchOS)
-class TestChildView : UIView, CustomPlaygroundQuickLookable {
-  convenience init() {
-    self.init(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
-  }
-  var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text("child")
-  }
-}
-
-UIKitTests.test("CustomPlaygroundQuickLookable") {
-  switch PlaygroundQuickLook(reflecting: TestChildView()) {
-  case .text("child"): break
-  default: expectUnreachable(
-    "TestChildView custom quicklookable should have been invoked")
-  }
-}
-#endif
-
 UIKitTests.test("NSValue bridging") {
   expectBridgeToNSValue(UIEdgeInsets(top: 17, left: 38, bottom: 6, right: 79),
                         nsValueInitializer: { NSValue(uiEdgeInsets: $0) },

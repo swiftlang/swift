@@ -542,13 +542,6 @@ extension String.UnicodeScalarView : CustomReflectable {
   }
 }
 
-extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
-
 // backward compatibility for index interchange.  
 extension String.UnicodeScalarView {
   @_inlineable // FIXME(sil-serialize-all)

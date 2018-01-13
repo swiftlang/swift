@@ -86,12 +86,6 @@ extension MyString : CustomReflectable {
   }
 }
 
-extension MyString : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return base.customPlaygroundQuickLook
-  }
-}
-
 extension MyString : CustomDebugStringConvertible {
   public var debugDescription: String {
     return "(***MyString***)"

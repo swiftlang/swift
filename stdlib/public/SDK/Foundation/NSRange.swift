@@ -197,12 +197,6 @@ extension NSRange : CustomReflectable {
     }
 }
 
-extension NSRange : CustomPlaygroundQuickLookable {
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
-        return .range(Int64(location), Int64(length))
-    }
-}
-
 extension NSRange : Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()

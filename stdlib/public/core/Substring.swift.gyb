@@ -336,13 +336,6 @@ extension Substring : CustomReflectable {
   }
 }
 
-extension Substring : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return String(self).customPlaygroundQuickLook
-  }
-}
-
 extension Substring : CustomStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {

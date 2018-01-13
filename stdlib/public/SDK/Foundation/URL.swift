@@ -1201,12 +1201,6 @@ extension NSURL : _HasCustomAnyHashableRepresentation {
     }
 }
 
-extension URL : CustomPlaygroundQuickLookable {
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
-        return .url(absoluteString)
-    }
-}
-
 extension URL : Codable {
     private enum CodingKeys : Int, CodingKey {
         case base
