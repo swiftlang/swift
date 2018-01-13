@@ -38,7 +38,7 @@ constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
-/// The Mach-O section name for the section containing type references.
+/// The Mach-O section name for the section containing type field references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeFieldRecordSection[] = "__swift3_fieldmd";
 
@@ -87,7 +87,7 @@ void swift::initializeTypeMetadataRecordLookup() {
 
 void swift::initializeTypeFieldLookup() {
   _dyld_register_func_for_add_image(
-      addImageCallback<TypeMetadataRecordSection,
+      addImageCallback<TypeFieldRecordSection,
                        addImageTypeFieldDescriptorBlockCallback>);
 }
 

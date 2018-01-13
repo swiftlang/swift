@@ -42,6 +42,7 @@
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 
 namespace swift {
@@ -3765,6 +3766,11 @@ void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift_getFieldAt(
+    const Metadata *type, unsigned index,
+    llvm::function_ref<void(llvm::StringRef name, FieldType type)> callback);
 
 } // end namespace swift
 

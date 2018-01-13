@@ -552,25 +552,26 @@ void swift_StructMirror_subscript(String *outString,
   if (i < 0 || (size_t)i > Struct->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
-  // Load the type and offset from their respective vectors.
-  auto fieldType = Struct->getFieldTypes()[i];
+  // Load the offset from its vector.
   auto fieldOffset = Struct->getFieldOffsets()[i];
 
-  auto bytes = reinterpret_cast<char*>(value);
-  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+  swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    new (outString) String(name.data(), name.size());
 
-  new (outString) String(getFieldName(Struct->getDescription()->FieldNames, i));
+    // 'owner' is consumed by this call.
+    SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
 
-  // 'owner' is consumed by this call.
-  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
+    assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
 
-  assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
+    auto bytes = reinterpret_cast<char *>(value);
+    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
-  // This only consumed owner if we succeed.
-  if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
-    return;
+    // This only consumed owner if we succeed.
+    if (loadSpecialReferenceStorage(owner, fieldData, fieldInfo, outMirror))
+      return;
 
-  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
+    new (outMirror) Mirror(reflect(owner, fieldData, fieldInfo.getType()));
+  });
 }
 
 // -- Enum destructuring.
@@ -791,11 +792,6 @@ void swift_ClassMirror_subscript(String *outString,
   if (i < 0 || (size_t)i > Clas->getDescription()->NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
 
-  // Load the type and offset from their respective vectors.
-  auto fieldType = Clas->getFieldTypes()[i];
-  assert(!fieldType.isIndirect()
-         && "class indirect properties not implemented");
-
   // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
   // metadata, because we don't update the field offsets in the face of
   // resilient base classes.
@@ -812,16 +808,21 @@ void swift_ClassMirror_subscript(String *outString,
 #endif
   }
 
-  auto bytes = *reinterpret_cast<char * const *>(value);
-  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+  swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    assert(!fieldInfo.isIndirect() &&
+           "class indirect properties not implemented");
 
-  new (outString) String(getFieldName(Clas->getDescription()->FieldNames, i));
+    auto bytes = *reinterpret_cast<char *const *>(value);
+    auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
- if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
-   return;
+    new (outString) String(name.data(), name.size());
 
-  // 'owner' is consumed by this call.
-  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
+    if (loadSpecialReferenceStorage(owner, fieldData, fieldInfo, outMirror))
+      return;
+
+    // 'owner' is consumed by this call.
+    new (outMirror) Mirror(reflect(owner, fieldData, fieldInfo.getType()));
+  });
 }
 
 // -- Mirror witnesses for ObjC classes.

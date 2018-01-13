@@ -60,7 +60,8 @@ public:
     return aName.compare(Name);
   }
 
-  template <class... T> static size_t getExtraAllocationSize(T &&... ignored) {
+  template <class... Args>
+  static size_t getExtraAllocationSize(Args &&... ignored) {
     return 0;
   }
 };
@@ -386,48 +387,48 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
   return foundProtocol;
 }
 
-#pragma Type field descriptors cache
+#pragma mark Type field descriptor cache
 namespace {
-struct FieldMetadataSection {
-  const FieldDescriptor *Begin, *End;
-  const FieldDescriptor *begin() const { return Begin; }
-  const FieldDescriptor *end() const { return End; }
+class FieldSection {
+  const void *Begin;
+  const void *End;
+
+public:
+  FieldSection(const void *begin, const void *end)
+    : Begin(begin), End(end) {}
+
+  FieldDescriptorIterator begin() const {
+    return FieldDescriptorIterator(Begin, End);
+  }
+
+  FieldDescriptorIterator end() const {
+    return FieldDescriptorIterator(End, End);
+  }
 };
 
-struct TypeFieldMetadataState {
+struct FieldCacheState {
   ConcurrentMap<DescriptorCacheEntry<FieldDescriptor>> FieldCache;
-  std::vector<FieldMetadataSection> SectionsToScan;
+  std::vector<FieldSection> SectionsToScan;
   Mutex SectionsToScanLock;
 
-  TypeFieldMetadataState() {
+  FieldCacheState() {
     SectionsToScan.reserve(16);
     initializeTypeFieldLookup();
   }
 };
 
-static Lazy<TypeFieldMetadataState> TypeFields;
+static Lazy<FieldCacheState> FieldCache;
 } // namespace
-
-static void _registerTypeFields(TypeFieldMetadataState &C,
-                                const FieldDescriptor *begin,
-                                const FieldDescriptor *end) {
-  ScopedLock guard(C.SectionsToScanLock);
-  C.SectionsToScan.push_back(FieldMetadataSection{begin, end});
-}
 
 void swift::addImageTypeFieldDescriptorBlockCallback(const void *fields,
                                                      uintptr_t size) {
-  assert(size % sizeof(FieldDescriptor) == 0 &&
-         "fields section not a multiple of FieldDescriptor");
-
-  // If we have a section, enqueue the protocols for lookup.
-  auto fieldBytes = reinterpret_cast<const char *>(fields);
-  auto recordsB = reinterpret_cast<const FieldDescriptor *>(fields);
-  auto recordsE = reinterpret_cast<const FieldDescriptor *>(fieldBytes + size);
+  auto fieldSectionBytes = reinterpret_cast<const char *>(fields);
+  auto fieldsEnd = reinterpret_cast<const void *>(fieldSectionBytes + size);
 
   // Type field cache should always be sufficiently initialized by this point.
-  _registerTypeFields(TypeFields.unsafeGetAlreadyInitialized(), recordsB,
-                      recordsE);
+  auto &state = FieldCache.unsafeGetAlreadyInitialized();
+  ScopedLock guard(state.SectionsToScanLock);
+  state.SectionsToScan.push_back(FieldSection{fields, fieldsEnd});
 }
 
 #pragma mark Metadata lookup via mangled name
@@ -970,4 +971,58 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
 
       return flatSubstitutions[flatIndex];
     });
+}
+
+void swift::swift_getFieldAt(
+    const Metadata *base, unsigned index,
+    llvm::function_ref<void(llvm::StringRef name, FieldType fieldInfo)>
+        callback) {
+  auto &fields = FieldCache.get();
+  auto *baseDesc = base->getNominalTypeDescriptor();
+
+  if (!baseDesc)
+    return;
+
+  auto getFieldAt = [&](const FieldDescriptor &descriptor) {
+    auto &field = descriptor.getFields()[index];
+    auto name = field.getFieldName(0);
+    auto type = field.getMangledTypeName(0);
+
+    auto &genericParams = baseDesc->GenericParams;
+    auto numberOfLevels = genericParams.NestingDepth;
+    size_t paramsPerLevel[numberOfLevels];
+
+    for (unsigned i = 0; i < numberOfLevels; ++i) {
+      auto numParams = baseDesc->getGenericContext(i).NumPrimaryParams;
+      paramsPerLevel[i] = numParams;
+    }
+
+    auto *typeMetadata =
+        swift_getTypeByMangledName(type.data(), type.length(), numberOfLevels,
+                                   paramsPerLevel, base->getGenericArgs());
+
+    callback(name, FieldType()
+                       .withType(typeMetadata)
+                       .withIndirect(field.isIndirectCase()));
+
+  };
+
+  llvm::StringRef baseTypeName(baseDesc->Name.get());
+
+  if (auto Value = fields.FieldCache.find(baseTypeName)) {
+    getFieldAt(*Value->getDescription());
+    return;
+  }
+
+  for (auto &section : fields.SectionsToScan) {
+    for (const auto &descriptor : section) {
+      assert(descriptor.hasMangledTypeName());
+      auto nominalName = descriptor.getMangledTypeName(0);
+      if (baseTypeName.equals(nominalName)) {
+        fields.FieldCache.getOrInsert(baseTypeName, &descriptor);
+        getFieldAt(descriptor);
+        return;
+      }
+    }
+  }
 }
