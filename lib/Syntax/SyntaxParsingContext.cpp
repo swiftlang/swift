@@ -35,8 +35,7 @@ static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
   return RawSyntax::make(Kind, Layout, SourcePresence::Present);
 }
 
-static RC<RawSyntax> createSyntaxAs(SyntaxKind Kind,
-                                    ArrayRef<RC<RawSyntax>> Parts) {
+RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
   // Convert RawSyntax to Syntax for SyntaxFactory.
   llvm::SmallVector<Syntax, 8> Scratch;
   std::transform(Parts.begin(), Parts.end(), std::back_inserter(Scratch),
@@ -49,13 +48,14 @@ static RC<RawSyntax> createSyntaxAs(SyntaxKind Kind,
   // Fallback to unknown syntax for the category.
   return makeUnknownSyntax(getUnknownKind(Kind), Parts);
 }
-
-} // End of anonymous namespace
+}// End of anonymous namespace
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
-                                           SourceFile &SF)
-    : Parent(nullptr), CtxtHolder(CtxtHolder), Mode(AccumulationMode::Root),
-      SF(&SF), Enabled(SF.shouldKeepSyntaxInfo()) {
+                                           SourceFile &SF,
+                                           DiagnosticEngine &Diags)
+    : RootDataOrParent(new RootContextData(SF, Diags)),
+      CtxtHolder(CtxtHolder), Mode(AccumulationMode::Root),
+      Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
 }
 
@@ -67,7 +67,7 @@ void SyntaxParsingContext::addRawSyntax(RC<RawSyntax> Raw) {
 SyntaxParsingContext *SyntaxParsingContext::getRoot() {
   auto Curr = this;
   while (!Curr->isRoot())
-    Curr = Curr->Parent;
+    Curr = Curr->getParent();
   return Curr;
 }
 
@@ -209,13 +209,13 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
   }
 }
 
-void finalizeSourceFile(SourceFile *SF, ArrayRef<RC<RawSyntax>> Parts) {
+void finalizeSourceFile(SourceFile &SF, ArrayRef<RC<RawSyntax>> Parts) {
   std::vector<DeclSyntax> AllTopLevel;
   llvm::Optional<TokenSyntax> EOFToken;
 
-  if (SF->hasSyntaxRoot()) {
-    EOFToken.emplace(SF->getSyntaxRoot().getEOFToken());
-    for (auto It : SF->getSyntaxRoot().getTopLevelDecls()) {
+  if (SF.hasSyntaxRoot()) {
+    EOFToken.emplace(SF.getSyntaxRoot().getEOFToken());
+    for (auto It : SF.getSyntaxRoot().getTopLevelDecls()) {
       AllTopLevel.push_back(It);
     }
   }
@@ -233,12 +233,11 @@ void finalizeSourceFile(SourceFile *SF, ArrayRef<RC<RawSyntax>> Parts) {
     AllTopLevel.push_back(
         SyntaxFactory::makeTopLevelCodeDecl(make<StmtListSyntax>(RawNode)));
   }
-  SF->setSyntaxRoot(SyntaxFactory::makeSourceFile(
+  SF.setSyntaxRoot(SyntaxFactory::makeSourceFile(
       SyntaxFactory::makeDeclList(AllTopLevel),
       EOFToken.hasValue() ? *EOFToken
                           : TokenSyntax::missingToken(tok::eof, "")));
 }
-
 } // End of anonymous namespace
 
 SyntaxParsingContext::~SyntaxParsingContext() {
@@ -247,7 +246,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   SWIFT_DEFER {
     // Pop this context from the stack.
     if (!isRoot())
-      CtxtHolder = Parent;
+      CtxtHolder = getParent();
+    else
+      delete RootDataOrParent.get<RootContextData*>();
   };
 
   if (!Enabled)
@@ -256,20 +257,17 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   switch (Mode) {
   // Create specified Syntax node from the parts and add it to the parent.
   case AccumulationMode::CreateSyntax:
-    assert(!isRoot());
-    Parent->addRawSyntax(createSyntaxAs(SynKind, Parts));
+    getParent()->addRawSyntax(createSyntaxAs(SynKind, Parts));
     break;
 
   // Ensure the result is specified Syntax category and add it to the parent.
   case AccumulationMode::CoerceKind:
-    assert(!isRoot());
-    Parent->addRawSyntax(bridgeAs(CtxtKind, Parts));
+    getParent()->addRawSyntax(bridgeAs(CtxtKind, Parts));
     break;
 
   // Just move the parts to the tail of the parent.
   case AccumulationMode::Transparent:
-    assert(!isRoot());
-    std::move(Parts.begin(), Parts.end(), std::back_inserter(Parent->Parts));
+    std::move(Parts.begin(), Parts.end(), std::back_inserter(getParent()->Parts));
     break;
 
   // Do nothing. Just let it discarded.
@@ -280,12 +278,12 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
     assert(isRoot() && "AccumulationMode::Root is only for root context");
-    finalizeSourceFile(SF, Parts);
+    finalizeSourceFile(getRootData().SF, Parts);
     break;
 
   // Never.
   case AccumulationMode::NotSet:
-    assert(!Enabled && "Cleanup mode must be spefcified before destruction");
+    assert(!Enabled && "Cleanup mode must be specified before destruction");
     break;
   }
 }

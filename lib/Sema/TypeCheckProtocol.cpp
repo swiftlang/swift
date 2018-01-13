@@ -255,7 +255,6 @@ static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
   case AccessorKind::IsMaterializeForSet:
     return true;
 
-  case AccessorKind::NotAccessor:
   case AccessorKind::IsWillSet:
   case AccessorKind::IsDidSet:
     llvm_unreachable("willSet/didSet protocol requirement?");
@@ -263,8 +262,8 @@ static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
   llvm_unreachable("bad accessor kind");
 }
 
-static FuncDecl *getAddressorForRequirement(AbstractStorageDecl *witness,
-                                            AccessorKind reqtKind) {
+static AccessorDecl *getAddressorForRequirement(AbstractStorageDecl *witness,
+                                                AccessorKind reqtKind) {
   assert(witness->hasAddressors());
   if (shouldUseSetterRequirements(reqtKind))
     return witness->getMutableAddressor();
@@ -288,21 +287,21 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
     witnessMutating = (requirement->isInstanceMember() &&
                        witness->isMutating());
   else {
-    assert(requirement->isAccessor());
+    auto reqtAsAccessor = cast<AccessorDecl>(requirement);
     auto storage = cast<AbstractStorageDecl>(witnessDecl);
     switch (storage->getStorageKind()) {
 
     // A stored property on a value type will have a mutating setter
     // and a non-mutating getter.
     case AbstractStorageDecl::Stored:
-      witnessMutating = requirement->isInstanceMember() &&
-        shouldUseSetterRequirements(requirement->getAccessorKind());
+      witnessMutating = reqtAsAccessor->isInstanceMember() &&
+        shouldUseSetterRequirements(reqtAsAccessor->getAccessorKind());
       break;
 
     // For an addressed property, consider the appropriate addressor.
     case AbstractStorageDecl::Addressed: {
-      FuncDecl *addressor =
-        getAddressorForRequirement(storage, requirement->getAccessorKind());
+      AccessorDecl *addressor =
+        getAddressorForRequirement(storage, reqtAsAccessor->getAccessorKind());
       witnessMutating = addressor->isMutating();
       break;
     }
@@ -3214,10 +3213,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       continue;
     }
 
-    // If this is a getter/setter for a funcdecl, ignore it.
-    if (auto *FD = dyn_cast<FuncDecl>(requirement))
-      if (FD->isAccessor())
-        continue;
+    // If this is an accessor for a storage decl, ignore it.
+    if (isa<AccessorDecl>(requirement))
+      continue;
     
     // Try to resolve the witness via explicit definitions.
     switch (resolveWitnessViaLookup(requirement)) {
@@ -4535,10 +4533,10 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   if (!nominal) return result;
 
   DeclName name = witness->getFullName();
-  auto accessorKind = AccessorKind::NotAccessor;
-  if (auto *fn = dyn_cast<FuncDecl>(witness)) {
-    accessorKind = fn->getAccessorKind();
-    switch (accessorKind) {
+  Optional<AccessorKind> accessorKind;
+  if (auto *accessor = dyn_cast<AccessorDecl>(witness)) {
+    accessorKind = accessor->getAccessorKind();
+    switch (*accessorKind) {
     case AccessorKind::IsAddressor:
     case AccessorKind::IsMutableAddressor:
     case AccessorKind::IsMaterializeForSet:
@@ -4551,10 +4549,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::IsGetter:
     case AccessorKind::IsSetter:
       // These are found relative to the main decl.
-      name = fn->getAccessorStorageDecl()->getFullName();
-      break;
-    case AccessorKind::NotAccessor:
-      // Do nothing.
+      name = accessor->getStorage()->getFullName();
       break;
     }
   }
@@ -4607,18 +4602,18 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
         }
 
         const ValueDecl *witnessToMatch = witness;
-        if (accessorKind != AccessorKind::NotAccessor)
-          witnessToMatch = cast<FuncDecl>(witness)->getAccessorStorageDecl();
+        if (accessorKind)
+          witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
         if (matchWitness(*this, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {
-          if (accessorKind != AccessorKind::NotAccessor) {
+          if (accessorKind) {
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
               continue;
-            req = storageReq->getAccessorFunction(accessorKind);
+            req = storageReq->getAccessorFunction(*accessorKind);
             if (!req)
               continue;
           }
@@ -4631,15 +4626,15 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
 
       // Dig out the appropriate accessor, if necessary.
-      if (accessorKind != AccessorKind::NotAccessor) {
+      if (accessorKind) {
         auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
         auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
         if (!storageReq || !storageFound)
           continue;
-        req = storageReq->getAccessorFunction(accessorKind);
+        req = storageReq->getAccessorFunction(*accessorKind);
         if (!req)
           continue;
-        found = storageFound->getAccessorFunction(accessorKind);
+        found = storageFound->getAccessorFunction(*accessorKind);
       }
 
       // Determine whether the witness for this conformance is in fact

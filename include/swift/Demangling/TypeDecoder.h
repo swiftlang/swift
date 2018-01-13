@@ -27,6 +27,11 @@
 namespace swift {
 namespace Demangle {
 
+/// Strip generic arguments from the "spine" of a context node, producing a
+/// bare context to be used in (e.g.) forming nominal type descriptors.
+NodePointer stripGenericArgsFromContextNode(const NodePointer &node,
+                                            NodeFactory &factory);
+
 /// Describe a function parameter, parameterized on the type
 /// representation.
 template <typename BuiltType>
@@ -74,6 +79,7 @@ template <typename BuilderType>
 class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
   using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;
@@ -89,14 +95,25 @@ class TypeDecoder {
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
     case NodeKind::Global:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::TypeMangling:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Type:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
     case NodeKind::Enum:
-    case NodeKind::Structure: {
+    case NodeKind::Structure:
+    case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
       if (!decodeMangledNominalType(Node, typeDecl, parent))
@@ -107,7 +124,9 @@ class TypeDecoder {
     case NodeKind::BoundGenericClass:
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure: {
-      assert(Node->getNumChildren() == 2);
+      if (Node->getNumChildren() != 2)
+        return BuiltType();
+
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
       if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
@@ -146,7 +165,10 @@ class TypeDecoder {
           return BuiltType();
         if (repr->getText() != "@thin")
           wasAbstract = true;
+      } else if (Node->getNumChildren() < 1) {
+        return BuiltType();
       }
+
       auto instance = decodeMangledType(Node->getChild(i));
       if (!instance)
         return BuiltType();
@@ -161,80 +183,57 @@ class TypeDecoder {
         return nullptr;
       }
     }
-    case NodeKind::ProtocolList: {
-      std::vector<BuiltType> protocols;
-      auto TypeList = Node->getChild(0);
-      for (auto componentType : *TypeList) {
-        if (auto protocol = decodeMangledType(componentType))
-          protocols.push_back(protocol);
-        else
-          return BuiltType();
-      }
-      if (protocols.size() == 1)
-        return protocols.front();
-      return Builder.createProtocolCompositionType(
-          protocols,
-          /*hasExplicitAnyObject=*/false);
-    }
-    case NodeKind::ProtocolListWithAnyObject: {
-      std::vector<BuiltType> protocols;
-      auto ProtocolList = Node->getChild(0);
-      auto TypeList = ProtocolList->getChild(0);
-      for (auto componentType : *TypeList) {
-        if (auto protocol = decodeMangledType(componentType))
-          protocols.push_back(protocol);
-        else
-          return BuiltType();
-      }
-      return Builder.createProtocolCompositionType(
-          protocols,
-          /*hasExplicitAnyObject=*/true);
-    }
+    case NodeKind::ProtocolList:
+    case NodeKind::ProtocolListWithAnyObject:
     case NodeKind::ProtocolListWithClass: {
-      std::vector<BuiltType> members;
-      auto ProtocolList = Node->getChild(0);
-      auto TypeList = ProtocolList->getChild(0);
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      // Find the protocol list.
+      std::vector<BuiltProtocolDecl> Protocols;
+      auto TypeList = Node->getChild(0);
+      if (TypeList->getKind() == NodeKind::ProtocolList &&
+          TypeList->getNumChildren() >= 1) {
+        TypeList = TypeList->getChild(0);
+      }
+
+      // Demangle the protocol list.
       for (auto componentType : *TypeList) {
-        if (auto protocol = decodeMangledType(componentType))
-          members.push_back(protocol);
+        if (auto Protocol = decodeMangledProtocolType(componentType))
+          Protocols.push_back(Protocol);
         else
           return BuiltType();
       }
 
-      auto SuperclassNode = Node->getChild(1);
-      if (auto superclass = decodeMangledType(SuperclassNode))
-        members.push_back(superclass);
+      // Superclass or AnyObject, if present.
+      bool IsClassBound = false;
+      auto Superclass = BuiltType();
+      if (Node->getKind() == NodeKind::ProtocolListWithClass) {
+        if (Node->getNumChildren() < 2)
+          return BuiltType();
 
-      return Builder.createProtocolCompositionType(
-          members,
-          /*hasExplicitAnyObject=*/true);
-    }
-    case NodeKind::Protocol: {
-      auto moduleName = Node->getChild(0)->getText();
-      auto nameNode = Node->getChild(1);
-      std::string privateDiscriminator, name;
-      if (nameNode->getKind() == NodeKind::PrivateDeclName) {
-        privateDiscriminator = nameNode->getChild(0)->getText();
-        name = nameNode->getChild(1)->getText();
-      } else if (nameNode->getKind() == NodeKind::Identifier) {
-        name = Node->getChild(1)->getText();
-      } else {
-        return BuiltType();
+        auto superclassNode = Node->getChild(1);
+        Superclass = decodeMangledType(superclassNode);
+        if (!Superclass) return BuiltType();
+
+        IsClassBound = true;
+      } else if (Node->getKind() == NodeKind::ProtocolListWithAnyObject) {
+        IsClassBound = true;
       }
 
-      // Consistent handling of protocols and protocol compositions
-      Demangle::Demangler Dem;
-      auto protocolList = Dem.createNode(NodeKind::ProtocolList);
-      auto typeList = Dem.createNode(NodeKind::TypeList);
-      auto type = Dem.createNode(NodeKind::Type);
-      type->addChild(Node, Dem);
-      typeList->addChild(type, Dem);
-      protocolList->addChild(typeList, Dem);
-
-      auto mangledName = Demangle::mangleNode(protocolList);
-      return Builder.createProtocolType(mangledName, moduleName,
-                                        privateDiscriminator, name);
+      return Builder.createProtocolCompositionType(Protocols, Superclass,
+                                                   IsClassBound);
     }
+
+    case NodeKind::Protocol: {
+      if (auto Proto = decodeMangledProtocolType(Node)) {
+        return Builder.createProtocolCompositionType(Proto, BuiltType(),
+                                                     /*IsClassBound=*/false);
+      }
+
+      return BuiltType();
+    }
+
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
@@ -244,6 +243,9 @@ class TypeDecoder {
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
     case NodeKind::FunctionType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -257,6 +259,9 @@ class TypeDecoder {
       bool isThrow =
         Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
       flags = flags.withThrows(isThrow);
+
+      if (isThrow && Node->getNumChildren() < 3)
+        return BuiltType();
 
       bool hasParamFlags = false;
       std::vector<FunctionParam<BuiltType>> parameters;
@@ -313,10 +318,19 @@ class TypeDecoder {
 
       return Builder.createFunctionType(parameters, result, flags);
     }
+
     case NodeKind::ArgumentTuple:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::ReturnType:
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::Tuple: {
       std::vector<BuiltType> elements;
       std::string labels;
@@ -359,43 +373,77 @@ class TypeDecoder {
       return Builder.createTupleType(elements, std::move(labels), variadic);
     }
     case NodeKind::TupleElement:
-      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName) {
+        if (Node->getNumChildren() < 2)
+          return BuiltType();
+
         return decodeMangledType(Node->getChild(1));
+      }
       return decodeMangledType(Node->getChild(0));
+
     case NodeKind::DependentGenericType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(1));
     }
     case NodeKind::DependentMemberType: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       auto member = Node->getChild(1)->getText();
-      auto protocol = decodeMangledType(Node->getChild(1));
+      auto assocTypeChild = Node->getChild(1);
+      if (assocTypeChild->getNumChildren() < 1)
+        return BuiltType();
+
+      auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(0));
       if (!protocol)
         return BuiltType();
       return Builder.createDependentMemberType(member, base, protocol);
     }
-    case NodeKind::DependentAssociatedTypeRef:
+    case NodeKind::DependentAssociatedTypeRef: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       return decodeMangledType(Node->getChild(0));
+    }
     case NodeKind::Unowned: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createUnownedStorageType(base);
     }
     case NodeKind::Unmanaged: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createUnmanagedStorageType(base);
     }
     case NodeKind::Weak: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
       return Builder.createWeakStorageType(base);
     }
     case NodeKind::SILBoxType: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
@@ -418,7 +466,9 @@ private:
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
-    assert(node->getNumChildren() == 2);
+    if (node->getNumChildren() < 2)
+      return false;
+
     auto moduleOrParentType = node->getChild(0);
 
     // Nested types are handled a bit funny here because a
@@ -426,15 +476,32 @@ private:
     // in addition to a reference to the parent type. The
     // mangled name already includes the module and parent
     // types, if any.
+    Demangle::NodePointer nominalNode = node;
     if (moduleOrParentType->getKind() != NodeKind::Module) {
       parent = decodeMangledType(moduleOrParentType);
       if (!parent) return false;
+
+      // Remove any generic arguments from the context node, producing a
+      // node that reference the nominal type declaration.
+      nominalNode =
+        stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
     }
 
-    typeDecl = Builder.createNominalTypeDecl(node);
+    typeDecl = Builder.createNominalTypeDecl(nominalNode);
     if (!typeDecl) return false;
 
     return true;
+  }
+
+  BuiltProtocolDecl decodeMangledProtocolType(
+                                           const Demangle::NodePointer &node) {
+    if (node->getKind() == NodeKind::Type)
+      return decodeMangledProtocolType(node->getChild(0));
+
+    if (node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
+      return BuiltProtocolDecl();
+
+    return Builder.createProtocolDecl(node);
   }
 
   bool decodeMangledFunctionInputType(

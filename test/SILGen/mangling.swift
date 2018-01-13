@@ -77,13 +77,13 @@ func single_protocol_composition(x: protocol<Foo>) {} // expected-warning {{'pro
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
-// CHECK-LABEL: sil hidden @$S8mangling28uses_objc_class_and_protocol1o1pySo8NSObjectC_So8NSAnsing_ptF
-func uses_objc_class_and_protocol(o: NSObject, p: NSAnsing) {}
+// CHECK-LABEL: sil hidden @$S8mangling28uses_objc_class_and_protocol1o1p2p2ySo8NSObjectC_So8NSAnsing_pSo14NSBetterAnsing_ptF
+func uses_objc_class_and_protocol(o: NSObject, p: NSAnsing, p2: BetterAnsing) {}
 
 // Clang-imported structs get mangled using their Clang module name.
 // FIXME: Temporarily mangles everything into the virtual module __C__
 // <rdar://problem/14221244>
-// CHECK-LABEL: sil hidden @$S8mangling17uses_clang_struct1rySC6NSRectV_tF
+// CHECK-LABEL: sil hidden @$S8mangling17uses_clang_struct1rySo6NSRectV_tF
 func uses_clang_struct(r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @$S8mangling14uses_optionals1xs7UnicodeO6ScalarVSgSiSg_tF

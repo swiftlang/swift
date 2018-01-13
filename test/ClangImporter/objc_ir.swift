@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -g -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -329,10 +329,20 @@ func customFactoryMethodsInherited() {
 // CHECK: load i8*, i8** @"\01L_selector(err7:callback:)"
 // CHECK: }
 
+
+// CHECK-LABEL: define hidden swiftcc void @"$S7objc_ir30testCompatibilityAliasMangling3objySo13SwiftNameTestC_tF"
+func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
+  // CHECK: call void @llvm.dbg.declare(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+}
+
+
 // CHECK: linkonce_odr hidden {{.*}} @"$SSo1BC3intSQyABGs5Int32V_tcfcTO"
 // CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
 // CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
 
 // CHECK: attributes [[NOUNWIND]] = { nounwind }
+
+// CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
+// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 

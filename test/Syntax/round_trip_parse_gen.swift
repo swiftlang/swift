@@ -223,6 +223,8 @@ func postfix() {
   foo(x:y:)()
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
+  _ = foo(&d)
+  _ = <#Placeholder#> + <#T##(Int) -> Int#>
 }
 
 #if blah
@@ -341,4 +343,22 @@ func foo() {
   de \(3 + 3 + "abc \(foo()) def")
   fg
   """
+}
+
+func keypath() {
+  _ = \a.?.b
+  _ = \a.b.c
+  _ = \a.b[1]
+  _ = \.a.b
+  _ = #keyPath(a.b.c)
+}
+
+func objectLiterals() {
+  #fileLiteral(a)
+  #colorLiteral(a, b)
+  #imageLiteral(a, b, c)
+  #column
+  #file
+  #function
+  #dsohandle
 }

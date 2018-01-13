@@ -119,6 +119,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
     single-source/ReversedCollections
+    single-source/RomanNumbers
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
@@ -145,6 +146,7 @@ set(SWIFT_BENCH_MODULES
     single-source/TypeFlood
     single-source/UTF8Decode
     single-source/Walsh
+    single-source/WordCount
     single-source/XorLoop
 )
 

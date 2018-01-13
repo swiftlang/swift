@@ -276,7 +276,7 @@ private:
 using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
 
 /// The result of importing a clang type. It holds both the Swift Type
-/// as well as a bool which true 'true' indicates either:
+/// as well as a bool in which 'true' indicates either:
 ///   This is an Optional type.
 ///   This is a function type where the result type is an Optional.
 /// It is otherwise 'false'.
@@ -303,9 +303,9 @@ public:
 #endif
   }
 
-  Type getType() { return type; }
+  Type getType() const { return type; }
 
-  bool isImplicitlyUnwrapped() { return isIUO; }
+  bool isImplicitlyUnwrapped() const { return isIUO; }
 
   // Allow a direct test in boolean contexts. It makes sense to base
   // this entirely on the type as the isIUO is meaningless for a null

@@ -1137,9 +1137,10 @@ public:
                                        SILLinkage linkage,
                                        Type selfInterfaceType, Type selfType,
                                        GenericEnvironment *genericEnv,
-                                       FuncDecl *requirement, FuncDecl *witness,
+                                       AccessorDecl *requirement,
+                                       AccessorDecl *witness,
                                        SubstitutionList witnessSubs);
-  void emitMaterializeForSet(FuncDecl *decl);
+  void emitMaterializeForSet(AccessorDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind);

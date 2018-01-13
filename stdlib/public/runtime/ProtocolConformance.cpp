@@ -596,10 +596,9 @@ swift::swift_conformsToProtocol(const Metadata * const type,
   }
 }
 
-const Metadata *
+const NominalTypeDescriptor *
 swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   auto &C = Conformances.get();
-  const Metadata *foundMetadata = nullptr;
 
   ScopedLock guard(C.SectionsToScanLock);
 
@@ -609,17 +608,21 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
-
-      if (foundMetadata != nullptr)
+      switch (record.getTypeKind()) {
+      case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+        if (auto ntd = record.getNominalTypeDescriptor()) {
+          if (ntd->Name.get() == typeName)
+            return ntd;
+        }
         break;
+
+      case TypeMetadataRecordKind::IndirectObjCClass:
+      case TypeMetadataRecordKind::Reserved:
+        break;
+      }
     }
-    if (foundMetadata != nullptr)
-      break;
   }
 
-  return foundMetadata;
+  return nullptr;
 }

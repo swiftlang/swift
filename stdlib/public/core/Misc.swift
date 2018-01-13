@@ -92,41 +92,44 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
-@_silgen_name("")
-internal func _getTypeByName(
-    _ name: UnsafePointer<UInt8>,
-    _ nameLength: UInt)
-  -> Any.Type?
-
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
-  let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByName(nameUTF8.baseAddress!,
-                              UInt(nameUTF8.endIndex))
-
-    return type
-  }
+  return _typeByMangledName(name);
 }
 
 @_silgen_name("swift_getTypeByMangledName")
 internal func _getTypeByMangledName(
   _ name: UnsafePointer<UInt8>,
-  _ nameLength: UInt)
+  _ nameLength: UInt,
+  _ numberOfLevels: UInt,
+  _ parametersPerLevel: UnsafePointer<UInt>,
+  _ substitutions: UnsafePointer<Any.Type>)
   -> Any.Type?
 
 /// Lookup a class given a mangled name. This is a placeholder while we bring
 /// up this functionality.
 public  // TEMPORARY
-func _typeByMangledName(_ name: String) -> Any.Type? {
+func _typeByMangledName(_ name: String,
+                        substitutions: [[Any.Type]] = []) -> Any.Type? {
+  // Map the substitutions to a flat representation that's easier to thread
+  // through to the runtime.
+  let numberOfLevels = UInt(substitutions.count)
+  var parametersPerLevel = [UInt]()
+  var flatSubstitutions = [Any.Type]()
+  for level in substitutions {
+    parametersPerLevel.append(UInt(level.count))
+    flatSubstitutions.append(contentsOf: level)
+  }
+
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByMangledName(nameUTF8.baseAddress!,
-                                     UInt(nameUTF8.endIndex))
-
-    return type
+    return  _getTypeByMangledName(nameUTF8.baseAddress!,
+                                  UInt(nameUTF8.endIndex),
+                                  numberOfLevels,
+                                  parametersPerLevel,
+                                  flatSubstitutions)
   }
 }
 

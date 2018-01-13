@@ -39,6 +39,7 @@
 
 namespace swift {
   enum class AccessSemantics : unsigned char;
+  class AccessorDecl;
   class ApplyExpr;
   class GenericEnvironment;
   class ArchetypeType;
@@ -55,7 +56,6 @@ namespace swift {
   class DeclRefExpr;
   class ForeignErrorConvention;
   class LiteralExpr;
-  class FuncDecl;
   class BraceStmt;
   class DeclAttributes;
   class GenericSignature;
@@ -399,6 +399,14 @@ protected:
     SelfAccess : 2
   );
 
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 3+3,
+    /// The kind of accessor this is.
+    AccessorKind : 3,
+
+    /// The kind of addressor this is.
+    AddressorKind : 3
+  );
+
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
@@ -621,18 +629,11 @@ protected:
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
-  ClangNode getClangNodeImpl() const {
-    assert(Bits.Decl.FromClang);
-    return ClangNode::getFromOpaqueValue(
-        *(reinterpret_cast<void * const*>(this) - 1));
-  }
+  /// \brief Get the Clang node associated with this declaration.
+  ClangNode getClangNodeImpl() const;
 
   /// \brief Set the Clang node associated with this declaration.
-  void setClangNode(ClangNode Node) {
-    Bits.Decl.FromClang = true;
-    // Extra memory is allocated for this.
-    *(reinterpret_cast<void **>(this) - 1) = Node.getOpaqueValue();
-  }
+  void setClangNode(ClangNode Node);
 
   void updateClangNode(ClangNode node) {
     assert(hasClangNode());
@@ -1355,8 +1356,10 @@ public:
   }
 };
 
-class GenericContext : public DeclContext {
-private:
+// A private class for forcing exact field layout.
+class _GenericContext {
+// Not really public. See GenericContext.
+public:
   GenericParamList *GenericParams = nullptr;
 
   /// The trailing where clause.
@@ -1371,13 +1374,15 @@ private:
   /// environment will be lazily loaded.
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
+};
 
+class GenericContext : private _GenericContext, public DeclContext {
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 protected:
   GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : DeclContext(Kind, Parent) { }
+    : _GenericContext(), DeclContext(Kind, Parent) { }
 
 public:
   /// \brief Retrieve the set of parameters to a generic context, or null if
@@ -1424,6 +1429,8 @@ public:
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
 };
+static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
+              sizeof(GenericContext), "Please add fields to _GenericContext");
 
 /// Describes what kind of name is being imported.
 ///
@@ -1532,7 +1539,7 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl final : public Decl, public GenericContext,
+class ExtensionDecl final : public GenericContext, public Decl,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
@@ -1948,13 +1955,13 @@ private:
 /// This, among other things, makes it easier to distinguish between local
 /// top-level variables (which are not live past the end of the statement) and
 /// global variables.
-class TopLevelCodeDecl : public Decl, public DeclContext {
+class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
 
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : Decl(DeclKind::TopLevelCode, Parent),
-      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+      Decl(DeclKind::TopLevelCode, Parent),
       Body(Body) {}
 
   BraceStmt *getBody() const { return Body; }
@@ -2373,7 +2380,7 @@ public:
 
 /// A type declaration that can have generic parameters attached to it.  Because
 /// it has these generic parameters, it is always a DeclContext.
-class GenericTypeDecl : public TypeDecl, public GenericContext {
+class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
@@ -2788,19 +2795,20 @@ public:
   
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  /// \brief Does this declaration expose a fixed layout to all resilience
-  /// domains?
+  /// \brief Should this declaration behave as if it must be accessed
+  /// resiliently, even when we're building a non-resilient module?
   ///
-  /// For structs, this means clients can assume the number and order of
-  /// stored properties will not change.
-  ///
-  /// For enums, this means clients can assume the number and order of
-  /// cases will not change.
-  bool hasFixedLayout() const;
+  /// This is used for diagnostics, because we do not want a behavior
+  /// change between builds with resilience enabled and disabled.
+  bool isFormallyResilient() const;
 
-  /// \brief Does this declaration expose a fixed layout to the given
-  /// module?
-  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+  /// \brief Do we need to use resilient access patterns outside of this type's
+  /// resilience domain?
+  bool isResilient() const;
+
+  /// \brief Do we need to use resilient access patterns when accessing this
+  /// type from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.
@@ -3755,8 +3763,6 @@ public:
 // Note that the values of these enums line up with %select values in
 // diagnostics.
 enum class AccessorKind {
-  /// \brief This is not a property accessor.
-  NotAccessor = -1,
   /// \brief This is a getter for a property or subscript.
   IsGetter = 0,
   /// \brief This is a setter for a property or subscript.
@@ -3936,8 +3942,8 @@ private:
   
   /// This is stored immediately before the GetSetRecord.
   struct alignas(1 << 3) AddressorRecord {
-    FuncDecl *Address = nullptr;        // User-defined address accessor
-    FuncDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
+    AccessorDecl *Address = nullptr;        // User-defined address accessor
+    AccessorDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
 
     GetSetRecord *getGetSet() {
       // Relies on not-strictly-portable ABI layout assumptions.
@@ -3945,13 +3951,13 @@ private:
     }
   };
   void configureAddressorRecord(AddressorRecord *record,
-                               FuncDecl *addressor, FuncDecl *mutableAddressor);
+                               AccessorDecl *addressor, AccessorDecl *mutableAddressor);
 
   struct alignas(1 << 3) GetSetRecord {
     SourceRange Braces;
-    FuncDecl *Get = nullptr;       // User-defined getter
-    FuncDecl *Set = nullptr;       // User-defined setter
-    FuncDecl *MaterializeForSet = nullptr; // optional materializeForSet accessor
+    AccessorDecl *Get = nullptr;       // User-defined getter
+    AccessorDecl *Set = nullptr;       // User-defined setter
+    AccessorDecl *MaterializeForSet = nullptr; // optional materializeForSet accessor
 
     AddressorRecord *getAddressors() {
       // Relies on not-strictly-portable ABI layout assumptions.
@@ -3959,18 +3965,18 @@ private:
     }
   };
   void configureGetSetRecord(GetSetRecord *getSetRecord,
-                             FuncDecl *getter, FuncDecl *setter,
-                             FuncDecl *materializeForSet);
+                             AccessorDecl *getter, AccessorDecl *setter,
+                             AccessorDecl *materializeForSet);
   void configureSetRecord(GetSetRecord *getSetInfo,
-                          FuncDecl *setter,
-                          FuncDecl *materializeForSet);
+                          AccessorDecl *setter,
+                          AccessorDecl *materializeForSet);
 
   struct ObservingRecord : GetSetRecord {
-    FuncDecl *WillSet = nullptr;   // willSet(value):
-    FuncDecl *DidSet = nullptr;    // didSet:
+    AccessorDecl *WillSet = nullptr;   // willSet(value):
+    AccessorDecl *DidSet = nullptr;    // didSet:
   };
   void configureObservingRecord(ObservingRecord *record,
-                                FuncDecl *willSet, FuncDecl *didSet);
+                                AccessorDecl *willSet, AccessorDecl *didSet);
 
   llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<AccessLevel>> GetSetInfo;
   llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
@@ -4116,58 +4122,59 @@ public:
     Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
   }
 
-  FuncDecl *getAccessorFunction(AccessorKind accessor) const;
+  AccessorDecl *getAccessorFunction(AccessorKind accessor) const;
 
   /// \brief Push all of the accessor functions associated with this VarDecl
   /// onto `decls`.
   void getAllAccessorFunctions(SmallVectorImpl<Decl *> &decls) const;
 
   /// \brief Turn this into a computed variable, providing a getter and setter.
-  void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
-                    FuncDecl *MaterializeForSet, SourceLoc RBraceLoc);
+  void makeComputed(SourceLoc LBraceLoc, AccessorDecl *Get, AccessorDecl *Set,
+                    AccessorDecl *MaterializeForSet, SourceLoc RBraceLoc);
 
   /// \brief Turn this into a computed object, providing a getter and a mutable
   /// addressor.
   void makeComputedWithMutableAddress(SourceLoc lbraceLoc,
-                                      FuncDecl *getter, FuncDecl *setter,
-                                      FuncDecl *materializeForSet,
-                                      FuncDecl *mutableAddressor,
+                                      AccessorDecl *getter,
+                                      AccessorDecl *setter,
+                                      AccessorDecl *materializeForSet,
+                                      AccessorDecl *mutableAddressor,
                                       SourceLoc rbraceLoc);
 
   /// \brief Add trivial accessors to this Stored or Addressed object.
-  void addTrivialAccessors(FuncDecl *Get, FuncDecl *Set,
-                           FuncDecl *MaterializeForSet);
+  void addTrivialAccessors(AccessorDecl *Get, AccessorDecl *Set,
+                           AccessorDecl *MaterializeForSet);
 
   /// \brief Turn this into a stored-with-observers var, providing the
   /// didSet/willSet specifiers.
-  void makeStoredWithObservers(SourceLoc LBraceLoc, FuncDecl *WillSet,
-                               FuncDecl *DidSet, SourceLoc RBraceLoc);
+  void makeStoredWithObservers(SourceLoc LBraceLoc, AccessorDecl *WillSet,
+                               AccessorDecl *DidSet, SourceLoc RBraceLoc);
 
   /// \brief Turn this into an inherited-with-observers var, providing
   /// the didSet/willSet specifiers.
-  void makeInheritedWithObservers(SourceLoc LBraceLoc, FuncDecl *WillSet,
-                                  FuncDecl *DidSet, SourceLoc RBraceLoc);
+  void makeInheritedWithObservers(SourceLoc LBraceLoc, AccessorDecl *WillSet,
+                                  AccessorDecl *DidSet, SourceLoc RBraceLoc);
 
   /// \brief Turn this into an addressed var.
-  void makeAddressed(SourceLoc LBraceLoc, FuncDecl *Addressor,
-                     FuncDecl *MutableAddressor,
+  void makeAddressed(SourceLoc LBraceLoc, AccessorDecl *Addressor,
+                     AccessorDecl *MutableAddressor,
                      SourceLoc RBraceLoc);
 
   /// \brief Turn this into an addressed var with observing accessors.
-  void makeAddressedWithObservers(SourceLoc LBraceLoc, FuncDecl *Addressor,
-                                  FuncDecl *MutableAddressor,
-                                  FuncDecl *WillSet, FuncDecl *DidSet,
+  void makeAddressedWithObservers(SourceLoc LBraceLoc, AccessorDecl *Addressor,
+                                  AccessorDecl *MutableAddressor,
+                                  AccessorDecl *WillSet, AccessorDecl *DidSet,
                                   SourceLoc RBraceLoc);
 
   /// \brief Specify the synthesized get/set functions for a
   /// StoredWithObservers or AddressedWithObservers var.  This is used by Sema.
-  void setObservingAccessors(FuncDecl *Get, FuncDecl *Set,
-                             FuncDecl *MaterializeForSet);
+  void setObservingAccessors(AccessorDecl *Get, AccessorDecl *Set,
+                             AccessorDecl *MaterializeForSet);
 
   /// \brief Add a setter to an existing Computed var.
   ///
   /// This should only be used by the ClangImporter.
-  void setComputedSetter(FuncDecl *Set);
+  void setComputedSetter(AccessorDecl *Set);
 
   /// \brief Add a behavior to a property.
   void addBehavior(TypeRepr *Type, Expr *Param);
@@ -4175,7 +4182,7 @@ public:
   /// \brief Set a materializeForSet accessor for this declaration.
   ///
   /// This should only be used by Sema.
-  void setMaterializeForSetFunc(FuncDecl *materializeForSet);
+  void setMaterializeForSetFunc(AccessorDecl *materializeForSet);
 
   /// \brief Specify the braces range without adding accessors.
   ///
@@ -4189,14 +4196,14 @@ public:
   }
 
   /// \brief Retrieve the getter used to access the value of this variable.
-  FuncDecl *getGetter() const {
+  AccessorDecl *getGetter() const {
     if (auto info = GetSetInfo.getPointer())
       return info->Get;
     return nullptr;
   }
   
   /// \brief Retrieve the setter used to mutate the value of this variable.
-  FuncDecl *getSetter() const {
+  AccessorDecl *getSetter() const {
     if (auto info = GetSetInfo.getPointer())
       return info->Set;
     return nullptr;
@@ -4217,36 +4224,36 @@ public:
 
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
-  FuncDecl *getMaterializeForSetFunc() const {
+  AccessorDecl *getMaterializeForSetFunc() const {
     if (auto info = GetSetInfo.getPointer())
       return info->MaterializeForSet;
     return nullptr;
   }
 
-  /// \brief Return the funcdecl for the 'address' accessor if it
+  /// \brief Return the decl for the 'address' accessor if it
   /// exists; this is only valid on a declaration with addressors.
-  FuncDecl *getAddressor() const { return getAddressorInfo().Address; }
+  AccessorDecl *getAddressor() const { return getAddressorInfo().Address; }
 
-  /// \brief Return the funcdecl for the 'mutableAddress' accessors if
+  /// \brief Return the decl for the 'mutableAddress' accessors if
   /// it exists; this is only valid on a declaration with addressors.
-  FuncDecl *getMutableAddressor() const {
+  AccessorDecl *getMutableAddressor() const {
     return getAddressorInfo().MutableAddress;
   }
 
   /// \brief Return the appropriate addressor for the given access kind.
-  FuncDecl *getAddressorForAccess(AccessKind accessKind) const {
+  AccessorDecl *getAddressorForAccess(AccessKind accessKind) const {
     if (accessKind == AccessKind::Read)
       return getAddressor();
     return getMutableAddressor();
   }
   
-  /// \brief Return the funcdecl for the willSet specifier if it exists, this is
+  /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
-  FuncDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
+  AccessorDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
 
-  /// \brief Return the funcdecl for the didSet specifier if it exists, this is
+  /// \brief Return the decl for the didSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
-  FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
+  AccessorDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
@@ -4294,17 +4301,13 @@ public:
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind) const;
 
-  /// \brief Does this declaration expose a fixed layout to all resilience
-  /// domains?
-  ///
-  /// Roughly speaking, this means we can make assumptions about whether
-  /// the storage is stored or computed, and if stored, the precise access
-  /// pattern to be used.
-  bool hasFixedLayout() const;
+  /// \brief Do we need to use resilient access patterns outside of this type's
+  /// resilience domain?
+  bool isResilient() const;
 
-  /// \brief Does this declaration expose a fixed layout to the given
-  /// module?
-  bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+  /// \brief Do we need to use resilient access patterns when accessing this
+  /// type from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Does the storage use a behavior?
   bool hasBehavior() const {
@@ -4702,7 +4705,7 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl, public GenericContext {
+class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
@@ -4711,8 +4714,8 @@ public:
   SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
-      GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);
@@ -4794,7 +4797,7 @@ public:
 };
 
 /// \brief Base class for function-like declarations.
-class AbstractFunctionDecl : public ValueDecl, public GenericContext {
+class AbstractFunctionDecl : public GenericContext, public ValueDecl {
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -4854,8 +4857,8 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
-      : ValueDecl(Kind, Parent, Name, NameLoc),
-        GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+        ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
@@ -5160,40 +5163,40 @@ enum class SelfAccessKind : uint8_t {
 };
   
 /// FuncDecl - 'func' declaration.
-class FuncDecl final : public AbstractFunctionDecl,
-    private llvm::TrailingObjects<FuncDecl, ParameterList *> {
+class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
-  friend TrailingObjects;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
-  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword, e.g. 'set'.
 
   TypeLoc FnRetType;
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
-  llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, BehaviorRecord *>
     OverriddenOrBehaviorParamDecl;
-  llvm::PointerIntPair<OperatorDecl *, 3,
-                       AddressorKind> OperatorAndAddressorKind;
+  OperatorDecl *Operator;
 
-  FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+protected:
+  ParameterList **getParameterListBuffer(); // defined inline below
+  ParameterList * const *getParameterListBuffer() const {
+    return const_cast<FuncDecl*>(this)->getParameterListBuffer();
+  }
+
+  FuncDecl(DeclKind Kind,
+           SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
-           SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
            GenericParamList *GenericParams, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Func, Parent,
+    : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
                            NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
-      AccessorKeywordLoc(AccessorKeywordLoc),
       OverriddenOrBehaviorParamDecl(),
-      OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
+      Operator(nullptr) {
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
@@ -5204,12 +5207,12 @@ class FuncDecl final : public AbstractFunctionDecl,
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
   }
 
+private:
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
                               StaticSpellingKind StaticSpelling,
                               SourceLoc FuncLoc,
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
-                              SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
                               unsigned NumParameterLists,
                               DeclContext *Parent,
@@ -5222,7 +5225,6 @@ public:
                                       SourceLoc FuncLoc,
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
-                                      SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
                                       unsigned NumParameterLists,
                                       DeclContext *Parent);
@@ -5232,7 +5234,6 @@ public:
                           SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
-                          SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
                           ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
@@ -5279,10 +5280,10 @@ public:
   /// The number of "top-level" elements will match the number of argument names
   /// in the compound name of the function or constructor.
   MutableArrayRef<ParameterList *> getParameterLists() {
-    return {getTrailingObjects<ParameterList *>(), getNumParameterLists()};
+    return {getParameterListBuffer(), getNumParameterLists()};
   }
   ArrayRef<const ParameterList *> getParameterLists() const {
-    return {getTrailingObjects<ParameterList *>(), getNumParameterLists()};
+    return {getParameterListBuffer(), getNumParameterLists()};
   }
   ParameterList *getParameterList(unsigned i) {
     return getParameterLists()[i];
@@ -5300,10 +5301,10 @@ public:
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
-  SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
   SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() && !isAccessor() ? StaticLoc : FuncLoc;
+    return StaticLoc.isValid() && !isa<AccessorDecl>(this)
+              ? StaticLoc : FuncLoc;
   }
   SourceRange getSourceRange() const;
 
@@ -5336,47 +5337,6 @@ public:
   /// prior to type checking.
   bool isBinaryOperator() const;
   
-  /// makeAccessor - Note that this function is an accessor for the given
-  /// VarDecl or SubscriptDecl.
-  void makeAccessor(AbstractStorageDecl *D, AccessorKind Kind) {
-    assert(Kind != AccessorKind::NotAccessor && "Must specify an accessor kind");
-    AccessorDecl.setPointerAndInt(D, Kind);
-  }
-
-  /// Set the addressor kind of this address or mutableAddress declaration.
-  void setAddressorKind(AddressorKind kind) {
-    assert(kind != AddressorKind::NotAddressor);
-    OperatorAndAddressorKind.setInt(kind);
-  }
-
-  AbstractStorageDecl *getAccessorStorageDecl() const {
-    return AccessorDecl.getPointer();
-  }
-
-  AccessorKind getAccessorKind() const {
-    if (AccessorDecl.getPointer() == nullptr)
-      return AccessorKind::NotAccessor;
-    return AccessorDecl.getInt();
-  }
-
-  AddressorKind getAddressorKind() const {
-    return OperatorAndAddressorKind.getInt();
-  }
-
-  bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
-  bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
-
-  /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
-  /// a normal function.
-  bool isGetterOrSetter() const { return isGetter() || isSetter(); }
-  bool isObservingAccessor() const {
-    return getAccessorKind() == AccessorKind::IsDidSet ||
-           getAccessorKind() == AccessorKind::IsWillSet;
-  }
-  bool isAccessor() const {
-    return getAccessorKind() != AccessorKind::NotAccessor;
-  }
-
   /// Determine whether this function has a dynamic \c Self return
   /// type.
   bool hasDynamicSelf() const { return Bits.FuncDecl.HasDynamicSelf; }
@@ -5423,11 +5383,11 @@ public:
   }
   
   OperatorDecl *getOperatorDecl() const {
-    return OperatorAndAddressorKind.getPointer();
+    return Operator;
   }
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    OperatorAndAddressorKind.setPointer(o);
+    Operator = o;
   }
   
   /// Returns true if the function is forced to be statically dispatched.
@@ -5438,7 +5398,10 @@ public:
     Bits.FuncDecl.ForcedStaticDispatch = flag;
   }
 
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Func ||
+           D->getKind() == DeclKind::Accessor;
+  }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));
   }
@@ -5455,6 +5418,128 @@ public:
   /// be applied to this function.
   bool isPotentialIBActionTarget() const;
 };
+
+/// \brief This represents an accessor function, such as a getter or setter.
+class AccessorDecl final : public FuncDecl {
+  /// Location of the accessor keyword, e.g. 'set'.
+  SourceLoc AccessorKeywordLoc;
+
+  AbstractStorageDecl *Storage;
+
+  AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+               AccessorKind accessorKind, AddressorKind addressorKind,
+               AbstractStorageDecl *storage,
+               SourceLoc staticLoc, StaticSpellingKind staticSpelling,
+               bool throws, SourceLoc throwsLoc,
+               unsigned numParameterLists, GenericParamList *genericParams,
+               DeclContext *parent)
+    : FuncDecl(DeclKind::Accessor,
+               staticLoc, staticSpelling, /*func loc*/ declLoc,
+               /*name*/ Identifier(), /*name loc*/ declLoc,
+               throws, throwsLoc, numParameterLists, genericParams, parent),
+      AccessorKeywordLoc(accessorKeywordLoc),
+      Storage(storage) {
+    Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
+    Bits.AccessorDecl.AddressorKind = unsigned(addressorKind);
+  }
+
+  static AccessorDecl *createImpl(ASTContext &ctx,
+                                  SourceLoc declLoc,
+                                  SourceLoc accessorKeywordLoc,
+                                  AccessorKind accessorKind,
+                                  AddressorKind addressorKind,
+                                  AbstractStorageDecl *storage,
+                                  SourceLoc staticLoc,
+                                  StaticSpellingKind staticSpelling,
+                                  bool throws, SourceLoc throwsLoc,
+                                  unsigned numParameterLists,
+                                  GenericParamList *genericParams,
+                                  DeclContext *parent,
+                                  ClangNode clangNode);
+
+public:
+  static AccessorDecl *createDeserialized(ASTContext &ctx,
+                              SourceLoc declLoc,
+                              SourceLoc accessorKeywordLoc,
+                              AccessorKind accessorKind,
+                              AddressorKind addressorKind,
+                              AbstractStorageDecl *storage,
+                              SourceLoc staticLoc,
+                              StaticSpellingKind staticSpelling,
+                              bool throws, SourceLoc throwsLoc,
+                              GenericParamList *genericParams,
+                              unsigned numParameterLists,
+                              DeclContext *parent);
+
+  static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
+                              SourceLoc accessorKeywordLoc,
+                              AccessorKind accessorKind,
+                              AddressorKind addressorKind,
+                              AbstractStorageDecl *storage,
+                              SourceLoc staticLoc,
+                              StaticSpellingKind staticSpelling,
+                              bool throws, SourceLoc throwsLoc,
+                              GenericParamList *genericParams,
+                              ArrayRef<ParameterList *> parameterLists,
+                              TypeLoc fnRetType, DeclContext *parent,
+                              ClangNode clangNode = ClangNode());
+
+  SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }
+
+  AbstractStorageDecl *getStorage() const {
+    return Storage;
+  }
+
+  AccessorKind getAccessorKind() const {
+    return AccessorKind(Bits.AccessorDecl.AccessorKind);
+  }
+
+  AddressorKind getAddressorKind() const {
+    return AddressorKind(Bits.AccessorDecl.AddressorKind);
+  }
+
+  bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
+  bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
+  bool isMaterializeForSet() const {
+    return getAccessorKind() == AccessorKind::IsMaterializeForSet;
+  }
+  bool isAnyAddressor() const {
+    auto kind = getAccessorKind();
+    return kind == AccessorKind::IsAddressor
+        || kind == AccessorKind::IsMutableAddressor;
+  }
+
+  /// isGetterOrSetter - Determine whether this is specifically a getter or
+  /// a setter, as opposed to some other kind of accessor.
+  ///
+  /// For example, only getters and setters can be exposed to Objective-C.
+  bool isGetterOrSetter() const { return isGetter() || isSetter(); }
+
+  bool isObservingAccessor() const {
+    return getAccessorKind() == AccessorKind::IsDidSet ||
+           getAccessorKind() == AccessorKind::IsWillSet;
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Accessor;
+  }
+  static bool classof(const AbstractFunctionDecl *D) {
+    return classof(static_cast<const Decl*>(D));
+  }
+  static bool classof(const DeclContext *DC) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
+      return classof(fn);
+    return false;
+  }
+};
+
+inline ParameterList **FuncDecl::getParameterListBuffer() {
+  if (!isa<AccessorDecl>(this)) {
+    assert(getKind() == DeclKind::Func && "no new kinds of functions");
+    return reinterpret_cast<ParameterList**>(this+1);
+  }
+  return reinterpret_cast<ParameterList**>(static_cast<AccessorDecl*>(this)+1);
+}
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
@@ -6351,6 +6436,7 @@ AbstractFunctionDecl::getParameterLists() {
   case DeclKind::Destructor:
     return cast<DestructorDecl>(this)->getParameterLists();
   case DeclKind::Func:
+  case DeclKind::Accessor:
     return cast<FuncDecl>(this)->getParameterLists();
   }
 }

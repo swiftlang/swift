@@ -583,6 +583,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::Constructor;
   case DeclKind::Destructor:
     return CodeCompletionDeclKind::Destructor;
+  case DeclKind::Accessor:
   case DeclKind::Func: {
     auto DC = D->getDeclContext();
     auto FD = cast<FuncDecl>(D);
@@ -2891,7 +2892,7 @@ public:
 
         // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
-        if (FD->isAccessor())
+        if (isa<AccessorDecl>(FD))
           return;
 
         // Do we want compound function names here?
@@ -2960,7 +2961,7 @@ public:
 
         // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
-        if (FD->isAccessor())
+        if (isa<AccessorDecl>(FD))
           return;
 
         // Do we want compound function names here?
@@ -4303,7 +4304,7 @@ public:
         return;
 
       // We cannot override individual accessors.
-      if (FD->isAccessor())
+      if (isa<AccessorDecl>(FD))
         return;
 
       if (hasFuncIntroducer || (!hasIntroducer && !hasInitializerModifier))
@@ -5513,6 +5514,11 @@ void PrintingCodeCompletionConsumer::handleResults(
     llvm::raw_svector_ostream NameOs(Name);
     Result->getCompletionString()->getName(NameOs);
     OS << "; name=" << Name;
+
+    StringRef comment = Result->getBriefDocComment();
+    if (IncludeComments && !comment.empty()) {
+      OS << "; comment=" << comment;
+    }
 
     OS << "\n";
   }

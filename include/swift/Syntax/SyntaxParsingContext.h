@@ -13,6 +13,7 @@
 #ifndef SWIFT_SYNTAX_PARSING_CONTEXT_H
 #define SWIFT_SYNTAX_PARSING_CONTEXT_H
 
+#include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -21,6 +22,7 @@ namespace swift {
 class SourceLoc;
 class SourceFile;
 class Token;
+class DiagnosticEngine;
 
 namespace syntax {
 struct RawTokenSyntax;
@@ -35,6 +37,8 @@ enum class SyntaxContextKind {
   Pattern,
   Syntax,
 };
+
+constexpr size_t SyntaxAlignInBits = 3;
 
 /// Indicates what action should be performed on the destruction of
 ///  SyntaxParsingContext
@@ -60,6 +64,18 @@ enum class AccumulationMode {
   NotSet,
 };
 
+/// The shared data for all syntax parsing contexts with the same root.
+/// This should be accessible from the root context only.
+struct alignas(1 << SyntaxAlignInBits) RootContextData {
+  // The source file under parsing.
+  SourceFile &SF;
+
+  // Where to issue diagnostics.
+  DiagnosticEngine &Diags;
+
+  RootContextData(SourceFile &SF, DiagnosticEngine &Diags): SF(SF), Diags(Diags) {}
+};
+
 /// RAII object which receive RawSyntax parts. On destruction, this constructs
 /// a specified syntax node from received parts and propagate it to the parent
 /// context.
@@ -75,9 +91,10 @@ enum class AccumulationMode {
 ///     // Now the context holds { '(' Expr ')' }.
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
-class SyntaxParsingContext {
-  // Parent context. Only the root context has nullptr.
-  SyntaxParsingContext *Parent;
+class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
+  // When this context is a root, this points to an instance of RootContextData;
+  // When this context isn't a root, this points to the parent context.
+  llvm::PointerUnion<RootContextData*, SyntaxParsingContext*> RootDataOrParent;
 
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
@@ -94,8 +111,6 @@ class SyntaxParsingContext {
     SyntaxKind SynKind;
     // For AccumulationMode::CoerceKind; desired syntax node category.
     SyntaxContextKind CtxtKind;
-    // For AccumulationMode::Root; the parsing source file.
-    SourceFile *SF;
   };
 
   // If false, context does nothing.
@@ -107,12 +122,13 @@ class SyntaxParsingContext {
 
 public:
   /// Construct root context.
-  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF);
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
+    DiagnosticEngine &Diags);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
-      : Parent(CtxtHolder), CtxtHolder(CtxtHolder),
-        Enabled(Parent->isEnabled()) {
+      : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
+        Enabled(getParent()->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     CtxtHolder = this;
@@ -132,8 +148,16 @@ public:
 
   void disable() { Enabled = false; }
   bool isEnabled() const { return Enabled; }
-  bool isRoot() const { return !Parent; }
+  bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
+
+  SyntaxParsingContext *getParent() {
+    return RootDataOrParent.get<SyntaxParsingContext*>();
+  }
+
+  RootContextData &getRootData() {
+    return *getRoot()->RootDataOrParent.get<RootContextData*>();
+  }
 
   SyntaxParsingContext *getRoot();
 

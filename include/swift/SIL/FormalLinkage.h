@@ -24,8 +24,6 @@ enum ForDefinition_t : bool;
 /// Formal linkage is a property of types and declarations that
 /// informs, but is not completely equivalent to, the linkage of
 /// symbols corresponding to those types and declarations.
-///
-/// Forms a semilattice with ^ as the meet operator.
 enum class FormalLinkage {
   /// This entity is visible in multiple Swift modules and has a
   /// unique file that is known to define it.
@@ -43,10 +41,8 @@ enum class FormalLinkage {
   /// have a unique file that is known to define it.
   HiddenNonUnique,
 
-  /// This entity is visible in only a single Swift file.
-  //
-  // In reality, these are by definition unique, but we use the
-  // non-unique flag to make merging more efficient.
+  /// This entity is visible in only a single Swift file. These are by
+  /// definition unique.
   Private,
 };
 

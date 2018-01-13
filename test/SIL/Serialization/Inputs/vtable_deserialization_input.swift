@@ -6,6 +6,7 @@ public protocol P {
 @_silgen_name("unknown") public
 func unknown() -> ()
 
+@_fixed_layout
 public class Y : P {
   @_inlineable
   public func doAnotherThing() {

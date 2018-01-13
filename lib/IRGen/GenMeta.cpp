@@ -687,12 +687,12 @@ namespace {
           if (i == 0) pointerToFirst = eltPtr.getAddress();
         }
 
-        TupleTypeFlags flags(0);
+        TupleTypeFlags flags =
+          TupleTypeFlags().withNumElements(elements.size());
         llvm::Value *args[] = {
-          llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
+          llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
           pointerToFirst,
           getTupleLabelsString(IGF.IGM, type),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
           llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
         };
 
@@ -1663,13 +1663,14 @@ namespace {
           if (i == 0) pointerToFirst = eltPtr.getAddress();
         }
 
-        TupleTypeFlags flags(0);
+        TupleTypeFlags flags =
+          TupleTypeFlags().withNumElements(elements.size());
+
         llvm::Value *args[] = {
-          llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
+          llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
           pointerToFirst,
           // labels don't matter for layout
           llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()),
           llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
         };
 
@@ -2112,9 +2113,9 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     return Flags(Flags::Kind::Init); // 'init' is considered static
 
   auto kind = [&] {
-    switch (cast<FuncDecl>(fn)->getAccessorKind()) {
-    case AccessorKind::NotAccessor:
-      return Flags::Kind::Method;
+    auto accessor = dyn_cast<AccessorDecl>(fn);
+    if (!accessor) return Flags::Kind::Method;
+    switch (accessor->getAccessorKind()) {
     case AccessorKind::IsGetter:
       return Flags::Kind::Getter;
     case AccessorKind::IsSetter:
@@ -3571,9 +3572,7 @@ namespace {
         unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
         auto access = FieldLayout.AllFieldAccesses[fieldIndex];
         if (access == FieldAccess::NonConstantDirect) {
-          Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop,
-                                                         /*indirect*/ false,
-                                                         ForDefinition);
+          Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop, ForDefinition);
 
           // We can't use emitClassFieldOffset() here because that creates
           // an invariant load, which could be hoisted above the point
@@ -3611,8 +3610,7 @@ namespace {
           //
           // TODO: Don't emit the symbol if field has a fixed offset and size
           // in all resilience domains
-          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ false,
-                                                     ForDefinition);
+          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, ForDefinition);
           auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
           offsetVar->setInitializer(fieldOffsetOrZero);
 
@@ -3624,24 +3622,6 @@ namespace {
 
         case FieldAccess::ConstantIndirect:
           // No global variable is needed.
-          break;
-
-        case FieldAccess::NonConstantIndirect:
-          // Emit a global variable storing an offset into the field offset
-          // vector within the class metadata. This access pattern is used
-          // when the field offset depends on generic parameters. As above,
-          // the Objective-C runtime will slide the field offsets within the
-          // class metadata to adjust for the superclass size.
-          //
-          // TODO: This isn't plumbed through all the way yet.
-          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ true,
-                                                     ForDefinition);
-          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-          offsetVar->setConstant(false);
-          auto offset = getClassFieldOffsetOffset(IGM, Target, prop).getValue();
-          auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-          offsetVar->setInitializer(offsetVal);
-
           break;
         }
       }
@@ -5276,6 +5256,7 @@ namespace {
     IRGenModule &IGM;
     ConstantStructBuilder &B;
     ProtocolDecl *Protocol;
+    std::string AssociatedTypeNames;
     SILDefaultWitnessTable *DefaultWitnesses;
 
   public:
@@ -5293,6 +5274,7 @@ namespace {
       addSize();
       addFlags();
       addRequirements();
+      addAssociatedTypeNames();
 
       B.suggestType(IGM.ProtocolDescriptorStructTy);
     }
@@ -5415,6 +5397,13 @@ namespace {
         if (info.DefaultImpl) numDefaultWitnesses++;
 #endif
 
+        // Add the associated type name to the list.
+        if (entry.isAssociatedType()) {
+          if (!AssociatedTypeNames.empty())
+            AssociatedTypeNames += ' ';
+          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
+        }
+
         reqt.finishAndAddTo(reqtsArray);
       }
 
@@ -5482,6 +5471,15 @@ namespace {
 
       return nullptr;
     }
+
+    void addAssociatedTypeNames() {
+      llvm::Constant *global = nullptr;
+      if (!AssociatedTypeNames.empty()) {
+        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
+                                           /*willBeRelativelyAddressed=*/true);
+      }
+      B.addRelativeAddressOrNull(global);
+    }
   };
 } // end anonymous namespace
 
@@ -5510,7 +5508,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   }
 
   SILDefaultWitnessTable *defaultWitnesses = nullptr;
-  if (!protocol->hasFixedLayout())
+  if (protocol->isResilient())
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
   ConstantInitBuilder initBuilder(*this);
@@ -5521,6 +5519,21 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   auto var = cast<llvm::GlobalVariable>(
           getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
   var->setConstant(true);
+
+  // Note that we emitted this protocol.
+  SwiftProtocols.push_back(protocol);
+
+  // If the protocol is resilient, emit dispatch thunks.
+  if (isResilient(protocol, ResilienceExpansion::Minimal)) {
+    for (auto *member : protocol->getMembers()) {
+      if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(funcDecl));
+      }
+      if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
+        emitDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+      }
+    }
+  }
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.
@@ -5552,5 +5565,5 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
   // The instance type field of MetatypeMetadata is immediately after
   // the isa field.
   return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
-                                     IGF.IGM.TypeMetadataPtrTy);
+                                              IGF.IGM.TypeMetadataPtrTy);
 }

@@ -312,7 +312,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             ProfileCounter entryCount) {
 
   auto name = constant.mangle();
-  auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
+  auto constantType = Types.getConstantFunctionType(constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = lookUpFunction(name)) {
@@ -360,10 +360,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
-      if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
-        // Add attributes for e.g. computed properties.
-        addFunctionAttributes(F, StorageDecl->getAttrs(), *this);
+    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+      auto *storage = accessor->getStorage();
+      // Add attributes for e.g. computed properties.
+      addFunctionAttributes(F, storage->getAttrs(), *this);
     }
     addFunctionAttributes(F, decl->getAttrs(), *this);
   }

@@ -118,13 +118,13 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
-    SILFunctionConventions fnConv(funcInfo, SGM.M);
+    auto funcTy = SGM.Types.getConstantFunctionType(c);
+    SILFunctionConventions fnConv(funcTy, SGM.M);
 
     if (inputTypes) {
       auto toSILType = [&SGM](Type ty) { return SGM.getLoweredType(ty); };
       if (fnConv.hasIndirectSILResults()
-          || funcInfo->getNumParameters() != inputTypes->size()
+          || funcTy->getNumParameters() != inputTypes->size()
           || !std::equal(
                  fnConv.getParameterSILTypes().begin(),
                  fnConv.getParameterSILTypes().end(),
@@ -445,10 +445,6 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                           SubclassScope::NotApplicable);
 }
 
-SILType SILGenModule::getConstantType(SILDeclRef constant) {
-  return Types.getConstantType(constant);
-}
-
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
                                               ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
@@ -492,8 +488,9 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool hasSILBody(FuncDecl *fd) {
-  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-    return !isa<ProtocolDecl>(fd->getDeclContext());
+  if (auto accessor = dyn_cast<AccessorDecl>(fd))
+    if (accessor->isMaterializeForSet())
+      return !isa<ProtocolDecl>(accessor->getDeclContext());
 
   return fd->getBody(/*canSynthesize=*/false);
 }
@@ -728,8 +725,9 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
       PrettyStackTraceSILFunction X("silgen emitFunction", f);
-      if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-        SILGenFunction(*this, *f).emitMaterializeForSet(fd);
+      auto accessor = dyn_cast<AccessorDecl>(fd);
+      if (accessor && accessor->isMaterializeForSet())
+        SILGenFunction(*this, *f).emitMaterializeForSet(accessor);
       else
         SILGenFunction(*this, *f).emitFunction(fd);
       postEmitFunction(constant, f);

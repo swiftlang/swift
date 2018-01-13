@@ -222,7 +222,9 @@ func postfix<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
 
   foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></IdentifierExpr>()</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ImplicitMemberExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></ImplicitMemberExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
-  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr></SequenceExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>(<FunctionCallArgument><InOutExpr>&<IdentifierExpr>d</IdentifierExpr></InOutExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><EditorPlaceholderExpr><#Placeholder#> </EditorPlaceholderExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><EditorPlaceholderExpr><#T##(Int) -> Int#></EditorPlaceholderExpr></SequenceExpr>
 }</CodeBlock></FunctionDecl><IfConfigDecl>
 
 #if <IdentifierExpr>blah</IdentifierExpr><ElseDirectiveClause>
@@ -341,4 +343,22 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
   de </StringSegment><ExpressionSegment>\(<SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><StringInterpolationExpr>"<StringSegment>abc </StringSegment><ExpressionSegment>\(<FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>()</FunctionCallExpr>)</ExpressionSegment><StringSegment> def</StringSegment>"</StringInterpolationExpr></SequenceExpr>)</ExpressionSegment><StringSegment>
   fg
   </StringSegment>"""</StringInterpolationExpr></InitializerClause></PatternBinding></VariableDecl>
+}</CodeBlock></FunctionDecl><FunctionDecl>
+
+func keypath<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<IdentifierExpr>a</IdentifierExpr>.?.b</KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr>.c</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<SubscriptExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr>.a.b</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ObjcKeyPathExpr>#keyPath(<ObjcNamePiece>a.</ObjcNamePiece><ObjcNamePiece>b.</ObjcNamePiece><ObjcNamePiece>c</ObjcNamePiece>)</ObjcKeyPathExpr></SequenceExpr>
+}</CodeBlock></FunctionDecl><FunctionDecl>
+
+func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ObjectLiteralExpr>
+  #fileLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
+  #colorLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
+  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><PoundColumnExpr>
+  #column</PoundColumnExpr><PoundFileExpr>
+  #file</PoundFileExpr><PoundFunctionExpr>
+  #function</PoundFunctionExpr><PoundDsohandleExpr>
+  #dsohandle</PoundDsohandleExpr>
 }</CodeBlock></FunctionDecl>

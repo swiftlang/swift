@@ -67,8 +67,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
     // If the override is defined in a class from a different resilience
     // domain, don't emit the vtable entry.
-    if (!derivedClass->hasFixedLayout(M.getSwiftModule(),
-                                      ResilienceExpansion::Maximal)) {
+    if (derivedClass->isResilient(M.getSwiftModule(),
+                                  ResilienceExpansion::Maximal)) {
       return None;
     }
   }
@@ -149,9 +149,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // Property accessors should be generated alongside the property unless
   // the @NSManaged attribute is present.
-  if (method->isGetterOrSetter()) {
-    auto asd = method->getAccessorStorageDecl();
-    return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>();
+  if (auto accessor = dyn_cast<AccessorDecl>(method)) {
+    if (accessor->isGetterOrSetter()) {
+      auto asd = accessor->getStorage();
+      return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>();
+    }
   }
 
   if (method->getAttrs().hasAttribute<NSManagedAttr>())
@@ -171,7 +173,7 @@ class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
-  bool hasFixedLayout;
+  bool isResilient;
 
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
@@ -181,7 +183,7 @@ public:
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass) {
-    hasFixedLayout = theClass->hasFixedLayout();
+    isResilient = theClass->isResilient();
   }
 
   void emitVTable() {
@@ -231,8 +233,8 @@ public:
 
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
-    // Only public, fixed-layout classes should be serialized.
-    if (classIsPublic && theClass->hasFixedLayout())
+    // Only public, fixed-layout classes should have serialized vtables.
+    if (classIsPublic && !theClass->isResilient())
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -268,7 +270,7 @@ public:
     // class is resilient.
     auto *func = cast<AbstractFunctionDecl>(member.getDecl());
     if (func->getDeclContext() == theClass) {
-      if (!hasFixedLayout &&
+      if (isResilient &&
           func->getEffectiveAccess() >= AccessLevel::Public) {
         SGM.emitDispatchThunk(member);
       }
@@ -327,12 +329,10 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
-    auto reqFunc = dyn_cast<FuncDecl>(requirementRef.getDecl());
-    auto accessorKind = (reqFunc ? reqFunc->getAccessorKind()
-                                 : AccessorKind::NotAccessor);
+    auto reqAccessor = dyn_cast<AccessorDecl>(requirementRef.getDecl());
 
     // If it's not an accessor, just look for the witness.
-    if (accessorKind == AccessorKind::NotAccessor) {
+    if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
         return addMethodImplementation(requirementRef,
                                        SILDeclRef(witness.getDecl(),
@@ -345,14 +345,13 @@ public:
 
     // Otherwise, we need to map the storage declaration and then get
     // the appropriate accessor for it.
-    auto witness =
-      asDerived().getWitness(reqFunc->getAccessorStorageDecl());
+    auto witness = asDerived().getWitness(reqAccessor->getStorage());
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
     auto witnessAccessor =
-      witnessStorage->getAccessorFunction(reqFunc->getAccessorKind());
+      witnessStorage->getAccessorFunction(reqAccessor->getAccessorKind());
     if (!witnessAccessor)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -685,8 +684,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto witnessSubs = witness.getSubstitutions();
 
   // Open-code protocol witness thunks for materializeForSet.
-  if (auto witnessFn = dyn_cast<FuncDecl>(witnessRef.getDecl())) {
-    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+  if (auto witnessFn = dyn_cast<AccessorDecl>(witnessRef.getDecl())) {
+    if (witnessFn->isMaterializeForSet()) {
       assert(!isFree);
 
       auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
@@ -694,8 +693,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
       auto selfType = GenericEnvironment::mapTypeIntoContext(
           genericEnv, selfInterfaceType);
 
-      auto reqFn = cast<FuncDecl>(requirement.getDecl());
-      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
+      auto reqFn = cast<AccessorDecl>(requirement.getDecl());
+      assert(reqFn->isMaterializeForSet());
 
       if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
                                               selfInterfaceType, selfType,
@@ -813,7 +812,7 @@ public:
     // Build a default witness table if this is a protocol.
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
       if (!protocol->isObjC() &&
-          !protocol->hasFixedLayout())
+          protocol->isResilient())
         SGM.emitDefaultWitnessTable(protocol);
       return;
     }

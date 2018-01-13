@@ -73,6 +73,12 @@ namespace inferred_attributes {
 } // end namespace swift
 
 namespace {
+
+struct AccessorInfo {
+  AbstractStorageDecl *Storage;
+  AccessorKind Kind;
+};
+
 enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
   MakeUnlabeledValueInit = 0x01,
@@ -145,6 +151,38 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
                                  SourceLoc(), varPattern, nullptr, dc);
 
   return {var, patternBinding};
+}
+
+static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
+                                      Optional<AccessorInfo> accessorInfo,
+                                      DeclName name, SourceLoc nameLoc,
+                                      ArrayRef<ParameterList*> bodyParams,
+                                      Type resultTy,
+                                      bool throws,
+                                      DeclContext *dc,
+                                      ClangNode clangNode) {
+  TypeLoc resultTypeLoc = resultTy ? TypeLoc::withoutLoc(resultTy) : TypeLoc();
+  if (accessorInfo) {
+    return AccessorDecl::create(ctx, funcLoc,
+                                /*accessorKeywordLoc*/ SourceLoc(),
+                                accessorInfo->Kind,
+                                AddressorKind::NotAddressor,
+                                accessorInfo->Storage,
+                                /*StaticLoc*/SourceLoc(),
+                                StaticSpellingKind::None,
+                                throws,
+                                /*ThrowsLoc=*/SourceLoc(),
+                                /*GenericParams=*/nullptr,
+                                bodyParams,
+                                resultTypeLoc, dc, clangNode);
+  } else {
+    return FuncDecl::create(ctx, /*StaticLoc=*/SourceLoc(),
+                            StaticSpellingKind::None,
+                            funcLoc, name, nameLoc,
+                            throws, /*ThrowsLoc=*/SourceLoc(),
+                            /*GenericParams=*/nullptr, bodyParams,
+                            resultTypeLoc, dc, clangNode);
+  }
 }
 
 #ifndef NDEBUG
@@ -477,9 +515,9 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
 //   }
 // Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
 // cast in order to preserve unknown or future cases from C.
-static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
-                                        EnumDecl *enumDecl,
-                                        VarDecl *rawValueDecl) {
+static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
+                                            EnumDecl *enumDecl,
+                                            VarDecl *rawValueDecl) {
   ASTContext &C = Impl.SwiftContext;
 
   auto rawTy = enumDecl->getRawType();
@@ -492,11 +530,16 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
     ParameterList::createEmpty(C)
   };
 
-  auto getterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+  auto getterDecl = AccessorDecl::create(C,
+                     /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     rawValueDecl,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
@@ -549,7 +592,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 //       return _rawValue as SwiftType
 //     }
 //   }
-static FuncDecl *makeStructRawValueGetter(
+static AccessorDecl *makeStructRawValueGetter(
                    ClangImporter::Implementation &Impl,
                    StructDecl *structDecl,
                    VarDecl *computedVar,
@@ -568,13 +611,17 @@ static FuncDecl *makeStructRawValueGetter(
   auto computedType = computedVar->getInterfaceType();
   auto storedType = storedVar->getInterfaceType();
 
-  auto getterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+  auto getterDecl = AccessorDecl::create(C,
+                     /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     computedVar,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
 
@@ -620,10 +667,10 @@ static FuncDecl *makeStructRawValueGetter(
   return getterDecl;
 }
 
-static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                     StructDecl *importedDecl,
-                                     VarDecl *importedFieldDecl,
-                                     ClangNode clangNode = ClangNode()) {
+static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
+                                         StructDecl *importedDecl,
+                                         VarDecl *importedFieldDecl,
+                                         ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl);
 
@@ -633,12 +680,16 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   };
   
   auto getterType = importedFieldDecl->getType();
-  auto getterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+  auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
-                     DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     importedFieldDecl,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
@@ -650,10 +701,10 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   return getterDecl;
 }
 
-static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                     StructDecl *importedDecl,
-                                     VarDecl *importedFieldDecl,
-                                     ClangNode clangNode = ClangNode()) {
+static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
+                                         StructDecl *importedDecl,
+                                         VarDecl *importedFieldDecl,
+                                         ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
@@ -671,11 +722,16 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 
   auto voidTy = TupleType::getEmpty(C);
 
-  auto setterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+  auto setterDecl = AccessorDecl::create(C,
+                     /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsSetter,
+                     AddressorKind::NotAddressor,
+                     importedFieldDecl,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
 
@@ -709,7 +765,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 /// \endcode
 ///
 /// \returns a pair of getter and setter function decls.
-static std::pair<FuncDecl *, FuncDecl *>
+static std::pair<AccessorDecl *, AccessorDecl *>
 makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                            const clang::IndirectFieldDecl *indirectField,
                            ArrayRef<VarDecl *> members,
@@ -821,7 +877,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 /// \endcode
 ///
 /// \returns a pair of the getter and setter function decls.
-static std::pair<FuncDecl *, FuncDecl *>
+static std::pair<AccessorDecl *, AccessorDecl *>
 makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                         StructDecl *importedUnionDecl,
                         VarDecl *importedFieldDecl) {
@@ -1563,10 +1619,10 @@ static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
 }
 
 /// Build a declaration for an Objective-C subscript getter.
-static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
-                                          const FuncDecl *getter,
-                                          Type elementTy, DeclContext *dc,
-                                          ParamDecl *index) {
+static AccessorDecl *
+buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
+                         SubscriptDecl *subscript, const FuncDecl *getter,
+                         Type elementTy, DeclContext *dc, ParamDecl *index) {
   auto &C = Impl.SwiftContext;
   auto loc = getter->getLoc();
 
@@ -1582,13 +1638,20 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
       getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
 
   // Create the getter thunk.
-  FuncDecl *thunk = FuncDecl::create(
-      C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-      /*FuncLoc=*/loc, /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, getterArgs,
-      TypeLoc::withoutLoc(elementTy), dc, getter->getClangNode());
+  auto thunk = AccessorDecl::create(C,
+                     /*FuncLoc=*/loc,
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     subscript,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, getterArgs,
+                     TypeLoc::withoutLoc(elementTy), dc,
+                     getter->getClangNode());
+
   thunk->setInterfaceType(interfaceType);
   thunk->setValidationStarted();
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
@@ -1604,10 +1667,11 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
 }
 
 /// Build a declaration for an Objective-C subscript setter.
-static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
-                                          const FuncDecl *setter,
-                                          Type elementInterfaceTy,
-                                          DeclContext *dc, ParamDecl *index) {
+static AccessorDecl *
+buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
+                         SubscriptDecl *subscript, const FuncDecl *setter,
+                         Type elementInterfaceTy,
+                         DeclContext *dc, ParamDecl *index) {
   auto &C = Impl.SwiftContext;
   auto loc = setter->getLoc();
 
@@ -1645,14 +1709,19 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
 
   // Create the setter thunk.
-  FuncDecl *thunk = FuncDecl::create(
-      C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-      /*FuncLoc=*/setter->getLoc(),
-      /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, setterArgs,
-      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc, setter->getClangNode());
+  auto thunk = AccessorDecl::create(C,
+                     /*FuncLoc=*/setter->getLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsSetter,
+                     AddressorKind::NotAddressor,
+                     subscript,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, setterArgs,
+                     TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
+                     setter->getClangNode());
   thunk->setInterfaceType(interfaceType);
   thunk->setValidationStarted();
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
@@ -1798,6 +1867,14 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   bool isStatic = true;
   bool isImplicit = true;
 
+  // Make the property decl
+  auto errorDomainPropertyDecl = new (C) VarDecl(
+      /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
+      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+  errorDomainPropertyDecl->setInterfaceType(stringTy);
+  errorDomainPropertyDecl->setValidationStarted();
+  errorDomainPropertyDecl->setAccess(AccessLevel::Public);
+
   DeclRefExpr *domainDeclRef = new (C)
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
   ParameterList *params[] = {
@@ -1806,23 +1883,20 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
       ParameterList::createEmpty(C)};
   auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params, C);
 
-  FuncDecl *getterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+  auto getterDecl = AccessorDecl::create(C,
+                     /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     errorDomainPropertyDecl,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
   getterDecl->setInterfaceType(toStringTy);
   getterDecl->setValidationStarted();
-
-  // Make the property decl
-  auto errorDomainPropertyDecl = new (C) VarDecl(
-      /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
-  errorDomainPropertyDecl->setInterfaceType(stringTy);
-  errorDomainPropertyDecl->setValidationStarted();
-  errorDomainPropertyDecl->setAccess(AccessLevel::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
@@ -2612,6 +2686,8 @@ namespace {
           errorWrapper->computeType();
           errorWrapper->setValidationStarted();
           errorWrapper->setAccess(AccessLevel::Public);
+          errorWrapper->getAttrs().add(
+            new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
@@ -3358,7 +3434,8 @@ namespace {
 
     Decl *importGlobalAsMethod(const clang::FunctionDecl *decl, DeclName name,
                                DeclContext *dc, Optional<unsigned> selfIdx,
-                               Optional<ImportedName> correctSwiftName);
+                               Optional<ImportedName> correctSwiftName,
+                               Optional<AccessorInfo> accessorInfo);
 
     /// Create an implicit property given the imported name of one of
     /// the accessors.
@@ -3394,30 +3471,32 @@ namespace {
         return property->getSetter();
       }
 
-      return importFunctionDecl(decl, importedName, correctSwiftName, nullptr);
+      return importFunctionDecl(decl, importedName, correctSwiftName, None);
     }
 
     Decl *importFunctionDecl(const clang::FunctionDecl *decl,
                              ImportedName importedName,
                              Optional<ImportedName> correctSwiftName,
-                             AbstractStorageDecl *owningStorage) {
+                             Optional<AccessorInfo> accessorInfo) {
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
-      DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
+      DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       if (importedName.importAsMember()) {
         // Handle initializers.
-        if (name.getBaseName() == Impl.SwiftContext.Id_init)
+        if (name.getBaseName() == Impl.SwiftContext.Id_init) {
+          assert(!accessorInfo);
           return importGlobalAsInitializer(decl, name, dc,
                                            importedName.getInitKind(),
                                            correctSwiftName);
+        }
 
         // Everything else is a method.
         return importGlobalAsMethod(decl, name, dc,
                                     importedName.getSelfIndex(),
-                                    correctSwiftName);
+                                    correctSwiftName, accessorInfo);
       }
 
       // Import the function type. If we have parameters, make sure their names
@@ -3443,13 +3522,10 @@ namespace {
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      auto result = FuncDecl::create(
-          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-          /*FuncLoc=*/loc, name, nameLoc,
-          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-          /*AccessorKeywordLoc=*/SourceLoc(),
-          /*GenericParams=*/nullptr, bodyParams,
-          TypeLoc::withoutLoc(resultTy), dc, decl);
+      FuncDecl *result = createFuncOrAccessor(Impl.SwiftContext, loc,
+                                              accessorInfo, name, nameLoc,
+                                              bodyParams, resultTy,
+                                              /*throws*/ false, dc, decl);
 
       result->setInterfaceType(type);
       result->setValidationStarted();
@@ -3717,13 +3793,14 @@ namespace {
       if (auto Known = Impl.importDeclCached(decl, getVersion()))
         return Known;
 
-      return importObjCMethodDecl(decl, dc);
+      return importObjCMethodDecl(decl, dc, None);
     }
 
     /// Check whether we have already imported a method with the given
     /// selector in the given context.
-    bool methodAlreadyImported(ObjCSelector selector, bool isInstance,
-                               DeclContext *dc) {
+    bool isMethodAlreadyImported(ObjCSelector selector, bool isInstance,
+                                 DeclContext *dc,
+                    llvm::function_ref<bool(AbstractFunctionDecl *fn)> filter) {
       // We only need to perform this check for classes.
       auto classDecl
         = dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
@@ -3736,8 +3813,9 @@ namespace {
       // Look for a matching imported or deserialized member.
       bool result = false;
       for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
-        if (decl->getClangDecl()
-            || !decl->getDeclContext()->getParentSourceFile()) {
+        if ((decl->getClangDecl()
+             || !decl->getDeclContext()->getParentSourceFile())
+            && filter(decl)) {
           result = true;
           break;
         }
@@ -3753,16 +3831,35 @@ namespace {
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                              DeclContext *dc) {
-      return importObjCMethodDecl(decl, dc, false);
+                              DeclContext *dc,
+                              Optional<AccessorInfo> accessorInfo) {
+      return importObjCMethodDecl(decl, dc, false, accessorInfo);
     }
 
   private:
+    static bool isAcceptableResult(Decl *fn,
+                                   Optional<AccessorInfo> accessorInfo) {
+      // We can't safely re-use the same declaration if it disagrees
+      // in accessor-ness.
+      auto accessor = dyn_cast<AccessorDecl>(fn);
+      if (!accessorInfo)
+        return accessor == nullptr;
+
+      // For consistency with previous behavior, allow it even if it's been
+      // imported for some other property.
+      return (accessor && accessor->getAccessorKind() == accessorInfo->Kind);
+    }
+
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
-                              bool forceClassMethod) {
+                              bool forceClassMethod,
+                              Optional<AccessorInfo> accessorInfo) {
       // If we have an init method, import it as an initializer.
       if (isInitMethod(decl)) {
+        // Cannot import initializers as accessors.
+        if (accessorInfo)
+          return nullptr;
+
         // Cannot force initializers into class methods.
         if (forceClassMethod)
           return nullptr;
@@ -3778,18 +3875,25 @@ namespace {
         // methods.
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
                                               getVersion()});
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
+        if (known != Impl.ImportedDecls.end()) {
+          auto decl = known->second;
+          if (isAcceptableResult(decl, accessorInfo))
+            return decl;
+        }
       }
 
       // Check whether another method with the same selector has already been
       // imported into this context.
       ObjCSelector selector = Impl.importSelector(decl->getSelector());
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
-      if (isActiveSwiftVersion() &&
-          methodAlreadyImported(selector, isInstance, dc))
-        return nullptr;
-
+      if (isActiveSwiftVersion()) {
+        if (isMethodAlreadyImported(selector, isInstance, dc,
+                                    [&](AbstractFunctionDecl *fn) {
+              return isAcceptableResult(fn, accessorInfo);
+            })) {
+          return nullptr;
+        }
+      }
 
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
@@ -3801,11 +3905,16 @@ namespace {
       // not an init
       if (!isActiveSwiftVersion() || !isFactoryInit(importedName)) {
         auto result = importNonInitObjCMethodDecl(decl, dc, importedName,
-                                                  selector, forceClassMethod);
+                                                  selector, forceClassMethod,
+                                                  accessorInfo);
         if (!isActiveSwiftVersion() && result)
           markAsVariant(result, *correctSwiftName);
         return result;
       }
+
+      // We can't import a factory-initializer as an accessor.
+      if (accessorInfo)
+        return nullptr;
 
       // We don't want to suppress init formation in Swift 3 names. Instead, we
       // want the normal Swift 3 name, and a "raw" name for diagnostics. The
@@ -3826,7 +3935,8 @@ namespace {
                                       DeclContext *dc,
                                       ImportedName importedName,
                                       ObjCSelector selector,
-                                      bool forceClassMethod) {
+                                      bool forceClassMethod,
+                                      Optional<AccessorInfo> accessorInfo) {
       assert(dc->isTypeContext() && "Method in non-type context?");
       assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
              "Clang method in Swift context?");
@@ -3877,6 +3987,12 @@ namespace {
           prop = nullptr;
       }
 
+      // If we have an accessor-import request but didn't find a property,
+      // reject the import request.
+      if (accessorInfo && !prop) {
+        return nullptr;
+      }
+
       ImportedType importedType;
       if (prop) {
         // If the matching property is in a superclass, or if the getter and
@@ -3905,17 +4021,21 @@ namespace {
         // methods.
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
                                               getVersion()});
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
+        if (known != Impl.ImportedDecls.end()) {
+          auto decl = known->second;
+          if (isAcceptableResult(decl, accessorInfo))
+            return decl;
+        }
       }
 
-      auto result = FuncDecl::create(
-          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
-          StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
-          importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
-          /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-          /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
+      auto result = createFuncOrAccessor(Impl.SwiftContext,
+                                         /*funcLoc*/SourceLoc(),
+                                         accessorInfo,
+                                         importedName.getDeclName(),
+                                         /*nameLoc*/SourceLoc(),
+                                         bodyParams, Type(),
+                                         importedName.getErrorInfo().hasValue(),
+                                         dc, decl);
 
       result->setAccess(getOverridableAccessLevel(dc));
 
@@ -4009,7 +4129,8 @@ namespace {
           // method, do so and mark the result as an alternate
           // declaration.
           if (auto imported = importObjCMethodDecl(decl, dc,
-                                                  /*forceClassMethod=*/true))
+                                                  /*forceClassMethod=*/true,
+                                                  /*accessor*/None))
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
@@ -4078,8 +4199,10 @@ namespace {
                                    const clang::ObjCMethodDecl *objcMethod);
 
     /// Import the accessor and its attributes.
-    FuncDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
-                             DeclContext *dc);
+    AccessorDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
+                                 AbstractStorageDecl *storage,
+                                 AccessorKind accessorKind,
+                                 DeclContext *dc);
 
   public:
 
@@ -4608,8 +4731,9 @@ namespace {
       if (original->isSettable(nullptr))
         return;
 
-      FuncDecl *setter = importAccessor(clangSetter,
-                                        original->getDeclContext());
+      AccessorDecl *setter = importAccessor(clangSetter,
+                                            original, AccessorKind::IsSetter,
+                                            original->getDeclContext());
       if (!setter)
         return;
 
@@ -4693,22 +4817,6 @@ namespace {
       if (!importedType)
         return nullptr;
 
-      // Import the getter.
-      FuncDecl *getter = nullptr;
-      if (auto clangGetter = decl->getGetterMethodDecl()) {
-        getter = importAccessor(clangGetter, dc);
-        if (!getter)
-          return nullptr;
-      }
-
-      // Import the setter, if there is one.
-      FuncDecl *setter = nullptr;
-      if (auto clangSetter = decl->getSetterMethodDecl()) {
-        setter = importAccessor(clangSetter, dc);
-        if (!setter)
-          return nullptr;
-      }
-
       // Check whether the property already got imported.
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
@@ -4726,6 +4834,22 @@ namespace {
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
+
+      // Import the getter.
+      AccessorDecl *getter = nullptr;
+      if (auto clangGetter = decl->getGetterMethodDecl()) {
+        getter = importAccessor(clangGetter, result, AccessorKind::IsGetter, dc);
+        if (!getter)
+          return nullptr;
+      }
+
+      // Import the setter, if there is one.
+      AccessorDecl *setter = nullptr;
+      if (auto clangSetter = decl->getSetterMethodDecl()) {
+        setter = importAccessor(clangSetter, result, AccessorKind::IsSetter, dc);
+        if (!setter)
+          return nullptr;
+      }
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
@@ -5468,7 +5592,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
     DeclName name,
     DeclContext *dc,
     Optional<unsigned> selfIdx,
-    Optional<ImportedName> correctSwiftName) {
+    Optional<ImportedName> correctSwiftName,
+    Optional<AccessorInfo> accessorInfo) {
   if (dc->getAsProtocolOrProtocolExtensionContext() && !selfIdx) {
     // FIXME: source location...
     Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
@@ -5534,12 +5659,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   auto loc = Impl.importSourceLoc(decl->getLocation());
   auto nameLoc = Impl.importSourceLoc(decl->getLocation());
   auto result =
-      FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                       /*FuncLoc=*/loc, name, nameLoc,
-                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                       /*AccessorKeywordLoc=*/SourceLoc(),
-                       /*GenericParams=*/nullptr, bodyParams,
-                       TypeLoc::withoutLoc(swiftResultTy), dc, decl);
+    createFuncOrAccessor(C, loc, accessorInfo, name, nameLoc,
+                         bodyParams, swiftResultTy, /*throws*/ false, dc, decl);
 
   auto interfaceType = getGenericMethodType(dc, fnType->castTo<AnyFunctionType>());
   result->setInterfaceType(interfaceType);
@@ -5720,8 +5841,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                                  FinalAttr(/*IsImplicit=*/true));
 
   // Import the getter.
-  auto *swiftGetter = dyn_cast_or_null<FuncDecl>(
-      importFunctionDecl(getter, getterName, None, property));
+  auto *swiftGetter = dyn_cast_or_null<AccessorDecl>(
+      importFunctionDecl(getter, getterName, None,
+                         AccessorInfo{property, AccessorKind::IsGetter}));
   if (!swiftGetter)
     return nullptr;
 
@@ -5731,10 +5853,11 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     markAsVariant(swiftGetter, *swift3GetterName);
 
   // Import the setter.
-  FuncDecl *swiftSetter = nullptr;
+  AccessorDecl *swiftSetter = nullptr;
   if (setter) {
-    swiftSetter = dyn_cast_or_null<FuncDecl>(
-        importFunctionDecl(setter, setterName, None, property));
+    swiftSetter = dyn_cast_or_null<AccessorDecl>(
+        importFunctionDecl(setter, setterName, None,
+                           AccessorInfo{property, AccessorKind::IsSetter}));
     if (!swiftSetter)
       return nullptr;
 
@@ -5772,7 +5895,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Check whether there is already a method with this selector.
   auto selector = Impl.importSelector(objcMethod->getSelector());
   if (isActiveSwiftVersion() &&
-      methodAlreadyImported(selector, /*isInstance=*/true, dc))
+      isMethodAlreadyImported(selector, /*isInstance=*/true, dc,
+                              [](AbstractFunctionDecl *fn) {
+        return true;
+      }))
     return nullptr;
 
   // Map the name and complete the import.
@@ -6440,7 +6566,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
           !existingSubscript->isSettable()) {
         // Create the setter thunk.
         auto setterThunk = buildSubscriptSetterDecl(
-            Impl, setter, elementTy, setter->getDeclContext(), setterIndex);
+            Impl, existingSubscript, setter, elementTy,
+            setter->getDeclContext(), setterIndex);
 
         // Set the computed setter.
         existingSubscript->setComputedSetter(setterThunk);
@@ -6467,24 +6594,26 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   DeclContext *dc =
       associateWithSetter ? setter->getDeclContext() : getter->getDeclContext();
 
-  // Build the thunks.
-  FuncDecl *getterThunk =
-      buildSubscriptGetterDecl(Impl, getter, elementTy, dc, getterIndex);
-
-  FuncDecl *setterThunk = nullptr;
-  if (setter)
-    setterThunk =
-        buildSubscriptSetterDecl(Impl, setter, elementTy, dc, setterIndex);
-
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
-  auto bodyParams = getterThunk->getParameterList(1)->clone(C);
+  auto bodyParams = ParameterList::create(C, getterIndex);
   DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessLevel(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),
       TypeLoc::withoutLoc(elementContextTy), dc,
       /*GenericParams=*/nullptr);
+
+  // Build the thunks.
+  AccessorDecl *getterThunk =
+      buildSubscriptGetterDecl(Impl, subscript, getter, elementTy,
+                               dc, getterIndex);
+
+  AccessorDecl *setterThunk = nullptr;
+  if (setter)
+    setterThunk =
+        buildSubscriptSetterDecl(Impl, subscript, setter, elementTy,
+                                 dc, setterIndex);
 
   /// Record the subscript as an alternative declaration.
   Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
@@ -6528,12 +6657,15 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   return subscript;
 }
 
-FuncDecl *
+AccessorDecl *
 SwiftDeclConverter::importAccessor(clang::ObjCMethodDecl *clangAccessor,
+                                   AbstractStorageDecl *storage,
+                                   AccessorKind accessorKind,
                                    DeclContext *dc) {
   SwiftDeclConverter converter(Impl, getActiveSwiftVersion());
-  auto *accessor =
-      cast_or_null<FuncDecl>(converter.importObjCMethodDecl(clangAccessor, dc));
+  auto *accessor = cast_or_null<AccessorDecl>(
+    converter.importObjCMethodDecl(clangAccessor, dc,
+                                   AccessorInfo{storage, accessorKind}));
   if (!accessor) {
     return nullptr;
   }
@@ -6767,9 +6899,8 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (!afd)
         continue;
 
-      if (auto func = dyn_cast<FuncDecl>(afd))
-        if (func->isAccessor())
-          continue;
+      if (isa<AccessorDecl>(afd))
+        continue;
 
       auto objcMethod =
           dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
@@ -7347,14 +7478,17 @@ void ClangImporter::Implementation::importAttributes(
     if (FD->getNumParams() == 1 &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")))
-      if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>())
+          FD->getName().endswith("Autorelease")) &&
+        !FD->getAttr<clang::SwiftNameAttr>()) {
+      if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {
           auto attr = AvailableAttr::createPlatformAgnostic(C,
             "Core Foundation objects are automatically memory managed");
           MappedDecl->getAttrs().add(attr);
           return;
         }
+      }
+    }
   }
 
   // Hack: mark any method named "print" with less than two parameters as
@@ -7779,7 +7913,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   SwiftDeclConverter converter(*this, version);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    result = converter.importObjCMethodDecl(method, dc);
+    result = converter.importObjCMethodDecl(method, dc, /*accessor*/None);
   } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
     result = converter.importObjCPropertyDecl(prop, dc);
   } else {
@@ -8086,12 +8220,16 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, C);
 
   // Create the getter function declaration.
-  auto func =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+  auto func = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
-                     /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::IsGetter,
+                     AddressorKind::NotAddressor,
+                     var,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, getterArgs,
                      TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);

@@ -132,26 +132,20 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   auto parentDC = cast<DeclContext>(parentDecl);
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
-  // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 rawInterfaceType,
-                                                 rawType,
-                                                 /*isStatic=*/false,
-                                                 /*isFinal=*/false);
-  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_rawValue,
-                                     rawInterfaceType,
-                                     rawType,
-                                     getterDecl,
-                                     /*isStatic=*/false,
-                                     /*isFinal=*/false);
-  
+    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_rawValue,
+                             rawInterfaceType, rawType, /*isStatic=*/false,
+                             /*isFinal=*/false);
+
+  // Define the getter.
+  auto getterDecl =
+    addGetterToReadOnlyDerivedProperty(tc, propDecl, rawType);
+  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);

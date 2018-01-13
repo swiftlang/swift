@@ -27,7 +27,7 @@ func testStructWithFlexibleArray(_ s : StructWithFlexibleArray) {
 }
 
 // Make sure flexible array struct member isn't represented in IR function signature as i0 (or at all). rdar://problem/18510461
-// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir27testStructWithFlexibleArrayyySC0defG0VF"(i32)
+// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir27testStructWithFlexibleArrayyySo0defG0aF"(i32)
 
 typealias EightUp = (Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8)
 

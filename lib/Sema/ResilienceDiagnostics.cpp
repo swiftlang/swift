@@ -26,8 +26,10 @@ using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
     if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(DC))
-      if (DAI->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        return FragileFunctionKind::DefaultArgument;
+      return FragileFunctionKind::DefaultArgument;
+
+    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+      return FragileFunctionKind::PropertyInitializer;
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // If the function is a nested function, we will serialize its body if
@@ -49,10 +51,9 @@ FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
 
       // If a property or subscript is @_inlineable, the accessors are
       // @_inlineable also.
-      if (auto FD = dyn_cast<FuncDecl>(AFD))
-        if (auto *ASD = FD->getAccessorStorageDecl())
-          if (ASD->getAttrs().getAttribute<InlineableAttr>())
-            return FragileFunctionKind::Inlineable;
+      if (auto accessor = dyn_cast<AccessorDecl>(AFD))
+        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
+          return FragileFunctionKind::Inlineable;
     }
   }
 

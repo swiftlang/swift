@@ -890,11 +890,12 @@ void performBasicLayout(BasicLayout &layout,
 } // end anonymous namespace
 
 const TupleTypeMetadata *
-swift::swift_getTupleTypeMetadata(size_t numElements,
+swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
                                   const Metadata * const *elements,
                                   const char *labels,
-                                  TupleTypeFlags flags,
                                   const ValueWitnessTable *proposedWitnesses) {
+  auto numElements = flags.getNumElements();
+
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
   if (numElements == 0) return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
@@ -913,8 +914,9 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
+  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
   char *newLabels =
-    (char *)TupleTypes.getAllocator().Allocate(labelsLen + 1, alignof(char));
+    (char *)TupleTypes.getAllocator().Allocate(labelsAllocSize, alignof(char));
   strcpy(newLabels, labels);
   key.Labels = newLabels;
 
@@ -924,7 +926,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
   if (!result.second) {
-    TupleTypes.getAllocator().Deallocate(newLabels, labelsLen + 1);
+    TupleTypes.getAllocator().Deallocate(newLabels, labelsAllocSize);
   }
 
   // Done.
@@ -1008,8 +1010,8 @@ swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1 };
-  return swift_getTupleTypeMetadata(2, elts, labels, TupleTypeFlags(0),
-                                    proposedWitnesses);
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(2),
+                                    elts, labels, proposedWitnesses);
 }
 
 const TupleTypeMetadata *
@@ -1018,8 +1020,8 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1, elt2 };
-  return swift_getTupleTypeMetadata(3, elts, labels, TupleTypeFlags(0),
-                                    proposedWitnesses);
+  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(3),
+                                    elts, labels, proposedWitnesses);
 }
 
 /***************************************************************************/
@@ -2349,19 +2351,40 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   return witnessTables[i];
 }
 
+#ifndef NDEBUG
+/// Determine whether any of the given protocols is class-bound.
+static bool anyProtocolIsClassBound(
+                                size_t numProtocols,
+                                const ProtocolDescriptor * const *protocols) {
+  for (unsigned i = 0; i != numProtocols; ++i) {
+    if (protocols[i]->Flags.getClassConstraint()
+          == ProtocolClassConstraint::Class)
+      return true;
+  }
+
+  return false;
+}
+#endif
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
-swift::swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
-                                        const Metadata *superclassConstraint,
-                                        size_t numProtocols,
-                                        const ProtocolDescriptor **protocols)
+swift::swift_getExistentialTypeMetadata(
+                                  ProtocolClassConstraint classConstraint,
+                                  const Metadata *superclassConstraint,
+                                  size_t numProtocols,
+                                  const ProtocolDescriptor * const *protocols)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 
   // We entrust that the compiler emitting the call to
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
   // a globally stable ordering that's consistent across modules.
 
+  // Ensure that the "class constraint" bit is set whenever we have a
+  // superclass or a one of the protocols is class-bound.
+  assert(classConstraint == ProtocolClassConstraint::Class ||
+         (!superclassConstraint &&
+          !anyProtocolIsClassBound(numProtocols, protocols)));
   ExistentialCacheEntry::Key key = {
     superclassConstraint, classConstraint, numProtocols, protocols
   };

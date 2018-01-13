@@ -102,12 +102,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       remangled = name;
     } else {
       remangled = swift::Demangle::mangleNode(pointer);
-      unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled.data());
+      unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled);
       assert(prefixLen > 0);
       // Replace the prefix if we remangled with a different prefix.
       if (!name.startswith(remangled.substr(0, prefixLen))) {
         unsigned namePrefixLen =
-          swift::Demangle::getManglingPrefixLength(name.data());
+          swift::Demangle::getManglingPrefixLength(name);
         assert(namePrefixLen > 0);
         remangled = name.take_front(namePrefixLen).str() +
                       remangled.substr(prefixLen);
@@ -138,8 +138,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
     if (Classify) {
       std::string Classifications;
-      std::string cName = name.str();
-      if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
+      if (!swift::Demangle::isSwiftSymbol(name))
         Classifications += 'N';
       if (DCtx.isThunkSymbol(name)) {
         if (!Classifications.empty())

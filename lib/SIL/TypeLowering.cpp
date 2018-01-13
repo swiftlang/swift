@@ -1283,7 +1283,7 @@ namespace {
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(structType);
 
       // Classify the type according to its stored properties.
@@ -1313,7 +1313,7 @@ namespace {
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(enumType);
 
       // If the whole enum is indirect, we lower it as if all payload
@@ -1738,6 +1738,14 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   // that have been made fully concrete.
   CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
 
+  // Remove @noescape from function return types. A @noescape
+  // function return type is a contradiction.
+  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    canResultTy =
+        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
+  }
+
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
@@ -1996,9 +2004,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
   AbstractionPattern origType = getAbstractionPattern(value);
   CanType substType = lvalueType->getCanonicalType();
 
-  // Remove a layer of l-value type if present.
-  if (auto substLVType = dyn_cast<LValueType>(substType))
-    substType = substLVType.getObjectType();
+  assert(!isa<LValueType>(substType));
 
   // Look through reference storage on the original type.
   auto origRefType = origType.getAs<ReferenceStorageType>();
@@ -2053,7 +2059,7 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
-    if (srcType == mappedType || isa<LValueType>(srcType))
+    if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
 
@@ -2520,8 +2526,8 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    assert(structDecl->hasFixedLayout(Module.getSwiftModule(),
-                                      ResilienceExpansion::Minimal) &&
+    assert(!structDecl->isResilient(Module.getSwiftModule(),
+                                    ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
@@ -2547,8 +2553,8 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
-    assert(enumDecl->hasFixedLayout(Module.getSwiftModule(),
-                                    ResilienceExpansion::Minimal) &&
+    assert(!enumDecl->isResilient(Module.getSwiftModule(),
+                                  ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;

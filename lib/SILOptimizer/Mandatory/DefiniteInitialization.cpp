@@ -72,7 +72,7 @@ enum class PartialInitializationKind {
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
-static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
+static void LowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
                                    PartialInitializationKind isInitialization) {
   DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
                      << "]: " << *Inst << "\n");
@@ -1199,9 +1199,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
     unsigned Case = ~0;
     DeclBaseName MethodName;
-    if (FD && FD->isAccessor()) {
-      MethodName = FD->getAccessorStorageDecl()->getBaseName();
-      Case = isa<SubscriptDecl>(FD->getAccessorStorageDecl()) ? 2 : 1;
+    if (auto accessor = dyn_cast_or_null<AccessorDecl>(FD)) {
+      MethodName = accessor->getStorage()->getBaseName();
+      Case = isa<SubscriptDecl>(accessor->getStorage()) ? 2 : 1;
     } else if (FD && FD->isOperator()) {
       MethodName = FD->getName();
       Case = 3;
@@ -1570,8 +1570,8 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     if (!shouldEmitError(Inst)) return true;
 
     DeclBaseName Name;
-    if (Method->isAccessor())
-      Name = Method->getAccessorStorageDecl()->getBaseName();
+    if (auto accessor = dyn_cast<AccessorDecl>(Method))
+      Name = accessor->getStorage()->getBaseName();
     else
       Name = Method->getName();
 
@@ -1584,7 +1584,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
                     ? BeforeSuperInit
                     : BeforeSelfInit));
     diagnose(Module, Inst->getLoc(), diag::self_use_before_fully_init,
-             Name, Method->isAccessor(), Kind);
+             Name, isa<AccessorDecl>(Method), Kind);
 
     if (SuperInitDone)
       noteUninitializedMembers(Use);
@@ -2177,7 +2177,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   // Use an empty location for the alloc_stack. If Loc is variable declaration
   // the alloc_stack would look like the storage of that variable.
   auto *ControlVariableBox =
-      B.createAllocStack(RegularLocation(SourceLoc()), IVType);
+      B.createAllocStack(getCompilerGeneratedLocation(), IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
@@ -2185,6 +2185,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (Term->isFunctionExiting()) {
       B.setInsertionPoint(Term);
+      B.setCurrentDebugScope(Term->getDebugScope());
       B.createDeallocStack(Loc, ControlVariableBox);
     }
   }
@@ -2226,7 +2227,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
         continue;
 
       APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
-      updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, B);
+      SILBuilderWithScope SB(Use.Inst);
+      updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, SB);
       continue;
     }
 

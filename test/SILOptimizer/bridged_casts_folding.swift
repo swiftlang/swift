@@ -779,22 +779,22 @@ print("Swift to NS sets: End")
 
 // Check optimizations of casts from String to CFString
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testForcedCastSwiftToCFStringSo0I0CyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testForcedCastSwiftToCFStringSo0I3RefayF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSString to $CFString
-// CHECK: end{{.*}}$S21bridged_casts_folding29testForcedCastSwiftToCFStringSo0I0CyF
+// CHECK: end{{.*}}$S21bridged_casts_folding29testForcedCastSwiftToCFStringSo0I3RefayF
 @inline(never)
 public func testForcedCastSwiftToCFString() -> CFString {
   let o: CFString = forcedCast(swiftString)
   return o
 }
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding27testCondCastSwiftToCFStringSo0I0CSgyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding27testCondCastSwiftToCFStringSo0I3RefaSgyF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSString to $CFString
-// CHECK: end{{.*}}$S21bridged_casts_folding27testCondCastSwiftToCFStringSo0I0CSgyF
+// CHECK: end{{.*}}$S21bridged_casts_folding27testCondCastSwiftToCFStringSo0I3RefaSgyF
 @inline(never)
 public func testCondCastSwiftToCFString() -> CFString? {
   let o: CFString? = condCast(swiftString)
@@ -803,22 +803,22 @@ public func testCondCastSwiftToCFString() -> CFString? {
 
 // Check optimizations of casts from Int to CFNumber
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding32testForcedCastSwiftIntToCFNumberSo0J0CyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding32testForcedCastSwiftIntToCFNumberSo0J3RefayF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSNumber to $CFNumber
-// CHECK: end{{.*}}$S21bridged_casts_folding32testForcedCastSwiftIntToCFNumberSo0J0CyF
+// CHECK: end{{.*}}$S21bridged_casts_folding32testForcedCastSwiftIntToCFNumberSo0J3RefayF
 @inline(never)
 public func testForcedCastSwiftIntToCFNumber() -> CFNumber {
   let o: CFNumber = forcedCast(swiftIntNumber)
   return o
 }
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding30testCondCastSwiftIntToCFNumberSo0J0CSgyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding30testCondCastSwiftIntToCFNumberSo0J3RefaSgyF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSNumber to $CFNumber
-// CHECK: end{{.*}}$S21bridged_casts_folding30testCondCastSwiftIntToCFNumberSo0J0CSgyF
+// CHECK: end{{.*}}$S21bridged_casts_folding30testCondCastSwiftIntToCFNumberSo0J3RefaSgyF
 @inline(never)
 public func testCondCastSwiftIntToCFNumber() -> CFNumber? {
   let o: CFNumber? = condCast(swiftIntNumber)
@@ -827,22 +827,22 @@ public func testCondCastSwiftIntToCFNumber() -> CFNumber? {
 
 // Check optimization of casts from Swift Array to CFArray
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding31testForcedCastSwiftToCFArrayIntSo0I0CyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding31testForcedCastSwiftToCFArrayIntSo0I3RefayF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSArray to $CFArray
-// CHECK: end{{.*}}$S21bridged_casts_folding31testForcedCastSwiftToCFArrayIntSo0I0CyF
+// CHECK: end{{.*}}$S21bridged_casts_folding31testForcedCastSwiftToCFArrayIntSo0I3RefayF
 @inline(never)
 public func testForcedCastSwiftToCFArrayInt() -> CFArray {
   let arr: CFArray = forcedCast(arrInt)
   return arr
 }
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testCondCastSwiftToCFArrayIntSo0I0CSgyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testCondCastSwiftToCFArrayIntSo0I3RefaSgyF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSArray to $CFArray
-// CHECK: end{{.*}}$S21bridged_casts_folding29testCondCastSwiftToCFArrayIntSo0I0CSgyF
+// CHECK: end{{.*}}$S21bridged_casts_folding29testCondCastSwiftToCFArrayIntSo0I3RefaSgyF
 @inline(never)
 public func testCondCastSwiftToCFArrayInt() -> CFArray? {
   let arrOpt: CFArray? = condCast(arrInt)
@@ -851,22 +851,22 @@ public func testCondCastSwiftToCFArrayInt() -> CFArray? {
 
 // Check optimization of casts from Swift Dict to CFDictionary
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding30testForcedCastSwiftToCFDictIntSo12CFDictionaryCyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding30testForcedCastSwiftToCFDictIntSo15CFDictionaryRefayF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSDictionary to $CFDictionary
-// CHECK: end{{.*}}$S21bridged_casts_folding30testForcedCastSwiftToCFDictIntSo12CFDictionaryCyF
+// CHECK: end{{.*}}$S21bridged_casts_folding30testForcedCastSwiftToCFDictIntSo15CFDictionaryRefayF
 @inline(never)
 public func testForcedCastSwiftToCFDictInt() -> CFDictionary {
   let dict: CFDictionary = forcedCast(dictInt)
   return dict
 }
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding28testCondCastSwiftToCFDictIntSo12CFDictionaryCSgyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding28testCondCastSwiftToCFDictIntSo15CFDictionaryRefaSgyF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSDictionary to $CFDictionary
-// CHECK: end{{.*}}$S21bridged_casts_folding28testCondCastSwiftToCFDictIntSo12CFDictionaryCSgyF
+// CHECK: end{{.*}}$S21bridged_casts_folding28testCondCastSwiftToCFDictIntSo15CFDictionaryRefaSgyF
 @inline(never)
 public func testCondCastSwiftToCFDictInt() -> CFDictionary? {
   let dictOpt: CFDictionary? = condCast(dictInt)
@@ -875,22 +875,22 @@ public func testCondCastSwiftToCFDictInt() -> CFDictionary? {
 
 // Check optimization of casts from Swift Set to CFSet
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testForcedCastSwiftToCFSetIntSo0I0CyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding29testForcedCastSwiftToCFSetIntSo0I3RefayF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSSet to $CFSet
-// CHECK: end{{.*}}$S21bridged_casts_folding29testForcedCastSwiftToCFSetIntSo0I0CyF
+// CHECK: end{{.*}}$S21bridged_casts_folding29testForcedCastSwiftToCFSetIntSo0I3RefayF
 @inline(never)
 public func testForcedCastSwiftToCFSetInt() -> CFSet {
   let set: CFSet = forcedCast(setInt)
   return set
 }
 
-// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding27testCondCastSwiftToCFSetIntSo0I0CSgyF
+// CHECK-LABEL: sil [noinline] @$S21bridged_casts_folding27testCondCastSwiftToCFSetIntSo0I3RefaSgyF
 // CHECK-NOT: unconditional_checked
 // CHECK: function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK: unchecked_ref_cast{{.*}}: $NSSet to $CFSet
-// CHECK: end{{.*}}$S21bridged_casts_folding27testCondCastSwiftToCFSetIntSo0I0CSgyF
+// CHECK: end{{.*}}$S21bridged_casts_folding27testCondCastSwiftToCFSetIntSo0I3RefaSgyF
 @inline(never)
 public func testCondCastSwiftToCFSetInt() -> CFSet? {
   let setOpt: CFSet? = condCast(setInt)
@@ -903,10 +903,10 @@ var anyHashable: AnyHashable = 0
 
 // CHECK-LABEL: $S21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$S21bridged_casts_folding11anyHashables03AnyE0Vv
-// CHECK: function_ref @$Ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
-// CHECK-NEXT: apply %3(%1)
-// CHECK-NEXT: destroy_addr %1
+// CHECK: [[FUNC:%.*]] = function_ref @$Ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
+// CHECK-NEXT: apply [[FUNC]]([[GLOBAL]])
 // CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to $NSObjectSubclass
+// CHECK: } // end sil function '$S21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF'
 @inline(never)
 public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {
   return anyHashable as! NSObjectSubclass

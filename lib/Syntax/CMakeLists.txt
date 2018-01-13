@@ -6,6 +6,7 @@ add_swift_library(swiftSyntax STATIC
   SyntaxBuilders.cpp.gyb
   SyntaxKind.cpp.gyb
   SyntaxFactory.cpp.gyb
+  SyntaxVisitor.cpp.gyb
   Trivia.cpp
   RawSyntax.cpp
   RawTokenSyntax.cpp

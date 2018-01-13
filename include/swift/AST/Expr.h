@@ -3389,7 +3389,7 @@ public:
 
 
 /// \brief A base class for closure expressions.
-class AbstractClosureExpr : public Expr, public DeclContext {
+class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
 
   /// \brief The set of parameters.
@@ -3398,8 +3398,8 @@ class AbstractClosureExpr : public Expr, public DeclContext {
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       unsigned Discriminator, DeclContext *Parent)
-      : Expr(Kind, Implicit, FnType),
-        DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+      : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+        Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }

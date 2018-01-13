@@ -509,7 +509,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printType(T);
   }
 
-  void printTypeLoc(const TypeLoc &TL) {
+  void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
     if (CurrentType && TL.getType()) {
       printTransformedType(TL.getType());
       return;
@@ -517,16 +517,21 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
-    if (willUseTypeReprPrinting(TL, CurrentType, Options)) {
-      if (auto repr = TL.getTypeRepr()) {
-        llvm::SaveAndRestore<bool> SPTA(Options.SkipParameterTypeAttributes,
-                                        true);
-        repr->print(Printer, Options);
-      }
+    if (willUseTypeReprPrinting(TL, CurrentType, options)) {
+      if (auto repr = TL.getTypeRepr())
+        repr->print(Printer, options);
       return;
     }
 
-    TL.getType().print(Printer, Options);
+    TL.getType().print(Printer, options);
+  }
+
+  void printTypeLoc(const TypeLoc &TL) { printTypeLocWithOptions(TL, Options); }
+
+  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL) {
+    PrintOptions options = Options;
+    options.PrintOptionalAsImplicitlyUnwrapped = true;
+    printTypeLocWithOptions(TL, options);
   }
 
   void printContextIfNeeded(const Decl *decl) {
@@ -1367,7 +1372,7 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
-static bool isAccessorAssumedNonMutating(FuncDecl *accessor) {
+static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::IsGetter:
   case AccessorKind::IsAddressor:
@@ -1379,14 +1384,11 @@ static bool isAccessorAssumedNonMutating(FuncDecl *accessor) {
   case AccessorKind::IsMaterializeForSet:
   case AccessorKind::IsMutableAddressor:
     return false;
-
-  case AccessorKind::NotAccessor:
-    llvm_unreachable("not an addressor!");
   }
   llvm_unreachable("bad addressor kind");
 }
 
-static StringRef getAddressorLabel(FuncDecl *addressor) {
+static StringRef getAddressorLabel(AccessorDecl *addressor) {
   switch (addressor->getAddressorKind()) {
   case AddressorKind::NotAddressor:
     llvm_unreachable("addressor claims not to be an addressor");
@@ -1402,7 +1404,7 @@ static StringRef getAddressorLabel(FuncDecl *addressor) {
   llvm_unreachable("bad addressor kind");
 }
 
-static StringRef getMutableAddressorLabel(FuncDecl *addressor) {
+static StringRef getMutableAddressorLabel(AccessorDecl *addressor) {
   switch (addressor->getAddressorKind()) {
   case AddressorKind::NotAddressor:
     llvm_unreachable("addressor claims not to be an addressor");
@@ -1497,7 +1499,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   bool PrintAccessorBody = Options.FunctionDefinitions || Options.FunctionBody;
 
-  auto PrintAccessor = [&](FuncDecl *Accessor, StringRef Label) {
+  auto PrintAccessor = [&](AccessorDecl *Accessor, StringRef Label) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
@@ -1522,12 +1524,12 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     }
   };
 
-  auto PrintAddressor = [&](FuncDecl *accessor) {
+  auto PrintAddressor = [&](AccessorDecl *accessor) {
     if (!accessor) return;
     PrintAccessor(accessor, getAddressorLabel(accessor));
   };
 
-  auto PrintMutableAddressor = [&](FuncDecl *accessor) {
+  auto PrintMutableAddressor = [&](AccessorDecl *accessor) {
     if (!accessor) return;
     PrintAccessor(accessor, getMutableAddressorLabel(accessor));
   };
@@ -2202,7 +2204,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     auto tyLoc = decl->getTypeLoc();
     if (!tyLoc.getTypeRepr())
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
-    printTypeLoc(tyLoc);
+
+    if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
+    else
+      printTypeLoc(tyLoc);
   }
 
   printAccessors(decl);
@@ -2264,13 +2270,11 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // FIXME: don't do if will be using type repr printing
-  printParameterFlags(Printer, Options, paramFlags);
-
   // Special case, if we're not going to use the type repr printing, peek
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+    printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy =
                 dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
       ++numParens;
@@ -2280,7 +2284,10 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   for (unsigned i = 0; i < numParens; ++i)
     Printer << "(";
-  printTypeLoc(TheTypeLoc);
+  if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
+  else
+    printTypeLoc(TheTypeLoc);
   for (unsigned i = 0; i < numParens; ++i)
     Printer << ")";
 
@@ -2408,154 +2415,156 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
   return PrintedSomething;
 }
 
+void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  switch (auto kind = decl->getAccessorKind()) {
+  case AccessorKind::IsGetter:
+  case AccessorKind::IsAddressor:
+    recordDeclLoc(decl,
+      [&]{
+        Printer << (kind == AccessorKind::IsGetter
+                      ? "get" : getAddressorLabel(decl));
+      });
+    Printer << " {";
+    break;
+  case AccessorKind::IsDidSet:
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::IsMutableAddressor:
+    recordDeclLoc(decl,
+      [&]{
+        Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
+                    kind == AccessorKind::IsMaterializeForSet
+                      ? "materializeForSet"
+                      : getMutableAddressorLabel(decl));
+      });
+    Printer << " {";
+    break;
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsWillSet:
+    recordDeclLoc(decl,
+      [&]{
+        Printer << (decl->isSetter() ? "set" : "willSet");
+
+        auto params = decl->getParameterLists().back();
+        if (params->size() != 0 && !params->get(0)->isImplicit()) {
+          auto Name = params->get(0)->getName();
+          if (!Name.empty()) {
+            Printer << "(";
+            Printer.printName(Name);
+            Printer << ")";
+          }
+        }
+      });
+    Printer << " {";
+  }
+  if (auto BodyFunc = Options.FunctionBody) {
+    {
+      IndentRAII IndentBody(*this);
+      indent();
+      Printer.printNewline();
+      Printer << BodyFunc(decl);
+    }
+    indent();
+    Printer.printNewline();
+  } else if (Options.FunctionDefinitions && decl->getBody()) {
+    if (printASTNodes(decl->getBody()->getElements())) {
+      Printer.printNewline();
+      indent();
+    }
+  }
+  Printer << "}";
+}
+
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
-  if (decl->isAccessor()) {
-    printDocumentationComment(decl);
-    printAttributes(decl);
-    switch (auto kind = decl->getAccessorKind()) {
-    case AccessorKind::NotAccessor: break;
-    case AccessorKind::IsGetter:
-    case AccessorKind::IsAddressor:
-      recordDeclLoc(decl,
-        [&]{
-          Printer << (kind == AccessorKind::IsGetter
-                        ? "get" : getAddressorLabel(decl));
-        });
-      Printer << " {";
-      break;
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::IsMutableAddressor:
-      recordDeclLoc(decl,
-        [&]{
-          Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
-                      kind == AccessorKind::IsMaterializeForSet
-                        ? "materializeForSet"
-                        : getMutableAddressorLabel(decl));
-        });
-      Printer << " {";
-      break;
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-      recordDeclLoc(decl,
-        [&]{
-          Printer << (decl->isSetter() ? "set" : "willSet");
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  printAccess(decl);
 
-          auto params = decl->getParameterLists().back();
-          if (params->size() != 0 && !params->get(0)->isImplicit()) {
-            auto Name = params->get(0)->getName();
-            if (!Name.empty()) {
-              Printer << "(";
-              Printer.printName(Name);
-              Printer << ")";
-            }
-          }
-        });
-      Printer << " {";
-    }
-    if (auto BodyFunc = Options.FunctionBody) {
-      {
-        IndentRAII IndentBody(*this);
-        indent();
-        Printer.printNewline();
-        Printer << BodyFunc(decl);
-      }
-      indent();
-      Printer.printNewline();
-    } else if (Options.FunctionDefinitions && decl->getBody()) {
-      if (printASTNodes(decl->getBody()->getElements())) {
-        Printer.printNewline();
-        indent();
-      }
-    }
-    Printer << "}";
-  } else {
-    printDocumentationComment(decl);
-    printAttributes(decl);
-    printAccess(decl);
-
-    if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
-      ASTContext &Ctx = decl->getASTContext();
-      SourceLoc StartLoc = decl->getStartLoc();
-      SourceLoc EndLoc;
-      if (!decl->getBodyResultTypeLoc().isNull()) {
-        EndLoc = decl->getBodyResultTypeLoc().getSourceRange().End;
-      } else {
-        EndLoc = decl->getSignatureSourceRange().End;
-      }
-      CharSourceRange Range =
-        Lexer::getCharSourceRangeFromSourceRange(Ctx.SourceMgr,
-                                                 SourceRange(StartLoc, EndLoc));
-      printSourceRange(Range, Ctx);
+  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+    ASTContext &Ctx = decl->getASTContext();
+    SourceLoc StartLoc = decl->getStartLoc();
+    SourceLoc EndLoc;
+    if (!decl->getBodyResultTypeLoc().isNull()) {
+      EndLoc = decl->getBodyResultTypeLoc().getSourceRange().End;
     } else {
-      if (!Options.SkipIntroducerKeywords) {
-        if (decl->isStatic())
-          printStaticKeyword(decl->getCorrectStaticSpelling());
-        if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
-          Printer.printKeyword("mutating");
-          Printer << " ";
-        } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
-          Printer.printKeyword("__consuming");
-          Printer << " ";
-        }
-        Printer << tok::kw_func << " ";
+      EndLoc = decl->getSignatureSourceRange().End;
+    }
+    CharSourceRange Range =
+      Lexer::getCharSourceRangeFromSourceRange(Ctx.SourceMgr,
+                                               SourceRange(StartLoc, EndLoc));
+    printSourceRange(Range, Ctx);
+  } else {
+    if (!Options.SkipIntroducerKeywords) {
+      if (decl->isStatic())
+        printStaticKeyword(decl->getCorrectStaticSpelling());
+      if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
+        Printer.printKeyword("mutating");
+        Printer << " ";
+      } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+        Printer.printKeyword("__consuming");
+        Printer << " ";
       }
-      printContextIfNeeded(decl);
-      recordDeclLoc(decl,
-        [&]{ // Name
-          if (!decl->hasName()) {
-            Printer << "<anonymous>";
-          } else {
-            Printer.printName(decl->getName());
-            if (decl->isOperator())
-              Printer << " ";
-          }
-        }, [&] { // Parameters
-          if (decl->isGeneric())
-            if (auto *genericSig = decl->getGenericSignature())
-              printGenericSignature(genericSig, PrintParams | InnermostOnly);
+      Printer << tok::kw_func << " ";
+    }
+    printContextIfNeeded(decl);
+    recordDeclLoc(decl,
+      [&]{ // Name
+        if (!decl->hasName()) {
+          Printer << "<anonymous>";
+        } else {
+          Printer.printName(decl->getName());
+          if (decl->isOperator())
+            Printer << " ";
+        }
+      }, [&] { // Parameters
+        if (decl->isGeneric())
+          if (auto *genericSig = decl->getGenericSignature())
+            printGenericSignature(genericSig, PrintParams | InnermostOnly);
 
-          printFunctionParameters(decl);
-        });
+        printFunctionParameters(decl);
+      });
 
-      Type ResultTy = decl->getResultInterfaceType();
-      if (ResultTy && !ResultTy->isVoid()) {
-        TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
-        if (!ResultTyLoc.getTypeRepr())
+    Type ResultTy = decl->getResultInterfaceType();
+    if (ResultTy && !ResultTy->isVoid()) {
+      TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+      if (!ResultTyLoc.getTypeRepr())
+        ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+      // FIXME: Hacky way to workaround the fact that 'Self' as return
+      // TypeRepr is not getting 'typechecked'. See
+      // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
+      if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
+        if (simId->getIdentifier().str() == "Self")
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
-        // FIXME: Hacky way to workaround the fact that 'Self' as return
-        // TypeRepr is not getting 'typechecked'. See
-        // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
-        if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
-          if (simId->getIdentifier().str() == "Self")
-            ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
-        }
-        Printer << " -> ";
-        Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+      }
+      Printer << " -> ";
+      Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+      if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
+      else
         printTypeLoc(ResultTyLoc);
-        Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
-      }
-      if (decl->isGeneric())
-        if (auto *genericSig = decl->getGenericSignature())
-          printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
+      Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
+    if (decl->isGeneric())
+      if (auto *genericSig = decl->getGenericSignature())
+        printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
+  }
 
-    if (auto BodyFunc = Options.FunctionBody) {
-      Printer << " {";
-      Printer.printNewline();
-      {
-        IndentRAII IndentBody(*this);
-        indent();
-        Printer << BodyFunc(decl);
-      }
+  if (auto BodyFunc = Options.FunctionBody) {
+    Printer << " {";
+    Printer.printNewline();
+    {
+      IndentRAII IndentBody(*this);
       indent();
-      Printer.printNewline();
-      Printer << "}";
-
-    } else if (Options.FunctionDefinitions && decl->getBody()) {
-      Printer << " ";
-      visit(decl->getBody());
+      Printer << BodyFunc(decl);
     }
+    indent();
+    Printer.printNewline();
+    Printer << "}";
+
+  } else if (Options.FunctionDefinitions && decl->getBody()) {
+    Printer << " ";
+    visit(decl->getBody());
   }
 }
 
@@ -2647,7 +2656,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   TypeLoc elementTy = decl->getElementTypeLoc();
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
-  printTypeLoc(elementTy);
+  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    printTypeLocForImplicitlyUnwrappedOptional(elementTy);
+  else
+    printTypeLoc(elementTy);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   if (decl->isGeneric())
     if (auto *genericSig = decl->getGenericSignature())
@@ -3002,7 +3014,7 @@ bool Decl::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 
 bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   // Skip getters/setters. They are part of the variable or subscript.
-  if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isAccessor())
+  if (isa<AccessorDecl>(this))
     return false;
 
   if (PO.ExplodePatternBindingDecls) {
@@ -3784,12 +3796,33 @@ public:
   }
 
   void visitOptionalType(OptionalType *T) {
+    auto printAsIUO = Options.PrintOptionalAsImplicitlyUnwrapped;
+
+    // Printing optionals with a trailing '!' applies only to
+    // top-level optionals, not to any nested within.
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        false;
     printWithParensIfNotSimple(T->getBaseType());
-    Printer << "?";
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        printAsIUO;
+
+    if (printAsIUO)
+      Printer << "!";
+    else
+      Printer << "?";
   }
 
   void visitImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalType *T) {
+    auto printAsIUO = Options.PrintOptionalAsImplicitlyUnwrapped;
+
+    // Printing optionals with a trailing '!' applies only to
+    // top-level optionals, not to any nested within.
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        false;
     printWithParensIfNotSimple(T->getBaseType());
+    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+        printAsIUO;
+
     Printer <<  "!";
   }
 

@@ -70,6 +70,7 @@ public struct X {
   }
 }
 
+@_fixed_layout
 public class Vehicle {
     @_versioned
     var numOfWheels: Int

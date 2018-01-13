@@ -1257,8 +1257,8 @@ void SILGlobalOpt::optimizeObjectAllocation(
   DEBUG(llvm::dbgs() << "Outline global variable in " <<
         ARI->getFunction()->getName() << '\n');
 
-  assert(Cl->hasFixedLayout(Module->getSwiftModule(),
-                            ResilienceExpansion::Minimal) &&
+  assert(!Cl->isResilient(Module->getSwiftModule(),
+                          ResilienceExpansion::Minimal) &&
     "constructor call of resilient class should prevent static allocation");
 
   // Create a name for the outlined global variable.
@@ -1357,8 +1357,8 @@ void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (!cacheDecl)
     return;
 
-  assert(cacheDecl->hasFixedLayout(Module->getSwiftModule(),
-                                   ResilienceExpansion::Minimal));
+  assert(!cacheDecl->isResilient(Module->getSwiftModule(),
+                                 ResilienceExpansion::Minimal));
 
   SILType wordTy = cacheType.getFieldType(
                             cacheDecl->getStoredProperties().front(), *Module);

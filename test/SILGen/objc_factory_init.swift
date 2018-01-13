@@ -66,12 +66,12 @@ extension Hive {
 }
 
 extension SomeClass {
-  // CHECK-LABEL: sil hidden @$SSo9SomeClassC17objc_factory_initE6doubleABSd_tcfc : $@convention(method) (Double, @owned SomeClass) -> @owned SomeClass {
+  // CHECK-LABEL: sil hidden @$SSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfc : $@convention(method) (Double, @owned SomeClass) -> @owned SomeClass {
   // CHECK: bb0([[DOUBLE:%.*]] : @trivial $Double,
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
   // CHECK: apply [[FNREF]]([[DOUBLE]])
-  // CHECK: } // end sil function '$SSo9SomeClassC17objc_factory_initE6doubleABSd_tcfc'
+  // CHECK: } // end sil function '$SSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfc'
   convenience init(double: Double) {
     self.init(value: double)
   }

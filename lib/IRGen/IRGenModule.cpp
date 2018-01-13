@@ -147,6 +147,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
+  Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
@@ -198,7 +199,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,                // flags
     Int16Ty,                // mandatory requirement count
     Int16Ty,                // total requirement count
-    Int32Ty                 // requirements array
+    Int32Ty,                // requirements array
+    RelativeAddressTy       // associated type names
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
@@ -280,6 +282,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
   OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
+
+  ProtocolRecordTy =
+    createStructType(*this, "swift.protocolref", {
+      RelativeAddressTy
+    });
+  ProtocolRecordPtrTy = ProtocolRecordTy->getPointerTo();
 
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {
@@ -870,6 +878,10 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
 
 llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
+}
+
+llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
+  return llvm::ConstantExpr::getBitCast(ptr, Int8PtrTy);
 }
 
 static void appendEncodedName(raw_ostream &os, StringRef name) {

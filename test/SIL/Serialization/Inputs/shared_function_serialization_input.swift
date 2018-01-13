@@ -1,4 +1,4 @@
-
+@_fixed_layout
 public struct X {
   @_inlineable
   public init() { }

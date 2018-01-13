@@ -11,9 +11,31 @@ precedencegroup AssignmentPrecedence {
   assignment: true
 }
 
+public protocol ExpressibleByNilLiteral {
+  init(nilLiteral: ())
+}
+
+protocol IteratorProtocol {
+  associatedtype Element
+  mutating func next() ->  Element?
+}
+
+protocol Sequence {
+  associatedtype Element
+  associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
+
+  func makeIterator() -> Iterator
+}
+
 enum Optional<T> {
 case none
 case some(T)
+}
+
+extension Optional : ExpressibleByNilLiteral {
+  public init(nilLiteral: ()) {
+    self = .none
+  }
 }
 
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
@@ -35,11 +57,50 @@ struct Buffer {
   }
 }
 
-typealias AnyObject = Builtin.AnyObject
+public typealias AnyObject = Builtin.AnyObject
 
 protocol Protocol {
   associatedtype AssocType
   static func useInput(_ input: Builtin.Int32, into processInput: (AssocType) -> ())
+}
+
+struct FakeArray<Element> {
+  // Just to make this type non-trivial
+  var k: Klass
+
+  // We are only interested in this being called. We are not interested in its
+  // implementation.
+  mutating func append(_ t: Element) {}
+}
+
+struct FakeDictionary<Key, Value> {
+}
+
+struct FakeDictionaryIterator<Key, Value> {
+  var dictionary: FakeDictionary<Key, Value>?
+
+  init(_ newDictionary: FakeDictionary<Key, Value>) {
+    dictionary = newDictionary
+  }
+}
+
+extension FakeDictionaryIterator : IteratorProtocol {
+  public typealias Element = (Key, Value)
+  public mutating func next() -> Element? {
+    return .none
+  }
+}
+
+extension FakeDictionary : Sequence {
+  public typealias Element = (Key, Value)
+  public typealias Iterator = FakeDictionaryIterator<Key, Value>
+  public func makeIterator() -> FakeDictionaryIterator<Key, Value> {
+    return FakeDictionaryIterator(self)
+  }
+}
+
+public struct Unmanaged<Instance : AnyObject> {
+  internal unowned(unsafe) var _value: Instance
 }
 
 ///////////
@@ -108,3 +169,48 @@ struct ReabstractionThunkTest : Protocol {
   }
 }
 
+// Make sure that we provide a cleanup to x properly before we pass it to
+// result.
+extension FakeDictionary {
+  // CHECK-LABEL: sil hidden @$Ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
+  // CHECK:   [[X:%.*]] = alloc_stack $(Key, Value), let, name "x"
+  // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt.1
+  // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0
+  // CHECK:   [[INDUCTION_VAR_1:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 1
+  // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
+  // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
+  // CHECK:   copy_addr [take] [[INDUCTION_VAR_0]] to [initialization] [[X_0]]
+  // CHECK:   copy_addr [take] [[INDUCTION_VAR_1]] to [initialization] [[X_1]]
+  // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
+  // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
+  // CHECK:   [[TMP_X:%.*]] = alloc_stack $(Key, Value)
+  // CHECK:   [[TMP_X_0:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 0
+  // CHECK:   [[TMP_0:%.*]] = alloc_stack $Key
+  // CHECK:   copy_addr [[X_0]] to [initialization] [[TMP_0]]
+  // CHECK:   copy_addr [take] [[TMP_0]] to [initialization] [[TMP_X_0]]
+  // CHECK:   [[TMP_X_1:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 1
+  // CHECK:   [[TMP_1:%.*]] = alloc_stack $Value
+  // CHECK:   copy_addr [[X_1]] to [initialization] [[TMP_1]]
+  // CHECK:   copy_addr [take] [[TMP_1]] to [initialization] [[TMP_X_1]]
+  // CHECK:   [[FUNC:%.*]] = function_ref @$Ss9FakeArrayV6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout FakeArray<τ_0_0>) -> ()
+  // CHECK:   apply [[FUNC]]<(Key, Value)>([[TMP_X]],
+  // CHECK: } // end sil function '$Ss14FakeDictionaryV20makeSureToCopyTuplesyyF'
+  func makeSureToCopyTuples() {
+    var result = FakeArray<Element>(k: Klass())
+    for x in self {
+      result.append(x)
+    }
+  }
+}
+
+extension Unmanaged {
+  // Just make sure that we do not crash on this.
+  func unsafeGuaranteedTest<Result>(
+    _ body: (Instance) -> Result
+  ) -> Result {
+    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
+    let result = body(guaranteedInstance)
+    Builtin.unsafeGuaranteedEnd(token)
+    return result
+  }
+}

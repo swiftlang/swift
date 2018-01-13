@@ -127,13 +127,7 @@ public:
     ConditionalRequirement,
     /// A single requirement placed on the type parameters.
     TypeParameterRequirement,
-    /// \brief For Optional types that can be implicitly unwrapped as
-    /// needed to successfully type check.
-    ImplicitlyUnwrappedValue,
-    /// \brief For the disjunction choices that result from when we
-    /// see ImplicitlyUnwrappedValue. This is used to avoid infinite
-    /// recursion where we would split those types out again into
-    /// another disjunction.
+    /// \brief Locator for a binding from an IUO disjunction choice.
     ImplicitlyUnwrappedDisjunctionChoice,
   };
 
@@ -167,7 +161,6 @@ public:
     case Requirement:
     case Witness:
     case OpenedGeneric:
-    case ImplicitlyUnwrappedValue:
     case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 
@@ -231,7 +224,6 @@ public:
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
-    case ImplicitlyUnwrappedValue:
     case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 

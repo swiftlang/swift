@@ -131,7 +131,7 @@ checkArchiving(ArchivedTwiceGeneric<Int>.self)
 mark() // CHECK-NEXT: --[[@LINE]]--
 
 checkArchiving(ArchivedTwiceGeneric<NSObject>.self)
-// CHECK-NEXT: Attempting to archive generic Swift class '_Test.ArchivedTwiceGeneric<__ObjC.NSObject>' with mangled runtime name '_TtGC5_Test20ArchivedTwiceGenericCSo8NSObject_'
+// CHECK-NEXT: Attempting to archive generic Swift class '_Test.ArchivedTwiceGeneric<__C.NSObject>' with mangled runtime name '_TtGC5_Test20ArchivedTwiceGenericCSo8NSObject_'
 // CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
 // CHECK-SAME: _TtGC5_Test20ArchivedTwiceGenericCSo8NSObject_
 // CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)

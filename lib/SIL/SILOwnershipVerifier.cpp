@@ -190,14 +190,6 @@ static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
          V.getOwnershipKind() == ValueOwnershipKind::Any;
 }
 
-static bool isUnsafeGuaranteedBuiltin(SILInstruction *I) {
-  auto *BI = dyn_cast<BuiltinInst>(I);
-  if (!BI)
-    return false;
-  auto BuiltinKind = BI->getBuiltinKind();
-  return BuiltinKind == BuiltinValueKind::UnsafeGuaranteed;
-}
-
 // These operations forward both owned and guaranteed ownership.
 static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   switch (K) {
@@ -239,22 +231,15 @@ static bool isGuaranteedForwardingValueKind(SILNodeKind K) {
 }
 
 static bool isGuaranteedForwardingValue(SILValue V) {
-  if (auto *SVI = dyn_cast<SingleValueInstruction>(V))
-    if (isUnsafeGuaranteedBuiltin(SVI))
-      return true;
   return isGuaranteedForwardingValueKind(
       V->getKindOfRepresentativeSILNodeInObject());
 }
 
 static bool isGuaranteedForwardingInst(SILInstruction *I) {
-  if (isUnsafeGuaranteedBuiltin(I))
-    return true;
   return isGuaranteedForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
 static bool isOwnershipForwardingInst(SILInstruction *I) {
-  if (isUnsafeGuaranteedBuiltin(I))
-    return true;
   return isOwnershipForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
@@ -1097,7 +1082,11 @@ visitFullApply(FullApplySite apply) {
     return {true, UseLifetimeConstraint::MustBeLive};
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    // A +1 value may be passed to a guaranteed argument. From the caller's
+    // point of view, this is just like a normal non-consuming use.
+    // Direct_Guaranteed only accepts non-trivial types, but trivial types are
+    // already handled above.
+    return visitApplyParameter(ValueOwnershipKind::Any,
                                UseLifetimeConstraint::MustBeLive);
   // The following conventions should take address types.
   case ParameterConvention::Indirect_Inout:
@@ -1262,16 +1251,6 @@ public:
 
 } // end anonymous namespace
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityBuiltinUseChecker::visitUnsafeGuaranteed(BuiltinInst *BI,
-                                                               StringRef Attr) {
-  // We accept owned or guaranteed values here.
-  if (compatibleWithOwnership(ValueOwnershipKind::Guaranteed))
-    return {true, UseLifetimeConstraint::MustBeLive};
-  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-          UseLifetimeConstraint::MustBeInvalidated};
-}
-
 // This is correct today since we do not have any builtins which return
 // @guaranteed parameters. This means that we can only have a lifetime ending
 // use with our builtins if it is owned.
@@ -1285,6 +1264,7 @@ OwnershipCompatibilityBuiltinUseChecker::visitUnsafeGuaranteed(BuiltinInst *BI,
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, WillThrow)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Alignof)

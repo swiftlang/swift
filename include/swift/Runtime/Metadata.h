@@ -212,7 +212,7 @@ struct OpaqueValue;
 ///  - An initialized buffer is an allocated buffer whose value
 ///    storage has been initialized.
 struct ValueBuffer {
-  void *PrivateData[3];
+  void *PrivateData[NumWords_ValueBuffer];
 };
 
 /// Can a value with the given size and alignment be allocated inline?
@@ -930,6 +930,21 @@ public:
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
 
+  /// Retrieve the generic arguments of this type, if it has any.
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
+  getGenericArgs() const {
+    auto description = getNominalTypeDescriptor();
+    if (!description)
+      return nullptr;
+
+    if (!description->GenericParams.hasGenericRequirements())
+      return nullptr;
+
+    auto asWords = reinterpret_cast<
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
+    return (asWords + description->GenericParams.getOffset(this));
+  }
+
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
   /// the type is not a class (or not a class with a class object).
@@ -1029,7 +1044,7 @@ struct GenericContextDescriptor {
   /// to NumGenericRequirements; it counts only the type parameters
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
-  
+
   // TODO: add meaningful descriptions of the generic requirements.
 };
 
@@ -1854,17 +1869,6 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       || metadata->getKind() == MetadataKind::Enum
       || metadata->getKind() == MetadataKind::Optional;
   }
-  
-  /// Retrieve the generic arguments of this type.
-  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
-  getGenericArgs() const {
-    if (!Description->GenericParams.hasGenericRequirements())
-      return nullptr;
-
-    auto asWords = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return (asWords + Description->GenericParams.getOffset(this));
-  }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
     return Description;
@@ -2145,7 +2149,7 @@ struct TargetProtocolDescriptor {
   
   /// The list of protocols this protocol refines.
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
-  InheritedProtocols;
+    InheritedProtocols;
   
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
@@ -2173,6 +2177,10 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
   void *getDefaultWitness(unsigned index) const {
     return Requirements.get()[index].DefaultImplementation.get();
   }
@@ -2190,7 +2198,8 @@ struct TargetProtocolDescriptor {
       Flags(Flags),
       NumMandatoryRequirements(0),
       NumRequirements(0),
-      Requirements(nullptr)
+      Requirements(nullptr),
+      AssociatedTypeNames(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
@@ -2580,6 +2589,18 @@ public:
 };
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
 
+/// The structure of a protocol reference record.
+template <typename Runtime>
+struct TargetProtocolRecord {
+  /// The protocol referenced.
+  ///
+  /// The remaining low bit is reserved for future use.
+  RelativeIndirectablePointerIntPair<TargetProtocolDescriptor<Runtime>,
+                                     /*reserved=*/bool>
+    Protocol;
+};
+using ProtocolRecord = TargetProtocolRecord<InProcess>;
+
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2875,10 +2896,9 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 ///   where the entrypoint is just being used to unique the metadata.
 SWIFT_RUNTIME_EXPORT
 const TupleTypeMetadata *
-swift_getTupleTypeMetadata(size_t numElements,
+swift_getTupleTypeMetadata(TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
-                           TupleTypeFlags flags,
                            const ValueWitnessTable *proposedWitnesses);
 
 SWIFT_RUNTIME_EXPORT
@@ -2936,7 +2956,7 @@ const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
-                                 const ProtocolDescriptor **protocols)
+                                 const ProtocolDescriptor * const *protocols)
     SWIFT_CC(RegisterPreservingCC);
 
 /// \brief Perform a copy-assignment from one existential container to another.
@@ -3040,6 +3060,11 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
+
+/// Register a block of protocol records for dynamic lookup.
+SWIFT_RUNTIME_EXPORT
+void swift_registerProtocols(const ProtocolRecord *begin,
+                             const ProtocolRecord *end);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT

@@ -145,8 +145,8 @@ namespace {
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
     DeclName name = AFD->getFullName();
     if (!name) {
-      if (auto *method = dyn_cast<FuncDecl>(AFD)) {
-        name = method->getAccessorStorageDecl()->getFullName();
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        name = accessor->getStorage()->getFullName();
       }
     }
     return name;
@@ -1565,8 +1565,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
 
-    // An inlinable constructor in a class must always be delegating.
-    if (!isDelegating && !ClassD->hasFixedLayout() &&
+    // An inlinable constructor in a class must always be delegating,
+    // unless the class is formally '@_fixed_layout'.
+    if (!isDelegating &&
+        ClassD->isFormallyResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

@@ -1506,22 +1506,22 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 /// Diagnose recursive use of properties within their own accessors
 static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
                                         const DeclContext *DC) {
-  auto fn = dyn_cast<FuncDecl>(DC);
-  if (!fn || !fn->isAccessor())
+  auto fn = dyn_cast<AccessorDecl>(DC);
+  if (!fn)
     return;
 
-  auto var = dyn_cast<VarDecl>(fn->getAccessorStorageDecl());
+  auto var = dyn_cast<VarDecl>(fn->getStorage());
   if (!var)  // Ignore subscripts
     return;
 
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
     VarDecl *Var;
-    const FuncDecl *Accessor;
+    const AccessorDecl *Accessor;
 
   public:
     explicit DiagnoseWalker(TypeChecker &TC, VarDecl *var,
-                            const FuncDecl *Accessor)
+                            const AccessorDecl *Accessor)
       : TC(TC), Var(var), Accessor(Accessor) {}
 
     /// Return true if this is an implicit reference to self.
@@ -2176,9 +2176,9 @@ public:
     // If this AFD is a setter, track the parameter and the getter for
     // the containing property so if newValue isn't used but the getter is used
     // an error can be reported.
-    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+    if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
       if (FD->getAccessorKind() == AccessorKind::IsSetter) {
-        if (auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl())) {
+        if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
           auto arguments = FD->getParameterLists().back();
           VarDecls[arguments->get(0)] = 0;
           AssociatedGetter = getter;
@@ -2400,9 +2400,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // override or want the named keyword, etc).  Warning to rewrite it to _ is
     // more annoying than it is useful.
     if (auto param = dyn_cast<ParamDecl>(var)) {
-      auto FD = dyn_cast<FuncDecl>(param->getDeclContext());
+      auto FD = dyn_cast<AccessorDecl>(param->getDeclContext());
       if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
-        auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
+        auto getter = dyn_cast<VarDecl>(FD->getStorage());
         if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
           if (auto DRE = AssociatedGetterDeclRef) {
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
@@ -3269,23 +3269,19 @@ public:
         out << "#selector(";
 
         DeclName name;
-        auto bestFunc = dyn_cast<FuncDecl>(bestMethod);
-        bool isAccessor = bestFunc && bestFunc->isAccessor();
-        if (isAccessor) {
-          switch (bestFunc->getAccessorKind()) {
-          case AccessorKind::NotAccessor:
-            llvm_unreachable("not an accessor");
-
+        auto bestAccessor = dyn_cast<AccessorDecl>(bestMethod);
+        if (bestAccessor) {
+          switch (bestAccessor->getAccessorKind()) {
           case AccessorKind::IsGetter:
             out << "getter: ";
-            name = bestFunc->getAccessorStorageDecl()->getFullName();
+            name = bestAccessor->getStorage()->getFullName();
             break;
 
           case AccessorKind::IsSetter:
           case AccessorKind::IsWillSet:
           case AccessorKind::IsDidSet:
             out << "setter: ";
-            name = bestFunc->getAccessorStorageDecl()->getFullName();
+            name = bestAccessor->getStorage()->getFullName();
             break;
 
           case AccessorKind::IsMaterializeForSet:
@@ -3314,7 +3310,7 @@ public:
 
         // If there will be an ambiguity when referring to the method,
         // introduce a coercion to resolve it to the method we found.
-        if (!isAccessor && isSelectorReferenceAmbiguous(bestMethod)) {
+        if (!bestAccessor && isSelectorReferenceAmbiguous(bestMethod)) {
           if (auto fnType =
                 bestMethod->getInterfaceType()->getAs<FunctionType>()) {
             // For static/class members, drop the metatype argument.

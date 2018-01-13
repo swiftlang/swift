@@ -415,7 +415,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // FIXME: If we had some basic sanity checking of Self, we might be able to
     // use these.
     if (auto func = dyn_cast<FuncDecl>(req)) {
-      if (func->isOperator() || func->isAccessor())
+      if (func->isOperator() || isa<AccessorDecl>(func))
         continue;
     }
 

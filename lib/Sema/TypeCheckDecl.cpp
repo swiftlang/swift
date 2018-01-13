@@ -1516,19 +1516,19 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
   if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>()) {
     D->setAccess(AA->getAccess());
 
-  } else if (auto fn = dyn_cast<FuncDecl>(D)) {
+  } else if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     // Special case for accessors, which inherit the access of their storage.
     // decl. A setter attribute can also override this.
-    if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
-      if (storage->hasAccess()) {
-        if (fn->getAccessorKind() == AccessorKind::IsSetter ||
-            fn->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-          fn->setAccess(storage->getSetterFormalAccess());
-        else
-          fn->setAccess(storage->getFormalAccess());
-      } else {
-        computeAccessLevel(storage);
-      }
+    AbstractStorageDecl *storage = accessor->getStorage();
+    if (storage->hasAccess()) {
+      if (accessor->getAccessorKind() == AccessorKind::IsSetter ||
+          accessor->getAccessorKind() == AccessorKind::IsMutableAddressor ||
+          accessor->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+        accessor->setAccess(storage->getSetterFormalAccess());
+      else
+        accessor->setAccess(storage->getFormalAccess());
+    } else {
+      computeAccessLevel(storage);
     }
   }
 
@@ -2297,10 +2297,10 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     return;
   }
 
+  case DeclKind::Accessor:
+    return;
+
   case DeclKind::Func:
-    if (cast<FuncDecl>(D)->isAccessor())
-      return;
-    LLVM_FALLTHROUGH;
   case DeclKind::Constructor: {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
@@ -2492,8 +2492,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (attr->isImplicit())
       return ObjCReason::ImplicitlyObjC;
 
-    bool isAccessor =
-      isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->isGetterOrSetter();
+    bool isGetterOrSetter =
+      isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
 
     // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
     if (TC.Context.LangOpts.EnableSwift3ObjCInference) {
@@ -2501,7 +2501,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
       // now.
       if (TC.Context.LangOpts.WarnSwift3ObjCInference !=
             Swift3ObjCInferenceWarnings::None &&
-          !isAccessor) {
+          !isGetterOrSetter) {
         TC.diagnose(VD, diag::objc_inference_swift3_dynamic)
           .highlight(attr->getLocation())
           .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
@@ -2604,7 +2604,7 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   // Accessors should not infer 'dynamic' on their own; they can get it from
   // their storage decls.
   if (auto FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isAccessor())
+    if (isa<AccessorDecl>(FD))
       return;
 
     auto staticSpelling = FD->getStaticSpelling();
@@ -2958,7 +2958,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // accessors---just the main storage declarations.
     if (TC.Context.LangOpts.WarnSwift3ObjCInference ==
           Swift3ObjCInferenceWarnings::Complete &&
-        !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
+        !(isa<AccessorDecl>(D) && cast<AccessorDecl>(D)->isGetterOrSetter())) {
       TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
       TC.diagnose(D, diag::objc_inference_swift3_addobjc)
         .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
@@ -3509,7 +3509,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       }
     } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
       // Handle accessors as part of their property.
-      if (func->isAccessor())
+      if (isa<AccessorDecl>(func))
         continue;
       
       // Handle a parameter block requirement.
@@ -4040,7 +4040,7 @@ public:
         TC.checkDeclCircularity(nominal);
       }
       if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-        if (!protocol->hasFixedLayout())
+        if (protocol->isResilient())
           TC.inferDefaultWitnesses(protocol);
       }
     }
@@ -4908,19 +4908,19 @@ public:
   }
 
   static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
-    if (!FD->getAccessorStorageDecl()) {
-      assert(!FD->isAccessor());
+    auto accessor = dyn_cast<AccessorDecl>(FD);
+    if (!accessor) {
       return FD->getBodyResultTypeLoc();
     }
 
-    assert(FD->isAccessor() && FD->isGetter());
-    auto *accessor = cast<AbstractStorageDecl>(FD->getAccessorStorageDecl());
-    assert(isa<VarDecl>(accessor) || isa<SubscriptDecl>(accessor));
+    assert(accessor->isGetter());
+    auto *storage = accessor->getStorage();
+    assert(isa<VarDecl>(storage) || isa<SubscriptDecl>(storage));
 
-    if (auto *subscript = dyn_cast<SubscriptDecl>(accessor))
+    if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
       return subscript->getElementTypeLoc();
 
-    return cast<VarDecl>(accessor)->getTypeLoc();
+    return cast<VarDecl>(storage)->getTypeLoc();
   }
 
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
@@ -4946,7 +4946,7 @@ public:
       return true;
     }
 
-    if (!FD->isAccessor() || FD->isGetter()) {
+    if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
       auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
       if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
         auto &C = FD->getASTContext();
@@ -5113,7 +5113,7 @@ public:
 
     // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
     // property. We could implement it as such in the future.
-    if (func->isAccessor())
+    if (isa<AccessorDecl>(func))
       return false;
 
     return checkDynamicSelfReturn(func, typeRepr, 0);
@@ -5138,11 +5138,17 @@ public:
     }
 
     // Look through optional types.
-    if (auto attrRepr = dyn_cast<OptionalTypeRepr>(typeRepr)) {
+    TypeRepr *base = nullptr;
+    if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
+      base = optRepr->getBase();
+    else if (auto *optRepr =
+                 dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
+      base = optRepr->getBase();
+
+    if (base) {
       // But only one level.
       if (optionalDepth != 0) return false;
-      return checkDynamicSelfReturn(func, attrRepr->getBase(),
-                                    optionalDepth + 1);
+      return checkDynamicSelfReturn(func, base, optionalDepth + 1);
     }
 
     // Check whether we have a simple identifier type.
@@ -5254,7 +5260,8 @@ public:
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.
     // FIXME: should this include the generic signature?
-    if (auto storage = FD->getAccessorStorageDecl()) {
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      auto storage = accessor->getStorage();
       TC.validateDecl(storage);
 
       // Note that it's important for correctness that we're filling in
@@ -5266,7 +5273,8 @@ public:
       // are sometimes different from the rules elsewhere; for example,
       // function types default to non-escaping.
 
-      auto valueParams = FD->getParameterList(FD->getParent()->isTypeContext());
+      auto valueParams =
+        accessor->getParameterList(accessor->getParent()->isTypeContext());
 
       // Determine the value type.
       Type valueIfaceTy, valueTy;
@@ -5296,13 +5304,10 @@ public:
       }
 
       // Propagate the value type into the correct position.
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::NotAccessor:
-        llvm_unreachable("not an accessor");
-
+      switch (accessor->getAccessorKind()) {
       // For getters, set the result type to the value type.
       case AccessorKind::IsGetter:
-        FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+        accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         break;
 
       // For setters and observers, set the old/new value parameter's type
@@ -5320,8 +5325,9 @@ public:
       // Addressor result types can get complicated because of the owner.
       case AccessorKind::IsAddressor:
       case AccessorKind::IsMutableAddressor:
-        if (Type resultType = buildAddressorResultType(FD, valueIfaceTy)) {
-          FD->getBodyResultTypeLoc().setType(resultType, true);
+        if (Type resultType =
+              buildAddressorResultType(accessor, valueIfaceTy)) {
+          accessor->getBodyResultTypeLoc().setType(resultType, true);
         }
         break;
 
@@ -5342,8 +5348,8 @@ public:
       auto *sig = TC.validateGenericFuncSignature(FD);
 
       GenericEnvironment *env;
-      if (auto storage = FD->getAccessorStorageDecl()) {
-        env = cast<SubscriptDecl>(storage)->getGenericEnvironment();
+      if (auto AD = dyn_cast<AccessorDecl>(FD)) {
+        env = cast<SubscriptDecl>(AD->getStorage())->getGenericEnvironment();
         assert(env && "accessor has generics but subscript is not generic");
       } else {
         env = sig->createGenericEnvironment();
@@ -5355,7 +5361,7 @@ public:
       TC.revertGenericFuncSignature(FD);
     } else if (auto genericSig =
                  FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (!FD->getAccessorStorageDecl()) {
+      if (!isa<AccessorDecl>(FD)) {
         (void)TC.validateGenericFuncSignature(FD);
 
         // Revert all of the types within the signature of the function.
@@ -5410,21 +5416,22 @@ public:
         checkMemberOperator(FD);
 
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
+      auto accessor = dyn_cast<AccessorDecl>(FD);
 
       auto *protocolContext = dyn_cast<ProtocolDecl>(
           FD->getDeclContext());
-      if (protocolContext && FD->isAccessor()) {
+      if (protocolContext && accessor) {
         if (isObjC)
           isObjC = ObjCReason::Accessor;
       }
 
-      if (FD->isGetterOrSetter()) {
+      if (accessor && accessor->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
         // The only additional condition we need to check is if the var decl
         // had an @objc or @iboutlet property.
 
-        AbstractStorageDecl *storage = FD->getAccessorStorageDecl();
+        AbstractStorageDecl *storage = accessor->getStorage();
         // Validate the subscript or property because it might not be type
         // checked yet.
         TC.validateDecl(storage);
@@ -5444,7 +5451,7 @@ public:
                 shouldDiagnoseObjCReason(*isObjC, TC.Context)) {
               TC.diagnose(storage, diag::accessor_swift3_objc_inference,
                           storage->getDescriptiveKind(), storage->getFullName(),
-                          isa<SubscriptDecl>(storage), FD->isSetter())
+                          isa<SubscriptDecl>(storage), accessor->isSetter())
                 .fixItInsert(storage->getAttributeInsertionLoc(
                                                       /*forModifier=*/false),
                              "@objc ");
@@ -5506,7 +5513,7 @@ public:
     }
   }
 
-  Type buildAddressorResultType(FuncDecl *addressor, Type valueType) {
+  Type buildAddressorResultType(AccessorDecl *addressor, Type valueType) {
     assert(addressor->getAccessorKind() == AccessorKind::IsAddressor ||
            addressor->getAccessorKind() == AccessorKind::IsMutableAddressor);
 
@@ -5944,9 +5951,8 @@ public:
 
     // Ignore accessor methods (e.g. getters and setters), they will be handled
     // when their storage decl is processed.
-    if (auto *fd = dyn_cast<FuncDecl>(decl))
-      if (fd->isAccessor())
-        return false;
+    if (isa<AccessorDecl>(decl))
+      return false;
     
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
     ConstructorDecl *ctor = nullptr;
@@ -6325,8 +6331,7 @@ public:
                     matchDecl->getFullName());
         emittedMatchError = true;
 
-      } else if ((!isa<FuncDecl>(method) ||
-                  !cast<FuncDecl>(method)->isAccessor()) &&
+      } else if (!isa<AccessorDecl>(method) &&
                  (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
         // Private migration help for overrides of Objective-C methods.
         TypeLoc resultTL;
@@ -6517,8 +6522,8 @@ public:
     void visitFinalAttr(FinalAttr *attr) {
       // If this is an accessor, don't complain if we would have
       // complained about the storage declaration.
-      if (auto func = dyn_cast<FuncDecl>(Override)) {
-        if (auto storageDecl = func->getAccessorStorageDecl()) {
+      if (auto accessor = dyn_cast<AccessorDecl>(Override)) {
+        if (auto storageDecl = accessor->getStorage()) {
           if (storageDecl->getOverriddenDecl() &&
               storageDecl->getOverriddenDecl()->isFinal())
             return;
@@ -6556,9 +6561,7 @@ public:
       // possible under the Swift 4 rules.
 
       // We only care about the storage declaration.
-      if (auto func = dyn_cast<FuncDecl>(Override)) {
-        if (func->isAccessor()) return;
-      }
+      if (isa<AccessorDecl>(Override)) return;
 
       // If @objc was explicit or handled elsewhere, nothing to do.
       if (!attr->isSwift3Inferred()) return;
@@ -6606,16 +6609,13 @@ public:
                                                     ValueDecl *override,
                                                     ValueDecl *base) {
 
-    auto *overrideFn = dyn_cast<FuncDecl>(override);
-    auto *baseFn = dyn_cast<FuncDecl>(base);
+    auto *overrideFn = dyn_cast<AccessorDecl>(override);
+    auto *baseFn = dyn_cast<AccessorDecl>(base);
     if (!overrideFn || !baseFn)
       return false;
 
-    AbstractStorageDecl *overrideASD = overrideFn->getAccessorStorageDecl();
-    AbstractStorageDecl *baseASD = baseFn->getAccessorStorageDecl();
-    if (!overrideASD || !baseASD)
-      return false;
-
+    AbstractStorageDecl *overrideASD = overrideFn->getStorage();
+    AbstractStorageDecl *baseASD = baseFn->getStorage();
     if (overrideASD->getOverriddenDecl() != baseASD)
       return false;
 
@@ -6641,7 +6641,7 @@ public:
     // for a getter or a setter, no need to complain about materializeForSet,
     // which is synthesized to be as available as both the getter and
     // the setter.
-    if (overrideFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+    if (overrideFn->isMaterializeForSet()) {
       if (accessorOverrideAlreadyDiagnosed(AccessorKind::IsGetter) ||
           accessorOverrideAlreadyDiagnosed(AccessorKind::IsSetter)) {
         return true;
@@ -6664,14 +6664,12 @@ public:
     if (isRedundantAccessorOverrideAvailabilityDiagnostic(TC, override, base))
       return false;
 
-    if (auto *FD = dyn_cast<FuncDecl>(override)) {
-      if (FD->isAccessor()) {
-        TC.diagnose(override, diag::override_accessor_less_available,
-                    FD->getDescriptiveKind(),
-                    FD->getAccessorStorageDecl()->getBaseName());
-        TC.diagnose(base, diag::overridden_here);
-        return true;
-      }
+    if (auto *accessor = dyn_cast<AccessorDecl>(override)) {
+      TC.diagnose(override, diag::override_accessor_less_available,
+                  accessor->getDescriptiveKind(),
+                  accessor->getStorage()->getBaseName());
+      TC.diagnose(base, diag::overridden_here);
+      return true;
     }
 
     TC.diagnose(override, diag::override_less_available,
@@ -7488,9 +7486,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // declarations, but for now, you can make an imported type conform to a
   // protocol with property requirements, which requires synthesizing getters
   // and setters, etc.
-  if (!isa<VarDecl>(D) &&
-      (!isa<FuncDecl>(D) ||
-       cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor)) {
+  if (!isa<VarDecl>(D) && !isa<AccessorDecl>(D)) {
     assert(isa<SourceFile>(D->getDeclContext()->getModuleScopeContext()) &&
            "Should not validate imported or deserialized declarations");
   }
@@ -7850,6 +7846,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
+  case DeclKind::Accessor:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
@@ -8147,6 +8144,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::Var:
   case DeclKind::Param:
   case DeclKind::Func:
+  case DeclKind::Accessor:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
     computeAccessLevel(D);
@@ -9134,8 +9132,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     } else if (auto *func = dyn_cast<FuncDecl>(D)) {
       if (!checkObjCDeclContext(D))
         error = diag::invalid_objc_decl_context;
-      else if (func->isAccessor() && !func->isGetterOrSetter())
-        error = diag::objc_observing_accessor;
+      else if (auto accessor = dyn_cast<AccessorDecl>(func))
+        if (!accessor->isGetterOrSetter())
+          error = diag::objc_observing_accessor;
     } else if (isa<ConstructorDecl>(D) ||
                isa<DestructorDecl>(D) ||
                isa<SubscriptDecl>(D) ||
@@ -9230,7 +9229,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (func &&
         (isa<DestructorDecl>(func) ||
          !checkObjCDeclContext(func) ||
-         (func->isAccessor() && !func->isGetterOrSetter()))) {
+         (isa<AccessorDecl>(func) &&
+          !cast<AccessorDecl>(func)->isGetterOrSetter()))) {
       error = diag::invalid_nonobjc_decl;
     }
 

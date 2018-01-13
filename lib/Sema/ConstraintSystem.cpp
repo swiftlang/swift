@@ -1403,9 +1403,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      OverloadChoice choice,
                                                      Type &refType,
                                                      Type &openedFullType) {
-  assert(choice.getKind() == OverloadChoiceKind::Decl
-         || choice.getKind() == OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional);
-  
+  assert(choice.getKind() == OverloadChoiceKind::Decl);
+
   switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
@@ -1515,7 +1514,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type openedFullType;
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
-  case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
     // If we refer to a top-level decl with special type-checking semantics,
     // handle it now.
     if (resolveOverloadForDeclWithSpecialTypeCheckingSemantics(
@@ -1671,18 +1669,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
-  // Update the locator if this is an implicitly unwrapped
-  // value. Processing the bind constraint will generate a new
-  // disjunction constraint that attempts the Optional and if that
-  // doesn't succeed, the underlying type.
-  if (choice.getKind() ==
-      OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional) {
-    locator = getConstraintLocator(locator,
-                                   ConstraintLocator::ImplicitlyUnwrappedValue);
+  if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    // Build the disjunction to attempt binding both T? and T (or
+    // function returning T? and function returning T).
+    buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType, locator);
+  } else {
+    // Add the type binding constraint.
+    addConstraint(ConstraintKind::Bind, boundType, refType, locator);
   }
-
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1838,7 +1832,6 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       return getDecl()->getFullName();
       
     case OverloadChoiceKind::KeyPathApplication: {
@@ -1854,4 +1847,11 @@ DeclName OverloadChoice::getName() const {
   }
   
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
+  // FIXME: Disable parts of the new IUO implementation for now.
+  return false;
+  return isDecl() &&
+         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }
