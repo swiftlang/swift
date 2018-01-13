@@ -62,30 +62,11 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
-  bool isPrivate = !hasPublicVisibility(declRef.getLinkage(ForDefinition));
-  // Even private methods of open classes (specifically, private methods that
-  // are in the vtable) have public symbols, because external subclasses
-  // currently need to refer to them by symbol for their own vtable.
-  switch (declRef.getSubclassScope()) {
-  case SubclassScope::External:
-    // Unlike the "truly" public things, private things have public symbols
-    // unconditionally, even if they're theoretically SIL only.
-    if (isPrivate) {
-      isPrivate = false;
-    }
-    break;
-  case SubclassScope::Internal:
-  case SubclassScope::NotApplicable:
-    break;
-  }
-  if (isPrivate)
-    return;
-
-  // FIXME: this includes too many symbols. There are some that are considered
-  // SIL-only, but it isn't obvious how to determine this (e.g. it seems that
-  // many, but not all, transparent functions result in object-file symbols)
-
-  addSymbol(declRef.mangle());
+  auto linkage = effectiveLinkageForClassMember(
+    declRef.getLinkage(ForDefinition),
+    declRef.getSubclassScope());
+  if (linkage == SILLinkage::Public)
+    addSymbol(declRef.mangle());
 }
 
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
@@ -116,70 +97,33 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
         normalConformance);
-    auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
-                                    SILLinkage witnessLinkage) {
+    auto addSymbolIfNecessary = [&](SILDeclRef declRef) {
+      auto witnessLinkage = declRef.getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
-        addSymbol(Mangler.mangleWitnessThunk(normalConformance, valueReq));
+        addSymbol(Mangler.mangleWitnessThunk(normalConformance,
+                                             declRef.getDecl()));
       }
     };
     normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
                                                         Witness witness) {
       if (isa<AbstractFunctionDecl>(valueReq)) {
-        auto witnessLinkage =
-            SILDeclRef(witness.getDecl()).getLinkage(ForDefinition);
-        addSymbolIfNecessary(valueReq, witnessLinkage);
-      } else if (auto VD = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        // A var or subscript decl needs extra special handling: the things that
-        // end up in the witness table are the accessors, but the compiler only
-        // talks about the actual storage decl in the conformance, so we have to
-        // manually walk over the members, having pulled out something that will
-        // have the right linkage.
-        auto witnessVD = cast<AbstractStorageDecl>(witness.getDecl());
-
-        SmallVector<Decl *, 4> members;
-        VD->getAllAccessorFunctions(members);
-
-        // Grab one of the accessors, and then use that to pull out which of the
-        // getter or setter will have the appropriate linkage.
-        FuncDecl *witnessWithRelevantLinkage;
-        switch (cast<AccessorDecl>(members[0])->getAccessorKind()) {
-        case AccessorKind::IsGetter:
-        case AccessorKind::IsAddressor:
-          witnessWithRelevantLinkage = witnessVD->getGetter();
-          break;
-        case AccessorKind::IsSetter:
-        case AccessorKind::IsWillSet:
-        case AccessorKind::IsDidSet:
-        case AccessorKind::IsMaterializeForSet:
-        case AccessorKind::IsMutableAddressor:
-          witnessWithRelevantLinkage = witnessVD->getSetter();
-          break;
-        }
-        auto witnessLinkage =
-            SILDeclRef(witnessWithRelevantLinkage).getLinkage(ForDefinition);
-        for (auto member : members) {
-          addSymbolIfNecessary(cast<ValueDecl>(member), witnessLinkage);
-        }
+        addSymbolIfNecessary(SILDeclRef(valueReq));
+      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        if (auto *getter = storage->getGetter())
+          addSymbolIfNecessary(SILDeclRef(getter));
+        if (auto *setter = storage->getGetter())
+          addSymbolIfNecessary(SILDeclRef(setter));
+        if (auto *materializeForSet = storage->getMaterializeForSetFunc())
+          addSymbolIfNecessary(SILDeclRef(materializeForSet));
       }
     });
   }
 }
 
-void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
-  addSymbol(SILDeclRef(VD));
-  visitMembers(VD);
-}
-
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
-  if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
-    // Accessors also appear nested inside the storage decl, which we treat as
-    // the canonical location, so skip if we've got an accessor that isn't
-    // inside the var decl.
-    if (!InsideAbstractStorageDecl)
-      return;
-  }
+  addSymbol(SILDeclRef(AFD));
 
   // Default arguments (of public functions) are public symbols, as the default
   // values are computed at the call site.
@@ -196,17 +140,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
       index++;
     }
   }
-
-  visitValueDecl(AFD);
 }
 
-void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
-  assert(!InsideAbstractStorageDecl &&
-         "unexpected nesting of abstract storage decls");
-  InsideAbstractStorageDecl = true;
-  visitMembers(ASD);
-  InsideAbstractStorageDecl = false;
-}
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
@@ -219,8 +154,6 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
-
-  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -239,7 +172,8 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   // There are symbols associated with any protocols this type conforms to.
   addConformances(NTD);
 
-  visitMembers(NTD);
+  for (auto member : NTD->getMembers())
+    visit(member);
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
@@ -332,7 +266,8 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     addConformances(ED);
   }
 
-  visitMembers(ED);
+  for (auto member : ED->getMembers())
+    visit(member);
 }
 
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
