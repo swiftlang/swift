@@ -439,6 +439,19 @@ IsSerialized_t SILDeclRef::isSerialized() const {
           return IsSerialized;
       }
     }
+
+    // Stored property initializers are inlinable if the type is explicitly
+    // marked as @_fixed_layout.
+    if (isStoredPropertyInitializer()) {
+      auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+      auto scope = nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                                 /*respectVersionedAttr=*/true);
+      if (!scope.isPublic())
+        return IsNotSerialized;
+      if (nominal->isFormallyResilient())
+        return IsNotSerialized;
+      return IsSerialized;
+    }
   }
 
   // Declarations imported from Clang modules are serialized if
