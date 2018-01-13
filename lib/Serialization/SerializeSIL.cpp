@@ -278,7 +278,7 @@ void SILSerializer::addMandatorySILFunction(const SILFunction *F,
 
   // Function body should be serialized unless it is a KeepAsPublic function
   // (which is typically a pre-specialization).
-  if (!emitDeclarationsForOnoneSupport && !F->isKeepAsPublic())
+  if (!emitDeclarationsForOnoneSupport)
     Worklist.push_back(F);
 }
 

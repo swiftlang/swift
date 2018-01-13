@@ -30,24 +30,6 @@ STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 namespace {
 
-/// Returns true if a function should be SIL serialized or emitted by IRGen.
-static bool shouldBeSerializedOrEmitted(SILFunction *F) {
-  // global initializers are always emitted into the defining module and
-  // their bodies are never SIL serialized.
-  if (F->isGlobalInit())
-    return true;
-
-  // public_external functions are never SIL serialized or emitted by IRGen.
-  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()))
-    return false;
-
-  // [serialized] functions should always be SIL serialized.
-  if (F->isSerialized())
-    return true;
-
-  return false;
-}
-
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
 /// It provides a common logic for computing live (i.e. reachable) functions.
@@ -124,24 +106,9 @@ protected:
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
-    // Functions that may be used externally cannot be removed.
-    if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
-      return true;
-
-    // If function is marked as "keep-as-public", don't remove it.
-    // Change its linkage to public, so that other applications can refer to it.
-    // It is important that this transformation is done at the end of
-    // a pipeline, as it may break some optimizations.
-    if (F->isKeepAsPublic()) {
-      F->setLinkage(SILLinkage::Public);
-      DEBUG(llvm::dbgs() << "DFE: Preserve the specialization "
-                         << F->getName() << '\n');
-      return true;
-    }
-
-    // Do not consider public_external functions that do not need to be emitted
-    // into the client as anchors.
-    if (shouldBeSerializedOrEmitted(F))
+    // Global initializers are always emitted into the defining module and
+    // their bodies are never SIL serialized.
+    if (F->isGlobalInit())
       return true;
 
     return false;
