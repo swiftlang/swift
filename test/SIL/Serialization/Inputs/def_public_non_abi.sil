@@ -1,0 +1,4 @@
+sil non_abi [serialized] @public_non_abi_function : $@convention(thin) () -> () {
+  %0 = tuple ()
+  return %0 : $()
+}
