@@ -2672,7 +2672,23 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  // If we have more arguments than can be passed directly, the remaining
+  // arguments are packed into an array.
+  ArrayRef<llvm::Type *> paramTypes;
+  llvm::Type *paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs+1];
+  if (genericArgs.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    // Copy direct parameter types.
+    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs))
+      paramTypesArray[i] = genericArgs[i];
+
+    paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs] =
+      Int8PtrPtrTy;
+    paramTypes = paramTypesArray;
+  } else {
+    paramTypes = genericArgs;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
