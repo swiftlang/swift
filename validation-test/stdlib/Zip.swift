@@ -69,43 +69,50 @@ ZipTests.test("Sequence") {
 
 ZipTests.test("Collections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
+  typealias Sequence = Zip2Sequence<
+    MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
+  typealias Collection = Zip2Collection<
+    MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
+
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
   }
 
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: Sequence.Iterator.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: Collection.Index.self,
+    indicesType: DefaultIndices<Collection>.self)
+    
   for test in zipTests {
     let s = MinimalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
     let other = MinimalCollection<OpaqueValue<Int32>>(
       elements: test.other.map(OpaqueValue.init))
-
-    typealias Sequence = Zip2Sequence<
-      MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int>>>
-    typealias Collection = Zip2Collection<
-      MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int>>>
-    expectCollectionAssociatedTypes(
-      collectionType: Collection.self,
-      iteratorType: Sequence.Iterator.self,
-      subSequenceType: Slice<Collection>.self,
-      indexType: Collection.Index.self,
-      indicesType: DefaultIndices<Collection>.self)
-      
-    let expected = [("one",1),("two",2),("three",3),("four",4)]
-    let left = ["one", "two", "three", "four"]
-    let right = 1...4
-    
-    checkCollection(expected,
-      zip(MinimalCollection(elements: left), MinimalCollection(elements: right)),
-      sameValue: { $0 == $1 }
-    )
+    var result = zip(s, other)
+    expectType(Collection.self,
+      &result)
   }
 }
 
 ZipTests.test("RandomAccessCollections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
+  typealias Sequence = Zip2Sequence<
+    MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+  typealias Collection = Zip2Collection<
+    MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
   }
+      
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: Sequence.Iterator.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: Collection.Index.self,
+    indicesType: DefaultIndices<Collection>.self)
 
   for test in zipTests {
     let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
@@ -114,25 +121,9 @@ ZipTests.test("RandomAccessCollections") {
       elements: test.other.map(OpaqueValue.init))
     var result = zip(s, other)
 
-    typealias Sequence = Zip2Sequence<
-      MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
-    typealias Collection = Zip2Collection<
-      MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
-    expectCollectionAssociatedTypes(
-      collectionType: Collection.self,
-      iteratorType: Sequence.Iterator.self,
-      subSequenceType: Slice<Collection>.self,
-      indexType: Collection.Index.self,
-      indicesType: DefaultIndices<Collection>.self)
-      
-    let expected = [("one",1),("two",2),("three",3),("four",4)]
-    let left = ["one", "two", "three", "four"]
-    let right = 1...4
-    
-    checkRandomAccessCollection(expected,
-      zip(MinimalRandomAccessCollection(elements: left), MinimalRandomAccessCollection(elements: right)),
-      sameValue: { $0 == $1 }
-    )
+    checkRandomAccessCollection(
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, 
+      result, sameValue: compareElements)
   }
 }
 
@@ -167,6 +158,32 @@ ZipTests.test("Equatable") {
     zip("abcdef",0..<0),
     zip("xyz",0..<3)
   ], oracle: { $0 == $1 })
+}
+
+ZipTests.test("Sequence+Collection") {
+  typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+    return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
+  }
+
+  for test in zipTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    let other = MinimalCollection<OpaqueValue<Int32>>(
+      elements: test.other.map(OpaqueValue.init))
+    var result = zip(s, other)
+    expectType(
+      Zip2Sequence<
+        MinimalSequence<OpaqueValue<Int>>, 
+        MinimalCollection<OpaqueValue<Int32>>>.self,
+      &result)
+
+    // Check for expected result and check the Zip2Sequence's Sequence
+    // conformance.
+    checkSequence(
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
+      stackTrace: SourceLocStack().with(test.loc), sameValue: compareElements)
+  }
 }
 
 runAllTests()
