@@ -74,17 +74,12 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
   @_versioned // FIXME(sil-serialize-all)
   internal let _sequence2: Sequence2
 
-  @available(*, deprecated, renamed: "Sequence1.Iterator")
-  public typealias Stream1 = Sequence1.Iterator
-  @available(*, deprecated, renamed: "Sequence2.Iterator")
-  public typealias Stream2 = Sequence2.Iterator
-
   /// Creates an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal // @testable
-  init(_ sequence1 : Sequence1, _ sequence2: Sequence2) {
+  init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
     self._sequence1 = sequence1
     self._sequence2 = sequence2
   }
@@ -307,7 +302,7 @@ extension Zip2Collection: Collection {
     return j
   }
 
-  // @_inlineable
+  @_inlineable
   public func index(_ i: Index, offsetBy n: Int, limitedBy limit: Index) -> Index? {
     _debugPrecondition(i >= startIndex)
     _debugPrecondition(i <= endIndex)
@@ -348,7 +343,9 @@ extension Zip2Collection: Collection {
 
 extension Zip2Collection: BidirectionalCollection
 where Collection1: RandomAccessCollection, Collection2: RandomAccessCollection {
-  
+  // Being bidirectional doesn't help us, because to calculate the shorter
+  // length we need to find the max distance of both collections.
+  // So no new features added here.
 }
 
 extension Zip2Collection: RandomAccessCollection
@@ -402,5 +399,13 @@ where Collection1: Equatable, Collection2: Equatable {
   }
 }
 
-// @available(*, deprecated, renamed: "Zip2Sequence.Iterator")
+@available(*, deprecated, renamed: "Zip2Sequence.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence
+
+extension Zip2Sequence {
+  @available(*, deprecated, renamed: "Sequence1.Iterator")
+  public typealias Stream1 = Sequence1.Iterator
+  @available(*, deprecated, renamed: "Sequence2.Iterator")
+  public typealias Stream2 = Sequence2.Iterator  
+}
+
