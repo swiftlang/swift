@@ -86,22 +86,28 @@ ZipTests.test("Collections") {
     indicesType: DefaultIndices<Collection>.self)
     
   for test in zipTests {
-    let s = MinimalCollection<OpaqueValue<Int>>(
+    let left = MinimalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    let other = MinimalCollection<OpaqueValue<Int32>>(
+    let right = MinimalCollection<OpaqueValue<Int32>>(
       elements: test.other.map(OpaqueValue.init))
-    var result = zip(s, other)
-    expectType(Collection.self,
-      &result)
+
+    var result = zip(left, right)
+    expectType(Collection.self, &result)
+
+    checkCollection(
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, 
+      result, sameValue: compareElements)      
   }
 }
 
 ZipTests.test("RandomAccessCollections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
   typealias Sequence = Zip2Sequence<
-    MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+    MinimalRandomAccessCollection<OpaqueValue<Int>>,
+    MinimalRandomAccessCollection<OpaqueValue<Int32>>>
   typealias Collection = Zip2Collection<
-    MinimalRandomAccessCollection<OpaqueValue<Int>>,MinimalRandomAccessCollection<OpaqueValue<Int>>>
+    MinimalRandomAccessCollection<OpaqueValue<Int>>,
+    MinimalRandomAccessCollection<OpaqueValue<Int32>>>
 
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
@@ -115,12 +121,13 @@ ZipTests.test("RandomAccessCollections") {
     indicesType: DefaultIndices<Collection>.self)
 
   for test in zipTests {
-    let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
+    let left = MinimalRandomAccessCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    let other = MinimalRandomAccessCollection<OpaqueValue<Int32>>(
+    let right = MinimalRandomAccessCollection<OpaqueValue<Int32>>(
       elements: test.other.map(OpaqueValue.init))
-    var result = zip(s, other)
 
+    var result = zip(left, right)
+    expectType(Collection.self, &result)
     checkRandomAccessCollection(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, 
       result, sameValue: compareElements)
