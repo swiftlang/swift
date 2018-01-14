@@ -595,7 +595,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   public typealias Indices = CountableRange<${Index}>
 %     elif Traversal == 'RandomAccess':
   // FIXME: this shouldn't be necessary, should come by default
-  public typealias Indices = DefaultRandomAccessIndices<${Self}<T>>
+  public typealias Indices = DefaultIndices<${Self}<T>>
 %     end
 
   public func _failEarlyRangeCheck(
@@ -869,7 +869,7 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Indices = CountableRange<${Index}>
 %  elif Traversal == 'RandomAccess':
   // FIXME: this shouldn't be necessary, should come by default
-  public typealias Indices = DefaultRandomAccessIndices<${Self}<Element>>
+  public typealias Indices = DefaultIndices<${Self}<Element>>
 %   end
 
 %   if Mutable or RangeReplaceable:
