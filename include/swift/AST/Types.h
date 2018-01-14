@@ -1506,6 +1506,7 @@ public:
   }
 
   static bool classof(const TypeBase *T) {
+    // Workaround: http://llvm.org/PR35906
     if (TypeKind::Last_Type == TypeKind::Last_SugarType)
       return T->getKind() >= TypeKind::First_SugarType;
     return T->getKind() >= TypeKind::First_SugarType &&
