@@ -1038,7 +1038,7 @@ extension Collection {
       self.startIndex,
       offsetBy: numericCast(random)
     )
-    return self[index!]
+    return self[index]
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

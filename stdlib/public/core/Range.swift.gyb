@@ -708,7 +708,7 @@ extension ${Self} : Equatable {
 % if 'Countable' in Self:
 extension ${Self}
 where Bound: FixedWidthInteger,
-      Bound.Magnitude: FixedWidthInteger & UnsignedInteger {
+      Bound.Magnitude: UnsignedInteger {
 
   /// Returns a random element from this collection.
   ///
@@ -738,7 +738,11 @@ where Bound: FixedWidthInteger,
 %   end
     let isLowerNegative = Bound.isSigned && lowerBound < 0
     let sameSign = !Bound.isSigned || isLowerNegative == (upperBound < 0)
+%   if 'Closed' not in Self:
     let delta: Bound.Magnitude
+%   else:
+    var delta: Bound.Magnitude
+%   end
     if isLowerNegative {
       delta = sameSign
         ? lowerBound.magnitude - upperBound.magnitude
@@ -770,11 +774,10 @@ where Bound: FixedWidthInteger,
 }
 % else:
 extension ${Self}
-where Bound: BinaryFloatingPoint,
+where Bound : BinaryFloatingPoint,
       Bound.RawSignificand : FixedWidthInteger,
       Bound.RawSignificand.Stride : SignedInteger & FixedWidthInteger,
-      Bound.RawSignificand.Magnitude : UnsignedInteger & FixedWidthInteger,
-      Bound.RawSignificand.Magnitude == Bound.RawSignificand.Magnitude.Magnitude {
+      Bound.RawSignificand.Magnitude : UnsignedInteger {
 
   /// Returns a random value within this range's bounds
   ///
@@ -809,6 +812,8 @@ where Bound: BinaryFloatingPoint,
     return delta * unitRandom + lowerBound
   }
 }
+% end
+
 % end
 
 % for Self in [

@@ -2340,7 +2340,8 @@ ${assignmentOperatorComment(x.operator, False)}
 % for Range in ['CountableRange', 'CountableClosedRange']:
 
 extension FixedWidthInteger
-where Self.Magnitude : FixedWidthInteger & UnsignedInteger {
+where Self.Stride : SignedInteger,
+      Self.Magnitude : FixedWidthInteger & UnsignedInteger {
 
   /// Returns a random representation of this integer within the range.
   ///

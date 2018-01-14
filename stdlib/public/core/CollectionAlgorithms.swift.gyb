@@ -235,6 +235,8 @@ extension ${Self} {
   }
 }
 
+% end
+
 extension MutableCollection {
   /// Shuffles the collection in place.
   ///
@@ -261,6 +263,10 @@ extension MutableCollection {
 //===----------------------------------------------------------------------===//
 // sorted()
 //===----------------------------------------------------------------------===//
+
+% for Self in ['Sequence', 'MutableCollection']:
+
+% sequenceKind = 'sequence' if 'Sequence' in Self else 'collection'
 
 extension ${Self} where Element : Comparable {
   /// Returns the elements of the ${sequenceKind}, sorted.

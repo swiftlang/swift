@@ -2375,9 +2375,9 @@ extension BinaryFloatingPoint {
 % for Range in ['Range', 'ClosedRange']:
 
 extension BinaryFloatingPoint
-where Self.RawSignificand : FixedWidthInteger
-      Self.RawSignificand.Stride : SignedInteger
-      Self.RawSignificand.Magnitude : UnsignedInteger & FixedWidthInteger,
+where Self.RawSignificand : FixedWidthInteger,
+      Self.RawSignificand.Stride : SignedInteger & FixedWidthInteger,
+      Self.RawSignificand.Magnitude : UnsignedInteger,
       Self.RawSignificand.Magnitude == Self.RawSignificand.Magnitude.Magnitude {
 
   /// Returns a random representation of this floating point within the range.
