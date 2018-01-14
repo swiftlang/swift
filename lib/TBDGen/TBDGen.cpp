@@ -36,29 +36,8 @@ using namespace swift::irgen;
 using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
 
-static bool isPrivateDecl(ValueDecl *VD) {
-  return getDeclLinkage(VD) != FormalLinkage::PublicUnique;
-}
-
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
-}
-
-void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  for (auto &entry : PBD->getPatternList()) {
-    auto *var = entry.getAnchoringVarDecl();
-    if (isPrivateDecl(var))
-      return;
-
-    // Non-global variables might have an explicit initializer symbol.
-    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
-      auto declRef =
-          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
-      // Stored property initializers for public properties are currently
-      // public.
-      addSymbol(declRef);
-    }
-  }
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
@@ -180,7 +159,7 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
-  if (isPrivateDecl(CD))
+  if (getDeclLinkage(CD) != FormalLinkage::PublicUnique)
     return;
 
   auto &ctxt = CD->getASTContext();
