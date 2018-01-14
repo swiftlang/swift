@@ -78,7 +78,6 @@ ZipTests.test("Collections") {
       elements: test.sequence.map(OpaqueValue.init))
     let other = MinimalCollection<OpaqueValue<Int32>>(
       elements: test.other.map(OpaqueValue.init))
-    var result = zip(s, other)
 
     typealias Sequence = Zip2Sequence<
       MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int>>>
@@ -161,5 +160,13 @@ ZipTests.test("Collection.count") {
   expectEqual(zip(0..<2,0..<2).count, 2)
 }
 
+ZipTests.test("Equatable") {
+  let s = 
+  checkEquatable([
+    zip("",0..<99),
+    zip("abcdef",0..<0),
+    zip("xyz",0..<3)
+  ], oracle: { $0 == $1 })
+}
 
 runAllTests()
