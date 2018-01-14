@@ -309,13 +309,6 @@ DeclContext *Decl::getInnermostDeclContext() const {
   return getDeclContext();
 }
 
-DeclContext *Decl::getDeclContextForModule() const {
-  if (auto module = dyn_cast<ModuleDecl>(this))
-    return const_cast<ModuleDecl *>(module);
-
-  return nullptr;
-}
-
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }

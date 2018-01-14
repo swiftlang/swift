@@ -1,16 +1,5 @@
 import SwiftOnoneSupport
 
-precedencegroup High {
-  associativity: left
-  higherThan: BitwiseShiftPrecedence
-}
-
-infix operator %%% : High
-
-postfix operator =->
-
-postfix operator =>
-
 func %%% (lhs: Int, rhs: Int) -> Int
 
 postfix func =-> (lhs: Int) -> Int
@@ -63,4 +52,15 @@ func hiddenImport()
 func overlayedFoo()
 
 func visibleImport()
+
+precedencegroup High {
+  associativity: left
+  higherThan: BitwiseShiftPrecedence
+}
+
+infix operator %%% : High
+
+postfix operator =->
+
+postfix operator =>
 

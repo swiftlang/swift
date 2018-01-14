@@ -208,6 +208,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
   
+  // See swift/AST/Decl.h
   static DeclContext *castDeclToDeclContext(const Decl *D);
 
   /// If this DeclContext is a GenericType declaration or an
@@ -235,6 +236,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
     llvm_unreachable("Unhandled DeclContextKind");
   }
 
+public:
   Decl *getAsDeclOrDeclExtensionContext() {
     return ParentAndKind.getInt() == ASTHierarchy::Decl ?
       reinterpret_cast<Decl*>(this + 1) : nullptr;
@@ -243,7 +245,6 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
     return const_cast<DeclContext*>(this)->getAsDeclOrDeclExtensionContext();
   }
 
-public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
       : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
     if (Kind != DeclContextKind::Module)
@@ -554,7 +555,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
   
-  // Some Decls are DeclContexts, but not all.
+  // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
 };
 
