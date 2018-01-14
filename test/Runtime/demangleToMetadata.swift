@@ -196,7 +196,9 @@ extension C {
 }
 
 class CG2<T, U> {
-  class Inner<V> { }
+  class Inner<V> {
+    struct Innermost<W1, W2, W3, W4> { }
+  }
 }
 
 DemangleToMetadataTests.test("nested generic specializations") {
@@ -206,6 +208,9 @@ DemangleToMetadataTests.test("nested generic specializations") {
     _typeByMangledName("4main1CC6NestedO9InnermoreV9InnermostVy_SiSS__SdG")!)
   expectEqual(CG2<Int, String>.Inner<Double>.self,
     _typeByMangledName("4main3CG2C5InnerCySiSS_SdG")!)
+  expectEqual(
+    CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
+    _typeByMangledName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
 }
 
 runAllTests()
