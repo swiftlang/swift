@@ -302,7 +302,8 @@ struct SDKNodeInitInfo {
   StringRef SuperclassUsr;
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty);
+  SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
+                  bool IsImplicitlyUnwrappedOptional =false);
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
@@ -1029,16 +1030,21 @@ public:
   SDKNodeDumpVisitor() {};
 };
 
-static StringRef getPrintedName(SDKContext &Ctx, Type Ty) {
+static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
+                                bool IsImplicitlyUnwrappedOptional) {
   std::string S;
   llvm::raw_string_ostream OS(S);
   PrintOptions PO;
   PO.SkipAttributes = true;
+  if (IsImplicitlyUnwrappedOptional)
+    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+
   Ty.print(OS, PO);
   return Ctx.buffer(OS.str());
 }
 
-static StringRef getTypeName(SDKContext &Ctx, Type Ty) {
+static StringRef getTypeName(SDKContext &Ctx, Type Ty,
+                             bool IsImplicitlyUnwrappedOptional) {
   if (Ty->getKind() == TypeKind::Paren) {
     return Ctx.buffer("Paren");
   }
@@ -1049,6 +1055,10 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty) {
     return NAT->getDecl()->getNameStr();
   }
   if (Ty->getAnyNominal()) {
+    if (IsImplicitlyUnwrappedOptional) {
+      assert(Ty->getAnyOptionalObjectType());
+      return StringRef("ImplicitlyUnwrappedOptional");
+    }
     return Ty->getAnyNominal()->getNameStr();
   }
 #define TYPE(id, parent)                                                      \
@@ -1159,8 +1169,10 @@ static Ownership getOwnership(ValueDecl *VD) {
   return Ownership::Strong;
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty)), PrintedName(getPrintedName(Ctx, Ty)) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
+                                 bool IsImplicitlyUnwrappedOptional) :
+    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
+    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
 }
@@ -1196,8 +1208,10 @@ case SDKNodeKind::X:                                                           \
 
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
-static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeNominal);
+static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
+                                  bool IsImplicitlyUnwrappedOptional =false) {
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional)
+    .createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeNameAlias);
@@ -1245,11 +1259,20 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
 static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
                                       SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType()));
+  bool resultIsImplicitlyUnwrappedOptional = false;
+  if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    resultIsImplicitlyUnwrappedOptional = true;
+  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(),
+                                   resultIsImplicitlyUnwrappedOptional));
   for (auto *paramList : FD->getParameterLists()) {
     for (auto param : *paramList) {
+      bool paramIsImplicitlyUnwrappedOptional = false;
+      if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        paramIsImplicitlyUnwrappedOptional = true;
+
       if (!param->isSelfParameter())
-        Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
+        Func->addChild(constructTypeNode(Ctx, param->getInterfaceType(),
+                                         paramIsImplicitlyUnwrappedOptional));
     }
   }
   return Func;
@@ -1321,7 +1344,11 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD) {
 
 static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
   auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::Var);
-  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType()));
+  auto isImplicitlyUnwrappedOptional = false;
+  if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    isImplicitlyUnwrappedOptional = true;
+  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType(),
+                                  isImplicitlyUnwrappedOptional));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::Getter));
