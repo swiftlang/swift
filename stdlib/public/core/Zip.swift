@@ -203,7 +203,7 @@ public struct Zip2Collection<Collection1 : Collection, Collection2 : Collection>
   /// Creates an instance that makes pairs of elements from `collection1` and
   /// `collection2`.
   // FIXME: this should be inlineable, but this results in a compilation error:
-  // ""
+  // "error: 'let' property '_collection1' may not be initialized directly; use "self.init(...)" or "self = ..." instead"
   // @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_ collection1: Collection1, _ collection2: Collection2) {
@@ -232,8 +232,8 @@ extension Zip2Collection {
     
     /// Creates an instance that makes pairs of elements from `index1` and
     /// `index2`.
-    // FIXME: this should be inlineable, but this results in a compilation error:
-    // ""
+    // FIXME: this should be inlineable, but this results in a compilation 
+    // error similar to the one for Zip2Collection.init above
     // @_inlineable // FIXME(sil-serialize-all)
     @_versioned
     internal init(_ index1: Collection1.Index, _ index2: Collection2.Index) {
