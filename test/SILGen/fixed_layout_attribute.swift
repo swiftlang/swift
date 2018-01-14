@@ -20,7 +20,7 @@ public struct NonFixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... okay to directly reference the addressor here:
 // CHECK: function_ref @$S22fixed_layout_attribute6globalSivau
@@ -31,7 +31,7 @@ public struct FixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @$S22fixed_layout_attribute11FixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil non_abi [transparent] [serialized] @$S22fixed_layout_attribute11FixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... a fragile build can still reference the addressor:
 // FRAGILE: function_ref @$S22fixed_layout_attribute6globalSivau
