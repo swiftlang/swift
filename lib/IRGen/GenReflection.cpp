@@ -327,10 +327,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, CanType type,
-                    bool indirect=false) {
+  void addFieldDecl(const ValueDecl *value, CanType type, bool indirect = false,
+                    bool weak = false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
+    flags.setWeak(weak);
 
     B.addInt32(flags.getRawValue());
 
@@ -374,10 +375,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     auto properties = NTD->getStoredProperties();
     B.addInt32(std::distance(properties.begin(), properties.end()));
-    for (auto property : properties)
-      addFieldDecl(property,
-                   property->getInterfaceType()
-                       ->getCanonicalType());
+    for (auto property : properties) {
+      auto type = property->getInterfaceType()->getCanonicalType();
+      addFieldDecl(property, type, /* indirect */ false,
+                   /* weak */ type->is<WeakStorageType>());
+    }
   }
 
   void layoutEnum() {

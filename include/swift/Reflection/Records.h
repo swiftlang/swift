@@ -30,7 +30,9 @@ class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
     // Is this an indirect enum case?
-    IsIndirectCase = 0x1
+    IsIndirectCase = 0x1,
+    // Is this a weak optional reference?
+    IsWeak = 0x2,
   };
   int_type Data = 0;
 
@@ -44,6 +46,15 @@ public:
       Data |= IsIndirectCase;
     else
       Data &= ~IsIndirectCase;
+  }
+
+  bool isWeak() const { return (Data & IsWeak) == IsWeak; }
+
+  void setWeak(bool Weak = true) {
+    if (Weak)
+      Data |= IsWeak;
+    else
+      Data &= ~IsWeak;
   }
 
   int_type getRawValue() const {
@@ -76,6 +87,8 @@ public:
   bool isIndirectCase() const {
     return Flags.isIndirectCase();
   }
+
+  bool isWeak() const { return Flags.isWeak(); }
 };
 
 struct FieldRecordIterator {

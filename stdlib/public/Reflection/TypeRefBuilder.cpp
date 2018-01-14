@@ -145,7 +145,8 @@ bool TypeRefBuilder::getFieldTypeRefs(
       continue;
     }
 
-    Fields.push_back(FieldTypeInfo::forField(FieldName, Substituted));
+    Fields.push_back(
+        FieldTypeInfo::forField(FieldName, Substituted, Field.isWeak()));
   }
   return true;
 }
