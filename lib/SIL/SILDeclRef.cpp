@@ -271,6 +271,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
+  // Default argument generators of Public functions have PublicNonABI linkage
+  // if the function was type-checked in Swift 4 mode.
+  if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
+    if (isSerialized())
+      return maybeAddExternal(SILLinkage::PublicNonABI);
+  }
+
   bool neverPublic = false;
 
   // ivar initializers and destroyers are completely contained within the class
