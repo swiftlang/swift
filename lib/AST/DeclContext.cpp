@@ -305,61 +305,23 @@ SourceFile *DeclContext::getParentSourceFile() const {
 }
 
 DeclContext *DeclContext::getModuleScopeContext() const {
-  const DeclContext *DC = this;
+  auto DC = const_cast<DeclContext*>(this);
+
   while (true) {
-    switch (DC->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-      return const_cast<DeclContext*>(DC);
-    default:
-      break;
+    if (DC->ParentAndKind.getInt() == ASTHierarchy::FileUnit)
+      return DC;
+    if (auto NextDC = DC->getParent()) {
+      DC = NextDC;
+    } else {
+      assert(isa<ModuleDecl>(DC->getAsDeclOrDeclExtensionContext()));
+      return DC;
     }
-    DC = DC->getParent();
   }
 }
 
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return false;
-
-    case DeclContextKind::Initializer:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::SerializedLocal:
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      if (cast<SubscriptDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::GenericTypeDecl:
-      if (cast<GenericTypeDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::ExtensionDecl:
-      if (cast<ExtensionDecl>(dc)->getGenericParams())
-        return true;
-      // Extensions do not capture outer generic parameters.
-      return false;
-    }
-    llvm_unreachable("bad decl context kind");
-  }
-  llvm_unreachable("illegal declcontext hierarchy");
+  return getGenericParamsOfContext() != nullptr;
 }
 
 /// Get the most optimal resilience expansion for the body of this function.
@@ -432,19 +394,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
 /// Determine whether the innermost context is generic.
 bool DeclContext::isInnermostContextGeneric() const {
-  switch (getContextKind()) {
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(this)->isGeneric();
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(this)->isGeneric();
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->isGeneric();
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(this)->isGeneric();
-  default:
-    return false;
-  }
-  llvm_unreachable("bad DeclContextKind");
+  if (auto Decl = getAsDeclOrDeclExtensionContext())
+    if (auto GC = Decl->getAsGenericContext())
+      return GC->isGeneric();
+  return false;
 }
 
 bool
