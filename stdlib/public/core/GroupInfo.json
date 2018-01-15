@@ -60,7 +60,6 @@
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
     "Indices.swift",
-    "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
