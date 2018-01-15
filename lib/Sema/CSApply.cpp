@@ -4241,6 +4241,19 @@ namespace {
           component = KeyPathExpr::Component::forProperty(ref,
                                                        resolvedTy,
                                                        origComponent.getLoc());
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
+
+          if (shouldForceUnwrapResult(property, locator)) {
+            auto objTy = baseTy->getRValueType()->getAnyOptionalObjectType();
+            if (baseTy->is<LValueType>())
+              baseTy = LValueType::get(objTy);
+            else
+              baseTy = objTy;
+            resolvedComponents.push_back(
+                KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
+          }
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4306,6 +4319,19 @@ namespace {
           // Save a reference to the component so we can do a post-pass to check
           // the Hashable conformance of the indexes.
           KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
+
+          if (shouldForceUnwrapResult(subscript, locator)) {
+            auto objTy = baseTy->getRValueType()->getAnyOptionalObjectType();
+            if (baseTy->is<LValueType>())
+              baseTy = LValueType::get(objTy);
+            else
+              baseTy = objTy;
+            resolvedComponents.push_back(
+                KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
+          }
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -4320,6 +4346,9 @@ namespace {
           
           component = KeyPathExpr::Component::forOptionalChain(objectTy,
                                                         origComponent.getLoc());
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalForce: {
@@ -4340,6 +4369,9 @@ namespace {
           
           component = KeyPathExpr::Component::forOptionalForce(objectTy,
                                                         origComponent.getLoc());
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
           break;
         }
         case KeyPathExpr::Component::Kind::Invalid:
@@ -4352,9 +4384,6 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalWrap:
           llvm_unreachable("already resolved");
         }
-
-        baseTy = component.getComponentType();
-        resolvedComponents.push_back(component);
       }
       
       // Wrap a non-optional result if there was chaining involved.
@@ -4389,7 +4418,8 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!baseTy || baseTy->hasUnresolvedType()
+             || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
       return E;
     }
 
