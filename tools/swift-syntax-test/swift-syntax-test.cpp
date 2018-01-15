@@ -43,6 +43,7 @@ enum class ActionType {
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
+  ParseOnly,
   ParserGen,
   EOFPos,
   None
@@ -66,6 +67,9 @@ Action(llvm::cl::desc("Action (required):"),
                    "round-trip-parse",
                    "Parse the source file and print it back out for "
                    "comparing against the input"),
+        clEnumValN(ActionType::ParseOnly,
+                   "parse-only",
+                   "Parse the source file with syntax nodes and exit"),
         clEnumValN(ActionType::ParserGen,
                    "parse-gen",
                    "Parse the source file and print it back out for "
@@ -233,6 +237,13 @@ int doSerializeRawTree(const char *MainExecutablePath,
   return EXIT_SUCCESS;
 }
 
+int doParseOnly(const char *MainExecutablePath,
+                  const StringRef InputFileName) {
+  CompilerInstance Instance;
+  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
+  return SF ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
 int dumpParserGen(const char *MainExecutablePath,
                   const StringRef InputFileName) {
   CompilerInstance Instance;
@@ -266,7 +277,6 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
   llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
   return 0;
 }
-
 }// end of anonymous namespace
 
 int main(int argc, char *argv[]) {
@@ -296,6 +306,9 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::SerializeRawTree:
     ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
+    break;
+  case ActionType::ParseOnly:
+    ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
     break;
   case ActionType::ParserGen:
     ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
