@@ -58,7 +58,7 @@ namespace swift {
   
   namespace syntax {
     class AbsolutePosition;
-    struct RawTokenSyntax;
+    class RawSyntax;
     enum class SyntaxKind;
     class TypeSyntax;
   }// end of syntax namespace
@@ -1435,7 +1435,7 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+std::vector<std::pair<RC<syntax::RawSyntax>,
                                  syntax::AbsolutePosition>>
 tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,

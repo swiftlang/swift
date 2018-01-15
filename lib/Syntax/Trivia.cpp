@@ -21,18 +21,6 @@ void printRepeated(llvm::raw_ostream &OS, char c, size_t Count) {
   for (decltype(Count) i = 0; i < Count; ++i)
     OS << c;
 }
-
-void escapeNewlines(std::string &S) {
-  size_t Index = 0;
-  while (true) {
-    Index = S.find("\n", Index);
-    if (Index == std::string::npos)
-      break;
-    S.erase(Index, 1);
-    S.insert(Index, "\\n");
-    Index += 3;
-  }
-}
 } // end anonymous namespace
 
 void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
@@ -62,29 +50,24 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     OS << "carriage_return_line_feed " << Count;
     break;
   case TriviaKind::LineComment:
-    OS << "line_comment" << Text.str();
+    OS << "line_comment ";
+    OS.write_escaped(Text.str());
     break;
-  case TriviaKind::BlockComment: {
-    // Make this fit a little more nicely with indentation
-    // and the lispy nature of the dump by escaping the newlines.
-    auto s = Text.str().str();
-    escapeNewlines(s);
-    OS << "block_comment" << Text.str();
+  case TriviaKind::BlockComment:
+    OS << "block_comment ";
+    OS.write_escaped(Text.str());
     break;
-  }
   case TriviaKind::DocLineComment:
-    OS << "doc_line_comment" << Text.str();
+    OS << "doc_line_comment ";
+    OS.write_escaped(Text.str());
     break;
-  case TriviaKind::DocBlockComment: {
-    // Make this fit a little more nicely with indentation
-    // and the lispy nature of the dump by escaping the newlines.
-    auto s = Text.str().str();
-    escapeNewlines(s);
-    OS << "doc_block_comment" << Text.str();
+  case TriviaKind::DocBlockComment:
+    OS << "doc_block_comment ";
+    OS.write_escaped(Text.str());
     break;
-  }
   case TriviaKind::GarbageText:
-    OS << "garbage_text " << Text.str();
+    OS << "garbage_text ";
+    OS.write_escaped(Text.str());
     break;
   case TriviaKind::Backtick:
     OS << "backtick " << Count;

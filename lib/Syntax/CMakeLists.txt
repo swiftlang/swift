@@ -10,7 +10,6 @@ add_swift_library(swiftSyntax STATIC
   SyntaxVisitor.cpp.gyb
   Trivia.cpp
   RawSyntax.cpp
-  RawTokenSyntax.cpp
   Syntax.cpp
   SyntaxData.cpp
   UnknownSyntax.cpp
