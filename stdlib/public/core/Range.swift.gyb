@@ -63,7 +63,7 @@ public protocol RangeExpression {
   func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound
-
+  
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range expression.
   ///
@@ -77,7 +77,7 @@ extension RangeExpression {
   @_inlineable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
-  }
+  }  
 }
 
 /// A half-open range that forms a collection of consecutive values.
@@ -707,8 +707,8 @@ extension ${Self} : Equatable {
 
 % if 'Countable' in Self:
 extension ${Self}
-where Bound: FixedWidthInteger,
-      Bound.Magnitude: UnsignedInteger {
+where Bound : FixedWidthInteger,
+      Bound.Magnitude : UnsignedInteger {
 
   /// Returns a random element from this collection.
   ///
@@ -728,6 +728,7 @@ where Bound: FixedWidthInteger,
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20", perhaps
+  @_inlineable
   public func random(
     using generator: RandomNumberGenerator = Random.default
   ) -> Element? {
@@ -770,46 +771,6 @@ where Bound: FixedWidthInteger,
         : 0 - Bound(randomMagnitude - upperBound.magnitude)
 %     end
     }
-  }
-}
-% else:
-extension ${Self}
-where Bound : BinaryFloatingPoint,
-      Bound.RawSignificand : FixedWidthInteger,
-      Bound.RawSignificand.Stride : SignedInteger & FixedWidthInteger,
-      Bound.RawSignificand.Magnitude : UnsignedInteger {
-
-  /// Returns a random value within this range's bounds
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random value.
-  /// - Returns: A randomly generated value within this range's bounds.
-  ///
-  /// If the range is empty, the value of this function is `nil`.
-  public func random(
-    using generator: RandomNumberGenerator = Random.default
-  ) -> Bound? {
-%   if 'Closed' not in Self:
-    guard lowerBound != upperBound else {
-      return nil
-    }
-%   end
-    let delta = upperBound - lowerBound
-    let maxSignificand: Bound.RawSignificand = 1 << Bound.significandBitCount
-%   if 'Closed' not in Self:
-    let rand = generator.next(upperBound: maxSignificand) as Bound.RawSignificand
-%   else:
-    let rand = generator.next(upperBound: maxSignificand + 1) as Bound.RawSignificand
-    if rand == maxSignificand {
-      return upperBound
-    }
-%   end
-    let unitRandom = Bound(
-      sign: .plus,
-      exponentBitPattern: (1 as Bound).exponentBitPattern,
-      significandBitPattern: rand
-    ) - 1
-    return delta * unitRandom + lowerBound
   }
 }
 % end
@@ -867,7 +828,7 @@ extension ${Self} where Bound : Strideable, Bound.Stride : SignedInteger {
 @_fixed_layout
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
-
+  
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -879,7 +840,7 @@ extension PartialRangeUpTo: RangeExpression {
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
-
+  
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func contains(_ element: Bound) -> Bool {
@@ -909,9 +870,9 @@ extension PartialRangeUpTo: RangeExpression {
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
 @_fixed_layout
-public struct PartialRangeThrough<Bound: Comparable> {
+public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
-
+  
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -1091,8 +1052,8 @@ extension CountablePartialRangeFrom: Sequence {
     }
   }
   @_inlineable
-  public func makeIterator() -> Iterator {
-    return Iterator(_current: lowerBound)
+  public func makeIterator() -> Iterator { 
+    return Iterator(_current: lowerBound) 
   }
 }
 
@@ -1334,7 +1295,7 @@ extension Collection {
   -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
-
+  
   @_inlineable
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]

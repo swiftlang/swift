@@ -30,8 +30,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <fcntl.h>
-#include <sys/types.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -334,58 +332,44 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
 }
 
 #if defined(__APPLE__)
-#include "TargetConditionals.h"
-#if defined(TARGET_IPHONE_SIMULATOR) \
-  || ( defined(TARGET_OS_IPHONE) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 10000 ) \
-  || ( defined(TARGET_OS_MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 )
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_stdlib_random(void *buf,
-                                __swift_ssize_t nbytes,
-                                __swift_uint32_t debug_flags) {
-  arc4random_buf(buf, nbytes);
-}
-#else
 #include <Security/Security.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_stdlib_random(void *buf,
-                                __swift_ssize_t nbytes,
-                                __swift_uint32_t debug_flags) {
-  if (SecRandomCopyBytes(kSecRandomDefault, nbytes, buf) != 0) {
-    fatalError(
-      debug_flags,
-      "Fatal error: Unexpected error with SecRandomCopyBytes\n"
-    );
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  if (__builtin_available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *)) {
+    arc4random_buf(buf, nbytes);
+  }else {
+    OSStatus status = SecRandomCopyBytes(kSecRandomDefault, nbytes, buf);
+    if (status != errSecSuccess) {
+      fatalError(0, "Fatal error: SecRandomCopyBytes failed with error %d\n", status);
+    }
   }
 }
-#endif
 #elif defined(__linux__)
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
-#define _GNU_SOURCE
 #include <sys/syscall.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_stdlib_random(void *buf,
-                                __swift_ssize_t nbytes,
-                                __swift_uint32_t debug_flags) {
-  int result = syscall(SYS_getrandom, buf, nbytes, 0);
-  if (result != 0) {
-    fatalError(debug_flags, "Fatal error: Unexpected error with getrandom\n")
-  }
-}
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
+  auto _read = [&]() -> __swift_ssize_t {
+    return syscall(SYS_getrandom, buf, bytes, 0);
+  };
 #else
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_stdlib_random(void *buf,
-                                __swift_ssize_t nbytes,
-                                __swift_uint32_t debug_flags) {
-  int oflags = O_RDONLY;
-  int fd = swift::_stdlib_open("/dev/urandom", oflags);
-  if (fd < 0) {
-    fatalError(debug_flags, "Fatal error: Unable to open /dev/urandom\n");
-  }
-  if (swift::_stdlib_read(fd, buf, nbytes) < 0) {
-    fatalError(debug_flags, "Fatal error: Unable to read /dev/urandom\n");
-  }
-  swift::_stdlib_close(fd);
-}
+  auto _read = [&]() -> __swift_ssize_t {
+    static const int fd = _stdlib_open("/dev/urandom", O_RDONLY);
+    if (fd < 0) {
+      fatalError(0, "Unable to open '/dev/urandom'\n");
+    }
+    return _stdlib_read(fd, buf, bytes);
+  };
 #endif
+  while (nbytes > 0) {
+    auto result = _read();
+    if (result < 1) {
+      if (errno == EINTR) { continue; }
+      fatalError(0, "Unable to read '/dev/urandom'\n");
+    }
+    buf = static_cast<uint8_t *>(buf) + result;
+    nbytes -= result;
+  }
+}
 #endif

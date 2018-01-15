@@ -215,16 +215,12 @@ extension MutableCollection where Self : BidirectionalCollection {
 // shuffled()
 //===----------------------------------------------------------------------===//
 
-% for Self in ['Sequence', 'MutableCollection']:
-
-% sequenceKind = 'sequence' if 'Sequence' in Self else 'collection'
-
-extension ${Self} {
-  /// Returns the elements of the ${sequenceKind}, shuffled.
+extension Sequence {
+  /// Returns the elements of the sequence, shuffled.
   ///
   /// - Parameter generator: The random number generator to use when shuffling
-  ///   the ${sequenceKind}.
-  /// - Returns: A shuffled array of this ${sequenceKind}'s elements.
+  ///   the sequence.
+  /// - Returns: A shuffled array of this sequence's elements.
   @_inlineable
   public func shuffled(
     using generator: RandomNumberGenerator = Random.default
@@ -234,8 +230,6 @@ extension ${Self} {
     return Array(result)
   }
 }
-
-% end
 
 extension MutableCollection {
   /// Shuffles the collection in place.
@@ -248,14 +242,15 @@ extension MutableCollection {
   ) {
     guard count > 1 else { return }
     var amount = count
+    var currentIndex = startIndex
     while amount > 1 {
-      let random = generator.next(upperBound: UInt(count))
-      guard amount != random else { continue }
+      let random = generator.next(upperBound: UInt(amount))
       amount -= 1
       swapAt(
-        index(startIndex, offsetBy: amount),
-        index(startIndex, offsetBy: numericCast(random))
+        currentIndex,
+        index(currentIndex, offsetBy: numericCast(random))
       )
+      formIndex(after: &currentIndex)
     }
   }
 }

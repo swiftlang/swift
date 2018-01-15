@@ -2334,6 +2334,7 @@ extension BinaryFloatingPoint {
     return true
   }
 
+
   /*  TODO: uncomment these default implementations when it becomes possible
       to use them.
   //  TODO: The following comparison implementations are not quite correct for
@@ -2377,8 +2378,7 @@ extension BinaryFloatingPoint {
 extension BinaryFloatingPoint
 where Self.RawSignificand : FixedWidthInteger,
       Self.RawSignificand.Stride : SignedInteger & FixedWidthInteger,
-      Self.RawSignificand.Magnitude : UnsignedInteger,
-      Self.RawSignificand.Magnitude == Self.RawSignificand.Magnitude.Magnitude {
+      Self.RawSignificand.Magnitude : UnsignedInteger {
 
   /// Returns a random representation of this floating point within the range.
   ///
@@ -2398,7 +2398,22 @@ where Self.RawSignificand : FixedWidthInteger,
       "Can't get random value with lowerBound == upperBound"
     )
 %   end
-    return range.random()!
+    let delta = range.upperBound - range.lowerBound
+    let maxSignificand: Self.RawSignificand = 1 << Self.significandBitCount
+%   if 'Closed' not in Range:
+    let rand: Self.RawSignificand = generator.next(upperBound: maxSignificand)
+%   else:
+    let rand: Self.RawSignificand = generator.next(upperBound: maxSignificand + 1)
+    if rand == maxSignificand {
+      return range.upperBound
+    }
+%   end
+    let unitRandom = Self.init(
+      sign: .plus,
+      exponentBitPattern: (1 as Self).exponentBitPattern,
+      significandBitPattern: rand
+    ) - 1
+    return delta * unitRandom + range.lowerBound
   }
 
 }

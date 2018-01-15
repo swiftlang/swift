@@ -2341,7 +2341,7 @@ ${assignmentOperatorComment(x.operator, False)}
 
 extension FixedWidthInteger
 where Self.Stride : SignedInteger,
-      Self.Magnitude : FixedWidthInteger & UnsignedInteger {
+      Self.Magnitude : UnsignedInteger {
 
   /// Returns a random representation of this integer within the range.
   ///
@@ -2350,6 +2350,7 @@ where Self.Stride : SignedInteger,
   /// - Parameter generator: The random number generator to use when getting
   ///   the random integer.
   /// - Returns: A random representation of this integer.
+  @_inlineable
   public static func random(
     in range: ${Range}<Self>,
     using generator: RandomNumberGenerator = Random.default
@@ -2360,7 +2361,7 @@ where Self.Stride : SignedInteger,
       "Can't get random value with lowerBound == upperBound"
     )
 %   end
-    return range.random()!
+    return range.random(using: generator)!
   }
 }
 

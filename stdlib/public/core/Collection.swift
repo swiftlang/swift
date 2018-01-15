@@ -62,7 +62,7 @@ public typealias Indexable = Collection
 ///             default: fatalError("Index out of bounds.")
 ///             }
 ///         }
-///
+///         
 ///         func index(after i: Int) -> Int {
 ///             precondition(i < endIndex, "Can't advance beyond endIndex")
 ///             return i + 1
@@ -363,7 +363,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
-
+ 
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
@@ -452,10 +452,10 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : Collection = DefaultIndices<Self>
-    where Indices.Element == Index,
+    where Indices.Element == Index, 
           Indices.Index == Index,
           Indices.SubSequence == Indices
-
+        
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
@@ -549,7 +549,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
   /// The following example searches for the index of the number `40` in an
   /// array of integers, and then prints the prefix of the array up to, and
   /// including, that index:
@@ -607,7 +607,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   var count: Int { get }
-
+  
   // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
   /// Returns `Optional(Optional(index))` if an element was found
@@ -620,7 +620,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// The first element of the collection.
   ///
   /// If the collection is empty, the value of this property is `nil`.
-  ///
+  /// 
   ///     let numbers = [10, 20, 30, 40, 50]
   ///     if let firstNumber = numbers.first {
   ///         print(firstNumber)
@@ -794,7 +794,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     if let randomNumber = numbers.random() {
   ///         print(randomNumber)
   ///     }
-  ///     // Could print "20"
+  ///     // Could print "20", perhaps
   func random(using generator: RandomNumberGenerator) -> Element?
 
   @available(*, deprecated, message: "all index distances are now of type Int")
@@ -1184,7 +1184,7 @@ extension Collection {
       return i.next()
     }
   }
-
+  
   // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   ///
@@ -1337,7 +1337,7 @@ extension Collection {
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-
+  
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1354,7 +1354,7 @@ extension Collection {
     var start = startIndex
     while try start != endIndex && predicate(self[start]) {
       formIndex(after: &start)
-    }
+    } 
     return self[start..<endIndex]
   }
 
@@ -1383,7 +1383,7 @@ extension Collection {
       offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-
+  
   /// Returns a subsequence containing the initial elements until `predicate`
   /// returns `false` and skipping the remaining elements.
   ///
@@ -1513,7 +1513,7 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
   /// The following example searches for the index of the number `40` in an
   /// array of integers, and then prints the prefix of the array up to, and
   /// including, that index:

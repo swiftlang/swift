@@ -46,6 +46,7 @@ extension RandomNumberGenerator {
   ///
   /// This differs from next() as this function has the ability to transform the
   /// generated number to any unsigned integer.
+  @_inlineable
   public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     return T(truncatingIfNeeded: self.next())
   }
@@ -58,6 +59,7 @@ extension RandomNumberGenerator {
   ///
   /// This uses the uniform distribution to form a random number within the
   /// upperBound.
+  @_inlineable
   public func next<T: FixedWidthInteger & UnsignedInteger>(upperBound: T) -> T {
     let range = T.max % upperBound
     var random: T = 0
@@ -99,10 +101,9 @@ public struct Random : RandomNumberGenerator {
   /// Produces the next randomly generated number
   ///
   /// - Returns: A number that was randomly generated
-  @_inlineable
   public func next() -> UInt64 {
     var random: UInt64 = 0
-    _stdlib_random(&random, MemoryLayout<UInt64>.size, _fatalErrorFlags())
+    _stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
 }
