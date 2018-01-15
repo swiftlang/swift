@@ -1040,9 +1040,7 @@ public struct ${Self}<Element> {
 }
 
 extension ${Self}: ${SelfProtocol} {
-  public typealias Indices
-    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
-
+  public typealias Indices = DefaultIndices<${Self}>
   public typealias Iterator = AnyIterator<Element>
   public typealias Index = AnyIndex
   public typealias SubSequence = ${Self}<Element> 

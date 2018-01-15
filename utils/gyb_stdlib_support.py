@@ -39,18 +39,6 @@ def protocolsForCollectionFeatures(traversal, mutable, rangeReplaceable):  # noq
         protocols.append('RangeReplaceableCollection')
     return protocols
 
-
-def defaultIndicesForTraversal(traversal):  # noqa (N802)
-    if traversal == 'Forward':
-        return 'DefaultIndices'
-    elif traversal == 'Bidirectional':
-        return 'DefaultBidirectionalIndices'
-    elif traversal == 'RandomAccess':
-        return 'DefaultRandomAccessIndices'
-    else:
-        raise ValueError("Unknown traversal %r" % traversal)
-
-
 def documentationNameForTraversal(traversal):  # noqa (N802)
     if traversal == 'Forward':
         return 'collection'

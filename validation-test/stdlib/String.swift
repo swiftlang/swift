@@ -66,7 +66,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-UTF16View") {
@@ -86,7 +86,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-CharacterView") {
@@ -96,7 +96,7 @@ StringTests.test("AssociatedTypes-CharacterView") {
     iteratorType: IndexingIterator<View>.self,
     subSequenceType: View.self,
     indexType: View.Index.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 func checkUnicodeScalarViewIteration(
