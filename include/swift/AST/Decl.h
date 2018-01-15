@@ -3079,6 +3079,11 @@ public:
     return result;
   }
 
+  /// If this enum has a unique element, return it. A unique element can
+  /// either hold a value or not, and the existence of one unique element does
+  /// not imply the existence or non-existence of the opposite unique element.
+  EnumElementDecl *getUniqueElement(bool hasValue) const;
+
   /// Return a range that iterates over all the cases of an enum.
   CaseRange getAllCases() const {
     return CaseRange(getMembers());
@@ -6520,6 +6525,20 @@ inline DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
 #include "swift/AST/DeclNodes.def"
     return const_cast<DeclContext *>(DC);
   }
+}
+
+inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
+  EnumElementDecl *result = nullptr;
+  bool found = false;
+  for (auto elt : getAllElements()) {
+    if (elt->hasAssociatedValues() == hasValue) {
+      if (found)
+        return nullptr;
+      found = true;
+      result = elt;
+    }
+  }
+  return result;
 }
 
 } // end namespace swift
