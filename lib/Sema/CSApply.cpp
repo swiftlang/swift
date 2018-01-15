@@ -7618,8 +7618,7 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
                              return getType(expr);
                            },
                            [&](Expr *expr, Type type) {
-                             expr->setType(type);
-                             cacheType(expr);
+                             setType(expr, type);
                            });
 }
 
