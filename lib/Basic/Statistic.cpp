@@ -49,8 +49,10 @@ makeFileName(StringRef Prefix,
   std::string tmp;
   raw_string_ostream stream(tmp);
   auto now = std::chrono::system_clock::now();
+  auto dur = now.time_since_epoch();
+  auto usec = std::chrono::duration_cast<std::chrono::microseconds>(dur);
   stream << Prefix
-         << "-" << now.time_since_epoch().count()
+         << "-" << usec.count()
          << "-" << ProgramName
          << "-" << AuxName
          << "-" << Process::GetRandomNumber()
