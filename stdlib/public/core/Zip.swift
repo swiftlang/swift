@@ -189,6 +189,7 @@ public func zip<Collection1, Collection2>(
   return Zip2Collection(collection1, collection2)
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 public struct Zip2Collection<Collection1 : Collection, Collection2 : Collection> {
   @_versioned // FIXME(sil-serialize-all)
   internal let _collection1: Collection1
@@ -197,9 +198,7 @@ public struct Zip2Collection<Collection1 : Collection, Collection2 : Collection>
   
   /// Creates an instance that makes pairs of elements from `collection1` and
   /// `collection2`.
-  // FIXME: this should be inlineable, but this results in a compilation error:
-  // "error: 'let' property '_collection1' may not be initialized directly; use "self.init(...)" or "self = ..." instead"
-  // @_inlineable // FIXME(sil-serialize-all)
+  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_ collection1: Collection1, _ collection2: Collection2) {
     self._collection1 = collection1
@@ -219,6 +218,7 @@ extension Zip2Collection: Sequence {
 }
 
 extension Zip2Collection {
+  @_fixed_layout
   public struct Index {
     @_versioned // FIXME(sil-serialize-all)
     internal var _index1: Collection1.Index
@@ -227,9 +227,7 @@ extension Zip2Collection {
     
     /// Creates an instance that makes pairs of elements from `index1` and
     /// `index2`.
-    // FIXME: this should be inlineable, but this results in a compilation 
-    // error similar to the one for Zip2Collection.init above
-    // @_inlineable // FIXME(sil-serialize-all)
+    @_inlineable // FIXME(sil-serialize-all)
     @_versioned
     internal init(_ index1: Collection1.Index, _ index2: Collection2.Index) {
       self._index1 = index1
