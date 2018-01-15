@@ -12,29 +12,36 @@
 ///
 /// This file defines x-macros used for metaprogramming with lexer tokens.
 ///
-/// KEYWORD(kw)
-///   SWIFT_KEYWORD(kw)
-///     DECL_KEYWORD(kw)
-///     STMT_KEYWORD(kw)
-///     EXPR_KEYWORD(kw)
-///     PAT_KEYWORD(kw)
-///   SIL_KEYWORD(kw)
-/// POUND_KEYWORD(kw)
-///   POUND_OBJECT_LITERAL(kw, desc, proto)
-///   POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
-///   POUND_CONFIG(kw)
-/// PUNCTUATOR(name, str)
-/// LITERAL(name)
-/// MISC(name)
+/// TOKEN(name)
+///   KEYWORD(kw)
+///     SWIFT_KEYWORD(kw)
+///       DECL_KEYWORD(kw)
+///       STMT_KEYWORD(kw)
+///       EXPR_KEYWORD(kw)
+///       PAT_KEYWORD(kw)
+///     SIL_KEYWORD(kw)
+///   POUND_KEYWORD(kw)
+///     POUND_OBJECT_LITERAL(kw, desc, proto)
+///     POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///     POUND_CONFIG(kw)
+///   PUNCTUATOR(name, str)
+///   LITERAL(name)
+///   MISC(name)
 ///
 //===----------------------------------------------------------------------===//
+
+/// TOKEN(name)
+///   Expands by default for every token kind.
+#ifndef TOKEN
+#define TOKEN(name)
+#endif
 
 /// KEYWORD(kw)
 ///   Expands by default for every Swift keyword and every SIL keyword, such as
 ///   'if', 'else', 'sil_global', etc. If you only want to use Swift keywords
 ///   see SWIFT_KEYWORD.
 #ifndef KEYWORD
-#define KEYWORD(kw)
+#define KEYWORD(kw) TOKEN(kw_ ## kw)
 #endif
 
 /// SWIFT_KEYWORD(kw)
@@ -78,7 +85,7 @@
 /// POUND_KEYWORD(kw)
 ///   Every keyword prefixed with a '#'.
 #ifndef POUND_KEYWORD
-#define POUND_KEYWORD(kw)
+#define POUND_KEYWORD(kw) TOKEN(pound_ ## kw)
 #endif
 
 /// POUND_OBJECT_LITERAL(kw, desc, proto)
@@ -107,19 +114,19 @@
 ///   \param str   A string literal containing the spelling of the punctuator,
 ///                such as '"("' or '"->"'.
 #ifndef PUNCTUATOR
-#define PUNCTUATOR(name, str)
+#define PUNCTUATOR(name, str) TOKEN(name)
 #endif
 
 /// LITERAL(name)
 ///   Tokens representing literal values, e.g. 'integer_literal'.
 #ifndef LITERAL
-#define LITERAL(name)
+#define LITERAL(name) TOKEN(name)
 #endif
 
 /// MISC(name)
 ///   Miscellaneous tokens, e.g. 'eof' and 'unknown'.
 #ifndef MISC
-#define MISC(name)
+#define MISC(name) TOKEN(name)
 #endif
 
 // Keywords that start decls.
@@ -291,6 +298,7 @@ MISC(string_quote)
 MISC(multiline_string_quote)
 MISC(string_segment)
 
+#undef TOKEN
 #undef KEYWORD
 #undef SWIFT_KEYWORD
 #undef DECL_KEYWORD
