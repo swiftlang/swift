@@ -114,10 +114,6 @@ struct SILDeclRef {
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
 
-    /// GlobalGetter - this constant references the lazy-initializing
-    /// getter for the global VarDecl.
-    GlobalGetter,
-
     /// References the generator for a default argument of a function.
     DefaultArgGenerator,
 
@@ -245,7 +241,7 @@ struct SILDeclRef {
   }
   /// True if the SILDeclRef references a global variable accessor.
   bool isGlobal() const {
-    return kind == Kind::GlobalAccessor || kind == Kind::GlobalGetter;
+    return kind == Kind::GlobalAccessor;
   }
   /// True if the SILDeclRef references the generator for a default argument of
   /// a function.

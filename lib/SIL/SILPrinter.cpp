@@ -344,9 +344,6 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::GlobalAccessor:
     OS << "!globalaccessor";
     break;
-  case SILDeclRef::Kind::GlobalGetter:
-    OS << "!globalgetter";
-    break;
   case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "!defaultarg" << "." << defaultArgIndex;
     break;

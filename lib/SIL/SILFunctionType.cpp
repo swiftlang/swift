@@ -1267,7 +1267,6 @@ static CanSILFunctionType getNativeSILFunctionType(
       LLVM_FALLTHROUGH;
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
-    case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
@@ -1796,7 +1795,6 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
@@ -2031,7 +2029,6 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
 
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
-    case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
       return SILFunctionTypeRepresentation::Thin;
@@ -2552,7 +2549,6 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::IVarInitializer:

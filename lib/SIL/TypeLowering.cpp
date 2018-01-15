@@ -1720,12 +1720,6 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType);
 }
 
-/// Get the type of a global variable getter function.
-static CanAnyFunctionType getGlobalGetterType(CanType varType) {
-  ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get(TupleType::getEmpty(C), varType);
-}
-
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
@@ -1920,12 +1914,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
            "constant ref to computed global var");
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
-  case SILDeclRef::Kind::GlobalGetter: {
-    VarDecl *var = cast<VarDecl>(vd);
-    assert(var->hasStorage() &&
-           "constant ref to computed global var");
-    return getGlobalGetterType(var->getInterfaceType()->getCanonicalType());
-  }
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(*this,
                                                cast<AbstractFunctionDecl>(vd),
@@ -1977,9 +1965,7 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter: {
     return vd->getDeclContext()->getGenericEnvironmentOfContext();
-  }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return cast<ClassDecl>(vd)->getGenericEnvironmentOfContext();

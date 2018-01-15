@@ -1038,20 +1038,6 @@ void SILGenModule::emitGlobalAccessor(VarDecl *global,
   });
 }
 
-void SILGenModule::emitGlobalGetter(VarDecl *global,
-                                    SILGlobalVariable *onceToken,
-                                    SILFunction *onceFunc) {
-  SILDeclRef accessor(global, SILDeclRef::Kind::GlobalGetter);
-  emitOrDelayFunction(*this, accessor,
-                      [this,accessor,global,onceToken,onceFunc](SILFunction *f){
-    preEmitFunction(accessor, global, f, global);
-    PrettyStackTraceSILFunction X("silgen emitGlobalGetter", f);
-    SILGenFunction(*this, *f)
-      .emitGlobalGetter(global, onceToken, onceFunc);
-    postEmitFunction(accessor, f);
-  });
-}
-
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
