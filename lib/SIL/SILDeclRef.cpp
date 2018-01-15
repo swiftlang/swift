@@ -650,10 +650,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                         /*isStatic*/ false,
                                         SKind);
 
-  case SILDeclRef::Kind::GlobalGetter:
-    assert(!isCurried);
-    return mangler.mangleGlobalGetterEntity(getDecl(), SKind);
-
   case SILDeclRef::Kind::DefaultArgGenerator:
     assert(!isCurried);
     return mangler.mangleDefaultArgumentEntity(
