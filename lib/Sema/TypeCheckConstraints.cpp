@@ -2854,7 +2854,15 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())
     return expr;
-  
+
+  // Walk into force optionals and coerce the source.
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+    auto sub = coerceToRValue(FVE->getSubExpr(), getType, setType);
+    FVE->setSubExpr(sub);
+    setType(FVE, getType(sub)->getAnyOptionalObjectType());
+    return FVE;
+  }
+
   // Load lvalues.
   if (auto lvalue = exprTy->getAs<LValueType>()) {
     expr->propagateLValueAccessKind(AccessKind::Read, getType);
