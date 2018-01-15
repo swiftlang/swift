@@ -1372,8 +1372,9 @@ public:
                 Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+    // FIXME: When the work to force MUI to be on Allocations/SILArguments
+    // complete, turn on this assertion.
 #if 0
-    // This will be turned back on in a couple of commits.
     require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
             "Mark Uninitialized should always be on the storage location");
 #endif
