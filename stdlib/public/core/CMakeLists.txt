@@ -53,7 +53,6 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
-  Existential.swift
   Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift

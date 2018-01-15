@@ -14,7 +14,7 @@ protocol AnyCodeUnits_ {
 
 struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
   let me: AnyCodeUnits_
-  typealias Indices = DefaultRandomAccessIndices<AnyCodeUnits>
+  typealias Indices = DefaultIndices<AnyCodeUnits>
   var startIndex: Int64 { return me.startIndex }
   var endIndex: Int64 { return me.endIndex }
   func index(after i: Index) -> Index { return me.index(after: i) }
