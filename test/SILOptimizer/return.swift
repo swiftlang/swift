@@ -97,7 +97,7 @@ func whileLoop(flag: Bool) -> Int {
 struct S {}
 extension S:ExpressibleByStringLiteral {
   init!(stringLiteral:String) {
-  } // expected-error {{missing return in a function expected to return 'S!'}}
+  } // expected-error {{missing return in a function expected to return 'S?'}}
 }
 
 func whileTrueLoop() -> Int {

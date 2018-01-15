@@ -414,7 +414,7 @@ class FailableBaseClass {
 
   // IUO to optional
   //
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC21failDuringDelegation2SQyACGyt_tcfc : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass> {
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfc : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass> {
   // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableBaseClass):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -438,7 +438,7 @@ class FailableBaseClass {
   //
   // CHECK: [[EPILOG_BB]]([[WRAPPED_RESULT:%.*]] : @owned $Optional<FailableBaseClass>):
   // CHECK:   return [[WRAPPED_RESULT]]
-  // CHECK: } // end sil function '$S21failable_initializers17FailableBaseClassC21failDuringDelegation2SQyACGyt_tcfc'
+  // CHECK: } // end sil function '$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfc'
   convenience init!(failDuringDelegation2: ()) {
     self.init(failBeforeFullInitialization: ())! // unnecessary-but-correct '!'
   }

@@ -4083,7 +4083,9 @@ class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
   ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)
     : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
-                           properties) {}
+                           properties) {
+    //llvm_unreachable("ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
+  }
 
 public:
   /// Return a uniqued optional type with the specified base type.

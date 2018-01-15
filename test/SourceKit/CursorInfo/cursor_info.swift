@@ -407,7 +407,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // RUN: %sourcekitd-test -req=cursor -pos=75:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK30
 // CHECK30: source.lang.swift.decl.function.constructor (75:3-75:16)
 // CHECK30-NEXT: init(x:)
-// CHECK30-NEXT: s:11cursor_info2C3C1xSQyACGSi_tcfc
+// CHECK30-NEXT: s:11cursor_info2C3C1xACSgSi_tcfc
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3!
 // CHECK30-NEXT: $S1xSQy11cursor_info2C3CGSi_tcD
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
