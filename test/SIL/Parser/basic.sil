@@ -1,7 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false | %FileCheck %s
-//
-// FIXME: Enable sil-verify-all in both commands above:
-//        SIL Parsing fails on vtables: <rdar://problem/24060338> Identify problems with textual SIL and fix them.
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -1160,7 +1157,7 @@ class Foo {
   init()
 }
 
-sil @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Foo) -> Int32 {
+sil @Foo_subscript_getter : $@convention(method) (Int32, Int32, @guaranteed Foo) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int32  // var x               // users: %17, %6
@@ -1172,14 +1169,13 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %10 = metatype $@thin Int32.Type
   %12 = integer_literal $Builtin.Int32, 0         // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
-  destroy_addr %8 : $*Foo
   dealloc_stack %8 : $*Foo
   dealloc_stack %5 : $*Int32
   dealloc_stack %4 : $*Int32
   return %13 : $Int32
 }
 
-sil @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
+sil @Foo_subscript_setter : $@convention(method) (Int32, Int32, Int32, @guaranteed Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value           // users: %16, %5
   store %0 to %4 : $*Int32
@@ -1189,7 +1185,6 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   store %2 to %7 : $*Int32
   %10 = alloc_stack $Foo  // var self             // users: %13, %12, %11
   store %3 to %10 : $*Foo
-  destroy_addr %10 : $*Foo
   dealloc_stack %10 : $*Foo
   dealloc_stack %7 : $*Int32
   dealloc_stack %6 : $*Int32
@@ -1638,12 +1633,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: {{.*}} : @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden @Foo_subscript_getter
+// CHECK: #Foo.subscript!setter.1: {{.*}} : @Foo_subscript_setter
 // CHECK: }
 sil_vtable Foo {
-  // Override the linke to check if it is parsed correctly.
-  #Foo.subscript!getter.1: hidden @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  // Override the linkage to check if it is parsed correctly.
+  #Foo.subscript!getter.1: hidden @Foo_subscript_getter
   // The public linkage is the same as the function's linkage and should not be printed.
-  #Foo.subscript!setter.1: public @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!setter.1: public @Foo_subscript_setter
 }

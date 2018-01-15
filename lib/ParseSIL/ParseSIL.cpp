@@ -1310,9 +1310,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "globalaccessor") {
         Kind = SILDeclRef::Kind::GlobalAccessor;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "globalgetter") {
-        Kind = SILDeclRef::Kind::GlobalGetter;
-        ParseState = 1;
       } else if (!ParseState && Id.str() == "ivardestroyer") {
         Kind = SILDeclRef::Kind::IVarDestroyer;
         ParseState = 1;

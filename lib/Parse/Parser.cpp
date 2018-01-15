@@ -143,7 +143,7 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     bool Parsed = false;
-    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (isa<AccessorDecl>(AFD)) {
       TheParser.parseAccessorBodyDelayed(AFD);
       Parsed = true;
     }
