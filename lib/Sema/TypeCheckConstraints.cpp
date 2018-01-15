@@ -540,10 +540,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         D->getDeclContext()->isLocalContext() &&
         D->getDeclContext() == DC &&
         Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
-      if (!D->isInvalid()) {
-        diagnose(Loc, diag::use_local_before_declaration, Name);
-        diagnose(D, diag::decl_declared_here, Name);
-      }
+      diagnose(Loc, diag::use_local_before_declaration, Name);
+      diagnose(D, diag::decl_declared_here, Name);
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
