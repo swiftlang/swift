@@ -19,6 +19,7 @@
 
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/TypeBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
@@ -113,6 +114,31 @@ static std::pair<SILType, const TypeInfo &>
 getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
   auto lowered = IGM.getLoweredType(unloweredType);
   return {lowered, IGM.getTypeInfo(lowered)};
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Injects printf + abort function calls to abort with an error message.
+static void abortOnTFOpBuiltin(IRGenFunction &IGF, llvm::StringRef errMessage) {
+  auto &llvmModule = IGF.IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+  auto printfFunc = llvmModule.getOrInsertFunction(
+      "printf", llvm::TypeBuilder<int(char *, ...), false>::get(llvmContext));
+  auto strConstant =
+      llvm::ConstantDataArray::getString(llvmContext, errMessage);
+  auto GVStr =
+      new llvm::GlobalVariable(llvmModule, strConstant->getType(), true,
+                               llvm::GlobalValue::InternalLinkage, strConstant);
+  llvm::Constant *zero = llvm::Constant::getNullValue(
+      llvm::IntegerType::getInt32Ty(llvmContext));
+  llvm::Constant *zeroes[] = {zero, zero};
+  llvm::Constant *strVal = llvm::ConstantExpr::getGetElementPtr(
+      GVStr->getValueType(), GVStr, zeroes, true);
+  IGF.Builder.CreateCall(printfFunc, {strVal});
+
+  auto abortFunc = llvmModule.getOrInsertFunction(
+      "abort", llvm::FunctionType::get(
+                   llvm::Type::getVoidTy(llvmContext), {}, false));
+  IGF.Builder.CreateCall(abortFunc, {});
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
@@ -960,11 +986,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // TFOp builtins are never actually used at runtime: they are always
     // extracted out of the program to a TensorFlow graph.  However, they do
     // make it here when building the TensorFlow module itself.  For those
-    // cases, we produce an unreachable instruction.  We can't easily do that
-    // directly, so we produce a store of undef -> undef.
-    IGF.Builder.CreateStore(llvm::UndefValue::get(IGF.IGM.Int8Ty),
-                            llvm::UndefValue::get(IGF.IGM.Int8PtrTy),
-                            Alignment());
+    // cases, we abort here with an error message.
+    const string errMessage = "!!! Compiler bug -- Tensor op builtin " +
+                              FnId.str().str() +
+                              " cannot be lowered to LLVM IR !!!\n";
+    abortOnTFOpBuiltin(IGF, errMessage.c_str());
+
     (void)args.claimAll();
     // Finally, we set up our explosion results full of undef values.
     ExplosionSchema schema = IGF.getTypeInfo(resultType).getSchema();
