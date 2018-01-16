@@ -376,6 +376,11 @@ SIMPLE_DECL_ATTR(_usableFromInline, UsableFromInlineImport,
   OnImport | UserInaccessible,
   77)
 
+// FIXME: Make it serialized
+DECL_ATTR(differentiable, TFGradient,
+          OnFunc | LongAttribute | NotSerialized,
+          /* Not serialized */ 78)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

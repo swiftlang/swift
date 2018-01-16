@@ -5769,6 +5769,9 @@ public:
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
 
+    // TF_ENABLE_TENSORFLOW
+    UNINTERESTING_ATTR(TFGradient)
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
