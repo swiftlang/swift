@@ -161,7 +161,7 @@ func makeGenericMetatypes() {
 // CHECK-NEXT:  [[T0_AS_VOIDPTR:%.*]] = bitcast %swift.type* [[T0]] to i8*
 // CHECK-NEXT:  store i8* [[T0_AS_VOIDPTR]], i8** [[SLOT_3]]
 // CHECK-NEXT:  [[BUFFER_PTR:%.*]] = bitcast [4 x i8*]* [[BUFFER]] to i8**
-// CHECK-NEXT:   call %swift.type* @"$S17generic_metatypes8FourArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8** [[BUFFER_PTR]]) [[NOUNWIND_READNONE]]
+// CHECK-NEXT:   call %swift.type* @"$S17generic_metatypes8FourArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
 // CHECK: call void @llvm.lifetime.end.p0i8
 
 // CHECK: define linkonce_odr hidden %swift.type* @"$S17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMa"() [[NOUNWIND_READNONE_OPT]]
@@ -176,3 +176,4 @@ func makeGenericMetatypes() {
 
 // CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK: attributes [[NOUNWIND_ARGMEM]] = { inaccessiblemem_or_argmemonly nounwind }

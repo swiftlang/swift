@@ -1200,7 +1200,9 @@ llvm::CallInst *IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   auto call = Builder.CreateCall(accessFunction, callArgs);
   call->setDoesNotThrow();
   call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
+                     allocatedArgsBuffer
+                       ? llvm::Attribute::InaccessibleMemOrArgMemOnly
+                       : llvm::Attribute::ReadNone);
 
   // If we allocated a buffer for the arguments, end it's lifetime.
   if (allocatedArgsBuffer)
