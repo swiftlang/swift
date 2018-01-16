@@ -213,7 +213,6 @@ struct SILDeclRef {
   enum class ManglingKind {
     Default,
     DynamicThunk,
-    SwiftDispatchThunk,
   };
 
   /// Produce a mangled form of this constant.

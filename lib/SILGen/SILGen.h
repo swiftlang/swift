@@ -149,14 +149,6 @@ public:
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
 
-  /// Get the function for a dispatch thunk, creating it if necessary.
-  SILFunction *getDispatchThunk(SILDeclRef constant,
-                                ForDefinition_t forDefinition);
-
-  /// Emit a native Swift class or protocol method dispatch thunk, used for
-  /// resilient method dispatch.
-  SILFunction *emitDispatchThunk(SILDeclRef constant);
-
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);

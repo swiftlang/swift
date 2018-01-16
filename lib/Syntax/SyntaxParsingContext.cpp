@@ -53,15 +53,15 @@ RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF,
                                            DiagnosticEngine &Diags)
-    : RootDataOrParent(new RootContextData(SF, Diags)),
-      CtxtHolder(CtxtHolder), Mode(AccumulationMode::Root),
+    : RootDataOrParent(new RootContextData(SF, Diags)), CtxtHolder(CtxtHolder),
+      Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
       Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
 }
 
 /// Add RawSyntax to the parts.
 void SyntaxParsingContext::addRawSyntax(RC<RawSyntax> Raw) {
-  Parts.emplace_back(Raw);
+  Storage.emplace_back(Raw);
 }
 
 SyntaxParsingContext *SyntaxParsingContext::getRoot() {
@@ -90,14 +90,17 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
-  assert(N >= 1);
+  if (N == 0) {
+    Storage.push_back(createSyntaxAs(Kind, {}));
+    return;
+  }
 
-  auto I = Parts.end() - N;
-  *I = createSyntaxAs(Kind, llvm::makeArrayRef(Parts).take_back(N));
+  auto I = Storage.end() - N;
+  *I = createSyntaxAs(Kind, getParts().take_back(N));
 
-  // Remove used parts.
+  // Remove consumed parts.
   if (N != 1)
-    Parts.erase(I + 1, Parts.end());
+    Storage.erase(I + 1, Storage.end());
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
@@ -123,7 +126,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
   case SyntaxKind::FunctionCallExpr:
   case SyntaxKind::SubscriptExpr:
   case SyntaxKind::ExprList: {
-    createNodeInPlace(Kind, Parts.size());
+    createNodeInPlace(Kind, getParts().size());
     break;
   }
   default:
@@ -136,14 +139,16 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind) {
   assert(isTopOfContextStack());
   if (!Enabled)
     return;
-  auto Count = std::count_if(Parts.rbegin(), Parts.rend(),
-                             [&](const RC<RawSyntax> &Raw) {
-    return SyntaxFactory::canServeAsCollectionMember(ColletionKind,
-                                                     make<Syntax>(Raw));
-  });
-  if (Count) {
-    createNodeInPlace(ColletionKind, Count);
+  auto Parts = getParts();
+  auto Count = 0;
+  for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
+    if (!SyntaxFactory::canServeAsCollectionMember(ColletionKind,
+                                                   make<Syntax>(*I)))
+      break;
+    ++Count;
   }
+  if (Count)
+    createNodeInPlace(ColletionKind, Count);
 }
 
 namespace {
@@ -257,28 +262,39 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   switch (Mode) {
   // Create specified Syntax node from the parts and add it to the parent.
   case AccumulationMode::CreateSyntax:
-    getParent()->addRawSyntax(createSyntaxAs(SynKind, Parts));
+    assert(!isRoot());
+    createNodeInPlace(SynKind, Storage.size() - Offset);
     break;
 
   // Ensure the result is specified Syntax category and add it to the parent.
-  case AccumulationMode::CoerceKind:
-    getParent()->addRawSyntax(bridgeAs(CtxtKind, Parts));
-    break;
-
-  // Just move the parts to the tail of the parent.
-  case AccumulationMode::Transparent:
-    std::move(Parts.begin(), Parts.end(), std::back_inserter(getParent()->Parts));
-    break;
-
-  // Do nothing. Just let it discarded.
-  case AccumulationMode::Discard:
+  case AccumulationMode::CoerceKind: {
     assert(!isRoot());
+    if (Storage.size() == Offset) {
+      Storage.push_back(bridgeAs(CtxtKind, {}));
+    } else {
+      auto I = Storage.begin() + Offset;
+      *I = bridgeAs(CtxtKind, getParts());
+      // Remove used parts.
+      if (Storage.size() > Offset + 1)
+        Storage.erase(Storage.begin() + (Offset + 1), Storage.end());
+    }
+    break;
+  }
+
+  // Do nothing.
+  case AccumulationMode::Transparent:
+    assert(!isRoot());
+    break;
+
+  // Remove all parts in this context.
+  case AccumulationMode::Discard:
+    Storage.resize(Offset);
     break;
 
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
     assert(isRoot() && "AccumulationMode::Root is only for root context");
-    finalizeSourceFile(getRootData().SF, Parts);
+    finalizeSourceFile(getRootData().SF, getParts());
     break;
 
   // Never.

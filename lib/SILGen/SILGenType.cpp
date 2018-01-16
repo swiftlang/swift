@@ -265,16 +265,6 @@ public:
     auto result = baseToIndexMap.insert(std::make_pair(member, index));
     assert(result.second);
     (void) result;
-
-    // Emit a method dispatch thunk if the method is public and the
-    // class is resilient.
-    auto *func = cast<AbstractFunctionDecl>(member.getDecl());
-    if (func->getDeclContext() == theClass) {
-      if (isResilient &&
-          func->getEffectiveAccess() >= AccessLevel::Public) {
-        SGM.emitDispatchThunk(member);
-      }
-    }
   }
 
   void addPlaceholder(MissingMemberDecl *m) {

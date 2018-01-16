@@ -19,10 +19,12 @@
 #include "Callee.h"
 #include "Explosion.h"
 #include "GenDecl.h"
+#include "GenMeta.h"
 #include "GenOpaque.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "ProtocolInfo.h"
 #include "Signature.h"
 #include "swift/IRGen/Linking.h"
@@ -52,11 +54,43 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
 
 static FunctionPointer lookupMethod(IRGenFunction &IGF,
                                     SILDeclRef declRef) {
-  // Find the witness table.
-  llvm::Value *wtable = (IGF.CurFn->arg_end() - 1);
+  auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
 
-  // Find the witness we're interested in.
-  return emitWitnessMethodValue(IGF, wtable, declRef);
+  // Protocol case.
+  if (isa<ProtocolDecl>(decl->getDeclContext())) {
+    // Find the witness table.
+    llvm::Value *wtable = (IGF.CurFn->arg_end() - 1);
+
+    // Find the witness we're interested in.
+    return emitWitnessMethodValue(IGF, wtable, declRef);
+  }
+
+  // Class case.
+  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(declRef);
+
+  // Load the metadata, or use the 'self' value if we have a static method.
+  llvm::Value *self;
+
+  // Non-throwing class methods always have the 'self' parameter at the end.
+  // Throwing class methods have 'self' right before the error parameter.
+  //
+  // FIXME: Should find a better way of expressing this.
+  if (funcTy->hasErrorResult())
+    self = (IGF.CurFn->arg_end() - 2);
+  else
+    self = (IGF.CurFn->arg_end() - 1);
+
+  auto selfTy = funcTy->getSelfParameter().getSILStorageType();
+
+  llvm::Value *metadata;
+  if (selfTy.is<MetatypeType>()) {
+    metadata = self;
+  } else {
+    metadata = emitHeapMetadataRefForHeapObject(IGF, self, selfTy,
+                                                /*suppress cast*/ true);
+  }
+
+  return emitVirtualMethodValue(IGF, metadata, declRef, funcTy);
 }
 
 llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
