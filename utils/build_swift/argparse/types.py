@@ -113,7 +113,6 @@ class PathType(object):
     def __call__(self, path):
         path = os.path.expanduser(path)
         path = os.path.abspath(path)
-        path = os.path.realpath(path)
 
         if self._assert_exists and not os.path.exists(path):
             raise ArgumentTypeError('{} does not exists'.format(path))
