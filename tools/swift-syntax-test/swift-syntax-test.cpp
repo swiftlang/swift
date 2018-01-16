@@ -44,6 +44,7 @@ enum class ActionType {
   FullParseRoundTrip,
   SerializeRawTree,
   ParserGen,
+  EOFPos,
   None
 };
 
@@ -72,7 +73,12 @@ Action(llvm::cl::desc("Action (required):"),
         clEnumValN(ActionType::SerializeRawTree,
                    "serialize-raw-tree",
                    "Parse the source file and serialize the raw tree"
-                   "to JSON")));
+                   "to JSON"),
+        clEnumValN(ActionType::EOFPos,
+                   "eof",
+                   "Parse the source file, calculate the absolute position"
+                   "of the EOF token, and dump the buffer from the start of the"
+                   "file to the EOF token")));
 
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
@@ -239,6 +245,21 @@ int dumpParserGen(const char *MainExecutablePath,
   return 0;
 }
 
+int dumpEOFSourceLoc(const char *MainExecutablePath,
+                     const StringRef InputFileName) {
+  CompilerInstance Instance;
+  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
+  auto BufferId = *SF->getBufferID();
+  SyntaxPrintOptions Opts;
+  auto Root = SF->getSyntaxRoot();
+  auto Offset = Root.getEOFToken().getAbsolutePosition(Root).getOffset();
+  SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
+  auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
+  auto EndLoc = SourceMgr.getLocForOffset(BufferId, Offset);
+  llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
+  return 0;
+}
+
 }// end of anonymous namespace
 
 int main(int argc, char *argv[]) {
@@ -271,6 +292,9 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::ParserGen:
     ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
+    break;
+  case ActionType::EOFPos:
+    ExitCode = dumpEOFSourceLoc(argv[0], options::InputSourceFilename);
     break;
   case ActionType::None:
     llvm::errs() << "an action is required\n";

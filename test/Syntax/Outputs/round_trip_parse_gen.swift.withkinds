@@ -2,6 +2,8 @@
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
+// RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
 
 import <AccessPathComponent>ABC</AccessPathComponent></ImportDecl><ImportDecl>
 import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B.</AccessPathComponent><AccessPathComponent>C</AccessPathComponent></ImportDecl><ImportDecl><Attribute>

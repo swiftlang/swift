@@ -286,10 +286,6 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
 
   bool isUnknown() const { return isUnknownKind(Kind); }
 
-  /// Get the absolute position of this raw syntax: its offset, line,
-  /// and column.
-  AbsolutePosition getAbsolutePosition(RC<RawSyntax> Root) const;
-
   /// Return a new raw syntax node with the given new layout element appended
   /// to the end of the node's layout.
   RC<RawSyntax> append(RC<RawSyntax> NewLayoutElement) const;
@@ -320,10 +316,6 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
 
   /// Dump this piece of syntax recursively.
   void dump(llvm::raw_ostream &OS, unsigned Indent) const;
-
-private:
-  bool accumulateAbsolutePosition(AbsolutePosition &Pos,
-                                  const RawSyntax *UpToTargetNode) const;
 };
 
 } // end namespace syntax
