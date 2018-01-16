@@ -40,6 +40,8 @@ struct SyntaxVisitor {
 
   virtual void visit(TokenSyntax token) {}
 
+  virtual void visitPre(Syntax node) {}
+  virtual void visitPost(Syntax node) {}
   void visit(Syntax node);
 
   void visitChildren(Syntax node) {

@@ -38,6 +38,7 @@ class SyntaxASTMap;
 namespace syntax {
 
 struct SyntaxVisitor;
+class SourceFileSyntax;
 
 template <typename SyntaxNode>
 SyntaxNode make(RC<RawSyntax> Raw) {
@@ -177,6 +178,10 @@ public:
 
   /// Recursively visit this node.
   void accept(SyntaxVisitor &Visitor);
+
+  /// Get the absolute position of this raw syntax: its offset, line,
+  /// and column.
+  AbsolutePosition getAbsolutePosition(SourceFileSyntax Root) const;
 
   // TODO: hasSameStructureAs ?
 };
