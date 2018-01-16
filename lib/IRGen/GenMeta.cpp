@@ -360,10 +360,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                                          genericArgs.Types,
                                                          NotForDefinition);
 
-  auto result = IGF.Builder.CreateCall(accessor, genericArgs.Values);
-  result->setDoesNotThrow();
-  result->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadNone);
+  auto result =
+    IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, genericArgs.Values);
 
   IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
                              result);
@@ -1156,6 +1154,63 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   IGF.Builder.CreateRet(phi);
 }
 
+llvm::CallInst *IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+                                              llvm::Function *accessFunction,
+                                              ArrayRef<llvm::Value *> args) {
+
+  ArrayRef<llvm::Value *> callArgs;
+  llvm::Value *callArgsVec[NumDirectGenericTypeMetadataAccessFunctionArgs + 1];
+  Address argsBuffer;
+  bool allocatedArgsBuffer = false;
+  if (args.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    // Copy direct arguments.
+    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs)) {
+      callArgsVec[i] = args[i];
+    }
+
+    // Allocate an array to pass the remaining arguments. Note that the
+    // buffer is allocated for the whole length so the callee can fill in
+    // the direct arguments and use the buffer.
+    auto argsBufferTy = llvm::ArrayType::get(IGM.Int8PtrTy, args.size());
+    argsBuffer = createAlloca(argsBufferTy, IGM.getPointerAlignment());
+
+    // Mark the beginning of the array lifetime.
+    Builder.CreateLifetimeStart(argsBuffer,
+                                IGM.getPointerSize() * args.size());
+    allocatedArgsBuffer = true;
+
+    // Fill in the non-direct arguments.
+    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs,
+                            args.size())) {
+      Address elt = Builder.CreateStructGEP(argsBuffer, i,
+                                            IGM.getPointerSize() * i);
+      auto *arg =
+        Builder.CreateBitCast(args[i], elt.getType()->getPointerElementType());
+      Builder.CreateStore(arg, elt);
+    }
+
+    // Fill in the buffer.
+    callArgsVec[NumDirectGenericTypeMetadataAccessFunctionArgs] =
+      Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrPtrTy);
+    callArgs = callArgsVec;
+  } else {
+    callArgs = args;
+  }
+
+  auto call = Builder.CreateCall(accessFunction, callArgs);
+  call->setDoesNotThrow();
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     allocatedArgsBuffer
+                       ? llvm::Attribute::InaccessibleMemOrArgMemOnly
+                       : llvm::Attribute::ReadNone);
+
+  // If we allocated a buffer for the arguments, end it's lifetime.
+  if (allocatedArgsBuffer)
+    Builder.CreateLifetimeEnd(argsBuffer, IGM.getPointerSize() * args.size());
+
+  return call;
+}
+
 static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
                                                       NominalTypeDecl *nominal,
                                                       GenericArguments &genericArgs) {
@@ -1164,28 +1219,57 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
 
   // Collect input arguments to the generic metadata accessor, as laid out
   // by the GenericArguments class.
-  for (auto &arg : IGF.CurFn->args())
-    genericArgs.Values.push_back(&arg);
-  assert(genericArgs.Values.size() == genericArgs.Types.size());
+  unsigned argIdx = 0;
+  llvm::Argument *callerArgArray = nullptr;
+  for (auto &arg : IGF.CurFn->args()) {
+    // If this an argument passed directly, record it.
+    if (argIdx < NumDirectGenericTypeMetadataAccessFunctionArgs) {
+      genericArgs.Values.push_back(&arg);
+      ++argIdx;
+      continue;
+    }
+
+    assert(!callerArgArray && "Too many arguments");
+    callerArgArray = &arg;
+  }
+
   assert((genericArgs.Values.size() > 0 ||
           nominal->getGenericSignature()->areAllParamsConcrete())
          && "no generic args?!");
 
-  // Slam that information directly into the generic arguments buffer.
-  auto argsBufferTy =
-    llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
-  Address argsBuffer = IGF.createAlloca(argsBufferTy,
-                                        IGF.IGM.getPointerAlignment(),
-                                        "generic.arguments");
-  IGF.Builder.CreateLifetimeStart(argsBuffer,
-                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
-  for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
-    Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
-                                              IGF.IGM.getPointerSize() * i);
-    IGF.Builder.CreateStore(genericArgs.Values[i], elt);
+  Address argsBuffer;
+  if (callerArgArray) {
+    // The caller provided a buffer with enough space for all of the arguments;
+    // use that.
+    argsBuffer = Address(callerArgArray, IGF.IGM.getPointerAlignment());
+  } else {
+    // Allocate a buffer with enough storage for the arguments.
+    auto argsBufferTy =
+      llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
+    argsBuffer = IGF.createAlloca(argsBufferTy,
+                                  IGF.IGM.getPointerAlignment(),
+                                  "generic.arguments");
+    IGF.Builder.CreateLifetimeStart(argsBuffer,
+                            IGF.IGM.getPointerSize() * genericArgs.Values.size());
   }
 
-  // Cast to void*.
+  /// Store direct arguments into the buffer.
+  for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
+    Address elt;
+    if (callerArgArray) {
+      elt = IGF.Builder.CreateConstArrayGEP(argsBuffer, i,
+                                            IGF.IGM.getPointerSize());
+    } else {
+      elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
+                                        IGF.IGM.getPointerSize() * i);
+    }
+
+    auto *arg =
+      IGF.Builder.CreateBitCast(genericArgs.Values[i],
+                                elt.getType()->getPointerElementType());
+    IGF.Builder.CreateStore(arg, elt);
+  }
+
   llvm::Value *arguments =
     IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
 
@@ -1196,8 +1280,11 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
   result->addAttribute(llvm::AttributeList::FunctionIndex,
                        llvm::Attribute::ReadOnly);
 
-  IGF.Builder.CreateLifetimeEnd(argsBuffer,
+  // If we allocated the array ourselves, end its lifetime.
+  if (!callerArgArray) {
+    IGF.Builder.CreateLifetimeEnd(argsBuffer,
                           IGF.IGM.getPointerSize() * genericArgs.Values.size());
+  }
 
   return result;
 
@@ -1569,12 +1656,7 @@ namespace {
             IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
                 type->getDecl(), types, NotForDefinition);
 
-        auto result = IGF.Builder.CreateCall(accessor, args);
-        result->setDoesNotThrow();
-        result->addAttribute(llvm::AttributeList::FunctionIndex,
-                             llvm::Attribute::ReadNone);
-
-        return result;
+        return IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, args);
       }
 
       // Otherwise, generic arguments are not lowered.

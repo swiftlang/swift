@@ -545,6 +545,8 @@ public:
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
+    static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
+                  "Need to account for change in number of direct arguments");
     switch (allGenericArgs.size()) {
     case 0:
       return accessFunction();
@@ -568,10 +570,15 @@ public:
                                                           allGenericArgs[0],
                                                           allGenericArgs[1],
                                                           allGenericArgs[2]);
-
     default:
-      // FIXME: Implement.
-      return BuiltType();
+      using GenericMetadataAccessFunction4 =
+        const Metadata *(const void *, const void *, const void *,
+                         const void *);
+      return ((GenericMetadataAccessFunction4 *)accessFunction)(
+                                                      allGenericArgs[0],
+                                                      allGenericArgs[1],
+                                                      allGenericArgs[2],
+                                                      allGenericArgs.data());
     }
   }
 
