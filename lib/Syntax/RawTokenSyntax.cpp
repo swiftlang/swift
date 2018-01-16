@@ -55,79 +55,14 @@ RawTokenSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
 
 void RawTokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   switch (getTokenKind()) {
-  case tok::unknown:
-    OS << "unknown";
-    break;
-  case tok::eof:
-    OS << "eof";
-    break;
-  case tok::code_complete:
-    OS << "code_complete";
-    break;
-  case tok::identifier:
-    OS << "identifier";
-    break;
-  case tok::oper_binary_unspaced:
-    OS << "oper_binary_unspaced";
-    break;
-  case tok::oper_binary_spaced:
-    OS << "oper_binary_spaced";
-    break;
-  case tok::string_interpolation_anchor:
-    OS << "string_interpolation_anchor";
-    break;
-  case tok::string_quote:
-    OS << "string_quote";
-    break;
-  case tok::multiline_string_quote:
-    OS << "multiline_string_quote";
-    break;
-  case tok::string_segment:
-    OS << "string_segment";
-    break;
-  case tok::contextual_keyword:
-    OS << "contextual_keyword";
-    break;
-  case tok::oper_postfix:
-    OS << "oper_postfix";
-    break;
-  case tok::oper_prefix:
-    OS << "oper_prefix";
-    break;
-  case tok::dollarident:
-    OS << "dollarident";
-    break;
-  case tok::integer_literal:
-    OS << "integer_literal";
-    break;
-  case tok::floating_literal:
-    OS << "floating_literal";
-    break;
-  case tok::string_literal:
-    OS << "string_literal";
-    break;
-  case tok::sil_local_name:
-    OS << "sil_local_name";
-    break;
-  case tok::comment:
-    OS << "comment";
-    break;
-  case tok::NUM_TOKENS:
-    OS << "NUM_TOKENS (unset)";
-    break;
-#define KEYWORD(X)                                                             \
-  case tok::kw_##X:                                                            \
-    OS << "kw_" << #X;                                                         \
-    break;
-#define PUNCTUATOR(X, Y)                                                       \
+#define TOKEN(X)                                                               \
   case tok::X:                                                                 \
     OS << #X;                                                                  \
     break;
-#define POUND_KEYWORD(X)                                                       \
-  case tok::pound_##X:                                                         \
-    OS << "pound_" << #X;                                                      \
-    break;
 #include "swift/Syntax/TokenKinds.def"
+  case tok::NUM_TOKENS:
+    OS << "NUM_TOKENS (unset)";
+    break;
   }
 }
 

@@ -40,13 +40,8 @@ struct ScalarEnumerationTraits<syntax::SourcePresence> {
 template <>
 struct ScalarEnumerationTraits<tok> {
   static void enumeration(Output &out, tok &value) {
-#define EXPAND(Str, Case) \
-    out.enumCase(value, Str, Case);
-#define LITERAL(X) EXPAND(#X, tok::X)
-#define MISC(X) EXPAND(#X, tok::X)
-#define KEYWORD(X) EXPAND("kw_" #X, tok::kw_##X)
-#define PUNCTUATOR(X, Y) EXPAND(#X, tok::X)
-#define POUND_KEYWORD(X) EXPAND("pound_" #X, tok::pound_##X)
+#define TOKEN(name) \
+    out.enumCase(value, #name, tok::name);
 #include "swift/Syntax/TokenKinds.def"
   }
 };

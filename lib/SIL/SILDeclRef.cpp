@@ -583,10 +583,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
-    case SILDeclRef::ManglingKind::SwiftDispatchThunk:
-      assert(!isForeign && !isDirectReference && !isCurried);
-      SKind = ASTMangler::SymbolKind::SwiftDispatchThunk;
-      break;
   }
 
   switch (kind) {

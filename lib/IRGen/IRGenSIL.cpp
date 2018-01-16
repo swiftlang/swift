@@ -5378,6 +5378,19 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   SILDeclRef method = i->getMember();
   auto methodType = i->getType().castTo<SILFunctionType>();
 
+  auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  if (IGM.isResilient(classDecl,
+                      ResilienceExpansion::Maximal)) {
+    method = method.getOverriddenVTableEntry();
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+    auto sig = IGM.getSignature(methodType);
+    FunctionPointer fn(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
+
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.
   FunctionPointer fn = emitVirtualMethodValue(*this, baseValue,
