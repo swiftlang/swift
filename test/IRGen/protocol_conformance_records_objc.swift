@@ -21,7 +21,7 @@ public protocol Runcible {
 // CHECK:           @"$SSo6NSRectVMn"
 // -- witness table
 // CHECK:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
-// -- reserved
+// -- flags
 // CHECK:           i32 0
 // CHECK:         },
 extension NSRect: Runcible {
@@ -31,14 +31,12 @@ extension NSRect: Runcible {
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
-// -- class object reference + 0x03 (class object reference, TODO: indirect me)
-// CHECK:           i32 add
+// -- class object reference
 // CHECK:           @"got.OBJC_CLASS_$_Gizmo"
-// CHECK:           i32 3
 // -- witness table
 // CHECK:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
-// -- reserved
-// CHECK:           i32 0
+// -- flags
+// CHECK:           i32 24
 // CHECK:         }
 extension Gizmo: Runcible {
   public func runce() {}

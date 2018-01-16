@@ -2601,7 +2601,7 @@ struct TargetProtocolRecord {
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
-/// The structure of a protocol conformance record.
+/// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
@@ -2617,58 +2617,47 @@ private:
   /// The protocol being conformed to.
   ///
   /// The remaining low bit is reserved for future use.
-  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
-    Protocol;
+  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
     /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
+    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime> * const,
-                                 TypeMetadataRecordKind>
+    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime> * const>
       IndirectNominalTypeDescriptor;
 
     /// An indirect reference to the metadata.
-    ///
-    /// Only valid when the \c IndirectClassOrDirectType value is
-    // \c IsIndirectClass.
-    RelativeDirectPointerIntPair<const TargetClassMetadata<Runtime> *,
-                                 TypeMetadataRecordKind> IndirectObjCClass;
+    RelativeDirectPointer<const TargetClassMetadata<Runtime> *>
+      IndirectObjCClass;
   };
-  
-  
+
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointerIntPair<const WitnessTable,
-                                 ProtocolConformanceReferenceKind>
-      WitnessTable;
+    RelativeDirectPointer<const WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type.
-    RelativeDirectPointerIntPair<WitnessTableAccessorFn,
-                                 ProtocolConformanceReferenceKind>
-      WitnessTableAccessor;
+    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
   };
 
-  /// Reserved word.
-  unsigned Reserved;
-  
+  /// Various flags, including the kind of conformance.
+  ConformanceFlags Flags;
+
 public:
   const ProtocolDescriptor *getProtocol() const {
-    return Protocol.getPointer();
+    return Protocol;
   }
 
   TypeMetadataRecordKind getTypeKind() const {
-    return DirectNominalTypeDescriptor.getInt();
+    return Flags.getTypeReferenceKind();
   }
 
-  ProtocolConformanceReferenceKind getConformanceKind() const {
-    return WitnessTable.getInt();
+  typename ConformanceFlags::ConformanceKind getConformanceKind() const {
+    return Flags.getConformanceKind();
   }
   
   const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
@@ -2684,7 +2673,7 @@ public:
       assert(false && "not indirect class object");
     }
     
-    return IndirectObjCClass.getPointer();
+    return IndirectObjCClass.get();
   }
   
   const TargetNominalTypeDescriptor<Runtime> *
@@ -2694,10 +2683,10 @@ public:
       return nullptr;
 
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor.getPointer();
+      return DirectNominalTypeDescriptor;
 
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor.getPointer();
+      return *IndirectNominalTypeDescriptor;
 
     case TypeMetadataRecordKind::IndirectObjCClass:
       assert(false && "not generic metadata pattern");
@@ -2709,30 +2698,26 @@ public:
   /// Get the directly-referenced static witness table.
   const swift::WitnessTable *getStaticWitnessTable() const {
     switch (getConformanceKind()) {
-    case ProtocolConformanceReferenceKind::WitnessTable:
+    case ConformanceFlags::ConformanceKind::WitnessTable:
       break;
         
-    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
-
-    case ProtocolConformanceReferenceKind::Reserved:
-      break;
     }
-    return WitnessTable.getPointer();
+    return WitnessTable;
   }
   
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
     switch (getConformanceKind()) {
-    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
-    case ProtocolConformanceReferenceKind::Reserved:
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
       break;
         
-    case ProtocolConformanceReferenceKind::WitnessTable:
+    case ConformanceFlags::ConformanceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
-    return WitnessTableAccessor.getPointer();
+    return WitnessTableAccessor;
   }
   
   /// Get the canonical metadata for the type referenced by this record, or
