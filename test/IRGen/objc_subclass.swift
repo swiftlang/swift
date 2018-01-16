@@ -9,8 +9,8 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type
 // CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
-// CHECK: [[OBJC:%objc_object]] = type opaque
+// CHECK-DAG: [[GIZMO:%TSo5GizmoC]] = type opaque
+// CHECK-DAG: [[OBJC:%objc_object]] = type opaque
 
 // CHECK-32: @"$S13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i32 4, align [[WORD_SIZE_IN_BYTES:4]]
 // CHECK-64: @"$S13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i64 8, align [[WORD_SIZE_IN_BYTES:8]]

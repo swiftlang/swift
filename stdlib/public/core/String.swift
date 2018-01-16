@@ -1011,7 +1011,7 @@ extension String {
   /// - Parameter other: Another string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
-    if self._guts._isEmptyLiteral {
+    if self._guts._isEmptySingleton {
       // We must be careful not to discard any capacity that
       // may have been reserved for the append -- this is why
       // we check for the empty string singleton rather than

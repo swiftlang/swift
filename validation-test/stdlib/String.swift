@@ -92,8 +92,11 @@ struct StringGutsCollection: RangeReplaceableCollection, RandomAccessCollection 
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-  // Size of a String is 16 bytes on all platforms.
+#if arch(i386) || arch(arm)
+  expectEqual(12, MemoryLayout<String>.size)
+#else
   expectEqual(16, MemoryLayout<String>.size)
+#endif
 }
 
 StringTests.test("AssociatedTypes-UTF8View") {
