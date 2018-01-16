@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// Concrete type for one dimensional Tensors.
-public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
-  public var underlyingTensor: Tensor<Element>
+public struct Tensor1D<Unit : AccelerableTensorUnit> : RankedTensor {
+  public var underlyingTensor: Tensor<Unit>
 
   public typealias BoolTensor = Tensor1D<Bool>
   public typealias Shape = Int
@@ -27,18 +27,18 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
 
   @_versioned
   @_inlineable
-  internal init(underlying: Tensor<Element>) {
+  internal init(underlying: Tensor<Unit>) {
     self.underlyingTensor = underlying
   }
 
   @_inlineable
-  public init?(_ other: Tensor<Element>) {
+  public init?(_ other: Tensor<Unit>) {
     guard other.rank == Tensor1D.rank else { return nil }
     self.init(underlying: other)
   }
 
   @_inlineable
-  public init(identicallyRanked other: Tensor<Element>) {
+  public init(identicallyRanked other: Tensor<Unit>) {
     // Assertion disabled because "x.rank" causes a copy of X
     // back to the host.  TODO(clattner): need a better way of
     // exposing rank information in our model.
@@ -50,11 +50,11 @@ public struct Tensor1D<Element : TensorElementProtocol> : RankedTensor {
 // Array literal support.
 extension Tensor1D : ExpressibleByArrayLiteral {
   // The type of the elements of an array literal.
-  public typealias ArrayLiteralElement = Element
+  public typealias ArrayLiteralElement = Unit
 
-  // Creates an instance initialized with the given elements.
+  // Creates an instance initialized with the given units.
   @_inlineable
-  public init(arrayLiteral elements: Element...) {
+  public init(arrayLiteral elements: Unit...) {
     self.init(elements)
   }
 }
@@ -64,7 +64,7 @@ public extension Tensor1D {
   /// Perform an element-wise type conversion from `Tensor1D<T>`.
   @_inlineable
   public init?<T>(_ other: Tensor1D<T>) {
-    guard let tensor = Tensor<Element>(other.underlyingTensor) else {
+    guard let tensor = Tensor<Unit>(other.underlyingTensor) else {
       return nil
     }
     self.init(underlying: tensor)
@@ -72,38 +72,38 @@ public extension Tensor1D {
 
   /// values initializer, takes an array of values.
   @_inlineable
-  init(_ elements: [Element]) {
-    self.init(underlying: Tensor<Element>(elements))
+  init(_ units: [Unit]) {
+    self.init(underlying: Tensor<Unit>(units))
   }
 
   /// values initializer, takes a vararg list of values.
   @_inlineable
-  init(_ elements: Element...) {
-    self.init(elements)
+  init(_ units: Unit...) {
+    self.init(units)
   }
 }
 
-public extension Tensor1D where Element : Numeric {
+public extension Tensor1D where Unit : Numeric {
   /// Zero initializer, takes a single integer as the shape.
   @_inlineable
   static func zeros(shape: Int) -> Tensor1D {
-    return Tensor1D(underlying: Tensor<Element>.zeros(shape: shape))
+    return Tensor1D(underlying: Tensor<Unit>.zeros(shape: shape))
   }
 
   /// One initializer, takes a single integer as the shape.
   @_inlineable
   static func ones(shape: Int) -> Tensor1D {
-    return Tensor1D(underlying: Tensor<Element>.ones(shape: shape))
+    return Tensor1D(underlying: Tensor<Unit>.ones(shape: shape))
   }
 }
 
-public extension Tensor1D where Element : FloatingPoint {
+public extension Tensor1D where Unit : FloatingPoint {
   @_inlineable
   static func randomNormal(
     shape: (Int, Int), mean: Double = 0, stddev: Double = 1
   ) -> Tensor1D {
     return Tensor1D(underlying:
-      Tensor<Element>.randomNormal(
+      Tensor<Unit>.randomNormal(
         shape: [shape.0],
         mean: mean,
         stddev: stddev
@@ -114,7 +114,7 @@ public extension Tensor1D where Element : FloatingPoint {
 
 // Subscripting a 1D tensor produces a scalar.
 public extension Tensor1D {
-  subscript(index: Int) -> Element {
+  subscript(index: Int) -> Unit {
     @inline(never) get {
       fatalError("Unimplemented")
     }
@@ -122,8 +122,8 @@ public extension Tensor1D {
 }
 
 /// Concrete type for two dimensional Tensors.
-public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
-  public var underlyingTensor: Tensor<Element>
+public struct Tensor2D<Unit : AccelerableTensorUnit> : RankedTensor {
+  public var underlyingTensor: Tensor<Unit>
 
   public typealias BoolTensor = Tensor2D<Bool>
   public typealias Shape = (Int, Int)
@@ -141,18 +141,18 @@ public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
   }
 
   @_versioned
-  internal init(underlying: Tensor<Element>) {
+  internal init(underlying: Tensor<Unit>) {
     self.underlyingTensor = underlying
   }
 
   @_inlineable
-  public init?(_ other: Tensor<Element>) {
+  public init?(_ other: Tensor<Unit>) {
     guard other.rank == Tensor2D.rank else { return nil }
     self.init(underlying: other)
   }
 
   @_inlineable
-  public init(identicallyRanked other: Tensor<Element>) {
+  public init(identicallyRanked other: Tensor<Unit>) {
     // FIXME: Check ranks
     self.init(underlying: other)
   }
@@ -161,11 +161,11 @@ public struct Tensor2D<Element : TensorElementProtocol> : RankedTensor {
 // Array literal support.
 extension Tensor2D : ExpressibleByArrayLiteral {
   // The type of the elements of an array literal.
-  public typealias ArrayLiteralElement = [Element]
+  public typealias ArrayLiteralUnit = [Unit]
 
   // Creates an instance initialized with the given elements.
   @_inlineable
-  public init(arrayLiteral elements: [Element]...) {
+  public init(arrayLiteral elements: [Unit]...) {
     self.init(elements)
   }
 }
@@ -175,7 +175,7 @@ public extension Tensor2D {
   /// Perform an element-wise type conversion from `Tensor2D<T>`.
   @_inlineable
   public init?<T>(_ other: Tensor1D<T>) {
-    guard let tensor = Tensor<Element>(other.underlyingTensor) else {
+    guard let tensor = Tensor<Unit>(other.underlyingTensor) else {
       return nil
     }
     self.init(underlying: tensor)
@@ -183,47 +183,47 @@ public extension Tensor2D {
 
   /// values initializer, takes an array of values.
   @_inlineable
-  init(_ elements: [[Element]]) {
-    self.init(underlying: Tensor<Element>(elements))
+  init(_ elements: [[Unit]]) {
+    self.init(underlying: Tensor<Unit>(elements))
   }
 
 #if true  // FIXME: temporary until the partitioner can handle arrays.
   @_inlineable
-  init(_ value: Element) {
+  init(_ value: Unit) {
     underlyingTensor = Tensor(value)
   }
 #endif
 }
 
-public extension Tensor2D where Element : Numeric {
+public extension Tensor2D where Unit : Numeric {
   /// Zero initializer, takes a tuple of integers as the shape.
   @_inlineable
-  public static func zeros(shape: (Int, Int)) -> Tensor1D<Element> {
+  public static func zeros(shape: (Int, Int)) -> Tensor1D<Unit> {
     return Tensor1D(underlying:
-      Tensor<Element>.zeros(shape: shape.0, shape.1))
+      Tensor<Unit>.zeros(shape: shape.0, shape.1))
   }
 
   /// One initializer, takes a tuple of integers as the shape.
   @_inlineable
-  public static func ones(shape: (Int, Int)) -> Tensor1D<Element> {
+  public static func ones(shape: (Int, Int)) -> Tensor1D<Unit> {
     return Tensor1D(underlying:
-      Tensor<Element>.ones(shape: shape.0, shape.1))
+      Tensor<Unit>.ones(shape: shape.0, shape.1))
   }
 
   @_inlineable
   static func eye(shape: (Int, Int)) -> Tensor2D {
     return Tensor2D(underlying:
-      Tensor<Element>.eye(rowCount: shape.0, columnCount: shape.1))
+      Tensor<Unit>.eye(rowCount: shape.0, columnCount: shape.1))
   }
 }
 
-public extension Tensor2D where Element : FloatingPoint {
+public extension Tensor2D where Unit : FloatingPoint {
   @_inlineable
   public static func randomNormal(
     shape: (Int, Int), mean: Double = 0, stddev: Double = 1
   ) -> Tensor2D {
     return Tensor2D(underlying:
-      Tensor<Element>.randomNormal(
+      Tensor<Unit>.randomNormal(
         shape: [shape.0, shape.1],
         mean: mean,
         stddev: stddev
@@ -235,11 +235,11 @@ public extension Tensor2D where Element : FloatingPoint {
 // Subscripting a tensor produces a smaller tensor.
 public extension Tensor2D {
   @_inlineable
-  subscript(index: Int) -> Tensor1D<Element> {
+  subscript(index: Int) -> Tensor1D<Unit> {
     return Tensor1D(underlying: underlyingTensor[index])
   }
 
-  subscript(index1: Int, index2: Int) -> Element {
+  subscript(index1: Int, index2: Int) -> Unit {
     @inline(never) get {
       fatalError("Implement")
     }
@@ -254,18 +254,18 @@ public extension Tensor2D {
 // this is too onerous in practice, we can pick other approaches.
 public extension Tensor1D {
   @_inlineable
-  func rankLifted() -> Tensor2D<Element> {
+  func rankLifted() -> Tensor2D<Unit> {
     return Tensor2D(underlying: underlyingTensor.rankLifted(by: 1))
   }
 }
 
 /// Value-preserving conversion initializer
 public extension Tensor {
-  init(_ tensor: Tensor1D<Element>) {
+  init(_ tensor: Tensor1D<Unit>) {
     self = tensor.underlyingTensor
   }
 
-  init(_ tensor: Tensor2D<Element>) {
+  init(_ tensor: Tensor2D<Unit>) {
     self = tensor.underlyingTensor
   }
 }

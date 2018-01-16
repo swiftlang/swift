@@ -17,20 +17,20 @@ infix operator ⊗ : MultiplicationPrecedence
 /// of the implementation logic for these types (which just wrap Tensor anyway)
 /// and allow writing rank-generic code over the TensorXD types.
 public protocol RankedTensor {
-  associatedtype Element : TensorElementProtocol
+  associatedtype Unit : AccelerableTensorUnit
   associatedtype Shape
 
   /// Convert from a rank-erased Tensor to the specified RankedTensor.  This
   /// fails when the Tensor has the wrong rank.
-  init?(_ other: Tensor<Element>)
+  init?(_ other: Tensor<Unit>)
 
   /// Convert from a rank-erased Tensor to the specified RankedTensor when there
   /// is some static information that tells us that it is of the correct rank
   /// already.
-  init(identicallyRanked other: Tensor<Element>)
+  init(identicallyRanked other: Tensor<Unit>)
 
   /// Tensor of same rank, but Bool element type.
-  associatedtype BoolTensor : RankedTensor where BoolTensor.Element == Bool
+  associatedtype BoolTensor : RankedTensor where BoolTensor.Unit == Bool
 
   /// Returns the rank of the Tensor - the number of dimensions it has.
   static var rank: Int { get }
@@ -39,21 +39,21 @@ public protocol RankedTensor {
   var shape: Shape { get }
 
   /// Returns the rank erased Tensor held by the RankedTensor.
-  var underlyingTensor: Tensor<Element> { get }
+  var underlyingTensor: Tensor<Unit> { get }
 }
 
 /// Array initializers
 public extension RankedTensor {
   /// Convert from a ShapedArray to the specified RankedTensor. This fails
   /// when the ShapedArray has the wrong rank.
-  init?(_ other: ShapedArray<Element>) {
+  init?(_ other: ShapedArray<Unit>) {
     self.init(Tensor(other))
   }
 
   /// Convert from a ShapedArray to the specified RankedTensor when there is
   /// some static information that tells us that it is of the correct rank
   /// already.
-  init(identicallyRanked other: ShapedArray<Element>) {
+  init(identicallyRanked other: ShapedArray<Unit>) {
     self.init(identicallyRanked: Tensor(other))
   }
 }
@@ -93,7 +93,7 @@ public extension RankedTensor {
 // ranks, implemented in terms of the underlying untyped Tensor APIs.
 
 /// RankedTensor - Arithmetic Operators.
-public extension RankedTensor where Element : Numeric {
+public extension RankedTensor where Unit : Numeric {
   @_inlineable
   static func +(lhs: Self, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs.underlyingTensor + rhs.underlyingTensor)
@@ -105,12 +105,12 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  static func +(lhs: Self, rhs: Element) -> Self {
+  static func +(lhs: Self, rhs: Unit) -> Self {
     return Self(identicallyRanked: lhs.underlyingTensor + rhs)
   }
 
   @_inlineable
-  static func +(lhs: Element, rhs: Self) -> Self {
+  static func +(lhs: Unit, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs + rhs.underlyingTensor)
   }
 
@@ -125,12 +125,12 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  static func -(lhs: Self, rhs: Element) -> Self {
+  static func -(lhs: Self, rhs: Unit) -> Self {
     return Self(identicallyRanked: lhs.underlyingTensor - rhs)
   }
 
   @_inlineable
-  static func -(lhs: Element, rhs: Self) -> Self {
+  static func -(lhs: Unit, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs - rhs.underlyingTensor)
   }
 
@@ -145,12 +145,12 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  static func /(lhs: Self, rhs: Element) -> Self {
+  static func /(lhs: Self, rhs: Unit) -> Self {
     return Self(identicallyRanked: lhs.underlyingTensor / rhs)
   }
 
   @_inlineable
-  static func /(lhs: Element, rhs: Self) -> Self {
+  static func /(lhs: Unit, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs / rhs.underlyingTensor)
   }
 
@@ -160,12 +160,12 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  static func *(lhs: Element, rhs: Self) -> Self {
+  static func *(lhs: Unit, rhs: Self) -> Self {
     return Self(identicallyRanked: lhs * rhs.underlyingTensor)
   }
 
   @_inlineable
-  static func *(lhs: Self, rhs: Element) -> Self {
+  static func *(lhs: Self, rhs: Unit) -> Self {
     return Self(identicallyRanked: lhs.underlyingTensor * rhs)
   }
 
@@ -180,17 +180,17 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  func mean() -> Element {
+  func mean() -> Unit {
     return underlyingTensor.mean()
   }
 
   @_inlineable
-  func min() -> Element {
+  func min() -> Unit {
     return underlyingTensor.min()
   }
 
   @_inlineable
-  func max() -> Element {
+  func max() -> Unit {
     return underlyingTensor.max()
   }
 
@@ -200,7 +200,7 @@ public extension RankedTensor where Element : Numeric {
   }
 
   @_inlineable
-  func sum() -> Element {
+  func sum() -> Unit {
     return underlyingTensor.sum()
   }
 
@@ -210,16 +210,16 @@ public extension RankedTensor where Element : Numeric {
   }
 }
 
-public extension RankedTensor where Element : Comparable {
+public extension RankedTensor where Unit : Comparable {
   @_inlineable
-  static func < (lhs: Self, rhs: Element) -> BoolTensor {
+  static func < (lhs: Self, rhs: Unit) -> BoolTensor {
     return BoolTensor(identicallyRanked: lhs.underlyingTensor < rhs)
   }
 }
 
-public extension RankedTensor where Element : Equatable {
+public extension RankedTensor where Unit : Equatable {
   @_inlineable
-  static func == (lhs: Self, rhs: Element) -> BoolTensor {
+  static func == (lhs: Self, rhs: Unit) -> BoolTensor {
     return BoolTensor(identicallyRanked: lhs.underlyingTensor == rhs)
   }
 }

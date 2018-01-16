@@ -11,7 +11,7 @@ var TensorTests = TestSuite("Tensor")
 @inline(never)
 func testInitializers() {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
-  expectEqual(Array(x.elements.contiguousView),
+  expectEqual(Array(x.array.units),
     [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
 }
 TensorTests.test("Initializers", testInitializers)
@@ -19,7 +19,7 @@ TensorTests.test("Initializers", testInitializers)
 @inline(never)
 func testFactoryInitializers() {
   let x = Tensor<Float>.ones(shape: [1, 10])
-  expectEqual(Array(x.elements.contiguousView),
+  expectEqual(Array(x.array.units),
     Array(repeating: 1, count: 10))
 }
 TensorTests.test("FactoryInitializers", testFactoryInitializers)
@@ -29,7 +29,7 @@ func testSimpleMath() {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   // TODO: Check result. Currently crashing because of rank/shape getters
-  // expectTrue(y.elements - 0.833655 < 0.000001)
+  // expectTrue(y.array - 0.833655 < 0.000001)
 }
 TensorTests.test("SimpleMath", testSimpleMath)
 
@@ -75,7 +75,7 @@ func testXORInference() {
     let x = Tensor([[x, y]])
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
-    return y.elements.contiguousView[0] // TODO: use better scalar getter
+    return y.array.units[0] // TODO: use better scalar getter
   }
   expectLT(abs(xor(0.0, 0.0) - 0.0), 0.1)
   expectLT(abs(xor(0.0, 1.0) - 1.0), 0.1)
