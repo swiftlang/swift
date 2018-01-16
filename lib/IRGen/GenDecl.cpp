@@ -1343,6 +1343,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     }
   }
 
+  case Kind::FieldOffset:
   case Kind::AssociatedTypeMetadataAccessFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::GenericProtocolWitnessTableCache:
