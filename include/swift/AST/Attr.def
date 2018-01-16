@@ -307,6 +307,10 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
           OnClass | OnStruct | OnEnum | OnProtocol | OnTypeAlias |
           LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
           /*Not serialized*/74)
+// FIXME: Make it serialized
+DECL_ATTR(differentiable, TFGradient,
+          OnFunc | LongAttribute | NotSerialized,
+          /* Not serialized */ 75)
 
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
                  OnEnum | OnStruct | OnClass | OnProtocol |

@@ -38,6 +38,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringSet.h"
 #include <algorithm>
 
 using namespace swift;
@@ -497,6 +498,59 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                            ProtocolType.get(), MemberName, MemberNameLoc));
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+ParserResult<TFGradientAttr>
+Parser::parseTFGradientAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  StringRef AttrName = "differentiable";
+  ParserStatus Status;
+  SourceLoc lParenLoc, rParenLoc;
+
+  // Set parse error, skip until ')' and parse it.
+  auto errorAndSkipToEnd = [&]() -> ParserStatus {
+    Status.setIsParseError();
+    skipUntil(tok::r_paren);
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
+      diagnose(Tok, diag::attr_expected_rparen, AttrName,
+               /*DeclModifier=*/false);
+    }
+    return Status;
+  };
+
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+             /*DeclModifier=*/false);
+    return errorAndSkipToEnd();
+  }
+
+  // Parse 'gradient:' label.
+  if (parseSpecificIdentifier("gradient", Loc, diag::attr_tfgradient_missing_gradient_label))
+    return errorAndSkipToEnd();
+  if (!consumeIf(tok::colon)) {
+    diagnose(Loc, diag::attr_tfgradient_expected_colon_after_label, "gradient");
+    return errorAndSkipToEnd();
+  }
+
+  // Parse the name of the gradient function.
+  DeclNameLoc gradFuncNameLoc;
+  DeclName gradFuncName =
+    parseUnqualifiedDeclName(/*afterDot=*/false, gradFuncNameLoc,
+                            diag::attr_implements_expected_member_name,
+                            /*allowOperators=*/true,
+                            /*allowZeroArgCompoundNames=*/true);
+  if (!gradFuncName)
+    return errorAndSkipToEnd();
+
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(Loc, diag::attr_expected_rparen, AttrName, /*DeclModifier=*/false);
+    Status.setIsParseError();
+    return Status;
+  }
+
+  return ParserResult<TFGradientAttr>(
+    new (Context) TFGradientAttr(gradFuncName, gradFuncNameLoc));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1344,6 +1398,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_Implements: {
     ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
+    if (Attr.isNonNull()) {
+      Attributes.add(Attr.get());
+    }
+    break;
+  }
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  case DAK_TFGradient: {
+    ParserResult<TFGradientAttr> Attr = parseTFGradientAttribute(AtLoc, Loc);
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }

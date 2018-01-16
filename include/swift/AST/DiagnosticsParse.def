@@ -1436,6 +1436,47 @@ ERROR(attr_specialize_expected_partial_or_full,none,
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+// differentiable
+ERROR(attr_tfgradient_expected_function_name,PointsToFirstBadToken,
+      "expected a qualified function to differentiate", ())
+
+ERROR(attr_tfgradient_missing_lsquare,PointsToFirstBadToken,
+      "missing '[' for argument index list", ())
+
+ERROR(attr_tfgradient_missing_rsquare,PointsToFirstBadToken,
+      "missing ']' for argument index list", ())
+
+ERROR(attr_tfgradient_expected_argument_list,PointsToFirstBadToken,
+      "expected a list of arguments to differentiate with respect to, e.g. [.0, w, b]", ())
+
+ERROR(attr_tfgradient_expected_argument,PointsToFirstBadToken,
+      "expected an argument, which can be a dot-index (e.g. '.0') of a function argument, or an identifier that is captured by the function", ())
+
+ERROR(attr_tfgradient_argument_index_must_be_positive_integer,PointsToFirstBadToken,
+      "gradient argument index must be a positive integer", ())
+
+ERROR(attr_tfgradient_nondifferentiable_function,none,
+      "function '%0' is not differentiable", (StringRef))
+
+ERROR(attr_tfgradient_invalid_argument_indices,none,
+      "gradient argument indices '%0' are invalid", (StringRef))
+
+ERROR(attr_tfgradient_expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after label '%0' in 'gradient' attribute", (StringRef))
+
+ERROR(attr_tfgradient_expected_config_label,PointsToFirstBadToken,
+      "expected a gradient configuration label: 'wrt:', 'keeping:', or 'seedable:'", ())
+
+ERROR(attr_tfgradient_expected_bool_value,PointsToFirstBadToken,
+      "expected a boolean true or false value in option '%0'", (StringRef))
+
+ERROR(attr_tfgradient_duplicate_config_option,PointsToFirstBadToken,
+      "duplicated gradient configuration option '%0'", (StringRef))
+
+ERROR(attr_tfgradient_missing_gradient_label,PointsToFirstBadToken,
+      "missing label 'gradient:' in '@differentiable' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

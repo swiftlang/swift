@@ -1264,6 +1264,35 @@ public:
   }
 };
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Attribute that marks a declaration to be the gradient of another function,
+/// e.g. @differentiable(gradient: foo(_:_:seed:)).
+class TFGradientAttr : public DeclAttribute {
+public:
+  explicit TFGradientAttr(DeclName gradFuncName, DeclNameLoc gradFuncNameLoc)
+    : DeclAttribute(DAK_TFGradient, SourceLoc(), SourceRange(),
+                    /*Implicit*/true),
+      GradFuncName(gradFuncName), GradFuncNameLoc(gradFuncNameLoc) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TFGradient;
+  }
+
+private:
+  /// The function which the declared function differentiates.
+  DeclName GradFuncName;
+  DeclNameLoc GradFuncNameLoc;
+
+public:
+  DeclName getGradFuncName() const {
+    return GradFuncName;
+  }
+
+  DeclNameLoc getGradFuncNameLoc() const {
+    return GradFuncNameLoc;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

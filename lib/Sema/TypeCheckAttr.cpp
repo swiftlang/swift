@@ -113,6 +113,7 @@ public:
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WeakLinked)
+  IGNORED_ATTR(TFGradient)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -879,6 +880,9 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+
+  // TF_ENABLE_TENSORFLOW
+  void visitTFGradientAttr(TFGradientAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2091,6 +2095,11 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
                 diag::implements_attr_non_protocol_type)
       .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
+}
+
+void AttributeChecker::visitTFGradientAttr(TFGradientAttr *attr) {
+  // FIXME: Implement
+  llvm_unreachable("Unimplemented");
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
