@@ -154,48 +154,26 @@ func makeGenericMetatypes() {
 // CHECK:   ret %swift.type* [[METADATA]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @"$S17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMa"() [[NOUNWIND_READNONE_OPT]]
+// CHECK:   [[BUFFER:%.*]] = alloca [4 x i8*]
 // CHECK:   [[T0:%.*]] = call %swift.type* @"$S17generic_metatypes3BarCMa"()
-// CHECK:   call %swift.type* @"$S17generic_metatypes8FourArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]]) [[NOUNWIND_READNONE]]
-
-// CHECK-LABEL: define hidden %swift.type* @"$S17generic_metatypes8FourArgsVMa"(%swift.type*, %swift.type*, %swift.type*, %swift.type*)
-// CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type* }
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 0
-// CHECK:   store %swift.type* %0, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 1
-// CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 2
-// CHECK:   store %swift.type* %2, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 3
-// CHECK:   store %swift.type* %3, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_rt_swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FourArgsVMP" {{.*}}, i8* [[BUFFER_PTR]])
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.end
-// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK-NEXT: [[SLOT_3:%.*]] = getelementptr inbounds [4 x i8*], [4 x i8*]* [[BUFFER]], i32 0, i32 3
+// CHECK-NEXT:  [[T0_AS_VOIDPTR:%.*]] = bitcast %swift.type* [[T0]] to i8*
+// CHECK-NEXT:  store i8* [[T0_AS_VOIDPTR]], i8** [[SLOT_3]]
+// CHECK-NEXT:  [[BUFFER_PTR:%.*]] = bitcast [4 x i8*]* [[BUFFER]] to i8**
+// CHECK-NEXT:   call %swift.type* @"$S17generic_metatypes8FourArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
+// CHECK: call void @llvm.lifetime.end.p0i8
 
 // CHECK: define linkonce_odr hidden %swift.type* @"$S17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMa"() [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[T0:%.*]] = call %swift.type* @"$S17generic_metatypes3BarCMa"()
-// CHECK:   call %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE]]
+// CHECK:   call %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8**
 
-// CHECK-LABEL: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type*)
-// CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.start
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 0
-// CHECK:   store %swift.type* %0, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 1
-// CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 2
-// CHECK:   store %swift.type* %2, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 3
-// CHECK:   store %swift.type* %3, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_rt_swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FiveArgsVMP" {{.*}}, i8* [[BUFFER_PTR]])
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.end
-// CHECK:   ret %swift.type* [[METADATA]]
+// CHECK-LABEL: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**)
+// CHECK-NOT: alloc
+// CHECK:   call %swift.type* @swift_rt_swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FiveArgsVMP" {{.*}}, i8*
+// CHECK-NOT: call void @llvm.lifetime.end
+// CHECK:   ret %swift.type*
 
 // CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK: attributes [[NOUNWIND_ARGMEM]] = { inaccessiblemem_or_argmemonly nounwind }

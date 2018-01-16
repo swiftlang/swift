@@ -181,7 +181,7 @@ enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
 };
-  
+
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeMetadataRecordKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
@@ -861,6 +861,13 @@ static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
 static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
 }
+
+/// The number of arguments that will be passed directly to a generic
+/// nominal type access function. The remaining arguments (if any) will be
+/// passed as an array. That array has enough storage for all of the arguments,
+/// but only fills in the elements not passed directly. The callee may
+/// mutate the array to fill in the direct arguments.
+constexpr unsigned NumDirectGenericTypeMetadataAccessFunctionArgs = 3;
 
 } // end namespace swift
 
