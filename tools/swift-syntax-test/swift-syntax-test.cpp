@@ -252,10 +252,17 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
   auto BufferId = *SF->getBufferID();
   SyntaxPrintOptions Opts;
   auto Root = SF->getSyntaxRoot();
-  auto Offset = Root.getEOFToken().getAbsolutePosition(Root).getOffset();
+  auto AbPos = Root.getEOFToken().getAbsolutePosition(Root);
+
   SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
   auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
-  auto EndLoc = SourceMgr.getLocForOffset(BufferId, Offset);
+  auto EndLoc = SourceMgr.getLocForOffset(BufferId, AbPos.getOffset());
+
+  // To ensure the correctness of position when translated to line & column pair.
+  if (SourceMgr.getLineAndColumn(EndLoc) != AbPos.getLineAndColumn()) {
+    llvm::outs() << "locations should be identical";
+    return EXIT_FAILURE;
+  }
   llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
   return 0;
 }
