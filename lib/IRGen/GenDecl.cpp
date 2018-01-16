@@ -1478,6 +1478,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+  case SILLinkage::PublicNonABI:
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {

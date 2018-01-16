@@ -36,29 +36,8 @@ using namespace swift::irgen;
 using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
 
-static bool isPrivateDecl(ValueDecl *VD) {
-  return getDeclLinkage(VD) != FormalLinkage::PublicUnique;
-}
-
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
-}
-
-void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  for (auto &entry : PBD->getPatternList()) {
-    auto *var = entry.getAnchoringVarDecl();
-    if (isPrivateDecl(var))
-      return;
-
-    // Non-global variables might have an explicit initializer symbol.
-    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
-      auto declRef =
-          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
-      // Stored property initializers for public properties are currently
-      // public.
-      addSymbol(declRef);
-    }
-  }
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
@@ -125,8 +104,11 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
-  // Default arguments (of public functions) are public symbols, as the default
-  // values are computed at the call site.
+  if (!SwiftModule->getASTContext().isSwiftVersion3())
+    return;
+
+  // In Swift 3, default arguments (of public functions) are public symbols,
+  // as the default values are computed at the call site.
   auto index = 0;
   auto paramLists = AFD->getParameterLists();
   // Skip the first arguments, which contains Self (etc.), can't be defaulted,
@@ -177,7 +159,7 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
-  if (isPrivateDecl(CD))
+  if (getDeclLinkage(CD) != FormalLinkage::PublicUnique)
     return;
 
   auto &ctxt = CD->getASTContext();

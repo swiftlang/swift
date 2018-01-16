@@ -66,6 +66,7 @@ static Optional<SILLinkage>
 fromStableSILLinkage(unsigned value) {
   switch (value) {
   case SIL_LINKAGE_PUBLIC: return SILLinkage::Public;
+  case SIL_LINKAGE_PUBLIC_NON_ABI: return SILLinkage::PublicNonABI;
   case SIL_LINKAGE_HIDDEN: return SILLinkage::Hidden;
   case SIL_LINKAGE_SHARED: return SILLinkage::Shared;
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
@@ -469,7 +470,14 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->setSerialized(IsSerialized_t(isSerialized));
 
     // Don't override the transparency or linkage of a function with
-    // an existing declaration.
+    // an existing declaration, except if we deserialized a
+    // PublicNonABI function, which has HiddenExternal when
+    // referenced as a declaration, and SharedExternal when it has
+    // a deserialized body.
+    if (fn->getLinkage() == SILLinkage::HiddenExternal &&
+        linkage == SILLinkage::PublicNonABI) {
+      fn->setLinkage(SILLinkage::SharedExternal);
+    }
 
   // Otherwise, create a new function.
   } else {
