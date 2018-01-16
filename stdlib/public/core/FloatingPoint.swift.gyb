@@ -486,46 +486,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   var significand: Self { get }
 
-  /// Adds two values and produces their sum, rounded to a
-  /// representable value.
-  ///
-  /// The addition operator (`+`) calculates the sum of its two arguments. For
-  /// example:
-  ///
-  ///     let x = 1.5
-  ///     let y = x + 2.25
-  ///     // y == 3.75
-  ///
-  /// The `+` operator implements the addition operation defined by the
-  /// [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to add.
-  ///   - rhs: The second value to add.
-  static func +(_ lhs: Self, _ rhs: Self) -> Self
-
-  /// Adds two values and stores the result in the left-hand-side variable,
-  /// rounded to a representable value.
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to add.
-  ///   - rhs: The second value to add.
-  static func +=(_ lhs: inout Self, _ rhs: Self)
-
-  /// Calculates the additive inverse of a value.
-  ///
-  /// The unary minus operator (prefix `-`) calculates the negation of its
-  /// operand. The result is always exact.
-  ///
-  ///     let x = 21.5
-  ///     let y = -x
-  ///     // y == -21.5
-  ///
-  /// - Parameter operand: The value to negate.
-  static prefix func - (_ operand: Self) -> Self
-
   /// Replaces this value with its additive inverse.
   ///
   /// The result is always exact. This example uses the `negate()` method to
@@ -535,62 +495,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///     x.negate()
   ///     // x == -21.5
   mutating func negate()
-
-  /// Subtracts one value from another and produces their difference, rounded
-  /// to a representable value.
-  ///
-  /// The subtraction operator (`-`) calculates the difference of its two
-  /// arguments. For example:
-  ///
-  ///     let x = 7.5
-  ///     let y = x - 2.25
-  ///     // y == 5.25
-  ///
-  /// The `-` operator implements the subtraction operation defined by the
-  /// [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - lhs: A numeric value.
-  ///   - rhs: The value to subtract from `lhs`.
-  static func -(_ lhs: Self, _ rhs: Self) -> Self
-
-  /// Subtracts the second value from the first and stores the difference in
-  /// the left-hand-side variable, rounding to a representable value.
-  ///
-  /// - Parameters:
-  ///   - lhs: A numeric value.
-  ///   - rhs: The value to subtract from `lhs`.
-  static func -=(_ lhs: inout Self, _ rhs: Self)
-
-  /// Multiplies two values and produces their product, rounding to a
-  /// representable value.
-  ///
-  /// The multiplication operator (`*`) calculates the product of its two
-  /// arguments. For example:
-  ///
-  ///     let x = 7.5
-  ///     let y = x * 2.25
-  ///     // y == 16.875
-  ///
-  /// The `*` operator implements the multiplication operation defined by the
-  /// [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  static func *(_ lhs: Self, _ rhs: Self) -> Self
-
-  /// Multiplies two values and stores the result in the left-hand-side
-  /// variable, rounding to a representable value.
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  static func *=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the quotient of dividing the first value by the second, rounded
   /// to a representable value.
