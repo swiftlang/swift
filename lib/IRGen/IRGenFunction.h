@@ -224,6 +224,11 @@ public:
 
   llvm::Value *emitAllocEmptyBoxCall();
 
+  // Emit a call to the given generic type metadata access function.
+  llvm::CallInst *emitGenericTypeMetadataAccessFunctionCall(
+                                          llvm::Function *accessFunction,
+                                          ArrayRef<llvm::Value *> args);
+
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
   // abstraction difference, the metadata contains the layout information for
