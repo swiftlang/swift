@@ -3,8 +3,8 @@
 import TensorFlow
 
 
-// Verify TensorElementProtocol makes it into the test.
-func testTensorElementProtocol<T : TensorElementProtocol>(a : T) -> T {
+// Verify AccelerableTensorUnit makes it into the test.
+func testAccelerableTensorUnit<T : AccelerableTensorUnit>(a : T) -> T {
   return a
 }
 

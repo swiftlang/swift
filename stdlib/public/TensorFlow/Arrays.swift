@@ -19,20 +19,20 @@ import CTensorFlow
 
 /// `TensorBuffer` is the internal storage of ShapedArray. This buffer has
 /// two modes of storage: 'native' and 'tensorFlow'. In 'native' mode, the
-/// buffer object stores a pointer to contiguous elements; in 'tensorFlow'
+/// buffer object stores a pointer to contiguous units; in 'tensorFlow'
 /// mode, the buffer object stores a `TF_Tensor*` and bridges to TensorFlow.
 /// In either mode, the buffer object owns the memory and will deallocate it
 /// on `deinit`.
-fileprivate final class TensorBuffer<Element> {
+fileprivate final class TensorBuffer<Unit> {
   typealias Shape = [Int]
 
   enum Allocation {
-    case native(UnsafeMutablePointer<Element>)
+    case native(UnsafeMutablePointer<Unit>)
     case tensorFlow(CTensor)
   }
 
   let allocation: Allocation
-  private let bufferPointer: UnsafeMutableBufferPointer<Element>
+  private let bufferPointer: UnsafeMutableBufferPointer<Unit>
 
   deinit {
     switch allocation {
@@ -52,20 +52,20 @@ fileprivate final class TensorBuffer<Element> {
       bufferPointer = UnsafeMutableBufferPointer(start: ptr, count: count)
     case let .tensorFlow(cTensor):
       let startAddress = TF_TensorData(cTensor)
-        .assumingMemoryBound(to: Element.self)
+        .assumingMemoryBound(to: Unit.self)
       bufferPointer = UnsafeMutableBufferPointer(
         start: startAddress, count: count)
     }
   }
 
-  convenience init(owning startAddress: UnsafeMutablePointer<Element>,
+  convenience init(owning startAddress: UnsafeMutablePointer<Unit>,
                    count: Int) {
     self.init(allocation: .native(startAddress), count: count)
   }
 }
 
 /// TF Tensor-specific initializer
-extension TensorBuffer where Element : TensorElementProtocol {
+extension TensorBuffer where Unit : AccelerableTensorUnit {
   /// Initialize a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
   convenience init(owning cTensor: CTensor, count: Int) {
@@ -79,8 +79,8 @@ extension TensorBuffer where Element : TensorElementProtocol {
 
 /// Factory methods
 extension TensorBuffer {
-  static func createUninitialized(count: Int) -> TensorBuffer<Element> {
-    let pointer = UnsafeMutablePointer<Element>.allocate(capacity: count)
+  static func createUninitialized(count: Int) -> TensorBuffer<Unit> {
+    let pointer = UnsafeMutablePointer<Unit>.allocate(capacity: count)
     return TensorBuffer(owning: pointer, count: count)
   }
 }
@@ -94,15 +94,15 @@ extension TensorBuffer {
 
 /// Unsafe address accessor
 extension TensorBuffer {
-  func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) throws -> R
+  func withUnsafeMutablePointerToUnits<R>(
+    _ body: (UnsafeMutablePointer<Unit>) throws -> R
   ) rethrows -> R {
     // `baseAddress` is guaranteed non-nil
     return try body(bufferPointer.baseAddress!)
   }
 
   func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> R
   ) rethrows -> R {
     var bufferPointer = self.bufferPointer
     return try body(&bufferPointer)
@@ -115,28 +115,28 @@ extension TensorBuffer {
 //===----------------------------------------------------------------------===//
 
 public protocol ShapedArrayProtocol {
-  associatedtype Element
+  associatedtype Unit
   associatedtype Shape
 
   /// Number of dimensions in this array.
   var rank: Int { get }
   /// Shape of this array.
   var shape: Shape { get }
-  /// The total number of elements in this array.
-  var totalElementCount: Int { get }
+  /// The total number of units in this array.
+  var unitCount: Int { get }
 
-  /// Initialize an array using specific shape and contiguous elements in
+  /// Initialize an array using specific shape and contiguous units in
   /// row-major order.
-  /// - Precondition: The number of `elements` must be equal to the product of
+  /// - Precondition: The number of `units` must be equal to the product of
   /// all dimensions of the shape.
-  init(shape: Shape, elements: [Element])
+  init(shape: Shape, units: [Unit])
 
   /// Initialize an array using specific shape and the contiguous view of
   /// another collection that conforms to ShapedArrayProtocol.
-  /// - Precondition: The number of `elements` must be equal to the product of
+  /// - Precondition: The number of `units` must be equal to the product of
   /// all dimensions of the shape.
-  init<Other>(shape: [Int], elements: ContiguousView<Other>)
-    where Element == Other.Element
+  init<Other>(shape: [Int], units: ContiguousView<Other>)
+    where Unit == Other.Unit
 
   /// Calls a closure with a pointer to the array’s contiguous storage.
   /// - Parameter body: A closure with an UnsafeBufferPointer parameter that
@@ -145,7 +145,7 @@ public protocol ShapedArrayProtocol {
   /// return value for the withUnsafeBufferPointer(_:) method. The pointer
   /// argument is valid only for the duration of the method’s execution.
   func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: (UnsafeBufferPointer<Unit>) throws -> R
   ) rethrows -> R
 
   /// Calls the given closure with a pointer to the array’s mutable contiguous
@@ -156,24 +156,24 @@ public protocol ShapedArrayProtocol {
   /// as the return value for the withUnsafeMutableBufferPointer(_:) method. The
   /// pointer argument is valid only for the duration of the method’s execution.
   mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> R
   ) rethrows -> R
 }
 
 public extension ShapedArrayProtocol {
-  /// A collection view of contiguous elements in row-major order.
-  var contiguousView: ContiguousView<Self> {
+  /// A collection view of contiguous units in row-major order.
+  var units: ContiguousView<Self> {
     return ContiguousView(base: self)
   }
 }
 
-public extension ShapedArrayProtocol where Element : Equatable, Shape : Equatable {
+public extension ShapedArrayProtocol where Unit : Equatable, Shape : Equatable {
   static func == <Other>(lhs: Self, rhs: Other) -> Bool
     where Shape == Other.Shape,
           Other: ShapedArrayProtocol,
-          Element == Other.Element {
+          Unit == Other.Unit {
     return lhs.shape == rhs.shape &&
-      lhs.contiguousView.elementsEqual(rhs.contiguousView)
+      lhs.units.elementsEqual(rhs.units)
   }
 }
 
@@ -182,17 +182,17 @@ public extension ShapedArrayProtocol where Element : Equatable, Shape : Equatabl
 //===----------------------------------------------------------------------===//
 
 /// ShapedArray
-public struct ShapedArray<Element> : ShapedArrayProtocol {
+public struct ShapedArray<Unit> : ShapedArrayProtocol {
   public typealias Shape = [Int]
 
-  /// Contiguous memory storing elements.
-  fileprivate var buffer: TensorBuffer<Element>
+  /// Contiguous memory storing units.
+  fileprivate var buffer: TensorBuffer<Unit>
 
   /// The shape of this array.
   public private(set) var shape: [Int]
 
   /// Initialize a shaped array from an existing buffer and a shape.
-  fileprivate init(buffer: TensorBuffer<Element>, shape: [Int]) {
+  fileprivate init(buffer: TensorBuffer<Unit>, shape: [Int]) {
     precondition(buffer.count == shape.reduce(1, *))
     self.buffer = buffer
     self.shape = shape
@@ -203,16 +203,16 @@ internal extension ShapedArray {
   mutating func ensureUniquelyReferenced() {
     if isKnownUniquelyReferenced(&buffer) { return }
     let oldBuffer = buffer
-    buffer = TensorBuffer.createUninitialized(count: totalElementCount)
-    oldBuffer.withUnsafeMutablePointerToElements { oldPtr in
-      buffer.withUnsafeMutablePointerToElements { ptr in
-        ptr.initialize(from: oldPtr, count: totalElementCount)
+    buffer = TensorBuffer.createUninitialized(count: unitCount)
+    oldBuffer.withUnsafeMutablePointerToUnits { oldPtr in
+      buffer.withUnsafeMutablePointerToUnits { ptr in
+        ptr.initialize(from: oldPtr, count: unitCount)
       }
     }
   }
 }
 
-internal extension ShapedArray where Element : TensorElementProtocol {
+internal extension ShapedArray where Unit : AccelerableTensorUnit {
   @_versioned
   init(moving cTensor: CTensor) {
     shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
@@ -225,7 +225,7 @@ public extension ShapedArray {
     return shape.count
   }
 
-  var totalElementCount: Int {
+  var unitCount: Int {
     return buffer.count
   }
 
@@ -233,48 +233,48 @@ public extension ShapedArray {
     return rank == 0
   }
 
-  var scalar: Element? {
+  var scalar: Unit? {
     guard rank == 0 else { return nil }
-    return contiguousView.first
+    return units.first
   }
 
   init(_ other: ShapedArray) {
     self.init(buffer: other.buffer, shape: other.shape)
   }
 
-  init(shape: [Int], elements: ContiguousView<ShapedArray>) {
-    precondition(elements.count == shape.reduce(1, *))
-    self.init(buffer: elements.base.buffer, shape: shape)
+  init(shape: [Int], units: ContiguousView<ShapedArray>) {
+    precondition(units.count == shape.reduce(1, *))
+    self.init(buffer: units.base.buffer, shape: shape)
   }
 
-  init(shape: [Int], elements: [Element]) {
+  init(shape: [Int], units: [Unit]) {
     let count = shape.reduce(1, *)
-    precondition(count == elements.count)
+    precondition(count == units.count)
     self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
-    buffer.withUnsafeMutablePointerToElements { ptr in
-      elements.withUnsafeBufferPointer { arrayBuf in
+    buffer.withUnsafeMutablePointerToUnits { ptr in
+      units.withUnsafeBufferPointer { arrayBuf in
         ptr.initialize(from: arrayBuf.baseAddress!, count: count)
       }
     }
   }
 
-  init<Other>(shape: [Int], elements: ContiguousView<Other>)
-    where Element == Other.Element {
+  init<Other>(shape: [Int], units: ContiguousView<Other>)
+    where Unit == Other.Unit {
     let count = shape.reduce(1, *)
-    precondition(count == elements.count)
+    precondition(count == units.count)
     self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
-    buffer.withUnsafeMutablePointerToElements { ptr in
-      elements.base.withUnsafeBufferPointer { arrayBuf in
+    buffer.withUnsafeMutablePointerToUnits { ptr in
+      units.base.withUnsafeBufferPointer { arrayBuf in
         ptr.initialize(from: arrayBuf.baseAddress!, count: count)
       }
     }
   }
 
   /// Initialize a scalar tensor.
-  init(_ scalar: Element) {
+  init(_ scalar: Unit) {
     self.init(buffer: TensorBuffer.createUninitialized(count: 1),
               shape: [])
-    buffer.withUnsafeMutablePointerToElements { ptr in
+    buffer.withUnsafeMutablePointerToUnits { ptr in
       ptr.initialize(to: scalar)
     }
   }
@@ -282,10 +282,10 @@ public extension ShapedArray {
   /// Allocate and initialize a tensor to a repeated value.
   /// - parameter shape: tensor shape
   /// - parameter repeating: repeated value
-  init(shape: Shape, repeating repeatedValue: Element) {
+  init(shape: Shape, repeating repeatedValue: Unit) {
     let count = shape.reduce(1, *)
     self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
-    buffer.withUnsafeMutablePointerToElements { ptr in
+    buffer.withUnsafeMutablePointerToUnits { ptr in
       ptr.initialize(repeating: repeatedValue, count: count)
     }
   }
@@ -293,7 +293,7 @@ public extension ShapedArray {
 
 public extension ShapedArray {
   func withUnsafeBufferPointer<Result>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> Result
+    _ body: (UnsafeBufferPointer<Unit>) throws -> Result
   ) rethrows -> Result {
     return try buffer.withUnsafeMutableBufferPointer { ptr in
       try body(UnsafeBufferPointer(ptr))
@@ -301,7 +301,7 @@ public extension ShapedArray {
   }
 
   mutating func withUnsafeMutableBufferPointer<Result>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> Result
+    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> Result
   ) rethrows -> Result {
     ensureUniquelyReferenced()
     return try buffer.withUnsafeMutableBufferPointer { ptr in
@@ -312,22 +312,22 @@ public extension ShapedArray {
 
 
 /// Tensor conversion
-extension ShapedArray where Element : TensorElementProtocol {
+extension ShapedArray where Unit : AccelerableTensorUnit {
   var byteSize: Int {
-    return MemoryLayout<Element>.stride * totalElementCount
+    return MemoryLayout<Unit>.stride * unitCount
   }
 
-  func makeTensorHandle() -> TensorHandle<Element> {
+  func makeTensorHandle() -> TensorHandle<Unit> {
     // This initializer is designed to optimize conversion from TF-allocated
     // `ShapedArray`s.
     switch buffer.allocation {
     case let .native(bufAddr):
-      let cTensor = TF_AllocateTensor(Element.cDataType,
+      let cTensor = TF_AllocateTensor(Unit.cDataType,
                                       shape.map(Int64.init),
                                       Int32(shape.count),
                                       byteSize)!
-      TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
-        .initialize(from: bufAddr, count: totalElementCount)
+      TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
+        .initialize(from: bufAddr, count: unitCount)
       defer {
         TF_DeleteTensor(cTensor)
       }
@@ -339,8 +339,8 @@ extension ShapedArray where Element : TensorElementProtocol {
 }
 
 /// Tensor conversion
-public extension Tensor where Element : TensorElementProtocol {
-  init(_ other: ShapedArray<Element>) {
+public extension Tensor where Unit : AccelerableTensorUnit {
+  init(_ other: ShapedArray<Unit>) {
     self.init(other.makeTensorHandle())
   }
 }
@@ -349,18 +349,18 @@ public extension Tensor where Element : TensorElementProtocol {
 // ContiguousView
 //===----------------------------------------------------------------------===//
 
-/// A view of a shaped array's contents as a collection of elements. It can be
-/// created using the `.contiguousView` getter on a value that conforms to
+/// A view of a shaped array's contents as a collection of units. It can be
+/// created using the `.units` getter on a value that conforms to
 /// `ShapedArrayProtocol`.
 ///
-/// For example, one can mutate the elements of a shaped array using linear
+/// For example, one can mutate the units of a shaped array using linear
 /// indices:
 ///
 ///   let tensor = Tensor([[1, 2], [3, 4]]) // Shape 2 x 2
-///   tensor.contiguousView[3] = 100
+///   tensor.units[3] = 100
 ///
 public struct ContiguousView<Base : ShapedArrayProtocol> {
-  public typealias Element = Base.Element
+  public typealias Element = Base.Unit
   fileprivate var base: Base
 
   fileprivate init(base: Base) {
@@ -370,7 +370,7 @@ public struct ContiguousView<Base : ShapedArrayProtocol> {
 
 extension ContiguousView : RandomAccessCollection {
   public var count: Int {
-    return base.totalElementCount
+    return base.unitCount
   }
 
   public var startIndex: Int {
