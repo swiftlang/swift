@@ -388,6 +388,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::ProtocolConformance:
+    case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
@@ -1372,6 +1373,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptor:
+    Printer << "protocol conformance descriptor for ";
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";

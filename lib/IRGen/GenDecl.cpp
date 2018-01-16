@@ -1329,6 +1329,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::ProtocolConformanceDescriptor:
     return getLinkageAsConformance();
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
@@ -1417,6 +1418,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
