@@ -36,22 +36,6 @@ sil_global @static_array : $TestArrayStorage = {
   %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
 }
 
-// Linkage types.
-
-// CHECK-LABEL: sil shared @clang_thunk : $@convention(thin) () -> ()
-sil shared @clang_thunk : $() -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
-
-// CHECK-LABEL: sil private @internal_fn : $@convention(thin) () -> ()
-sil private @internal_fn : $() -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
-
 // Type references
 
 // Some cyclic type references between SIL function bodies.

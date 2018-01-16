@@ -225,16 +225,46 @@ static std::string mangleGetter(VarDecl *varDecl) {
   return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 
+static SILFunction *getGlobalGetterFunction(SILModule &M,
+                                            SILLocation loc,
+                                            VarDecl *varDecl) {
+  auto getterName = mangleGetter(varDecl);
+
+  // Check if a getter was generated already.
+  if (auto *F = M.lookUpFunction(getterName))
+    return F;
+
+  auto Linkage = (varDecl->getEffectiveAccess() >= AccessLevel::Public
+                  ? SILLinkage::PublicNonABI
+                  : SILLinkage::Private);
+  auto Serialized = (varDecl->getEffectiveAccess() >= AccessLevel::Public
+                     ? IsSerialized
+                     : IsNotSerialized);
+
+  auto refType = M.Types.getLoweredType(varDecl->getInterfaceType());
+
+  // Function takes no arguments and returns refType
+  SILResultInfo Results[] = { SILResultInfo(refType.getSwiftRValueType(),
+                                            ResultConvention::Owned) };
+  SILFunctionType::ExtInfo EInfo;
+  EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
+  auto LoweredType =
+    SILFunctionType::get(nullptr, EInfo,
+                         SILCoroutineKind::None,
+                         ParameterConvention::Direct_Unowned,
+                         /*params*/ {}, /*yields*/ {}, Results, None,
+                         M.getASTContext());
+
+  return M.getOrCreateFunction(
+      loc, getterName, Linkage, LoweredType,
+      IsBare, IsNotTransparent, Serialized);
+}
+
 /// Generate getter from the initialization code whose
 /// result is stored by a given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
-  auto getterName = mangleGetter(varDecl);
-
-  // Check if a getter was generated already.
-  if (auto *F = Store->getModule().lookUpFunction(getterName))
-    return F;
 
   // Find the code that performs the initialization first.
   // Recursively walk the SIL value being assigned to the SILG.
@@ -253,25 +283,15 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
     Insns.push_back(ReverseInsns.pop_back_val());
   }
 
-  // Generate a getter from the global init function without side-effects.
-  auto refType = varDecl->getInterfaceType()->getCanonicalType();
-  // Function takes no arguments and returns refType
-  SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
-  SILFunctionType::ExtInfo EInfo;
-  EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
-  auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
-      /*params*/ {}, /*yields*/ {}, Results, None,
-      Store->getModule().getASTContext());
-  auto *GetterF = Store->getModule().getOrCreateFunction(
-      Store->getLoc(),
-      getterName, SILLinkage::Private, LoweredType,
-      IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
-      IsSerialized_t::IsSerialized);
+  auto *GetterF = getGlobalGetterFunction(Store->getModule(),
+                                          Store->getLoc(),
+                                          varDecl);
+
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
   if (!Store->getFunction()->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
   auto *EntryBB = GetterF->createBasicBlock();
+
   // Copy instructions into GetterF
   InstructionsCloner Cloner(*GetterF, Insns, EntryBB);
   Cloner.clone();
@@ -503,26 +523,9 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
-  auto getterName = mangleGetter(varDecl);
-
-  // Check if a getter was generated already.
-  if (auto *F = InitF->getModule().lookUpFunction(getterName))
-    return F;
-
-  auto refType = varDecl->getInterfaceType()->getCanonicalType();
-  // Function takes no arguments and returns refType
-  SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
-  SILFunctionType::ExtInfo EInfo;
-  EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
-  auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
-      /*params*/ {}, /*yields*/ {}, Results, None,
-      InitF->getASTContext());
-  auto *GetterF = InitF->getModule().getOrCreateFunction(
-      InitF->getLocation(),
-      getterName, SILLinkage::Private, LoweredType,
-      IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
-      IsSerialized_t::IsSerialized);
+  auto *GetterF = getGlobalGetterFunction(InitF->getModule(),
+                                          InitF->getLocation(),
+                                          varDecl);
   if (!InitF->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 

@@ -2192,6 +2192,7 @@ void SILFunction::dump(const char *FileName) const {
 static StringRef getLinkageString(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return "public ";
+  case SILLinkage::PublicNonABI: return "non_abi ";
   case SILLinkage::Hidden: return "hidden ";
   case SILLinkage::Shared: return "shared ";
   case SILLinkage::Private: return "private ";

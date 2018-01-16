@@ -44,6 +44,7 @@ STATISTIC(TotalExternalFuncDecls, "Number of external funcs declarations");
 
 // Linkage statistics
 STATISTIC(TotalPublicFuncs, "Number of public funcs");
+STATISTIC(TotalPublicNonABIFuncs, "Number of public non-ABI funcs");
 STATISTIC(TotalHiddenFuncs, "Number of hidden funcs");
 STATISTIC(TotalPrivateFuncs, "Number of private funcs");
 STATISTIC(TotalSharedFuncs, "Number of shared funcs");
@@ -116,6 +117,9 @@ class InstCount : public SILFunctionTransform {
     switch (F->getLinkage()) {
     case SILLinkage::Public:
       ++TotalPublicFuncs;
+      break;
+    case SILLinkage::PublicNonABI:
+      ++TotalPublicNonABIFuncs;
       break;
     case SILLinkage::Hidden:
       ++TotalHiddenFuncs;

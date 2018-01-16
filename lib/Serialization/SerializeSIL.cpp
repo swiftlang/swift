@@ -64,6 +64,7 @@ toStableConstStringEncoding(ConstStringLiteralInst::Encoding encoding) {
 static unsigned toStableSILLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
+  case SILLinkage::PublicNonABI: return SIL_LINKAGE_PUBLIC_NON_ABI;
   case SILLinkage::Hidden: return SIL_LINKAGE_HIDDEN;
   case SILLinkage::Shared: return SIL_LINKAGE_SHARED;
   case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
