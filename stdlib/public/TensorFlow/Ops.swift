@@ -68,7 +68,7 @@ infix operator ⊗ : MultiplicationPrecedence
 //
 
 /// Arithmetic Operators.
-extension Tensor /*: Numeric*/ where Element : Numeric {
+extension Tensor /*: Numeric*/ where Unit : Numeric {
   @_inlineable
   public static func +(lhs: Tensor, rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Add", "tt:t", lhs.handle, rhs.handle))
@@ -85,14 +85,14 @@ extension Tensor /*: Numeric*/ where Element : Numeric {
   }
 }
 
-public extension Tensor where Element : Numeric {
+public extension Tensor where Unit : Numeric {
   @_inlineable
-  static func +(lhs: Tensor, rhs: Element) -> Tensor {
+  static func +(lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs + Tensor(rhs)
   }
 
   @_inlineable
-  static func +(lhs: Element, rhs: Tensor) -> Tensor {
+  static func +(lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) + rhs
   }
 
@@ -107,12 +107,12 @@ public extension Tensor where Element : Numeric {
   }
 
   @_inlineable
-  static func -(lhs: Tensor, rhs: Element) -> Tensor {
+  static func -(lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs - Tensor(rhs)
   }
 
   @_inlineable
-  static func -(lhs: Element, rhs: Tensor) -> Tensor {
+  static func -(lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) - rhs
   }
 
@@ -122,17 +122,17 @@ public extension Tensor where Element : Numeric {
   }
 
   @_inlineable
-  static func -=(lhs: inout Tensor, rhs: Element) {
+  static func -=(lhs: inout Tensor, rhs: Unit) {
     lhs = lhs - rhs
   }
 
   @_inlineable
-  static func *(lhs: Element, rhs: Tensor) -> Tensor {
+  static func *(lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) * rhs
   }
 
   @_inlineable
-  static func *(lhs: Tensor, rhs: Element) -> Tensor {
+  static func *(lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs * Tensor(rhs)
   }
 
@@ -142,12 +142,12 @@ public extension Tensor where Element : Numeric {
   }
 
   @_inlineable
-  static func /(lhs: Tensor, rhs: Element) -> Tensor {
+  static func /(lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs / Tensor(rhs)
   }
 
   @_inlineable
-  static func /(lhs: Element, rhs: Tensor) -> Tensor {
+  static func /(lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) / rhs
   }
 
@@ -157,7 +157,7 @@ public extension Tensor where Element : Numeric {
   }
 
   @_inlineable
-  static func /=(lhs: inout Tensor, rhs: Element) {
+  static func /=(lhs: inout Tensor, rhs: Unit) {
     lhs = lhs / rhs
   }
 
@@ -173,17 +173,17 @@ public extension Tensor where Element : Numeric {
   }
 
   @_inlineable
-  static func ⊗ (lhs: Element, rhs: Tensor) -> Tensor {
+  static func ⊗ (lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) ⊗ rhs
   }
 
   @_inlineable
-  static func ⊗ (lhs: Tensor, rhs: Element) -> Tensor {
+  static func ⊗ (lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs ⊗ Tensor(rhs)
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func mean() -> Element {
+  func mean() -> Unit {
     // FIXME: Implement!
     fatalError("FIXME: implement reduceMean")
   }
@@ -197,7 +197,7 @@ public extension Tensor where Element : Numeric {
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func min() -> Element {
+  func min() -> Unit {
     fatalError("FIXME: implement min")
   }
 
@@ -210,7 +210,7 @@ public extension Tensor where Element : Numeric {
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func max() -> Element {
+  func max() -> Unit {
     fatalError("FIXME: implement max")
   }
 
@@ -224,7 +224,7 @@ public extension Tensor where Element : Numeric {
 
   // Sum entire tensor to produce a scalar value.
   @inline(never) // make @_inlinable when implemented.
-  func sum() -> Element {
+  func sum() -> Unit {
     fatalError("FIXME: implement sum")
   }
 
@@ -253,36 +253,36 @@ public extension Tensor where Element : Numeric {
   }
 }
 
-public extension Tensor /*: Comparable*/ where Element : Comparable {
+public extension Tensor /*: Comparable*/ where Unit : Comparable {
   @_inlineable
   static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
     return Tensor<Bool>(#tfop("Less", "tt:t<bool>", lhs.handle, rhs.handle))
   }
 
   @_inlineable
-  static func < (lhs: Tensor, rhs: Element) -> Tensor<Bool> {
+  static func < (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
     return lhs < Tensor(rhs)
   }
 
   @_inlineable
-  static func < (lhs: Element, rhs: Tensor) -> Tensor<Bool> {
+  static func < (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
     return Tensor(lhs) < rhs
   }
 }
 
-public extension Tensor /*: Equatable*/ where Element : Equatable {
+public extension Tensor /*: Equatable*/ where Unit : Equatable {
   @_inlineable
   static func == (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
     return Tensor<Bool>(#tfop("Equal", "tt:t<bool>", lhs.handle, rhs.handle))
   }
 
   @_inlineable
-  static func == (lhs: Tensor, rhs: Element) -> Tensor<Bool> {
+  static func == (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
     return lhs == Tensor(rhs)
   }
 
   @_inlineable
-  static func == (lhs: Element, rhs: Tensor) -> Tensor<Bool> {
+  static func == (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
     return Tensor(lhs) == rhs
   }
 }
@@ -301,119 +301,119 @@ public extension Tensor {
 }
 
 @_inlineable
-public func abs<Element: Numeric>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func abs<Unit: Numeric>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Abs", "t:t", x.handle))
 }
 
 @_inlineable
-public func log<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func log<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Log", "t:t", x.handle))
 }
 
 @_inlineable
-public func sin<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func sin<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Sin", "t:t", x.handle))
 }
 
 @_inlineable
-public func cos<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func cos<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Cos", "t:t", x.handle))
 }
 
 @_inlineable
-public func tan<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func tan<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Tan", "t:t", x.handle))
 }
 
 @_inlineable
-public func sinh<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func sinh<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Sinh", "t:t", x.handle))
 }
 
 @_inlineable
-public func cosh<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func cosh<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Cosh", "t:t", x.handle))
 }
 
 @_inlineable
-public func tanh<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func tanh<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Tanh", "t:t", x.handle))
 }
 
 @_inlineable
-public func exp<Element: FloatingPoint>(
-  _ x: Tensor<Element>
-) -> Tensor<Element> {
+public func exp<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Exp", "t:t", x.handle))
 }
 
 @_inlineable
-public func pow<Element>(_ x: Tensor<Element>) -> Tensor<Element> {
+public func pow<Unit>(_ x: Tensor<Unit>) -> Tensor<Unit> {
   return Tensor(#tfop("Pow", "t:t", x.handle))
 }
 
 @_inlineable
-public func min<Element: Comparable>(
-  _ lhs: Tensor<Element>, _ rhs: Tensor<Element>
-) -> Tensor<Element> {
+public func min<Unit: Comparable>(
+  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Min", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable
-public func max<Element: Comparable>(
-  _ lhs: Tensor<Element>, _ rhs: Tensor<Element>
-) -> Tensor<Element> {
+public func max<Unit: Comparable>(
+  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
   return Tensor(#tfop("Max", "tt:t", lhs.handle, rhs.handle))
 }
 
-public extension Tensor2D where Element : Numeric {
+public extension Tensor2D where Unit : Numeric {
   // Sum tensor along one axis, producing a Tensor1D.
   @_inlineable
-  func reduceSum(alongAxis axis: Int) -> Tensor1D<Element> {
-    return Tensor1D<Element>(underlying:
+  func reduceSum(alongAxis axis: Int) -> Tensor1D<Unit> {
+    return Tensor1D<Unit>(underlying:
       underlyingTensor.reduceSum(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMax(alongAxis axis: Int) -> Tensor1D<Element> {
-    return Tensor1D<Element>(underlying:
+  func reduceMax(alongAxis axis: Int) -> Tensor1D<Unit> {
+    return Tensor1D<Unit>(underlying:
       underlyingTensor.reduceMax(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMin(alongAxis axis: Int) -> Tensor1D<Element> {
-    return Tensor1D<Element>(underlying:
+  func reduceMin(alongAxis axis: Int) -> Tensor1D<Unit> {
+    return Tensor1D<Unit>(underlying:
       underlyingTensor.reduceMin(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMean(alongAxis axis: Int) -> Tensor1D<Element> {
-    return Tensor1D<Element>(underlying:
+  func reduceMean(alongAxis axis: Int) -> Tensor1D<Unit> {
+    return Tensor1D<Unit>(underlying:
       underlyingTensor.reduceMean(alongAxes: axis))
   }
 }
 
-public extension Tensor2D where Element : Numeric {
+public extension Tensor2D where Unit : Numeric {
   @_inlineable
   static func ⊗ (
-    lhs: Tensor1D<Element>, rhs: Tensor2D<Element>
-  ) -> Tensor1D<Element> {
+    lhs: Tensor1D<Unit>, rhs: Tensor2D<Unit>
+  ) -> Tensor1D<Unit> {
     return Tensor1D(underlying: lhs.underlyingTensor.dot(rhs.underlyingTensor))
   }
 }
@@ -430,7 +430,7 @@ public extension Tensor {
   }
 
   @_inlineable
-  var totalElementCountTensor: Tensor<Int32> {
+  var unitCountTensor: Tensor<Int32> {
     return Tensor<Int32>(#tfop("Size", "t:t<int32>", handle))
   }
 }
@@ -444,7 +444,7 @@ public extension Tensor {
     fatalError("FIXME: implement subscript to tensor")
   }
 
-  // Slicing out a range of elements.
+  // Slicing out a range of subdimensional tensors.
   // TODO: begin/end are vectors in general.
   // tfop_slice(tensor, begin, end) -> tensor
   subscript(bounds: Range<Int>) -> Tensor {

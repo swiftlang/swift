@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TensorElementProtocol and related helpers.
+// This file defines the AccelerableTensorUnit and related helpers.
 //
 //===----------------------------------------------------------------------===//
 
@@ -73,90 +73,90 @@ extension TensorDataType {
   }
 }
 
-public protocol TensorElementProtocol {
+public protocol AccelerableTensorUnit {
   static var dataType: TensorDataType { get }
 }
 
-internal extension TensorElementProtocol {
+internal extension AccelerableTensorUnit {
   @_versioned
   static var cDataType: TF_DataType {
     return dataType.cDataType
   }
 }
 
-extension Bool : TensorElementProtocol {
+extension Bool : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .bool
   }
 }
 
-extension Int8 : TensorElementProtocol {
+extension Int8 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .int8
   }
 }
 
-extension UInt8 : TensorElementProtocol {
+extension UInt8 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .uint8
   }
 }
 
-extension Int16 : TensorElementProtocol {
+extension Int16 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .int16
   }
 }
 
-extension UInt16 : TensorElementProtocol {
+extension UInt16 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .uint16
   }
 }
 
-extension Int32 : TensorElementProtocol {
+extension Int32 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .int32
   }
 }
 
-extension UInt32 : TensorElementProtocol {
+extension UInt32 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .uint32
   }
 }
 
-extension Int64 : TensorElementProtocol {
+extension Int64 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .int64
   }
 }
 
-extension UInt64 : TensorElementProtocol {
+extension UInt64 : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .uint64
   }
 }
 
-extension Int : TensorElementProtocol {
+extension Int : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .int64
   }
 }
 
-extension UInt : TensorElementProtocol {
+extension UInt : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .uint64
   }
 }
 
-extension Float : TensorElementProtocol {
+extension Float : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .float
   }
 }
 
-extension Double : TensorElementProtocol {
+extension Double : AccelerableTensorUnit {
   public static var dataType: TensorDataType {
     return .double
   }

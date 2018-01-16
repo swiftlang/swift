@@ -28,13 +28,13 @@ import CTensorFlow
 // Tensor type
 //===----------------------------------------------------------------------===//
 
-public struct Tensor<Element : TensorElementProtocol> {
+public struct Tensor<Unit : AccelerableTensorUnit> {
   /// A tensor just contains a TensorHandle under the covers.  This is public to
   /// allow user defined ops, but shouldn't normally be used otherwise.
-  public let handle: TensorHandle<Element>
+  public let handle: TensorHandle<Unit>
 
   @_inlineable
-  public init(_ handle: TensorHandle<Element>) {
+  public init(_ handle: TensorHandle<Unit>) {
     self.handle = handle
   }
 }
@@ -75,15 +75,13 @@ func _TFScalarize<T>(_ handle: TensorHandle<T>) -> T? {
 
 /// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
-  /// Indicate that this tensor is being moved to the accelerator.
   @_inlineable
-  func toDevice() -> Tensor<Element> {
+  func toDevice() -> Tensor {
     return Tensor(_TFSend(handle))
   }
 
-  /// Indicate that this tensor is being moved to the host.
   @_inlineable
-  func toHost() -> Tensor<Element> {
+  func toHost() -> Tensor {
     return Tensor(_TFReceive(handle))
   }
 }
@@ -101,19 +99,19 @@ public extension Tensor {
 
   // Scalar (0-D) initializer, takes exactly one value.
   @_inlineable
-  init(_ value: Element) {
-    self.init(#tfop("Const", "dc:t", Element.self, value))
+  init(_ value: Unit) {
+    self.init(#tfop("Const", "dc:t", Unit.self, value))
   }
 
   /// Vector (1-D) initializer, takes an array of values.
   @_inlineable
-  init(_ vector: [Element]) {
-    self.init(shape: [vector.count], elements: vector)
+  init(_ vector: [Unit]) {
+    self.init(shape: [vector.count], units: vector)
   }
 
   /// Matrix (2-D) initializer, takes an array of array of values.
   @_inlineable
-  init(_ matrix: [[Element]]) {
+  init(_ matrix: [[Unit]]) {
     /// Sanity check
     guard let firstRow = matrix.first else {
       preconditionFailure("The first dimension is empty. Cannot infer shape.")
@@ -123,20 +121,20 @@ public extension Tensor {
     /// Now we make assumption about the shape.
     let rowCount = matrix.count, columnCount = firstRow.count
     let contiguousSize = rowCount * columnCount
-    let byteSize = contiguousSize * MemoryLayout<Element>.stride
+    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
     /// Check rest dimensions.
     for row in matrix.dropFirst() {
       precondition(row.count == columnCount,
                    "Each dimension must have equal number of subdimensions.")
     }
     /// Initialize tensor and copy data.
-    /// We don't want to delegate initialization to `init(shape:elements:)`
+    /// We don't want to delegate initialization to `init(shape:units:)`
     /// because flattening `matrix` to an array is unnecessary cost.
-    let cTensor = TF_AllocateTensor(Element.cDataType,
+    let cTensor = TF_AllocateTensor(Unit.cDataType,
                                     [Int64(rowCount), Int64(columnCount)], 2,
                                     byteSize)
     let status = TF_NewStatus()
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
     /// Copy to TF_Tensor memory, one row at a time.
     for (i, row) in matrix.enumerated() {
       row.withUnsafeBufferPointer { ptr in
@@ -153,23 +151,23 @@ public extension Tensor {
   }
 
   /// Arbitrary shape initializer.
-  /// - Precondition: The number of elements should be the same as the
+  /// - Precondition: The number of units should be the same as the
   /// product of all of shape's dimensions.
   @_inlineable
-  init(shape: [Int], elements: [Element]) {
+  init(shape: [Int], units: [Unit]) {
     let contiguousSize = shape.reduce(1, *)
-    let byteSize = contiguousSize * MemoryLayout<Element>.stride
-    precondition(elements.count == contiguousSize, """
-      The number of elements don't match the shape
+    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
+    precondition(units.count == contiguousSize, """
+      The number of units don't match the shape
       """)
-    let cTensor = TF_AllocateTensor(Element.cDataType,
+    let cTensor = TF_AllocateTensor(Unit.cDataType,
                                     shape.map(Int64.init),
                                     Int32(shape.count),
                                     byteSize)
     let status = TF_NewStatus()
     /// Copy data
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
-    elements.withUnsafeBufferPointer { ptr in
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
+    units.withUnsafeBufferPointer { ptr in
       addr.assign(from: ptr.baseAddress!, count: contiguousSize)
     }
     /// Create handle and we are done
@@ -181,16 +179,16 @@ public extension Tensor {
   }
 
   @_inlineable
-  init(shape: [Int], repeating repeatedValue: Element) {
+  init(shape: [Int], repeating repeatedValue: Unit) {
     let contiguousSize = shape.reduce(1, *)
-    let byteSize = contiguousSize * MemoryLayout<Element>.stride
-    let cTensor = TF_AllocateTensor(Element.cDataType,
+    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
+    let cTensor = TF_AllocateTensor(Unit.cDataType,
                                     shape.map(Int64.init),
                                     Int32(shape.count),
                                     byteSize)
     let status = TF_NewStatus()
     /// Copy data
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Element.self)
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
     /// Memset to `repeatedValue`
     addr.initialize(repeating: repeatedValue, count: contiguousSize)
     /// Create handle and we are done
@@ -209,19 +207,19 @@ public extension Tensor {
 public extension Tensor {
   @_inlineable
   var shape: [Int] {
-    return shapeTensor.elements.contiguousView.map(Int.init)
+    return shapeTensor.array.units.map(Int.init)
   }
 
   @_inlineable
   var rank: Int {
     // TODO: Optimize when we have rank-collapsing scalar getters
-    return Int(rankTensor.elements.scalar!)
+    return Int(rankTensor.array.scalar!)
   }
 
   @_inlineable
-  var totalElementCount: Int {
+  var unitCount: Int {
     // TODO: Optimize when we have rank-collapsing scalar getters
-    return Int(totalElementCountTensor.elements.scalar!)
+    return Int(unitCountTensor.array.scalar!)
   }
 }
 
@@ -229,7 +227,7 @@ public extension Tensor {
 // Factory methods for numeric tensors
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Element : Numeric {
+public extension Tensor where Unit : Numeric {
   /// Zero initializer, takes a list of dimensions.
   @_inlineable
   static func zeros(shape: [Int]) -> Tensor {
@@ -266,7 +264,7 @@ public extension Tensor where Element : Numeric {
 // Factory methods for floating point tensors
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Element : FloatingPoint {
+public extension Tensor where Unit : FloatingPoint {
   // def tf.random_normal(shape, mean=0.0, stddev=1.0, dtype=dtypes.float32,
   //                      seed=None, name=None):
   @inline(never) // make @_inlineable when implemented.
@@ -281,7 +279,7 @@ public extension Tensor where Element : FloatingPoint {
 // Broadcasting and rank lifting
 //===----------------------------------------------------------------------===//
 
-public extension TensorElementProtocol {
+public extension AccelerableTensorUnit {
   /// Broadcast the specified scalar value to be a tensor with the same rank as
   /// the specified other tensor, but with dimension=1 for each rank.
   @inline(never) // make @_inlineable when implemented.
@@ -323,12 +321,12 @@ public extension Tensor {
   /// Returns the underlying scalar from a 0-ranked Tensor.
   /// - precondition: Tensor is 0-ranked.
   @_inlineable
-  var scalar: Element? {
-    return Element(self)
+  var scalar: Unit? {
+    return Unit(self)
   }
 }
 
-public extension TensorElementProtocol {
+public extension AccelerableTensorUnit {
   @_inlineable
   init?(_ tensor: Tensor<Self>) {
     guard let scalar = _TFScalarize(tensor.handle) else {
@@ -362,7 +360,7 @@ extension Tensor : CustomPlaygroundQuickLookable {
 
 public extension Tensor {
   @_inlineable
-  var elements: ShapedArray<Element> {
+  var array: ShapedArray<Unit> {
     return handle.makeHostCopy()
   }
 }

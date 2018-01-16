@@ -19,11 +19,11 @@ import CTensorFlow
 // The C type is TF_TensorHandle*
 public typealias CTensorHandle = OpaquePointer
 
-/// TensorHandle<Element> is the type used by "ops" and the #tfop() syntax
+/// TensorHandle<Unit> is the type used by "ops" and the #tfop() syntax
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
-public final class TensorHandle<Element: TensorElementProtocol> {
+public final class TensorHandle<Unit: AccelerableTensorUnit> {
   // This is the underlying "TF_TensorHandle*" which this TensorHandle
   // represents.
   //
@@ -44,7 +44,7 @@ public final class TensorHandle<Element: TensorElementProtocol> {
 extension TensorHandle {
   @_versioned
   @inline(never)
-  func makeHostCopy() -> ShapedArray<Element> {
+  func makeHostCopy() -> ShapedArray<Unit> {
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
     checkOk(status)
