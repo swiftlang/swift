@@ -24,9 +24,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -65,11 +66,12 @@ struct IRGenContext {
 
 private:
   IRGenContext(ASTContext &ctx, ModuleDecl *module)
-    : SILMod(SILModule::createEmptyModule(module, SILOpts)),
-      IRGen(IROpts, *SILMod),
-      IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>") {
-    }
+      : SILMod(SILModule::createEmptyModule(
+            module, SILOpts, PrimarySpecificPaths::fakeNamesStub())),
+        IRGen(IROpts, *SILMod),
+        IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
+            LLVMContext, "<fake module name>",
+            PrimarySpecificPaths::fakeNamesStub()) {}
 
 public:
   static std::unique_ptr<IRGenContext>

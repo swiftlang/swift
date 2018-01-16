@@ -46,7 +46,8 @@ class CommandOutput {
   /// from which the output file is derived.
   SmallVector<StringRef, 1> BaseInputs;
 
-  llvm::SmallDenseMap<types::ID, std::string, 4> AdditionalOutputsMap;
+  llvm::SmallDenseMap<types::ID, std::vector<std::string>, 4>
+      AdditionalOutputsMap;
 
 public:
   CommandOutput(types::ID PrimaryOutputType)
@@ -69,13 +70,23 @@ public:
   ArrayRef<std::string> getPrimaryOutputFilenames() const {
     return PrimaryOutputFilenames;
   }
-  
-  void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
-  const std::string &getAdditionalOutputForType(types::ID type) const;
 
+  void addAdditionalOutputForType(types::ID type, StringRef OutputFilename);
+  const std::string &getAdditionalDependenciesOutput() const;
+  const std::string &getAdditionalSerializedDiagnosticsOutput() const;
+  ArrayRef<std::string> getAdditionalOutputsForType(types::ID type) const;
+
+  // xxx now that there can be multiples, does this still make sense?
   const std::string &getAnyOutputForType(types::ID type) const;
 
+  void
+  forEachOutputOfType(types::ID type,
+                      llvm::function_ref<void(std::string const &)> fn) const;
+
   StringRef getBaseInput(int Index) const { return BaseInputs[Index]; }
+
+  // xxx move this info into type??
+  static bool doesBatchModeProduceMultiples(types::ID type);
 };
 
 class Job {
@@ -115,24 +126,22 @@ private:
   EnvironmentVector ExtraEnvironment;
 
   /// Whether the job wants a list of input or output files created.
-  FilelistInfo FilelistFileInfo;
+  std::vector<FilelistInfo> FilelistFileInfos;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
 public:
-  Job(const JobAction &Source,
-      SmallVectorImpl<const Job *> &&Inputs,
-      std::unique_ptr<CommandOutput> Output,
-      const char *Executable,
+  Job(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
+      std::unique_ptr<CommandOutput> Output, const char *Executable,
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
-      FilelistInfo Info = {})
+      std::vector<FilelistInfo> Infos = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfo(std::move(Info)) {}
+        FilelistFileInfos(std::move(Infos)) {}
 
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
@@ -140,7 +149,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
-  FilelistInfo getFilelistInfo() const { return FilelistFileInfo; }
+  ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
