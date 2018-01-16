@@ -418,11 +418,22 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  for (const std::string &ModuleOutputPath :
-       context.Output.getAdditionalOutputsForType(
-           types::ID::TY_SwiftModuleFile)) {
-    Arguments.push_back("-emit-module-path");
-    Arguments.push_back(ModuleOutputPath.c_str());
+  // FIXME: (dmu) Either don't use primary-output for module, or fix
+  // getAdditionalOutputsForType to check primary output.
+  if (false /*xxx*/ &&
+      context.Output.getPrimaryOutputType() == types::ID::TY_SwiftModuleFile) {
+    for (const std::string &ModuleOutputPath :
+         context.Output.getPrimaryOutputFilenames()) {
+      Arguments.push_back("-emit-module-path");
+      Arguments.push_back(ModuleOutputPath.c_str());
+    }
+  } else {
+    for (const std::string &ModuleOutputPath :
+         context.Output.getAdditionalOutputsForType(
+             types::ID::TY_SwiftModuleFile)) {
+      Arguments.push_back("-emit-module-path");
+      Arguments.push_back(ModuleOutputPath.c_str());
+    }
   }
 
   for (const std::string &ObjCHeaderOutputPath :

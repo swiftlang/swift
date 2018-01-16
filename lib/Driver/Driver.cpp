@@ -2475,7 +2475,8 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
                                          CommandOutput *Output) const {
 
   // Avoid a redundant output path with the following test:
-  if (Output->getPrimaryOutputType() == types::TY_SwiftModuleFile)
+  if (false /*xxx*/ &&
+      Output->getPrimaryOutputType() == types::TY_SwiftModuleFile)
     return;
 
   // FIXME: dmu temp hack to get timings

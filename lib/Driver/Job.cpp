@@ -36,8 +36,8 @@ void CommandOutput::addAdditionalOutputForType(types::ID type,
   AdditionalOutputsMap[type].push_back(OutputFilename);
 }
 
-ArrayRef<std::string>
-CommandOutput::getAdditionalOutputsForType(types::ID type) const {
+ArrayRef<std::string> CommandOutput::getAdditionalOutputsForType(
+    types::ID type) const { // xxx additional?!
   auto iter = AdditionalOutputsMap.find(type);
   if (iter != AdditionalOutputsMap.end())
     return iter->second;
