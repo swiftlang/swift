@@ -4516,7 +4516,27 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   return call;
 }
 
-/// Load the correct virtual function for the given class method.
+FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                                              llvm::Value *metadata,
+                                              SILDeclRef method,
+                                              CanSILFunctionType methodType) {
+  Signature signature = IGF.IGM.getSignature(methodType);
+
+  auto classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  // Find the vtable entry we're interested in.
+  auto methodInfo =
+    IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
+  auto offset = methodInfo.getOffset();
+
+  auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                      signature.getType()->getPointerTo(),
+                                      IGF.IGM.getPointerAlignment());
+  auto fnPtr = IGF.emitInvariantLoad(slot);
+
+  return FunctionPointer(fnPtr, signature);
+}
+
 FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               llvm::Value *base,
                                               SILType baseType,
@@ -4565,22 +4585,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     }
   }
 
-  // Use the type of the method we were type-checked against, not the
-  // type of the overridden method.
-  auto sig = IGF.IGM.getSignature(methodType);
-
-  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
-
-  auto methodInfo =
-    IGF.IGM.getClassMetadataLayout(declaringClass).getMethodInfo(IGF, overridden);
-  auto offset = methodInfo.getOffset();
-
-  auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                      sig.getType()->getPointerTo(),
-                                      IGF.IGM.getPointerAlignment());
-  auto fnPtr = IGF.emitInvariantLoad(slot);
-
-  return FunctionPointer(fnPtr, sig);
+  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
 }
 
 //===----------------------------------------------------------------------===//
