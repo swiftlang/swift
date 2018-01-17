@@ -30,9 +30,25 @@ public struct _TFCRuntimeConfig {
 typealias CTFStatus = OpaquePointer
 public typealias CTensor = OpaquePointer
 
+// These checks run in both debug and release modes (while assert() only runs in
+// debug mode), to help shake out more bugs and facilitate debugging in the
+// early project phases. It can be replaced with plain assert() later, when we
+// have a more mature code base.
+@_versioned
+func internalConsistencyCheck(
+  _ predicate: Bool,
+  _ errMessage: String = "TF runtime assertion failure",
+  file: StaticString = #file,
+  line: UInt = #line
+) {
+  guard predicate else {
+    fatalError(errMessage, file: file, line: line)
+  }
+}
+
 @_versioned
 func checkOk(_ s: CTFStatus?) {
-  precondition(TF_GetCode(s) == TF_OK, String(cString: TF_Message(s)))
+  internalConsistencyCheck(TF_GetCode(s) == TF_OK, String(cString: TF_Message(s)))
 }
 
 // The call sequence for the APIs below must be one of the two:
@@ -114,7 +130,7 @@ public final class TensorProgram {
         return nil
       }, UnsafeMutableRawPointer(programPtr))
       // TODO(hongm): do error handling.
-      precondition(createStatus == 0)
+      internalConsistencyCheck(createStatus == 0)
     } else {
       // Print a debug message to differentiate from async computation.
       print("Running tensor computation synchronously.")
@@ -142,7 +158,7 @@ public final class TensorProgram {
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
       // TODO(hongm): Assess TF's thread cancel support.
       let cancelStatus = pthread_cancel(pthread)
-      precondition(cancelStatus == 0)
+      internalConsistencyCheck(cancelStatus == 0)
     }
   }
 
@@ -154,7 +170,7 @@ public final class TensorProgram {
   func finish() -> [CTensorHandle] {
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
       let joinStatus = pthread_join(pthread, nil)
-      precondition(joinStatus == 0)
+      internalConsistencyCheck(joinStatus == 0)
     }
 
     // Now that all the elements have been filled in, remove a level of optional.
@@ -218,9 +234,8 @@ public func _TFCFinishTensorProgram(
   _ tensorResultCount: Int) {
 
   let results = program.finish()
-  // TODO(hongm): Change to some form of assert.
-  precondition(results.count == tensorResultCount,
-               "internal compiler error: result count mismatch!")
+  internalConsistencyCheck(results.count == tensorResultCount,
+    "internal compiler error: result count mismatch!")
 
   let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
                                                 count: tensorResultCount)
