@@ -73,10 +73,18 @@ struct alignas(1 << SyntaxAlignInBits) RootContextData {
   // Where to issue diagnostics.
   DiagnosticEngine &Diags;
 
+  SourceManager &SourceMgr;
+
+  unsigned BufferID;
+
   // Storage for Collected parts.
   std::vector<RC<RawSyntax>> Storage;
 
-  RootContextData(SourceFile &SF, DiagnosticEngine &Diags): SF(SF), Diags(Diags) {}
+  RootContextData(SourceFile &SF,
+                  DiagnosticEngine &Diags,
+                  SourceManager &SourceMgr,
+                  unsigned BufferID): SF(SF), Diags(Diags),
+                    SourceMgr(SourceMgr), BufferID(BufferID) {}
 };
 
 /// RAII object which receive RawSyntax parts. On destruction, this constructs
@@ -133,7 +141,7 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
-    DiagnosticEngine &Diags);
+    DiagnosticEngine &Diags, SourceManager &SourceMgr, unsigned BufferID);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)

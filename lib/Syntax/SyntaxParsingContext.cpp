@@ -20,6 +20,7 @@
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
+#include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/Trivia.h"
@@ -52,10 +53,12 @@ RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF,
-                                           DiagnosticEngine &Diags)
-    : RootDataOrParent(new RootContextData(SF, Diags)), CtxtHolder(CtxtHolder),
-      Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
-      Enabled(SF.shouldKeepSyntaxInfo()) {
+                                           DiagnosticEngine &Diags,
+                                           SourceManager &SourceMgr,
+                                           unsigned BufferID)
+    : RootDataOrParent(new RootContextData(SF, Diags, SourceMgr, BufferID)),
+      CtxtHolder(CtxtHolder), Storage(getRootData().Storage), Offset(0),
+      Mode(AccumulationMode::Root), Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
 }
 
@@ -214,7 +217,37 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
   }
 }
 
-void finalizeSourceFile(SourceFile &SF, ArrayRef<RC<RawSyntax>> Parts) {
+/// This verifier traverses a syntax node to emit proper diagnostics.
+class SyntaxVerifier: public SyntaxVisitor {
+  SourceFileSyntax Root;
+  RootContextData &RootData;
+  template<class T>
+  SourceLoc getSourceLoc(T Node) {
+    return RootData.SourceMgr.getLocForOffset(RootData.BufferID,
+      Node.getAbsolutePosition(Root).getOffset());
+  }
+public:
+  SyntaxVerifier(SourceFileSyntax Root, RootContextData &RootData) :
+    Root(Root), RootData(RootData) {}
+  void visit(UnknownDeclSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "declaration");
+    visitChildren(Node);
+  }
+  void visit(UnknownExprSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "expression");
+    visitChildren(Node);
+  }
+
+  void verify(Syntax Node) {
+    Node.accept(*this);
+  }
+};
+
+void finalizeSourceFile(RootContextData &RootData,
+                        ArrayRef<RC<RawSyntax>> Parts) {
+  SourceFile &SF = RootData.SF;
   std::vector<DeclSyntax> AllTopLevel;
   llvm::Optional<TokenSyntax> EOFToken;
 
@@ -242,6 +275,14 @@ void finalizeSourceFile(SourceFile &SF, ArrayRef<RC<RawSyntax>> Parts) {
       SyntaxFactory::makeDeclList(AllTopLevel),
       EOFToken.hasValue() ? *EOFToken
                           : TokenSyntax::missingToken(tok::eof, "")));
+
+  if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
+    // Verify the added nodes if specified.
+    SyntaxVerifier Verifier(SF.getSyntaxRoot(), RootData);
+    for (auto RawNode: Parts) {
+      Verifier.verify(make<Syntax>(RawNode));
+    }
+  }
 }
 } // End of anonymous namespace
 
@@ -294,7 +335,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
     assert(isRoot() && "AccumulationMode::Root is only for root context");
-    finalizeSourceFile(getRootData().SF, getParts());
+    finalizeSourceFile(getRootData(), getParts());
     break;
 
   // Never.
