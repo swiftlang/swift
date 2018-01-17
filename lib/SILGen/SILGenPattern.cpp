@@ -422,7 +422,10 @@ public:
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
-  JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt, bool hasFallthroughTo);
+  void initSharedCaseBlockDest(CaseStmt *caseBlock, bool hasFallthroughTo);
+
+  JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
+
   void emitSharedCaseBlocks();
 
   void emitCaseBody(CaseStmt *caseBlock);
@@ -2324,44 +2327,42 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
   }
 }
 
-/// Retrieve the jump destination for a shared case block.
-JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
-                                                      bool hasFallthroughTo) {
+void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
+                                                   bool hasFallthroughTo) {
   auto result = SharedCases.insert({caseBlock, {nullptr, hasFallthroughTo}});
+  assert(result.second);
 
-  // If there's already an entry, use that.
-  SILBasicBlock *block;
-  if (!result.second) {
-    block = result.first->second.first;
-    assert(block);
-  } else {
-    // Create the shared destination at the first place that might
-    // have needed it.
-    block = SGF.createBasicBlock();
-    result.first->second.first = block;
+  auto *block = SGF.createBasicBlock();
+  result.first->second.first = block;
     
-    // Add args for any pattern variables
-    if (caseBlock->hasBoundDecls()) {
-      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-      pattern->forEachVariable([&](VarDecl *V) {
-        if (!V->hasName())
-          return;
-        // We should never PHI addresses. To eliminate that possibility, we:
-        //
-        // 1. Load all loadable types and pass them as objects to the block.
-        // 2. We do not emit arguments for address only types. We instead just
-        // assign SILUndef to the VarLoc.
-        SILType ty = SGF.getLoweredType(V->getType());
-        if (ty.isAddressOnly(SGF.F.getModule()))
-          return;
-        block->createPHIArgument(ty, ValueOwnershipKind::Owned, V);
-      });
-    }
+  // Add args for any pattern variables
+  if (caseBlock->hasBoundDecls()) {
+    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    pattern->forEachVariable([&](VarDecl *V) {
+      if (!V->hasName())
+        return;
+
+      // We don't pass address-only values in basic block arguments.
+      SILType ty = SGF.getLoweredType(V->getType());
+      if (ty.isAddressOnly(SGF.F.getModule()))
+        return;
+      block->createPHIArgument(ty, ValueOwnershipKind::Owned, V);
+    });
   }
+}
+
+/// Retrieve the jump destination for a shared case block.
+JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
+  auto result = SharedCases.find(caseBlock);
+  assert(result != SharedCases.end());
+
+  auto *block = result->second.first;
+  assert(block);
 
   return JumpDest(block, PatternMatchStmtDepth,
                   CleanupLocation(PatternMatchStmt));
 }
+
 
 /// Emit all the shared case statements.
 void PatternMatchEmission::emitSharedCaseBlocks() {
@@ -2386,8 +2387,13 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
       SGF.B.setInsertionPoint(predBB);
       
     } else {
+      // FIXME: Figure out why this is necessary.
+      if (caseBB->pred_empty()) {
+        SGF.eraseBasicBlock(caseBB);
+        continue;
+      }
+
       // Otherwise, move the block to after the first predecessor.
-      assert(!caseBB->pred_empty() && "Emitted an unused shared block?");
       auto predBB = *caseBB->pred_begin();
       caseBB->moveAfter(predBB);
 
@@ -2593,12 +2599,11 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     if (!caseBlock->hasBoundDecls()) {
       // Don't emit anything yet, we emit it at the cleanup level of the switch
       // statement.
-      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
-                                                        row.hasFallthroughTo());
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
     } else if (caseBlock->getCaseLabelItems().size() > 1) {
       JumpDest sharedDest =
-          emission.getSharedCaseBlockDest(caseBlock, row.hasFallthroughTo());
+          emission.getSharedCaseBlockDest(caseBlock);
 
       // Generate the arguments from this row's pattern in the case block's expected order,
       // and keep those arguments from being cleaned up, as we're passing the +1 along to
@@ -2679,6 +2684,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   clauseRows.reserve(S->getRawCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
+    if (!caseBlock->hasBoundDecls() ||
+        caseBlock->getCaseLabelItems().size() > 1 ||
+        hasFallthrough) {
+      emission.initSharedCaseBlockDest(caseBlock, hasFallthrough);
+    }
+
     for (auto &labelItem : caseBlock->getCaseLabelItems()) {
       clauseRows.emplace_back(caseBlock,
                               const_cast<Pattern*>(labelItem.getPattern()),
@@ -2721,7 +2732,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   // Get the destination block.
   CaseStmt *caseStmt = S->getFallthroughDest();
   JumpDest sharedDest =
-    context->Emission.getSharedCaseBlockDest(caseStmt, true);
+    context->Emission.getSharedCaseBlockDest(caseStmt);
   Cleanups.emitBranchAndCleanups(sharedDest, S);
 }
 
