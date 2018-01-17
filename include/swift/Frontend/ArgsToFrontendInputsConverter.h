@@ -45,7 +45,7 @@ namespace swift {
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const ArgList &Args;
-  FrontendInputs &Inputs;
+  FrontendInputsAndOutputs &InputsAndOutputs;
 
   Arg const *const FilelistPathArg;
   Arg const *const PrimaryFilelistPathArg;
@@ -56,7 +56,7 @@ class ArgsToFrontendInputsConverter {
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags, const ArgList &args,
-                                FrontendInputs &inputs);
+                                FrontendInputsAndOutputs &inputsAndOutputs);
 
   bool convert();
 

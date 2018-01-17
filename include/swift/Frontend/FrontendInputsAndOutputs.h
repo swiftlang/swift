@@ -15,7 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -30,26 +30,26 @@ namespace swift {
 
 /// Information about all the inputs and outputs to the frontend.
 
-class FrontendInputs {
+class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
-  std::vector<InputFile> AllFiles;
+  std::vector<InputFile> AllInputs;
   typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
 public:
-  FrontendInputs() = default;
+  FrontendInputsAndOutputs() = default;
 
-  FrontendInputs(const FrontendInputs &other) {
-    for (InputFile input : other.getAllFiles())
+  FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other) {
+    for (InputFile input : other.getAllInputs())
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   }
 
-  FrontendInputs &operator=(const FrontendInputs &other) {
+  FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other) {
     clearInputs();
-    for (InputFile input : other.getAllFiles())
+    for (InputFile input : other.getAllInputs())
       addInput(input);
     IsSingleThreadedWMO = other.IsSingleThreadedWMO;
     return *this;
@@ -79,22 +79,22 @@ public:
 
   // Readers:
 
-  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-  std::vector<InputFile> &getAllFiles() { return AllFiles; }
+  ArrayRef<InputFile> getAllInputs() const { return AllInputs; }
+  std::vector<InputFile> &getAllInputs() { return AllInputs; }
 
   InputFile &firstPrimaryInput();
   const InputFile &firstPrimaryInput() const;
 
   std::vector<std::string> getInputFilenames() const;
 
-  unsigned inputCount() const { return getAllFiles().size(); }
+  unsigned inputCount() const { return getAllInputs().size(); }
 
-  bool hasInputs() const { return !getAllFiles().empty(); }
+  bool hasInputs() const { return !getAllInputs().empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
-  const InputFile &firstInput() const { return getAllFiles()[0]; }
-  InputFile &firstInput() { return getAllFiles()[0]; }
+  const InputFile &firstInput() const { return getAllInputs()[0]; }
+  InputFile &firstInput() { return getAllInputs()[0]; }
 
   StringRef getFilenameOfFirstInput() const;
 

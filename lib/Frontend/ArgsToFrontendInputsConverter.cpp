@@ -30,8 +30,9 @@ using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args, FrontendInputs &inputs)
-    : Diags(diags), Args(args), Inputs(inputs),
+    DiagnosticEngine &diags, const ArgList &args,
+    FrontendInputsAndOutputs &inputsAndOutputs)
+    : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
@@ -50,7 +51,7 @@ bool ArgsToFrontendInputsConverter::convert() {
     return true;
 
   // Must be set before we iterate over inputs needing outputs.
-  Inputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
+  InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
 
   return false;
 }
@@ -138,7 +139,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
     std::set<StringRef> primaryFiles) {
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    Inputs.addInput(InputFile(file, isPrimary));
+    InputsAndOutputs.addInput(InputFile(file, isPrimary));
     if (isPrimary)
       primaryFiles.erase(file);
   }
@@ -158,7 +159,7 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
 }
 
 bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
-  return Inputs.hasInputs() && !Inputs.hasPrimaryInputs() &&
+  return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
          OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
                                                                           Diags)
                  .size() == 1;

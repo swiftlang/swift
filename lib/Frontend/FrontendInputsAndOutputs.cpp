@@ -27,7 +27,7 @@
 using namespace swift;
 using namespace llvm::opt;
 
-bool FrontendInputs::shouldTreatAsLLVM() const {
+bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
@@ -36,7 +36,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
   return false;
 }
 
-bool FrontendInputs::shouldTreatAsSIL() const {
+bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
@@ -56,18 +56,19 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
-unsigned
-FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
+unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
+    const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const std::pair<StringRef, unsigned> &elem) -> bool {
-        StringRef filename = getAllFiles()[elem.second].file();
+        StringRef filename = getAllInputs()[elem.second].file();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                                  bool isREPLRequested,
-                                  bool isNoneRequested) const {
+bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
+                                            bool treatAsSIL,
+                                            bool isREPLRequested,
+                                            bool isNoneRequested) const {
   if (isREPLRequested) {
     if (hasInputs()) {
       diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -96,8 +97,8 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
   return false;
 }
 
-bool FrontendInputs::areAllNonPrimariesSIB() const {
-  for (const InputFile &input : getAllFiles()) {
+bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
+  for (const InputFile &input : getAllInputs()) {
     if (input.isPrimary())
       continue;
     if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
@@ -107,24 +108,24 @@ bool FrontendInputs::areAllNonPrimariesSIB() const {
   return true;
 }
 
-InputFile &FrontendInputs::firstPrimaryInput() {
+InputFile &FrontendInputsAndOutputs::firstPrimaryInput() {
   assert(!PrimaryInputs.empty());
-  return getAllFiles()[PrimaryInputs.front().second];
+  return getAllInputs()[PrimaryInputs.front().second];
 }
-const InputFile &FrontendInputs::firstPrimaryInput() const {
+const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
   assert(!PrimaryInputs.empty());
-  return getAllFiles()[PrimaryInputs.front().second];
+  return getAllInputs()[PrimaryInputs.front().second];
 }
 
-std::vector<std::string> FrontendInputs::getInputFilenames() const {
+std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
   std::vector<std::string> filenames;
-  for (auto &input : getAllFiles()) {
+  for (auto &input : getAllInputs()) {
     filenames.push_back(input.file());
   }
   return filenames;
 }
 
-StringRef FrontendInputs::getFilenameOfFirstInput() const {
+StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
   assert(hasInputs());
   const InputFile &inp = firstInput();
   StringRef f = inp.file();
@@ -132,115 +133,117 @@ StringRef FrontendInputs::getFilenameOfFirstInput() const {
   return f;
 }
 
-const InputFile *FrontendInputs::getUniquePrimaryInput() const {
+const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
   assertMustNotBeMoreThanOnePrimaryInput();
   const auto b = PrimaryInputs.begin();
-  return b == PrimaryInputs.end() ? nullptr : &getAllFiles()[b->second];
+  return b == PrimaryInputs.end() ? nullptr : &getAllInputs()[b->second];
 }
 
-const InputFile &FrontendInputs::getRequiredUniquePrimaryInput() const {
+const InputFile &
+FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
   if (const auto *input = getUniquePrimaryInput())
     return *input;
   llvm_unreachable("No primary when one is required");
 }
 
-StringRef FrontendInputs::getNameOfUniquePrimaryInputFile() const {
+StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
   const auto *input = getUniquePrimaryInput();
   return input == nullptr ? StringRef() : input->file();
 }
 
-bool FrontendInputs::isFilePrimary(StringRef file) {
+bool FrontendInputsAndOutputs::isFilePrimary(StringRef file) {
   return PrimaryInputs.count(file) != 0;
 }
 
-void FrontendInputs::addInputFile(StringRef file, llvm::MemoryBuffer *buffer) {
+void FrontendInputsAndOutputs::addInputFile(StringRef file,
+                                            llvm::MemoryBuffer *buffer) {
   addInput(InputFile(file, false, buffer));
 }
-void FrontendInputs::addPrimaryInputFile(StringRef file,
-                                         llvm::MemoryBuffer *buffer) {
+void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
+                                                   llvm::MemoryBuffer *buffer) {
   addInput(InputFile(file, true, buffer));
 }
 
-void FrontendInputs::addInput(const InputFile &input) {
-  getAllFiles().push_back(input);
+void FrontendInputsAndOutputs::addInput(const InputFile &input) {
+  getAllInputs().push_back(input);
   if (input.isPrimary()) {
     // Take care to push a reference to the string in the InputFile stored in
-    // AllFiles, NOT in the input parameter.
-    PrimaryInputs.insert(
-        std::make_pair(getAllFiles().back().file(), getAllFiles().size() - 1));
+    // AllInputs, NOT in the input parameter.
+    PrimaryInputs.insert(std::make_pair(getAllInputs().back().file(),
+                                        getAllInputs().size() - 1));
   }
 }
 
-void FrontendInputs::clearInputs() {
-  AllFiles.clear();
+void FrontendInputsAndOutputs::clearInputs() {
+  AllInputs.clear();
   PrimaryInputs.clear();
 }
 
-void FrontendInputs::assertMustNotBeMoreThanOnePrimaryInput() const {
+void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
   assert(primaryInputCount() < 2 &&
          "have not implemented >1 primary input yet");
 }
 
-unsigned FrontendInputs::countOfFilesProducingOutput() const {
+unsigned FrontendInputsAndOutputs::countOfFilesProducingOutput() const {
   return hasPrimaryInputs() ? primaryInputCount() : inputCount();
 }
 
-const InputFile &FrontendInputs::firstInputProducingOutput() const {
+const InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() const {
   return isSingleThreadedWMO()
              ? *getSingleThreadedWMOInput()
              : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
 }
 
-bool FrontendInputs::forEachInputProducingOutput(
+bool FrontendInputsAndOutputs::forEachInputProducingOutput(
     llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
   return isSingleThreadedWMO()
              ? fn(*getSingleThreadedWMOInput(), 0)
              : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
-bool FrontendInputs::forEachInput(
+bool FrontendInputsAndOutputs::forEachInput(
     llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
-  for (auto i : indices(getAllFiles()))
-    if (fn(getAllFiles()[i], i))
+  for (auto i : indices(getAllInputs()))
+    if (fn(getAllInputs()[i], i))
       return true;
   return false;
 }
 
-bool FrontendInputs::forEachPrimaryInput(
+bool FrontendInputsAndOutputs::forEachPrimaryInput(
     llvm::function_ref<bool(const InputFile &, unsigned)> fn) const {
   unsigned i = 0;
   for (const auto p : PrimaryInputs)
-    if (fn(getAllFiles()[p.second], i++))
+    if (fn(getAllInputs()[p.second], i++))
       return true;
   return false;
 }
 
-InputFile &FrontendInputs::firstInputProducingOutput() {
+InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() {
   return isSingleThreadedWMO()
              ? *getSingleThreadedWMOInput()
              : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
 }
 
-bool FrontendInputs::forEachInputProducingOutput(
+bool FrontendInputsAndOutputs::forEachInputProducingOutput(
     llvm::function_ref<bool(InputFile &, unsigned)> fn) {
   return isSingleThreadedWMO()
              ? fn(*getSingleThreadedWMOInput(), 0)
              : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
 
-bool FrontendInputs::forEachInput(
+bool FrontendInputsAndOutputs::forEachInput(
     llvm::function_ref<bool(InputFile &, unsigned)> fn) {
-  for (auto i : indices(getAllFiles()))
-    if (fn(getAllFiles()[i], i))
+  for (auto i : indices(getAllInputs()))
+    if (fn(getAllInputs()[i], i))
       return true;
   return false;
 }
 
-bool FrontendInputs::forEachPrimaryInput(
+bool FrontendInputsAndOutputs::forEachPrimaryInput(
     llvm::function_ref<bool(InputFile &input, unsigned)> fn) {
   unsigned i = 0;
   for (auto p : PrimaryInputs)
-    if (fn(getAllFiles()[p.second], i++))
+    if (fn(getAllInputs()[p.second], i++))
       return true;
   return false;
 }
