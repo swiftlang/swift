@@ -405,6 +405,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   addSSAPasses(P, OptimizationLevelKind::LowLevel);
 
+  P.addDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();
 

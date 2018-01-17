@@ -5,7 +5,6 @@
 
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{.*}}):
-// CHECK: alloc_ref
 // CHECK: function_ref @unknown1
 // CHECK: apply
 // CHECK: apply
