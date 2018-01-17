@@ -133,10 +133,11 @@ namespace {
    };
 } // end anonymous namespace
 
-static std::tuple<Type, Type, OptionalAdjustmentKind>
-getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
-                  Type witnessType, bool witnessTypeIsIUO,
-                  VarianceKind variance) {
+static std::tuple<Type,Type, OptionalAdjustmentKind> 
+getTypesToCompare(ValueDecl *reqt, 
+                  Type reqtType,
+                  Type witnessType,
+                  VarianceKind variance) {  
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
@@ -159,11 +160,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
         break;
 
       case OTK_Optional:
-        if (witnessTypeIsIUO) {
-          optAdjustment = OptionalAdjustmentKind::RemoveIUO;
-          break;
-        }
-
         switch (variance) {
         case VarianceKind::None:
         case VarianceKind::Covariant:
@@ -183,17 +179,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
       break;
 
     case OTK_Optional:
-      // When the requirement is an IUO, all is permitted, because we
-      // assume that the user knows more about the signature than we
-      // have information in the protocol.
-      if (reqtTypeIsIUO)
-        break;
-
-      if (witnessTypeIsIUO) {
-        optAdjustment = OptionalAdjustmentKind::IUOToOptional;
-        break;
-      }
-
       switch (witnessOptKind) {
       case OTK_None:
         switch (variance) {
@@ -224,15 +209,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
       // have information in the protocol.
       break;
     }
-  } else {
-    // FIXME: Until IUOs are removed from the type system, make
-    // sure we turn these both into optionals for the purpose of
-    // comparing types since we could be producing IUOs in some
-    // places and optionals in others.
-    if (auto objTy = reqtType->getImplicitlyUnwrappedOptionalObjectType())
-      reqtType = OptionalType::get(objTy);
-    if (auto objTy = witnessType->getImplicitlyUnwrappedOptionalObjectType())
-      witnessType = OptionalType::get(objTy);
   }
 
   return std::make_tuple(reqtType, witnessType, optAdjustment);
@@ -365,14 +341,6 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   }
 
   return false;
-}
-
-static ParameterList *getParameterList(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->getParameterList(func->getDeclContext()->isTypeContext());
-
-  auto subscript = cast<SubscriptDecl>(value);
-  return subscript->getIndices();
 }
 
 RequirementMatch
@@ -522,13 +490,9 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto reqTypeIsIUO =
-          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto witnessTypeIsIUO =
-          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto types =
-          getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
-                            witnessTypeIsIUO, VarianceKind::Covariant);
+      auto types = getTypesToCompare(req, reqResultType, 
+                                     witnessResultType,
+                                     VarianceKind::Covariant);
 
       // Record optional adjustment, if any.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -536,10 +500,8 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types)));
       }
 
-      if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
-        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-
-      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
+      if (auto result = matchTypes(std::get<0>(types), 
+                                   std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -555,12 +517,6 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, 
                               witnessType);
 
-    ParameterList *witnessParamList = getParameterList(witness);
-    assert(witnessParamList->size() == witnessParams.size());
-
-    ParameterList *reqParamList = getParameterList(req);
-    assert(reqParamList->size() == reqParams.size());
-
     // Match each of the parameters.
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
       // Variadic bits must match.
@@ -574,22 +530,11 @@ swift::matchWitness(
       if (reqParams[i].isInOut() != witnessParams[i].isInOut())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
-      auto reqParamDecl = reqParamList->get(i);
-      auto witnessParamDecl = witnessParamList->get(i);
-
-      auto reqParamTypeIsIUO =
-          reqParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto witnessParamTypeIsIUO =
-          witnessParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
-      auto types =
-          getTypesToCompare(req, reqParams[i].getType(), reqParamTypeIsIUO,
-                            witnessParams[i].getType(), witnessParamTypeIsIUO,
-                            VarianceKind::Contravariant);
+      auto types = getTypesToCompare(req, reqParams[i].getType(),
+                                     witnessParams[i].getType(),
+                                     VarianceKind::Contravariant);
 
       // Record any optional adjustment that occurred.
       if (std::get<2>(types) != OptionalAdjustmentKind::None) {
@@ -597,10 +542,9 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types), i));
       }
 
-      if (!req->isObjC() && reqParamTypeIsIUO != witnessParamTypeIsIUO)
-        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-
-      if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
+      // Check whether the parameter types match.
+      if (auto result = matchTypes(std::get<0>(types), 
+                                   std::get<1>(types))) {
         return std::move(result.getValue());
       }
     }
@@ -612,21 +556,15 @@ swift::matchWitness(
     }
 
   } else {
-    auto reqTypeIsIUO =
-        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    auto witnessTypeIsIUO =
-        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
-                                   witnessTypeIsIUO, VarianceKind::None);
+    // Simple case: add the constraint.
+    auto types = getTypesToCompare(req, reqType, witnessType,
+                                   VarianceKind::None);
 
     // Record optional adjustment, if any.
     if (std::get<2>(types) != OptionalAdjustmentKind::None) {
       optionalAdjustments.push_back(
         OptionalAdjustment(std::get<2>(types)));
     }
-
-    if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
-      return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return std::move(result.getValue());
@@ -785,8 +723,8 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
   };
 
   // Match a type in the requirement to a type in the witness.
-  auto matchTypes = [&](Type reqType,
-                        Type witnessType) -> Optional<RequirementMatch> {
+  auto matchTypes = [&](Type reqType, Type witnessType) 
+                      -> Optional<RequirementMatch> {
     cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return None;
