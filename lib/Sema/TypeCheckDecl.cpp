@@ -4787,6 +4787,34 @@ public:
           }
         }
 
+        // Require the superclass to have an available designated initializer,
+        // unless we have already determined the class or superclass is invalid.
+        if (!isInvalidSuperclass && !Super->isInvalid()) {
+          bool superIsConstructible = false; // can be satisfied by convenience initializers
+          bool superHasDesignatedInitializer = false; // is subclassable
+          for (auto member : Super->getMembers()) {
+            if (auto constructor = dyn_cast<ConstructorDecl>(member)) {
+              superIsConstructible = true;
+              if (constructor->isDesignatedInit()) {
+                superHasDesignatedInitializer = true;
+                break;
+              }
+            }
+          }
+
+          if (!superHasDesignatedInitializer) {
+            if (superIsConstructible) {
+              TC.diagnose(Super->getLoc(), diag::no_accessible_initializers,
+                          Super->getDeclaredType()); // TODO: is this error being handled elsewhere? Can my code jump in on this check and refine it?
+
+            } else {
+              TC.diagnose(CD, diag::inheritance_from_class_with_no_designated_initializers,
+                          Super->getName());
+              isInvalidSuperclass = true;
+            }
+          }
+        }
+
         // Require the superclass to be open if this is outside its
         // defining module.  But don't emit another diagnostic if we
         // already complained about the class being inherently

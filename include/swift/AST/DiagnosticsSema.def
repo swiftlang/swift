@@ -2002,6 +2002,9 @@ ERROR(inheritance_from_cf_class,none,
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
       "Objective-C runtime", (Identifier))
+ERROR(inheritance_from_class_with_no_designated_initializers,none,
+	  "cannot inherit from class %0 because it has no designated initializers",
+	  (Identifier))
 WARNING(class_inherits_anyobject,none,
         "conformance of class %0 to 'AnyObject' is redundant", (Type))
 

@@ -57,3 +57,9 @@ class NSSomething : NSObject {
   // expected-error@-2 {{class 'NSSomething' has no initializers}}
   var x: Int // expected-error{{stored property 'x' requires an initial value or should be @NSManaged}}
 }
+
+class NotInitializable : NSProxy { // expected-error{{cannot inherit from class 'NSProxy' because it has no designated initializers}}
+}
+
+class StillNotInitializable : NotInitializable { // expected-error{{cannot inherit from class 'NotInitializable' because it has no designated initializers}}
+}
