@@ -490,10 +490,11 @@ public:
     IsActive = active;
   }
 
-  /// Whether this constraint is active, i.e., in the worklist.
+  /// Whether this constraint is disable, i.e.,
+  /// shouldn't be considered by the solver.
   bool isDisabled() const { return IsDisabled; }
 
-  /// Set whether this constraint is active or not.
+  /// Set whether this constraint is disabled.
   void setDisabled() {
     assert(!isActive() && "Cannot disable constraint marked as active!");
     IsDisabled = true;

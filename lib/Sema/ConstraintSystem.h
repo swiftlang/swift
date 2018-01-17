@@ -914,6 +914,13 @@ public:
   /// The original CS if this CS was created as a simplification of another CS
   ConstraintSystem *baseCS = nullptr;
 
+  /// Collects all of the witnesses to protocol requirements we have
+  /// found in the overload sets, so they can be enabled/disabled on
+  /// demain as we solve the system.
+  llvm::SmallDenseMap<Constraint *,
+                      llvm::SmallVector<std::pair<unsigned, Constraint *>, 8>>
+      Witnesses;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
