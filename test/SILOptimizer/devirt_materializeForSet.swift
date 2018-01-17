@@ -5,7 +5,7 @@
 //
 // Note: now we no longer speculatively devirtualize inside thunks, so this test does nothing.
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T024devirt_materializeForSet7BaseFooCAA0F0A2aDP3barSSvmTW
+// CHECK-LABEL: sil shared [transparent] [thunk] @$S24devirt_materializeForSet7BaseFooCAA0F0A2aDP3barSSvmTW
 
 public protocol Foo {
     var bar: String { get set }

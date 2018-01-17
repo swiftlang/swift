@@ -16,13 +16,11 @@ public protocol Runcible {
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
-// -- type metadata + 0x02 (nonunique type metadata)
-// CHECK:           i32 add
-// CHECK:           @_T0SC6NSRectVN
-// CHECK:           i32 2
+// CHECK:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
+// -- nominal type descriptor
+// CHECK:           @"$SSo6NSRectVMn"
 // -- witness table
-// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
 // -- reserved
 // CHECK:           i32 0
 // CHECK:         },
@@ -33,12 +31,12 @@ extension NSRect: Runcible {
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
-// -- class object reference + 0x03 (indirect class object)
+// -- class object reference + 0x03 (class object reference, TODO: indirect me)
 // CHECK:           i32 add
-// CHECK:           @"OBJC_CLASS_REF_$_Gizmo"
+// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
 // CHECK:           i32 3
 // -- witness table
-// CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
 // -- reserved
 // CHECK:           i32 0
 // CHECK:         }

@@ -17,17 +17,15 @@
 #include "swift/IRGen/Linking.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
-#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
+using namespace Mangle;
 
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
@@ -50,14 +48,6 @@ void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
   mangle(stream);
 }
 
-/// Use the Clang importer to mangle a Clang declaration.
-static void mangleClangDecl(raw_ostream &buffer,
-                            const clang::NamedDecl *clangDecl,
-                            ASTContext &ctx) {
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  importer->getMangledName(buffer, clangDecl);
-}
-
 /// Mangle this entity into the given stream.
 void LinkEntity::mangle(raw_ostream &buffer) const {
   std::string Result = mangleAsString();
@@ -68,6 +58,24 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 std::string LinkEntity::mangleAsString() const {
   IRGenMangler mangler;
   switch (getKind()) {
+    case Kind::DispatchThunk:
+      return mangler.mangleEntity(getDecl(), /*isCurried=*/false,
+                                  ASTMangler::SymbolKind::SwiftDispatchThunk);
+
+    case Kind::DispatchThunkInitializer:
+      return mangler.mangleConstructorEntity(
+          cast<ConstructorDecl>(getDecl()),
+          /*isAllocating=*/false,
+          /*isCurried=*/false,
+          ASTMangler::SymbolKind::SwiftDispatchThunk);
+
+    case Kind::DispatchThunkAllocator:
+      return mangler.mangleConstructorEntity(
+          cast<ConstructorDecl>(getDecl()),
+          /*isAllocating=*/true,
+          /*isCurried=*/false,
+          ASTMangler::SymbolKind::SwiftDispatchThunk);
+
     case Kind::ValueWitness:
       return mangler.mangleValueWitness(getType(), getValueWitness());
 
@@ -106,7 +114,7 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
     case Kind::FieldOffset:
-      return mangler.mangleFieldOffsetFull(getDecl(), isOffsetIndirect());
+      return mangler.mangleFieldOffset(getDecl());
 
     case Kind::DirectProtocolWitnessTable:
       return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
@@ -141,45 +149,9 @@ std::string LinkEntity::mangleAsString() const {
                   getProtocolConformance(), assocConf.first, assocConf.second);
     }
 
-    case Kind::Function:
-      // As a special case, functions can have manually mangled names.
-      if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-        if (!AsmA->Name.empty())
-          return AsmA->Name;
-
-      // Otherwise, fall through into the 'other decl' case.
-      LLVM_FALLTHROUGH;
-
-    case Kind::Other:
-      // As a special case, Clang functions and globals don't get mangled at all.
-      if (auto clangDecl = getDecl()->getClangDecl()) {
-        if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
-          if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-            std::string Name(1, '\01');
-            Name.append(asmLabel->getLabel());
-            return Name;
-          }
-          if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
-            // FIXME: When we can import C++, use Clang's mangler all the time.
-            std::string storage;
-            llvm::raw_string_ostream SS(storage);
-            mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
-            return SS.str();
-          }
-          return namedClangDecl->getName();
-        }
-      }
-
-      if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-        return mangler.mangleNominalType(type);
-      }
-      if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
-        // FIXME: Hack. LinkInfo should be able to refer to the allocating
-        // constructor rather than inferring it here.
-        return mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                               /*isCurried=*/false);
-      }
-      return mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    case Kind::CoroutineContinuationPrototype:
+      return mangler.mangleCoroutineContinuationPrototype(
+                                              cast<SILFunctionType>(getType()));
 
       // An Objective-C class reference reference. The symbol is private, so
       // the mangling is unimportant; it should just be readable in LLVM IR.
@@ -221,9 +193,6 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::ReflectionAssociatedTypeDescriptor:
       return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                       getProtocolConformance());
-    case Kind::ReflectionSuperclassDescriptor:
-      return mangler.mangleReflectionSuperclassDescriptor(
-                                                    cast<ClassDecl>(getDecl()));
   }
   llvm_unreachable("bad entity kind!");
 }

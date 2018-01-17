@@ -751,7 +751,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   DeclName name(C, C.Id_encode, params[1]);
   auto *encodeDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                       SourceLoc(), name, SourceLoc(),
-                                      /*Throws=*/true, SourceLoc(), SourceLoc(),
+                                      /*Throws=*/true, SourceLoc(),
                                       nullptr, params,
                                       TypeLoc::withoutLoc(returnType),
                                       target);

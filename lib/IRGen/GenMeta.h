@@ -223,6 +223,12 @@ namespace irgen {
                                                 SILType objectType,
                                                 bool suppressCast = false);
 
+  /// Given a metadata pointer, emit the callee for the given method.
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType);
+
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
   FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,

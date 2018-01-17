@@ -138,6 +138,14 @@ contain the following fields:
   If the function takes no arguments, **parameter type vector** as well as
   **parameter flags vector** are going to be empty.
 
+Currently we have specialized ABI endpoints to retrieve metadata for functions
+with 0/1/2/3 parameters - `swift_getFunctionTypeMetadata{0|1|2|3}` and the general
+one `swift_getFunctionTypeMetadata` which handles all other function types and
+functions with parameter flags e.g. `(inout Int) -> Void`. Based on the usage
+information collected from Swift Standard Library and Overlays as well as Source
+Compatibility Suite it was decided not to have specialized ABI endpoints for
+functions with parameter flags due their minimal use.
+
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
 
@@ -419,6 +427,18 @@ Objective-C ``Protocol`` objects. The layout is as follows:
     a value of conforming type.
   * **Bit 31** is set by the Objective-C runtime when it has done its
     initialization of the protocol record. It is unused by the Swift runtime.
+- **Number of mandatory requirements** is stored as a 16-bit integer after
+  the flags. It specifies the number of requirements that do not have default
+  implementations.
+- **Number of requirements** is stored as a 16-bit integer after the flags. It
+  specifies the total number of requirements for the protocl.
+- **Requirements pointer** stored as a 32-bit relative pointer to an array
+  of protocol requirements. The number of elements in the array is specified
+  by the preceding 16-bit integer.
+- **Associated type names** stored as a 32-bit relative pointer to a
+  null-terminated string. The string contains the names of the associated
+  types, in the order they apparent in the requirements list, separated by
+  spaces.
 
 
 Protocol Conformance Records
@@ -440,7 +460,7 @@ contains:
 
     0. A direct reference to a nominal type descriptor.
     1. An indirect reference to a nominal type descriptor.
-    2. A reference to nonunique, foreign type metadata.
+    2. Reserved for future use.
     3. A reference to a pointer to an Objective-C class object.
 
 - The **witness table field** that provides access to the witness table

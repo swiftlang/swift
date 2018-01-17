@@ -15,11 +15,9 @@
 
 #include "ASTVisitor.h"
 #include "Cleanup.h"
-#include "SILGenProfiling.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -57,28 +55,6 @@ public:
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
   SILGenFunction /*nullable*/ *TopLevelSGF;
-
-  /// The profiler for instrumentation based profiling, or null if profiling is
-  /// disabled.
-  std::unique_ptr<SILGenProfiling> Profiler;
-
-  /// The indexed profile data to be used for PGO, or nullptr.
-  std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
-
-  /// Load the profiled execution count corresponding to \p N, if one is
-  /// available.
-  ProfileCounter loadProfilerCount(ASTNode N) {
-    if (PGOReader && Profiler && Profiler->hasRegionCounters())
-      return Profiler->getExecutionCount(N);
-    return ProfileCounter();
-  }
-
-  /// Get the PGO's node parent
-  Optional<ASTNode> getPGOParent(ASTNode Node) {
-    if (PGOReader && Profiler && Profiler->hasRegionCounters())
-      return Profiler->getPGOParent(Node);
-    return None;
-  }
 
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
@@ -164,15 +140,6 @@ public:
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
-  /// Returns the type of a constant reference.
-  SILType getConstantType(SILDeclRef constant);
-  
-  /// Returns the calling convention for a function.
-  SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef constant) {
-    return getConstantType(constant).getAs<SILFunctionType>()
-      ->getRepresentation();
-  }
-
   /// Get the function for a SILDeclRef, or return nullptr if it hasn't been
   /// emitted yet.
   SILFunction *getEmittedFunction(SILDeclRef constant,
@@ -181,14 +148,6 @@ public:
   /// Get the function for a SILDeclRef, creating it if necessary.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
-
-  /// Get the function for a dispatch thunk, creating it if necessary.
-  SILFunction *getDispatchThunk(SILDeclRef constant,
-                                ForDefinition_t forDefinition);
-
-  /// Emit a native Swift class or protocol method dispatch thunk, used for
-  /// resilient method dispatch.
-  SILFunction *emitDispatchThunk(SILDeclRef constant);
 
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
@@ -362,10 +321,6 @@ public:
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
 
-  void emitGlobalGetter(VarDecl *global,
-                        SILGlobalVariable *onceToken,
-                        SILFunction *onceFunc);
-  
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);

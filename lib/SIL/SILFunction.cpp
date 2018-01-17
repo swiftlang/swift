@@ -97,7 +97,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false), KeepAsPublic(false),
+      HasCReferences(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
   if (InsertBefore)

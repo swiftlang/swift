@@ -145,8 +145,8 @@ namespace {
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
     DeclName name = AFD->getFullName();
     if (!name) {
-      if (auto *method = dyn_cast<FuncDecl>(AFD)) {
-        name = method->getAccessorStorageDecl()->getFullName();
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        name = accessor->getStorage()->getFullName();
       }
     }
     return name;
@@ -1201,6 +1201,18 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     
     // Otherwise, produce a generic diagnostic.
     if (callee) {
+      auto &ctx = callee->getASTContext();
+      if (callee->isImplicit()) {
+        // Translate calls to implicit functions to their user-facing names
+        if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
+            callee->getBaseName() == ctx.Id_derived_struct_equals) {
+          diagnose(fn->getLoc(), diag::expression_unused_result_operator,
+                   ctx.Id_EqualsOperator)
+            .highlight(SR1).highlight(SR2);
+          return;
+        }
+      }
+
       auto diagID = diag::expression_unused_result_call;
       if (callee->getFullName().isOperator())
         diagID = diag::expression_unused_result_operator;
@@ -1553,8 +1565,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
 
-    // An inlinable constructor in a class must always be delegating.
-    if (!isDelegating && !ClassD->hasFixedLayout() &&
+    // An inlinable constructor in a class must always be delegating,
+    // unless the class is formally '@_fixed_layout'.
+    if (!isDelegating &&
+        ClassD->isFormallyResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

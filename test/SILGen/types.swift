@@ -4,7 +4,7 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_T05types1CC3foo1xySi_tF : $@convention(method) (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @$S5types1CC3foo1xySi_tF : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[THIS:%[0-9]+]] : @guaranteed $C):
     member = x
@@ -14,7 +14,7 @@ class C {
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
     // CHECK-NOT: destroy_value
   }
-  // CHECK: } // end sil function '_T05types1CC3foo1xySi_tF'
+  // CHECK: } // end sil function '$S5types1CC3foo1xySi_tF'
 }
 
 struct S {
@@ -36,7 +36,7 @@ struct S {
   }
 
   class SC {
-    // CHECK-LABEL: sil hidden @_T05types1SV2SCC3bar{{.*}}
+    // CHECK-LABEL: sil hidden @$S5types1SV2SCC3bar{{.*}}
     func bar() {}
   }
 }
@@ -69,7 +69,7 @@ enum ReferencedFromFunctionEnum {
   case g((ReferencedFromFunctionStruct) -> ())
 }
 
-// CHECK-LABEL: sil hidden @_T05types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_guaranteed (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()) {
+// CHECK-LABEL: sil hidden @$S5types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_guaranteed (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()) {
 // CHECK: bb0([[X:%.*]] : @owned $ReferencedFromFunctionStruct):
 // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
 // CHECK:   [[F:%.*]] = struct_extract [[BORROWED_X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
@@ -82,13 +82,13 @@ enum ReferencedFromFunctionEnum {
 // CHECK:   destroy_value [[X]]
 // CHECK:   [[RESULT:%.*]] = tuple ([[COPIED_F]] : {{.*}}, [[COPIED_G]] : {{.*}})
 // CHECK:   return [[RESULT]]
-// CHECK: } // end sil function '_T05types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF'
+// CHECK: } // end sil function '$S5types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF'
 func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
     -> ((ReferencedFromFunctionStruct) -> (), (ReferencedFromFunctionEnum) -> ()) {
   return (x.f, x.g)
 }
 
-// CHECK-LABEL: sil hidden @_T05types32referencedFromFunctionEnumFieldsyyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
+// CHECK-LABEL: sil hidden @$S5types32referencedFromFunctionEnumFieldsyyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
 // CHECK:       bb{{[0-9]+}}([[F:%.*]] : @owned $@callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()):
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : @owned $@callee_guaranteed (@owned ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
@@ -104,6 +104,6 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
   }
 }
 
-// CHECK-LABEL: sil private @_T05types1fyyF2FCL_C3zimyyF
-// CHECK-LABEL: sil private @_T05types1g1bySb_tF2FCL_C3zimyyF
-// CHECK-LABEL: sil private @_T05types1g1bySb_tF2FCL0_C3zimyyF
+// CHECK-LABEL: sil private @$S5types1fyyF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @$S5types1g1bySb_tF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @$S5types1g1bySb_tF2FCL0_C3zimyyF

@@ -284,6 +284,10 @@ public:
   /// they are externally visible.
   void emitGlobalTopLevel();
 
+  /// Emit references to each of the protocol descriptors defined in this
+  /// IR module.
+  void emitSwiftProtocols();
+
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
@@ -431,6 +435,10 @@ public:
     llvm::IntegerType *Int32Ty;          /// i32
     llvm::IntegerType *RelativeAddressTy;
   };
+  union {
+    llvm::PointerType *Int32PtrTy;            /// i32 *
+    llvm::PointerType *RelativeAddressPtrTy;
+  };
   llvm::IntegerType *Int64Ty;          /// i64
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
@@ -486,6 +494,8 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
+  llvm::StructType *ProtocolRecordTy;
+  llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
@@ -717,6 +727,7 @@ public:
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
+  llvm::Constant *emitSwiftProtocols();
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
 
@@ -824,6 +835,8 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
+  /// List of non-ObjC protocols described by this module.
+  SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
@@ -1030,8 +1043,15 @@ public:
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
 
-  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
-                               ForDefinition_t forDefinition);
+  /// Cast the given constant to i8*.
+  llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
+
+  llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
+                                         ForDefinition_t forDefinition);
+
+  llvm::Function *emitDispatchThunk(SILDeclRef declRef);
+
+  Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
@@ -1074,6 +1094,7 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);

@@ -7,7 +7,7 @@ EXPR_NODES = [
     Node('InOutExpr', kind='Expr',
          children=[
              Child('Ampersand', kind='PrefixAmpersandToken'),
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Expression', kind='Expr'),
          ]),
 
     # A #column expression.
@@ -28,11 +28,9 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
-    # FIXME: Enforce the requirement that the members can only be
-    # StringSegment or ExpressionSegment
     Node('StringInterpolationSegments', kind='SyntaxCollection',
-         element='Syntax',
-         element_name='Segment'),
+         element='Syntax', element_name='Segment',
+         element_choices=['StringSegment', 'ExpressionSegment']),
 
     # The try operator.
     # try foo()
@@ -125,6 +123,12 @@ EXPR_NODES = [
     Node('PoundFunctionExpr', kind='Expr',
          children=[
              Child('PoundFunction', kind='PoundFunctionToken'),
+         ]),
+
+    # A #dsohandle expression.
+    Node('PoundDsohandleExpr', kind='Expr',
+         children=[
+             Child('PoundDsohandle', kind='PoundDsohandleToken'),
          ]),
 
     # symbolic-reference-expression -> identifier generic-argument-clause?
@@ -441,5 +445,50 @@ EXPR_NODES = [
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
+         ]),
+
+    # e.g. "\a.b[2].a"
+    Node('KeyPathExpr', kind='Expr',
+         children=[
+             Child('Backslash', kind='BackslashToken'),
+             Child('Expression', kind='Expr'),
+         ]),
+
+    # e.g. "a." or "a"
+    Node('ObjcNamePiece', kind='Syntax',
+         children=[
+             Child('Name', kind='IdentifierToken'),
+             Child('Dot', kind='PeriodToken', is_optional=True),
+         ]),
+
+    # e.g. "a.b.c"
+    Node('ObjcName', kind='SyntaxCollection', element='ObjcNamePiece'),
+
+    # e.g. "#keyPath(a.b.c)"
+    Node('ObjcKeyPathExpr', kind='Expr',
+         children=[
+             Child('KeyPath', kind='PoundKeyPathToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Name', kind='ObjcName'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # <#content#>
+    Node('EditorPlaceholderExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='IdentifierToken'),
+         ]),
+    # #fileLiteral(a, b, c)
+    Node('ObjectLiteralExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'PoundColorLiteralToken',
+                       'PoundFileLiteralToken',
+                       'PoundImageLiteralToken',
+                   ]),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Arguments', kind='FunctionCallArgumentList'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 ]

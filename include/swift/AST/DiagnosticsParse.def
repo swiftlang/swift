@@ -677,6 +677,8 @@ ERROR(sil_coverage_invalid_counter, none,
       "expected counter expression, id, or 'zero'", ())
 ERROR(sil_coverage_expected_rparen, none,
       "expected ')' to end counter expression", ())
+ERROR(sil_coverage_expected_quote, none,
+      "expected quotes surrounding PGO function name", ())
 ERROR(sil_coverage_invalid_operator, none,
       "expected '+' or '-'", ())
 
@@ -1550,6 +1552,12 @@ ERROR(pound_available_swift_not_allowed, none,
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
+
+//------------------------------------------------------------------------------
+// syntax parsing diagnostics
+//------------------------------------------------------------------------------
+WARNING(unknown_syntax_entity, PointsToFirstBadToken,
+        "unknown %0 syntax exists in the source", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

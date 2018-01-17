@@ -37,6 +37,21 @@ void record(const swift::MetadataSections *sections) {
 }
 }
 
+void swift::initializeProtocolLookup() {
+  const swift::MetadataSections *sections = registered;
+  while (true) {
+    const swift::MetadataSections::Range &protocols =
+      sections->swift5_protocols;
+    if (protocols.length)
+      addImageProtocolsBlockCallback(reinterpret_cast<void *>(protocols.start),
+                                     protocols.length);
+
+    if (sections->next == registered)
+      break;
+    sections = sections->next;
+  }
+}
+
 void swift::initializeProtocolConformanceLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
@@ -73,6 +88,12 @@ void swift_addNewDSOImage(const void *addr) {
       static_cast<const swift::MetadataSections *>(addr);
 
   record(sections);
+
+  const auto &protocols_section = sections->swift5_protocols;
+  const void *protocols =
+      reinterpret_cast<void *>(protocols_section.start);
+  if (protocols_section.length)
+    addImageProtocolsBlockCallback(protocols, protocols_section.length);
 
   const auto &protocol_conformances = sections->swift5_protocol_conformances;
   const void *conformances =

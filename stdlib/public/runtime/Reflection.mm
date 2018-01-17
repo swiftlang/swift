@@ -47,6 +47,8 @@ using namespace swift;
 - (id)debugQuickLookObject;
 @end
 
+// mangled Swift._SwiftObject
+#define SwiftObject _TtCs12_SwiftObject
 @class SwiftObject;
 #endif
 
@@ -612,11 +614,19 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
 #else
     false;
 #endif
+
   ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
+
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  // Destroy the whole original value if we couldn't take it.
+  if (!take)
+      type->vw_destroy(value);
+#endif
+
   return result;
 }
 

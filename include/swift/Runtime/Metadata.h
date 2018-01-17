@@ -212,7 +212,7 @@ struct OpaqueValue;
 ///  - An initialized buffer is an allocated buffer whose value
 ///    storage has been initialized.
 struct ValueBuffer {
-  void *PrivateData[3];
+  void *PrivateData[NumWords_ValueBuffer];
 };
 
 /// Can a value with the given size and alignment be allocated inline?
@@ -930,6 +930,21 @@ public:
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
 
+  /// Retrieve the generic arguments of this type, if it has any.
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
+  getGenericArgs() const {
+    auto description = getNominalTypeDescriptor();
+    if (!description)
+      return nullptr;
+
+    if (!description->GenericParams.hasGenericRequirements())
+      return nullptr;
+
+    auto asWords = reinterpret_cast<
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
+    return (asWords + description->GenericParams.getOffset(this));
+  }
+
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
   /// the type is not a class (or not a class with a class object).
@@ -1029,7 +1044,7 @@ struct GenericContextDescriptor {
   /// to NumGenericRequirements; it counts only the type parameters
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
-  
+
   // TODO: add meaningful descriptions of the generic requirements.
 };
 
@@ -1333,6 +1348,10 @@ public:
     return getGenericContexts()[i];
   }
 
+  bool isUnique() const {
+    return GenericParams.Flags.isUnique();
+  }
+
   bool hasVTable() const {
     return getKind() == NominalTypeKind::Class
       && GenericParams.Flags.hasVTable();
@@ -1355,6 +1374,9 @@ public:
            && i < numTrailingObjects(OverloadToken<MethodDescriptor>{}));
     return getMethodDescriptors()[i].Impl.get();
   }
+
+  /// Determine whether two nominal type descriptors are equivalent.
+  bool isEqual(const TargetNominalTypeDescriptor *other) const;
 
 private:
   size_t numTrailingObjects(OverloadToken<GenericContextDescriptor>) const {
@@ -1847,17 +1869,6 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       || metadata->getKind() == MetadataKind::Enum
       || metadata->getKind() == MetadataKind::Optional;
   }
-  
-  /// Retrieve the generic arguments of this type.
-  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
-  getGenericArgs() const {
-    if (!Description->GenericParams.hasGenericRequirements())
-      return nullptr;
-
-    auto asWords = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
-    return (asWords + Description->GenericParams.getOffset(this));
-  }
 
   const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
     return Description;
@@ -2138,7 +2149,7 @@ struct TargetProtocolDescriptor {
   
   /// The list of protocols this protocol refines.
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
-  InheritedProtocols;
+    InheritedProtocols;
   
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
@@ -2166,6 +2177,10 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
   void *getDefaultWitness(unsigned index) const {
     return Requirements.get()[index].DefaultImplementation.get();
   }
@@ -2183,7 +2198,8 @@ struct TargetProtocolDescriptor {
       Flags(Flags),
       NumMandatoryRequirements(0),
       NumRequirements(0),
-      Requirements(nullptr)
+      Requirements(nullptr),
+      AssociatedTypeNames(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
@@ -2544,57 +2560,46 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 template <typename Runtime>
 struct TargetTypeMetadataRecord {
 private:
-  // Some description of the type that is resolvable at runtime.
-  union {
-    /// A direct reference to the metadata.
-    RelativeDirectPointerIntPair<const TargetMetadata<Runtime>,
-                                 TypeMetadataRecordKind> DirectType;
-
-    /// The nominal type descriptor for a resilient or generic type.
-    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
-      TypeDescriptor;
-  };
+  /// The nominal type descriptor.
+  RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                               TypeMetadataRecordKind>
+    TypeDescriptor;
 
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return DirectType.getInt();
+    return TypeDescriptor.getInt();
   }
   
-  const TargetMetadata<Runtime> *getDirectType() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      break;
-        
-    case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not direct type metadata");
-    }
-
-    return this->DirectType.getPointer();
-  }
-
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       break;
-        
+
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not generic metadata pattern");
     }
     
     return this->TypeDescriptor.getPointer();
   }
-
-  /// Get the canonical metadata for the type referenced by this record, or
-  /// return null if the record references a generic or universal type.
-  const TargetMetadata<Runtime> *getCanonicalTypeMetadata() const;
 };
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
+
+/// The structure of a protocol reference record.
+template <typename Runtime>
+struct TargetProtocolRecord {
+  /// The protocol referenced.
+  ///
+  /// The remaining low bit is reserved for future use.
+  RelativeIndirectablePointerIntPair<TargetProtocolDescriptor<Runtime>,
+                                     /*reserved=*/bool>
+    Protocol;
+};
+using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
 /// The structure of a protocol conformance record.
 ///
@@ -2627,11 +2632,6 @@ private:
                                  TypeMetadataRecordKind>
       IndirectNominalTypeDescriptor;
 
-    /// A direct reference to the metadata, which must be uniqued before
-    /// being used.
-    RelativeDirectPointerIntPair<TargetMetadata<Runtime>,
-                                 TypeMetadataRecordKind> NonuniqueDirectType;
-    
     /// An indirect reference to the metadata.
     ///
     /// Only valid when the \c IndirectClassOrDirectType value is
@@ -2671,26 +2671,14 @@ public:
     return WitnessTable.getInt();
   }
   
-  const TargetMetadata<Runtime> *getDirectType() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      break;
-        
-    case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not direct type metadata");
-    }
-
-    return NonuniqueDirectType.getPointer();
-  }
-  
   const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::IndirectObjCClass:
       break;
         
-    case TypeMetadataRecordKind::NonuniqueDirectType:
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       assert(false && "not indirect class object");
@@ -2702,6 +2690,9 @@ public:
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (getTypeKind()) {
+    case TypeMetadataRecordKind::Reserved:
+      return nullptr;
+
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
@@ -2709,7 +2700,6 @@ public:
       return *IndirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::IndirectObjCClass:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
     
@@ -2836,16 +2826,14 @@ swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                               const Metadata *arg0,
+swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
                                const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *result);
+swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
+                               const Metadata *arg0,
+                               const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
@@ -2855,15 +2843,6 @@ swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        ParameterFlags flags0,
-                                        const Metadata *arg1,
-                                        ParameterFlags flags1,
-                                        const Metadata *result);
-
-SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 FunctionTypeFlags flags,
                                                 const Metadata *arg0,
@@ -2871,102 +2850,7 @@ const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 const Metadata *arg2,
                                                 const Metadata *result);
 
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
-                                                FunctionTypeFlags flags,
-                                                const Metadata *arg0,
-                                                ParameterFlags flags0,
-                                                const Metadata *arg1,
-                                                ParameterFlags flags1,
-                                                const Metadata *arg2,
-                                                ParameterFlags flags2,
-                                                const Metadata *result);
-
-/// \brief Fetch a uniqued metadata for a thin function type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata(size_t numArguments,
-                                  const void * argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata1(const void *arg0,
-                                   const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata2(const void *arg0,
-                                   const void *arg1,
-                                   const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getThinFunctionTypeMetadata3(const void *arg0,
-                                   const void *arg1,
-                                   const void *arg2,
-                                   const Metadata *resultMetadata);
-
-/// \brief Fetch a uniqued metadata for a C function type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata(size_t numArguments,
-                               const void * argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata1(const void *arg0,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata2(const void *arg0,
-                                const void *arg1,
-                                const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getCFunctionTypeMetadata3(const void *arg0,
-                                const void *arg1,
-                                const void *arg2,
-                                const Metadata *resultMetadata);
-
 #if SWIFT_OBJC_INTEROP
-/// \brief Fetch a uniqued metadata for a block type.
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata(size_t numArguments,
-                           const void *argsAndResult []);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata0(const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata1(const void *arg0,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata2(const void *arg0,
-                            const void *arg1,
-                            const Metadata *resultMetadata);
-
-SWIFT_RUNTIME_EXPORT
-const FunctionTypeMetadata *
-swift_getBlockTypeMetadata3(const void *arg0,
-                            const void *arg1,
-                            const void *arg2,
-                            const Metadata *resultMetadata);
-
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
@@ -3012,7 +2896,7 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 ///   where the entrypoint is just being used to unique the metadata.
 SWIFT_RUNTIME_EXPORT
 const TupleTypeMetadata *
-swift_getTupleTypeMetadata(size_t numElements,
+swift_getTupleTypeMetadata(TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
@@ -3072,7 +2956,7 @@ const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
-                                 const ProtocolDescriptor **protocols)
+                                 const ProtocolDescriptor * const *protocols)
     SWIFT_CC(RegisterPreservingCC);
 
 /// \brief Perform a copy-assignment from one existential container to another.
@@ -3176,6 +3060,11 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
+
+/// Register a block of protocol records for dynamic lookup.
+SWIFT_RUNTIME_EXPORT
+void swift_registerProtocols(const ProtocolRecord *begin,
+                             const ProtocolRecord *end);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT

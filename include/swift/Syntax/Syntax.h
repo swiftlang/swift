@@ -37,6 +37,9 @@ class SyntaxASTMap;
 
 namespace syntax {
 
+struct SyntaxVisitor;
+class SourceFileSyntax;
+
 template <typename SyntaxNode>
 SyntaxNode make(RC<RawSyntax> Raw) {
   auto Data = SyntaxData::make(Raw);
@@ -172,6 +175,14 @@ public:
     // Trivially true.
     return true;
   }
+
+  /// Recursively visit this node.
+  void accept(SyntaxVisitor &Visitor);
+
+  /// Get the absolute position of this raw syntax: its offset, line,
+  /// and column.
+  AbsolutePosition getAbsolutePosition(SourceFileSyntax Root) const;
+
   // TODO: hasSameStructureAs ?
 };
 

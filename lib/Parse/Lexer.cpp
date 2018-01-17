@@ -852,8 +852,9 @@ void Lexer::lexDollarIdent() {
   const char *tokStart = CurPtr-1;
   assert(*tokStart == '$');
 
-  // In a SIL function body, '$' is a token by itself.
-  if (InSILBody)
+  // In a SIL function body, '$' is a token by itself, except it's a SIL global
+  // name. SIL global identifiers may start with a '$', e.g. @$S1m3fooyyF.
+  if (InSILBody && NextToken.getKind() != tok::at_sign)
     return formToken(tok::sil_dollar, tokStart);
 
   bool isAllDigits = true;
@@ -881,7 +882,7 @@ void Lexer::lexDollarIdent() {
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
   if (!isAllDigits) {
-    if (!LangOpts.EnableDollarIdentifiers)
+    if (!LangOpts.EnableDollarIdentifiers && !InSILBody)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,

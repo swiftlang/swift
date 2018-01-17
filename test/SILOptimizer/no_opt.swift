@@ -2,7 +2,7 @@
 
 func bar(_ x : Int) { }
 
-// CHECK-LABEL: _T06no_opt4foo1yyF
+// CHECK-LABEL: $S6no_opt4foo1yyF
 // CHECK-NOT: integer_literal
 // CHECK: return
 public func foo1() {
@@ -12,7 +12,7 @@ public func foo1() {
   bar(4)
 }
 
-// CHECK-LABEL: _T06no_opt4foo2yyF
+// CHECK-LABEL: $S6no_opt4foo2yyF
 // CHECK: integer_literal
 // CHECK: integer_literal
 // CHECK: integer_literal

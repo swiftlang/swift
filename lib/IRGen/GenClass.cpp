@@ -31,6 +31,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILVTableVisitor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -534,7 +535,6 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   }
   case FieldAccess::NonConstantDirect:
   case FieldAccess::ConstantIndirect:
-  case FieldAccess::NonConstantIndirect:
     return nullptr;
   }
 }
@@ -591,8 +591,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   }
     
   case FieldAccess::NonConstantDirect: {
-    Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false,
-                                                   NotForDefinition);
+    Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, NotForDefinition);
     auto offsetVar = cast<llvm::GlobalVariable>(offsetA.getAddress());
     offsetVar->setConstant(false);
     auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
@@ -602,22 +601,6 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::ConstantIndirect: {
     auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
-    return emitAddressAtOffset(IGF, baseType, base, offset, field);
-  }
-    
-  case FieldAccess::NonConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
-    Address indirectOffsetA =
-      IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true,
-                                   NotForDefinition);
-    auto offsetVar = cast<llvm::GlobalVariable>(indirectOffsetA.getAddress());
-    offsetVar->setConstant(false);
-    auto indirectOffset =
-      IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
-    auto offsetA =
-      IGF.emitByteOffsetGEP(metadata, indirectOffset, IGF.IGM.SizeTy);
-    auto offset =
-      IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
   }
@@ -641,7 +624,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
   case FieldAccess::NonConstantDirect: {
     std::string symbol =
-      LinkEntity::forFieldOffset(field, /*indirect*/ false).mangleAsString();
+      LinkEntity::forFieldOffset(field).mangleAsString();
     return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
@@ -649,14 +632,6 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
   case FieldAccess::ConstantIndirect: {
     Size indirectOffset = getClassFieldOffsetOffset(IGM, baseClass, field);
     return MemberAccessStrategy::getIndirectFixed(indirectOffset,
-                                 MemberAccessStrategy::OffsetKind::Bytes_Word);
-  }
-
-  case FieldAccess::NonConstantIndirect: {
-    std::string symbol =
-      LinkEntity::forFieldOffset(field, /*indirect*/ true).mangleAsString();
-    return MemberAccessStrategy::getIndirectGlobal(std::move(symbol),
-                                 MemberAccessStrategy::OffsetKind::Bytes_Word,
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
   }
@@ -1045,6 +1020,36 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
+
+  // If the class is resilient, emit dispatch thunks.
+  if (isResilient(D, ResilienceExpansion::Minimal)) {
+    struct ThunkEmitter : public SILVTableVisitor<ThunkEmitter> {
+      IRGenModule &IGM;
+      ClassDecl *D;
+
+      ThunkEmitter(IRGenModule &IGM, ClassDecl *D)
+        : IGM(IGM), D(D) {
+        addVTableEntries(D);
+      }
+
+      void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
+
+      void addMethod(SILDeclRef member) {
+        auto *func = cast<AbstractFunctionDecl>(member.getDecl());
+        if (func->getDeclContext() == D &&
+            func->getEffectiveAccess() >= AccessLevel::Public) {
+          IGM.emitDispatchThunk(member);
+        }
+      }
+
+      void addPlaceholder(MissingMemberDecl *m) {
+        assert(m->getNumberOfVTableEntries() == 0
+               && "Should not be emitting class with missing members");
+      }
+    };
+
+    ThunkEmitter emitter(*this, D);
+  }
 }
 
 namespace {
@@ -1539,7 +1544,7 @@ namespace {
       
       // getters and setters funcdecls will be handled by their parent
       // var/subscript.
-      if (method->isAccessor()) return;
+      if (isa<AccessorDecl>(method)) return;
 
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
@@ -1626,21 +1631,18 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
-      auto func = dyn_cast<FuncDecl>(method);
-      if (!func)
+      auto accessor = dyn_cast<AccessorDecl>(method);
+      if (!accessor)
         return emitObjCMethodDescriptor(IGM, descriptors, method);
 
-      switch (func->getAccessorKind()) {
-      case AccessorKind::NotAccessor:
-        return emitObjCMethodDescriptor(IGM, descriptors, method);
-
+      switch (accessor->getAccessorKind()) {
       case AccessorKind::IsGetter:
         return emitObjCGetterDescriptor(IGM, descriptors,
-                                        func->getAccessorStorageDecl());
+                                        accessor->getStorage());
 
       case AccessorKind::IsSetter:
         return emitObjCSetterDescriptor(IGM, descriptors,
-                                        func->getAccessorStorageDecl());
+                                        accessor->getStorage());
 
       case AccessorKind::IsWillSet:
       case AccessorKind::IsDidSet:
@@ -1820,13 +1822,11 @@ namespace {
         // If the field offset is fixed relative to the start of the superclass,
         // reference the global from the ivar metadata so that the Objective-C
         // runtime will slide it down.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
-                                                   NotForDefinition);
+        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, NotForDefinition);
         offsetPtr = cast<llvm::Constant>(offsetAddr.getAddress());
         break;
       }
       case FieldAccess::ConstantIndirect:
-      case FieldAccess::NonConstantIndirect:
         // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
         // the Objective-C runtime into the field offset vector of the
         // instantiated metadata.
@@ -2328,10 +2328,3 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
   auto &layout = selfTI.getClassLayout(IGM, selfType);
   return layout.MetadataRequiresDynamicInitialization;
 }
-
-bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
-                                                       CanType conformingType) {
-  NominalTypeDecl *nom = conformingType->getAnyNominal();
-  return !isa<ClangModuleUnit>(nom->getModuleScopeContext());
-}
-

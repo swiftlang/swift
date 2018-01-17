@@ -84,7 +84,8 @@ extension LazyCollection : Sequence {
     return _base.makeIterator()
   }
 
-  /// A value less than or equal to the number of elements in the collection.
+  /// A value less than or equal to the number of elements in the sequence,
+  /// calculated nondestructively.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length

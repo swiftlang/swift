@@ -133,7 +133,7 @@ extension _UIntBuffer : BidirectionalCollection {
 }
 
 extension _UIntBuffer : RandomAccessCollection {
-  public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
+  public typealias Indices = DefaultIndices<_UIntBuffer>
   
   @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {

@@ -28,6 +28,7 @@ add_swift_library(swiftIRGen STATIC
   GenProto.cpp
   GenReflection.cpp
   GenStruct.cpp
+  GenThunk.cpp
   GenTuple.cpp
   GenType.cpp
   GenValueWitness.cpp

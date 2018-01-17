@@ -427,7 +427,7 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
     case Node::Kind::Module:
       SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
       SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
-      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_CLANG_IMPORTER, "SC");
       break;
     case Node::Kind::Structure:
       if (isInSwiftModule(node)) {
@@ -1847,6 +1847,11 @@ void Remangler::mangleOutlinedVariable(Node *node) {
 void Remangler::mangleOutlinedBridgedMethod(Node *node) {
   Out << "Te" << node->getText();
   mangleSingleChildNode(node);
+}
+
+void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
+  Out << "TC";
+  mangleChildNodes(node);
 }
 
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {

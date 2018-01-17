@@ -45,7 +45,7 @@ func if_test(_ x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_T010statements7if_test{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements7if_test{{[_0-9a-zA-Z]*}}F
 
 func if_else(_ x: Int, y: Bool) {
   if (y) {
@@ -56,7 +56,7 @@ func if_else(_ x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_T010statements7if_else{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements7if_else{{[_0-9a-zA-Z]*}}F
 
 func nested_if(_ x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -71,7 +71,7 @@ func nested_if(_ x: Int, y: Bool, z: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_T010statements9nested_if{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements9nested_if{{[_0-9a-zA-Z]*}}F
 
 func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -85,7 +85,7 @@ func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010statements21nested_if_merge_noret{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements21nested_if_merge_noret{{[_0-9a-zA-Z]*}}F
 
 func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
@@ -101,7 +101,7 @@ func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   return 2
 }
 
-// CHECK-LABEL: sil hidden @_T010statements19nested_if_merge_ret{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements19nested_if_merge_ret{{[_0-9a-zA-Z]*}}F
 
 func else_break(_ x: Int, y: Bool, z: Bool) {
   while z {
@@ -112,7 +112,7 @@ func else_break(_ x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010statements10else_break{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements10else_break{{[_0-9a-zA-Z]*}}F
 
 func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
@@ -123,7 +123,7 @@ func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010statements15loop_with_break{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements15loop_with_break{{[_0-9a-zA-Z]*}}F
 
 func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
@@ -136,7 +136,7 @@ func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_T010statements18loop_with_continue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements18loop_with_continue{{[_0-9a-zA-Z]*}}F
 
 func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   repeat {
@@ -150,7 +150,7 @@ func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden @_T010statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F 
+// CHECK-LABEL: sil hidden @$S10statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F 
 
 
 // CHECK-LABEL: sil hidden @{{.*}}for_loops1
@@ -166,7 +166,7 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @$Ss16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
@@ -183,7 +183,7 @@ func void_return() {
     return
   }
 }
-// CHECK-LABEL: sil hidden @_T010statements11void_return{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements11void_return{{[_0-9a-zA-Z]*}}F
 // CHECK: cond_br {{%[0-9]+}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 // CHECK: [[BB1]]:
 // CHECK:   br [[EPILOG:bb[0-9]+]]
@@ -196,7 +196,7 @@ func void_return() {
 func foo() {}
 
 // <rdar://problem/13549626>
-// CHECK-LABEL: sil hidden @_T010statements14return_from_if{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements14return_from_if{{[_0-9a-zA-Z]*}}F
 func return_from_if(_ a: Bool) -> Int {
   // CHECK: bb0(%0 : @trivial $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
@@ -240,7 +240,7 @@ func test_break(_ i : Int) {
 
 // <rdar://problem/19150249> Allow labeled "break" from an "if" statement
 
-// CHECK-LABEL: sil hidden @_T010statements13test_if_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
+// CHECK-LABEL: sil hidden @$S10statements13test_if_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_break(_ c : C?) {
 // CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
 label1:
@@ -263,7 +263,7 @@ label1:
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T010statements18test_if_else_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
+// CHECK-LABEL: sil hidden @$S10statements18test_if_else_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_else_break(_ c : C?) {
 // CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
 label2:
@@ -292,7 +292,7 @@ label2:
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T010statements23test_if_else_then_breakyySb_AA1CCSgtF
+// CHECK-LABEL: sil hidden @$S10statements23test_if_else_then_breakyySb_AA1CCSgtF
 func test_if_else_then_break(_ a : Bool, _ c : C?) {
 label3:
   // CHECK: bb0({{.*}}, [[ARG2:%.*]] : @owned $Optional<C>):
@@ -331,11 +331,11 @@ label3:
 }
 
 
-// CHECK-LABEL: sil hidden @_T010statements13test_if_breakyySbF
+// CHECK-LABEL: sil hidden @$S10statements13test_if_breakyySbF
 func test_if_break(_ a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
-  // CHECK: function_ref @_T0Sb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$SSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: apply
   // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[OUT:bb[0-9]+]]
   while a {
@@ -347,7 +347,7 @@ func test_if_break(_ a : Bool) {
   }
 
   // CHECK: [[LOOPTRUE]]:
-  // CHECK: function_ref @_T0Sb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$SSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: apply
   // CHECK-NEXT: cond_br {{.*}}, [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
 
@@ -363,21 +363,21 @@ func test_if_break(_ a : Bool) {
   // CHECK:   return
 }
 
-// CHECK-LABEL: sil hidden @_T010statements7test_doyyF
+// CHECK-LABEL: sil hidden @$S10statements7test_doyyF
 func test_do() {
   // CHECK: integer_literal $Builtin.Int2048, 0
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+  // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
   // CHECK-NOT: br bb
   do {
-    // CHECK: [[CTOR:%.*]] = function_ref @_T010statements7MyClassC{{[_0-9a-zA-Z]*}}fC
+    // CHECK: [[CTOR:%.*]] = function_ref @$S10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
     
     // CHECK: integer_literal $Builtin.Int2048, 1
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+    // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
 
@@ -387,31 +387,31 @@ func test_do() {
   }
 
   // CHECK: integer_literal $Builtin.Int2048, 2
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+  // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(2)
 }
 
-// CHECK-LABEL: sil hidden @_T010statements15test_do_labeledyyF
+// CHECK-LABEL: sil hidden @$S10statements15test_do_labeledyyF
 func test_do_labeled() {
   // CHECK: integer_literal $Builtin.Int2048, 0
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+  // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
   // CHECK: br bb1
   // CHECK: bb1:
   lbl: do {
-    // CHECK: [[CTOR:%.*]] = function_ref @_T010statements7MyClassC{{[_0-9a-zA-Z]*}}fC
+    // CHECK: [[CTOR:%.*]] = function_ref @$S10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
 
     // CHECK: integer_literal $Builtin.Int2048, 1
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+    // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @$S10statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
@@ -422,11 +422,11 @@ func test_do_labeled() {
 
     // CHECK: bb3:
     // CHECK: integer_literal $Builtin.Int2048, 2
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+    // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(2)
 
-    // CHECK: [[GLOBAL:%.*]] = function_ref @_T010statements11global_condSbvau
+    // CHECK: [[GLOBAL:%.*]] = function_ref @$S10statements11global_condSbvau
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:
@@ -437,7 +437,7 @@ func test_do_labeled() {
 
     // CHECK: bb5:
     // CHECK: integer_literal $Builtin.Int2048, 3
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+    // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(3)
 
@@ -446,7 +446,7 @@ func test_do_labeled() {
   }
 
   // CHECK: integer_literal $Builtin.Int2048, 4
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3baryySiF
+  // CHECK: [[BAR:%.*]] = function_ref @$S10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(4)
 }
@@ -456,26 +456,26 @@ func callee1() {}
 func callee2() {}
 func callee3() {}
 
-// CHECK-LABEL: sil hidden @_T010statements11defer_test1yyF
+// CHECK-LABEL: sil hidden @$S10statements11defer_test1yyF
 func defer_test1() {
   defer { callee1() }
   defer { callee2() }
   callee3()
   
-  // CHECK: [[C3:%.*]] = function_ref @_T010statements7callee3yyF
+  // CHECK: [[C3:%.*]] = function_ref @$S10statements7callee3yyF
   // CHECK: apply [[C3]]
-  // CHECK: [[C2:%.*]] = function_ref @_T010statements11defer_test1yyF6
+  // CHECK: [[C2:%.*]] = function_ref @$S10statements11defer_test1yyF6
   // CHECK: apply [[C2]]
-  // CHECK: [[C1:%.*]] = function_ref @_T010statements11defer_test1yyF6
+  // CHECK: [[C1:%.*]] = function_ref @$S10statements11defer_test1yyF6
   // CHECK: apply [[C1]]
 }
-// CHECK: sil private @_T010statements11defer_test1yyF6
+// CHECK: sil private @$S10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee1yyF
 
-// CHECK: sil private @_T010statements11defer_test1yyF6
+// CHECK: sil private @$S10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee2yyF
 
-// CHECK-LABEL: sil hidden @_T010statements11defer_test2yySbF
+// CHECK-LABEL: sil hidden @$S10statements11defer_test2yySbF
 func defer_test2(_ cond : Bool) {
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3yyF
   // CHECK: apply [[C3]]
@@ -491,7 +491,7 @@ func defer_test2(_ cond : Bool) {
   // CHECK: [[C2:%.*]] = function_ref @{{.*}}callee2yyF
   // CHECK: apply [[C2]]
 
-  // CHECK: [[C1:%.*]] = function_ref @_T010statements11defer_test2yySbF6
+  // CHECK: [[C1:%.*]] = function_ref @$S10statements11defer_test2yySbF6
   // CHECK: apply [[C1]]
   // CHECK: br [[EXIT]]
     defer { callee1() }
@@ -510,35 +510,35 @@ func generic_callee_1<T>(_: T) {}
 func generic_callee_2<T>(_: T) {}
 func generic_callee_3<T>(_: T) {}
 
-// CHECK-LABEL: sil hidden @_T010statements16defer_in_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements16defer_in_generic{{[_0-9a-zA-Z]*}}F
 func defer_in_generic<T>(_ x: T) {
-  // CHECK: [[C3:%.*]] = function_ref @_T010statements16generic_callee_3{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[C3:%.*]] = function_ref @$S10statements16generic_callee_3{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[C3]]<T>
-  // CHECK: [[C2:%.*]] = function_ref @_T010statements16defer_in_genericyyxlF6
+  // CHECK: [[C2:%.*]] = function_ref @$S10statements16defer_in_genericyyxlF6
   // CHECK: apply [[C2]]<T>
-  // CHECK: [[C1:%.*]] = function_ref @_T010statements16defer_in_genericyyxlF6
+  // CHECK: [[C1:%.*]] = function_ref @$S10statements16defer_in_genericyyxlF6
   // CHECK: apply [[C1]]<T>
   defer { generic_callee_1(x) }
   defer { generic_callee_2(x) }
   generic_callee_3(x)
 }
 
-// CHECK-LABEL: sil hidden @_T010statements017defer_in_closure_C8_genericyyxlF : $@convention(thin) <T> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S10statements017defer_in_closure_C8_genericyyxlF : $@convention(thin) <T> (@in T) -> ()
 func defer_in_closure_in_generic<T>(_ x: T) {
-  // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
+  // CHECK-LABEL: sil private @$S10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
-    // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
+    // CHECK-LABEL: sil private @$S10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
     defer { generic_callee_1(T.self) }
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010statements13defer_mutableyySiF
+// CHECK-LABEL: sil hidden @$S10statements13defer_mutableyySiF
 func defer_mutable(_ x: Int) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
   // CHECK-NEXT: project_box [[BOX]]
   // CHECK-NOT: [[BOX]]
-  // CHECK: function_ref @_T010statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
+  // CHECK: function_ref @$S10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
   // CHECK: destroy_value [[BOX]]
   defer { _ = x }
@@ -555,11 +555,11 @@ func testDeferOpenExistential(_ b: Bool, type: StaticFooProtocol.Type) {
 
 
 
-// CHECK-LABEL: sil hidden @_T010statements22testRequireExprPatternyySiF
+// CHECK-LABEL: sil hidden @$S10statements22testRequireExprPatternyySiF
 
 func testRequireExprPattern(_ a : Int) {
   marker_1()
-  // CHECK: [[M1:%[0-9]+]] = function_ref @_T010statements8marker_1yyF : $@convention(thin) () -> ()
+  // CHECK: [[M1:%[0-9]+]] = function_ref @$S10statements8marker_1yyF : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
   // CHECK: function_ref Swift.~= infix<A where A: Swift.Equatable>(A, A) -> Swift.Bool
@@ -569,13 +569,13 @@ func testRequireExprPattern(_ a : Int) {
   // Fall through case comes first.
 
   // CHECK: bb1:
-  // CHECK: [[M3:%[0-9]+]] = function_ref @_T010statements8marker_3yyF : $@convention(thin) () -> ()
+  // CHECK: [[M3:%[0-9]+]] = function_ref @$S10statements8marker_3yyF : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M3]]() : $@convention(thin) () -> ()
   // CHECK-NEXT: br bb3
   marker_3()
 
   // CHECK: bb2:
-  // CHECK: [[M2:%[0-9]+]] = function_ref @_T010statements8marker_2yyF : $@convention(thin) () -> ()
+  // CHECK: [[M2:%[0-9]+]] = function_ref @$S10statements8marker_2yyF : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M2]]() : $@convention(thin) () -> ()
   // CHECK-NEXT: br bb3
 
@@ -585,7 +585,7 @@ func testRequireExprPattern(_ a : Int) {
 }
 
 
-// CHECK-LABEL: sil hidden @_T010statements20testRequireOptional1yS2iSgF
+// CHECK-LABEL: sil hidden @$S10statements20testRequireOptional1yS2iSgF
 // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Int>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<Int>, let, name "a"
 // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
@@ -604,13 +604,13 @@ func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK:  [[ABORT]]:
   // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
-  // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @_T010statements5aborts5NeverOyF
+  // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @$S10statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
   // CHECK-NEXT:    unreachable
   return t
 }
 
-// CHECK-LABEL: sil hidden @_T010statements20testRequireOptional2yS2SSgF
+// CHECK-LABEL: sil hidden @$S10statements20testRequireOptional2yS2SSgF
 // CHECK: bb0([[ARG:%.*]] : @owned $Optional<String>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
 // CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -637,14 +637,14 @@ func testRequireOptional2(_ a : String?) -> String {
 
   // CHECK:        [[ABORT_BB]]:
   // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
-  // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @_T010statements5aborts5NeverOyF
+  // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @$S10statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
   // CHECK-NEXT:   unreachable
   return t
 }
 
 
-// CHECK-LABEL: sil hidden @_T010statements19testCleanupEmission{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S10statements19testCleanupEmission{{[_0-9a-zA-Z]*}}F
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
 protocol MyProtocol {}
 func testCleanupEmission<T>(_ x: T) {
@@ -654,7 +654,7 @@ func testCleanupEmission<T>(_ x: T) {
 }
 
 
-// CHECK-LABEL: sil hidden @_T010statements15test_is_patternyyAA9BaseClassCF
+// CHECK-LABEL: sil hidden @$S10statements15test_is_patternyyAA9BaseClassCF
 func test_is_pattern(_ y : BaseClass) {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
   guard case is DerivedClass = y else { marker_1(); return }
@@ -662,7 +662,7 @@ func test_is_pattern(_ y : BaseClass) {
   marker_2()
 }
 
-// CHECK-LABEL: sil hidden @_T010statements15test_as_patternyAA12DerivedClassCAA04BaseF0CF
+// CHECK-LABEL: sil hidden @$S10statements15test_as_patternyAA12DerivedClassCAA04BaseF0CF
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK: bb0([[ARG:%.*]] : @owned $BaseClass):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -685,7 +685,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }
-// CHECK-LABEL: sil hidden @_T010statements22let_else_tuple_bindingyS2i_SitSgF
+// CHECK-LABEL: sil hidden @$S10statements22let_else_tuple_bindingyS2i_SitSgF
 func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<(Int, Int)>):

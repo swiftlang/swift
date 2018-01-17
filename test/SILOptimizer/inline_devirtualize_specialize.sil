@@ -90,7 +90,7 @@ bb0(%0 : $*C):
 }
 
 sil_vtable C {
-  #C.foo!1: class_target
+  #C.foo!1: @class_target
 }
 
 sil_witness_table C: P module main {

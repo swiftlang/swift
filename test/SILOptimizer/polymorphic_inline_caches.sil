@@ -108,19 +108,19 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
 }
 
 sil_vtable A {
-  #A.ping!1: _TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
+  #A.ping!1: @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
 }
 
 sil_vtable B {
-  #A.ping!1: _TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
+  #A.ping!1: @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
 }
 
 sil_vtable C {
-  #A.ping!1: _TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
+  #A.ping!1: @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
 }
 
 sil_vtable D {
-  #A.ping!1: _TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_
+  #A.ping!1: @_TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_
 }
 
 protocol P {
@@ -219,13 +219,13 @@ bb0(%0 : $E):
 }
 
 sil_vtable E {
-  #E.foo!1: _TFC5casts1E3foofS0_FT_T_
+  #E.foo!1: @_TFC5casts1E3foofS0_FT_T_
 }
 
 sil_vtable F {
-  #E.foo!1: _TFC5casts1F3foofS0_FT_T_
+  #E.foo!1: @_TFC5casts1F3foofS0_FT_T_
 }
 
 sil_vtable G {
-  #E.foo!1: _TFC5casts1G3foofS0_FT_T_
+  #E.foo!1: @_TFC5casts1G3foofS0_FT_T_
 }

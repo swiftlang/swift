@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @_T016generic_literals0A14IntegerLiteral1xyx_ts013ExpressibleBycD0RzlF
+// CHECK-LABEL: sil hidden @$S16generic_literals0A14IntegerLiteral1xyx_ts013ExpressibleBycD0RzlF
 func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   var x = x
   // CHECK: [[ADDR:%.*]] = alloc_stack $T
@@ -16,7 +16,7 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   x = 17
 }
 
-// CHECK-LABEL: sil hidden @_T016generic_literals0A15FloatingLiteral{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S16generic_literals0A15FloatingLiteral{{[_0-9a-zA-Z]*}}F
 func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   var x = x
   // CHECK: [[TVAL:%.*]] = alloc_stack $T

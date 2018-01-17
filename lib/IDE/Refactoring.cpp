@@ -1003,20 +1003,18 @@ getNewFuncInsertLoc(DeclContext *DC, DeclContext*& InsertToContext) {
     // getter/setter function and the individual var decl. The pattern binding
     // decl is the position before which we should insert the newly extracted
     // function.
-    if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isAccessor()) {
-        ValueDecl *SD = FD->getAccessorStorageDecl();
-        switch(SD->getKind()) {
-        case DeclKind::Var:
-          if (auto *PBD = static_cast<VarDecl*>(SD)->getParentPatternBinding())
-            D = PBD;
-          break;
-        case DeclKind::Subscript:
-          D = SD;
-          break;
-        default:
-          break;
-        }
+    if (auto *FD = dyn_cast<AccessorDecl>(D)) {
+      ValueDecl *SD = FD->getStorage();
+      switch (SD->getKind()) {
+      case DeclKind::Var:
+        if (auto *PBD = cast<VarDecl>(SD)->getParentPatternBinding())
+          D = PBD;
+        break;
+      case DeclKind::Subscript:
+        D = SD;
+        break;
+      default:
+        break;
       }
     }
 
@@ -1690,6 +1688,11 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
   if (Info.Kind != RangeKind::SingleExpression
       && Info.Kind != RangeKind::PartOfExpression)
     return nullptr;
+
+  // FIXME: We should always have a valid node.
+  if (Info.ContainedNodes.empty())
+    return nullptr;
+
   Expr *E = Info.ContainedNodes[0].get<Expr*>();
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
@@ -2899,10 +2902,9 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
 
   if (isa<AbstractFunctionDecl>(VD)) {
     // Disallow renaming accessors.
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      if (FD->isAccessor())
-        return Scratch;
-    }
+    if (isa<AccessorDecl>(VD))
+      return Scratch;
+
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
       return Scratch;

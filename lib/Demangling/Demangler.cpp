@@ -56,12 +56,13 @@ static bool isContext(Node::Kind kind) {
   }
 }
 
-static bool isNominal(Node::Kind kind) {
+static bool isAnyGeneric(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::Structure:
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::TypeAlias:
       return true;
     default:
       return false;
@@ -115,25 +116,42 @@ static bool isFunctionAttr(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
-int swift::Demangle::getManglingPrefixLength(const char *mangledName) {
+int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
+  if (mangledName.empty()) return 0;
+
   // Check for the swift-4 prefix
-  if (mangledName[0] == '_' && mangledName[1] == 'T' && mangledName[2] == '0')
+  if (mangledName.size() >= 3 && mangledName[0] == '_' &&
+      mangledName[1] == 'T' && mangledName[2] == '0')
     return 3;
 
   // Check for the swift > 4 prefix
   unsigned Offset = (mangledName[0] == '_' ? 1 : 0);
-  if (mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
+  if (mangledName.size() >= Offset + 1 &&
+      mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
     return Offset + 2;
 
   return 0;
 }
 
-bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
-  // The old mangling.
-  if (mangledName[0] == '_' && mangledName[1] == 'T')
+bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
+  if (isOldFunctionTypeMangling(mangledName))
     return true;
 
   return getManglingPrefixLength(mangledName) != 0;
+}
+
+bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
+  StringRef mangledNameRef(mangledName, 4);
+  return isSwiftSymbol(mangledNameRef);
+}
+
+bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
+  return mangledName.size() >= 2 && mangledName[0] == '_' &&
+      mangledName[1] == 'T';
+}
+
+llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
+  return mangledName.drop_front(getManglingPrefixLength(mangledName));
 }
 
 namespace swift {
@@ -149,6 +167,23 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
     Factory.Reallocate(Children, ReservedChildren, 1);
   assert(NumChildren < ReservedChildren);
   Children[NumChildren++] = Child;
+}
+
+void Node::removeChildAt(unsigned Pos, swift::Demangle::NodeFactory &factory) {
+  assert(Pos < NumChildren && "invalid child position!");
+
+  size_t Index = 0;
+  auto *NewChildren = factory.Allocate<NodePointer>(NumChildren - 1);
+  for (unsigned i = 0, n = NumChildren; i != n; ++i) {
+    auto Child = Children[i];
+    if (i != Pos) {
+      NewChildren[Index] = Child;
+      ++Index;
+    } else {
+      --NumChildren;
+    }
+  }
+  Children = NewChildren;
 }
 
 void Node::reverseChildren(size_t StartingAt) {
@@ -253,10 +288,11 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   if (nextIf("_Tt"))
     return demangleObjCTypeName();
 
-  unsigned PrefixLength = getManglingPrefixLength(MangledName.data());
+  unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
     return nullptr;
 
+  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
   Pos += PrefixLength;
 
   // If any other prefixes are accepted, please update Mangler::verify.
@@ -392,7 +428,7 @@ NodePointer Demangler::demangleTypeMangling() {
   auto TypeMangling = createNode(Node::Kind::TypeMangling);
 
   addChild(TypeMangling, LabelList);
-  addChild(TypeMangling, Type);
+  TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
 
@@ -553,7 +589,7 @@ NodePointer Demangler::demangleStandardSubstitution() {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
-      return createNode(Node::Kind::Module, MANGLING_MODULE_C);
+      return createNode(Node::Kind::Module, MANGLING_MODULE_CLANG_IMPORTER);
     case 'g': {
       NodePointer OptionalTy =
         createType(createWithChildren(Node::Kind::BoundGenericEnum,
@@ -735,9 +771,9 @@ NodePointer Demangler::popTypeAndGetChild() {
   return Ty->getFirstChild();
 }
 
-NodePointer Demangler::popTypeAndGetNominal() {
+NodePointer Demangler::popTypeAndGetAnyGeneric() {
   NodePointer Child = popTypeAndGetChild();
-  if (Child && isNominal(Child->getKind()))
+  if (Child && isAnyGeneric(Child->getKind()))
     return Child;
   return nullptr;
 }
@@ -825,7 +861,7 @@ NodePointer Demangler::demangleAnyGenericType(Node::Kind kind) {
 NodePointer Demangler::demangleExtensionContext() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Module = popModule();
-  NodePointer Type = popTypeAndGetNominal();
+  NodePointer Type = popTypeAndGetAnyGeneric();
   NodePointer Ext = createWithChildren(Node::Kind::Extension, Module, Type);
   if (GenSig)
     Ext = addChild(Ext, GenSig);
@@ -884,10 +920,11 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
 }
 
 NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
-  if (popNode(Node::Kind::EmptyList))
+  if (!IsOldFunctionTypeMangling && popNode(Node::Kind::EmptyList))
     return createNode(Node::Kind::LabelList);
 
-  assert(Type->getKind() == Node::Kind::Type);
+  if (!Type || Type->getKind() != Node::Kind::Type)
+    return nullptr;
 
   auto FuncType = Type->getFirstChild();
   if (FuncType->getKind() == Node::Kind::DependentGenericType)
@@ -904,15 +941,65 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   if (ParameterType->getIndex() == 0)
     return nullptr;
 
+  auto getChildIf =
+      [](NodePointer Node,
+         Node::Kind filterBy) -> std::pair<NodePointer, unsigned> {
+    for (unsigned i = 0, n = Node->getNumChildren(); i != n; ++i) {
+      auto Child = Node->getChild(i);
+      if (Child->getKind() == filterBy)
+        return {Child, i};
+    }
+    return {nullptr, 0};
+  };
+
+  auto getLabel = [&](NodePointer Params, unsigned Idx) -> NodePointer {
+    // Old-style function type mangling has labels as part of the argument.
+    if (IsOldFunctionTypeMangling) {
+      auto Param = Params->getChild(Idx);
+      auto Label = getChildIf(Param, Node::Kind::TupleElementName);
+
+      if (Label.first) {
+        Param->removeChildAt(Label.second, *this);
+        return createNodeWithAllocatedText(Node::Kind::Identifier,
+                                           Label.first->getText());
+      }
+
+      return createNode(Node::Kind::FirstElementMarker);
+    }
+
+    return popNode();
+  };
+
   auto LabelList = createNode(Node::Kind::LabelList);
+  auto Tuple = ParameterType->getFirstChild()->getFirstChild();
+
+  if (IsOldFunctionTypeMangling &&
+      (!Tuple || Tuple->getKind() != Node::Kind::Tuple))
+    return LabelList;
+
+  bool hasLabels = false;
   for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
-    auto Label = popNode();
-    assert(Label && (Label->getKind() == Node::Kind::Identifier ||
-                     Label->getKind() == Node::Kind::FirstElementMarker));
+    auto Label = getLabel(Tuple, i);
+
+    if (!Label)
+      return nullptr;
+
+    if (Label->getKind() != Node::Kind::Identifier &&
+        Label->getKind() != Node::Kind::FirstElementMarker)
+      return nullptr;
+
     LabelList->addChild(Label, *this);
+    hasLabels |= Label->getKind() != Node::Kind::FirstElementMarker;
   }
 
-  LabelList->reverseChildren();
+  // Old style label mangling can produce label list without
+  // actual labels, we need to support that case specifically.
+  if (!hasLabels)
+    return createNode(Node::Kind::LabelList);
+
+  if (!IsOldFunctionTypeMangling)
+    LabelList->reverseChildren();
+
   return LabelList;
 }
 
@@ -982,7 +1069,7 @@ NodePointer Demangler::demangleBoundGenericType() {
     if (!popNode(Node::Kind::FirstElementMarker))
       return nullptr;
   }
-  NodePointer Nominal = popTypeAndGetNominal();
+  NodePointer Nominal = popTypeAndGetAnyGeneric();
   NodePointer NTy = createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
   addSubstitution(NTy);
   return NTy;
@@ -1180,7 +1267,7 @@ NodePointer Demangler::demangleMetatype() {
                              popProtocolConformance());
     case 'C': {
       NodePointer Ty = popNode(Node::Kind::Type);
-      if (!Ty || !isNominal(Ty->getChild(0)->getKind()))
+      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
         return nullptr;
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
@@ -1336,6 +1423,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);
+    case 'C': {
+      NodePointer type = popNode(Node::Kind::Type);
+      return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
+    }
     case 'V': {
       NodePointer Base = popNode(isEntity);
       NodePointer Derived = popNode(isEntity);
@@ -1998,16 +2089,16 @@ NodePointer Demangler::demangleFunctionEntity() {
     case None:
       break;
     case Index:
-      addChild(Entity, NameOrIndex);
+      Entity = addChild(Entity, NameOrIndex);
       break;
     case TypeAndMaybePrivateName:
       addChild(Entity, LabelList);
-      addChild(Entity, ParamType);
+      Entity = addChild(Entity, ParamType);
       addChild(Entity, NameOrIndex);
       break;
     case TypeAndIndex:
-      addChild(Entity, NameOrIndex);
-      addChild(Entity, ParamType);
+      Entity = addChild(Entity, NameOrIndex);
+      Entity = addChild(Entity, ParamType);
       break;
   }
   return Entity;
@@ -2034,9 +2125,9 @@ NodePointer Demangler::demangleSubscript() {
   NodePointer Context = popContext();
 
   NodePointer Subscript = createNode(Node::Kind::Subscript);
-  addChild(Subscript, Context);
+  Subscript = addChild(Subscript, Context);
   addChild(Subscript, LabelList);
-  addChild(Subscript, Type);
+  Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
 
   return demangleAccessor(Subscript);

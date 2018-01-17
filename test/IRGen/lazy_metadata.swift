@@ -3,43 +3,43 @@
 // RUN: %FileCheck -check-prefix=CHECK-DEAD %s < %t.ll
 
 // protocol descriptor for test.Proto
-// CHECK-DAG: @_T04test5ProtoMp =
-// CHECK-DAG: @_T04test12PrivateProto{{[_A-Z0-9]*}}Mp =
+// CHECK-DAG: @"$S4test5ProtoMp" =
+// CHECK-DAG: @"$S4test12PrivateProto{{[_A-Z0-9]*}}Mp" =
 
 // reflection metadata field descriptors
-// CHECK-DAG: @_T04test7StructAVMF =
-// CHECK-DAG: @_T04test7StructBVMF =
-// CHECK-DAG: @_T04test7StructCVMF =
-// CHECK-DAG: @_T04test7StructDVMF =
-// CHECK-DAG: @_T04test7StructEVMF =
+// CHECK-DAG: @"$S4test7StructAVMF" =
+// CHECK-DAG: @"$S4test7StructBVMF" =
+// CHECK-DAG: @"$S4test7StructCVMF" =
+// CHECK-DAG: @"$S4test7StructDVMF" =
+// CHECK-DAG: @"$S4test7StructEVMF" =
 
 // value witness tables
-// CHECK-DAG: @_T04test7StructAVWV =
-// CHECK-DAG: @_T04test7StructBVWV =
-// CHECK-DAG: @_T04test7StructCVWV =
-// CHECK-DEAD-NOT: @_T04test7StructDVWV
-// CHECK-DAG: @_T04test7StructEVWV =
+// CHECK-DAG: @"$S4test7StructAVWV" =
+// CHECK-DAG: @"$S4test7StructBVWV" =
+// CHECK-DAG: @"$S4test7StructCVWV" =
+// CHECK-DEAD-NOT: @"$S4test7StructDVWV"
+// CHECK-DAG: @"$S4test7StructEVWV" =
 
 // nominal type descriptors
-// CHECK-DAG: @_T04test7StructAVMn =
-// CHECK-DAG: @_T04test7StructBVMn =
-// CHECK-DAG: @_T04test7StructCVMn =
-// CHECK-DEAD-NOT: @_T04test7StructDVMn
-// CHECK-DAG: @_T04test7StructEVMn =
+// CHECK-DAG: @"$S4test7StructAVMn" =
+// CHECK-DAG: @"$S4test7StructBVMn" =
+// CHECK-DAG: @"$S4test7StructCVMn" =
+// CHECK-DEAD-NOT: @"$S4test7StructDVMn"
+// CHECK-DAG: @"$S4test7StructEVMn" =
 
 // full type metadata
-// CHECK-DAG: @_T04test7StructAVMf =
-// CHECK-DAG: @_T04test7StructBVMf =
-// CHECK-DAG: @_T04test7StructCVMf =
-// CHECK-DEAD-NOT: @_T04test7StructDVMf
-// CHECK-DAG: @_T04test7StructEVMf =
+// CHECK-DAG: @"$S4test7StructAVMf" =
+// CHECK-DAG: @"$S4test7StructBVMf" =
+// CHECK-DAG: @"$S4test7StructCVMf" =
+// CHECK-DEAD-NOT: @"$S4test7StructDVMf"
+// CHECK-DAG: @"$S4test7StructEVMf" =
 
 // protocol witness tables
-// CHECK-DAG: @_T04test7StructAVAA5ProtoAAWP =
-// CHECK-DAG: @_T04test7StructBVAA5ProtoAAWP =
-// CHECK-DAG: @_T04test7StructCVAA5ProtoAAWP =
-// CHECK-DEAD-NOT: @_T04test7StructDVAA5ProtoAAWP =
-// CHECK-DAG: @_T04test7StructEVAA12PrivateProto{{[_A-Z0-9]*}}AAWP =
+// CHECK-DAG: @"$S4test7StructAVAA5ProtoAAWP" =
+// CHECK-DAG: @"$S4test7StructBVAA5ProtoAAWP" =
+// CHECK-DAG: @"$S4test7StructCVAA5ProtoAAWP" =
+// CHECK-DEAD-NOT: @"$S4test7StructDVAA5ProtoAAWP" =
+// CHECK-DAG: @"$S4test7StructEVAA12PrivateProto{{[_A-Z0-9]*}}AAWP" =
 
 public protocol Proto {
   func abc()

@@ -4,7 +4,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi9testMultiyyXlAA10SwiftGizmoCF : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden @$S25objc_attr_NSManaged_multi9testMultiyyXlAA10SwiftGizmoCF : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
 // CHECK: bb0([[ARG:%.*]] : @owned $SwiftGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: = objc_method [[BORROWED_ARG]] : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> (), $@convention(objc_method) (SwiftGizmo) -> ()
@@ -21,7 +21,7 @@ func testMulti(_ obj: SwiftGizmo) -> AnyObject {
   return obj.x
 }
 
-// CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi14testFinalMultiySSAA0F5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
+// CHECK-LABEL: sil hidden @$S25objc_attr_NSManaged_multi14testFinalMultiySSAA0F5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @owned $FinalGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: objc_method [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()

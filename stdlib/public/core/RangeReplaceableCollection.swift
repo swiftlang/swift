@@ -902,7 +902,7 @@ extension RangeReplaceableCollection
   }
 }
 
-extension Sequence {
+extension RangeReplaceableCollection {
   /// Creates a new collection by concatenating the elements of a collection and
   /// a sequence.
   ///
@@ -923,10 +923,9 @@ extension Sequence {
   ///   - rhs: A collection or finite sequence.
   @_inlineable
   public static func + <
-    Other : RangeReplaceableCollection
-  >(lhs: Other, rhs: Self) -> Other
+    Other : Sequence
+  >(lhs: Self, rhs: Other) -> Self
   where Element == Other.Element {
-
     var lhs = lhs
     // FIXME: what if lhs is a reference type?  This will mutate it.
     lhs.append(contentsOf: rhs)
@@ -953,11 +952,10 @@ extension Sequence {
   ///   - rhs: A range-replaceable collection.
   @_inlineable
   public static func + <
-    Other : RangeReplaceableCollection
-  >(lhs: Self, rhs: Other) -> Other
+    Other : Sequence
+  >(lhs: Other, rhs: Self) -> Self
   where Element == Other.Element {
-
-    var result = Other()
+    var result = Self()
     result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
     result.append(contentsOf: lhs)
     result.append(contentsOf: rhs)
@@ -982,14 +980,12 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @_inlineable
   public static func += <
-    Other : RangeReplaceableCollection
-  >(lhs: inout Other, rhs: Self)
+    Other : Sequence
+  >(lhs: inout Self, rhs: Other)
   where Element == Other.Element {
     lhs.append(contentsOf: rhs)
   }
-}
 
-extension RangeReplaceableCollection {
   /// Creates a new collection by concatenating the elements of two collections.
   ///
   /// The two arguments must have the same `Element` type. For example, you can
@@ -1009,11 +1005,10 @@ extension RangeReplaceableCollection {
   ///   - lhs: A range-replaceable collection.
   ///   - rhs: Another range-replaceable collection.
   @_inlineable
-  public static func +<
+  public static func + <
     Other : RangeReplaceableCollection
   >(lhs: Self, rhs: Other) -> Self
-    where Element == Other.Element {
-
+  where Element == Other.Element {
     var lhs = lhs
     // FIXME: what if lhs is a reference type?  This will mutate it.
     lhs.append(contentsOf: rhs)

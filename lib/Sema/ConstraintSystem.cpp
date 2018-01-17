@@ -1404,7 +1404,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &refType,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
-  
+
   switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
@@ -1524,8 +1524,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional: {
+  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
     bool isDynamicResult
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
@@ -1661,9 +1660,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
-
   // Note that we have resolved this overload.
   resolvedOverloadSets
     = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
@@ -1672,6 +1668,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               openedFullType,
                                               refType};
+
+  if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    // Build the disjunction to attempt binding both T? and T (or
+    // function returning T? and function returning T).
+    buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType, locator);
+  } else {
+    // Add the type binding constraint.
+    addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+  }
+
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
@@ -1826,7 +1832,6 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       return getDecl()->getFullName();
       
     case OverloadChoiceKind::KeyPathApplication: {
@@ -1842,4 +1847,11 @@ DeclName OverloadChoice::getName() const {
   }
   
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
+  // FIXME: Disable parts of the new IUO implementation for now.
+  return false;
+  return isDecl() &&
+         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }

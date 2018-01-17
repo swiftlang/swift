@@ -540,10 +540,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         D->getDeclContext()->isLocalContext() &&
         D->getDeclContext() == DC &&
         Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
-      if (!D->isInvalid()) {
-        diagnose(Loc, diag::use_local_before_declaration, Name);
-        diagnose(D, diag::decl_declared_here, Name);
-      }
+      diagnose(Loc, diag::use_local_before_declaration, Name);
+      diagnose(D, diag::decl_declared_here, Name);
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
@@ -2854,7 +2852,15 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())
     return expr;
-  
+
+  // Walk into force optionals and coerce the source.
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+    auto sub = coerceToRValue(FVE->getSubExpr(), getType, setType);
+    FVE->setSubExpr(sub);
+    setType(FVE, getType(sub)->getAnyOptionalObjectType());
+    return FVE;
+  }
+
   // Load lvalues.
   if (auto lvalue = exprTy->getAs<LValueType>()) {
     expr->propagateLValueAccessKind(AccessKind::Read, getType);
@@ -3019,7 +3025,6 @@ void Solution::dump(raw_ostream &out) const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
@@ -3196,7 +3201,6 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
         out << choice.getDecl()->getBaseName() << ": "

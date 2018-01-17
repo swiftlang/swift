@@ -111,44 +111,6 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-bool RawSyntax::accumulateAbsolutePosition(
-    AbsolutePosition &Pos, const RawSyntax *UpToTargetNode) const {
-  auto Found = this == UpToTargetNode;
-  for (auto LE : Layout) {
-    switch (LE->Kind) {
-    case SyntaxKind::Token: {
-      auto Tok = llvm::cast<RawTokenSyntax>(LE);
-      for (auto Leader : Tok->LeadingTrivia) {
-        Leader.accumulateAbsolutePosition(Pos);
-      }
-
-      if (Found) {
-        return true;
-      }
-
-      Pos.addText(Tok->getText());
-
-      for (auto Trailer : Tok->TrailingTrivia) {
-        Trailer.accumulateAbsolutePosition(Pos);
-      }
-      break;
-    }
-    default:
-      if (Found)
-        return true;
-      LE->accumulateAbsolutePosition(Pos, UpToTargetNode);
-      break;
-    }
-  }
-  return false;
-}
-
-AbsolutePosition RawSyntax::getAbsolutePosition(RC<RawSyntax> Root) const {
-  AbsolutePosition Pos;
-  Root->accumulateAbsolutePosition(Pos, this);
-  return Pos;
-}
-
 void AbsolutePosition::printLineAndColumn(llvm::raw_ostream &OS) const {
   OS << getLine() << ':' << getColumn();
 }

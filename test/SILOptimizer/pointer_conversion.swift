@@ -18,7 +18,7 @@ func get<T>() -> T
 // The purpose of these tests is to make sure the storage is never released
 // before the call to the opaque function.
 
-// CHECK-LABEL: sil @_T018pointer_conversion9testArrayyyF
+// CHECK-LABEL: sil @$S18pointer_conversion9testArrayyyF
 public func testArray() {
   let array: [Int] = get()
   takesConstRawPointer(array)
@@ -33,7 +33,7 @@ public func testArray() {
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @_T018pointer_conversion19testArrayToOptionalyyF
+// CHECK-LABEL: sil @$S18pointer_conversion19testArrayToOptionalyyF
 public func testArrayToOptional() {
   let array: [Int] = get()
   takesOptConstRawPointer(array)
@@ -49,7 +49,7 @@ public func testArrayToOptional() {
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @_T018pointer_conversion16testMutableArrayyyF
+// CHECK-LABEL: sil @$S18pointer_conversion16testMutableArrayyyF
 public func testMutableArray() {
   var array: [Int] = get()
   takesMutableRawPointer(&array)
@@ -65,7 +65,7 @@ public func testMutableArray() {
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @_T018pointer_conversion26testMutableArrayToOptionalyyF
+// CHECK-LABEL: sil @$S18pointer_conversion26testMutableArrayToOptionalyyF
 public func testMutableArrayToOptional() {
   var array: [Int] = get()
   takesOptMutableRawPointer(&array)
@@ -82,7 +82,7 @@ public func testMutableArrayToOptional() {
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @_T018pointer_conversion17testOptionalArrayyyF
+// CHECK-LABEL: sil @$S18pointer_conversion17testOptionalArrayyyF
 public func testOptionalArray() {
   let array: [Int]? = get()
   takesOptConstRawPointer(array)
@@ -107,10 +107,10 @@ public func testOptionalArray() {
   // CHECK-NEXT: [[NO_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.none!enumelt
   // CHECK-NEXT: [[NO_OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.none!enumelt
   // CHECK-NEXT: br [[CALL_BRANCH]]([[NO_POINTER]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
-} // CHECK: end sil function '_T018pointer_conversion17testOptionalArrayyyF'
+} // CHECK: end sil function '$S18pointer_conversion17testOptionalArrayyyF'
 
 
-// CHECK-LABEL: sil @_T018pointer_conversion21arrayLiteralPromotionyyF
+// CHECK-LABEL: sil @$S18pointer_conversion21arrayLiteralPromotionyyF
 public func arrayLiteralPromotion() {
   takesConstRawPointer([41,42,43,44])
   

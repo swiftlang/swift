@@ -12,7 +12,9 @@
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
-@objc public enum MachErrorCode : Int32 {
+@_fixed_layout // FIXME(sil-serialize-all)
+@objc
+public enum MachErrorCode : Int32 {
   case success                  = 0
 
   /// Specified address is not currently valid.

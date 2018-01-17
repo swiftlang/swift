@@ -206,6 +206,8 @@ public:
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
+  // Only to be used by the demangler parsers.
+  void removeChildAt(unsigned Pos, NodeFactory &factory);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -219,20 +221,36 @@ public:
 /// Returns the length of the swift mangling prefix of the \p SymbolName.
 ///
 /// Returns 0 if \p SymbolName is not a mangled swift (>= swift 4.x) name.
-int getManglingPrefixLength(const char *mangledName);
+int getManglingPrefixLength(llvm::StringRef mangledName);
 
 /// Returns true if \p SymbolName is a mangled swift name.
 ///
 /// This does not include the old (<= swift 3.x) mangling prefix "_T".
-inline bool isMangledName(llvm::StringRef MangledName) {
-  return getManglingPrefixLength(MangledName.data()) != 0;
+inline bool isMangledName(llvm::StringRef mangledName) {
+  return getManglingPrefixLength(mangledName) != 0;
 }
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
-/// \param mangledName A null-terminated string containing a mangled name.
+bool isSwiftSymbol(llvm::StringRef mangledName);
+
+/// Returns true if the mangledName starts with the swift mangling prefix.
+///
+/// This includes the old (<= swift 3.x) mangling prefix "_T".
 bool isSwiftSymbol(const char *mangledName);
+
+/// Drops the Swift mangling prefix from the given mangled name, if there is
+/// one.
+///
+/// This does not include the old (<= swift 3.x) mangling prefix "_T".
+llvm::StringRef dropSwiftManglingPrefix(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name has the old scheme of function type
+/// mangling where labels are part of the type.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isOldFunctionTypeMangling(llvm::StringRef mangledName);
 
 class Demangler;
 

@@ -23,6 +23,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/SILProfiler.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -132,6 +133,10 @@ private:
   /// The source location and scope of the function.
   const SILDebugScope *DebugScope;
 
+  /// The profiler for instrumentation based profiling, or null if profiling is
+  /// disabled.
+  SILProfiler *Profiler = nullptr;
+
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
   unsigned Bare : 1;
@@ -165,11 +170,6 @@ private:
   /// preserved and exported more widely than its Swift linkage and usage
   /// would indicate.
   unsigned HasCReferences : 1;
-
-  /// Set if the function should be preserved and changed to public linkage
-  /// during dead function elimination. This is used for some generic
-  /// pre-specialization.
-  unsigned KeepAsPublic : 1;
 
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
@@ -251,7 +251,23 @@ public:
     return SILFunctionConventions(LoweredType, getModule());
   }
 
+  SILProfiler *getProfiler() const { return Profiler; }
+
+  void setProfiler(SILProfiler *InheritedProfiler) {
+    assert(!Profiler && "Function already has a profiler");
+    Profiler = InheritedProfiler;
+  }
+
+  void createProfiler(ASTNode Root) {
+    assert(!Profiler && "Function already has a profiler");
+    Profiler = SILProfiler::create(Module, Root);
+  }
+
+  void discardProfiler() { Profiler = nullptr; }
+
   ProfileCounter getEntryCount() const { return EntryCount; }
+
+  void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction() const;
 
@@ -265,10 +281,6 @@ public:
   /// You have to do that yourself
   void rewriteLoweredTypeUnsafe(CanSILFunctionType newType) {
     LoweredType = newType;
-  }
-
-  bool canBeDeleted() const {
-    return !getRefCount() && !isZombie() && !isKeepAsPublic();
   }
 
   /// Return the number of entities referring to this function (other
@@ -574,9 +586,6 @@ public:
   /// called within the addressor.
   bool isGlobalInit() const { return GlobalInitFlag; }
   void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
-
-  bool isKeepAsPublic() const { return KeepAsPublic; }
-  void setKeepAsPublic(bool keep) { KeepAsPublic = keep; }
 
   /// Return whether this function has a foreign implementation which can
   /// be emitted on demand.

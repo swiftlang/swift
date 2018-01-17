@@ -5,9 +5,9 @@
 #endif
 
 #ifndef SWIFT_ENUM
-#  define SWIFT_ENUM(_type, _name)    \
-  enum _name : _type _name;           \
-  enum __attribute__((enum_extensibility(open))) SWIFT_ENUM_EXTRA _name : _type
+#  define SWIFT_ENUM(_name)    \
+  enum _name _name;            \
+  enum __attribute__((enum_extensibility(open))) SWIFT_ENUM_EXTRA _name
 #endif
 
 // Renaming global variables.
@@ -27,7 +27,7 @@ struct SNSomeStruct SNMakeSomeStructForX(double X) SWIFT_NAME(makeSomeStruct(x:)
 typedef int SNIntegerType SWIFT_NAME(MyInt);
 
 // Renaming enumerations.
-SWIFT_ENUM(unsigned char, SNColorChoice) {
+SWIFT_ENUM(SNColorChoice) {
   SNColorRed SWIFT_NAME(Rouge),
   SNColorGreen,
   SNColorBlue

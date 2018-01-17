@@ -779,7 +779,6 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        name,
                        /*NameLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
-                       /*AccessorKeywordLoc=*/SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
                        TypeLoc(),

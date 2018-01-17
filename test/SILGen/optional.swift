@@ -30,7 +30,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:    [[NOTHING_BLOCK_EXIT]]:
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br [[EXIT]]
-// CHECK: } // end sil function '_T08optional8testCallyyyycSgF'
+// CHECK: } // end sil function '$S8optional8testCallyyyycSgF'
 
 func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
@@ -81,7 +81,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 
 func wrap<T>(_ x: T) -> T? { return x }
 
-// CHECK-LABEL: sil hidden @_T08optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(_ x: T) -> T {
   // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
@@ -91,7 +91,7 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
   return wrap(x)!
 }
 
-// CHECK-LABEL: sil hidden @_T08optional10tuple_bind{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
 func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
@@ -102,7 +102,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @_T08optional16crash_on_deallocyys10DictionaryVySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyys10DictionaryVySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)

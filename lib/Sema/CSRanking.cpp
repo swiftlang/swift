@@ -147,7 +147,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
@@ -193,8 +192,16 @@ static bool isNominallySuperclassOf(Type type1, Type type2) {
 /// Determine the relationship between the self types of the given declaration
 /// contexts..
 static std::pair<SelfTypeRelationship, Optional<ProtocolConformanceRef>>
-computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, DeclContext *dc1,
-                            DeclContext *dc2) {
+computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
+                            ValueDecl *decl2) {
+  // If both declarations are operators, even through they
+  // might have Self such types are unrelated.
+  if (decl1->isOperator() && decl2->isOperator())
+    return {SelfTypeRelationship::Unrelated, None};
+
+  auto *dc1 = decl1->getDeclContext();
+  auto *dc2 = decl2->getDeclContext();
+
   // If at least one of the contexts is a non-type context, the two are
   // unrelated.
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
@@ -542,7 +549,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // appropriate constraints. The constraints themselves never fail, but
       // they help deduce type variables that were opened.
       auto selfTypeRelationship =
-          computeSelfTypeRelationship(tc, dc, outerDC1, outerDC2);
+          computeSelfTypeRelationship(tc, dc, decl1, decl2);
       auto relationshipKind = selfTypeRelationship.first;
       auto conformance = selfTypeRelationship.second;
       switch (relationshipKind) {
@@ -815,8 +822,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
-      if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
+      if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
+          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         score1 += weight;
@@ -848,7 +855,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclForImplicitlyUnwrappedOptional:
       break;
     }
     

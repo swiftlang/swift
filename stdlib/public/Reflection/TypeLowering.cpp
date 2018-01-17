@@ -205,7 +205,8 @@ BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
-  std::vector<const ProtocolTypeRef *> Protocols;
+  std::vector<const NominalTypeRef *> Protocols;
+  const TypeRef *Superclass = nullptr;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
@@ -221,8 +222,11 @@ class ExistentialTypeInfoBuilder {
     if (Protocols.size() != 1)
       return false;
 
+    if (Superclass)
+      return false;
+
     for (auto *P : Protocols) {
-      if (P->isError())
+      if (P->isErrorProtocol())
         return true;
     }
     return false;
@@ -274,35 +278,32 @@ public:
       ObjC(false), WitnessTableCount(0),
       Invalid(false) {}
 
-  void addProtocol(const ProtocolTypeRef *P) {
+  void addProtocol(const NominalTypeRef *P) {
     Protocols.push_back(P);
   }
 
   void addProtocolComposition(const ProtocolCompositionTypeRef *PC) {
-    for (auto *T : PC->getMembers()) {
-      if (auto *P = dyn_cast<ProtocolTypeRef>(T)) {
-        addProtocol(P);
-        continue;
-      }
+    for (auto *T : PC->getProtocols()) {
+      addProtocol(T);
+    }
 
-      if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(T)) {
-        addProtocolComposition(PC);
-        continue;
-      }
+    if (PC->hasExplicitAnyObject())
+      addAnyObject();
 
+    if (auto *T = PC->getSuperclass()) {
       // Anything else should either be a superclass constraint, or
       // we have an invalid typeref.
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T)) {
         DEBUG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
       const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
       if (FD.first == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
 
       // We have a valid superclass constraint. It only affects
@@ -319,12 +320,9 @@ public:
       default:
         DEBUG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
     }
-
-    if (PC->hasExplicitAnyObject())
-      addAnyObject();
   }
 
   void addAnyObject() {
@@ -680,10 +678,6 @@ public:
     return true;
   }
 
-  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return true;
-  }
-
   bool
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return true;
@@ -802,10 +796,6 @@ public:
     for (const auto &Param : F->getParameters())
       result = combineRepresentations(result, visit(Param.getType()));
     return result;
-  }
-
-  MetatypeRepresentation visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation
@@ -1146,12 +1136,6 @@ public:
     swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
-  const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    ExistentialTypeInfoBuilder builder(TC);
-    builder.addProtocol(P);
-    return builder.build();
-  }
-
   const TypeInfo *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     ExistentialTypeInfoBuilder builder(TC);
@@ -1178,9 +1162,7 @@ public:
     ExistentialTypeInfoBuilder builder(TC);
     auto *TR = EM->getInstanceType();
 
-    if (auto *P = dyn_cast<ProtocolTypeRef>(TR)) {
-      builder.addProtocol(P);
-    } else if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
+    if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
       DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());

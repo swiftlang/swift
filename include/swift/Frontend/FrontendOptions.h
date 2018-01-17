@@ -96,7 +96,6 @@ public:
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getAllFiles()) {
-      assert(!input.file().empty());
       filenames.push_back(input.file());
     }
     return filenames;

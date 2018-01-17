@@ -15,7 +15,7 @@ import _SwiftDispatchOverlayShims
 public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public typealias Iterator = DispatchDataIterator
 	public typealias Index = Int
-	public typealias Indices = DefaultRandomAccessIndices<DispatchData>
+	public typealias Indices = DefaultIndices<DispatchData>
 
 	public static let empty: DispatchData = DispatchData(data: _swift_dispatch_data_empty())
 

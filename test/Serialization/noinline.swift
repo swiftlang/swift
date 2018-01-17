@@ -8,17 +8,17 @@
 import def_noinline
 
 // SIL-LABEL: sil @main
-// SIL: [[RAW:%.+]] = global_addr @_T08noinline3rawSbvp : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @_T012def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool
+// SIL: [[RAW:%.+]] = global_addr @$S8noinline3rawSbvp : $*Bool
+// SIL: [[FUNC:%.+]] = function_ref @$S12def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testNoinline(x: false)
 
-// SIL: [[FUNC2:%.+]] = function_ref @_T012def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
+// SIL: [[FUNC2:%.+]] = function_ref @$S12def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
 // SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
 
 var a = NoInlineInitStruct(x: false)
 
-// SIL-LABEL: [serialized] [noinline] @_T012def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [serialized] [noinline] @$S12def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [serialized] [noinline] @_T012def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [noinline] @$S12def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {

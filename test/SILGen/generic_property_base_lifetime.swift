@@ -13,7 +13,7 @@ protocol ProtocolB {
 }
 
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF : $@convention(thin) (@owned ProtocolA) -> Int {
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF : $@convention(thin) (@owned ProtocolA) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @owned $ProtocolA):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
@@ -26,12 +26,12 @@ protocol ProtocolB {
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[RESULT]]
-// CHECK: } // end sil function '_T030generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF'
+// CHECK: } // end sil function '$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF'
 func getIntPropExistential(_ a: ProtocolA) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF : $@convention(thin) (@owned ProtocolA) -> () {
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF : $@convention(thin) (@owned ProtocolA) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $ProtocolA):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
@@ -43,12 +43,12 @@ func getIntPropExistential(_ a: ProtocolA) -> Int {
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK: } // end sil function '_T030generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF'
+// CHECK: } // end sil function '$S30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF'
 func setIntPropExistential(_ a: ProtocolA) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @owned $T):
 // CHECK:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:    apply {{%.*}}<T>([[BORROWED_ARG]])
@@ -58,7 +58,7 @@ func getIntPropGeneric<T: ProtocolA>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @owned $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   apply {{%.*}}<T>({{%.*}}, [[BORROWED_ARG]])
@@ -68,7 +68,7 @@ func setIntPropGeneric<T: ProtocolA>(_ a: T) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolB_pF
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolB_pF
 // CHECK:         [[PROJECTION:%.*]] = open_existential_addr immutable_access %0
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}) ProtocolB
 // CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]
@@ -80,7 +80,7 @@ func getIntPropExistential(_ a: ProtocolB) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK:         copy_addr %0 to [initialization] [[STACK]]
 // CHECK:         apply {{%.*}}<T>([[STACK]])
@@ -91,7 +91,7 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF : $@convention(thin) (@owned ProtocolO) -> Int {
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF : $@convention(thin) (@owned ProtocolO) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @owned $ProtocolO):
 // CHECK:  [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:  [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
@@ -101,12 +101,12 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
 // CHECK:  destroy_value [[PROJECTION_COPY]]
 // CHECK:  end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:  destroy_value [[ARG]]
-// CHECK: } // end sil function '_T030generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF'
+// CHECK: } // end sil function '$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF'
 func getIntPropExistential(_ a: ProtocolO) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF : $@convention(thin) (@owned ProtocolO) -> () {
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF : $@convention(thin) (@owned ProtocolO) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $ProtocolO):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
@@ -116,12 +116,12 @@ func getIntPropExistential(_ a: ProtocolO) -> Int {
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK: } // end sil function '_T030generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF'
+// CHECK: } // end sil function '$S30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF'
 func setIntPropExistential(_ a: ProtocolO) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @owned $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   apply {{%.*}}<T>([[BORROWED_ARG]])
@@ -131,7 +131,7 @@ func getIntPropGeneric<T: ProtocolO>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @owned $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   apply {{%.*}}<T>({{%.*}}, [[BORROWED_ARG]])

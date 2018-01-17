@@ -134,9 +134,6 @@ Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
 Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
                                    std::string &error);
 
-Type getTypeFromMangledTypename(ASTContext &Ctx, StringRef mangledName,
-                                std::string &error);
-
 Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
                                   std::string &error);
 
@@ -233,9 +230,8 @@ private:
   bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
                                     ValueDecl *D) override;
   bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
-  bool rangeContainsLoc(SourceRange Range) const {
-    return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
-  }
+  bool rangeContainsLoc(SourceRange Range) const;
+  bool rangeContainsLoc(CharSourceRange Range) const;
   bool isDone() const { return CursorInfo.isValid(); }
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type());

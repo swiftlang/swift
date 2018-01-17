@@ -2474,9 +2474,8 @@ public:
           continue;
         
         // If this is an accessor for something, ignore it.
-        if (auto *FD = dyn_cast<FuncDecl>(member))
-          if (FD->isAccessor())
-            continue;
+        if (isa<AccessorDecl>(member))
+          continue;
 
 
         if (auto req = dyn_cast<ValueDecl>(member)) {
@@ -2692,7 +2691,10 @@ public:
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
-        if (resultOptionality != CD->getFailability()) {
+        auto declOptionality = CD->getFailability();
+
+        if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
+            (resultOptionality == OTK_None || declOptionality == OTK_None)) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
           abort();
@@ -2704,7 +2706,8 @@ public:
           resultOptionality = OTK_None;
           genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
             ->getAnyOptionalObjectType(resultOptionality);
-          if (resultOptionality != CD->getFailability()) {
+          if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
+              (resultOptionality == OTK_None || declOptionality == OTK_None)) {
             Out << "Initializer has result optionality/failability mismatch\n";
             CD->dump(llvm::errs());
             abort();
@@ -2715,7 +2718,15 @@ public:
       if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
         if (!CD->getInterfaceType() ||
             !CD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected FuncDecl to have a function type!\n";
+          Out << "Expected ConstructorDecl to have a function type!\n";
+          CD->dump(llvm::errs());
+          abort();
+        }
+
+        if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
+          Out << "Expected IUO failability for constructor with IUO decl "
+                 "attribute!\n";
+          CD->dump(llvm::errs());
           abort();
         }
 
@@ -2725,7 +2736,15 @@ public:
         // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getAnyOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
-                 "on functions with optional return types\n";
+                 "on constructors with optional return types\n";
+          CD->dump(llvm::errs());
+          abort();
+        }
+      } else {
+        if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+          Out << "Expected IUO decl attribute for constructor with IUO "
+                 "failability!\n";
+          CD->dump(llvm::errs());
           abort();
         }
       }
@@ -2850,54 +2869,6 @@ public:
     void verifyChecked(FuncDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
 
-      if (FD->isAccessor()) {
-        auto *storageDecl = FD->getAccessorStorageDecl();
-        if (!storageDecl) {
-          Out << "Missing storage decl\n";
-          abort();
-        }
-
-        if (FD->isGetterOrSetter()) {
-          if (FD->isFinal() != storageDecl->isFinal()) {
-            Out << "Property and accessor do not match for 'final'\n";
-            abort();
-          }
-          if (FD->isDynamic() != storageDecl->isDynamic()) {
-            Out << "Property and accessor do not match for 'dynamic'\n";
-            abort();
-          }
-        }
-
-        auto storedAccessor =
-          storageDecl->getAccessorFunction(FD->getAccessorKind());
-        if (storedAccessor != FD) {
-          Out << "storage declaration has different accessor for this kind\n";
-          abort();
-        }
-
-        switch (FD->getAccessorKind()) {
-        case AccessorKind::NotAccessor: llvm_unreachable("bad kind");
-        case AccessorKind::IsGetter:
-        case AccessorKind::IsSetter:
-        case AccessorKind::IsWillSet:
-        case AccessorKind::IsDidSet:
-        case AccessorKind::IsMaterializeForSet:
-          if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-            Out << "non-addressor accessor has an addressor kind\n";
-            abort();
-          }
-          break;
-
-        case AccessorKind::IsAddressor:
-        case AccessorKind::IsMutableAddressor:
-          if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-            Out << "addressor does not have an addressor kind\n";
-            abort();
-          }
-          break;
-        }
-      }
-
       if (FD->isMutating()) {
         if (!FD->isInstanceMember()) {
           Out << "mutating function is not an instance member\n";
@@ -2941,6 +2912,57 @@ public:
       verifyCheckedBase(FD);
     }
 
+    void verifyChecked(AccessorDecl *FD) {
+      PrettyStackTraceDecl debugStack("verifying AccessorDecl", FD);
+
+      auto *storageDecl = FD->getStorage();
+      if (!storageDecl) {
+        Out << "Missing storage decl\n";
+        abort();
+      }
+
+      if (FD->isGetterOrSetter()) {
+        if (FD->isFinal() != storageDecl->isFinal()) {
+          Out << "Property and accessor do not match for 'final'\n";
+          abort();
+        }
+        if (FD->isDynamic() != storageDecl->isDynamic()) {
+          Out << "Property and accessor do not match for 'dynamic'\n";
+          abort();
+        }
+      }
+
+      auto storedAccessor =
+        storageDecl->getAccessorFunction(FD->getAccessorKind());
+      if (storedAccessor != FD) {
+        Out << "storage declaration has different accessor for this kind\n";
+        abort();
+      }
+
+      switch (FD->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsMaterializeForSet:
+        if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
+          Out << "non-addressor accessor has an addressor kind\n";
+          abort();
+        }
+        break;
+
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+        if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
+          Out << "addressor does not have an addressor kind\n";
+          abort();
+        }
+        break;
+      }
+
+      verifyCheckedBase(FD);
+    }
+
     void verifyParsed(FuncDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
 
@@ -2951,22 +2973,24 @@ public:
         abort();
       }
 
-      if (FD->isAccessor()) {
-        unsigned NumExpectedParamPatterns = 1;
-        if (FD->getImplicitSelfDecl())
-          NumExpectedParamPatterns++;
-        if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
-          Out << "accessors should not be curried\n";
-          abort();
-        }
+      verifyParsedBase(FD);
+    }
+
+    void verifyParsed(AccessorDecl *FD) {
+      PrettyStackTraceDecl debugStack("verifying AccessorDecl", FD);
+
+      unsigned NumExpectedParamPatterns = 1;
+      if (FD->getImplicitSelfDecl())
+        NumExpectedParamPatterns++;
+      if (FD->getParameterLists().size() != NumExpectedParamPatterns) {
+        Out << "accessors should not be curried\n";
+        abort();
       }
 
-      if (auto *VD = FD->getAccessorStorageDecl()) {
-        if (isa<VarDecl>(VD)
-            && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
-          Out << "getter or setter static-ness must match static-ness of var\n";
-          abort();
-        }
+      auto storage = FD->getStorage();
+      if (storage->isStatic() != FD->isStatic()) {
+        Out << "accessor static-ness must match static-ness of storage\n";
+        abort();
       }
 
       verifyParsedBase(FD);

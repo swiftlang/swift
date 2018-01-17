@@ -1083,21 +1083,13 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
-    //
-    // Exception: When compiling OnoneSupport anything can reference anything,
-    // because the bodies of functions are never SIL serialized, but
-    // specializations are exposed as public symbols in the produced object
-    // files. For the same reason, KeepAsPublic functions (i.e. specializations)
-    // can refer to anything or can be referenced from any other function.
-    if (!F.getModule().isOptimizedOnoneSupportModule() &&
-        !(F.isKeepAsPublic() || RefF->isKeepAsPublic())) {
-      if (F.isSerialized()) {
-        require((SingleFunction && RefF->isExternalDeclaration()) ||
-                    RefF->hasValidLinkageForFragileRef(),
-                "function_ref inside fragile function cannot "
-                "reference a private or hidden symbol");
-      }
+    if (F.isSerialized()) {
+      require((SingleFunction && RefF->isExternalDeclaration()) ||
+              RefF->hasValidLinkageForFragileRef(),
+              "function_ref inside fragile function cannot "
+              "reference a private or hidden symbol");
     }
+
     verifySILFunctionType(fnType);
   }
 
@@ -1380,8 +1372,9 @@ public:
                 Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+    // FIXME: When the work to force MUI to be on Allocations/SILArguments
+    // complete, turn on this assertion.
 #if 0
-    // This will be turned back on in a couple of commits.
     require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
             "Mark Uninitialized should always be on the storage location");
 #endif
@@ -3607,12 +3600,34 @@ public:
   }
   
   void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
-    require(IBSHI->getBlockStorage()->getType().isAddress(),
+    auto storage = IBSHI->getBlockStorage();
+    require(storage->getType().isAddress(),
             "block storage operand must be an address");
-    auto storageTy
-      = IBSHI->getBlockStorage()->getType().getAs<SILBlockStorageType>();
+
+    auto storageTy = storage->getType().getAs<SILBlockStorageType>();
     require(storageTy, "block storage operand must be a @block_storage type");
-    
+
+    auto captureTy = storageTy->getCaptureType();
+    if (auto capturedFnTy = captureTy->getAs<SILFunctionType>()) {
+      if (capturedFnTy->isNoEscape()) {
+        // If the capture is a noescape function then it must be possible to
+        // locally determine the value stored to initialize the storage for the
+        // capture. This is required to diagnose static exclusivity violations
+        // when a noescape closure is converted to a noescape block that
+        // is then passed to a function.
+        auto *storageProjection =
+           storage->getSingleUserOfType<ProjectBlockStorageInst>();
+        require(storageProjection,
+                "block storage operand with noescape capture must have "
+                "projection from block");
+
+        auto *storeInst = storageProjection->getSingleUserOfType<StoreInst>();
+        require(storeInst,
+                "block storage operand with noescape capture must have "
+                "store to projection");
+      }
+    }
+
     require(IBSHI->getInvokeFunction()->getType().isObject(),
             "invoke function operand must be a value");
     auto invokeTy
@@ -4456,8 +4471,8 @@ void SILVTable::verify(const SILModule &M) const {
     auto baseInfo = M.Types.getConstantInfo(entry.Method);
     ValueDecl *decl = entry.Method.getDecl();
 
-    assert((!isa<FuncDecl>(decl)
-            || !cast<FuncDecl>(decl)->isObservingAccessor())
+    assert((!isa<AccessorDecl>(decl)
+            || !cast<AccessorDecl>(decl)->isObservingAccessor())
            && "observing accessors shouldn't have vtable entries");
 
     // For ivar destroyers, the decl is the class itself.
@@ -4523,9 +4538,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
         if (isSerialized()) {
-          assert((!isLessVisibleThan(F->getLinkage(), getLinkage()) ||
-                  (F->isSerialized() &&
-                   hasSharedVisibility(F->getLinkage()))) &&
+          assert(F->hasValidLinkageForFragileRef() &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }
@@ -4552,15 +4565,18 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getWitness();
-    // FIXME
-    #if 0
-    assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
+
+#if 0
+    // FIXME: For now, all default witnesses are private.
+    assert(F->hasValidLinkageForFragileRef() &&
            "Default witness tables should not reference "
            "less visible functions.");
-    #endif
+#endif
+
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
     auto *witnessSelfProtocol = F->getLoweredFunctionType()
         ->getDefaultWitnessMethodProtocol();
     assert(witnessSelfProtocol == getProtocol() &&

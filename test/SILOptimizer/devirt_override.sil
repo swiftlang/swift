@@ -62,16 +62,16 @@ bb0:
 }
 
 sil_vtable Hash {
-  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
-  #Hash.hash!1: _TFC4test4Hash4hashfS0_FT3MsgVs5UInt8_T_
+  #Hash.update!1: @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
+  #Hash.hash!1: @_TFC4test4Hash4hashfS0_FT3MsgVs5UInt8_T_
 }
 
 sil_vtable MD5 {
   // vtable should be keyed with the least-derived method, otherwise
   // devirtualizer will choose the wrong function ref.
-  #Hash.hash!1: _TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_
-  #MD5.init!initializer.1: _TFC4test3MD5cfMS0_FT_S0_
-  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
+  #Hash.hash!1: @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_
+  #MD5.init!initializer.1: @_TFC4test3MD5cfMS0_FT_S0_
+  #Hash.update!1: @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
 }
 
 class C {
@@ -123,13 +123,13 @@ bb0:
 }
 
 sil_vtable C {
-  #C.doIt!1: _TFC1b1C4doItfS0_FT_T_
+  #C.doIt!1: @_TFC1b1C4doItfS0_FT_T_
 }
 
 sil_vtable D {
-  #C.doIt!1: _TFC1b1D4doItfS0_FT_T_
+  #C.doIt!1: @_TFC1b1D4doItfS0_FT_T_
 }
 
 sil_vtable E {
-  #C.doIt!1: _TFC1b1E4doItfS0_FT_T_
+  #C.doIt!1: @_TFC1b1E4doItfS0_FT_T_
 }

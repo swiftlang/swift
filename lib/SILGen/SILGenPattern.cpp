@@ -1031,8 +1031,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
         }
-        if (!isDefault)
-          SGF.SGM.diagnose(Loc, diag::unreachable_case);
+        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
       }
     }
   }
@@ -1333,7 +1332,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     auto caseBlock = clauses[rowIndex].getClientData<CaseStmt>();
     ProfileCounter count = ProfileCounter();
     if (caseBlock) {
-      count = SGF.SGM.loadProfilerCount(caseBlock);
+      count = SGF.loadProfilerCount(caseBlock);
     }
     rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count});
   };
@@ -1350,7 +1349,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     if (!specializer) {
       auto caseBlock = clauses[lastRow].getClientData<CaseStmt>();
       if (caseBlock) {
-        defaultCaseCount = SGF.SGM.loadProfilerCount(caseBlock);
+        defaultCaseCount = SGF.loadProfilerCount(caseBlock);
       }
       break;
     }
@@ -1761,8 +1760,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     }
 
     // FIXME: Get expansion from SILFunction
-    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                 ResilienceExpansion::Maximal)) {
+    if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
+                               ResilienceExpansion::Maximal)) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {
@@ -1989,8 +1988,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
       enumDecl = SGF.getASTContext().getOptionalDecl();
     }
 
-    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                 SGF.F.getResilienceExpansion())) {
+    // FIXME: Get expansion from SILFunction
+    if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
+                               SGF.F.getResilienceExpansion())) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {
@@ -2316,7 +2316,13 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
 
   // Implicitly break out of the pattern match statement.
   if (SGF.B.hasValidInsertionPoint()) {
-    SGF.emitBreakOutOf(CleanupLocation(caseBlock), PatternMatchStmt);
+    // Case blocks without trailing braces have ambiguous cleanup locations.
+    SILLocation cleanupLoc = getCompilerGeneratedLocation();
+    if (auto *braces = dyn_cast<BraceStmt>(caseBlock->getBody()))
+      if (braces->getNumElements() == 1 &&
+          dyn_cast_or_null<DoStmt>(braces->getElement(0).dyn_cast<Stmt *>()))
+        cleanupLoc = CleanupLocation(caseBlock);
+    SGF.emitBreakOutOf(cleanupLoc, PatternMatchStmt);
   }
 }
 

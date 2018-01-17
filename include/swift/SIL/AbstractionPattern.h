@@ -662,8 +662,7 @@ public:
   /// The based abstraction pattern must be either opaque or based on
   /// a Clang or Swift type.  That is, it cannot be a tuple or an ObjC
   /// method type.
-  static AbstractionPattern getOptional(AbstractionPattern objectPattern,
-                                        OptionalTypeKind optionalKind);
+  static AbstractionPattern getOptional(AbstractionPattern objectPattern);
 
   /// Does this abstraction pattern have something that can be used as a key?
   bool hasCachingKey() const {

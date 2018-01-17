@@ -552,7 +552,8 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
-  if (ProtocolConformances.empty()
+  if (SwiftProtocols.empty()
+      && ProtocolConformances.empty()
       && RuntimeResolvableTypes.empty()
       && (!ObjCInterop || (ObjCProtocols.empty() &&
                            ObjCClasses.empty() &&
@@ -657,6 +658,27 @@ void IRGenModule::emitRuntimeRegistration() {
       CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
   }
+
+  // Register Swift protocols if we added any.
+  if (!SwiftProtocols.empty()) {
+    llvm::Constant *protocols = emitSwiftProtocols();
+
+    llvm::Constant *beginIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, 0),
+    };
+    auto begin = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, protocols, beginIndices);
+    llvm::Constant *endIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, SwiftProtocols.size()),
+    };
+    auto end = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, protocols, endIndices);
+
+    RegIGF.Builder.CreateCall(getRegisterProtocolsFn(), {begin, end});
+  }
+
   // Register Swift protocol conformances if we added any.
   if (!ProtocolConformances.empty()) {
 
@@ -866,6 +888,10 @@ void IRGenModule::emitGlobalLists() {
                  false);
 }
 
+static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
+  return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
+}
+
 void IRGenerator::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
@@ -885,8 +911,10 @@ void IRGenerator::emitGlobalTopLevel() {
   
   // Emit SIL functions.
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
-    // Only eagerly emit functions that are externally visible.
-    if (!f.isPossiblyUsedExternally())
+    // Eagerly emit functions that are externally visible. Functions with code
+    // coverage instrumentation must also be eagerly emitted.
+    if (!f.isPossiblyUsedExternally() &&
+        !hasCodeCoverageInstrumentation(f, PrimaryIGM->getSILModule()))
       continue;
 
     CurrentIGMPtr IGM = getGenModule(&f);
@@ -938,6 +966,12 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *Nominal) {
     IGM.emitProtocolDecl(pd);
   } else {
     llvm_unreachable("should not have enqueued a class decl here!");
+  }
+}
+
+void IRGenerator::emitSwiftProtocols() {
+  for (auto &m : *this) {
+    m.second->emitSwiftProtocols();
   }
 }
 
@@ -1179,6 +1213,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   };
 
   switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator: {
+    auto *decl = getDecl();
+
+    // Protocol requirements don't have their own access control
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+      decl = proto;
+
+    return getSILLinkage(getDeclLinkage(decl), forDefinition);
+  }
+
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
     auto type = getType();
@@ -1251,12 +1297,31 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
-  case Kind::Function:
-  case Kind::Other:
+  // Continuation prototypes need to be external or else LLVM will fret.
+  case Kind::CoroutineContinuationPrototype:
+    return SILLinkage::PublicExternal;
+
+  case Kind::FieldOffset: {
+    auto *varDecl = cast<VarDecl>(getDecl());
+
+    auto linkage = getDeclLinkage(varDecl);
+
+    // Resilient classes don't expose field offset symbols.
+    if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
+      assert(linkage != FormalLinkage::PublicNonUnique &&
+             linkage != FormalLinkage::HiddenNonUnique &&
+            "Cannot have a resilient class with non-unique linkage");
+
+      if (linkage == FormalLinkage::PublicUnique)
+        linkage = FormalLinkage::HiddenUnique;
+    }
+
+    return getSILLinkage(linkage, forDefinition);
+  }
+
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
-  case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
@@ -1303,10 +1368,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
-  case Kind::ReflectionSuperclassDescriptor:
-    if (getDeclLinkage(getDecl()) == FormalLinkage::PublicNonUnique)
-      return SILLinkage::Shared;
-    return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1331,6 +1392,11 @@ static bool isAvailableExternally(IRGenModule &IGM, Type type) {
 
 bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+    return ::isAvailableExternally(IGM, getDecl());
+
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
     return ::isAvailableExternally(IGM, getType());
@@ -1354,13 +1420,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
-    return false;
-
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::Function:
-  case Kind::Other:
   case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableAccessFunction:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
@@ -1374,7 +1436,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
-  case Kind::ReflectionSuperclassDescriptor:
+  case Kind::CoroutineContinuationPrototype:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -1416,6 +1478,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+  case SILLinkage::PublicNonABI:
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
@@ -1457,7 +1520,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
 /// Given that we're going to define a global value but already have a
 /// forward-declaration of it, update its linkage.
-static void updateLinkageForDefinition(IRGenModule &IGM,
+void irgen::updateLinkageForDefinition(IRGenModule &IGM,
                                        llvm::GlobalValue *global,
                                        const LinkEntity &entity) {
   // TODO: there are probably cases where we can avoid redoing the
@@ -1689,6 +1752,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
+  case DeclKind::Accessor:
     // Handled in SIL.
     return;
 
@@ -1919,7 +1983,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     }
 
   // Otherwise, if we have a lazy definition for it, be sure to queue that up.
-  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally()) {
+  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally() &&
+             !hasCodeCoverageInstrumentation(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
 
@@ -2211,33 +2276,21 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 
   auto nom = conformingType->getAnyNominal();
   auto clas = dyn_cast<ClassDecl>(nom);
-  if (doesConformanceReferenceNominalTypeDescriptor(IGM, conformingType)) {
+  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(IGM, clas)) {
+    // A reference to an Objective-C class object.
+    assert(clas->isObjC() && "Must have an Objective-C class here");
+
+    typeKind = TypeMetadataRecordKind::IndirectObjCClass;
+    defaultTy = IGM.TypeMetadataPtrTy;
+    defaultPtrTy = IGM.TypeMetadataPtrTy;
+    entity = LinkEntity::forObjCClass(clas);
+  } else {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
     typeKind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
     defaultTy = IGM.NominalTypeDescriptorTy;
     defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
-  } else if (clas && !clas->isForeign()) {
-    // A reference to an Objective-C class object.
-    assert(clas->isObjC() && "Must have an Objective-C class here");
-    assert(!hasKnownSwiftMetadata(IGM, clas) &&
-           "Should use nominal type descriptor");
-
-    // Form the class reference.
-    (void)IGM.getAddrOfObjCClassRef(clas);
-
-    typeKind = TypeMetadataRecordKind::IndirectObjCClass;
-    entity = LinkEntity::forObjCClassRef(clas);
-    defaultTy = IGM.TypeMetadataPtrTy;
-    defaultPtrTy = IGM.TypeMetadataPtrTy;
-  } else {
-    // Metadata for Clang types should be uniqued like foreign classes.
-    assert(isa<ClangModuleUnit>(nom->getModuleScopeContext()));
-    typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
-    entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
-    defaultTy = IGM.TypeMetadataStructTy;
-    defaultPtrTy = IGM.TypeMetadataPtrTy;
   }
 
   return {typeKind, *entity, defaultTy, defaultPtrTy};
@@ -2295,6 +2348,57 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
                                                 RelativeAddressTy);
 
   return relativeAddr;
+}
+
+/// Emit the protocol descriptors list and return it.
+llvm::Constant *IRGenModule::emitSwiftProtocols() {
+  if (SwiftProtocols.empty())
+    return nullptr;
+
+  // Define the global variable for the protocol list.
+  ConstantInitBuilder builder(*this);
+  auto recordsArray = builder.beginArray(ProtocolRecordTy);
+
+  for (auto *protocol : SwiftProtocols) {
+    auto record = recordsArray.beginStruct(ProtocolRecordTy);
+
+    // Relative reference to the protocol descriptor.
+    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
+                  LinkEntity::forProtocolDescriptor(protocol),
+                  getPointerAlignment(), ProtocolDescriptorStructTy);
+    record.addRelativeAddress(descriptorRef);
+
+    record.finishAndAddTo(recordsArray);
+  }
+
+  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+  // resolve relocations relative to it.
+
+  auto var = recordsArray.finishAndCreateGlobal(
+                                            "\x01l_protocols",
+                                            Alignment(4),
+                                            /*isConstant*/ true,
+                                            llvm::GlobalValue::PrivateLinkage);
+
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = "swift5_protocols";
+    break;
+  case llvm::Triple::COFF:
+    sectionName = ".sw5prt$B";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit protocols for "
+                     "the selected object format.");
+  }
+
+  var->setSection(sectionName);
+  addUsedGlobal(var);
+  return var;
 }
 
 /// Emit the protocol conformance list and return it.
@@ -2569,7 +2673,23 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  // If we have more arguments than can be passed directly, the remaining
+  // arguments are packed into an array.
+  ArrayRef<llvm::Type *> paramTypes;
+  llvm::Type *paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs+1];
+  if (genericArgs.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    // Copy direct parameter types.
+    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs))
+      paramTypesArray[i] = genericArgs[i];
+
+    paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs] =
+      Int8PtrPtrTy;
+    paramTypes = paramTypesArray;
+  } else {
+    paramTypes = genericArgs;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
@@ -2938,9 +3058,9 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// object (if indirect).
 ///
 /// The result is always a GlobalValue.
-Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect,
+Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forFieldOffset(var, isIndirect);
+  LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
                                  forDefinition);
@@ -2968,6 +3088,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Var:
     case DeclKind::Subscript:
     case DeclKind::Func:
+    case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
     case DeclKind::EnumCase:
@@ -3307,7 +3428,7 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  return !D->hasFixedLayout(getSwiftModule(), expansion);
+  return D->isResilient(getSwiftModule(), expansion);
 }
 
 // The most general resilience expansion where the given declaration is visible.
@@ -3513,6 +3634,19 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
+  LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return entry;
+
+  auto signature = Signature::forCoroutineContinuation(*this, fnType);
+  LinkInfo link = LinkInfo::get(*this, entity, NotForDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
 }

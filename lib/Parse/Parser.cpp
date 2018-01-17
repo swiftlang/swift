@@ -143,11 +143,9 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     bool Parsed = false;
-    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-      if (FD->isAccessor()) {
-        TheParser.parseAccessorBodyDelayed(AFD);
-        Parsed = true;
-      }
+    if (isa<AccessorDecl>(AFD)) {
+      TheParser.parseAccessorBodyDelayed(AFD);
+      Parsed = true;
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
@@ -469,7 +467,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF)) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags, SourceMgr,
+                                           L->getBufferID())) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());

@@ -129,7 +129,7 @@ extension _UIntBuffer : BidirectionalCollection {
 }
 
 extension _UIntBuffer : RandomAccessCollection {
-  public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
+  public typealias Indices = DefaultIndices<_UIntBuffer>
   
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)

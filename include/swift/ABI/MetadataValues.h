@@ -27,6 +27,17 @@
 
 namespace swift {
 
+enum {
+  /// The number of words (pointers) in a value buffer.
+  NumWords_ValueBuffer = 3,
+
+  /// The number of words in a yield-once coroutine buffer.
+  NumWords_YieldOnceBuffer = 4,
+
+  /// The number of words in a yield-many coroutine buffer.
+  NumWords_YieldManyBuffer = 8,
+};
+
 struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -170,7 +181,7 @@ enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
 };
-  
+
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeMetadataRecordKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
@@ -181,10 +192,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// The conformance is for a foreign type described by its type metadata.
-  /// getDirectType() points to a nonunique metadata record for the type, which
-  /// needs to be uniqued by the runtime.
-  NonuniqueDirectType = 0x02,
+  /// Reserved for future use.
+  Reserved = 0x02,
   
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
@@ -288,6 +297,7 @@ enum class ProtocolDispatchStrategy: uint8_t {
 class GenericParameterDescriptorFlags {
   typedef uint16_t int_type;
   enum : int_type {
+    IsNonUnique            = 0x0002,
     HasVTable              = 0x0004,
     HasResilientSuperclass = 0x0008,
   };
@@ -300,6 +310,17 @@ public:
   constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
     return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
                                              : (Data & ~HasVTable));
+  }
+
+  constexpr GenericParameterDescriptorFlags withIsUnique(bool b) const {
+    return GenericParameterDescriptorFlags(!b ? (Data | IsNonUnique)
+                                           : (Data & ~IsNonUnique));
+  }
+
+  /// Whether this nominal type descriptor is known to be nonunique, requiring
+  /// comparison operations to check string equality of the mangled name.
+  bool isUnique() const {
+    return !(Data & IsNonUnique);
   }
 
   /// If this type is a class, does it have a vtable?  If so, the number
@@ -666,6 +687,49 @@ public:
 };
 using ParameterFlags = TargetParameterTypeFlags<uint32_t>;
 
+template <typename int_type>
+class TargetTupleTypeFlags {
+  enum : int_type {
+    NumElementsMask = 0x0000FFFFU,
+    NonConstantLabelsMask = 0x00010000U,
+  };
+  int_type Data;
+
+public:
+  constexpr TargetTupleTypeFlags() : Data(0) {}
+  constexpr TargetTupleTypeFlags(int_type Data) : Data(Data) {}
+
+  constexpr TargetTupleTypeFlags
+  withNumElements(unsigned numElements) const {
+    return TargetTupleTypeFlags((Data & ~NumElementsMask) | numElements);
+  }
+
+  constexpr TargetTupleTypeFlags<int_type> withNonConstantLabels(
+                                             bool hasNonConstantLabels) const {
+    return TargetTupleTypeFlags<int_type>(
+                        (Data & ~NonConstantLabelsMask) |
+                          (hasNonConstantLabels ? NonConstantLabelsMask : 0));
+  }
+
+  unsigned getNumElements() const { return Data & NumElementsMask; }
+
+  bool hasNonConstantLabels() const { return Data & NonConstantLabelsMask; }
+
+  int_type getIntValue() const { return Data; }
+
+  static TargetTupleTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetTupleTypeFlags(Data);
+  }
+
+  bool operator==(TargetTupleTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetTupleTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
+
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.
 class FieldType {
@@ -797,6 +861,13 @@ static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
 static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
 }
+
+/// The number of arguments that will be passed directly to a generic
+/// nominal type access function. The remaining arguments (if any) will be
+/// passed as an array. That array has enough storage for all of the arguments,
+/// but only fills in the elements not passed directly. The callee may
+/// mutate the array to fill in the direct arguments.
+constexpr unsigned NumDirectGenericTypeMetadataAccessFunctionArgs = 3;
 
 } // end namespace swift
 

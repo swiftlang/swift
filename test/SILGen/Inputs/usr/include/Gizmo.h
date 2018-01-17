@@ -5,6 +5,10 @@
 - (void) anse;
 @end
 
+__attribute__((swift_name("BetterAnsing")))
+@protocol NSBetterAnsing <NSAnsing>
+@end
+
 @interface NSObject (NSAnsing)
 @property Class<NSAnsing> qualifiedClassProp;
 @end

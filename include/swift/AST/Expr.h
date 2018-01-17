@@ -3033,6 +3033,26 @@ public:
   }
 };
 
+/// Perform a function conversion from a function returning an
+/// Optional<T> to a function returning T.
+///
+/// This is generated during expression type checking in places where
+/// we need to force the result type of a function being called. When
+/// we go to rewrite the call, we remove this node and force the
+/// result of the call to the underlying function. It should never
+/// exist outside of this final stage of expression type checking.
+class ImplicitlyUnwrappedFunctionConversionExpr
+    : public ImplicitConversionExpr {
+public:
+  ImplicitlyUnwrappedFunctionConversionExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::ImplicitlyUnwrappedFunctionConversion,
+                               subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ImplicitlyUnwrappedFunctionConversion;
+  }
+};
+
 /// MetatypeConversionExpr - Convert a metatype to another metatype
 /// using essentially a derived-to-base conversion.
 class MetatypeConversionExpr : public ImplicitConversionExpr {
@@ -3369,7 +3389,7 @@ public:
 
 
 /// \brief A base class for closure expressions.
-class AbstractClosureExpr : public Expr, public DeclContext {
+class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
 
   /// \brief The set of parameters.
@@ -3378,8 +3398,8 @@ class AbstractClosureExpr : public Expr, public DeclContext {
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       unsigned Discriminator, DeclContext *Parent)
-      : Expr(Kind, Implicit, FnType),
-        DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+      : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+        Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }

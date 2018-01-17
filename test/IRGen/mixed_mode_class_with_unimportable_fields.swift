@@ -24,11 +24,11 @@ public class SubSubButtHolder: SubButtHolder {
 // CHECK-LABEL: define {{.*}} @{{.*}}accessFinalFields
 public func accessFinalFields(of holder: ButtHolder) -> (Any, Any) {
   // x and z came from the other module, so we should use their accessors.
-  // CHECK: [[OFFSET:%.*]] = load [[WORD:i[0-9]+]], [[WORD]]* @_T014UsingObjCStuff10ButtHolderC1xSivpWvd
+  // CHECK: [[OFFSET:%.*]] = load [[WORD:i[0-9]+]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
   // CHECK: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
   // CHECK: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @_T014UsingObjCStuff10ButtHolderC1zSSvpWvd
+  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
   // CHECK: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
   // CHECK: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
   return (holder.x, holder.z)
@@ -38,15 +38,15 @@ public func accessFinalFields(of holder: ButtHolder) -> (Any, Any) {
 public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
   // We should use the runtime-adjusted ivar offsets since we may not have
   // a full picture of the layout in mixed Swift language version modes.
-  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @_T014UsingObjCStuff10ButtHolderC1xSivpWvd
+  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
   // CHECK: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
   // CHECK: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @_T014UsingObjCStuff10ButtHolderC1zSSvpWvd
+  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
   // CHECK: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
   // CHECK: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @_T04main13SubButtHolderC1wSdvpWvd
+  // CHECK: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S4main13SubButtHolderC1wSdvpWvd"
 
   // CHECK: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
   // CHECK: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]

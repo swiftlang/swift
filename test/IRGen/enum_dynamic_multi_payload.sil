@@ -20,7 +20,7 @@ class C {}
 
 sil_vtable C {}
 
-// CHECK: @_T026enum_dynamic_multi_payload8EitherOrOMP = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
+// CHECK: @"$S26enum_dynamic_multi_payload8EitherOrOMP" = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
 
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.

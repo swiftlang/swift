@@ -31,14 +31,12 @@
   * SuperRefExpr
   * ImplicitMemberExpr
   * InterpolatedStringLiteralExpr
-
-### In-progress (UnknownExpr):
-  * ObjectLiteralExpr
-  * MagicIdentifierLiteralExpr
-  * InOutExpr
   * KeyPathExpr
   * KeyPathDotExpr
+  * InOutExpr
   * EditorPlaceholderExpr
+  * ObjectLiteralExpr
+  * MagicIdentifierLiteralExpr
 
 ### Not-started (UnknownExpr):
   * UnresolvedSpecializeExpr

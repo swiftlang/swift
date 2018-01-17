@@ -344,12 +344,10 @@ private:
   StringRef getName(const FuncDecl &FD) {
     // Getters and Setters are anonymous functions, so we forge a name
     // using its parent declaration.
-    if (FD.isAccessor())
-      if (ValueDecl *VD = FD.getAccessorStorageDecl()) {
+    if (auto accessor = dyn_cast<AccessorDecl>(&FD))
+      if (ValueDecl *VD = accessor->getStorage()) {
         const char *Kind;
-        switch (FD.getAccessorKind()) {
-        case AccessorKind::NotAccessor:
-          llvm_unreachable("this is an accessor");
+        switch (accessor->getAccessorKind()) {
         case AccessorKind::IsGetter:
           Kind = ".get";
           break;
