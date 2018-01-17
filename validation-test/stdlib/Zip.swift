@@ -69,9 +69,9 @@ ZipTests.test("Sequence") {
 
 ZipTests.test("Collections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  typealias Sequence = Zip2Sequence<
+  typealias SequenceType = Zip2Sequence<
     MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
-  typealias Collection = Zip2Collection<
+  typealias CollectionType = Zip2Collection<
     MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
 
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
@@ -79,11 +79,11 @@ ZipTests.test("Collections") {
   }
 
   expectCollectionAssociatedTypes(
-    collectionType: Collection.self,
-    iteratorType: Sequence.Iterator.self,
-    subSequenceType: Slice<Collection>.self,
-    indexType: Collection.Index.self,
-    indicesType: DefaultIndices<Collection>.self)
+    collectionType: CollectionType.self,
+    iteratorType: SequenceType.Iterator.self,
+    subSequenceType: Slice<CollectionType>.self,
+    indexType: CollectionType.Index.self,
+    indicesType: DefaultIndices<CollectionType>.self)
     
   for test in zipTests {
     let left = MinimalCollection<OpaqueValue<Int>>(
@@ -92,7 +92,7 @@ ZipTests.test("Collections") {
       elements: test.other.map(OpaqueValue.init))
 
     var result = zip(left, right)
-    expectType(Collection.self, &result)
+    expectType(CollectionType.self, &result)
 
     checkCollection(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, 
@@ -102,10 +102,10 @@ ZipTests.test("Collections") {
 
 ZipTests.test("RandomAccessCollections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  typealias Sequence = Zip2Sequence<
+  typealias SequenceType = Zip2Sequence<
     MinimalRandomAccessCollection<OpaqueValue<Int>>,
     MinimalRandomAccessCollection<OpaqueValue<Int32>>>
-  typealias Collection = Zip2Collection<
+  typealias CollectionType = Zip2Collection<
     MinimalRandomAccessCollection<OpaqueValue<Int>>,
     MinimalRandomAccessCollection<OpaqueValue<Int32>>>
 
@@ -114,11 +114,11 @@ ZipTests.test("RandomAccessCollections") {
   }
       
   expectCollectionAssociatedTypes(
-    collectionType: Collection.self,
-    iteratorType: Sequence.Iterator.self,
-    subSequenceType: Slice<Collection>.self,
-    indexType: Collection.Index.self,
-    indicesType: DefaultIndices<Collection>.self)
+    collectionType: CollectionType.self,
+    iteratorType: SequenceType.Iterator.self,
+    subSequenceType: Slice<CollectionType>.self,
+    indexType: CollectionType.Index.self,
+    indicesType: DefaultIndices<CollectionType>.self)
 
   for test in zipTests {
     let left = MinimalRandomAccessCollection<OpaqueValue<Int>>(
@@ -127,7 +127,7 @@ ZipTests.test("RandomAccessCollections") {
       elements: test.other.map(OpaqueValue.init))
 
     var result = zip(left, right)
-    expectType(Collection.self, &result)
+    expectType(CollectionType.self, &result)
     checkRandomAccessCollection(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, 
       result, sameValue: compareElements)
@@ -143,7 +143,7 @@ ZipTests.test("Collection.isEmpty") {
   expectFalse(zip(0..<3,0..<2).isEmpty)
 }
 
-ZipTests.test("Collection.count") {
+ZipTests.test("Collection.count") {  
   expectEqual(zip(0..<0,0..<0).underestimatedCount, 0)
   expectEqual(zip(0..<1,0..<0).underestimatedCount, 0)
   expectEqual(zip(0..<0,0..<1).underestimatedCount, 0)
@@ -156,10 +156,14 @@ ZipTests.test("Collection.count") {
   expectEqual(zip(0..<2,0..<1).count, 1)
   expectEqual(zip(0..<1,0..<2).count, 1)
   expectEqual(zip(0..<2,0..<2).count, 2)
+  
+  // underestimatedCount is the minimum of the two bases, to 
+  expectEqual(zip(0..<2,(0..<2).lazy.filter { _ in true }).underestimatedCount, 0)
+  expectEqual(zip((0..<2).lazy.filter { _ in true }, 0..<2).underestimatedCount, 0)
+  expectEqual(zip((0..<2).lazy.filter { _ in true }, (0..<2).lazy.map { $0 }).underestimatedCount, 0)
 }
 
 ZipTests.test("Equatable") {
-  let s = 
   checkEquatable([
     zip("",0..<99),
     zip("abcdef",0..<0),
