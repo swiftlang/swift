@@ -26,8 +26,9 @@ TensorTests.test("FactoryInitializers", testFactoryInitializers)
 
 @inline(never)
 func testSimpleMath() {
-  let x = Tensor<Float>([1.2, 1.2])
+  let x = Tensor<Float>([1.2, 1.2]).toDevice()
   let y = tanh(x)
+  _ = y
   // TODO: Check result. Currently crashing because of rank/shape getters
   // expectTrue(y.array - 0.833655 < 0.000001)
 }
@@ -35,11 +36,12 @@ TensorTests.test("SimpleMath", testSimpleMath)
 
 @inline(never)
 func testMultiOpMath() {
-  let x = Tensor<Float>([1.2, 1.2])
-  let y = Tensor<Float>([4.3, 4.3])
+  let x = Tensor<Float>([1.2, 1.2]).toDevice()
+  let y = Tensor<Float>([4.3, 4.3]).toDevice()
   let sum = x + y
   let squared = sum * sum
   let expsqr = exp(squared)
+  _ = expsqr
   // TODO: Check result
 }
 TensorTests.test("testMultiOpMath", testMultiOpMath)
@@ -47,11 +49,11 @@ TensorTests.test("testMultiOpMath", testMultiOpMath)
 @inline(never)
 func testXWPlusB() {
   // Shape: 4
-  let x = Tensor([1.0, 2.0, 2.0, 1.0])
+  let x = Tensor([1.0, 2.0, 2.0, 1.0]).toDevice()
   // Shape: 2 x 4
-  let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
+  let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]]).toDevice()
   // Shape: 2
-  let b = Tensor([0.5, 0.5])
+  let b = Tensor([0.5, 0.5]).toDevice()
   // Do xW+b!
   _ = x ⊗ w + b
   // TODO: Check result
@@ -64,15 +66,15 @@ func testXORInference() {
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4
     let w1 = Tensor([[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
-                     [-1.83523219, -0.51167348, 0.15490439, 1.91018065]])
+                     [-1.83523219, -0.51167348, 0.15490439, 1.91018065]]).toDevice()
     // 1 x 4
-    let b1 = Tensor([[2.54353216, 0.25132703, -0.16503136, -0.85754058]])
+    let b1 = Tensor([[2.54353216, 0.25132703, -0.16503136, -0.85754058]]).toDevice()
     // 4 x 1
-    let w2 = Tensor([[ 3.04350065], [ 0.35590511], [-0.3252157 ], [ 3.49349223]])
+    let w2 = Tensor([[ 3.04350065], [ 0.35590511], [-0.3252157 ], [ 3.49349223]]).toDevice()
     // 1 x 1
-    let b2 = Tensor([[-0.74635993]])
+    let b2 = Tensor([[-0.74635993]]).toDevice()
 
-    let x = Tensor([[x, y]])
+    let x = Tensor([[x, y]]).toDevice()
     let o1 = tanh(x ⊗ w1 + b1)
     let y = tanh(o1 ⊗ w2 + b2)
     return y.array.units[0] // TODO: use better scalar getter

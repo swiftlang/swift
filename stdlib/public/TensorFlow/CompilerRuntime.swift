@@ -29,6 +29,7 @@ public struct _TFCRuntimeConfig {
 // The C type is TF_Status*
 typealias CTFStatus = OpaquePointer
 public typealias CTensor = OpaquePointer
+typealias TF_Function = OpaquePointer
 
 // These checks run in both debug and release modes (while assert() only runs in
 // debug mode), to help shake out more bugs and facilitate debugging in the
@@ -47,8 +48,10 @@ func internalConsistencyCheck(
 }
 
 @_versioned
-func checkOk(_ s: CTFStatus?) {
-  internalConsistencyCheck(TF_GetCode(s) == TF_OK, String(cString: TF_Message(s)))
+func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
+  internalConsistencyCheck(TF_GetCode(s) == TF_OK,
+                           String(cString: TF_Message(s)),
+                           file: file, line: line)
 }
 
 // The call sequence for the APIs below must be one of the two:
@@ -91,21 +94,55 @@ public final class TensorProgram {
     let inputTensors = UnsafeBufferPointer(start: tensorArgumentAddress,
                                            count: tensorArgumentCount)
 
+    // Create a status object that we reuse to check the results of the
+    // TensorFlow runtime call we're making.  These should never fail unless
+    // there is a compiler/runtime bug.
     self.status = TF_NewStatus()
-    let tfFunc = TF_FunctionImportFunctionDef(programByteAddress,
-                                              programByteCount, status)
-    checkOk(status)
 
-    // Now we start the graph computation.
+    // TFE_Context is the host of the graph computation that we want to perform.
     let opts = TFE_NewContextOptions()
     self.context = TFE_NewContext(opts, status)
-    checkOk(status)
     TFE_DeleteContextOptions(opts)
-
-    TFE_ContextAddFunction(context, tfFunc, status)
     checkOk(status)
-    TF_DeleteFunction(tfFunc)
 
+    // Here we have to do a fairly awkward dance to load the graph functions
+    // and populate them into the TFE_Context.  We load the program as a
+    // TF_Graph, then copy the functions out of it, then copy them into the
+    // TFE_Context.
+    let graph = TF_NewGraph()
+    defer { TF_DeleteGraph(graph) }
+
+    // TensorFlow loads things through TF_Buffer.  Create one that avoids
+    // redundantly copying the program bytes.
+    var programBuffer = TF_Buffer(data: programByteAddress,
+                                  length: programByteCount,
+                                  data_deallocator: { data, length in /*noop*/})
+
+    let graphDefOptions = TF_NewImportGraphDefOptions()
+    TF_GraphImportGraphDef(graph, &programBuffer, graphDefOptions, status)
+    TF_DeleteImportGraphDefOptions(graphDefOptions)
+    checkOk(status)
+
+    // Now that we have all of the TF_Function objects in the graph, copy them
+    // to standalone TF_Function's.
+    let functionCount = TF_GraphNumFunctions(graph)
+    let funcs =
+      UnsafeMutablePointer<TF_Function?>.allocate(capacity: Int(functionCount))
+    TF_GraphGetFunctions(graph, funcs, functionCount, status)
+    checkOk(status)
+
+    // Finally, copy them again into the the TFE_Context so we can use them.
+    for function in UnsafeBufferPointer(start: funcs,
+                                        count: Int(functionCount)) {
+      TFE_ContextAddFunction(context, function, status)
+      checkOk(status)
+      TF_DeleteFunction(function)
+    }
+    funcs.deallocate()
+
+
+    // Now that we have them in our context, we can get ready to call the top
+    // level function, which we know is always called "the_function".
     self.`operator` = TFE_NewOp(context, "the_function", status)
     checkOk(status)
 
@@ -119,7 +156,8 @@ public final class TensorProgram {
     self.pthread = 0
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
       let programPtr = Unmanaged.passRetained(self).toOpaque()
-      // When the closure gets long, split it into a static function that takes a TensorProgram.
+      // When the closure gets long, split it into a static function that takes
+      // a TensorProgram.
       let createStatus = pthread_create(&pthread, nil, { arg in
         let program = Unmanaged<TensorProgram>.fromOpaque(arg!).takeRetainedValue()
         TFE_Execute(program.`operator`,
@@ -235,7 +273,7 @@ public func _TFCFinishTensorProgram(
 
   let results = program.finish()
   internalConsistencyCheck(results.count == tensorResultCount,
-    "internal compiler error: result count mismatch!")
+                           "internal compiler error: result count mismatch!")
 
   let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
                                                 count: tensorResultCount)
