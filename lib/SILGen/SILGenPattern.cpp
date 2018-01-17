@@ -2580,10 +2580,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     emitIgnoredExpr(S->getSubjectExpr());
     return failure(SILLocation(S));
   }
-  
-  SILBasicBlock *contBB = createBasicBlock();
-  emitProfilerIncrement(S);
-  JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
   bool diagnosedError = false;
 
@@ -2662,19 +2658,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   };
 
   PatternMatchEmission emission(*this, S, completionHandler);
-  
-  Scope switchScope(Cleanups, CleanupLocation(S));
-
-  // Enter a break/continue scope.  If we wanted a continue
-  // destination, it would probably be out here.
-  BreakContinueDestStack.push_back({S, contDest, JumpDest(S)});
-
-  PatternMatchContext switchContext = { emission };
-  SwitchStack.push_back(&switchContext);
-
-  // Emit the subject value. Dispatching will consume it.
-  ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
-  auto subject = ConsumableManagedValue::forOwned(subjectMV);
 
   // Add a row for each label of each case.
   //
@@ -2699,6 +2682,23 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     
     hasFallthrough = containsFallthrough(caseBlock->getBody());
   }
+
+  SILBasicBlock *contBB = createBasicBlock();
+  emitProfilerIncrement(S);
+  JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
+
+  Scope switchScope(Cleanups, CleanupLocation(S));
+
+  // Enter a break/continue scope.  If we wanted a continue
+  // destination, it would probably be out here.
+  BreakContinueDestStack.push_back({S, contDest, JumpDest(S)});
+
+  PatternMatchContext switchContext = { emission };
+  SwitchStack.push_back(&switchContext);
+
+  // Emit the subject value. Dispatching will consume it.
+  ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
+  auto subject = ConsumableManagedValue::forOwned(subjectMV);
 
   // Set up an initial clause matrix.
   ClauseMatrix clauses(clauseRows);
