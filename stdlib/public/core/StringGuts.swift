@@ -586,18 +586,6 @@ extension _StringGuts {
     print(" ", terminator: "")
     printHex(UInt(rawBits.1), newline: false)
     print(": ", terminator: "")
-    _dumpContents()
-    if isASCII {
-      print(" <ascii>", terminator: "")
-    }
-    else {
-      print(" <utf16>", terminator: "")
-    }
-    print(")")
-  }
-
-  // FIXME: Remove
-  internal func _dumpContents() {
     if _object.isNative {
       let storage = _object.nativeRawStorage
       print("native ", terminator: "")
@@ -650,6 +638,13 @@ extension _StringGuts {
     }
 #endif
     print("error", terminator: "")
+    if isASCII {
+      print(" <ascii>", terminator: "")
+    }
+    else {
+      print(" <utf16>", terminator: "")
+    }
+    print(")")
   }
 }
 
