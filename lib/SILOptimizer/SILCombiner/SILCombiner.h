@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 namespace swift {
 
@@ -294,6 +295,15 @@ private:
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                          WitnessMethodInst *WMI);
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+
+  /// Create Apply Instruction with concrete types for arguments.
+  SILInstruction *
+  createApplyWithConcreteType(FullApplySite AI,
+                              llvm::SmallVector<SILValue, 8> &Args,
+                              SubstitutionMap &SubMap);
+
+  /// Propagate concrete types to all apply arguments.
+  SILInstruction *propagateConcreteTypeOfInitExistentialToAllApplyArgs(FullApplySite AI);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
