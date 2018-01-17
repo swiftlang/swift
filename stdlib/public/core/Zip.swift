@@ -149,6 +149,13 @@ extension Zip2Sequence: Sequence {
       _sequence1.makeIterator(),
       _sequence2.makeIterator())
   }
+  
+  // ensure propogation of intentional underestimates from bases
+  @_inlineable // FIXME(sil-serialize-all)
+  public var underestimatedCount: Int {
+    return Swift.min(
+      _sequence1.underestimatedCount,_sequence2.underestimatedCount)
+  }  
 }
 
 /// Creates a collection of pairs built out of two underlying collections.
@@ -275,8 +282,7 @@ extension Zip2Collection: Collection {
 
   @_inlineable
   public func index(after: Index) -> Index {
-    _precondition(after >= startIndex)
-    _precondition(after < endIndex)
+    _failEarlyRangeCheck(after, bounds: startIndex..<endIndex)
 
     return Index(
       _collection1.index(after: after._index1),
@@ -286,24 +292,24 @@ extension Zip2Collection: Collection {
 
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _precondition(i >= startIndex)
-    _precondition(i <= endIndex)
+    _precondition(i >= startIndex, "Index out of range")
+    _precondition(i <= endIndex, "Index out of range")
 
     let j = Index(
       _collection1.index(i._index1, offsetBy: n),
       _collection2.index(i._index2, offsetBy: n)
     )
     
-    _precondition(j >= startIndex)
-    _precondition(j <= endIndex)
+    _debugPrecondition(j >= startIndex, "Unexpected zipped index out of bounds.")
+    _debugPrecondition(j <= endIndex, "Unexpected zipped index out of bounds.")
     
     return j
   }
 
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int, limitedBy limit: Index) -> Index? {
-    _debugPrecondition(i >= startIndex)
-    _debugPrecondition(i <= endIndex)
+    _precondition(i >= startIndex, "Index out of range")
+    _precondition(i <= endIndex, "Index out of range")
     
     guard let i1 = _collection1.index(i._index1, offsetBy: n, limitedBy: limit._index1),
           let i2 = _collection2.index(i._index2, offsetBy: n, limitedBy: limit._index2)
@@ -311,8 +317,8 @@ extension Zip2Collection: Collection {
 
     let j = Index(i1, i2)
     
-    _debugPrecondition(j >= startIndex)
-    _debugPrecondition(j <= endIndex)
+    _debugPrecondition(j >= startIndex, "Unexpected zipped index out of bounds.")
+    _debugPrecondition(j <= endIndex, "Unexpected zipped index out of bounds.")
     
     return j
   }
@@ -337,6 +343,13 @@ extension Zip2Collection: Collection {
     }
 
   }
+
+  // ensure propogation of intentional underestimates from bases
+  @_inlineable // FIXME(sil-serialize-all)
+  public var underestimatedCount: Int {
+    return Swift.min(
+      _collection1.underestimatedCount, _collection2.underestimatedCount)
+  }  
 }
 
 extension Zip2Collection: BidirectionalCollection
@@ -368,8 +381,8 @@ where Collection1: RandomAccessCollection, Collection2: RandomAccessCollection {
   
   @_inlineable
   public func index(before i: Index) -> Index {
-    _debugPrecondition(i > startIndex)
-    _debugPrecondition(i <= endIndex)
+    _precondition(i > startIndex, "Index out of range")
+    _precondition(i <= endIndex, "Index out of range")
 
     return Index(
       _collection1.index(before: i._index1),
