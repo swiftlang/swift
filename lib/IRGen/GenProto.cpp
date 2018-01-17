@@ -2081,7 +2081,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   NormalProtocolConformance *Conf = wt->getConformance();
-  addProtocolConformanceRecord(Conf);
+  addProtocolConformance(Conf);
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = Conf->getType()->getCanonicalType();

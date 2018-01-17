@@ -2606,7 +2606,7 @@ using ProtocolRecord = TargetProtocolRecord<InProcess>;
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 template <typename Runtime>
-struct TargetProtocolConformanceRecord {
+struct TargetProtocolConformanceDescriptor {
 public:
   using WitnessTableAccessorFn
     = const WitnessTable *(const TargetMetadata<Runtime>*,
@@ -2734,8 +2734,16 @@ public:
   void dump() const;
 #endif
 };
-using ProtocolConformanceRecord
-  = TargetProtocolConformanceRecord<InProcess>;
+using ProtocolConformanceDescriptor
+  = TargetProtocolConformanceDescriptor<InProcess>;
+
+template<typename Runtime>
+using TargetProtocolConformanceRecord =
+  RelativeDirectPointer<TargetProtocolConformanceDescriptor<Runtime>,
+                        /*Nullable=*/false>;
+
+using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
+
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///

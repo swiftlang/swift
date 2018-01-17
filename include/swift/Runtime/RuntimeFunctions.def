@@ -1214,7 +1214,7 @@ FUNCTION(RegisterProtocols,
 FUNCTION(RegisterProtocolConformances,
          swift_registerProtocolConformances, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(ProtocolConformanceRecordPtrTy, ProtocolConformanceRecordPtrTy),
+         ARGS(RelativeAddressPtrTy, RelativeAddressPtrTy),
          ATTRS(NoUnwind))
 FUNCTION(RegisterTypeMetadataRecords,
          swift_registerTypeMetadataRecords, DefaultCC,

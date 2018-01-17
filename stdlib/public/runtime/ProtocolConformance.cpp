@@ -38,7 +38,7 @@ static const char *class_getName(const ClassMetadata* type) {
     reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
 }
 
-template<> void ProtocolConformanceRecord::dump() const {
+template<> void ProtocolConformanceDescriptor::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
     SymbolInfo info;
     int ok = lookupSymbol(addr, &info);
@@ -85,7 +85,8 @@ template<> void ProtocolConformanceRecord::dump() const {
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
 template <>
-const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
+const Metadata *
+ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::Reserved:
     return nullptr;
@@ -107,7 +108,7 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
 
 template<>
 const WitnessTable *
-ProtocolConformanceRecord::getWitnessTable(const Metadata *type) const {
+ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
   switch (getConformanceKind()) {
@@ -520,9 +521,11 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     auto &section = C.SectionsToScan[sectionIdx];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
+      auto &descriptor = *record.get();
+
       // If the record applies to a specific type, cache it.
-      if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto P = record.getProtocol();
+      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -532,7 +535,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
           continue;
 
         // Store the type-protocol pair in the cache.
-        auto witness = record.getWitnessTable(metadata);
+        auto witness = descriptor.getWitnessTable(metadata);
         if (witness) {
           C.cacheSuccess(metadata, P, witness);
         } else {
@@ -542,12 +545,12 @@ swift::swift_conformsToProtocol(const Metadata * const type,
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
       // can be shared.
-      } else if (record.getTypeKind()
+      } else if (descriptor.getTypeKind()
                    == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
-                 record.getTypeKind()
+                 descriptor.getTypeKind()
                   == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
-        auto R = record.getNominalTypeDescriptor();
-        auto P = record.getProtocol();
+        auto R = descriptor.getNominalTypeDescriptor();
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -559,19 +562,19 @@ swift::swift_conformsToProtocol(const Metadata * const type,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
         // Store the type-protocol pair in the cache.
-        switch (record.getConformanceKind()) {
+        switch (descriptor.getConformanceKind()) {
         case ConformanceFlags::ConformanceKind::WitnessTable:
           // If the record provides a nondependent witness table for all
           // instances of a generic type, cache it for the generic pattern.
           C.cacheSuccess(type->getNominalTypeDescriptor(), P,
-                         record.getStaticWitnessTable());
+                         descriptor.getStaticWitnessTable());
           break;
 
         case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
         case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
           // If the record provides a dependent witness table accessor,
           // cache the result for the instantiated type metadata.
-          C.cacheSuccess(type, P, record.getWitnessTable(type));
+          C.cacheSuccess(type, P, descriptor.getWitnessTable(type));
           break;
 
         default:
@@ -609,10 +612,12 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      switch (record.getTypeKind()) {
+      auto &descriptor = *record.get();
+
+      switch (descriptor.getTypeKind()) {
       case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
       case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-        if (auto ntd = record.getNominalTypeDescriptor()) {
+        if (auto ntd = descriptor.getNominalTypeDescriptor()) {
           if (ntd->Name.get() == typeName)
             return ntd;
         }

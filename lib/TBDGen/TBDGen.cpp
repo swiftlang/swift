@@ -70,6 +70,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
     addSymbol(
         LinkEntity::forProtocolWitnessTableAccessFunction(normalConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
