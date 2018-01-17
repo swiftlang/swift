@@ -346,12 +346,12 @@ class CompilerInstance {
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
   std::vector<SourceFile *> PrimarySourceFiles;
 
-  /// Return whether there is an entry in PrimaryInputs for buffer \BufID.
+  /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
     return PrimaryBufferIDs.count(BufID) != 0;
   }
 
-  /// Record in PrimaryBufferIDs the fact that \BufID is a primary.
+  /// Record in PrimaryBufferIDs the fact that \p BufID is a primary.
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
