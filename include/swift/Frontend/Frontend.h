@@ -346,7 +346,7 @@ class CompilerInstance {
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
   std::vector<SourceFile *> PrimarySourceFiles;
 
-  /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
+  /// \return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
     return PrimaryBufferIDs.count(BufID) != 0;
   }
