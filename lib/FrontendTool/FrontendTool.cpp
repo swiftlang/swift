@@ -829,7 +829,7 @@ static bool performCompile(CompilerInstance &Instance,
         for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
           auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
           PSGIs.push_back(PostSILGenInputs{
-              std::move(SM), !fileIsSIB(PrimaryFile), PrimaryFile});
+              std::move(SM), true, PrimaryFile});
         }
       }
     } else {
