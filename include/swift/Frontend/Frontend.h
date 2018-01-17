@@ -344,7 +344,7 @@ class CompilerInstance {
   /// Identifies the set of SourceFiles that are considered primaries. An
   /// invariant is that any SourceFile in this set with an associated
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
-  llvm::SetVector<SourceFile*> PrimarySourceFiles;
+  std::vector<SourceFile *> PrimarySourceFiles;
 
   /// Return whether there is an entry in PrimaryInputs for buffer \BufID.
   bool isPrimaryInput(unsigned BufID) const {
@@ -433,7 +433,7 @@ public:
 
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
-  const llvm::SetVector<SourceFile*> &getPrimarySourceFiles() {
+  const ArrayRef<SourceFile *> getPrimarySourceFiles() {
     return PrimarySourceFiles;
   }
 
