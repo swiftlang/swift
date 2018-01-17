@@ -124,7 +124,7 @@ public func testExitBranch(i : Int) {
 
 
 // This program results in a boolean parameter being passed in.
-public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can only handle single basic block programs}}
+public func test_bool_param(cond: Bool) {
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
@@ -155,7 +155,7 @@ public func test_bool_param(cond: Bool) {  // expected-error {{TFLowerGraph can 
 // CHECK-NEXT:  dealloc_stack
 
 
-public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can only handle single basic block programs}}
+public func test_bool_param2(cond: Bool) { 
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
@@ -186,4 +186,5 @@ public func test_bool_param2(cond: Bool) {  // expected-error {{TFLowerGraph can
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: cond_br [[BOOLVAL]],
+
 
