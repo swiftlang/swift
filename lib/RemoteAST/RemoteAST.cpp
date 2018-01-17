@@ -421,9 +421,8 @@ public:
   }
 
   Type createObjCClassType(StringRef name) {
-    Identifier ident = Ctx.getIdentifier(name);
     auto typeDecl =
-        findForeignNominalTypeDecl(ident, /*discriminator*/Identifier(),
+        findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
                                    ForeignModuleKind::Imported,
                                    Demangle::Node::Kind::Class);
     if (!typeDecl) return Type();
@@ -481,8 +480,8 @@ private:
                                        Identifier name,
                                        Identifier privateDiscriminator,
                                        Demangle::Node::Kind kind);
-  NominalTypeDecl *findForeignNominalTypeDecl(Identifier name,
-                                              Identifier privateDiscriminator,
+  NominalTypeDecl *findForeignNominalTypeDecl(StringRef name,
+                                              StringRef relatedEntityKind,
                                               ForeignModuleKind lookupKind,
                                               Demangle::Node::Kind kind);
 
@@ -622,15 +621,22 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       return dyn_cast<DeclContext>(decl);
     }
 
-    Identifier name;
+    StringRef name;
+    StringRef relatedEntityKind;
     Identifier privateDiscriminator;
     if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
-      name = Ctx.getIdentifier(declNameNode->getText());
+      name = declNameNode->getText();
+
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::PrivateDeclName) {
-      name = Ctx.getIdentifier(declNameNode->getChild(1)->getText());
+      name = declNameNode->getChild(1)->getText();
       privateDiscriminator =
         Ctx.getIdentifier(declNameNode->getChild(0)->getText());
+
+    } else if (declNameNode->getKind() ==
+                 Demangle::Node::Kind::RelatedEntityDeclName) {
+      name = declNameNode->getChild(0)->getText();
+      relatedEntityKind = declNameNode->getText();
 
     // Ignore any other decl-name productions for now.
     } else {
@@ -640,15 +646,18 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
     DeclContext *dc = findDeclContext(node->getChild(0));
     if (!dc) {
       // Do some backup logic for foreign type declarations.
-      if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
-        return findForeignNominalTypeDecl(name, privateDiscriminator,
-                                          foreignModuleKind.getValue(),
-                                          node->getKind());
+      if (privateDiscriminator.empty()) {
+        if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
+          return findForeignNominalTypeDecl(name, relatedEntityKind,
+                                            foreignModuleKind.getValue(),
+                                            node->getKind());
+        }
       }
       return nullptr;
     }
 
-    return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
+    return findNominalTypeDecl(dc, Ctx.getIdentifier(name),
+                               privateDiscriminator, node->getKind());
   }
 
   case Demangle::Node::Kind::Global:
@@ -711,8 +720,8 @@ getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
-                                                 Identifier discriminator,
+RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
+                                                 StringRef relatedEntityKind,
                                                  ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
@@ -741,18 +750,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
 
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
-    if (!discriminator.empty()) {
+    if (!relatedEntityKind.empty()) {
       Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
       if (!lookupKind)
         return nullptr;
-      importer->lookupSynthesizedTypeDecl(name.str(), lookupKind.getValue(),
-                                          discriminator.str(),
-                                          [&](TypeDecl *found) {
+      importer->lookupRelatedEntity(name, lookupKind.getValue(),
+                                    relatedEntityKind, [&](TypeDecl *found) {
         consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
       });
       break;
     }
-    importer->lookupValue(name, consumer);
+    importer->lookupValue(Ctx.getIdentifier(name), consumer);
     if (consumer.Result)
       consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
     break;
@@ -760,7 +768,7 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
     Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
     if (!lookupKind)
       return nullptr;
-    importer->lookupTypeDecl(name.str(), lookupKind.getValue(),
+    importer->lookupTypeDecl(name, lookupKind.getValue(),
                              [&](TypeDecl *found) {
       consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
     });

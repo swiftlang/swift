@@ -62,11 +62,11 @@ func testObjC(
   _ = f
   // CHECK-objc: type: SomeClassAlias	for 'g' mangled=$SSo14SomeClassAliasaD
   _ = g
-  // CHECK-objc: type: SomeError	for 'h' mangled=$SSC9SomeError15ns_error_domainLLVD
+  // CHECK-objc: type: SomeError	for 'h' mangled=$SSC9SomeErrorLeVD
   _ = h
   // CHECK-objc: type: SomeError.Code	for 'i' mangled=$SSo9SomeErrorVD
   _ = i
-  // CHECK-objc: type: SomeRenamedError	for 'j' mangled=$SSC14SomeOtherError21ns_error_domain__anonLLVD
+  // CHECK-objc: type: SomeRenamedError	for 'j' mangled=$SSC14SomeOtherErrorLEVD
   _ = j
   // CHECK-objc: type: SomeRenamedError.Code	for 'k' mangled=$SSo14SomeOtherErroraD
   _ = k

@@ -643,11 +643,10 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
 
-  StringRef privateDiscriminator;
-  if (customNameAttr)
-    privateDiscriminator = customNameAttr->Discriminator.str();
-  else
-    privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
+  if (customNameAttr && !customNameAttr->getRelatedEntityKind().empty())
+    return appendOperatorParam("L", customNameAttr->getRelatedEntityKind());
+
+  StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
   if (!privateDiscriminator.empty()) {
     appendIdentifier(privateDiscriminator.str());
     return appendOperator("LL");

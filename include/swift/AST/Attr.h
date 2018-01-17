@@ -1204,13 +1204,24 @@ public:
 /// just the name part.
 class CustomTypeNameManglingAttr : public DeclAttribute {
 public:
-  CustomTypeNameManglingAttr(Identifier name, Identifier discriminator)
+  const Identifier Name;
+private:
+  const char RelatedEntityKind;
+public:
+  explicit CustomTypeNameManglingAttr(Identifier name,
+                                      char relatedEntityKind = '\0')
     : DeclAttribute(DAK_CustomTypeNameMangling, SourceLoc(), SourceRange(),
                     /*Implicit=*/true),
-      Name(name), Discriminator(discriminator) {}
+      Name(name), RelatedEntityKind(relatedEntityKind) {
+    assert(!relatedEntityKind ||
+           (relatedEntityKind >= 'a' && relatedEntityKind <= 'j') ||
+           (relatedEntityKind >= 'A' && relatedEntityKind <= 'J') &&
+           "only [A-Ja-j] are supported as related entity kinds");
+  }
 
-  const Identifier Name;
-  const Identifier Discriminator;
+  StringRef getRelatedEntityKind() const & {
+    return RelatedEntityKind ? StringRef(&RelatedEntityKind, 1) : StringRef();
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CustomTypeNameMangling;

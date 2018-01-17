@@ -157,15 +157,16 @@ public:
                       llvm::function_ref<void(TypeDecl*)> receiver);
 
   /// Look up type a declaration synthesized by the Clang importer itself, using
-  /// a "discriminator" to determine which type it should be. For example, this
-  /// can be used to find the synthesized error struct for an NS_ERROR_ENUM.
+  /// a "related entity kind" to determine which type it should be. For example,
+  /// this can be used to find the synthesized error struct for an
+  /// NS_ERROR_ENUM.
   ///
   /// Note that this method does no filtering. If it finds the type in a loaded
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
-  void lookupSynthesizedTypeDecl(StringRef clangName, ClangTypeKind kind,
-                                 StringRef discriminator,
-                                 llvm::function_ref<void(TypeDecl*)> receiver);
+  void lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                           StringRef relatedEntityKind,
+                           llvm::function_ref<void(TypeDecl*)> receiver);
 
   /// Look for textually included declarations from the bridging header.
   ///

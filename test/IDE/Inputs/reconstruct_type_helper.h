@@ -32,7 +32,7 @@ enum SomeError {
 
 extern NSString *SomeOtherErrorDomain;
 typedef enum __attribute__((ns_error_domain(SomeOtherErrorDomain))) {
-  SomeOtherErrorBadness __attribute__((swift_name("badness")))
+  SomeOtherErrorBadness
 } SomeOtherError __attribute__((swift_name("SomeRenamedError")));
 
 #endif // __OBJC__

@@ -509,8 +509,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_CustomTypeNameMangling: {
     Printer.printAttrName("@_customTypeNameMangling");
     auto *attr = cast<CustomTypeNameManglingAttr>(this);
-    Printer << "(\"" << attr->Name << "\", \"" << attr->Discriminator
-            << "\")";
+    Printer << "(name: \"" << attr->Name << "\"";
+    if (!attr->getRelatedEntityKind().empty()) {
+      Printer << ", relatedEntityKind: \"" << attr->getRelatedEntityKind()
+              << "\"";
+    }
+    Printer << ")";
     break;
   }
 

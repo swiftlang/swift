@@ -31,9 +31,24 @@ class MacroInfo;
 namespace swift {
 namespace importer {
 
-// This spelling matches the Clang attribute.
-static const char ERROR_ENUM_MANGLING_KEY[] = "ns_error_domain";
-static const char ERROR_ENUM_ANON_MANGLING_KEY[] = "ns_error_domain__anon";
+/// "Related entity" code used in the mangling for the structs synthesized by
+/// the importer to represent NSErrors with a particular domain, as specified
+/// by an enum with the \c ns_error_domain Clang attribute.
+///
+/// This one is for enums with names.
+///
+/// \sa ERROR_ENUM_ANON_MANGLING_KEY
+static const char ERROR_ENUM_MANGLING_KEY = 'e';
+
+/// "Related entity" code used in the mangling for the structs synthesized by
+/// the importer to represent NSErrors with a particular domain, as specified
+/// by an enum with the \c ns_error_domain Clang attribute.
+///
+/// This one is for anonymous enums that are immediately typedef'd, giving them
+/// a unique name for linkage purposes according to the C++ standard.
+///
+/// \sa ERROR_ENUM_MANGLING_KEY
+static const char ERROR_ENUM_ANON_MANGLING_KEY = 'E';
 
 /// Describes how a particular C enumeration type will be imported
 /// into Swift. All of the possibilities have the same storage
