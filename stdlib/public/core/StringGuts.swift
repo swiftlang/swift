@@ -210,8 +210,8 @@ extension _StringGuts {
 #if _runtime(_ObjC)
 extension _StringGuts {
   //
-  // HACK HACK HACK: Work around for ARC :-(
-  //  @inline(never) // Hide CF dependency
+  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
+  //
   @_versioned
   @effects(readonly)
   internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
