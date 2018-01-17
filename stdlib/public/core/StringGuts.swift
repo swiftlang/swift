@@ -615,7 +615,7 @@ extension _StringGuts {
 #else
     if _object.isOpaque {
       print("opaque ", terminator: "")
-      internalDumpHex(_object.asOpaqueObject, newline: false)
+      printHex(Builtin.reinterpretCast(_object.asOpaqueObject), newline: false)
       print(" count: ", terminator: "")
       print(_opaqueCount, terminator: "")
       return
