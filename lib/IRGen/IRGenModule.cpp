@@ -289,15 +289,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     });
   ProtocolRecordPtrTy = ProtocolRecordTy->getPointerTo();
 
-  ProtocolConformanceRecordTy
-    = createStructType(*this, "swift.protocol_conformance", {
+  ProtocolConformanceDescriptorTy
+    = createStructType(*this, "swift.protocol_conformance_descriptor", {
       RelativeAddressTy,
       RelativeAddressTy,
       RelativeAddressTy,
       Int32Ty
     });
-  ProtocolConformanceRecordPtrTy
-    = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
+  ProtocolConformanceDescriptorPtrTy
+    = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
   NominalTypeDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");

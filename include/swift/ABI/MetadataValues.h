@@ -205,60 +205,6 @@ enum class TypeMetadataRecordKind : unsigned {
   IndirectObjCClass = 0x03,
 };
 
-/// Kinds of reference to protocol conformance.
-enum class ProtocolConformanceReferenceKind : unsigned {
-  /// A direct reference to a protocol witness table.
-  WitnessTable,
-  /// A function pointer that can be called to access the protocol witness
-  /// table.
-  WitnessTableAccessor,
-  /// A function pointer that can be called to access the protocol witness
-  /// table whose conformance is conditional on additional requirements that
-  /// must first be evaluated and then provided to the accessor function.
-  ConditionalWitnessTableAccessor,
-  /// Reserved for future use.
-  Reserved,
-};
-
-// Type metadata record discriminant
-struct TypeMetadataRecordFlags {
-protected:
-  using int_type = unsigned;
-  int_type Data;
-  
-  enum : int_type {
-    TypeKindMask = 0x0000000FU,
-    TypeKindShift = 0,
-  };
-  
-public:
-  constexpr TypeMetadataRecordFlags() : Data(0) {}
-  constexpr TypeMetadataRecordFlags(int_type Data) : Data(Data) {}
-  
-  constexpr TypeMetadataRecordKind getTypeKind() const {
-    return TypeMetadataRecordKind((Data & TypeKindMask) >> TypeKindShift);
-  }
-  constexpr TypeMetadataRecordFlags withTypeKind(
-                                        TypeMetadataRecordKind ptk) const {
-    return TypeMetadataRecordFlags(
-                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
-  }
-  
-  int_type getValue() const { return Data; }
-};
-
-// Protocol conformance discriminant
-struct ProtocolConformanceFlags : public TypeMetadataRecordFlags {
-  constexpr ProtocolConformanceFlags() : TypeMetadataRecordFlags(0) {}
-  constexpr ProtocolConformanceFlags(int_type Data) : TypeMetadataRecordFlags(Data) {}
-
-  constexpr ProtocolConformanceFlags withTypeKind(
-                                        TypeMetadataRecordKind ptk) const {
-    return ProtocolConformanceFlags(
-                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
-  }
-};
-
 /// Flag that indicates whether an existential type is class-constrained or not.
 enum class ProtocolClassConstraint : bool {
   /// The protocol is class-constrained, so only class types can conform to it.
@@ -496,6 +442,107 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
+};
+
+/// Flags that go in a TargetConformanceDescriptor structure.
+class ConformanceFlags {
+public:
+  typedef uint32_t int_type;
+
+  enum class ConformanceKind {
+    /// A direct reference to a protocol witness table.
+    WitnessTable,
+    /// A function pointer that can be called to access the protocol witness
+    /// table.
+    WitnessTableAccessor,
+    /// A function pointer that can be called to access the protocol witness
+    /// table whose conformance is conditional on additional requirements that
+    /// must first be evaluated and then provided to the accessor function.
+    ConditionalWitnessTableAccessor
+  };
+
+private:
+  enum : int_type {
+    ConformanceKindMask = 0x07,      // 8 conformance kinds
+
+    TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
+    TypeMetadataKindShift = 3,
+
+    IsRetroactiveMask = 0x01 << 6,
+    IsSynthesizedNonUniqueMask = 0x01 << 7,
+
+    NumConditionalRequirementsMask = 0xFF << 8,
+    NumConditionalRequirementsShift = 8,
+  };
+
+  int_type Value;
+
+public:
+  ConformanceFlags(int_type value = 0) : Value(value) {}
+
+  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
+    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
+  }
+
+  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+    return ConformanceFlags((Value & ~TypeMetadataKindMask)
+                            | (int_type(kind) << TypeMetadataKindShift));
+  }
+
+  ConformanceFlags withIsRetroactive(bool isRetroactive) const {
+    return ConformanceFlags((Value & ~IsRetroactiveMask)
+                            | (isRetroactive? IsRetroactiveMask : 0));
+  }
+
+  ConformanceFlags withIsSynthesizedNonUnique(
+                                          bool isSynthesizedNonUnique) const {
+    return ConformanceFlags(
+                  (Value & ~IsSynthesizedNonUniqueMask)
+                  | (isSynthesizedNonUnique ? IsSynthesizedNonUniqueMask : 0));
+  }
+
+  ConformanceFlags withNumConditionalRequirements(unsigned n) const {
+    return ConformanceFlags((Value & ~NumConditionalRequirementsMask)
+                            | (n << NumConditionalRequirementsShift));
+  }
+
+  /// Retrieve the conformance kind.
+  ConformanceKind getConformanceKind() const {
+    return ConformanceKind(Value & ConformanceKindMask);
+  }
+
+  /// Retrieve the type reference kind kind.
+  TypeMetadataRecordKind getTypeReferenceKind() const {
+    return TypeMetadataRecordKind(
+                      (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
+  }
+
+  /// Is the conformance "retroactive"?
+  ///
+  /// A conformance is retroactive when it occurs in a module that is
+  /// neither the module in which the protocol is defined nor the module
+  /// in which the conforming type is defined. With retroactive conformance,
+  /// it is possible to detect a conflict at run time.
+  bool isRetroactive() const { return Value & IsRetroactiveMask; }
+
+  /// Is the conformance synthesized in a non-unique manner?
+  ///
+  /// The Swift compiler will synthesize conformances on behalf of some
+  /// imported entities (e.g., C typedefs with the swift_wrapper attribute).
+  /// Such conformances are retroactive by nature, but the presence of multiple
+  /// such conformances is not a conflict because all synthesized conformances
+  /// will be equivalent.
+  bool isSynthesizedNonUnique() const {
+    return Value & IsSynthesizedNonUniqueMask;
+  }
+
+  /// Retrieve the # of conditional requirements.
+  unsigned getNumConditionalRequirements() const {
+    return (Value & NumConditionalRequirementsMask)
+              >> NumConditionalRequirementsShift;
+  }
 
   int_type getIntValue() const { return Value; }
 };

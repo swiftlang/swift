@@ -1240,6 +1240,9 @@ NodePointer Demangler::demangleImplFunctionType() {
 
 NodePointer Demangler::demangleMetatype() {
   switch (nextChar()) {
+    case 'c':
+      return createWithChild(Node::Kind::ProtocolConformanceDescriptor,
+                             popProtocolConformance());
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
     case 'P':
