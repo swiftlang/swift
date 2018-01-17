@@ -408,6 +408,8 @@ class PatternMatchEmission {
   CleanupsDepth PatternMatchStmtDepth;
   llvm::MapVector<CaseStmt*, std::pair<SILBasicBlock*, bool>> SharedCases;
 
+  llvm::DenseMap<VarDecl*, SILValue> Temporaries;
+
   using CompletionHandlerTy =
     llvm::function_ref<void(PatternMatchEmission &, ArgArray, ClauseRow &)>;
   CompletionHandlerTy CompletionHandler;
@@ -416,13 +418,16 @@ public:
   PatternMatchEmission(SILGenFunction &SGF, Stmt *S,
                        CompletionHandlerTy completionHandler)
     : SGF(SGF), PatternMatchStmt(S),
-      PatternMatchStmtDepth(SGF.getCleanupsDepth()),
       CompletionHandler(completionHandler) {}
 
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
   void initSharedCaseBlockDest(CaseStmt *caseBlock, bool hasFallthroughTo);
+
+  void emitAddressOnlyAllocations();
+
+  void emitAddressOnlyInitialization(VarDecl *dest, SILValue value);
 
   JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
 
@@ -2363,6 +2368,42 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
                   CleanupLocation(PatternMatchStmt));
 }
 
+void PatternMatchEmission::emitAddressOnlyAllocations() {
+  for (auto &entry: SharedCases) {
+    CaseStmt *caseBlock = entry.first;
+
+    // If we have a shared case with bound decls, then the 0th pattern has the
+    // order of variables that are the incoming BB arguments. Setup the VarLocs
+    // to point to the incoming args and setup initialization so any args needing
+    // cleanup will get that as well.
+    if (caseBlock->hasBoundDecls()) {
+      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+      pattern->forEachVariable([&](VarDecl *V) {
+        if (!V->hasName())
+          return;
+
+        SILType ty = SGF.getLoweredType(V->getType());
+
+        if (ty.isAddressOnly(SGF.F.getModule())) {
+          assert(!Temporaries[V]);
+          Temporaries[V] = SGF.emitTemporaryAllocation(V, ty);
+          return;
+        }
+      });
+    }
+  }
+
+  // Now we have all of our cleanups entered, so we can record the
+  // depth.
+  PatternMatchStmtDepth = SGF.getCleanupsDepth();
+}
+
+void PatternMatchEmission::
+emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
+  auto found = Temporaries.find(dest);
+  assert(found != Temporaries.end());
+  SGF.B.createCopyAddr(dest, value, found->second, IsNotTake, IsInitialization);
+}
 
 /// Emit all the shared case statements.
 void PatternMatchEmission::emitSharedCaseBlocks() {
@@ -2416,27 +2457,37 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           return;
 
         SILType ty = SGF.getLoweredType(V->getType());
+
+        SILValue value;
         if (ty.isAddressOnly(SGF.F.getModule())) {
-          // Just assign SILUndef as a value for address only values.
-          SGF.VarLocs[V].value = SILUndef::get(ty, SGF.F.getModule());
-          return;
+          // There's no basic block argument, since we don't allow basic blocks
+          // to have address arguments.
+          //
+          // Instead, we map the variable to a temporary alloc_stack in
+          // emitAddressOnlyAllocations(), and store into it at each
+          // predecessor block.
+          //
+          // There's nothing to do here, since the value should already have
+          // been initialized on entry.
+          auto found = Temporaries.find(V);
+          assert(found != Temporaries.end());
+          value = found->second;
+        } else {
+          value = caseBB->getArgument(argIndex++);
         }
 
         if (V->isLet()) {
           // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
-          SGF.emitInitializationForVarDecl(V, V->isLet())
-            ->finishInitialization(SGF);
+          SGF.VarLocs[V].value = value;
+          SGF.enterDestroyCleanup(value);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
           // now we finally alloc a box for the var and forward in the chosen value.
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
-          auto loc = SGF.CurrentSILLoc;
-          auto value =
-              ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));
-          auto formalType = V->getType()->getCanonicalType();
-          RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
+          auto mv = ManagedValue::forUnmanaged(value);
+          newVar->copyOrInitValueInto(SGF, V, mv, /*isInit*/ true);
+          newVar->finishInitialization(SGF);
         }
       });
       emitCaseBody(caseBlock);
@@ -2535,35 +2586,6 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
   variableSwapper();
 }
 
-static void diagnoseMultiPatternCaseAddressOnlyBinding(SILGenFunction &SGF,
-                                                       ValueDecl *decl,
-                                                       SILValue value) {
-  SILLocation loc(decl);
-
-  // Try to figure out why this is an address only type. This is just an
-  // approximation. The targets of interest are:
-  //
-  // 1. existentials.
-  // 2. generics.
-  //
-  // If we are unable to show that we have an existential or generic, we use the
-  // more general unknown_addressonly_type_used_in_multipattern_case diagnostic.
-  unsigned errorPatternIndex = 0;
-  CanType ty = value->getType().getSwiftRValueType();
-
-  if (ty.findIf([&](Type ty) -> bool {
-        return ty->is<ProtocolType>() || ty->is<ProtocolCompositionType>();
-      })) {
-    errorPatternIndex = 1;
-  } else if (ty.findIf(
-                 [&](Type ty) -> bool { return ty->is<ArchetypeType>(); })) {
-    errorPatternIndex = 2;
-  }
-
-  SGF.SGM.diagnose(loc, diag::addressonly_type_used_in_multipattern_case,
-                   errorPatternIndex, ty);
-}
-
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
@@ -2580,8 +2602,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     emitIgnoredExpr(S->getSubjectExpr());
     return failure(SILLocation(S));
   }
-
-  bool diagnosedError = false;
 
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ArgArray argArray,
@@ -2601,16 +2621,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       JumpDest sharedDest =
           emission.getSharedCaseBlockDest(caseBlock);
 
-      // Generate the arguments from this row's pattern in the case block's expected order,
-      // and keep those arguments from being cleaned up, as we're passing the +1 along to
-      // the shared case block dest. (The cleanups still happen, as they are threaded through
-      // here messily, but the explicit retains here counteract them, and then the
+      // Generate the arguments from this row's pattern in the case block's
+      // expected order, and keep those arguments from being cleaned up, as
+      // we're passing the +1 along to the shared case block dest. (The
+      // cleanups still happen, as they are threaded through here messily,
+      // but the explicit retains here counteract them, and then the
       // retain/release pair gets optimized out.)
-      //
-      // *NOTE*. We assume that all values are passed as objects for
-      // simplicity. This is ok to do since any time we diagnose an error, we
-      // pass SILUndef to the shared case block. This is to maintain the CFG
-      // structure and thus prevent spurious 'dead code' warnings.
       ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
       SmallVector<SILValue, 4> args;
       SmallVector<VarDecl *, 4> expectedVarOrder;
@@ -2626,10 +2642,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           if (var->hasName() && var->getName() == expected->getName()) {
             SILValue value = VarLocs[var].value;
             SILType type = value->getType();
+
+            // If we have an address-only type, initialize the temporary
+            // allocation. We're not going to pass the address as a block
+            // argument.
             if (type.isAddressOnly(M)) {
-              if (!diagnosedError)
-                diagnoseMultiPatternCaseAddressOnlyBinding(*this, var, value);
-              diagnosedError = true;
+              emission.emitAddressOnlyInitialization(expected, value);
               break;
             }
 
@@ -2682,6 +2700,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     
     hasFallthrough = containsFallthrough(caseBlock->getBody());
   }
+
+  // Emit alloc_stacks for address-only variables appearing in
+  // multiple-entry case blocks.
+  emission.emitAddressOnlyAllocations();
 
   SILBasicBlock *contBB = createBasicBlock();
   emitProfilerIncrement(S);
