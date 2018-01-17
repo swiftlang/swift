@@ -506,7 +506,7 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
 
 struct PostSILGenInputs {
   std::unique_ptr<SILModule> TheSILModule;
-  bool astGuaranteedToCorrespondToSIL;
+  bool ASTGuaranteedToCorrespondToSIL;
   ModuleOrSourceFile ModuleOrPrimarySourceFile;
 };
 
@@ -845,7 +845,7 @@ static bool performCompile(CompilerInstance &Instance,
     PSGIs.pop_front();
     if (performCompileStepsPostSILGen(Instance, Invocation,
                                       std::move(PSGI.TheSILModule),
-                                      PSGI.astGuaranteedToCorrespondToSIL,
+                                      PSGI.ASTGuaranteedToCorrespondToSIL,
                                       PSGI.ModuleOrPrimarySourceFile,
                                       moduleIsPublic,
                                       ReturnValue, observer, Stats))
