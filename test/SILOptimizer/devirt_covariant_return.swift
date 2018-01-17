@@ -11,7 +11,6 @@
 // CHECK: bb0
 // CHECK: alloc_ref
 // CHECK: alloc_ref
-// CHECK: alloc_ref
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
