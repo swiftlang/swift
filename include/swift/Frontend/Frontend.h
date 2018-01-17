@@ -433,7 +433,7 @@ public:
 
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
-  const ArrayRef<SourceFile *> getPrimarySourceFiles() {
+  ArrayRef<SourceFile *> getPrimarySourceFiles() {
     return PrimarySourceFiles;
   }
 
