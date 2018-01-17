@@ -7,7 +7,7 @@
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-4-LABEL: {{^}}enum ExhaustiveEnum : {{.+}} {
+// CHECK-4-LABEL: {{^}}@_exhaustive enum ExhaustiveEnum : {{.+}} {
 // CHECK-5-LABEL: {{^}}@_exhaustive enum ExhaustiveEnum : {{.+}} {
 // CHECK:      case A
 // CHECK-NEXT: case B

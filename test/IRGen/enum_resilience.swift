@@ -261,9 +261,9 @@ extension ResilientMultiPayloadGenericEnum {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T015enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF(%T14resilient_enum11SimpleShapeO* noalias nocapture sret)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%T14resilient_enum11SimpleShapeO* noalias nocapture sret)
 // CHECK: [[BUFFER:%.*]] = bitcast %T14resilient_enum11SimpleShapeO* %0 to %swift.opaque*
-// CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
+// CHECK: [[METADATA:%.*]] = call %swift.type* @"$S16resilient_struct4SizeVMa"()
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
 // CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 0, i32 1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
@@ -272,7 +272,7 @@ public func constructExhaustiveWithResilientMembers() -> SimpleShape {
   return .KleinBottle
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i{{64|32}}, i8 } @_T015enum_resilience19constructFullyFixed010resilient_A00dE6LayoutOyF()
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i{{64|32}}, i8 } @"$S15enum_resilience19constructFullyFixed010resilient_A00dE6LayoutOyF"()
 // CHECK: ret { [[INT]], i8 } { [[INT]] 0, i8 1 }
 // CHECK-NEXT: {{^}$}}
 public func constructFullyFixed() -> FullyFixedLayout {

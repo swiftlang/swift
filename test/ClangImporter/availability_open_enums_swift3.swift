@@ -7,7 +7,7 @@ import AvailabilityExtras
 
 func exhaustiveSwitch(e: NSEnumAddedCasesIn2017) {
   switch e { // expected-warning{{switch must be exhaustive}}
-    // expected-note@-1{{add missing case: '.newCaseOne'}}
+    // expected-note@-1{{do you want to add a default clause?}}
   case .existingCaseOne:
     return
   case .existingCaseTwo:
