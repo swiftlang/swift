@@ -800,7 +800,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (auto SM = Instance.takeSILModule()) {
     PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod});
   }
-  else if (PSGIs.empty()) {
+  else {
     auto fileIsSIB = [](const FileUnit *File) -> bool {
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
