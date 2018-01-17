@@ -352,11 +352,11 @@ class CompilerInstance {
   }
 
   /// Record in PrimaryBufferIDs the fact that \BufID is a primary.
-  /// If \BufID is already in the set, do nothing.
+  /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  /// Record in PrimarySourceFiles the fact that \SF is a primary, and
-  /// call recordPrimaryInputBuffer on \SF's buffer (if it exists).
+  /// Record in PrimarySourceFiles the fact that \p SF is a primary, and
+  /// call recordPrimaryInputBuffer on \p SF's buffer (if it exists).
   void recordPrimarySourceFile(SourceFile *SF);
 
   bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
