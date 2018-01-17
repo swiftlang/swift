@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O -sil-verify-all -emit-sil  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// FIXME: <rdar://problem/36587088>
+// XFAIL: linux
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
 
