@@ -88,7 +88,7 @@
 // FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}@_exhaustive enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt

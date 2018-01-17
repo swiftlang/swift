@@ -2759,8 +2759,7 @@ namespace {
         // Annotate as '@exhaustive' or '@nonexhaustive' as appropriate.
         bool nonExhaustiveIsDefault = C.isSwiftVersionAtLeast(5);
         if (enumKind == EnumKind::ExhaustiveEnum) {
-          enumDecl->getAttrs().add(
-              new (C) ExhaustiveAttr(/*implicit*/!nonExhaustiveIsDefault));
+          enumDecl->getAttrs().add(new (C) ExhaustiveAttr(/*implicit*/false));
         } else {
           enumDecl->getAttrs().add(
               new (C) NonExhaustiveAttr(/*implicit*/nonExhaustiveIsDefault));

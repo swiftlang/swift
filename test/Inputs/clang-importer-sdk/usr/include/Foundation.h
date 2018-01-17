@@ -314,7 +314,7 @@ typedef NSPoint *NSPointArray;
 typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
   NSRuncingQuince
-};
+} __attribute__((enum_extensibility(closed)));
 
 typedef NS_ENUM(int, NSUnderlyingType) {
   NSUnderlyingTypeZim,
@@ -395,7 +395,7 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesByEquivalentValue = -127,
   NSAliasesByName = NSAliasesOriginal,
   NSAliasesDifferentValue = 2
-};
+} __attribute__((enum_extensibility(closed)));
 
 typedef NS_ENUM(unsigned char, NSUnavailableAliasesEnum) {
   NSUnavailableAliasesOriginalAU = 0,
