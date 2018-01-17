@@ -4140,7 +4140,7 @@ namespace {
 
       simplifyExprType(E);
       
-      if (cs.getType(E)->hasError())
+      if (cs.getType(E)->hasError() || cs.getType(E)->hasUnresolvedType())
         return E;
 
       // If a component is already resolved, then all of them should be
@@ -4167,13 +4167,6 @@ namespace {
       
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getComponents()[i];
-        
-        // If there were unresolved types, we may end up with a null base for
-        // following components.
-        if (!baseTy) {
-          resolvedComponents.push_back(origComponent);
-          continue;
-        }
         
         KeyPathExpr::Component component;
         switch (auto kind = origComponent.getKind()) {
@@ -4339,9 +4332,6 @@ namespace {
           // Chaining always forces the element to be an rvalue.
           auto objectTy = baseTy->getWithoutSpecifierType()
             ->getAnyOptionalObjectType();
-          if (baseTy->hasUnresolvedType() && !objectTy) {
-            objectTy = baseTy;
-          }
           assert(objectTy);
           
           component = KeyPathExpr::Component::forOptionalChain(objectTy,
@@ -4355,15 +4345,10 @@ namespace {
           Type objectTy;
           if (auto lvalue = baseTy->getAs<LValueType>()) {
             objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
-            if (baseTy->hasUnresolvedType() && !objectTy) {
-              objectTy = baseTy;
-            }
+            assert(objectTy);
             objectTy = LValueType::get(objectTy);
           } else {
             objectTy = baseTy->getAnyOptionalObjectType();
-            if (baseTy->hasUnresolvedType() && !objectTy) {
-              objectTy = baseTy;
-            }
             assert(objectTy);
           }
           
@@ -4389,7 +4374,6 @@ namespace {
       // Wrap a non-optional result if there was chaining involved.
       if (didOptionalChain &&
           baseTy &&
-          !baseTy->hasUnresolvedType() &&
           !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getAnyOptionalObjectType()
                      ->isEqual(baseTy->getWithoutSpecifierType()));
@@ -4418,8 +4402,7 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->hasUnresolvedType()
-             || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!baseTy|| baseTy->getWithoutSpecifierType()->isEqual(leafTy));
       return E;
     }
 
