@@ -717,6 +717,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
+  Out << "Mc";
+  mangleProtocolConformance(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global

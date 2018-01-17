@@ -333,6 +333,26 @@ AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
   return getRootNormalConformance()->getBehaviorDecl();
 }
 
+bool NormalProtocolConformance::isRetroactive() const {
+  auto module = getDeclContext()->getParentModule();
+
+  // If the conformance occurs in the same module as the protocol definition,
+  // this is not a retroactive conformance.
+  auto protocolModule = getProtocol()->getDeclContext()->getParentModule();
+  if (module == protocolModule)
+    return false;
+
+  // If the conformance occurs in the same module as the conforming type
+  // definition, this is not a retroactive conformance.
+  if (auto nominal = getType()->getAnyNominal()) {
+    if (module == nominal->getParentModule())
+      return false;
+  }
+
+  // Everything else is retroactive.
+  return true;
+}
+
 ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
 }
