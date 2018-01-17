@@ -1455,6 +1455,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
+void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
+  mangleProtocolConformance(node->getChild(0));
+  Buffer << "Mc";
+}
+
 void Remangler::mangleProtocolList(Node *node, Node *superclass,
                                    bool hasExplicitAnyObject) {
   auto *protocols = getSingleChild(node, Node::Kind::TypeList);

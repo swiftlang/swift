@@ -16,6 +16,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
@@ -71,6 +72,14 @@ public:
     beginMangling();
     appendProtocolName(Decl);
     appendOperator("Mp");
+    return finalize();
+  }
+
+  std::string mangleProtocolConformanceDescriptor(
+                                 const NormalProtocolConformance *Conformance) {
+    beginMangling();
+    appendProtocolConformance(Conformance);
+    appendOperator("Mc");
     return finalize();
   }
 
