@@ -86,6 +86,30 @@ func testXORInference() {
 }
 TensorTests.test("XORInference", testXORInference)
 
+TensorTests.test("MLPClassifierStruct") {
+  struct MLPClassifier {
+    // 2 x 4
+    var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
+        [0.4, 0.3, 0.2, 0.1]])
+    // 4 x 1
+    var w2 = Tensor<Float>([[0.4],
+        [0.4],
+        [0.3],
+        [0.9]])
+    var b1 = Tensor<Float>.zeros(shape: [1, 4])
+    var b2 = Tensor<Float>.zeros(shape: [1, 1])
+
+    @_versioned
+    @_inlineable
+    func prediction(for x: Tensor<Float>) -> Tensor<Float> {
+      let o1 = tanh(x ⊗ w1 + b1)
+      return tanh(o1 ⊗ w2 + b2)
+    }
+  }
+  // TODO: Check results
+  _ = MLPClassifier().prediction(for: Tensor([[1, 0.5]]))
+}
+
 // FIXME: GraphGen crashes due to function being multi-BB when
 // partitioning `rank` and `shape` getters.
 //
