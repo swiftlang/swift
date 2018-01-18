@@ -1759,9 +1759,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
       enumDecl = SGF.getASTContext().getOptionalDecl();
     }
 
-    // FIXME: Get expansion from SILFunction
     if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
-                               ResilienceExpansion::Maximal)) {
+                               SGF.F.getResilienceExpansion())) {
       exhaustive = true;
 
       for (auto elt : enumDecl->getAllElements()) {
@@ -1988,7 +1987,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
       enumDecl = SGF.getASTContext().getOptionalDecl();
     }
 
-    // FIXME: Get expansion from SILFunction
     if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
                                SGF.F.getResilienceExpansion())) {
       exhaustive = true;
