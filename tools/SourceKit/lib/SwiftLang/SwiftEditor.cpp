@@ -35,6 +35,8 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -669,6 +671,7 @@ public:
       P.parseTopLevel();
       Done = P.Tok.is(tok::eof);
     }
+    P.finalizeSyntaxTree();
   }
 
   SourceFile &getSourceFile() {
@@ -1790,7 +1793,14 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
-
+  std::string SyntaxContent;
+  {
+    llvm::raw_string_ostream OS(SyntaxContent);
+    json::Output JsonOut(OS);
+    auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
+    JsonOut << Root;
+  }
+  Consumer.handleSerializedSyntaxTree(SyntaxContent);
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
   SwiftEditorSyntaxWalker SyntaxWalker(NewMap,

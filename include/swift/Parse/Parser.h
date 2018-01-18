@@ -356,6 +356,11 @@ public:
 
   bool isInSILMode() const { return SIL != nullptr; }
 
+  void finalizeSyntaxTree() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    SyntaxContext->finalizeRoot();
+  }
+
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 

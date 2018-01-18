@@ -239,6 +239,8 @@ public:
   /// Discard collected parts on this context.
   void setDiscard() { Mode = AccumulationMode::Discard; }
 
+  void finalizeRoot();
+
 };
 
 } // namespace syntax

@@ -258,7 +258,7 @@ void finalizeSourceFile(RootContextData &RootData,
     }
   }
 
-  if (Parts.back()->isToken() &&
+  if (!Parts.empty() && Parts.back()->isToken() &&
       cast<RawTokenSyntax>(Parts.back())->is(tok::eof)) {
     EOFToken.emplace(make<TokenSyntax>(Parts.back()));
     Parts = Parts.drop_back();
@@ -285,6 +285,16 @@ void finalizeSourceFile(RootContextData &RootData,
   }
 }
 } // End of anonymous namespace
+
+void SyntaxParsingContext::finalizeRoot() {
+  if (!Enabled)
+    return;
+  assert(isTopOfContextStack() && "some sub-contexts are not destructed");
+  assert(isRoot() && "AccumulationMode::Root is only for root context");
+  assert(Mode == AccumulationMode::Root);
+  finalizeSourceFile(getRootData(), getParts());
+  getRootData().Storage.clear();
+}
 
 SyntaxParsingContext::~SyntaxParsingContext() {
   assert(isTopOfContextStack() && "destructed in wrong order");
@@ -334,8 +344,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
 
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
-    assert(isRoot() && "AccumulationMode::Root is only for root context");
-    finalizeSourceFile(getRootData(), getParts());
+    finalizeRoot();
     break;
 
   // Never.

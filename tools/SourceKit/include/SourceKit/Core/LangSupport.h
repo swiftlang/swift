@@ -238,6 +238,8 @@ public:
 
   virtual bool handleSourceText(StringRef Text) = 0;
 
+  virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
+
   virtual void finished() {}
 };
 

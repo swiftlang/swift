@@ -97,6 +97,7 @@ private:
   }
 
   bool handleSourceText(StringRef Text) override { return false; }
+  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
 };
 
 struct DocUpdateMutexState {
