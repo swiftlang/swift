@@ -29,20 +29,20 @@ import FoundationBridgeObjC
 
 class TestDecimal : TestDecimalSuper {
     func test_AdditionWithNormalization() {
-        
+
         let biggie = Decimal(65536)
         let smallee = Decimal(65536)
         let answer = biggie/smallee
         expectEqual(Decimal(1),answer)
-        
+
         var one = Decimal(1)
         var addend = Decimal(1)
         var expected = Decimal()
         var result = Decimal()
-        
+
         expected._isNegative = 0;
         expected._isCompact = 0;
-        
+
         // 2 digits -- certain to work
         addend._exponent = -1;
         expectEqual(.noError, NSDecimalAdd(&result, &one, &addend, .plain), "1 + 0.1")
@@ -50,7 +50,7 @@ class TestDecimal : TestDecimalSuper {
         expected._length = 1;
         expected._mantissa.0 = 11;
         expectEqual(.orderedSame, NSDecimalCompare(&expected, &result), "1.1 == 1 + 0.1")
-        
+
         // 38 digits -- guaranteed by NSDecimal to work
         addend._exponent = -37;
         expectEqual(.noError, NSDecimalAdd(&result, &one, &addend, .plain), "1 + 1e-37")
@@ -65,7 +65,7 @@ class TestDecimal : TestDecimalSuper {
         expected._mantissa.6 = 0xee10;
         expected._mantissa.7 = 0x0785;
         expectEqual(.orderedSame, NSDecimalCompare(&expected, &result), "1 + 1e-37")
-        
+
         // 39 digits -- not guaranteed to work but it happens to, so we make the test work either way
         addend._exponent = -38;
         let error = NSDecimalAdd(&result, &one, &addend, .plain)
@@ -85,7 +85,7 @@ class TestDecimal : TestDecimalSuper {
         } else {
             expectEqual(.orderedSame, NSDecimalCompare(&one, &result), "1 + 1e-38")
         }
-        
+
         // 40 digits -- doesn't work; need to make sure it's rounding for us
         addend._exponent = -39;
         expectEqual(.lossOfPrecision, NSDecimalAdd(&result, &one, &addend, .plain), "1 + 1e-39")
@@ -197,7 +197,7 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(FloatingPointSign.plus, explicit.sign)
         expectFalse(explicit.isSignMinus)
         expectTrue(explicit.isNormal)
-        
+
         let significand = explicit.significand
         expectEqual(0, significand._exponent)
         expectEqual(0, significand.exponent)
@@ -214,7 +214,7 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(11, sm5)
         expectEqual(12, sm6)
         expectEqual(13, sm7)
-        
+
         let ulp = explicit.ulp
         expectEqual(0x7f, ulp.exponent)
         expectEqual(8, ulp._length)
@@ -333,15 +333,15 @@ class TestDecimal : TestDecimalSuper {
 
     func test_MultiplicationOverflow() {
         var multiplicand = Decimal(_exponent: 0, _length: 8, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: ( 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff ))
-        
+
         var result = Decimal()
         var multiplier = Decimal(1)
-        
+
         multiplier._mantissa.0 = 2
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &multiplicand, &multiplier, .plain), "2 * max mantissa")
         expectEqual(.noError, NSDecimalMultiply(&result, &multiplier, &multiplicand, .plain), "max mantissa * 2")
-        
+
         multiplier._exponent = 0x7f
         expectEqual(.overflow, NSDecimalMultiply(&result, &multiplicand, &multiplier, .plain), "2e127 * max mantissa")
         expectEqual(.overflow, NSDecimalMultiply(&result, &multiplier, &multiplicand, .plain), "max mantissa * 2e127")
@@ -351,34 +351,34 @@ class TestDecimal : TestDecimalSuper {
         var NaN = Decimal.nan
         var one = Decimal(1)
         var result = Decimal()
-        
+
         expectNotEqual(.noError, NSDecimalAdd(&result, &NaN, &one, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN + 1")
         expectNotEqual(.noError, NSDecimalAdd(&result, &one, &NaN, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "1 + NaN")
-        
+
         expectNotEqual(.noError, NSDecimalSubtract(&result, &NaN, &one, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN - 1")
         expectNotEqual(.noError, NSDecimalSubtract(&result, &one, &NaN, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "1 - NaN")
-        
+
         expectNotEqual(.noError, NSDecimalMultiply(&result, &NaN, &one, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN * 1")
         expectNotEqual(.noError, NSDecimalMultiply(&result, &one, &NaN, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "1 * NaN")
-        
+
         expectNotEqual(.noError, NSDecimalDivide(&result, &NaN, &one, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN / 1")
         expectNotEqual(.noError, NSDecimalDivide(&result, &one, &NaN, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "1 / NaN")
-        
+
         expectNotEqual(.noError, NSDecimalPower(&result, &NaN, 0, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN ^ 0")
         expectNotEqual(.noError, NSDecimalPower(&result, &NaN, 4, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN ^ 4")
         expectNotEqual(.noError, NSDecimalPower(&result, &NaN, 5, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN ^ 5")
-        
+
         expectNotEqual(.noError, NSDecimalMultiplyByPowerOf10(&result, &NaN, 0, .plain))
         expectTrue(NSDecimalIsNotANumber(&result), "NaN e0")
         expectNotEqual(.noError, NSDecimalMultiplyByPowerOf10(&result, &NaN, 4, .plain))
@@ -391,33 +391,33 @@ class TestDecimal : TestDecimalSuper {
         var one = Decimal(1)
         var zero = Decimal(0)
         var negativeOne = Decimal(-1)
-        
+
         var result = Decimal()
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &one, &one, .plain), "1 * 1")
         expectEqual(.orderedSame, NSDecimalCompare(&one, &result), "1 * 1")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &one, &negativeOne, .plain), "1 * -1")
         expectEqual(.orderedSame, NSDecimalCompare(&negativeOne, &result), "1 * -1")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &negativeOne, &one, .plain), "-1 * 1")
         expectEqual(.orderedSame, NSDecimalCompare(&negativeOne, &result), "-1 * 1")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &negativeOne, &negativeOne, .plain), "-1 * -1")
         expectEqual(.orderedSame, NSDecimalCompare(&one, &result), "-1 * -1")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &one, &zero, .plain), "1 * 0")
         expectEqual(.orderedSame, NSDecimalCompare(&zero, &result), "1 * 0")
         expectEqual(0, result._isNegative, "1 * 0")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &zero, &one, .plain), "0 * 1")
         expectEqual(.orderedSame, NSDecimalCompare(&zero, &result), "0 * 1")
         expectEqual(0, result._isNegative, "0 * 1")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &negativeOne, &zero, .plain), "-1 * 0")
         expectEqual(.orderedSame, NSDecimalCompare(&zero, &result), "-1 * 0")
         expectEqual(0, result._isNegative, "-1 * 0")
-        
+
         expectEqual(.noError, NSDecimalMultiply(&result, &zero, &negativeOne, .plain), "0 * -1")
         expectEqual(.orderedSame, NSDecimalCompare(&zero, &result), "0 * -1")
         expectEqual(0, result._isNegative, "0 * -1")
@@ -449,7 +449,7 @@ class TestDecimal : TestDecimalSuper {
         var guess = Decimal()
         NSDecimalCopy(&guess, &three)
         expectEqual(three, guess)
-        
+
         var f = Decimal(_exponent: 0, _length: 2, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0x0000, 0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
         let before = f.description
         expectEqual(0, f._isCompact)
@@ -463,10 +463,10 @@ class TestDecimal : TestDecimalSuper {
         let repeatingNumerator = Decimal(16)
         let repeatingDenominator = Decimal(9)
         let repeating = repeatingNumerator / repeatingDenominator
-        
+
         let numerator = Decimal(1010)
         var result = numerator / repeating
-        
+
         var expected = Decimal()
         expected._exponent = -35;
         expected._length = 8;
@@ -481,7 +481,7 @@ class TestDecimal : TestDecimalSuper {
         expected._mantissa.5 = 55436;
         expected._mantissa.6 = 45186;
         expected._mantissa.7 = 10941;
-        
+
         expectEqual(.orderedSame, NSDecimalCompare(&expected, &result), "568.12500000000000000000000000000248554: \(expected.description) != \(result.description)");
     }
 
@@ -497,7 +497,7 @@ class TestDecimal : TestDecimalSuper {
             ( 5.5, 5.5, 1, Decimal.RoundingMode.up ),
             ( 6.5, 6.5, 1, Decimal.RoundingMode.plain ),
             ( 7.5, 7.5, 1, Decimal.RoundingMode.bankers ),
-            
+
             ( -1, -0.5, 0, Decimal.RoundingMode.down ),
             ( -2, -2.5, 0, Decimal.RoundingMode.up ),
             ( -3, -2.5, 0, Decimal.RoundingMode.bankers ),
@@ -558,25 +558,25 @@ class TestDecimal : TestDecimalSuper {
         multiplicand._isCompact = 0
         multiplicand._length = 1
         multiplicand._exponent = 1
-        
+
         var multiplier = multiplicand
         multiplier._exponent = 2
-        
+
         var expected = multiplicand
         expected._isNegative = 0
         expected._isCompact = 0
         expected._exponent = 3
         expected._length = 1
-        
+
         var result = Decimal()
-        
+
         for i in 1..<UInt8.max {
             multiplicand._mantissa.0 = UInt16(i)
-            
+
             for j in 1..<UInt8.max {
                 multiplier._mantissa.0 = UInt16(j)
                 expected._mantissa.0 = UInt16(i) * UInt16(j)
-                
+
                 expectEqual(.noError, NSDecimalMultiply(&result, &multiplicand, &multiplier, .plain), "\(i) * \(j)")
                 expectEqual(.orderedSame, NSDecimalCompare(&expected, &result), "\(expected._mantissa.0) == \(i) * \(j)");
             }
