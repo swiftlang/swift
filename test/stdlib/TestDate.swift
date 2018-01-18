@@ -26,27 +26,27 @@ class TestDate : TestDateSuper {
     func testDateComparison() {
         let d1 = Date()
         let d2 = d1 + 1
-        
+
         expectTrue(d2 > d1)
         expectTrue(d1 < d2)
-        
+
         let d3 = Date(timeIntervalSince1970: 12345)
         let d4 = Date(timeIntervalSince1970: 12345)
-        
+
         expectTrue(d3 == d4)
         expectTrue(d3 <= d4)
         expectTrue(d4 >= d3)
     }
-    
+
     func testDateMutation() {
         let d0 = Date()
         var d1 = Date()
         d1 = d1 + 1
         let d2 = Date(timeIntervalSinceNow: 10)
-        
+
         expectTrue(d2 > d1)
         expectTrue(d1 != d0)
-        
+
         let d3 = d1
         d1 += 10
         expectTrue(d1 > d3)
@@ -117,15 +117,15 @@ class TestDate : TestDateSuper {
         let sameSeconds = sameDate.timeIntervalSince(referenceDate)
         expectEqual(sameSeconds, 0.0)
     }
-    
+
     func testDateComponents() {
         // Make sure the optional init stuff works
         let dc = DateComponents()
-        
+
         expectNil(dc.year)
-        
+
         let dc2 = DateComponents(year: 1999)
-        
+
         expectNil(dc2.day)
         expectEqual(1999, dc2.year)
     }
