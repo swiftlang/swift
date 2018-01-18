@@ -887,7 +887,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printFoundUSR(Info, SourceBuf.get(), llvm::outs());
       break;
 
-    case SourceKitRequest::SyntaxTree:
+    case SourceKitRequest::SyntaxTree: {
+      // Print only the serialized syntax tree.
+      llvm::outs() << sourcekitd_variant_dictionary_get_string(
+        sourcekitd_response_get_value(Resp), KeySerializedSyntaxTree);
+      llvm::outs() << '\n';
+      break;
+    }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
@@ -905,12 +911,9 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         sourcekitd_request_dictionary_set_string(EdReq, KeySourceText,
                                            Opts.ReplaceText.getValue().c_str());
         bool EnableSyntaxMax = Opts.Request == SourceKitRequest::SyntaxMap;
-        bool EnableSyntaxTree = Opts.Request == SourceKitRequest::SyntaxTree;
         bool EnableSubStructure = Opts.Request == SourceKitRequest::Structure;
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableSyntaxMap,
                                                 EnableSyntaxMax);
-        sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableSyntaxTree,
-                                                EnableSyntaxTree);
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableStructure,
                                                 EnableSubStructure);
         sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
