@@ -672,7 +672,7 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, Level,
+  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, OI, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),

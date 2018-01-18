@@ -17,6 +17,7 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
+#include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -42,6 +43,7 @@ namespace swift {
 namespace driver {
   class Driver;
   class ToolChain;
+  class OutputInfo;
   class PerformJobsState;
 
 /// An enum providing different levels of output which should be produced
@@ -73,6 +75,11 @@ private:
   /// The ToolChain this Compilation was built with, that it may reuse to build
   /// subsequent BatchJobs.
   LLVM_ATTRIBUTE_UNUSED const ToolChain &TheToolChain;
+
+  /// The OutputInfo, which the Compilation stores a copy of upon
+  /// construction, and which it may use to build subsequent batch
+  /// jobs itself.
+  OutputInfo TheOutputInfo;
 
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
@@ -182,6 +189,7 @@ private:
 
 public:
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
+              OutputInfo const &OI,
               OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
@@ -194,6 +202,10 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
+
+  OutputInfo const &getOutputInfo() const {
+    return TheOutputInfo;
+  }
 
   UnwrappedArrayView<const Action> getActions() const {
     return llvm::makeArrayRef(Actions);
