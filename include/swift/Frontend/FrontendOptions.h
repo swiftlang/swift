@@ -30,7 +30,7 @@ namespace swift {
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
-  friend class FrontendArgsToOptionsConverter;
+  friend class ArgsToFrontendOptionsConverter;
 
 public:
   FrontendInputs Inputs;
