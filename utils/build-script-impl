@@ -1833,6 +1833,13 @@ function set_lldb_xcodebuild_options() {
             DEBUGSERVER_USE_FROM_SYSTEM="1"
         )
     fi
+    if [[ "${ENABLE_ASAN}" ]] ; then
+	lldb_xcodebuild_options=(
+	    "${lldb_xcodebuild_options[@]}"
+	    ENABLE_ADDRESS_SANITIZER="YES"
+	    -enableAddressSanitizer=YES
+	)
+    fi
 }
 
 #
