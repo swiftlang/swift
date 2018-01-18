@@ -128,6 +128,10 @@ void swift_abortRetainUnowned(const void *object);
 LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
 void swift_abortUnownedRetainOverflow();
 
+// Halt due to an overflow in incrementWeak().
+LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+void swift_abortWeakRetainOverflow();
+
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
 /// true, this functions prints only the name of the symbol and offset, ignores

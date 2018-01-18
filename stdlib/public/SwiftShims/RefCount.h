@@ -1231,7 +1231,9 @@ class RefCounts {
       newbits = oldbits;
       assert(newbits.getWeakRefCount() != 0);
       newbits.incrementWeakRefCount();
-      // FIXME: overflow check
+      
+      if (newbits.getWeakRefCount() < oldbits.getWeakRefCount())
+        swift_abortWeakRetainOverflow();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
