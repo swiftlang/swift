@@ -1,4 +1,5 @@
 add_swift_library(swiftFrontend STATIC
+  ArgsToFrontendInputsConverter.cpp
   CompilerInvocation.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
