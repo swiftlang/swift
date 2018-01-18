@@ -4393,7 +4393,7 @@ namespace {
         payloadTI.collectArchetypeMetadata(IGF, typeToMetadataVec, PayloadT);
       }
       if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-          typeToMetadataVec.size() != SZ) {
+          ((typeToMetadataVec.size() != SZ) || (TIK < Fixed))) {
         auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
         assert(metadata && "Expected Type Metadata Ref");
         typeToMetadataVec.insert(std::make_pair(canType, metadata));
