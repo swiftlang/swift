@@ -204,7 +204,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable {
 
 extension Date : Strideable {
  /// A type that represents the distance between two values of `Self`.
-  typealias Stride = TimeInterval
+  public typealias Stride = TimeInterval
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
@@ -213,7 +213,7 @@ extension Date : Strideable {
   ///
   /// - Complexity: O(1).
   /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
-  func distance(to other: Self) -> Stride {
+  public func distance(to other: Date) -> Stride {
   	return other.timeIntervalSinceReferenceDate - self.timeIntervalSinceReferenceDate
   }
 
@@ -223,7 +223,7 @@ extension Date : Strideable {
   ///
   /// - Complexity: O(1).
   /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
-  func advanced(by n: Stride) -> Self {
+  public func advanced(by timeInterval: Stride) -> Date {
   	return self + timeInterval
   }
 }
