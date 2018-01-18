@@ -1264,16 +1264,7 @@ class RefCounts {
   
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
-  uint32_t getWeakCount() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    if (bits.hasSideTable()) {
-      return bits.getSideTable()->getWeakCount();
-    } else {
-      // No weak refcount storage. Return only the weak increment held
-      // on behalf of the unowned count.
-      return bits.getUnownedRefCount() ? 1 : 0;
-    }
-  }
+  uint32_t getWeakCount() const;
 
 
   private:
@@ -1289,6 +1280,11 @@ static_assert(swift::IsTriviallyConstructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially initializable");
 static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially destructible");
+
+template <>
+inline uint32_t RefCounts<InlineRefCountBits>::getWeakCount() const;
+template <>
+inline uint32_t RefCounts<SideTableRefCountBits>::getWeakCount() const;
 
 class HeapObjectSideTableEntry {
   // FIXME: does object need to be atomic?
@@ -1534,6 +1530,23 @@ doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
                "a side table entry of its own");
 }
 
+template <>
+inline uint32_t RefCounts<InlineRefCountBits>::getWeakCount() const {
+  auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (bits.hasSideTable()) {
+    return bits.getSideTable()->getWeakCount();
+  } else {
+    // No weak refcount storage. Return only the weak increment held
+    // on behalf of the unowned count.
+    return bits.getUnownedRefCount() ? 1 : 0;
+  }
+}
+
+template <>
+inline uint32_t RefCounts<SideTableRefCountBits>::getWeakCount() const {
+  auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  return bits.getWeakRefCount();
+}
 
 template <> inline
 HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() {
