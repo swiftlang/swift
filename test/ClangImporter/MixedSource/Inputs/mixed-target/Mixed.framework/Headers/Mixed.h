@@ -4,6 +4,7 @@
 void doSomething(ForwardClass *arg);
 
 @interface Base
+- (instancetype)init;
 - (NSObject *)safeOverride:(ForwardClass *)arg;
 - (NSObject *)unsafeOverrideParam:(NSObject *)arg;
 - (ForwardClass *)unsafeOverrideReturn:(ForwardClass *)arg;

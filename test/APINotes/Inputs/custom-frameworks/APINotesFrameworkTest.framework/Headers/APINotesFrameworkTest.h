@@ -11,6 +11,7 @@ void normallyChangedOriginal(void) __attribute__((swift_name("normallyChanged()"
 
 __attribute__((objc_root_class))
 @interface A
+- (instancetype)init;
 @end
 
 __attribute__((objc_root_class))

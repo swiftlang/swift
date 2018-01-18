@@ -32,6 +32,7 @@ CCRefrigeratorRef CCRefrigeratorClone(CCRefrigeratorRef fridge);
 void CCRefrigeratorDestroy(__attribute__((cf_consumed)) CCRefrigeratorRef);
 
 @interface CCMagnetismModel
+- (instancetype)init; // TODO: does this make sense here?
 // Unattributed method: unmanaged result
 - (CCRefrigeratorRef) refrigerator;
 // Attribute: managed +0 result

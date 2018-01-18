@@ -22,6 +22,7 @@ enum BarForwardDeclaredEnum {
 };
 
 @interface PropertyUserInterface
+- (instancetype) init;
 - (int) field;
 - (int * _Nullable) field2;
 - (void) setField:(int)info;

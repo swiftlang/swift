@@ -1,6 +1,7 @@
 extern int ANTGlobalValue;
 
 @interface NewType
+- (instancetype)init;
 @end
 @interface OldType
 @end

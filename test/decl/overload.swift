@@ -66,7 +66,7 @@ typealias typealias_redecl2 = UInt // expected-error {{invalid redeclaration}}
 
 var mixed_redecl1: Int // expected-note {{previously declared here}}
 class mixed_redecl1 {} // expected-error {{invalid redeclaration}}
-class mixed_redecl1a : mixed_redecl1 {}
+class mixed_redecl1a : mixed_redecl1 {} // expected-error{{cannot inherit from class 'mixed_redecl1' because it has no designated initializers}} //TODO: should this be ambiguous, or some other warning? Or is this the right error?
 
 class mixed_redecl2 {} // expected-note {{previously declared here}}
 struct mixed_redecl2 {} // expected-error {{invalid redeclaration}}
@@ -97,7 +97,7 @@ func mixed_redecl7() {} // expected-error {{invalid redeclaration of 'mixed_rede
 
 func mixed_redecl8() {} // expected-note {{previously declared here}}
 class mixed_redecl8 {} // expected-error {{invalid redeclaration}}
-class mixed_redecl8a : mixed_redecl8 {}
+class mixed_redecl8a : mixed_redecl8 {} // expected-error{{cannot inherit from class 'mixed_redecl8' because it has no designated initializers}} //TODO: should this be ambiguous, or some other warning? Or is this the right error?
 
 class mixed_redecl9 {} // expected-note {{previously declared here}}
 func mixed_redecl9() {} // expected-error {{invalid redeclaration}}

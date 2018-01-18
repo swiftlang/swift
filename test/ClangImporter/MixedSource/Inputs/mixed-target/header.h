@@ -13,6 +13,7 @@ void doSomething(ForwardClass *arg);
 void doSomethingProto(id <ForwardProto> arg);
 
 @interface Base
+- (instancetype)init;
 - (NSObject *)safeOverride:(ForwardClass *)arg;
 - (NSObject *)unsafeOverrideParam:(NSObject *)arg;
 - (ForwardClass *)unsafeOverrideReturn:(ForwardClass *)arg;

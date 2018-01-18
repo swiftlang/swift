@@ -870,6 +870,7 @@ typedef struct NonNilableReferences {
 @end
 
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
+- (instancetype)init;
 -(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.51)));
 @end
 

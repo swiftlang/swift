@@ -39,7 +39,7 @@ func testSubclassInitializers() {
   _ = DesignatedInitDisappearsSub(value: 0) // expected-error {{argument passed to call that takes no arguments}}
   _ = DesignatedInitDisappearsSub(convenience: 0) // expected-error {{argument passed to call that takes no arguments}}
 
-  class OnlyDesignatedInitDisappearsSub : D2_OnlyDesignatedInitDisappears {}
+  class OnlyDesignatedInitDisappearsSub : D2_OnlyDesignatedInitDisappears {} // expected-error{{cannot inherit from class 'D2_OnlyDesignatedInitDisappears' because it has no designated initializers}}
   _ = OnlyDesignatedInitDisappearsSub(value: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
   _ = OnlyDesignatedInitDisappearsSub(convenience: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
 
