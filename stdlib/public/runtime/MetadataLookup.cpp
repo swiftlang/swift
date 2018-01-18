@@ -549,6 +549,31 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   swift_runtime_unreachable("associated type names don't line up");
 }
 
+class TypeOwnership {
+  enum : uint8_t {
+    Weak = 1 << 0,
+    Unowned = 1 << 1,
+    Unmanaged = 1 << 2,
+  };
+
+  uint8_t Data;
+
+  constexpr TypeOwnership(uint8_t Data) : Data(Data) {}
+
+public:
+  constexpr TypeOwnership() : Data(0) {}
+
+  bool isWeak() const { return Data & Weak; }
+  bool isUnowned() const { return Data & Unowned; }
+  bool isUnmanaged() const { return Data & Unmanaged; }
+
+  void setWeak() { Data |= Weak; }
+
+  void setUnowned() { Data |= Unowned; }
+
+  void setUnmanaged() { Data |= Unmanaged; }
+};
+
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
@@ -916,7 +941,7 @@ swift::_getTypeByMangledName(StringRef typeName,
     NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
                                                   typeName.substr(0, dotPos));
     NodePointer nameNode = demangler.createNode(Node::Kind::Identifier,
-                                            typeName.substr(dotPos + 1));
+                                                typeName.substr(dotPos + 1));
     classNode->addChild(moduleNode, demangler);
     classNode->addChild(nameNode, demangler);
 
@@ -970,7 +995,7 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
         flatIndex += parametersPerLevel[i];
 
       return flatSubstitutions[flatIndex];
-    });
+    }).first;
 }
 
 void swift::swift_getFieldAt(
@@ -988,22 +1013,32 @@ void swift::swift_getFieldAt(
     auto name = field.getFieldName(0);
     auto type = field.getMangledTypeName(0);
 
-    auto &genericParams = baseDesc->GenericParams;
-    auto numberOfLevels = genericParams.NestingDepth;
-    size_t paramsPerLevel[numberOfLevels];
+    const Metadata *metadata;
+    TypeOwnership ownership;
 
-    for (unsigned i = 0; i < numberOfLevels; ++i) {
-      auto numParams = baseDesc->getGenericContext(i).NumPrimaryParams;
-      paramsPerLevel[i] = numParams;
-    }
+    const auto &genericParams = baseDesc->GenericParams;
+    std::tie(metadata, ownership) = _swift_getTypeByMangledName(
+        type, [&](unsigned depth, unsigned index) -> const Metadata * {
+          if (depth >= genericParams.NestingDepth)
+            return nullptr;
 
-    auto *typeMetadata =
-        swift_getTypeByMangledName(type.data(), type.length(), numberOfLevels,
-                                   paramsPerLevel, base->getGenericArgs());
+          auto &context = baseDesc->getGenericContext(depth);
+          if (index >= context.NumPrimaryParams)
+            return nullptr;
+
+          unsigned flatIndex = index;
+          for (unsigned i = 0; i < depth; ++i)
+            flatIndex += baseDesc->getGenericContext(i).NumPrimaryParams;
+
+          // FIXME: Once `getGenericContext(unsigned)` is ready
+          // switch to that instead of using flatten list of substitutions.
+          return base->getGenericArgs()[flatIndex];
+        });
 
     callback(name, FieldType()
-                       .withType(typeMetadata)
-                       .withIndirect(field.isIndirectCase()));
+                       .withType(metadata)
+                       .withIndirect(field.isIndirectCase())
+                       .withWeak(ownership.isWeak()));
 
   };
 
