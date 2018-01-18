@@ -81,53 +81,38 @@ llvm::Optional<Syntax> Syntax::getParent() const {
   };
 }
 
+Syntax Syntax::getRoot() const {
+  return { Root, Root.get() };
+}
+
 size_t Syntax::getNumChildren() const {
-  size_t NonTokenChildren = 0;
-  for (auto Child : getRaw()->getLayout()) {
-    if (!Child->isToken()) {
-      ++NonTokenChildren;
-    }
-  }
-  return NonTokenChildren;
+  return Data->getNumChildren();
 }
 
 Syntax Syntax::getChild(const size_t N) const {
-  // The actual index of the Nth non-token child.
-  size_t ActualIndex = 0;
-  // The number of non-token children we've seen.
-  size_t NumNonTokenSeen = 0;
-  for (auto Child : getRaw()->getLayout()) {
-    // If we see a child that's not a token, count it.
-    if (!Child->isToken()) {
-      ++NumNonTokenSeen;
-    }
-    // If the number of children we've seen indexes the same (count - 1) as
-    // the number we're looking for, then we're done.
-    if (NumNonTokenSeen == N + 1) { break; }
-
-    // Otherwise increment the actual index and keep searching.
-    ++ActualIndex;
-  }
-  return Syntax { Root, Data->getChild(ActualIndex).get() };
+  return Syntax { Root, Data->getChild(N).get() };
 }
 
-AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
+AbsolutePosition Syntax::getAbsolutePosition() const {
+  assert(getRoot().is<SourceFileSyntax>() &&
+         "Absolute position can only be calculated for nodes which has "
+         "SourceFile root");
   AbsolutePosition Pos;
 
   /// This visitor collects all of the nodes before this node to calculate its
   /// offset from the begenning of the file.
   class Visitor: public SyntaxVisitor {
     AbsolutePosition &Pos;
-    RawSyntax *Target;
+    const SyntaxData *Target;
     bool Found = false;
 
   public:
-    Visitor(AbsolutePosition &Pos, RawSyntax *Target): Pos(Pos),
-                                                       Target(Target) {}
+    Visitor(AbsolutePosition &Pos, const SyntaxData *Target)
+        : Pos(Pos), Target(Target) {}
     ~Visitor() { assert(Found); }
     void visitPre(Syntax Node) override {
       // Check if this node is the target;
-      Found |= Node.getRaw().get() == Target;
+      Found |= Node.getDataPointer() == Target;
     }
     void visit(TokenSyntax Node) override {
       // Ignore missing node and ignore the nodes after this node.
@@ -136,7 +121,7 @@ AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
       // Collect all the offsets.
       Node.getRaw()->accumulateAbsolutePosition(Pos);
     }
-  } Calculator(Pos, getRaw().get());
+  } Calculator(Pos, getDataPointer());
 
   /// This visitor visit the first token node of this node to accumulate its
   /// leading trivia. Therefore, the calculated absolute location will point
@@ -157,7 +142,7 @@ AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
   } FTFinder(Pos);
 
   // Visit the root to get all the nodes before this node.
-  Root.accept(Calculator);
+  getRoot().accept(Calculator);
 
   // Visit this node to accumulate the leading trivia of its first token.
   const_cast<Syntax*>(this)->accept(FTFinder);
