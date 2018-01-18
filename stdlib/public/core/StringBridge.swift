@@ -369,10 +369,8 @@ extension String {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 public class _SwiftNativeNSString {
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init() {}
-  @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 }
 
