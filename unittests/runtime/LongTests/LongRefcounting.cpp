@@ -330,6 +330,112 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
 }
 
 
+/////////////////////////////////////////////////
+// Max weak retain count and overflow checking //
+/////////////////////////////////////////////////
+
+static HeapObjectSideTableEntry *weakRetainALot(TestObject *object, uint64_t count) {
+  if (count == 0) return nil;
+  
+  auto side = object->refCounts.formWeakReference();
+  for (uint64_t i = 1; i < count; i++) {
+    side = side->incrementWeak();
+    EXPECT_ALLOCATED(object);
+  }
+  return side;
+}
+
+template <bool atomic>
+static void weakReleaseALot(HeapObjectSideTableEntry *side, uint64_t count) {
+  for (uint64_t i = 0; i < count; i++) {
+    if (atomic) side->decrementWeak();
+    else side->decrementWeakNonAtomic();
+  }
+}
+
+// Maximum legal weak retain count. 32 bits with no implicit +1.
+const uint64_t maxWRC = (1ULL << 32) - 1;
+
+TEST(LongRefcountingTest, weak_retain_max) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = true;
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // RC is 1. WRC is 1.
+  // Weak-retain to maxWRC.
+  // Release and verify deallocated object and live side table.
+  // Weak-release back to 1, then weak-release and verify deallocated.
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(object->refCounts.getWeakCount(), 1u);
+  auto side = weakRetainALot(object, maxWRC - 1);
+  EXPECT_EQ(side->getWeakCount(), maxWRC);
+  
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  EXPECT_ALLOCATED(side);
+  swift_release(object);
+  EXPECT_EQ(1u, deinited);
+  EXPECT_UNALLOCATED(object);
+  EXPECT_ALLOCATED(side);
+
+  weakReleaseALot<true>(side, maxWRC - 2);
+  EXPECT_EQ(side->getWeakCount(), 1u);
+
+  EXPECT_ALLOCATED(side);
+  side->decrementWeak();
+  EXPECT_UNALLOCATED(side);
+}
+
+TEST(LongRefcountingTest, weak_retain_overflow_DeathTest) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = true;
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // URC is 1. Retain to maxURC, then retain again and verify overflow error.
+  weakRetainALot(object, maxWRC - 1);
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  ASSERT_DEATH(weakRetainALot(object, 1),
+               "Object's weak reference was retained too many times");
+}
+
+TEST(LongRefcountingTest, nonatomic_weak_retain_max) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = true;
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // RC is 1. WRC is 1.
+  // Weak-retain to maxWRC.
+  // Release and verify deallocated object and live side table.
+  // Weak-release back to 1, then weak-release and verify deallocated.
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(object->refCounts.getWeakCount(), 1u);
+  auto side = weakRetainALot(object, maxWRC - 1);
+  EXPECT_EQ(side->getWeakCount(), maxWRC);
+  
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  EXPECT_ALLOCATED(side);
+  swift_release(object);
+  EXPECT_EQ(1u, deinited);
+  EXPECT_UNALLOCATED(object);
+  EXPECT_ALLOCATED(side);
+
+  weakReleaseALot<false>(side, maxWRC - 2);
+  EXPECT_EQ(side->getWeakCount(), 1u);
+
+  EXPECT_ALLOCATED(side);
+  side->decrementWeak();
+  EXPECT_UNALLOCATED(side);
+}
+
+
 //////////////////////
 // Object lifecycle //
 //////////////////////
