@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 
 #include <string>
@@ -24,47 +25,6 @@ namespace llvm {
 }
 
 namespace swift {
-
-enum class InputFileKind {
-  IFK_None,
-  IFK_Swift,
-  IFK_Swift_Library,
-  IFK_Swift_REPL,
-  IFK_SIL,
-  IFK_LLVM_IR
-};
-
-// Inputs may include buffers that override contents, and eventually should
-// always include a buffer.
-class InputFile {
-  std::string Filename;
-  bool IsPrimary;
-  /// Null if the contents are not overridden.
-  llvm::MemoryBuffer *Buffer;
-
-public:
-  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
-  /// string.
-  InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(!name.empty());
-  }
-
-  bool isPrimary() const { return IsPrimary; }
-  llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const {
-    assert(!Filename.empty());
-    return Filename;
-  }
-
-  /// Return Swift-standard file name from a buffer name set by
-  /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
-  static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-      StringRef filename) {
-    return filename.equals("<stdin>") ? "-" : filename;
-  }
-};
 
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
