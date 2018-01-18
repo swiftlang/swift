@@ -1793,14 +1793,16 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
-  std::string SyntaxContent;
-  {
+
+  if (Consumer.syntaxTreeEnabled()) {
+    std::string SyntaxContent;
     llvm::raw_string_ostream OS(SyntaxContent);
     json::Output JsonOut(OS);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
     JsonOut << Root;
+    Consumer.handleSerializedSyntaxTree(OS.str());
   }
-  Consumer.handleSerializedSyntaxTree(SyntaxContent);
+
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
   SwiftEditorSyntaxWalker SyntaxWalker(NewMap,

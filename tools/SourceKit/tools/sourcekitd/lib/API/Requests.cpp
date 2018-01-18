@@ -2058,6 +2058,7 @@ public:
 
   bool handleSourceText(StringRef Text) override;
   bool handleSerializedSyntaxTree(StringRef Text) override;
+  virtual bool syntaxTreeEnabled() override;
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
@@ -2396,6 +2397,10 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
 bool SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
   return true;
+}
+
+bool SKEditorConsumer::syntaxTreeEnabled() {
+  return EnableSyntaxTree;
 }
 
 bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
