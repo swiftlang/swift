@@ -16,7 +16,6 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
@@ -32,8 +31,7 @@ namespace {
 static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
                                        ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  RawSyntax::LayoutList Layout(Parts);
-  return RawSyntax::make(Kind, Layout, SourcePresence::Present);
+  return RawSyntax::make(Kind, Parts, SourcePresence::Present);
 }
 
 RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
@@ -80,9 +78,9 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  addRawSyntax(RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
-                                    SourcePresence::Present, LeadingTrivia,
-                                    TrailingTrivia));
+  addRawSyntax(RawSyntax::make(Tok.getKind(), Tok.getText(),
+                               SourcePresence::Present, LeadingTrivia.Pieces,
+                               TrailingTrivia.Pieces));
 }
 
 /// Add Syntax to the parts.
@@ -258,14 +256,13 @@ void finalizeSourceFile(RootContextData &RootData,
     }
   }
 
-  if (!Parts.empty() && Parts.back()->isToken() &&
-      cast<RawTokenSyntax>(Parts.back())->is(tok::eof)) {
+  if (!Parts.empty() && Parts.back()->isToken(tok::eof)) {
     EOFToken.emplace(make<TokenSyntax>(Parts.back()));
     Parts = Parts.drop_back();
   }
 
   for (auto RawNode : Parts) {
-    if (RawNode->Kind != SyntaxKind::StmtList)
+    if (RawNode->getKind() != SyntaxKind::StmtList)
       // FIXME: Skip for now.
       continue;
     AllTopLevel.push_back(

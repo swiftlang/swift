@@ -22,7 +22,7 @@ RC<RawSyntax> Syntax::getRaw() const {
 }
 
 SyntaxKind Syntax::getKind() const {
-  return getRaw()->Kind;
+  return getRaw()->getKind();
 }
 
 void Syntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
@@ -83,7 +83,7 @@ llvm::Optional<Syntax> Syntax::getParent() const {
 
 size_t Syntax::getNumChildren() const {
   size_t NonTokenChildren = 0;
-  for (auto Child : getRaw()->Layout) {
+  for (auto Child : getRaw()->getLayout()) {
     if (!Child->isToken()) {
       ++NonTokenChildren;
     }
@@ -96,7 +96,7 @@ Syntax Syntax::getChild(const size_t N) const {
   size_t ActualIndex = 0;
   // The number of non-token children we've seen.
   size_t NumNonTokenSeen = 0;
-  for (auto Child : getRaw()->Layout) {
+  for (auto Child : getRaw()->getLayout()) {
     // If we see a child that's not a token, count it.
     if (!Child->isToken()) {
       ++NumNonTokenSeen;
@@ -111,11 +111,6 @@ Syntax Syntax::getChild(const size_t N) const {
   return Syntax { Root, Data->getChild(ActualIndex).get() };
 }
 
-static void accumulateTrivia(AbsolutePosition &Pos, const Trivia &Trv) {
-  for (auto Piece: Trv) {
-    Piece.accumulateAbsolutePosition(Pos);
-  }
-}
 AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
   AbsolutePosition Pos;
 
@@ -139,10 +134,7 @@ AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
       if (Found || Node.isMissing())
         return;
       // Collect all the offsets.
-      auto Tok = llvm::cast<RawTokenSyntax>(Node.getRaw().get());
-      accumulateTrivia(Pos, Tok->LeadingTrivia);
-      Pos.addText(Tok->getText());
-      accumulateTrivia(Pos, Tok->TrailingTrivia);
+      Node.getRaw()->accumulateAbsolutePosition(Pos);
     }
   } Calculator(Pos, getRaw().get());
 
@@ -159,8 +151,8 @@ AbsolutePosition Syntax::getAbsolutePosition(SourceFileSyntax Root) const {
       if (Found || Node.isMissing())
         return;
       Found = true;
-      auto Tok = llvm::cast<RawTokenSyntax>(Node.getRaw().get());
-      accumulateTrivia(Pos, Tok->LeadingTrivia);
+      for (auto &Leader : Node.getRaw()->getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
     }
   } FTFinder(Pos);
 

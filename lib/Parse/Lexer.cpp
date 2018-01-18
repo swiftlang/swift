@@ -20,8 +20,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
-#include "swift/Syntax/RawTokenSyntax.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"

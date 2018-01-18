@@ -25,8 +25,7 @@ class Token;
 class DiagnosticEngine;
 
 namespace syntax {
-struct RawTokenSyntax;
-struct RawSyntax;
+class RawSyntax;
 enum class SyntaxKind;
 
 enum class SyntaxContextKind {
@@ -201,7 +200,7 @@ public:
 
   TokenSyntax popToken() {
     assert(Storage.size() > Offset);
-    assert(Storage.back()->Kind == SyntaxKind::Token);
+    assert(Storage.back()->getKind() == SyntaxKind::Token);
     auto Node = make<TokenSyntax>(std::move(Storage.back()));
     Storage.pop_back();
     return Node;
