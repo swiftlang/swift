@@ -3,8 +3,9 @@
 import TensorFlow
 
 public func testTensor() {
-  var x = Tensor<Float>([1.0, 2.0, 3.0])  // expected-warning {{value implicitly copied to accelerator, use .toDevice() to make transfer explicit}}
-  x += x
+  var x = Tensor<Float>([1.0, 2.0, 3.0])  // expected-warning {{'Tensor<Float>' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  x += x  // expected-note {{value used here}}
+
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
   // GraphGen doesn't support sends yet: expected-error @-1 {{internal error generating TensorFlow graph}}
 
@@ -43,7 +44,8 @@ public func testTensor() {
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 public func testScalar(f: Float) {
-  var x = Tensor<Float>(f) +    // expected-warning {{value implicitly copied to accelerator}}
+  var x = Tensor<Float>(f)     // expected-warning {{'Tensor<Float>' implicitly copied to the accelerator}}
+          + // expected-note {{value used here}}
           Tensor<Float>(1.0)
   x += x
   print(x)
@@ -124,11 +126,11 @@ public func testExitBranch(i : Int) {
 
 
 // This program results in a boolean parameter being passed in.
-public func test_bool_param(cond: Bool) {
+public func test_bool_param(cond: Bool) {// expected-warning {{'cond' implicitly copied to the accelerator}}
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
-  if cond {  // expected-warning {{value implicitly copied to accelerator}}
+  if cond {  // expected-note {{value used here}}
     a -= b
   }
   a += b
@@ -155,13 +157,13 @@ public func test_bool_param(cond: Bool) {
 // CHECK-NEXT:  dealloc_stack
 
 
-public func test_bool_param2(cond: Bool) { 
+public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitly copied to the accelerator}}
   var a = Tensor1D<Float>(1,2,3).toDevice()
   let b = Tensor1D<Float>(1,2,4).toDevice()
 
   a += b
 
-  if cond {  // expected-warning {{value implicitly copied to accelerator}}
+  if cond { // expected-note {{value used here}}
     a -= b
   }
   a += b
@@ -189,17 +191,17 @@ public func test_bool_param2(cond: Bool) {
 
 
 // expected-error@+1 {{TFLowerGraph cannot handle loops yet}}
-public func test_while1(maxCount: Int,
+public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor1D<Float>, arg2: Tensor1D<Float>) {
   var a = arg1.toDevice()
   let b = arg2.toDevice()
 
   a += b
 
-  var count = 0  // "0": expected-warning {{value implicitly copied to accelerator}}
-  while count < maxCount {  // "maxCount": expected-warning {{value implicitly copied to accelerator}}
+  var count = 0  // expected-warning {{'Int' implicitly copied to the accelerator}}
+  while count < maxCount { // expected-note 2 {{value used here}}
     a -= b
-    count += 1    // "1": expected-warning {{value implicitly copied to accelerator}}
+    count += 1    // expected-warning {{'Int' implicitly copied to the accelerator}}
   }
   a += b
   print(a.toHost())

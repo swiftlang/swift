@@ -25,6 +25,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
@@ -587,28 +588,27 @@ public:
   };
   PartitionedTensorProgram partition();
 
-  void diagnoseCopyInIfNotSend(SILValue value);
+  void diagnoseCopyInIfNotSend(SILValue value, SILInstruction *user);
   bool diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user);
 
 private:
   // Marking.
   void markBlock(SILBasicBlock *BB);
   void markInstruction(SILInstruction &inst, Marking mark);
-  void markArgument(SILArgument *arg);
-  void markValue(SILValue value);
+  void markArgument(SILArgument *arg, SILInstruction *user);
+  void markValue(SILValue value, SILInstruction *user);
 
   // Rewriting the host function.
   PartitionedTensorProgram insertTensorProgramStartEndTerminate();
 };
 } // end anonymous namespace
 
-
-
 /// Check to see if the specified value being copied into a partition for the
 /// accelerator is our designated "send" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
-void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
+void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
+                                                  SILInstruction *user) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
@@ -618,13 +618,50 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value) {
         return;
       }
 
+  // If we have a struct extract from a type like Int or Float, look through it
+  // to the Int or Float value itself, which will have better source location
+  // information.  The struct-extract came from the implementation of some
+  // operator in the standard library like "+", and we want the source of the
+  // parameter.
+  if (auto *sei = dyn_cast<StructExtractInst>((SILNode*)value))
+    if (sei->getType().getSwiftRValueType()->is<BuiltinType>())
+      value = sei->getOperand();
+
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value.getLoc(), value);
 
+  // Try to make a useful description of the value being copied to help
+  // disambiguate.
+  std::string description = "value";
+  if (auto expr = loc.getAsASTNode<Expr>()) {
+    if (auto *ae = dyn_cast<ApplyExpr>(expr->getSemanticsProvidingExpr())) {
+      if (isa<ConstructorRefCallExpr>(ae->getFn()))
+        description = "'" + expr->getType()->getString() + "'";
+      else if (isa<DotSyntaxCallExpr>(ae->getFn()))
+        description = "method result";
+    }
+  } else if (auto decl = loc.getAsASTNode<Decl>()) {
+    if (auto pd = dyn_cast<ParamDecl>(decl))
+      description = "'" + pd->getName().str().str() + "'";
+  }
+
   // Emit the warning.
   diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-           diag::tf_value_implicitly_copied_to_accel)
+           diag::tf_value_implicitly_copied_to_accel, description)
     .highlight(loc.getSourceRange());
+
+  // If the use is on a different line, emit a note showing where it is.
+  auto userLoc = getUserSourceLocation(user->getLoc(), user);
+  auto &SM = fn.getModule().getASTContext().SourceMgr;
+
+  if (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
+        SM.findBufferContainingLoc(userLoc.getSourceLoc()) ||
+      SM.getLineNumber(loc.getSourceLoc()) !=
+        SM.getLineNumber(userLoc.getSourceLoc())) {
+    diagnose(fn.getModule().getASTContext(), userLoc.getSourceLoc(),
+             diag::tf_value_implicitly_copied_to_host_computed_used_here)
+    .highlight(userLoc.getSourceRange());
+  }
 }
 
 bool TFFunctionPartition::
@@ -824,7 +861,7 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     // computation over to the accelerator, by copying the value over, or by
     // passing as an argument to the tensor computation.
     for (auto &op : operandRange)
-      markValue(op.get());
+      markValue(op.get(), &inst);
     return;
   }
 
@@ -839,7 +876,7 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     switch (operandInfo) {
     case OpCommand::Tensor:
       // Tensor operands are recursively marked.
-      markValue(inst.getOperand(nextOperand++));
+      markValue(inst.getOperand(nextOperand++), &inst);
       break;
     case OpCommand::AddDType:
     case OpCommand::Constant:
@@ -850,7 +887,7 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   }
 }
 
-void TFFunctionPartition::markArgument(SILArgument *arg) {
+void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // If we've already marked this argument, there is nothing more to do.
   if (markedBBArguments.count(arg))
     return;
@@ -863,7 +900,7 @@ void TFFunctionPartition::markArgument(SILArgument *arg) {
   if (!DI.properlyDominates(tensorStartPoint->getParent(), arg->getParent())) {
     markedBBArguments.insert({arg, Marking::Argument});
     tensorFnArguments.push_back(SILValue(arg));
-    diagnoseCopyInIfNotSend(arg);
+    diagnoseCopyInIfNotSend(arg, user);
     return;
   }
 
@@ -895,7 +932,7 @@ void TFFunctionPartition::markArgument(SILArgument *arg) {
     SmallVector<SILValue, 4> incomingValues;
     arg->getIncomingValues(incomingValues);
     for (auto v : incomingValues)
-      markValue(v);
+      markValue(v, user);
   }
 }
 
@@ -943,14 +980,14 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
 /// Indicate that the specified value must be available on the accelerator.
 /// This can be done by moving the computation over, or by inserting a data
 /// transfer.
-void TFFunctionPartition::markValue(SILValue value) {
+void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // We can safely ignore SILUndef, since SILCloner will just make another
   // one for us.
   if (isa<SILUndef>(value))
     return;
 
   if (auto *arg = dyn_cast<SILArgument>(value))
-    return markArgument(arg);
+    return markArgument(arg, user);
 
   auto *inst = cast<SILInstruction>((SILNode*)value);
   if (markedInstructions.count(inst))
@@ -969,7 +1006,7 @@ void TFFunctionPartition::markValue(SILValue value) {
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
-    diagnoseCopyInIfNotSend(value);
+    diagnoseCopyInIfNotSend(value, user);
     return;
   }
 
@@ -981,7 +1018,7 @@ void TFFunctionPartition::markValue(SILValue value) {
 
   // Otherwise, insert a send from the host to the accelerator.
   valuesToSend.insert(value);
-  diagnoseCopyInIfNotSend(value);
+  diagnoseCopyInIfNotSend(value, user);
 
   // Instead of cloning over this instruction, we'll add a send after it and
   // insert a receive in the accelerator code.
