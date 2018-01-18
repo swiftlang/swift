@@ -1692,7 +1692,11 @@ public:
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams) const;
+  ///
+  /// \param lookThroughAlias Indicates if potential typealias this type
+  /// represents should be unwrapped when returning result.
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams,
+                        bool lookThroughAlias = false) const;
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.

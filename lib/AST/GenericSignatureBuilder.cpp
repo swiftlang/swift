@@ -385,12 +385,13 @@ namespace llvm {
 namespace {
   /// Retrieve the type described by the given unresolved tyoe.
   Type getUnresolvedType(GSBUnresolvedType type,
-                         ArrayRef<GenericTypeParamType *> genericParams) {
+                         ArrayRef<GenericTypeParamType *> genericParams,
+                         bool lookThroughAlias = false) {
     if (auto concrete = type.dyn_cast<Type>())
       return concrete;
 
     if (auto pa = type.dyn_cast<PotentialArchetype *>())
-      return pa->getDependentType(genericParams);
+      return pa->getDependentType(genericParams, lookThroughAlias);
 
     return Type();
   }
@@ -2750,7 +2751,8 @@ void ArchetypeType::resolveNestedType(
 }
 
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
-                        ArrayRef<GenericTypeParamType *> genericParams) const {
+    ArrayRef<GenericTypeParamType *> genericParams,
+    bool lookThroughAlias) const {
   if (auto parent = getParent()) {
     Type parentType = parent->getDependentType(genericParams);
     if (parentType->hasError())
@@ -2759,6 +2761,36 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType);
+
+    // FIXME: This is a narrow fix to support typealiases as
+    // left-hand side of the generic requirement, better fix
+    // would be to never form concrete potential archetypes.
+    if (lookThroughAlias) {
+      auto *concreteDecl = getResolvedType();
+      if (!concreteDecl->hasInterfaceType())
+        return ErrorType::get(getASTContext());
+
+      auto *protocol = concreteDecl->getDeclContext()
+                           ->getAsProtocolOrProtocolExtensionContext();
+
+      auto type = concreteDecl->getDeclaredInterfaceType();
+      if (protocol) {
+        // Substitute in the type of the current PotentialArchetype in
+        // place of 'Self' here.
+        auto subMap = SubstitutionMap::getProtocolSubstitutions(
+            protocol, parentType, ProtocolConformanceRef(protocol));
+        type = type.subst(subMap, SubstFlags::UseErrorType);
+        if (!type)
+          type = ErrorType::get(protocol->getASTContext());
+        return type;
+      }
+
+      if (auto superclass = getEquivalenceClassIfPresent()->superclass) {
+        auto superclassDecl = superclass->getClassOrBoundGenericClass();
+        return superclass->getTypeOfMember(superclassDecl->getParentModule(),
+                                           concreteDecl, type);
+      }
+    }
 
     return DependentMemberType::get(parentType, getNestedName());
   }
@@ -6115,7 +6147,7 @@ void GenericSignatureBuilder::enumerateRequirements(
     // Dig out the subject type and its corresponding component.
     auto equivClass = subject.first;
     auto &component = equivClass->derivedSameTypeComponents[subject.second];
-    Type subjectType = getUnresolvedType(component.anchor, genericParams);
+    Type subjectType = getUnresolvedType(component.anchor, genericParams, true);
 
     // If this equivalence class is bound to a concrete type, equate the
     // anchor with a concrete type.
