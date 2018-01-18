@@ -753,7 +753,6 @@ class BuildScriptInvocation(object):
                 "--fuchsia-icu-i18n-include", args.fuchsia_icu_i18n_include,
                 "--fuchsia-toolchain-path", args.fuchsia_toolchain_path,
             ]
-
             if args.fuchsia_x86_64_libs is not None:
                 impl_args += [
                     "--fuchsia-x86-64-libs", args.fuchsia_x86_64_libs,
