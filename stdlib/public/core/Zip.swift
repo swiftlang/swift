@@ -152,16 +152,13 @@ extension Zip2: Sequence {
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     // implementation of this function is problematic, because it needs two
-    // passes over right to operate independendly on left and right using the
-    // single predicate that takes both...    
+    // passes over the elements...    
     var i = 0
-    var rightIterator = right.makeIterator()
-    let leftSubSequence = try left.drop { l in
-      guard let r = rightIterator.next() else { return false }
-      i += 1
-      return try predicate(l,r)
+    for (l,r) in self { 
+      if try predicate(l,r) { i += 1 }
+      else { break }
     }
-    return zip(leftSubSequence, right.dropFirst(i))
+    return zip(left.dropFirst(i), right.dropFirst(i))
   }
   
   @_inlineable // FIXME(sil-serialize-all)
@@ -175,13 +172,11 @@ extension Zip2: Sequence {
   ) rethrows -> SubSequence {
     // similar to drop(while:), this currently takes two passes over right
     var i = 0
-    var rightIterator = right.makeIterator()
-    let leftSubSequence = try left.prefix { l in
-      guard let r = rightIterator.next() else { return false }
-      i += 1
-      return try predicate(l,r)
+    for (l,r) in self { 
+      if try predicate(l,r) { i += 1 }
+      else { break }
     }
-    return zip(leftSubSequence, right.prefix(i))
+    return zip(left.prefix(i), right.prefix(i))
   }
   
   @_inlineable // FIXME(sil-serialize-all)
