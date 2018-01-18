@@ -22,20 +22,20 @@ protocol ABO : A, B, O { func abo() }
 // -- size 72
 // -- flags: 1 = Swift | 2 = Not Class-Constrained | 4 = Needs Witness Table
 // CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 1, i16 1,
+// CHECK-SAME:   i16 2, i16 2,
 // CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[A_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1AMp", i32 0, i32 12) to i64)) to i32)
 // CHECK-SAME: }
 
 // CHECK: @"$S17protocol_metadata1BMp" = hidden constant %swift.protocol {
 // CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 1, i16 1,
+// CHECK-SAME:   i16 2, i16 2,
 // CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[B_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1BMp", i32 0, i32 12) to i64)) to i32)
 // CHECK: }
 
 // CHECK: @"$S17protocol_metadata1CMp" = hidden constant %swift.protocol {
 // -- flags: 1 = Swift | 4 = Needs Witness Table
 // CHECK-SAME:   i32 72, i32 5,
-// CHECK-SAME:   i16 1, i16 1,
+// CHECK-SAME:   i16 2, i16 2,
 // CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[C_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1CMp", i32 0, i32 12) to i64)) to i32)
 // CHECK-SAME: }
 
@@ -71,7 +71,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: @"$S17protocol_metadata2ABMp" = hidden constant %swift.protocol { 
 // CHECK-SAME:   [[AB_INHERITED]]
 // CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 3, i16 3,
+// CHECK-SAME:   i16 4, i16 4,
 // CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([3 x %swift.protocol_requirement]* [[AB_REQTS]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata2ABMp", i32 0, i32 12) to i64)) to i32)
 // CHECK-SAME: }
 

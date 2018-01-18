@@ -746,6 +746,10 @@ namespace {
     SmallVector<WitnessTableEntry, 16> Entries;
 
   public:
+    void addProtocolConformanceDescriptor() {
+      Entries.push_back(WitnessTableEntry::forProtocolConformanceDescriptor());
+    }
+
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
       Entries.push_back(WitnessTableEntry::forOutOfLineBase(baseProto));
@@ -1223,6 +1227,18 @@ public:
 
     /// Create the access function.
     void buildAccessFunction(llvm::Constant *wtable);
+
+    /// Add reference to the protocol conformance descriptor that generated
+    /// this table.
+    void addProtocolConformanceDescriptor() {
+      if (Conformance.isBehaviorConformance()) {
+        Table.addNullPointer(IGM.Int8PtrTy);
+      } else {
+        auto descriptor =
+          IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
+        Table.addBitCast(descriptor, IGM.Int8PtrTy);
+      }
+    }
 
     /// A base protocol is witnessed by a pointer to the conformance
     /// of this type to that protocol.

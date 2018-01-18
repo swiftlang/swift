@@ -42,7 +42,7 @@ namespace irgen {
 class WitnessTableEntry {
 public:
   llvm::PointerUnion<Decl *, TypeBase *> MemberOrAssociatedType;
-  ProtocolDecl *Protocol;
+  ProtocolDecl *Protocol = nullptr;
 
   WitnessTableEntry(llvm::PointerUnion<Decl *, TypeBase *> member,
                     ProtocolDecl *protocol)
@@ -51,13 +51,25 @@ public:
 public:
   WitnessTableEntry() = default;
 
+  static WitnessTableEntry forProtocolConformanceDescriptor() {
+    return WitnessTableEntry();
+  }
+
+  /// Is this the reference to the protocol conformance descriptor that
+  /// generated the witness table.
+  bool isProtocolConformanceDescriptor() const {
+    return Protocol == nullptr && MemberOrAssociatedType.isNull();
+  }
+
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
     assert(proto != nullptr);
     return WitnessTableEntry({}, proto);
   }
 
   /// Is this a base-protocol entry?
-  bool isBase() const { return MemberOrAssociatedType.isNull(); }
+  bool isBase() const {
+    return Protocol != nullptr && MemberOrAssociatedType.isNull();
+  }
 
   bool matchesBase(ProtocolDecl *proto) const {
     assert(proto != nullptr);
