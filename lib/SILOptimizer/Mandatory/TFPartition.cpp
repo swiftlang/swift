@@ -111,11 +111,14 @@ static bool canMoveOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
 static std::string getPartitionedScalarOpName(SILInstruction *I) {
   // We can turn integer and FP literals into constant nodes if their type is
   // compatible.
+  // FIXME(clattner): Disable scalar promotion for now, we will need a new approach.
+#if 0
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
     auto resultTy = I->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
-      return "__tfop_Const__dc__";
+      return "__tfop_Const__dc:t__";
   }
+#endif
 
   auto *BI = dyn_cast<BuiltinInst>(I);
   if (!BI) return std::string();
@@ -136,7 +139,7 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   // for a tensor op.
   auto check = [&](bool cond, StringRef result) -> std::string {
     if (!cond) return std::string();
-    return "__tfop_" + result.str() + "__tt__";
+    return "__tfop_" + result.str() + "__tt:t__";
   };
 
   // Given an overflowing operation, return true if the overflow result will be
@@ -900,24 +903,40 @@ void TFFunctionPartition::markArgument(SILArgument *arg) {
 /// the tensor computation and needs to be copied into it.  Try to hoist above
 /// the start point, since we prefer arguments to the tensor program rather than
 /// send and receives.  This returns true if it successfully hoists the
-/// computation.
+/// computation or if the value is already above the start point.
 static bool hoistValueAboveStartPoint(SILInstruction *inst,
                                       SILInstruction *tensorStartPoint,
                                       DominanceInfo &DI) {
+  // If this instruction already dominates the start point, then we're good to
+  // go.  Don't move anything.
+  if (DI.properlyDominates(inst, tensorStartPoint))
+    return true;
+
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
   //
   // For now though, our implementation is extremely simple: we just check for
-  // struct_extract(x), since it is the thing that unboxes primitives like
-  // Int and Bool into the underlying values.  We can extend this in the future
-  // when there is a need.
-  if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-    if (DI.properlyDominates(sei->getOperand(), tensorStartPoint)) {
-      sei->moveBefore(tensorStartPoint);
-      return true;
+  // a couple of simple instructions that have come up so far.
+  //
+  // We can extend this in the future when there is a need.
+  if (isa<StructExtractInst>(inst) || isa<LiteralInst>(inst)) {
+    // We can hoist one of these instructions if all of their operands are
+    // hoistable.
+    for (auto &op : inst->getAllOperands()) {
+      if (auto *opInst = dyn_cast<SILInstruction>((SILNode*)op.get())) {
+        if (!hoistValueAboveStartPoint(opInst, tensorStartPoint, DI))
+          return false;
+      } else if (!DI.properlyDominates(op.get(), tensorStartPoint))
+        return false;
     }
+
+    // If all of the operands are hoisted above the start point, then this
+    // instruction can be too.
+    inst->moveBefore(tensorStartPoint);
+    return true;
   }
 
+  // Otherwise, we can't handle this instruction.
   return false;
 }
 
@@ -1364,14 +1383,19 @@ void PartitionCloner::visitLiteralInst(LiteralInst *inst) {
   auto opName = getPartitionedScalarOpName(inst);
   assert(!opName.empty() && "Should correspond to an op");
   auto &B = getBuilder();
+
   auto name = B.getASTContext().getIdentifier(opName);
   auto ourCst = inst->clone();
   ourCst->setDebugLocation(B.getSILDebugLocation(loc));
   B.getInsertionBB()->push_back(ourCst);
 
+  auto mtt = MetatypeType::get(inst->getType().getSwiftRValueType());
+  auto metatype =
+    B.createMetatype(loc,
+                     SILType::getPrimitiveObjectType(mtt->getCanonicalType()));
   auto result =
     B.createBuiltin(loc, name, remapType(inst->getType()),
-                    /*substitutionlist*/{}, SILValue(ourCst));
+                    /*substitutionlist*/{}, { metatype, SILValue(ourCst) });
   ValueMap[inst] = result;
 }
 

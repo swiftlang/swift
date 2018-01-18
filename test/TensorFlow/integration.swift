@@ -188,3 +188,51 @@ public func test_bool_param2(cond: Bool) {
 // CHECK: cond_br [[BOOLVAL]],
 
 
+// expected-error@+1 {{TFLowerGraph cannot handle loops yet}}
+public func test_while1(maxCount: Int,
+                        arg1: Tensor1D<Float>, arg2: Tensor1D<Float>) {
+  var a = arg1.toDevice()
+  let b = arg2.toDevice()
+
+  a += b
+
+  var count = 0  // "0": expected-warning {{value implicitly copied to accelerator}}
+  while count < maxCount {  // "maxCount": expected-warning {{value implicitly copied to accelerator}}
+    a -= b
+    count += 1    // "1": expected-warning {{value implicitly copied to accelerator}}
+  }
+  a += b
+  print(a.toHost())
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
+// CHECK: sil private @{{.*}}test_while1{{.*}}
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
+// CHECK-NEXT: builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
+// CHECK-NEXT: builtin "__tfop_Less__tt:t__"(
+// CHECK-NEXT: builtin "tf_tensor_to_i1"(
+// CHECK-NEXT: cond_br %7, bb2, bb1
+
+// CHECK: bb3([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>, [[A:%.*]] : $TensorHandle<Float>):
+// CHECK-NEXT:  [[NEXTA:%.*]] = builtin "__tfop_Sub__tt:t__"([[A:%.*]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  [[NEXTCOUNT:%.*]] = builtin "__tfop_Add__tt:t__"([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>,
+// CHECK-NEXT: [[CONDT:%.*]] = builtin "__tfop_Less__tt:t__"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>,
+// CHECK-NEXT:   [[COND:%.*]] = builtin "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK-NEXT:   cond_br [[COND]], bb5, bb4
+
+// CHECK: bb5:
+// CHECK-NEXT: br bb3([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>, [[NEXTA]] : $TensorHandle<Float>)
+
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_while1{{.*}}
+// CHECK: [sequence
+// CHECK:   {condition Header: bb0
+// CHECK:     [sequence
+// CHECK:       block bb2
+// CHECK:       <while Header: bb3   exit: bb4
+// CHECK:         block bb5>
+// CHECK:       block bb4]
+// CHECK:     block bb1}
+// CHECK:   block bb6]
+
+
