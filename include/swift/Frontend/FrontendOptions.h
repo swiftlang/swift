@@ -30,7 +30,7 @@ namespace swift {
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
-  friend class FrontendArgsToOptionsConverter;
+  friend class ArgsToFrontendOptionsConverter;
 
 public:
   FrontendInputs Inputs;
@@ -319,8 +319,6 @@ public:
   }
 
 private:
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
-
   bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
   bool hasUnusedObjCHeaderOutputPath() const;
@@ -332,9 +330,11 @@ private:
   bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
+public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
 };
 
 }
