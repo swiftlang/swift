@@ -290,9 +290,12 @@ void SyntaxParsingContext::finalizeRoot() {
   if (!Enabled)
     return;
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
-  assert(isRoot() && "AccumulationMode::Root is only for root context");
+  assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
   finalizeSourceFile(getRootData(), getParts());
+
+  // Clear the parts because we will call this function again when destroying
+  // the root context.
   getRootData().Storage.clear();
 }
 

@@ -356,6 +356,8 @@ public:
 
   bool isInSILMode() const { return SIL != nullptr; }
 
+  /// Calling this function to finalize libSyntax tree creation without destroying
+  /// the parser instance.
   void finalizeSyntaxTree() {
     assert(Tok.is(tok::eof) && "not done parsing yet");
     SyntaxContext->finalizeRoot();

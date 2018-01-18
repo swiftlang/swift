@@ -239,6 +239,10 @@ public:
   /// Discard collected parts on this context.
   void setDiscard() { Mode = AccumulationMode::Discard; }
 
+  /// Explicitly finalizing syntax tree creation.
+  /// This function will be called during the destroying of a root syntax
+  /// parsing context. However, we can explicitly call this function to get
+  /// the syntax tree before closing the root context.
   void finalizeRoot();
 
 };
