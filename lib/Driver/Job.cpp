@@ -52,6 +52,32 @@ void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
   }
 }
 
+bool CommandOutput::hasSameAdditionalOutputTypes(
+    CommandOutput const &other) const {
+  bool sameAdditionalOutputTypes = true;
+  types::forAllTypes([&](types::ID Type) {
+      bool a = AdditionalOutputTypes.count(Type) == 0;
+      bool b = other.AdditionalOutputTypes.count(Type) == 0;
+      if (a != b)
+        sameAdditionalOutputTypes = false;
+    });
+  return sameAdditionalOutputTypes;
+}
+
+void CommandOutput::addOutputs(CommandOutput const &other) {
+  assert(PrimaryOutputType == other.PrimaryOutputType);
+  assert(&DerivedOutputMap == &other.DerivedOutputMap);
+  Inputs.append(other.Inputs.begin(),
+                other.Inputs.end());
+  // Should only be called with an empty AdditionalOutputTypes
+  // or one populated with the same types as other.
+  if (AdditionalOutputTypes.empty()) {
+    AdditionalOutputTypes = other.AdditionalOutputTypes;
+  } else {
+    assert(hasSameAdditionalOutputTypes(other));
+  }
+}
+
 CommandOutput::CommandOutput(types::ID PrimaryOutputType,
                              OutputFileMap &Derived)
     : PrimaryOutputType(PrimaryOutputType), DerivedOutputMap(Derived) {}
