@@ -151,6 +151,9 @@ extension Zip2: Sequence {
   public func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
+    // implementation of this function is problematic, because it needs two
+    // passes over right to operate independendly on left and right using the
+    // single predicate that takes both...    
     var i = 0
     var rightIterator = right.makeIterator()
     let leftSubSequence = try left.drop { l in
@@ -170,6 +173,7 @@ extension Zip2: Sequence {
   public func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
+    // similar to drop(while:), this currently takes two passes over right
     var i = 0
     var rightIterator = right.makeIterator()
     let leftSubSequence = try left.prefix { l in
@@ -190,6 +194,7 @@ extension Zip2: Sequence {
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence] {
+    // needs similar solution to drop(while:)
     fatalError()
   }
   
