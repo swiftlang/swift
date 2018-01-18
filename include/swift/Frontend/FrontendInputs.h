@@ -100,7 +100,7 @@ public:
 
   bool shouldTreatAsSIL() const;
 
-  /// Return true for error
+  /// \return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
