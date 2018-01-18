@@ -174,11 +174,12 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
     );
 % elif node.is_syntax_collection():
       std::vector<${node.collection_element_type}> Parts;
+      Parts.reserve(Elements.size());
       for (auto &E: Elements) {
         if (!canServeAsCollectionMember(SyntaxKind::${node.syntax_kind}, E))
           return None;
         if (auto P = E.getAs<${node.collection_element_type}>()) {
-          Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
+          Parts.emplace_back(*P);
         } else {
           return None;
         }

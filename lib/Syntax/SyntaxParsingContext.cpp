@@ -58,6 +58,7 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
       CtxtHolder(CtxtHolder), Storage(getRootData().Storage), Offset(0),
       Mode(AccumulationMode::Root), Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
+  Storage.reserve(128);
 }
 
 /// Add RawSyntax to the parts.

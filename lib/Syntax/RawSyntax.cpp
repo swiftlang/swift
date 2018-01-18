@@ -134,9 +134,10 @@ RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
+  auto Layout = getLayout();
   std::vector<RC<RawSyntax>> NewLayout;
-  std::copy(getLayout().begin(), getLayout().end(),
-            std::back_inserter(NewLayout));
+  NewLayout.reserve(Layout.size() + 1);
+  std::copy(Layout.begin(), Layout.end(), std::back_inserter(NewLayout));
   NewLayout.push_back(NewLayoutElement);
   return RawSyntax::make(getKind(), NewLayout, SourcePresence::Present);
 }
@@ -145,6 +146,7 @@ RC<RawSyntax> RawSyntax::replaceChild(CursorIndex Index,
                                       RC<RawSyntax> NewLayoutElement) const {
   auto Layout = getLayout();
   std::vector<RC<RawSyntax>> NewLayout;
+  NewLayout.reserve(Layout.size());
 
   std::copy(Layout.begin(), Layout.begin() + Index,
             std::back_inserter(NewLayout));

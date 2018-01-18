@@ -58,6 +58,7 @@ private:
   static RC<SyntaxData>
   makeData(std::initializer_list<Element> &Elements) {
     std::vector<RC<RawSyntax>> List;
+    List.reserve(Elements.size());
     for (auto &Elt : Elements)
       List.push_back(Elt.getRaw());
     auto Raw = RawSyntax::make(CollectionKind, List,
@@ -161,6 +162,7 @@ public:
     assert(i <= size());
     auto OldLayout = getRaw()->getLayout();
     std::vector<RC<RawSyntax>> NewLayout;
+    NewLayout.reserve(OldLayout.size() + 1);
 
     std::copy(OldLayout.begin(), OldLayout.begin() + i,
               std::back_inserter(NewLayout));
