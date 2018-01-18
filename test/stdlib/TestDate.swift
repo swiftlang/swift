@@ -52,6 +52,17 @@ class TestDate : TestDateSuper {
         expectTrue(d1 > d3)
     }
 
+    func testDateMath() {
+        for i in -2...10 {
+            for j in 0...5 {
+            	//Strideable conformance
+            	let Date_i = Date(timeIntervalSinceReferenceDate: TimeInterval(i))
+            	let Date_j = Date(timeIntervalSinceReferenceDate: TimeInterval(j))
+            	expectEqual(Date_i.advanced(by: Date_i.distance(to: Date_j)), Date_j, "Date(i).advanced(by: Date(i).distance(to: Date(j)) == Date(j)")
+            }
+        }
+    }
+
     func testCast() {
         let d0 = NSDate()
         let d1 = d0 as Date
@@ -200,6 +211,7 @@ class TestDate : TestDateSuper {
 var DateTests = TestSuite("TestDate")
 DateTests.test("testDateComparison") { TestDate().testDateComparison() }
 DateTests.test("testDateMutation") { TestDate().testDateMutation() }
+DateTests.test("testDateMath") { TestDate().testDateMath() }
 DateTests.test("testCast") { TestDate().testCast() }
 DateTests.test("testDistantPast") { TestDate().testDistantPast() }
 DateTests.test("testDistantFuture") { TestDate().testDistantFuture() }
