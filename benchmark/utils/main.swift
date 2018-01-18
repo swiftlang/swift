@@ -27,6 +27,7 @@ import ArrayOfPOD
 import ArrayOfRef
 import ArraySetElement
 import ArraySubscript
+import BinaryFloatingPointConversionFromBinaryInteger
 import BitCount
 import ByteSwap
 import COWTree
@@ -162,6 +163,7 @@ registerBenchmark(ArrayOfPOD)
 registerBenchmark(ArrayOfRef)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
+registerBenchmark(BinaryFloatingPointConversionFromBinaryInteger)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
