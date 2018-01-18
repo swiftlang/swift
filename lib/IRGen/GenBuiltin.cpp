@@ -987,7 +987,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // extracted out of the program to a TensorFlow graph.  However, they do
     // make it here when building the TensorFlow module itself.  For those
     // cases, we abort here with an error message.
-    const string errMessage = "!!! Compiler bug -- Tensor op builtin " +
+    const std::string errMessage = "!!! Compiler bug -- Tensor op builtin " +
                               FnId.str().str() +
                               " cannot be lowered to LLVM IR !!!\n";
     abortOnTFOpBuiltin(IGF, errMessage.c_str());
