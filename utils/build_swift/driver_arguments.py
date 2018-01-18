@@ -138,7 +138,6 @@ def _apply_default_arguments(args):
         args.build_foundation = False
         args.build_libdispatch = False
         args.build_libicu = False
-        args.build_playgroundlogger = False
         args.build_playgroundsupport = False
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
@@ -626,11 +625,6 @@ def create_argument_parser():
         action=arguments.action.enable,
         dest='build_libicu',
         help='build libicu')
-    projects_group.add_argument(
-        '--playgroundlogger',
-        action='store_true',
-        dest='build_playgroundlogger',
-        help='build playgroundlogger')
     projects_group.add_argument(
         '--playgroundsupport',
         action='store_true',
