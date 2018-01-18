@@ -431,9 +431,6 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// Sorts the collection in place, using the given predicate as the
   /// comparison between elements.
   ///
-  /// This method can take throwing closure. If closure throws error while
-  /// sorting, order of elements may change. No elements will be lost.
-  ///
   /// When you want to sort a collection of elements that doesn't conform to
   /// the `Comparable` protocol, pass a closure to this method that returns
   /// `true` when the first element passed should be ordered before the
@@ -496,7 +493,9 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
-  ///   otherwise, `false`.
+  ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
+  ///   the sort, the elements may be in a different order, but none will be
+  ///   lost.
   @_inlineable
   public mutating func sort(
     by areInIncreasingOrder:
