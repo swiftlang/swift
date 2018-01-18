@@ -42,10 +42,10 @@
 /// - Returns: A sequence of tuple pairs, where the elements of each pair are
 ///   corresponding elements of `sequence1` and `sequence2`.
 @_inlineable // FIXME(sil-serialize-all)
-public func zip<Sequence1, Sequence2>(
-  _ sequence1: Sequence1, _ sequence2: Sequence2
-) -> Zip2Sequence<Sequence1, Sequence2> {
-  return Zip2Sequence(sequence1, sequence2)
+public func zip<Left, Right>(
+  _ left: Left, _ right: Right
+) -> Zip2<Left, Right> {
+  return Zip2(left, right)
 }
 
 /// A sequence of pairs built out of two underlying sequences.
@@ -68,51 +68,45 @@ public func zip<Sequence1, Sequence2>(
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _sequence1: Sequence1
-  @_versioned // FIXME(sil-serialize-all)
-  internal let _sequence2: Sequence2
-
-  /// Creates an instance that makes pairs of elements from `sequence1` and
-  /// `sequence2`.
-  @_inlineable // FIXME(sil-serialize-all)
+public struct Zip2<Left: Sequence, Right: Sequence> {
+  public let left: Left
+  public let right: Right
+  
+  @_inlineable
   @_versioned
-  internal // @testable
-  init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
-    self._sequence1 = sequence1
-    self._sequence2 = sequence2
+  internal init(_ left: Left, _ right: Right) {
+    self.left = left
+    self.right = right
   }
 }
 
-extension Zip2Sequence {
+extension Zip2 {
   /// An iterator for `Zip2Sequence`.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _iterator1: Sequence1.Iterator
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _iterator2: Sequence2.Iterator
+    public var left: Left.Iterator
+    public var right: Right.Iterator
+
     @_versioned // FIXME(sil-serialize-all)
     internal var _reachedEnd: Bool = false
-
+    
     /// Creates an instance around a pair of underlying iterators.
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal init(
-      _ iterator1: Sequence1.Iterator, 
-      _ iterator2: Sequence2.Iterator
+      _ left: Left.Iterator,
+      _ right: Right.Iterator
     ) {
-      self._iterator1 = iterator1
-      self._iterator2 = iterator2
+      self.left = left
+      self.right = right
     }
   }
 }
 
-extension Zip2Sequence.Iterator: IteratorProtocol {
+extension Zip2.Iterator: IteratorProtocol {
   /// The type of element returned by `next()`.
-  public typealias Element = (Sequence1.Element, Sequence2.Element)
-
+  public typealias Element = (Left.Element, Right.Element)
+  
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -124,180 +118,183 @@ extension Zip2Sequence.Iterator: IteratorProtocol {
     // have already exhausted the second sequence, on every subsequent call to
     // next() we would consume and discard one additional element from the
     // first sequence, even though next() had already returned nil.
-
+    
     if _reachedEnd {
       return nil
     }
-
-    guard let element1 = _iterator1.next(),
-          let element2 = _iterator2.next() else {
-      _reachedEnd = true
-      return nil
+    
+    guard let l = left.next(),
+      let r = right.next() else {
+        _reachedEnd = true
+        return nil
     }
-
-    return (element1, element2)
+    
+    return (l, r)
   }
 }
 
-extension Zip2Sequence: Sequence {
-  public typealias Element = (Sequence1.Element, Sequence2.Element)
+extension Zip2: Sequence {
+  public typealias Element = (Left.Element, Right.Element)
+  public typealias SubSequence = Zip2<Left.SubSequence, Right.SubSequence>
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return zip(left.dropFirst(n),right.dropFirst(n))
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropLast(_ n: Int) -> SubSequence {
+    return zip(left.dropLast(n),right.dropLast(n))
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var i = 0
+    var rightIterator = right.makeIterator()
+    let leftSubSequence = try left.drop { l in
+      guard let r = rightIterator.next() else { return false }
+      i += 1
+      return try predicate(l,r)
+    }
+    return zip(leftSubSequence, right.dropFirst(i))
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    return zip(left.prefix(maxLength),right.prefix(maxLength))
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var i = 0
+    var rightIterator = right.makeIterator()
+    let leftSubSequence = try left.prefix { l in
+      guard let r = rightIterator.next() else { return false }
+      i += 1
+      return try predicate(l,r)
+    }
+    return zip(leftSubSequence, right.prefix(i))
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return zip(left.suffix(maxLength),right.suffix(maxLength))
+  }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    fatalError()
+  }
+  
   /// Returns an iterator over the elements of this sequence.
   @_inlineable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(
-      _sequence1.makeIterator(),
-      _sequence2.makeIterator())
+      left.makeIterator(),
+      right.makeIterator())
   }
-  
+
   // ensure propogation of intentional underestimates from bases
   @_inlineable // FIXME(sil-serialize-all)
   public var underestimatedCount: Int {
-    return Swift.min(
-      _sequence1.underestimatedCount,_sequence2.underestimatedCount)
-  }  
+    return Swift.min(left.underestimatedCount, right.underestimatedCount)
+  }
 }
 
-/// Creates a collection of pairs built out of two underlying collections.
-///
-/// In the `Zip2Collection` instance returned by this function, the elements of
-/// the *i*th pair are the *i*th elements of each underlying collection. The
-/// following example uses the `zip(_:_:)` function to iterate over an array
-/// of strings and a countable range at the same time:
-///
-///     let words = ["one", "two", "three", "four"]
-///     let numbers = 1...4
-///
-///     for (word, number) in zip(words, numbers) {
-///         print("\(word): \(number)")
-///     }
-///     // Prints "one: 1"
-///     // Prints "two: 2
-///     // Prints "three: 3"
-///     // Prints "four: 4"
-///
-/// If the two sequences passed to `zip(_:_:)` are different lengths, the
-/// resulting sequence is the same length as the shorter sequence. In this
-/// example, the resulting array is the same length as `words`:
-///
-///     let naturalNumbers = 1...Int.max
-///     let zipped = Array(zip(words, naturalNumbers))
-///     // zipped == [("one", 1), ("two", 2), ("three", 3), ("four", 4)]
-///
-/// - Parameters:
-///   - collection1: The first collection to zip.
-///   - collection2: The second collection to zip.
-/// - Returns: A sequence of tuple pairs, where the elements of each pair are
-///   corresponding elements of `collection1` and `collection2`.
-@_inlineable // FIXME(sil-serialize-all)
-public func zip<Collection1, Collection2>(
-  _ collection1: Collection1, _ collection2: Collection2
-) -> Zip2Collection<Collection1, Collection2> {
-  return Zip2Collection(collection1, collection2)
-}
-
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct Zip2Collection<Collection1 : Collection, Collection2 : Collection> {
+// Because this type needs to work accross both Zip2<A,B> and 
+// Zip2<A.SubSequence,B.SubSequence>, it needs to be a non-nested
+// type.
+@_fixed_layout
+public struct _Zip2Index<Left: Comparable, Right: Comparable> {
   @_versioned // FIXME(sil-serialize-all)
-  internal let _collection1: Collection1
+  internal var left: Left
   @_versioned // FIXME(sil-serialize-all)
-  internal let _collection2: Collection2
+  internal var right: Right
   
-  /// Creates an instance that makes pairs of elements from `collection1` and
-  /// `collection2`.
+  /// Creates an instance that makes pairs of elements from `index1` and
+  /// `index2`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal init(_ collection1: Collection1, _ collection2: Collection2) {
-    self._collection1 = collection1
-    self._collection2 = collection2
+  internal init(_ left: Left, _ right: Right) {
+    self.left = left
+    self.right = right
   }
 }
 
-extension Zip2Collection: Sequence {
-  public typealias Element = (Collection1.Element, Collection2.Element)
-  public typealias Iterator = Zip2Sequence<Collection1, Collection2>.Iterator
-  
-  /// Returns an iterator over the elements of this collection.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> Iterator {
-    return Zip2Sequence(_collection1, _collection2).makeIterator()
-  }
-}
-
-extension Zip2Collection {
-  @_fixed_layout
-  public struct Index {
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _index1: Collection1.Index
-    @_versioned // FIXME(sil-serialize-all)
-    internal var _index2: Collection2.Index
-    
-    /// Creates an instance that makes pairs of elements from `index1` and
-    /// `index2`.
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned
-    internal init(_ index1: Collection1.Index, _ index2: Collection2.Index) {
-      self._index1 = index1
-      self._index2 = index2
-    }
-  }
-}
-
-extension Zip2Collection.Index: Comparable {
+extension _Zip2Index: Comparable {
   @_inlineable
   public static func == (
-    lhs: Zip2Collection<Collection1, Collection2>.Index,
-    rhs: Zip2Collection<Collection1, Collection2>.Index
+    lhs: _Zip2Index<Left, Right>,
+    rhs: _Zip2Index<Left, Right>
   ) -> Bool {
     // yes, this is an || not an &&. this makes
     // the first endIndex of either match
-    return lhs._index1 == rhs._index1
-        || lhs._index2 == rhs._index2
+    return lhs.left == rhs.left
+        || lhs.right == rhs.right
   }
-    
+  
   @_inlineable
   public static func < (
-    lhs: Zip2Collection<Collection1, Collection2>.Index,
-    rhs: Zip2Collection<Collection1, Collection2>.Index
+    lhs: _Zip2Index<Left, Right>,
+    rhs: _Zip2Index<Left, Right>
   ) -> Bool {
-    return lhs._index1 < rhs._index1
+    let result = lhs.left < rhs.left
+    _debugPrecondition(result == (lhs.right < rhs.right),
+       "Unexpected left/right mismatch in Zip2 index comparison")
+    return result
   }
 }
-  
-extension Zip2Collection: Collection {
+
+extension Zip2: Collection where Left: Collection, Right: Collection {
+  public typealias Index = _Zip2Index<Left.Index,Right.Index>
+
   @_inlineable
   public var startIndex: Index {
-    return Index(_collection1.startIndex, _collection2.startIndex)
+    return Index(left.startIndex, right.startIndex)
   }
-
+  
   @_inlineable
   public var endIndex: Index {
-    return Index(_collection1.endIndex, _collection2.endIndex)
+    return Index(left.endIndex, right.endIndex)
   }
-
+  
   @_inlineable
   public subscript(i: Index) -> Element {
-    return (_collection1[i._index1], _collection2[i._index2])
+    return (left[i.left], right[i.right])
+  }
+  
+  @_inlineable
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    let leftRange = bounds.lowerBound.left..<bounds.upperBound.left
+    let rightRange = bounds.lowerBound.right..<bounds.upperBound.right
+    return zip(left[leftRange],right[rightRange])
   }
 
   @_inlineable
   public func index(after: Index) -> Index {
-    _failEarlyRangeCheck(after, bounds: startIndex..<endIndex)
-
+//    _failEarlyRangeCheck(after, bounds: startIndex..<endIndex)
+    
     return Index(
-      _collection1.index(after: after._index1),
-      _collection2.index(after: after._index2)
+      left.index(after: after.left),
+      right.index(after: after.right)
     )
   }
-
+  
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     _precondition(i >= startIndex, "Index out of range")
     _precondition(i <= endIndex, "Index out of range")
-
+    
     let j = Index(
-      _collection1.index(i._index1, offsetBy: n),
-      _collection2.index(i._index2, offsetBy: n)
+      left.index(i.left, offsetBy: n),
+      right.index(i.right, offsetBy: n)
     )
     
     _debugPrecondition(j >= startIndex, "Unexpected zipped index out of bounds.")
@@ -305,16 +302,16 @@ extension Zip2Collection: Collection {
     
     return j
   }
-
+  
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int, limitedBy limit: Index) -> Index? {
     _precondition(i >= startIndex, "Index out of range")
     _precondition(i <= endIndex, "Index out of range")
     
-    guard let i1 = _collection1.index(i._index1, offsetBy: n, limitedBy: limit._index1),
-          let i2 = _collection2.index(i._index2, offsetBy: n, limitedBy: limit._index2)
-    else { return nil }
-
+    guard let i1 = left.index(i.left, offsetBy: n, limitedBy: limit.left),
+      let i2 = right.index(i.right, offsetBy: n, limitedBy: limit.right)
+      else { return nil }
+    
     let j = Index(i1, i2)
     
     _debugPrecondition(j >= startIndex, "Unexpected zipped index out of bounds.")
@@ -322,58 +319,50 @@ extension Zip2Collection: Collection {
     
     return j
   }
-
+  
   @_inlineable
   public func distance(from start: Index, to end: Index) -> Int {
     // This is necessary because non-random zips don't compute which
     // is shorter eagerly, so it could be either.
-    if end._index1 == _collection1.endIndex 
-    || end._index2 == _collection2.endIndex
-    || start._index1 == _collection1.endIndex // inverted distances are a thing
-    || start._index2 == _collection2.endIndex {
-      let d1 = _collection1.distance(from: start._index1, to: end._index1)
-      let d2 = _collection2.distance(from: start._index2, to: end._index2)
+    if end.left == left.endIndex
+      || end.right == right.endIndex
+      || start.left == left.endIndex // inverted distances are a thing
+      || start.right == right.endIndex {
+      let d1 = left.distance(from: start.left, to: end.left)
+      let d2 = right.distance(from: start.right, to: end.right)
       return Swift.min(d1,d2)
     }
     else {
-      let d = _collection1.distance(from: start._index1, to: end._index1)
-      _debugPrecondition(d == _collection2.distance(from: start._index2, to: end._index2),
+      let d = left.distance(from: start.left, to: end.left)
+      _debugPrecondition(d == right.distance(from: start.right, to: end.right),
         "Unexpected difference between two zipped collections.")
       return d
     }
-
   }
-
-  // ensure propogation of intentional underestimates from bases
-  @_inlineable // FIXME(sil-serialize-all)
-  public var underestimatedCount: Int {
-    return Swift.min(
-      _collection1.underestimatedCount, _collection2.underestimatedCount)
-  }  
 }
 
-extension Zip2Collection: BidirectionalCollection
-where Collection1: RandomAccessCollection, Collection2: RandomAccessCollection {
+extension Zip2: BidirectionalCollection
+where Left: RandomAccessCollection, Right: RandomAccessCollection {
   // Being bidirectional doesn't help us, because to calculate the shorter
   // length we need to find the max distance of both collections.
   // So no new features added here.
 }
 
-extension Zip2Collection: RandomAccessCollection
-where Collection1: RandomAccessCollection, Collection2: RandomAccessCollection {
-  
+extension Zip2: RandomAccessCollection
+where Left: RandomAccessCollection, Right: RandomAccessCollection {
+
   @_inlineable
   public var endIndex: Index {
-    let i1: Collection1.Index, i2: Collection2.Index
-    let c1 = _collection1.count, c2 = _collection2.count
+    let i1: Left.Index, i2: Right.Index
+    let c1 = left.count, c2 = right.count
     
     if c1 < c2 {
-      i1 = _collection1.endIndex
-      i2 = _collection2.index(_collection2.startIndex, offsetBy: c1)
+      i1 = left.endIndex
+      i2 = right.index(right.startIndex, offsetBy: c1)
     }
     else {
-      i1 = _collection1.index(_collection1.startIndex, offsetBy: c2)
-      i2 = _collection2.endIndex
+      i1 = left.index(left.startIndex, offsetBy: c2)
+      i2 = right.endIndex
     }
     
     return Index(i1, i2)
@@ -385,38 +374,45 @@ where Collection1: RandomAccessCollection, Collection2: RandomAccessCollection {
     _precondition(i <= endIndex, "Index out of range")
 
     return Index(
-      _collection1.index(before: i._index1),
-      _collection2.index(before: i._index2)
+      left.index(before: i.left),
+      right.index(before: i.right)
     )
   }
 
   @_inlineable
   public func distance(from start: Index, to end: Index) -> Int {
-    let d = _collection1.distance(from: start._index1, to: end._index1)
-    _debugPrecondition(d == _collection2.distance(from: start._index2, to: end._index2),
+    let d = left.distance(from: start.left, to: end.left)
+    _debugPrecondition(d == right.distance(from: start.right, to: end.right),
       "Unexpected difference between two zipped collections.")
     return d
   }
 }
 
-extension Zip2Collection: Equatable
-where Collection1: Equatable, Collection2: Equatable {
+extension Zip2: Equatable
+where Left: Equatable, Right: Equatable {
   public static func == (
-    lhs: Zip2Collection<Collection1,Collection2>,
-    rhs: Zip2Collection<Collection1,Collection2>
+    lhs: Zip2<Left,Right>,
+    rhs: Zip2<Left,Right>
   ) -> Bool {
-    return lhs._collection1 == rhs._collection1
-        && lhs._collection2 == rhs._collection2
+    return lhs.left == rhs.left
+        && lhs.right == rhs.right
   }
 }
 
-@available(*, deprecated, renamed: "Zip2Sequence.Iterator")
+@available(*, deprecated, renamed: "Zip2.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence
 
-extension Zip2Sequence {
-  @available(*, deprecated, renamed: "Sequence1.Iterator")
-  public typealias Stream1 = Sequence1.Iterator
-  @available(*, deprecated, renamed: "Sequence2.Iterator")
-  public typealias Stream2 = Sequence2.Iterator  
+@available(*, deprecated, renamed: "Zip2")
+public typealias Zip2Sequence<T, U> = Zip2<T, U> where T: Sequence, U: Sequence
+
+extension Zip2 {
+  @available(*, deprecated, renamed: "Left")
+  public typealias Sequence1 = Left
+  @available(*, deprecated, renamed: "Right")
+  public typealias Sequence2 = Right  
+  @available(*, deprecated, renamed: "Left.Iterator")
+  public typealias Stream1 = Left.Iterator
+  @available(*, deprecated, renamed: "Right.Iterator")
+  public typealias Stream2 = Right.Iterator  
 }
 

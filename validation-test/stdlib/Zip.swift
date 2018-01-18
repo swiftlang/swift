@@ -18,16 +18,16 @@ extension IteratorSequence where Base : TestProtocol1 {
 
 
 // Check generic parameter names.
-extension Zip2Sequence.Iterator
-where Sequence1: TestProtocol1, Sequence2: TestProtocol1 {
+extension Zip2.Iterator
+where Left: TestProtocol1, Right: TestProtocol1 {
   var _generator1IsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
 // Check generic parameter names.
-extension Zip2Sequence
-where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
+extension Zip2
+where Left : TestProtocol1, Right : TestProtocol1 {
   var _sequence1IsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -46,7 +46,7 @@ ZipTests.test("Sequence") {
       elements: test.other.map(OpaqueValue.init))
     var result = zip(s, other)
     expectType(
-      Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
+      Zip2<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
       &result)
 
     // Check for expected result and check the Zip2Sequence's Sequence
@@ -69,9 +69,7 @@ ZipTests.test("Sequence") {
 
 ZipTests.test("Collections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  typealias SequenceType = Zip2Sequence<
-    MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
-  typealias CollectionType = Zip2Collection<
+  typealias CollectionType = Zip2<
     MinimalCollection<OpaqueValue<Int>>,MinimalCollection<OpaqueValue<Int32>>>
 
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
@@ -80,8 +78,8 @@ ZipTests.test("Collections") {
 
   expectCollectionAssociatedTypes(
     collectionType: CollectionType.self,
-    iteratorType: SequenceType.Iterator.self,
-    subSequenceType: Slice<CollectionType>.self,
+    iteratorType: CollectionType.Iterator.self,
+    subSequenceType: CollectionType.SubSequence.self,
     indexType: CollectionType.Index.self,
     indicesType: DefaultIndices<CollectionType>.self)
     
@@ -102,10 +100,7 @@ ZipTests.test("Collections") {
 
 ZipTests.test("RandomAccessCollections") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  typealias SequenceType = Zip2Sequence<
-    MinimalRandomAccessCollection<OpaqueValue<Int>>,
-    MinimalRandomAccessCollection<OpaqueValue<Int32>>>
-  typealias CollectionType = Zip2Collection<
+  typealias CollectionType = Zip2<
     MinimalRandomAccessCollection<OpaqueValue<Int>>,
     MinimalRandomAccessCollection<OpaqueValue<Int32>>>
 
@@ -115,8 +110,8 @@ ZipTests.test("RandomAccessCollections") {
       
   expectCollectionAssociatedTypes(
     collectionType: CollectionType.self,
-    iteratorType: SequenceType.Iterator.self,
-    subSequenceType: Slice<CollectionType>.self,
+    iteratorType: CollectionType.Iterator.self,
+    subSequenceType: CollectionType.SubSequence.self,
     indexType: CollectionType.Index.self,
     indicesType: DefaultIndices<CollectionType>.self)
 
@@ -184,7 +179,7 @@ ZipTests.test("Sequence+Collection") {
       elements: test.other.map(OpaqueValue.init))
     var result = zip(s, other)
     expectType(
-      Zip2Sequence<
+      Zip2<
         MinimalSequence<OpaqueValue<Int>>, 
         MinimalCollection<OpaqueValue<Int32>>>.self,
       &result)
