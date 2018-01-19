@@ -1736,6 +1736,50 @@ static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
   return None;
 }
 
+static StringRef assignOutputName(Compilation &C, const JobAction *JA,
+                                  DiagnosticEngine &Diags,
+                                  llvm::SmallString<128> &Buffer,
+                                  StringRef BaseName,
+                                  PreserveOnSignal ShouldPreserveOnSignal) {
+  // We should output to a temporary file, since we're not at the top level
+  // (or are generating a bridging PCH, which is currently always a temp).
+  StringRef Stem = llvm::sys::path::stem(BaseName);
+  StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+  std::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
+  if (EC) {
+    Diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                   EC.message());
+    return {};
+  }
+  C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
+
+  return Buffer.str();
+}
+
+static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
+                                  const llvm::Triple &Triple,
+                                  llvm::SmallString<128> &Buffer,
+                                  StringRef BaseInput, StringRef BaseName) {
+  if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
+    return llvm::sys::path::stem(BaseInput);
+  auto link = dyn_cast<LinkJobAction>(JA);
+  if (!link)
+    return BaseName;
+  if (link->getKind() != LinkKind::DynamicLibrary)
+    return BaseName;
+
+  Buffer = Triple.isOSWindows() ? "" : "lib";
+  Buffer.append(BaseName);
+
+  if (Triple.isOSDarwin())
+    Buffer.append(".dylib");
+  else if (Triple.isOSWindows())
+    Buffer.append(".dll");
+  else
+    Buffer.append(".so");
+  return Buffer.str();
+}
+
 static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const OutputInfo &OI,
@@ -1805,47 +1849,12 @@ static StringRef getOutputFilename(Compilation &C,
     BaseName = OI.ModuleName;
 
   // We don't yet have a name, assign one.
-  if (!AtTopLevel) {
-    // We should output to a temporary file, since we're not at the top level
-    // (or are generating a bridging PCH, which is currently always a temp).
-    StringRef Stem = llvm::sys::path::stem(BaseName);
-    StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-    std::error_code EC =
-        llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
-    if (EC) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_unable_to_make_temporary_file,
-                     EC.message());
-      return {};
-    }
-    C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
+  if (!AtTopLevel)
+    return assignOutputName(C, JA, Diags, Buffer, BaseName,
+                            ShouldPreserveOnSignal);
 
-    return Buffer.str();
-  }
-
-
-  if (JA->getType() == types::TY_Image) {
-    if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
-      BaseName = llvm::sys::path::stem(BaseInput);
-    if (auto link = dyn_cast<LinkJobAction>(JA)) {
-      if (link->getKind() == LinkKind::DynamicLibrary) {
-        if (Triple.isOSWindows())
-          Buffer = "";
-        else
-          Buffer = "lib";
-        Buffer.append(BaseName);
-        if (Triple.isOSDarwin())
-          Buffer.append(".dylib");
-        else if (Triple.isOSWindows())
-          Buffer.append(".dll");
-        else
-          Buffer.append(".so");
-        return Buffer.str();
-      }
-    }
-    return BaseName;
-  }
-
+  if (JA->getType() == types::TY_Image)
+    return baseNameForImage(JA, OI, Triple, Buffer, BaseInput, BaseName);
 
   StringRef Suffix = types::getTypeTempSuffix(JA->getType());
   assert(Suffix.data() &&
