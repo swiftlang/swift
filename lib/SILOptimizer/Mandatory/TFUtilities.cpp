@@ -1,4 +1,4 @@
-//===--- TensorFlow.cpp - TensorFlow lowering support ---------------------===//
+//===--- TFUtilities.cpp - TensorFlow lowering utilities ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TensorFlow.h"
+#include "TFUtilities.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILModule.h"
@@ -203,14 +203,32 @@ bool TensorOpInfo::decode() {
       return decode();
     }
 
-  // Tensor operations are builtin instructions.
-  auto *builtinInst = dyn_cast<BuiltinInst>(inst);
-  if (!builtinInst) return false;
-  StringRef mangledName = builtinInst->getName().str();
+  // Tensor operations are builtin instructions and apply instructions.
+  if (auto *builtinInst = dyn_cast<BuiltinInst>(inst))
+    return decodeBuiltin(builtinInst);
+
+  // Operations which can conditionally run on the host or the accelerator are
+  // modeled as well-known function calls.  If they satisfy the requirements
+  // (e.g. that their parameters are constants we can analyze) then they get
+  // promoted to notional "ops".
+  if (auto *applyInst = dyn_cast<ApplyInst>(inst))
+    if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
+      auto callee = fnRef->getReferencedFunction()->getName();
+      if (callee == "__tf_init_scalar")
+        return decodeTFInitScalar(applyInst);
+    }
+
+  return false;
+}
+
+/// The vast majority of interesting tensor operations are builtin instructions,
+/// which come from the user-exposed #tfop() syntax.
+bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
+  builtinName = inst->getName().str();
 
   // If the name is valid, it isn't an op.
   StringRef typeDescriptorStr;
-  if (!decodeTensorOpName(mangledName, opName, typeDescriptorStr))
+  if (!decodeTensorOpName(builtinName, opName, typeDescriptorStr))
     return false;
 
   auto diagInvalid = [&](std::string problem) {
@@ -264,9 +282,9 @@ bool TensorOpInfo::decode() {
       break;
     }
     case OpCommand::AddDType: {
-      auto op = getNextOperand();
-      if (!op || !isa<MetatypeInst>(op)) {
-        diagInvalid("metatype expected for 'd' operand");
+      // 'd' doesn't correspond to an operand, but requires a tensor result.
+      if (!isTensorHandle(inst->getType().getSwiftRValueType())) {
+        diagInvalid("'d' operand requires a Tensor result");
         return false;
       }
       break;
@@ -294,6 +312,27 @@ bool TensorOpInfo::decode() {
 
   return true;
 }
+
+/// Handle calls to __tf_init_scalar, which take a pointer to a stack slot
+/// and return a TensorHandle<T>.
+bool TensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
+  assert(inst->getNumOperands() == 2 &&
+         isTensorHandle(inst->getType().getSwiftRValueType()) &&
+         "Unexpected type signature for __tf_init_scalar");
+
+  // If we can't analyze the operand as a constant value, then give up.
+  if (getTensorConstantOperand(1) == nullptr)
+    return false;
+
+  // Otherwise, good news everyone!  We can treat this as a Const op.
+  opName = "Const";
+  operandDescriptorStr = "cd";
+  resultDescriptorStr = "t";
+  builtinName = "__tfop_Const__cd:t__";
+  operandDescriptors = { OpCommand::Constant, OpCommand::AddDType };
+  return true;
+}
+
 
 
 /// The SIL location for operations we process are usually deep in the bowels
