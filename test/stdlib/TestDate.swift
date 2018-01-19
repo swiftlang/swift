@@ -55,7 +55,7 @@ class TestDate : TestDateSuper {
     func testDateMath() {
         for i in -2...10 {
             for j in 0...5 {
-            	//Strideable conformance
+            	// Strideable conformance
             	let Date_i = Date(timeIntervalSinceReferenceDate: TimeInterval(i))
             	let Date_j = Date(timeIntervalSinceReferenceDate: TimeInterval(j))
             	expectEqual(Date_i.advanced(by: Date_i.distance(to: Date_j)), Date_j, "Date(i).advanced(by: Date(i).distance(to: Date(j)) == Date(j)")

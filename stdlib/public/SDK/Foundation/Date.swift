@@ -212,7 +212,7 @@ extension Date : Strideable {
   /// If `Stride` conforms to `Integer`, then `self.advanced(by: x) == other`.
   ///
   /// - Complexity: O(1).
-  /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+  /// - warning: This only measures an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
   public func distance(to other: Date) -> Stride {
   	return other.timeIntervalSinceReferenceDate - self.timeIntervalSinceReferenceDate
   }
