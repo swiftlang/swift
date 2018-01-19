@@ -2179,6 +2179,10 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
+  /// The superclass of which all conforming types must be a subclass.
+  RelativeDirectPointer<const TargetClassMetadata<Runtime>, /*Nullable=*/true>
+    Superclass;
+
   /// Associated type names, as a space-separated list in the same order
   /// as the requirements.
   RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
@@ -2201,6 +2205,7 @@ struct TargetProtocolDescriptor {
       NumMandatoryRequirements(0),
       NumRequirements(0),
       Requirements(nullptr),
+      Superclass(nullptr),
       AssociatedTypeNames(nullptr)
   {}
 };

@@ -200,6 +200,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int16Ty,                // mandatory requirement count
     Int16Ty,                // total requirement count
     Int32Ty,                // requirements array
+    RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
   });
   
