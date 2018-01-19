@@ -120,6 +120,7 @@ static SILValue skipValueProjections(SILValue V) {
       case ValueKind::TupleExtractInst:
       case ValueKind::UncheckedEnumDataInst:
       case ValueKind::UncheckedTrivialBitCastInst:
+      case ValueKind::UncheckedRefCastInst:
         V = cast<SingleValueInstruction>(V)->getOperand(0);
         break;
       default:
@@ -346,10 +347,6 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::UnownedReleaseInst:
       FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
-      
-      // TODO: Check the call graph to be less conservative about what
-      // destructors might be called.
-      FInfo->FE.setWorstEffects();
       return;
     case SILInstructionKind::UnconditionalCheckedCastInst:
       FInfo->FE.getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads = true;
