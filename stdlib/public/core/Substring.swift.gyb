@@ -433,6 +433,9 @@ extension Substring.${View} : BidirectionalCollection {
   }
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(r: Range<Index>) -> SubSequence {
+    // FIXME(strings): tests.
+    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
+      "${View} index range out of bounds")
     return Substring.${View}(_wholeString.${property}, _bounds: r)
   }
 }
@@ -607,6 +610,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
+    _boundsCheck(r)
     return Substring(
       _slice: Slice(base: self, bounds: r))
   }
@@ -614,12 +618,14 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
+    _boundsCheck(bounds)
     return String(Substring(_slice: Slice(base: self, bounds: bounds)))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
+    _boundsCheck(bounds)
     return String(Substring(_slice: Slice(
           base: self,
           bounds: bounds.relative(to: self))))

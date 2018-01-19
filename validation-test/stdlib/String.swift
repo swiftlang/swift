@@ -301,6 +301,28 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
   _ = acceptor[r]
 }
 
+StringTests.test("ForeignIndexes/subscript(ClosedRange)/OutOfBoundsTrap/1") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex...donor.index(_nth: 2)])
+
+  let r = donor.startIndex...donor.index(_nth: 3)
+  expectCrashLater()
+  _ = acceptor[r]
+}
+
+StringTests.test("ForeignIndexes/subscript(ClosedRange)/OutOfBoundsTrap/2") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex...donor.index(_nth: 2)])
+
+  let r = donor.index(_nth: 3)...donor.index(_nth: 5)
+  expectCrashLater()
+  _ = acceptor[r]
+}
+
 StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/1") {
   let donor = "abcdef"
   var acceptor = "uvw"

@@ -89,6 +89,34 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index { return Index(encodedOffset: _guts.count) }
 
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  internal func _boundsCheck(_ index: Index) {
+    _precondition(index.encodedOffset >= 0 && index.encodedOffset < _guts.count,
+      "String index is out of bounds")
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  internal func _boundsCheck(_ range: Range<Index>) {
+    _precondition(
+      range.lowerBound.encodedOffset >= 0 &&
+      range.upperBound.encodedOffset <= _guts.count,
+      "String index range is out of bounds")
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  internal func _boundsCheck(_ range: ClosedRange<Index>) {
+    _precondition(
+      range.lowerBound.encodedOffset >= 0 &&
+      range.upperBound.encodedOffset < _guts.count,
+      "String index range is out of bounds")
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
