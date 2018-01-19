@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// XFAIL: linux
+// rdar://problem/34758773
+
 
 // This is an end-to-end test to check if the array literal in the loop is
 // stack promoted.

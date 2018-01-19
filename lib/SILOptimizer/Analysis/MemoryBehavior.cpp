@@ -268,10 +268,6 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
       auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
-      if (ArgEffect.mayRelease()) {
-        Behavior = MemBehavior::MayHaveSideEffects;
-        break;
-      }
       auto NewBehavior = combineMemoryBehavior(Behavior, ArgBehavior);
       if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
