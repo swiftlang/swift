@@ -2982,3 +2982,38 @@ bb7:
   br bb5
 }
 
+// CHECK-LABEL: sil @test_constant_folding
+// CHECK:  [[R:%[0-9]+]] = integer_literal $Builtin.Int32, 30
+// CHECK:  return [[R]] : $Builtin.Int32
+// CHECK-NEXT: }
+sil @test_constant_folding : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %20 = integer_literal $Builtin.Int32, 20
+  %30 = integer_literal $Builtin.Int32, 30
+  cond_br %0, bb1, bb2
+bb1:
+  br bb3(%20 : $Builtin.Int32)
+bb2:
+  br bb3(%30 : $Builtin.Int32)
+
+bb3(%2 : $Builtin.Int32):
+  %3 = builtin "cmp_slt_Int32"(%2 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %3, bb4, bb5
+bb4:
+  br bb6(%20 : $Builtin.Int32)
+bb5:
+  br bb6(%30 : $Builtin.Int32)
+
+bb6(%4 : $Builtin.Int32):
+  %5 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %5, bb7, bb8
+bb7:
+  br bb9(%20 : $Builtin.Int32)
+bb8:
+  br bb9(%30 : $Builtin.Int32)
+
+bb9(%6 : $Builtin.Int32):
+  return %6 : $Builtin.Int32
+}
+
