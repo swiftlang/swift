@@ -14,7 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Glibc
+#if os(Linux) || os(FreeBSD)
+  import Glibc
+#else
+  import Darwin
+#endif
 import CTensorFlow
 
 /// The configuration for the compiler runtime.
@@ -44,12 +48,14 @@ public final class TensorProgram {
   var returnValues: [CTensorHandle?]
   var returnValueCount: CInt
 
+#if os(Linux) || os(FreeBSD)
   /// The thread to run tensor computation in.
   /// TODO(hongm): For pthread portability on Darwin and other OSes, see
   /// swift/stdlib/private/SwiftPrivatePthreadExtras/SwiftPrivatePthreadExtras.swift
   /// https://github.com/ketzusaka/Strand/blob/master/Sources/Strand.swift
   /// Also assess Windows portability (where pthread_create does not exist).
   var pthread: pthread_t
+#endif
 
   /// Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
   /// and 'size', start the computation, and return a state object as a unique
@@ -118,7 +124,6 @@ public final class TensorProgram {
     }
     funcs.deallocate()
 
-
     // Now that we have them in our context, we can get ready to call the top
     // level function, which we know is always called "the_function".
     self.op = TFE_NewOp(context, "the_function", status)
@@ -131,8 +136,11 @@ public final class TensorProgram {
 
     self.returnValues = [CTensorHandle?](repeating: nil, count: resultCount)
     self.returnValueCount = CInt(resultCount)
+#if os(Linux) || os(FreeBSD)
     self.pthread = 0
+#endif
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+#if os(Linux)
       let programPtr = Unmanaged.passRetained(self).toOpaque()
       // When the closure gets long, split it into a static function that takes a
       // TensorProgram.
@@ -147,6 +155,10 @@ public final class TensorProgram {
       }, UnsafeMutableRawPointer(programPtr))
       // TODO(hongm): do error handling.
       internalConsistencyCheck(createStatus == 0)
+#else
+      print("asynchronous execution not supported on this host yet")
+      abort()
+#endif
     } else {
       // Log a debug message to differentiate from async computation.
       logToStderr("Running tensor computation synchronously.")
@@ -170,9 +182,11 @@ public final class TensorProgram {
   @_versioned
   func terminate() {
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+#if os(Linux) || os(FreeBSD)
       // TODO(hongm): Assess TF's thread cancel support.
       let cancelStatus = pthread_cancel(pthread)
       internalConsistencyCheck(cancelStatus == 0)
+#endif
     }
   }
 
@@ -181,8 +195,10 @@ public final class TensorProgram {
   @_versioned
   func finish() -> [CTensorHandle] {
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
+#if os(Linux) || os(FreeBSD)
       let joinStatus = pthread_join(pthread, nil)
       internalConsistencyCheck(joinStatus == 0)
+#endif
     }
     // Now that all the elements have been filled in, remove a level of optional.
     return self.returnValues.map { $0! }
