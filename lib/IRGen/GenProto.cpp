@@ -746,9 +746,7 @@ namespace {
     SmallVector<WitnessTableEntry, 16> Entries;
 
   public:
-    void addProtocolConformanceDescriptor() {
-      Entries.push_back(WitnessTableEntry::forProtocolConformanceDescriptor());
-    }
+    void addProtocolConformanceDescriptor() { }
 
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
@@ -826,7 +824,7 @@ namespace {
     llvm::Value *apply(IRGenFunction &IGF, llvm::Value *wtable) const {
       for (unsigned i = ReversePath.size(); i != 0; --i) {
         wtable = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                                  ReversePath[i-1]);
+                                   ReversePath[i-1].forProtocolWitnessTable());
         wtable = IGF.Builder.CreateBitCast(wtable, IGF.IGM.WitnessTablePtrTy);
       }
       return wtable;
@@ -1250,7 +1248,8 @@ public:
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
       auto piIndex = PI.getBaseIndex(baseProto);
-      assert((size_t)piIndex.getValue() == Table.size() &&
+      assert((size_t)piIndex.getValue() ==
+              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
       
@@ -1295,7 +1294,8 @@ public:
              && "sil witness table does not match protocol");
       auto piIndex =
         PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
-      assert((size_t)piIndex.getValue() == Table.size() &&
+      assert((size_t)piIndex.getValue() ==
+              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
 
@@ -1326,7 +1326,8 @@ public:
                == requirement.getAssociation()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedTypeIndex(requirement);
-      assert((size_t)piIndex.getValue() == Table.size() &&
+      assert((size_t)piIndex.getValue() ==
+              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
 
@@ -1374,7 +1375,8 @@ public:
                requirement.getAssociatedRequirement()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedConformanceIndex(requirement);
-      assert((size_t)piIndex.getValue() == Table.size() &&
+      assert((size_t)piIndex.getValue() ==
+              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
 
@@ -2073,16 +2075,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
   // Build the witnesses.
   ConstantInitBuilder builder(*this);
-  auto witnesses = builder.beginArray(Int8PtrTy);
-  WitnessTableBuilder wtableBuilder(*this, witnesses, wt);
+  auto wtableContents = builder.beginArray(Int8PtrTy);
+  WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
   wtableBuilder.build();
   
-  assert(getProtocolInfo(wt->getConformance()->getProtocol())
-           .getNumWitnesses() == witnesses.size()
+  assert((getProtocolInfo(wt->getConformance()->getProtocol())
+           .getNumWitnesses() + WitnessTableFirstRequirementOffset)
+          == wtableContents.size()
          && "witness table size doesn't match ProtocolInfo");
 
   // Produce the initializer value.
-  auto initializer = witnesses.finishAndCreateFuture();
+  auto initializer = wtableContents.finishAndCreateFuture();
 
   auto global = cast<llvm::GlobalVariable>(
                     getAddrOfWitnessTable(wt->getConformance(), initializer));
@@ -2280,7 +2283,8 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                   llvm::Value *wtable,
                                   WitnessIndex index,
                                   llvm::Value *associatedTypeMetadata) {
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                             index.forProtocolWitnessTable());
 
   // Cast the witness to the appropriate function type.
   auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
@@ -2376,7 +2380,8 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (source) {
       WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
-      source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
+      source = emitInvariantLoadOfOpaqueWitness(IGF, source,
+                                              index.forProtocolWitnessTable());
       source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
       setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
                                   inheritedProtocol);
@@ -3106,7 +3111,8 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto);
   auto index = fnProtoInfo.getFunctionIndex(fn);
   llvm::Value *witnessFnPtr =
-    emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+    emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                     index.forProtocolWitnessTable());
 
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(member);
   Signature signature = IGF.IGM.getSignature(fnType);
@@ -3150,7 +3156,8 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                 AssociatedType associatedType) {
   auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol());
   auto index = pi.getAssociatedTypeIndex(associatedType);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                            index.forProtocolWitnessTable());
 
   // Cast the witness to the appropriate function type.
   auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();

@@ -5453,11 +5453,11 @@ namespace {
 
       B.addInt16(DefaultWitnesses
                    ? DefaultWitnesses->getMinimumWitnessTableSize()
-                   : pi.getNumWitnesses() - WitnessTableFirstRequirementOffset);
-      B.addInt16(pi.getNumWitnesses() - WitnessTableFirstRequirementOffset);
+                   : pi.getNumWitnesses());
+      B.addInt16(pi.getNumWitnesses());
 
       // If there are no entries, just add a null reference and return.
-      if (pi.getNumWitnesses() == WitnessTableFirstRequirementOffset) {
+      if (pi.getNumWitnesses() == 0) {
         B.addInt(IGM.RelativeAddressTy, 0);
         return;
       }
@@ -5469,9 +5469,6 @@ namespace {
       ConstantInitBuilder reqtBuilder(IGM);
       auto reqtsArray = reqtBuilder.beginArray(IGM.ProtocolRequirementStructTy);
       for (auto &entry : pi.getWitnessEntries()) {
-        if (entry.isProtocolConformanceDescriptor())
-          continue;
-
         auto reqt = reqtsArray.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);
