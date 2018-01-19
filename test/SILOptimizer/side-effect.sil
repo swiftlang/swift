@@ -42,7 +42,7 @@ sil @unknown_func : $@convention(thin) () -> ()
 
 
 struct SP {
-  var value: X
+  var value: Builtin.BridgeObject
 }
 
 enum EP {
@@ -147,7 +147,7 @@ bb0(%0 : $*X, %1 : $X):
 }
 
 // CHECK-LABEL: sil @release_owned
-// CHECK: <func=,param0=->
+// CHECK: <func=rw+-,param0=-;alloc;trap;readrc>
 sil @release_owned : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   strong_release %0 : $X
@@ -291,8 +291,7 @@ bb0(%0 : $EP):
   %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt.1
   %te = tuple_extract %ee : $(SP, Builtin.Int1), 0
   %se = struct_extract %te : $SP, #SP.value
-  %urc = unchecked_ref_cast %se : $X to $Builtin.BridgeObject
-  %utbc = unchecked_trivial_bit_cast %urc : $Builtin.BridgeObject to $Builtin.RawPointer
+  %utbc = unchecked_trivial_bit_cast %se : $Builtin.BridgeObject to $Builtin.RawPointer
   %idx = integer_literal $Builtin.Int32, 0
   %irp = index_raw_pointer %utbc : $Builtin.RawPointer, %idx : $Builtin.Int32
   %pta = pointer_to_address %irp : $Builtin.RawPointer to [strict] $*Int32

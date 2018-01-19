@@ -878,7 +878,6 @@ void ReleaseCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
 
 bool ReleaseCodeMotionContext::performCodeMotion() {
   bool Changed = false;
-  SmallVector<SILInstruction *, 8> NewReleases;
   // Create the new releases at each anchor point.
   for (auto RC : RCRootVault) {
     auto Iter = InsertPoints.find(RC);
@@ -889,12 +888,10 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
       // point. Check if the successor instruction is reusable, reuse it, do
       // not insert new instruction and delete old one.
       if (auto I = getPrevReusableInst(IP, Iter->first)) {
-        if (RCInstructions.erase(I))
-          NewReleases.push_back(I);
+        RCInstructions.erase(I);
         continue;
       }
-      if (SILInstruction *I = createDecrementBefore(Iter->first, IP).getPtrOrNull())
-        NewReleases.push_back(I);
+      createDecrementBefore(Iter->first, IP);
       Changed = true;
     }
   }
@@ -903,23 +900,6 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
     ++NumReleasesHoisted;
     recursivelyDeleteTriviallyDeadInstructions(R, true);
   }
-
-  // Eliminate pairs of retain-release if they are adjacent to each other and
-  // retain/release the same RCRoot, e.g.
-  //    strong_retain %2
-  //    strong_release %2
-  for (SILInstruction *ReleaseInst : NewReleases) {
-    auto InstIter = ReleaseInst->getIterator();
-    if (InstIter == ReleaseInst->getParent()->begin())
-      continue;
-
-    SILInstruction *PrevInst = &*std::prev(InstIter);
-    if (isRetainInstruction(PrevInst) && getRCRoot(PrevInst) == getRCRoot(ReleaseInst)) {
-      recursivelyDeleteTriviallyDeadInstructions(PrevInst, true);
-      recursivelyDeleteTriviallyDeadInstructions(ReleaseInst, true);
-    }
-  }
-
   return Changed;
 }
 
