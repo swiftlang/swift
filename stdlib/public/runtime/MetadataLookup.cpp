@@ -383,7 +383,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
       continue;
 
     if (currentAssocTypeIdx == matchingAssocTypeIdx)
-      return reqIdx;
+      return reqIdx + WitnessTableFirstRequirementOffset;
 
     ++currentAssocTypeIdx;
   }

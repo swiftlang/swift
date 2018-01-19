@@ -439,6 +439,10 @@ public:
                                    Entries, ConditionalConformances);
   }
 
+  void addProtocolConformanceDescriptor() {
+  }
+
+
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
     assert(Lowering::TypeConverter::protocolRequiresWitnessTable(baseProtocol));
 
@@ -724,6 +728,8 @@ public:
   void addMissingDefault() {
     DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
   }
+
+  void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
     addMissingDefault();

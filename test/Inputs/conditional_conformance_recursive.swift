@@ -28,12 +28,14 @@ extension Wrapper: P3 where T: P3 { }
 // CHECK:   [[T_TO_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** [[WRAPPER_T_TO_P2:%.*]], i32 -1
 // CHECK:   [[T_TO_P2_VAL:%.*]] = load i8*, i8** [[T_TO_P2_PTR]]
 // CHECK:   [[T_TO_P2:%.*]] = bitcast i8* [[T_TO_P2_VAL]] to i8**
-// CHECK:   [[T_TO_P1_VAL:%.*]] = load i8*, i8** [[T_TO_P2]]
+// CHECK:   [[T_TO_P1_VAL_GEP:%.*]] = getelementptr inbounds i8*, i8** [[T_TO_P2]], i32 1
+// CHECK:   [[T_TO_P1_VAL:%.*]] = load i8*, i8** [[T_TO_P1_VAL_GEP]]
 // CHECK:   [[T_TO_P1:%.*]] = bitcast i8* [[T_TO_P1_VAL]] to i8**
 // CHECK:   [[WRAPPER_T_TYPE:%.*]] = bitcast %swift.type* [[WRAPPER_T:%.*]] to %swift.type**
 // CHECK:   [[T_TYPE_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[WRAPPER_T_TYPE]], i64 2
 // CHECK:   [[T_TYPE:%.*]] = load %swift.type*, %swift.type** [[T_TYPE_PTR]]
-// CHECK:   [[T_B_TYPE_ACCESSOR_PTR:%.*]] = load i8*, i8** [[T_TO_P1]], align 8
+// CHECK:   [[T_B_TYPE_ACCESSOR_PTR_GEP:%.*]] = getelementptr inbounds i8*, i8** [[T_TO_P1]], i32 1
+// CHECK:   [[T_B_TYPE_ACCESSOR_PTR:%.*]] = load i8*, i8** [[T_B_TYPE_ACCESSOR_PTR_GEP]], align 8
 // CHECK:   [[T_B_TYPE_ACCESSOR:%.*]] = bitcast i8* [[T_B_TYPE_ACCESSOR_PTR]] to %swift.type* (%swift.type*, i8**)*
 // CHECK:   [[T_A_TYPE:%.*]] = call %swift.type* [[T_B_TYPE_ACCESSOR]](%swift.type* [[T_TYPE]], i8** [[T_TO_P1]])
 // CHECK:   ret %swift.type* [[T_A_TYPE]]
