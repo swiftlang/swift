@@ -53,19 +53,19 @@ public struct Tensor<Unit : AccelerableTensorUnit> {
 
 @_versioned @inline(never)
 @_silgen_name("__tf_send")
-func _TFSend<T>(_ handle: TensorHandle<T>) -> TensorHandle<T> {
+func _TFSend<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_receive")
-func _TFReceive<T>(_ handle: TensorHandle<T>) -> TensorHandle<T> {
+func _TFReceive<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_scalarize")
-func _TFScalarize<T>(_ handle: TensorHandle<T>) -> T? {
+func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
   return handle.makeHostCopy().scalar
 }
 
@@ -170,6 +170,7 @@ public extension Tensor {
     units.withUnsafeBufferPointer { ptr in
       addr.assign(from: ptr.baseAddress!, count: contiguousSize)
     }
+
     /// Create handle and we are done
     let cHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
@@ -191,6 +192,7 @@ public extension Tensor {
     let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
     /// Memset to `repeatedValue`
     addr.initialize(repeating: repeatedValue, count: contiguousSize)
+
     /// Create handle and we are done
     let cHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
