@@ -97,6 +97,10 @@ class SILPerformanceInliner {
     /// specialization for a call.
     GenericSpecializationBenefit = RemovedCallBenefit + 300,
 
+    /// The benefit of inlining class methods with -Osize.
+    /// We only inline very small class methods with -Osize.
+    OSizeClassMethodBenefit = 5,
+
     /// Approximately up to this cost level a function can be inlined without
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
@@ -243,6 +247,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
+  bool isClassMethodAtOsize = false;
   if (OptMode == OptimizationMode::ForSize) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
@@ -253,9 +258,8 @@ bool SILPerformanceInliner::isProfitableToInline(
       auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
-        return false;
+        isClassMethodAtOsize = true;
     }
-
     // Use command line option to control inlining in Osize mode.
     const uint64_t CallerBaseBenefitReductionFactor = AI.getFunction()->getModule().getOptions().CallerBaseBenefitReductionFactor;
     BaseBenefit = BaseBenefit / CallerBaseBenefitReductionFactor;
@@ -263,8 +267,13 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
-  if (isPureCall(AI, SEA))
+  if (isPureCall(AI, SEA)) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    pure-call decision " << Callee->getName() << '\n';
+    );
     return true;
+  }
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
@@ -294,7 +303,6 @@ bool SILPerformanceInliner::isProfitableToInline(
   }
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
-  //  Benefit = 1;
 
   // Go through all blocks of the function, accumulate the cost and find
   // benefits.
@@ -431,6 +439,9 @@ bool SILPerformanceInliner::isProfitableToInline(
   if (bbIt != BBToWeightMap.end()) {
     return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
                                 NumCallerBlocks, bbIt);
+  }
+  if (isClassMethodAtOsize && Benefit > OSizeClassMethodBenefit) {
+    Benefit = OSizeClassMethodBenefit;
   }
 
   // This is the final inlining decision.
