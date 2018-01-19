@@ -5452,10 +5452,9 @@ namespace {
       auto &pi = IGM.getProtocolInfo(Protocol);
 
       B.addInt16(DefaultWitnesses
-                   ? (DefaultWitnesses->getMinimumWitnessTableSize()
-                       + WitnessTableFirstRequirementOffset)
-                   : pi.getNumWitnesses());
-      B.addInt16(pi.getNumWitnesses());
+                   ? DefaultWitnesses->getMinimumWitnessTableSize()
+                   : pi.getNumWitnesses() - WitnessTableFirstRequirementOffset);
+      B.addInt16(pi.getNumWitnesses() - WitnessTableFirstRequirementOffset);
 
       // If there are no entries, just add a null reference and return.
       if (pi.getNumWitnesses() == WitnessTableFirstRequirementOffset) {

@@ -25,8 +25,8 @@ import resilient_protocol
 
 // CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(protected )?}}constant %swift.protocol {
 // CHECK-SAME:   i32 1031,
-// CHECK-SAME:   i16 5,
-// CHECK-SAME:   i16 9,
+// CHECK-SAME:   i16 4,
+// CHECK-SAME:   i16 8,
 // CHECK-SAME:   i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint ([8 x %swift.protocol_requirement]* [[RP_REQTS]] to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience17ResilientProtocolMp", i32 0
 // CHECK-SAME: }
 
@@ -47,8 +47,8 @@ public protocol ResilientProtocol {
 
 // CHECK: @"$S19protocol_resilience16InternalProtocolMp" = hidden constant %swift.protocol {
 // CHECK-SAME:   i32 7,
-// CHECK-SAME:   i16 2,
-// CHECK-SAME:   i16 2,
+// CHECK-SAME:   i16 1,
+// CHECK-SAME:   i16 1,
 // CHECK-SAME:   i32{{ | trunc \(i64 }}sub ({{i32|i64}} ptrtoint ([1 x %swift.protocol_requirement]* [[IP_REQTS:@.*]] to {{i32|i64}}), {{i32|i64}} ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience16InternalProtocolMp", i32 0
 // CHECK-SAME: }
 
