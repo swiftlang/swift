@@ -291,6 +291,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->getOverriddenDecl())
         return;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
+      if (!D->isObjC())
+        return;
+
       // Ensure that the declaration has a type.
       if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;

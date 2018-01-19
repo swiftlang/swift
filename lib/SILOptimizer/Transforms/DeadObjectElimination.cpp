@@ -193,14 +193,11 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
-  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
-    return true;
-
+static bool canZapInstruction(SILInstruction *Inst) {
   // It is ok to eliminate various retains/releases. We are either removing
   // everything or nothing.
   if (isa<RefCountingInst>(Inst) || isa<StrongPinInst>(Inst))
-    return acceptRefCountInsts;
+    return true;
 
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
@@ -230,8 +227,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
-                    bool acceptRefCountInsts) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -250,7 +246,7 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I, acceptRefCountInsts)) {
+    if (!canZapInstruction(I)) {
       DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
@@ -699,11 +695,15 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
     DestructorAnalysisCache[Type] = HasSideEffects;
   }
 
+  if (HasSideEffects) {
+    DEBUG(llvm::dbgs() << " Destructor had side effects. \n");
+    return false;
+  }
+
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ARI, UsersToRemove,
-                          /*acceptRefCountInsts=*/ !HasSideEffects)) {
+  if (hasUnremovableUsers(ARI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -723,7 +723,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
 
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true)) {
+  if (hasUnremovableUsers(ASI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
