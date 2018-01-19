@@ -54,12 +54,11 @@ public func testScalar(f: Float) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:   %1 = metatype $@thick Float.Type
-// CHECK-NEXT:   %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %3 = builtin "__tfop_Const__dc:t__"(%1 : $@thick Float.Type, %2 : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK-NEXT:   %4 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = builtin "__tfop_Add__tt:t__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   return %5 : $TensorHandle<Float>
+// CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:   %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Float>
+// CHECK-NEXT:   %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %4 = builtin "__tfop_Add__tt:t__"(%3 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   return %4 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
 
@@ -96,11 +95,10 @@ public func testExitBranch(i : Int) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch{{.*}}
 // CHECK: sil private @{{.*}}testExitBranch{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = metatype $@thick Float.Type
-// CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %2 = builtin "__tfop_Const__dc:t__"(%0 : $@thick Float.Type, %1 : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK-NEXT:   %3 = builtin "__tfop_Add__tt:t__"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   return %3 : $TensorHandle<Float>
+// CHECK-NEXT:   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:   %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Float>
+// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   return %2 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
 

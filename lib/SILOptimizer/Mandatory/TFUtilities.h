@@ -1,4 +1,4 @@
-//===--- TensorFlow.h - Definitions for TensorFlow lowering xforms --------===//
+//===--- TFUtilities.h - TensorFlow lowering utilities ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -49,6 +49,9 @@ namespace tf {
     /// The instruction being analyzed.
     SILInstruction *inst;
 
+    /// This is the name for the entire builtin that we'll partition out.
+    StringRef builtinName;
+
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
@@ -71,6 +74,10 @@ namespace tf {
       return getTensorConstantOperand(inst->getOperand(operandNumber));
     }
     LiteralInst *getTensorConstantOperand(SILValue v);
+
+  private:
+    bool decodeBuiltin(BuiltinInst *inst);
+    bool decodeTFInitScalar(ApplyInst *inst);
   };
 
 

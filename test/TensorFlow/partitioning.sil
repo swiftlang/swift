@@ -1,21 +1,20 @@
+// RUN: %target-sil-opt -tf-partition %s -o /dev/null
 // RUN: %target-sil-opt -tf-partition %s -o /dev/null | %FileCheck %s
 
 import Builtin
 import Swift
 import TensorFlow
 
-sil @_T018__tfop_Const__dc__Sf_Tg5 : $@convention(thin) (Swift.Float) -> @owned TensorHandle<Swift.Float>
-sil @_T016__tfop_Add__tt__Sf_Tg5Tf4gg_n : $@convention(thin) (@guaranteed TensorHandle<Swift.Float>, @guaranteed TensorHandle<Swift.Float>) -> @owned TensorHandle<Swift.Float>
+sil [noinline] @__tf_init_scalar : $@convention(thin) <τ_0_0 where τ_0_0 : AccelerableTensorUnit> (@in τ_0_0) -> @owned TensorHandle<τ_0_0>
 
 // Test that a single constant can be partitioned out, the most basic
 // case possible.
 
 // CHECK-LABEL: -- TFPartition Accelerator Result: simple_test
 // CHECK: bb0:
-// CHECK-NEXT: %0 = metatype $@thick Float.Type
-// CHECK-NEXT: %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT: %2 = builtin "__tfop_Const__dc:t__"(%0 : $@thick Float.Type, %1 : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK-NEXT: return %2 : $TensorHandle<Float>
+// CHECK-NEXT: %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT: %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Float>
+// CHECK-NEXT: return %1 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
 // CHECK-LABEL: --- TFPartition Host Result: simple_test
@@ -30,9 +29,12 @@ sil @simple_test : $@convention(thin) () -> TensorHandle<Swift.Float> {
 bb0:
   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1.0
   %1 = struct $Swift.Float (%0 : $Builtin.FPIEEE32)
-  debug_value %1 : $Swift.Float, let, name "value", argno 1 // id: %2
-  %4 = metatype $@thick Float.Type
-  %5 = builtin "__tfop_Const__dc:t__"(%4 : $@thick Float.Type, %1: $Swift.Float) : $TensorHandle<Swift.Float>
+
+  %2 = alloc_stack $Float
+  store %1 to [trivial] %2 : $*Float
+  %4 = function_ref @__tf_init_scalar : $@convention(thin) <τ_0_0 where τ_0_0 : AccelerableTensorUnit> (@in τ_0_0) -> @owned TensorHandle<τ_0_0> // users: %11, %5
+  %5 = apply %4<Float>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : AccelerableTensorUnit> (@in τ_0_0) -> @owned TensorHandle<τ_0_0>
+  dealloc_stack %2 : $*Float
 
   return %5 : $TensorHandle<Swift.Float>
 }
