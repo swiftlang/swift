@@ -5851,7 +5851,8 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
   ExtraTagBitCount = numTagBits <= commonSpareBitCount
     ? 0 : numTagBits - commonSpareBitCount;
-  NumExtraTagValues = numTags >> commonSpareBitCount;
+  NumExtraTagValues =
+      (commonSpareBitCount < 32) ? numTags >> commonSpareBitCount : 0;
 
   // Create the type. We need enough bits to store the largest payload plus
   // extra tag bits we need.
