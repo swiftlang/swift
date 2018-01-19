@@ -477,9 +477,12 @@ extension Set {
   ///   buffer.
   @_inlineable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
+    let reservedCapacity = _NativeBuffer.minimumCapacity(
+      minimumCount: minimumCapacity,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
     _variantBuffer =
       _VariantBuffer.native(
-        _NativeBuffer(minimumCapacity: minimumCapacity))
+        _NativeBuffer(minimumCapacity: reservedCapacity))
   }
 
   /// Private initializer.
@@ -1751,8 +1754,11 @@ public struct Dictionary<Key : Hashable, Value> {
   ///   allocate buffer for in the new dictionary.
   @_inlineable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
+    let reservedCapacity = _NativeBuffer.minimumCapacity(
+      minimumCount: minimumCapacity,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
     _variantBuffer =
-      .native(_NativeBuffer(minimumCapacity: minimumCapacity))
+      .native(_NativeBuffer(minimumCapacity: reservedCapacity))
   }
 
   /// Creates a new dictionary from the key-value pairs in the given sequence.
@@ -4027,7 +4033,7 @@ extension _Native${Self}Buffer
     maxLoadFactorInverse: Double
   ) -> Int {
     // `minimumCount + 1` below ensures that we don't fill in the last hole
-    return max(Int(Double(minimumCount) * maxLoadFactorInverse),
+    return max(Int((Double(minimumCount) * maxLoadFactorInverse).rounded(.up)),
                minimumCount + 1)
   }
 
@@ -6404,11 +6410,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
   @_inlineable // FIXME(sil-serialize-all)
   public init(count: Int) {
-    let requiredCapacity =
-      _Native${Self}Buffer<${TypeParameters}>.minimumCapacity(
-        minimumCount: count,
-        maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    _result = ${Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
+    _result = ${Self}<${TypeParameters}>(minimumCapacity: count)
     _nativeBuffer = _result._variantBuffer.asNative
     _requestedCount = count
     _actualCount = 0
@@ -6507,6 +6509,7 @@ extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variantBuffer.reserveCapacity(minimumCapacity)
+    _sanityCheck(self.capacity >= minimumCapacity)
   }
 }
 
