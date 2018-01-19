@@ -10,19 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the utilities functions and common type alises.
+// This file defines utility functions and common type aliases.
 //
 //===----------------------------------------------------------------------===//
 
-import Glibc
+#if os(Linux) || os(FreeBSD)
+  import Glibc
+#else
+  import Darwin
+#endif
 import CTensorFlow
 
 //===----------------------------------------------------------------------===//
 // - MARK: Runtime checkers
 //===----------------------------------------------------------------------===//
 
-/// These checks run in both debug and release modes (while assert() only runs in
-/// debug mode), to help shake out more bugs and facilitate debugging in the
+/// These checks run in both debug and release modes (while assert() only runs
+/// in debug mode), to help shake out more bugs and facilitate debugging in the
 /// early project phases. It can be replaced with plain assert() later, when we
 /// have a more mature code base.
 @_versioned
@@ -67,11 +71,15 @@ typealias CTFEOp = OpaquePointer
 // - MARK: Logging
 //===----------------------------------------------------------------------===//
 
+#if os(MacOS)
+let stderr = __strerrp
+#endif
+
 /// Log to standard error.
 func logToStderr(_ message: StaticString) {
   message.utf8Start
     .withMemoryRebound(to: Int8.self, capacity: message.utf8CodeUnitCount) {
-    _ = fputs($0, stderr)
+  _ = fputs($0, stderr)
   }
 }
 
