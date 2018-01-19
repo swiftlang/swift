@@ -335,7 +335,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
 /////////////////////////////////////////////////
 
 static HeapObjectSideTableEntry *weakRetainALot(TestObject *object, uint64_t count) {
-  if (count == 0) return nil;
+  if (count == 0) return nullptr;
   
   auto side = object->refCounts.formWeakReference();
   for (uint64_t i = 1; i < count; i++) {
