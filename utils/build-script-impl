@@ -1840,12 +1840,6 @@ function set_lldb_xcodebuild_options() {
 	    -enableAddressSanitizer=YES
 	)
     fi
-    if [[ "${ENABLE_UBSAN}" ]] ; then
-	lldb_xcodebuild_options=(
-	    "${lldb_xcodebuild_options[@]}"
-	    -enableUndefinedBehaviorSanitizer=YES
-	)
-    fi
 }
 
 #
