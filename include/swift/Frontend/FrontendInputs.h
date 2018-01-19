@@ -173,4 +173,6 @@ public:
 };
 
 } // namespace swift
-#endif /* SWIFT_FRONTEND_ΩRONTENDINPUTS_H */
+
+#endif /* SWIFT_FRONTEND_FRONTENDINPUTS_H */
+

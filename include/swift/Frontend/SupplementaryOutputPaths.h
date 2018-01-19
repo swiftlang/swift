@@ -1,8 +1,8 @@
-//===--- SupplementaryOutputPaths.h - Command to Execute ------------------===//
+//===--- SupplementaryOutputPaths.h - Command to Execute -------*- C++ -*-===*\\
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SupplementaryOutputPaths_h
-#define SupplementaryOutputPaths_h
+#ifndef SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
+#define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 namespace swift {
 struct SupplementaryOutputPaths {
@@ -61,4 +61,4 @@ struct SupplementaryOutputPaths {
 };
 } // namespace swift
 
-#endif /* SupplementaryOutputPaths_h */
+#endif /* SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H */
