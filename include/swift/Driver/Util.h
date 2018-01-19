@@ -45,6 +45,7 @@ namespace driver {
   struct FilelistInfo {
     enum class WhichFiles : unsigned {
       Input,
+      PrimaryInputs,
       Output
     };
 

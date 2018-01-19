@@ -800,7 +800,8 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
     return false;
   }
 
-  if (filelistInfo.whichFiles == FilelistInfo::WhichFiles::Input) {
+  switch (filelistInfo.whichFiles) {
+  case FilelistInfo::WhichFiles::Input:
     // FIXME: Duplicated from ToolChains.cpp.
     for (const Job *input : job->getInputs()) {
       const CommandOutput &outputInfo = input->getOutput();
@@ -813,11 +814,19 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
           out << output << "\n";
       }
     }
-  } else {
+    break;
+  case FilelistInfo::WhichFiles::PrimaryInputs:
+    for (const Action *A : job->getSource().getInputs()) {
+      const auto *IA = cast<InputAction>(A);
+      out << IA->getInputArg().getValue() << "\n";
+    }
+    break;
+  case FilelistInfo::WhichFiles::Output:
     const CommandOutput &outputInfo = job->getOutput();
     assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
     for (auto &output : outputInfo.getPrimaryOutputFilenames())
       out << output << "\n";
+    break;
   }
 
   return true;
