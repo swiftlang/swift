@@ -1719,6 +1719,9 @@ static std::unique_ptr<llvm::SetVector<Expr*>>
     bool walkToExprPre(Expr *E) {
       if (E->isImplicit())
         return true;
+      // FIXME: we should have ErrorType instead of null.
+      if (E->getType().isNull())
+        return true;
       auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
       //Only binary concatenation operators should exist in expression
       if (E->getKind() == ExprKind::Binary) {
