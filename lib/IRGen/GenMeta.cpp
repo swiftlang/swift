@@ -3339,6 +3339,12 @@ namespace {
     void addClassFlags() {
       auto flags = ClassFlags();
 
+#if !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+      // FIXME: Remove this after enabling stable ABI.
+      // This bit is NOT conditioned on UseDarwinPreStableABIBit.
+      flags |= ClassFlags::IsSwiftPreStableABI;
+#endif
+
       // Set a flag if the class uses Swift refcounting.
       auto type = Target->getDeclaredType()->getCanonicalType();
       if (getReferenceCountingForType(IGM, type)
@@ -3878,7 +3884,12 @@ namespace {
       // The rodata pointer will be instantiated here.
       // Make sure we at least set the 'is Swift class' bit, though.
       ClassRODataPtrOffset = getNextOffsetFromTemplateHeader();
-      B.addInt(IGM.MetadataKindTy, 1);
+      if (!IGM.ObjCInterop) {
+        // FIXME: Remove null data altogether rdar://problem/18801263
+        B.addInt(IGM.MetadataKindTy, 1);
+      } else {
+        B.addInt(IGM.MetadataKindTy, IGM.UseDarwinPreStableABIBit ? 1 : 2);
+      }
     }
     
     void addDependentData() {
