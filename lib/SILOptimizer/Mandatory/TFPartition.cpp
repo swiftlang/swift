@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-partition"
-#include "TensorFlow.h"
+#include "TFUtilities.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -112,14 +112,11 @@ static bool canMoveOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
 static std::string getPartitionedScalarOpName(SILInstruction *I) {
   // We can turn integer and FP literals into constant nodes if their type is
   // compatible.
-  // FIXME(clattner): Disable scalar promotion for now, we will need a new approach.
-#if 0
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
     auto resultTy = I->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
-      return "__tfop_Const__dc:t__";
+      return "__tfop_Const__cd:t__";
   }
-#endif
 
   auto *BI = dyn_cast<BuiltinInst>(I);
   if (!BI) return std::string();
@@ -879,6 +876,8 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
       markValue(inst.getOperand(nextOperand++), &inst);
       break;
     case OpCommand::AddDType:
+      // No operand to mark.
+      break;
     case OpCommand::Constant:
       // No need to mark these operands.
       ++nextOperand;
@@ -1221,8 +1220,9 @@ public:
     return convertToTensorHandleType(ty);
   }
 
-  void visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo);
+  void visitOpInst(SingleValueInstruction *inst, TensorOpInfo &tfopInfo);
   void visitBuiltinInst(BuiltinInst *inst);
+  void visitApplyInst(ApplyInst *inst);
   void visitLiteralInst(LiteralInst *inst);
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
     visitLiteralInst(inst);
@@ -1323,7 +1323,8 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 
 
 // Transform ops builtin instructions to the one we need in the tensor program.
-void PartitionCloner::visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo) {
+void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
+                                  TensorOpInfo &tfopInfo) {
   auto &B = getBuilder();
   SmallVector<SILValue, 4> args;
   auto loc = remapLocation(inst->getLoc());
@@ -1335,7 +1336,7 @@ void PartitionCloner::visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo) {
     return ourInst;
   };
 
-  unsigned nextOperand = 0;
+  unsigned nextOperand = isa<ApplyInst>(inst);  // Skip callee.
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
     case OpCommand::Tensor:
@@ -1347,15 +1348,14 @@ void PartitionCloner::visitOpInst(BuiltinInst *inst, TensorOpInfo &tfopInfo) {
       args.push_back(cloneSingleInst(cst)->getResults()[0]);
       break;
     }
-    case OpCommand::AddDType: {
-      auto metatype = cast<MetatypeInst>(inst->getOperand(nextOperand++));
-      args.push_back(cloneSingleInst(metatype)->getResults()[0]);
+    case OpCommand::AddDType:
+      // Nothing to do for this.
       break;
-    }
     }
   }
 
-  auto result = B.createBuiltin(loc, inst->getName(), inst->getType(),
+  auto name = B.getASTContext().getIdentifier(tfopInfo.builtinName);
+  auto result = B.createBuiltin(loc, name, inst->getType(),
                                 /*substitutionlist*/{}, args);
   ValueMap[inst] = result;
 }
@@ -1407,6 +1407,17 @@ void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
   ValueMap[inst] = result;
 }
 
+// If we're copying over an apply instruction, it is a function that we're
+// promoting to a builtin in the graph.
+void PartitionCloner::visitApplyInst(ApplyInst *inst) {
+  // Check to see if this is an op.
+  TensorOpInfo tfopInfo(*inst);
+  bool isTensorOp = tfopInfo.decode();
+  assert(isTensorOp && "Cloning a non-tensor apply?"); (void)isTensorOp;
+  return visitOpInst(inst, tfopInfo);
+}
+
+
 /// We clone over simple literals like:
 ///
 ///    %X = integer_literal $Builtin.Int32, 0
@@ -1426,13 +1437,9 @@ void PartitionCloner::visitLiteralInst(LiteralInst *inst) {
   ourCst->setDebugLocation(B.getSILDebugLocation(loc));
   B.getInsertionBB()->push_back(ourCst);
 
-  auto mtt = MetatypeType::get(inst->getType().getSwiftRValueType());
-  auto metatype =
-    B.createMetatype(loc,
-                     SILType::getPrimitiveObjectType(mtt->getCanonicalType()));
   auto result =
     B.createBuiltin(loc, name, remapType(inst->getType()),
-                    /*substitutionlist*/{}, { metatype, SILValue(ourCst) });
+                    /*substitutionlist*/{}, { SILValue(ourCst) });
   ValueMap[inst] = result;
 }
 

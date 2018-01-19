@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TensorFlow.h"
+#include "TFUtilities.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "TFCanonicalizeCFG.h"
 #ifdef CMAKE_INTDIR
@@ -155,7 +155,6 @@ public:
   bool checkStatus(SILLocation loc,
                    Diag<StringRef> id = diag::tf_lowering_error) {
     if (TF_GetCode(status) == TF_OK) return false;
-
     internalError(loc, TF_Message(status), id);
     return true;
   }
@@ -445,10 +444,10 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
 
     case OpCommand::AddDType: {
-      // This command adds the dtype of the metatype  the dtype attribute.
-      auto mt = cast<MetatypeInst>(inst->getOperand(nextOperand++));
-      auto type = mt->getType().getMetatypeInstanceType(SILFn->getModule());
-      TF_SetAttrType(op, "dtype", getTensorFlowDataType(type, inst->getLoc()));
+      // This command adds the dtype of the result tensor as a dtype attribute.
+      auto type = isTensorHandle(inst->getType().getSwiftRValueType());
+      assert(type && "Not a valid builtin");
+      TF_SetAttrType(op, "dtype", (TF_DataType)convertSwiftTypeToTF(type));
       break;
     }
     }
