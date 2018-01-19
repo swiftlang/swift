@@ -69,6 +69,13 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
   return handle.makeHostCopy().scalar
 }
 
+@_versioned @inline(never)
+@_silgen_name("__tf_init_scalar")
+func _TFInitScalar<Unit>(_ value: Unit) -> TensorHandle<Unit> {
+  let dtype = Unit.cDataType
+  return TensorHandle(cTensorHandle: _TFCCreateCTensorHandle(value, dtype))
+}
+
 //===----------------------------------------------------------------------===//
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
@@ -100,7 +107,7 @@ public extension Tensor {
   // Scalar (0-D) initializer, takes exactly one value.
   @_inlineable
   init(_ value: Unit) {
-    self.init(#tfop("Const", "dc:t", Unit.self, value))
+    self.init(_TFInitScalar(value))
   }
 
   /// Vector (1-D) initializer, takes an array of values.
