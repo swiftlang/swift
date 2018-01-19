@@ -42,7 +42,7 @@ sil @$S6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-native: %swift.opaque* null,
 // CHECK-native: %swift.opaque* null,
 // CHECK-native: i64 1,
-// CHECK-native: i32 2, i32 0, i32 16, i16 7, i16 0,
+// CHECK-native: i32 {{3|2}}, i32 0, i32 16, i16 7, i16 0,
 // CHECK-native: i32 112, i32 16,
 // CHECK-native: @"$S6vtable1CCMn"
 // CHECK-native: [[C]]* (%swift.type*)* @"$S6vtable1CCACycACmcfC",
