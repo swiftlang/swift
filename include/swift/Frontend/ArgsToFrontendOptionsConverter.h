@@ -98,6 +98,9 @@ public:
       : Diags(Diags), Args(Args), Opts(Opts) {}
 
   bool convert();
+
+  static FrontendOptions::ActionType
+  determineRequestedAction(const llvm::opt::ArgList &);
 };
 
 } // namespace swift
