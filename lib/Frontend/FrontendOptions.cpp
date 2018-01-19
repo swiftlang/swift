@@ -27,8 +27,6 @@
 using namespace swift;
 using namespace llvm::opt;
 
-
-
 bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:

@@ -1,8 +1,8 @@
-//===--- InputFile.h - Command to Execute ---------------------------------===//
+//===--- InputFile.h --------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef InputFile_h
-#define InputFile_h
+#ifndef SWIFT_FRONTEND_INPUTFILE_H
+#define SWIFT_FRONTEND_INPUTFILE_H
 
 #include "llvm/Support/MemoryBuffer.h"
 #include <string>
@@ -42,13 +42,15 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(name.begin() != Filename.c_str());
-    assert(!name.empty() && "Empty strings signify no inputs in other places");
+    assert(!name.empty());
   }
 
   bool isPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const { return Filename; }
+  StringRef file() const {
+    assert(!Filename.empty());
+    return Filename;
+  }
 
   /// Return Swift-standard file name from a buffer name set by
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
@@ -59,4 +61,4 @@ public:
 };
 } // namespace swift
 
-#endif /* InputFile_h */
+#endif /* SWIFT_FRONTEND_INPUTFILE_H */

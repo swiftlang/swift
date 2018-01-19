@@ -1,8 +1,8 @@
-//===--- ArgsToFrontendOptionsConverter --------------------------------------//
+//===--- ArgsToFrontendOptionsConverter -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
+
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "swift/Option/Options.h"
@@ -401,8 +401,8 @@ bool ArgsToFrontendOptionsConverter::computeModuleName() {
                                               : diag::error_bad_module_name;
   Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
   Opts.ModuleName = "__bad__";
-  return false; // FIXME: dmu Must continue to run to pass the tests, but should
-  // not have to.
+  return false; // FIXME: Must continue to run to pass the tests, but should not
+  // have to.
 }
 
 bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
@@ -414,7 +414,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   // In order to pass some tests, must leave ModuleName empty.
   if (!Opts.Inputs.hasInputs()) {
     Opts.ModuleName = StringRef();
-    // FIXME: dmu This is a bug that should not happen, but does in tests.
+    // FIXME: This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
     // selected".
     return false;

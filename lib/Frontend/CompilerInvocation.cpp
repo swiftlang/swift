@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Frontend/Frontend.h"
+
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
@@ -80,7 +82,6 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
-
 
 static bool ParseFrontendArgs(FrontendOptions &opts, ArgList &args,
                               DiagnosticEngine &diags) {

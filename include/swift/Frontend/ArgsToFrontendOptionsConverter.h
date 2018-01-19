@@ -1,8 +1,8 @@
-//===--- ArgsToFrontendOptionsConverter.h ---------------------------------===//
+//=== = ---ArgsToFrontendOptionsConverter.h-- -----------------*-C++ - * -=== //
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ArgsToFrontendOptionsConverter_h
-#define ArgsToFrontendOptionsConverter_h
+#ifndef SWIFT_FRONTEND_ARGSTOFRONTENDOPTIONSCONVERTER_H
+#define SWIFT_FRONTEND_ARGSTOFRONTENDOPTIONSCONVERTER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -20,9 +20,6 @@
 #include "llvm/Option/ArgList.h"
 
 #include <vector>
-
-using namespace swift;
-using namespace llvm::opt;
 
 namespace swift {
 
@@ -76,4 +73,4 @@ public:
 };
 } // namespace swift
 
-#endif /* ArgsToFrontendOptionsConverter_h */
+#endif /* SWIFT_FRONTEND_ARGSTOFRONTENDOPTIONSCONVERTER_H */

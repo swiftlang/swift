@@ -1,8 +1,8 @@
-//===--- FrontendInputs.h -------------------------------------------------===//
+//===--- FrontendInputs.h ---------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef FrontendInputs_h
-#define FrontendInputs_h
+#ifndef SWIFT_FRONTEND_FRONTENDINPUTS_H
+#define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/InputFile.h"
 #include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -34,7 +35,7 @@ class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllFiles;
-  typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
+  typedef llvm::StringMap<unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
@@ -162,7 +163,7 @@ public:
 
   bool shouldTreatAsSIL() const;
 
-  /// Return true for error
+  /// \return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
@@ -182,4 +183,4 @@ public:
 
 } // namespace swift
 
-#endif /* FrontendInputsAndOutputs_h */
+#endif /* SWIFT_FRONTEND_FRONTENDINPUTS_H */

@@ -14,10 +14,9 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Basic/InputFile.h"
 #include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>

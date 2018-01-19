@@ -1,8 +1,8 @@
-//===--- ArgsToFrontendInputsConverter.h ----------------------------------===//
+//===--- ArgsToFrontendInputsConverter.h ------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,16 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ArgsToFrontendInputsConverter_h
-#define ArgsToFrontendInputsConverter_h
+#ifndef SWIFT_FRONTEND_ARGSTOFRONTENDINPUTSCONVERTER_H
+#define SWIFT_FRONTEND_ARGSTOFRONTENDINPUTSCONVERTER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "llvm/Option/ArgList.h"
-
-using namespace swift;
-using namespace llvm::opt;
 
 namespace swift {
 
@@ -44,43 +41,35 @@ namespace swift {
 
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
-  const ArgList &Args;
+  const llvm::opt::ArgList &Args;
   FrontendInputs &Inputs;
 
-  Arg const *const FilelistPathArg;
-  Arg const *const PrimaryFilelistPathArg;
+  llvm::opt::Arg const *const FilelistPathArg;
+  llvm::opt::Arg const *const PrimaryFilelistPathArg;
 
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
 
   llvm::SetVector<StringRef> Files;
 
 public:
-  ArgsToFrontendInputsConverter(DiagnosticEngine &diags, const ArgList &args,
+  ArgsToFrontendInputsConverter(DiagnosticEngine &diags,
+                                const llvm::opt::ArgList &args,
                                 FrontendInputs &inputs);
 
   bool convert();
 
 private:
   bool enforceFilelistExclusion();
-
   bool readInputFilesFromCommandLine();
-
   bool readInputFilesFromFilelist();
-
-  bool forAllFilesInFilelist(Arg const *const pathArg,
+  bool forAllFilesInFilelist(llvm::opt::Arg const *const pathArg,
                              llvm::function_ref<void(StringRef)> fn);
-
   bool addFile(StringRef file);
-
   Optional<std::set<StringRef>> readPrimaryFiles();
-
   std::set<StringRef>
   createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles);
-
   bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles);
-
-  bool isSingleThreadedWMO() const;
 };
 } // namespace swift
 
-#endif /* ArgsToFrontendInputsConverter_h */
+#endif /* SWIFT_FRONTEND_ARGSTOFRONTENDINPUTSCONVERTER_H */
