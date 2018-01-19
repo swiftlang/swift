@@ -21,7 +21,7 @@ public func testWitnessDispatch(user: Proto) {
   // for the witness table slot for 'lastMethod()'. If the layout here
   // changes, please check that offset 11 is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: [[SLOT:%.+]] = getelementptr inbounds i8*, i8** {{%.+}}, i32 11
+  // CHECK-IR: [[SLOT:%.+]] = getelementptr inbounds i8*, i8** {{%.+}}, i32 12
   // CHECK-IR-NOT: ret
   // CHECK-IR: [[RAW_METHOD:%.+]] = load i8*, i8** [[SLOT]]
   // CHECK-IR-NOT: ret
@@ -37,7 +37,7 @@ public func testGenericDispatch<T: Proto>(user: T) {
   // for the witness table slot for 'lastMethod()'. If the layout here
   // changes, please check that offset 11 is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: [[SLOT:%.+]] = getelementptr inbounds i8*, i8** %T.Proto, i32 11
+  // CHECK-IR: [[SLOT:%.+]] = getelementptr inbounds i8*, i8** %T.Proto, i32 12
   // CHECK-IR-NOT: ret
   // CHECK-IR: [[RAW_METHOD:%.+]] = load i8*, i8** [[SLOT]]
   // CHECK-IR-NOT: ret

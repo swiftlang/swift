@@ -916,6 +916,9 @@ static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
 /// mutate the array to fill in the direct arguments.
 constexpr unsigned NumDirectGenericTypeMetadataAccessFunctionArgs = 3;
 
+/// The offset (in pointers) to the first requirement in a witness table.
+constexpr unsigned WitnessTableFirstRequirementOffset = 1;
+
 } // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */
