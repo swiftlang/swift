@@ -5372,6 +5372,7 @@ namespace {
       addSize();
       addFlags();
       addRequirements();
+      addSuperclass();
       addAssociatedTypeNames();
 
       B.suggestType(IGM.ProtocolDescriptorStructTy);
@@ -5568,6 +5569,11 @@ namespace {
       }
 
       return nullptr;
+    }
+
+    void addSuperclass() {
+      // FIXME: Implement.
+      B.addRelativeAddressOrNull(nullptr);
     }
 
     void addAssociatedTypeNames() {
