@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift 5.0](#swift-50) |
 | [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
@@ -18,6 +19,16 @@ CHANGELOG
 | [Swift 1.0](#swift-10) |
 
 </details>
+
+Swift 5.0
+---------
+
+* C macros containing casts are no longer imported to Swift if the type in the
+  cast is unavailable or deprecated, or produces some other diagnostic when
+  referenced. (These macros were already only imported under very limited
+  circumstances with very simple values, so this is unlikely to affect
+  real-world code.)
+
 
 Swift 4.1
 ---------
