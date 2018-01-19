@@ -69,7 +69,8 @@ public:
 
   bool convert();
 
-  static FrontendOptions::ActionType determineRequestedAction(const ArgList &);
+  static FrontendOptions::ActionType
+  determineRequestedAction(const llvm::opt::ArgList &);
 };
 } // namespace swift
 

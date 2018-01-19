@@ -1,4 +1,5 @@
-//===--- FrontendInputs.h ---------------------------------------*- C++ -*-===//
+//===--- FrontendInputsAndOutputs.h ---------------------------------------*-
+//C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,8 +15,7 @@
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Basic/InputFile.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
@@ -31,30 +31,20 @@ namespace swift {
 
 /// Information about all the inputs and outputs to the frontend.
 
-class FrontendInputs {
+class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
-  std::vector<InputFile> AllFiles;
+  std::vector<InputFile> AllInputs;
   typedef llvm::StringMap<unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
   bool IsSingleThreadedWMO = false;
 
 public:
-  FrontendInputs() = default;
+  FrontendInputsAndOutputs() = default;
 
-  FrontendInputs(const FrontendInputs &other) {
-    for (InputFile input : other.getAllFiles())
-      addInput(input);
-    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-  }
+  FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
 
-  FrontendInputs &operator=(const FrontendInputs &other) {
-    clearInputs();
-    for (InputFile input : other.getAllFiles())
-      addInput(input);
-    IsSingleThreadedWMO = other.IsSingleThreadedWMO;
-    return *this;
-  }
+  FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
 
   // Single-threaded WMO routines:
 
@@ -68,40 +58,34 @@ public:
   //    the command line, and it hasn't been critical. So right now there's only
   //    one of everything in WMO, always, except for the actual object files in
   //    threaded mode.)
-  const InputFile *getSingleThreadedWMOInput() const {
-    return isSingleThreadedWMO() ? &firstInput() : nullptr;
-  }
-  InputFile *getSingleThreadedWMOInput() {
-    return isSingleThreadedWMO() ? &firstInput() : nullptr;
-  }
+  const InputFile *getSingleThreadedWMOInput() const;
+  InputFile *getSingleThreadedWMOInput();
 
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
 
   // Readers:
 
-  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-  std::vector<InputFile> &getAllFiles() { return AllFiles; }
+  ArrayRef<InputFile> getAllInputs() const { return AllInputs; }
+  std::vector<InputFile> &getAllInputs() { return AllInputs; }
 
   InputFile &firstPrimaryInput();
   const InputFile &firstPrimaryInput() const;
 
   std::vector<std::string> getInputFilenames() const;
 
-  unsigned inputCount() const { return getAllFiles().size(); }
+  unsigned inputCount() const { return getAllInputs().size(); }
 
-  bool hasInputs() const { return !getAllFiles().empty(); }
+  bool hasInputs() const { return !getAllInputs().empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
-  const InputFile &firstInput() const { return getAllFiles()[0]; }
-  InputFile &firstInput() { return getAllFiles()[0]; }
+  const InputFile &firstInput() const { return getAllInputs()[0]; }
+  InputFile &firstInput() { return getAllInputs()[0]; }
 
   StringRef getFilenameOfFirstInput() const;
 
-  bool isReadingFromStdin() const {
-    return hasSingleInput() && getFilenameOfFirstInput() == "-";
-  }
+  bool isReadingFromStdin() const;
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
   // treat the input as LLVM_IR.
@@ -155,7 +139,7 @@ public:
   /// there isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const;
 
-  bool isFilePrimary(StringRef file);
+  bool isFilePrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
@@ -177,7 +161,7 @@ public:
 
   void clearInputs();
 
-  // FIXME: dmu fix uses / remove these when batch mode works
+  // FIXME: fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
 };
 
