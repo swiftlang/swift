@@ -24,13 +24,13 @@ extension Decimal {
 
     public static let pi = Decimal(_exponent: -38, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x6623, 0x7d57, 0x16e7, 0xad0d, 0xaf52, 0x4641, 0xdfa7, 0xec58))
 
-    public var exponent: Int {
+    public var exponent: Int { 
         get {
             return Int(_exponent)
         }
     }
 
-    public var significand: Decimal {
+    public var significand: Decimal { 
         get {
             return Decimal(_exponent: 0, _length: _length, _isNegative: _isNegative, _isCompact: _isCompact, _reserved: 0, _mantissa: _mantissa)
         }
@@ -44,7 +44,7 @@ extension Decimal {
         self.init(_exponent: magnitude._exponent, _length: magnitude._length, _isNegative: signOf._isNegative, _isCompact: magnitude._isCompact, _reserved: 0, _mantissa: magnitude._mantissa)
     }
 
-    public var sign: FloatingPointSign {
+    public var sign: FloatingPointSign { 
         return _isNegative == 0 ? FloatingPointSign.plus : FloatingPointSign.minus
     }
 
@@ -152,7 +152,7 @@ extension Decimal : Hashable, Comparable {
         if _length == 0 && _isNegative == 0 {
             return Double.nan
         }
-
+        
         d = d * 65536 + Double(_mantissa.7)
         d = d * 65536 + Double(_mantissa.6)
         d = d * 65536 + Double(_mantissa.5)
@@ -161,7 +161,7 @@ extension Decimal : Hashable, Comparable {
         d = d * 65536 + Double(_mantissa.2)
         d = d * 65536 + Double(_mantissa.1)
         d = d * 65536 + Double(_mantissa.0)
-
+        
         if _exponent < 0 {
             for _ in _exponent..<0 {
                 d /= 10.0
@@ -285,27 +285,27 @@ extension Decimal {
     public init(_ value: UInt8) {
         self.init(UInt64(value))
     }
-
+    
     public init(_ value: Int8) {
         self.init(Int64(value))
     }
-
+    
     public init(_ value: UInt16) {
         self.init(UInt64(value))
     }
-
+    
     public init(_ value: Int16) {
         self.init(Int64(value))
     }
-
+    
     public init(_ value: UInt32) {
         self.init(UInt64(value))
     }
-
+    
     public init(_ value: Int32) {
         self.init(Int64(value))
     }
-
+    
     public init(_ value: Double) {
         if value.isNaN {
             self = Decimal.nan
@@ -325,7 +325,7 @@ extension Decimal {
                 exponent += 1
             }
             var mantissa = UInt64(val)
-
+            
             var i = UInt32(0)
             // this is a bit ugly but it is the closest approximation of the C initializer that can be expressed here.
             while mantissa != 0 && i < 8 /* NSDecimalMaxSize */ {
@@ -359,37 +359,37 @@ extension Decimal {
             NSDecimalCompact(&self)
         }
     }
-
+    
     public init(_ value: UInt64) {
         self.init(Double(value))
     }
-
+    
     public init(_ value: Int64) {
         self.init(Double(value))
     }
-
+    
     public init(_ value: UInt) {
         self.init(UInt64(value))
     }
-
+    
     public init(_ value: Int) {
         self.init(Int64(value))
     }
-
+    
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public static var infinity: Decimal { fatalError("Decimal does not yet fully adopt FloatingPoint") }
-
+    
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public static var signalingNaN: Decimal { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
-    public var isSignalingNaN: Bool {
+    public var isSignalingNaN: Bool { 
         return false
-    }
+    } 
 
     public static var nan: Decimal {
         return quietNaN
     }
-
+    
     public static var quietNaN: Decimal {
         return Decimal(_exponent: 0, _length: 0, _isNegative: 1, _isCompact: 0, _reserved: 0, _mantissa: (0, 0, 0, 0, 0, 0, 0, 0))
     }
@@ -438,7 +438,7 @@ extension Decimal : CustomStringConvertible {
         }
         self = theDecimal
     }
-
+    
     public var description: String {
         var val = self
         return NSDecimalString(&val, nil)
@@ -450,13 +450,13 @@ extension Decimal : _ObjectiveCBridgeable {
     public func _bridgeToObjectiveC() -> NSDecimalNumber {
         return NSDecimalNumber(decimal: self)
     }
-
+    
     public static func _forceBridgeFromObjectiveC(_ x: NSDecimalNumber, result: inout Decimal?) {
         if !_conditionallyBridgeFromObjectiveC(x, result: &result) {
             fatalError("Unable to bridge \(_ObjectiveCType.self) to \(self)")
         }
     }
-
+    
     public static func _conditionallyBridgeFromObjectiveC(_ input: NSDecimalNumber, result: inout Decimal?) -> Bool {
         result = input.decimalValue
         return true
