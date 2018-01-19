@@ -1,11 +1,10 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=GlobalOpt %s -emit-sil -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=ObjectOutliner %s -emit-sil -sil-verify-all | %FileCheck %s
 
 // Make sure that we completely inline/devirtualize/substitute all the way down
 // to unknown1.
 
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{.*}}):
-// CHECK: alloc_ref
 // CHECK: function_ref @unknown1
 // CHECK: apply
 // CHECK: apply
