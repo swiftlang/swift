@@ -800,7 +800,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
     return false;
   }
 
-  if (filelistInfo.whichFiles == FilelistInfo::Input) {
+  if (filelistInfo.whichFiles == FilelistInfo::WhichFiles::Input) {
     // FIXME: Duplicated from ToolChains.cpp.
     for (const Job *input : job->getInputs()) {
       const CommandOutput &outputInfo = input->getOutput();
