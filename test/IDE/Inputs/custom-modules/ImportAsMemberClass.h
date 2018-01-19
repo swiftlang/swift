@@ -19,6 +19,9 @@ __attribute__((swift_name("SomeClass.applyOptions(self:_:)")))
 void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass, 
                               IAMSomeClassOptions options);
 
+__attribute__((swift_name("SomeClass.doIt(self:)")))
+void IAMSomeClassDoIt(IAMSomeClass * _Nonnull someClass);
+
 @interface UnavailableDefaultInit : NSObject
 -(instancetype)init __attribute__((availability(swift,unavailable)));
 @end

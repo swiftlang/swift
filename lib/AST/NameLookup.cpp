@@ -1835,6 +1835,10 @@ bool DeclContext::lookupQualified(Type type,
       if (decl->getOverriddenDecl())
         continue;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
+      if (!decl->isObjC())
+        continue;
+
       auto dc = decl->getDeclContext();
       auto nominal = dyn_cast<NominalTypeDecl>(dc);
       if (!nominal) {

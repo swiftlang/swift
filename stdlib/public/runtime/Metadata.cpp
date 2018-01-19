@@ -2749,7 +2749,8 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   if (genericTable->Instantiator.isNull() &&
       genericTable->WitnessTablePrivateSizeInWords == 0 &&
       genericTable->WitnessTableSizeInWords ==
-        genericTable->Protocol->NumRequirements) {
+        (genericTable->Protocol->NumRequirements +
+           WitnessTableFirstRequirementOffset)) {
     return true;
   }
 
@@ -2770,11 +2771,13 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // The number of mandatory requirements, i.e. requirements lacking
   // default implementations.
-  size_t numMandatoryRequirements = protocol->NumMandatoryRequirements;
+  size_t numMandatoryRequirements =
+    protocol->NumMandatoryRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses >= numMandatoryRequirements);
 
   // The total number of requirements.
-  size_t numRequirements = protocol->NumRequirements;
+  size_t numRequirements =
+    protocol->NumRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses <= numRequirements);
 
   // Number of bytes for any private storage used by the conformance itself.
@@ -2807,7 +2810,9 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // Fill in any default requirements.
   for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    void *defaultImpl = requirements[i].DefaultImplementation.get();
+    size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
+    void *defaultImpl =
+      requirements[requirementIndex].DefaultImplementation.get();
     assert(defaultImpl &&
            "no default implementation for missing requirement");
     table[i] = defaultImpl;

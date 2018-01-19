@@ -69,7 +69,7 @@ func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
 // CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$S17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type*) #0
 func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
-  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
+  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
   // CHECK: ret { %swift.type*, i8** } [[RET2]]
   return z
 }

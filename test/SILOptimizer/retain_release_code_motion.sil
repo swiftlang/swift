@@ -266,7 +266,9 @@ final class MyArrayBuffer {
 
 // CHECK-LABEL: sil @builtin_does_not_block_locally_allocated_ref
 // CHECK: builtin
-// CHECK-NEXT: return
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK: return
 sil @builtin_does_not_block_locally_allocated_ref : $@convention(thin) () -> @owned MyArrayBuffer {
 bb0:
   %3 = integer_literal $Builtin.Word, 3
@@ -283,7 +285,9 @@ bb0:
 // CHECK: bb0
 // CHECK: cond_br undef, bb1, bb2
 // CHECK: bb1:
-// CHECK-NEXT: br bb3
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: br bb3
 // CHECK: bb2:
 // CHECK: strong_retain
 // CHECK: apply
@@ -341,7 +345,8 @@ bb2(%4 : $Error):
 // Make sure release can be hoisted across memory that do not escape.
 // CHECK-LABEL: sil @hoist_release_across_local_memory_use
 // CHECK: bb1:
-// CHECK-NEXT: br bb3
+// CHECK: strong_release
+// CHECK: br bb3
 // CHECK: bb2:
 // CHECK: strong_release
 // CHECK: br bb3
@@ -507,8 +512,9 @@ bb2:
 // CHECK:      bb2:
 // CHECK-NEXT:   br bb2
 // CHECK:      bb3:
-// CHECK-NEXT:   tuple
-// CHECK-NEXT:   return
+// CHECK:        strong_retain
+// CHECK:        strong_release
+// CHECK:        return
 sil @handle_infinite_loop : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 bb0(%a : $*Builtin.NativeObject):
   cond_br undef, bb1, bb3
@@ -534,6 +540,8 @@ bb3:
 /// One round of retain-sinking can sink only one of retains.
 /// CHECK-LABEL: sil @checkRetainSinkingMultipleRounds
 /// CHECK:      bb9:
+/// CHECK-NEXT:   retain_value %2 : $S
+/// CHECK-NEXT:   release_value %2 : $S
 /// CHECK-NEXT:   release_value %2 : $S
 /// In the ideal world, we should see a third retain_value here.
 /// But it would require another round of retain sinking.
@@ -544,6 +552,8 @@ bb3:
 /// CHECK-MULTIPLE-RS-ROUNDS-LABEL: sil @checkRetainSinkingMultipleRounds
 /// CHECK-MULTIPLE-RS-ROUNDS:      bb9:
 /// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   retain_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   retain_value %2 : $S
+/// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   release_value %2 : $S
 /// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   release_value %2 : $S
 /// CHECK-MULTIPLE-RS-ROUNDS-NEXT:   br bb5
 
