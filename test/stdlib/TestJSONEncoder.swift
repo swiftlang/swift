@@ -410,11 +410,22 @@ class TestJSONEncoder : TestJSONEncoderSuper {
   }
 
   // MARK: - Key Strategy Tests
-  private struct EncodeMe : Encodable {
+  private struct EncodeMe : Codable, Equatable {
     var keyName: String
+    let found: Bool
+    init(keyName: String) {
+      self.keyName = keyName
+      found = false
+    }
+    init(from coder: Decoder) throws {
+      let c = try coder.container(keyedBy: _TestKey.self)
+      keyName = try c.decode(String.self, forKey: _TestKey(stringValue: "__camel_case_key")!)
+      found = try c.decode(Bool.self, forKey: _TestKey(stringValue: keyName)!)
+    }
     func encode(to coder: Encoder) throws {
       var c = coder.container(keyedBy: _TestKey.self)
-      try c.encode("test", forKey: _TestKey(stringValue: keyName)!)
+      try c.encode(keyName, forKey: _TestKey(stringValue: "__camelCaseKey")!)
+      try c.encode(true, forKey: _TestKey(stringValue: keyName)!)
     }
   }
 
@@ -452,7 +463,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     ]
 
     for test in toSnakeCaseTests {
-      let expected = "{\"\(test.1)\":\"test\"}"
+      let expected = "{\"__camel_case_key\":\"\(test.0)\",\"\(test.1)\":true}"
       let encoded = EncodeMe(keyName: test.0)
       
       let encoder = JSONEncoder()
@@ -461,11 +472,17 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       let resultString = String(bytes: resultData, encoding: .utf8)
       
       expectEqual(expected, resultString)
+
+      let decoder = JSONDecoder()
+      decoder.keyDecodingStrategy = .useSnakeCasedKeys
+      let decoded = try! decoder.decode(EncodeMe.self, from: resultData)
+
+      expectTrue(decoded.found)
     }
   }
   
   func testEncodingKeyStrategyCustom() {
-    let expected = "{\"QQQhello\":\"test\"}"
+    let expected = "{\"QQQ__camelCaseKey\":\"hello\",\"QQQhello\":true}"
     let encoded = EncodeMe(keyName: "hello")
     
     let encoder = JSONEncoder()
@@ -491,11 +508,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
   func testEncodingKeyStrategyPath() {
     // Make sure a more complex path shows up the way we want
     // Make sure the path reflects keys in the Swift, not the resulting ones in the JSON
-    let expected = "{\"QQQouterValue\":{\"QQQnestedValue\":{\"QQQhelloWorld\":\"test\"}}}"
+    let expected = "{\"QQQouterValue\":{\"QQQnestedValue\":{\"QQQ__camelCaseKey\":\"helloWorld\",\"QQQhelloWorld\":true}}}"
     let encoded = EncodeNestedNested(outerValue: EncodeNested(nestedValue: EncodeMe(keyName: "helloWorld")))
     
     let encoder = JSONEncoder()
     var callCount = 0
+    var callCountOfNested = 0
     
     let customKeyConversion = { (_ path : [CodingKey]) -> CodingKey in
       // This should be called three times:
@@ -511,7 +529,15 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       } else if path.count == 2 {
         expectEqual(["outerValue", "nestedValue"], path.map { $0.stringValue })
       } else if path.count == 3 {
-        expectEqual(["outerValue", "nestedValue", "helloWorld"], path.map { $0.stringValue })
+        switch callCountOfNested {
+        case 0:
+          expectEqual(["outerValue", "nestedValue", "__camelCaseKey"], path.map { $0.stringValue })
+        case 1:
+          expectEqual(["outerValue", "nestedValue", "helloWorld"], path.map { $0.stringValue })
+        default:
+          expectUnreachable("The path mysteriously had more entries")
+        }
+        callCountOfNested = callCountOfNested + 1
       } else {
         expectUnreachable("The path mysteriously had more entries")
       }
@@ -524,7 +550,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let resultString = String(bytes: resultData, encoding: .utf8)
     
     expectEqual(expected, resultString)
-    expectEqual(3, callCount)
+    expectEqual(4, callCount)
   }
   
   private struct DecodeMe : Decodable {
