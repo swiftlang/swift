@@ -1269,7 +1269,6 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
 
 Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *Context;
   NominalTypeDecl *implDecl;
 
   // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
@@ -1291,16 +1290,16 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     return UTy;
   }
   case TypeKind::ArraySlice:
-    implDecl = ctx.getArrayDecl();
+    implDecl = Context->getArrayDecl();
     break;
   case TypeKind::Optional:
-    implDecl = ctx.getOptionalDecl();
+    implDecl = Context->getOptionalDecl();
     break;
   case TypeKind::ImplicitlyUnwrappedOptional:
-    implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
+    implDecl = Context->getImplicitlyUnwrappedOptionalDecl();
     break;
   case TypeKind::Dictionary:
-    implDecl = ctx.getDictionaryDecl();
+    implDecl = Context->getDictionaryDecl();
     break;
   }
   assert(implDecl && "Type has not been set yet");
