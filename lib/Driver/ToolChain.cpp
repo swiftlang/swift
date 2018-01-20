@@ -121,7 +121,7 @@ ToolChain::constructJob(const JobAction &JA,
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
                                 std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfo));
+                                std::move(invocationInfo.FilelistInfos));
 }
 
 std::string
