@@ -12,6 +12,7 @@
 
 import SwiftShims
 
+@_fixed_layout
 public
 class _SwiftRawStringStorage : _SwiftNativeNSString {
   @nonobjc
@@ -46,6 +47,7 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
 internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
 
+@_fixed_layout
 public final class _SwiftStringStorage<CodeUnit>
   : _SwiftRawStringStorage, _NSStringCore
 where CodeUnit : UnsignedInteger & FixedWidthInteger {
