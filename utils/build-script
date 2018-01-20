@@ -553,6 +553,8 @@ class BuildScriptInvocation(object):
             # have a separate bot that checks for leaks.
             if platform.system() == 'Linux':
                 os.environ['ASAN_OPTIONS'] = 'detect_leaks=0'
+        if args.enable_ubsan:
+            impl_args += ["--enable-ubsan"]
 
         # If we have lsan, we need to export our suppression list. The actual
         # passing in of the LSAN flag is done via the normal cmake method. We
