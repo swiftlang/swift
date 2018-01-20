@@ -71,7 +71,7 @@ typealias CTFEOp = OpaquePointer
 // - MARK: Logging
 //===----------------------------------------------------------------------===//
 
-#if os(MacOS)
+#if os(macOS)
 let stderr = __strerrp
 #endif
 
@@ -86,4 +86,10 @@ func logToStderr(_ message: StaticString) {
 /// Log to standard error.
 func logToStderr(_ message: String) {
   _ = fputs(message, stderr)
+}
+
+func debugLog(_ message: @autoclosure () -> String) {
+  if _TFCRuntimeConfig.printsDebugLog {
+    print(message())
+  }
 }

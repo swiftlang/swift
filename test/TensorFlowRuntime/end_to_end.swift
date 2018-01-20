@@ -16,8 +16,10 @@ func checkOk(_ s: OpaquePointer?) {
 
 // The C Type of s is TF_Status*.
 func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
+  print("Resolving tensor handle.")
   let s = TF_NewStatus()
   let out_t = TFE_TensorHandleResolve(outputTensor, s)
+  print("Done resolving tensor handle with status \(TF_GetCode(s)).")
   checkOk(s)
   TF_DeleteStatus(s)
 
@@ -38,6 +40,7 @@ public func testTanh() {
 }
 
 RuntimeTests.test("e2e/BasicTanhTest") {
+  _TFCRuntimeConfig.printsDebugLog = true
   testTanh()
 }
 
