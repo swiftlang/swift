@@ -383,6 +383,13 @@ void swift::swift_abortUnownedRetainOverflow() {
                     "Fatal error: Object's unowned reference was retained too many times");
 }
 
+// Crash due to a weak retain count overflow.
+// FIXME: can't pass the object's address from InlineRefCounts without hacks
+void swift::swift_abortWeakRetainOverflow() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Fatal error: Object's weak reference was retained too many times");
+}
+
 // Crash due to retain of a dead unowned reference.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks
 void swift::swift_abortRetainUnowned(const void *object) {
