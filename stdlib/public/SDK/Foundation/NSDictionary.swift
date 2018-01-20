@@ -91,7 +91,7 @@ extension Dictionary : _ObjectiveCBridgeable {
         let value = Swift._forceBridgeFromObjectiveC(
           anyValue as AnyObject, Value.self)
         // FIXME: Log a warning if `dict` already had a value for `key`
-        dict.updateValue(value, forKey: key)
+        dict[key] = value
       })
       result = dict
       return
