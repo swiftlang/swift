@@ -3134,8 +3134,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
   nsd.setObject(42, forKey: cafe1)
   nsd.setObject(23, forKey: cafe2)
   expectEqual(2, nsd.count)
-  expectTrue((42 as NSNumber).isEqual(to: nsd.object(forKey: cafe1)))
-  expectTrue((23 as NSNumber).isEqual(to: nsd.object(forKey: cafe2)))
+  expectTrue((42 as NSNumber).isEqual(nsd.object(forKey: cafe1)))
+  expectTrue((23 as NSNumber).isEqual(nsd.object(forKey: cafe2)))
 
   let d = convertNSDictionaryToDictionary(nsd) as [String: Int]
   expectEqual(1, d.count)
