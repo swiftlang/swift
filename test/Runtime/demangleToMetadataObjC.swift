@@ -60,12 +60,12 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
     _typeByMangledName("So21NSURLFileResourceTypea")!)
 }
 
+// FIXME: Shouldn't need this?
 extension URLSessionTask.State: P2 { }
 
 DemangleToMetadataTests.test("Imported enum types") {
-  // FIXME: Should work
-  // expectEqual(NSURLSessionTask.State.self,
-  //  _typeByMangledName("So21NSURLSessionTaskStateV")!)
+  expectEqual(NSURLSessionTask.State.self,
+    _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
 runAllTests()
