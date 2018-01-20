@@ -28,6 +28,9 @@ public enum _TFCRuntimeConfig {
   /// instead of running it in a thread.
   /// Set to true only for debugging purposes.
   static public var usesSynchronousExecution = false
+
+  /// When true, prints various debug messages on the runtime state.
+  static public var printsDebugLog = false
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,6 +142,7 @@ public final class TensorProgram {
 #if os(Linux) || os(FreeBSD)
     self.pthread = 0
 #endif
+    debugLog("Starting TF graph execution.")
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
 #if os(Linux)
       let programPtr = Unmanaged.passRetained(self).toOpaque()
@@ -169,6 +173,7 @@ public final class TensorProgram {
                   program.status)
       checkOk(program.status)
     }
+    debugLog("Exiting TensorProgram.init().")
   }
 
   deinit {
@@ -194,12 +199,15 @@ public final class TensorProgram {
   /// output handles.
   @_versioned
   func finish() -> [CTensorHandle] {
+    debugLog("Calling TensorProgram.finish().")
     if (!_TFCRuntimeConfig.usesSynchronousExecution) {
 #if os(Linux) || os(FreeBSD)
       let joinStatus = pthread_join(pthread, nil)
       internalConsistencyCheck(joinStatus == 0)
 #endif
     }
+    debugLog("Done executing TF graph.")
+
     // Now that all the elements have been filled in, remove a level of optional.
     return self.returnValues.map { $0! }
   }
