@@ -437,26 +437,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   return false;
 }
 
-static bool hasRequiredTypeMetadataAccessFunction(NominalTypeDecl *typeDecl) {
-  // This needs to be kept in sync with getTypeMetadataStrategy.
-
-  if (isa<ProtocolDecl>(typeDecl))
-    return false;
-
-  switch (getDeclLinkage(typeDecl)) {
-  case FormalLinkage::PublicUnique:
-  case FormalLinkage::HiddenUnique:
-  case FormalLinkage::Private:
-    return true;
-
-  case FormalLinkage::PublicNonUnique:
-  case FormalLinkage::HiddenNonUnique:
-    return true;
-  }
-  llvm_unreachable("bad formal linkage");
-
-}
-
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
 MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
@@ -1543,26 +1523,12 @@ static llvm::Constant *
 getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
                                       NominalTypeDecl *theDecl,
                                       ForDefinition_t shouldDefine) {
-  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
-    return nullptr;
-
   if (theDecl->isGenericContext()) {
     return getGenericTypeMetadataAccessFunction(IGM, theDecl, shouldDefine);
   }
 
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
   return getTypeMetadataAccessFunction(IGM, declaredType, shouldDefine);
-}
-
-/// Force a public metadata access function into existence if necessary
-/// for the given type.
-template <class BuilderTy>
-static void maybeEmitNominalTypeMetadataAccessFunction(NominalTypeDecl *theDecl,
-                                                       BuilderTy &builder) {
-  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
-    return;
-
-  builder.createMetadataAccessFunction();
 }
 
 /// Emit a call to the type metadata accessor for the given function.
@@ -4156,7 +4122,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
                                           layout, fieldLayout);
@@ -4164,7 +4130,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   } else {
     FixedClassMetadataBuilder builder(IGM, classDecl, init,
                                       layout, fieldLayout);
@@ -4172,7 +4138,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -4797,14 +4763,14 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
+    builder.createMetadataAccessFunction();
   } else {
     StructMetadataBuilder builder(IGM, structDecl, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
@@ -4953,14 +4919,14 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
+    builder.createMetadataAccessFunction();
   } else {
     EnumMetadataBuilder builder(IGM, theEnum, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
@@ -5316,7 +5282,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ClassNominalTypeDescriptorBuilder(*this, classDecl).emit();
 
     createCandidateVariable();
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
@@ -5326,7 +5292,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     addressPoint = builder.getOffsetOfAddressPoint();
 
     createCandidateVariable();
-    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
+    builder.createMetadataAccessFunction();
   } else if (auto enumType = dyn_cast<EnumType>(type)) {
     auto enumDecl = enumType->getDecl();
     assert(enumDecl->hasClangNode());
@@ -5336,7 +5302,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     addressPoint = builder.getOffsetOfAddressPoint();
 
     createCandidateVariable();
-    maybeEmitNominalTypeMetadataAccessFunction(enumDecl, builder);
+    builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }

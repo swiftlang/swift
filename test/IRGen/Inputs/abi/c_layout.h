@@ -96,3 +96,9 @@ static const char * const staticString = "abc";
 static inline void doubleTrouble(void) {
   staticFloat *= 2.0;
 }
+
+#define NS_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+
+typedef NS_ENUM(int, AmazingColor) {
+  Cyan, Magenta, Yellow
+};
