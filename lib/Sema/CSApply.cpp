@@ -2470,6 +2470,12 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
+      // SWIFT_ENABLE_TENSORFLOW
+      // #tfop() declarations are not like normal object literals, so we don't
+      // need any special type checking after we resolve their result type.
+      if (expr->isTFOp())
+        return expr;
+
       if (type->is<UnresolvedType>()) return expr;
 
       Type conformingType = type;
