@@ -5257,7 +5257,7 @@ namespace {
 bool IRGenModule::requiresForeignTypeMetadata(CanType type) {
   if (NominalTypeDecl *nominal = type->getAnyNominal()) {
     if (auto *clas = dyn_cast<ClassDecl>(nominal)) {
-      return clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
+      return clas->isForeign();
     }
 
     return isa<ClangModuleUnit>(nominal->getModuleScopeContext());
