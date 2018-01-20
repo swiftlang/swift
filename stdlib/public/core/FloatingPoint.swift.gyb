@@ -2053,6 +2053,7 @@ extension BinaryFloatingPoint {
       significandBitPattern: magnitudeOf.significandBitPattern)
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   static func _convert<Source : BinaryInteger>(
     from source: Source
@@ -2129,6 +2130,7 @@ extension BinaryFloatingPoint {
     self = value_
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
     from source: Source
