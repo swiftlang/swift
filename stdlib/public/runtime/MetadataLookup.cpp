@@ -389,13 +389,13 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
 
 #pragma mark Type field descriptor cache
 namespace {
-class FieldSection {
+class StaticFieldSection {
   const void *Begin;
   const void *End;
 
 public:
-  FieldSection(const void *begin, const void *end)
-    : Begin(begin), End(end) {}
+  StaticFieldSection(const void *begin, const void *end)
+      : Begin(begin), End(end) {}
 
   FieldDescriptorIterator begin() const {
     return FieldDescriptorIterator(Begin, End);
@@ -406,13 +406,29 @@ public:
   }
 };
 
+class DynamicFieldSection {
+  const FieldDescriptor **Begin;
+  const FieldDescriptor **End;
+
+public:
+  DynamicFieldSection(const FieldDescriptor **fields, size_t size)
+      : Begin(fields), End(fields + size) {}
+
+  const FieldDescriptor **begin() { return Begin; }
+
+  const FieldDescriptor **end() const { return End; }
+};
+
 struct FieldCacheState {
   ConcurrentMap<DescriptorCacheEntry<FieldDescriptor>> FieldCache;
-  std::vector<FieldSection> SectionsToScan;
-  Mutex SectionsToScanLock;
+
+  Mutex SectionsLock;
+  std::vector<StaticFieldSection> StaticSections;
+  std::vector<DynamicFieldSection> DynamicSections;
 
   FieldCacheState() {
-    SectionsToScan.reserve(16);
+    StaticSections.reserve(16);
+    DynamicSections.reserve(8);
     initializeTypeFieldLookup();
   }
 };
@@ -420,15 +436,22 @@ struct FieldCacheState {
 static Lazy<FieldCacheState> FieldCache;
 } // namespace
 
-void swift::addImageTypeFieldDescriptorBlockCallback(const void *fields,
-                                                     uintptr_t size) {
-  auto fieldSectionBytes = reinterpret_cast<const char *>(fields);
-  auto fieldsEnd = reinterpret_cast<const void *>(fieldSectionBytes + size);
+void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
+                                           size_t size) {
+  auto &cache = FieldCache.get();
+  ScopedLock guard(cache.SectionsLock);
+  cache.DynamicSections.push_back({records, size});
+}
 
-  // Type field cache should always be sufficiently initialized by this point.
-  auto &state = FieldCache.unsafeGetAlreadyInitialized();
-  ScopedLock guard(state.SectionsToScanLock);
-  state.SectionsToScan.push_back(FieldSection{fields, fieldsEnd});
+void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
+                                                     uintptr_t size) {
+  auto sectionBytes = reinterpret_cast<const char *>(recordsBegin);
+  auto recordsEnd = reinterpret_cast<const void *>(sectionBytes + size);
+
+  // Field cache should always be sufficiently initialized by this point.
+  auto &cache = FieldCache.unsafeGetAlreadyInitialized();
+  ScopedLock guard(cache.SectionsLock);
+  cache.StaticSections.push_back({recordsBegin, recordsEnd});
 }
 
 #pragma mark Metadata lookup via mangled name
@@ -1002,9 +1025,7 @@ void swift::swift_getFieldAt(
     const Metadata *base, unsigned index,
     llvm::function_ref<void(llvm::StringRef name, FieldType fieldInfo)>
         callback) {
-  auto &fields = FieldCache.get();
   auto *baseDesc = base->getNominalTypeDescriptor();
-
   if (!baseDesc)
     return;
 
@@ -1031,7 +1052,7 @@ void swift::swift_getFieldAt(
             flatIndex += baseDesc->getGenericContext(i).NumPrimaryParams;
 
           // FIXME: Once `getGenericContext(unsigned)` is ready
-          // switch to that instead of using flatten list of substitutions.
+          // switch to that instead of using flattened list of substitutions.
           return base->getGenericArgs()[flatIndex];
         });
 
@@ -1043,21 +1064,37 @@ void swift::swift_getFieldAt(
   };
 
   llvm::StringRef baseTypeName(baseDesc->Name.get());
+  auto &cache = FieldCache.get();
+  auto isRequestedDescriptor = [&](StringRef name,
+                                   const FieldDescriptor &descriptor) {
+    assert(descriptor.hasMangledTypeName());
+    if (!name.equals(descriptor.getMangledTypeName(0)))
+      return false;
 
-  if (auto Value = fields.FieldCache.find(baseTypeName)) {
+    cache.FieldCache.getOrInsert(name, &descriptor);
+    getFieldAt(descriptor);
+    return true;
+  };
+
+  // Fast path: If we already have field descriptor cached.
+  if (auto Value = cache.FieldCache.find(baseTypeName)) {
     getFieldAt(*Value->getDescription());
     return;
   }
 
-  for (auto &section : fields.SectionsToScan) {
-    for (const auto &descriptor : section) {
-      assert(descriptor.hasMangledTypeName());
-      auto nominalName = descriptor.getMangledTypeName(0);
-      if (baseTypeName.equals(nominalName)) {
-        fields.FieldCache.getOrInsert(baseTypeName, &descriptor);
-        getFieldAt(descriptor);
+  ScopedLock guard(cache.SectionsLock);
+  // Otherwise let's try to find it in one of the sections.
+  for (auto &section : cache.DynamicSections) {
+    for (const auto *descriptor : section) {
+      if (isRequestedDescriptor(baseTypeName, *descriptor))
         return;
-      }
+    }
+  }
+
+  for (const auto &section : cache.StaticSections) {
+    for (auto &descriptor : section) {
+      if (isRequestedDescriptor(baseTypeName, descriptor))
+        return;
     }
   }
 }

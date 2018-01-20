@@ -37,6 +37,7 @@
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Reflection/Records.h"
 #include "swift/Runtime/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 #if SWIFT_OBJC_INTEROP
@@ -3760,6 +3761,11 @@ void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
 SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
+
+/// Register a block of type field records for dynamic lookup.
+SWIFT_RUNTIME_EXPORT
+void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
+                                    size_t size);
 
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.

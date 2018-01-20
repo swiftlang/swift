@@ -6065,13 +6065,12 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     emitEnumMetadata(*this, theEnum);
 
   emitNestedTypeDecls(theEnum->getMembers());
+  emitFieldMetadataRecord(theEnum);
 
   if (shouldEmitOpaqueTypeMetadataRecord(theEnum)) {
     emitOpaqueTypeMetadataRecord(theEnum);
     return;
   }
-
-  emitFieldMetadataRecord(theEnum);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

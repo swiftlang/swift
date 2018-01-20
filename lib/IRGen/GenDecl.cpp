@@ -554,12 +554,11 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
-  if (SwiftProtocols.empty()
-      && ProtocolConformances.empty()
-      && RuntimeResolvableTypes.empty()
-      && (!ObjCInterop || (ObjCProtocols.empty() &&
-                           ObjCClasses.empty() &&
-                           ObjCCategoryDecls.empty())))
+  if (SwiftProtocols.empty() && ProtocolConformances.empty() &&
+      RuntimeResolvableTypes.empty() &&
+      (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
+                        ObjCCategoryDecls.empty())) &&
+      FieldDescriptors.empty())
     return;
   
   // Find the entry point.
@@ -719,6 +718,14 @@ void IRGenModule::emitRuntimeRegistration() {
         /*Ty=*/nullptr, records, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
+  }
+
+  if (!FieldDescriptors.empty()) {
+    auto *records = emitFieldDescriptors();
+    auto *begin =
+        llvm::ConstantExpr::getBitCast(records, FieldDescriptorPtrPtrTy);
+    auto *size = llvm::ConstantInt::get(SizeTy, FieldDescriptors.size());
+    RegIGF.Builder.CreateCall(getRegisterFieldDescriptorsFn(), {begin, size});
   }
 
   RegIGF.Builder.CreateRetVoid();
@@ -2845,6 +2852,52 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   var->setAlignment(4);
   addUsedGlobal(var);
   
+  return var;
+}
+
+llvm::Constant *IRGenModule::emitFieldDescriptors() {
+  std::string sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift3_fieldmd, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = "swift3_fieldmd";
+    break;
+  case llvm::Triple::COFF:
+    sectionName = ".swift3_fieldmd";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit field records table for "
+                     "the selected object format.");
+  }
+
+  // Do nothing if the list is empty.
+  if (FieldDescriptors.empty())
+    return nullptr;
+
+  // Define the global variable for the field record list.
+  // We have to do this before defining the initializer since the entries will
+  // contain offsets relative to themselves.
+  auto arrayTy =
+      llvm::ArrayType::get(FieldDescriptorPtrTy, FieldDescriptors.size());
+
+  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+  // resolve relocations relative to it.
+  auto var = new llvm::GlobalVariable(
+      Module, arrayTy,
+      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage,
+      /*initializer*/ nullptr, "\x01l_type_metadata_table");
+
+  SmallVector<llvm::Constant *, 8> elts;
+  for (auto *descriptor : FieldDescriptors)
+    elts.push_back(
+        llvm::ConstantExpr::getBitCast(descriptor, FieldDescriptorPtrTy));
+
+  var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
+  var->setSection(sectionName);
+  var->setAlignment(4);
+  addUsedGlobal(var);
   return var;
 }
 

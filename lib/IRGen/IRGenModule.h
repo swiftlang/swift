@@ -545,6 +545,7 @@ public:
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
   llvm::PointerType *FieldDescriptorPtrTy;
+  llvm::PointerType *FieldDescriptorPtrPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
@@ -772,6 +773,7 @@ public:
   llvm::Constant *emitProtocolConformances();
   void addProtocolConformance(const NormalProtocolConformance *conformance);
   llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *emitFieldDescriptors();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -886,7 +888,10 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
-  
+
+  /// List of fields descriptors to register in runtime.
+  SmallVector<llvm::GlobalVariable *, 4> FieldDescriptors;
+
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
   struct ObjCProtocolPair {
