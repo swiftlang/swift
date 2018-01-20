@@ -1331,7 +1331,7 @@ namespace {
       argTypes.push_back(TupleTypeElt(stringType));
       argTypes.push_back(TupleTypeElt(stringType));
 
-      Type lastMetaTypeElementType;
+      Type lastTensorUnitType;
       Type lastTensorType;
       auto locator = CS.getConstraintLocator(expr);
 
@@ -1353,17 +1353,15 @@ namespace {
           lastTensorType = openedType;
           break;
         }
+        case 's':     // Scalar operand.
         case 'c': {   // Constant integer or fp value.
           auto ty = CS.createTypeVariable(locator, 0);
           argTypes.push_back(TupleTypeElt(ty));
+          lastTensorUnitType = ty;
           break;
         }
-        case 'd': {   // value = Metatype<T>
-          auto baseTy = CS.createTypeVariable(locator, 0);
-          argTypes.push_back(TupleTypeElt(MetatypeType::get(baseTy)));
-          lastMetaTypeElementType = baseTy;
+        case 'd':     // Dtype - no operand added.
           break;
-        }
         default:
           auto charLoc =
             constraints->getLoc()
@@ -1390,14 +1388,14 @@ namespace {
         if (lastTensorType)
           return false;
 
-        if (!lastMetaTypeElementType) {
+        if (!lastTensorUnitType) {
           tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
                       "no way to infer result element type");
           return true;
         }
 
         lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
-                                               {lastMetaTypeElementType});
+                                               {lastTensorUnitType});
         return false;
       };
 
