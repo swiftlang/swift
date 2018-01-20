@@ -126,27 +126,32 @@ module SwiftGlibc [system] {
       export *
     }
     module signal {
+% if CMAKE_SDK == "FREEBSD":
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/signal.h"
+% end
       header "${GLIBC_INCLUDE_PATH}/signal.h"
       export *
     }
 
-    // note: supplied by the compiler
-    // module stdarg {
-    //   header "${GLIBC_INCLUDE_PATH}/stdarg.h"
-    //   export *
-    // }
-    // module stdbool {
-    //   header "${GLIBC_INCLUDE_PATH}/stdbool.h"
-    //   export *
-    // }
-    // module stddef {
-    //   header "${GLIBC_INCLUDE_PATH}/stddef.h"
-    //   export *
-    // }
-    // module stdint {
-    //   header "${GLIBC_INCLUDE_PATH}/stdint.h"
-    //   export *
-    // }
+    // note: supplied by the compiler under Linux
+% if CMAKE_SDK == "FREEBSD":
+    module stdarg {
+      header "${GLIBC_INCLUDE_PATH}/stdarg.h"
+      export *
+    }
+    module stdbool {
+      header "${GLIBC_INCLUDE_PATH}/stdbool.h"
+      export *
+    }
+    module stddef {
+      header "${GLIBC_INCLUDE_PATH}/stddef.h"
+      export *
+    }
+    module stdint {
+      header "${GLIBC_INCLUDE_PATH}/stdint.h"
+      export *
+    }
+% end
 
     module stdio {
       header "${GLIBC_INCLUDE_PATH}/stdio.h"
@@ -405,6 +410,13 @@ module SwiftGlibc [system] {
 % end
       module statvfs {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/statvfs.h"
+        export *
+      }
+% end
+
+% if CMAKE_SDK == "FREEBSD":
+      module param {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/param.h"
         export *
       }
 % end

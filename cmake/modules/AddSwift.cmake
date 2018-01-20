@@ -1538,9 +1538,12 @@ function(add_swift_library name)
                    "-latomic")
             # the same issue on FreeBSD, missing symbols:
             # __atomic_store, __atomic_compare_exchange, __atomic_load
+            # NOTE: the "-l" is required here, otherwise Ninja will fail
+            # on clean builds because the library might not have been copied
+            # yet.
             elseif("${sdk}" STREQUAL "FREEBSD")
               list(APPEND swiftlib_private_link_libraries_targets
-                   "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
+                   "-l${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
             endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
