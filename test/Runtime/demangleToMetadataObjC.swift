@@ -4,12 +4,14 @@
 
 import StdlibUnittest
 import Foundation
+import CoreFoundation
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
 @objc class C : NSObject { }
 @objc enum E: Int { case a }
 @objc protocol P1 { }
+protocol P2 { }
 
 DemangleToMetadataTests.test("@objc classes") {
   expectEqual(type(of: C()), _typeByMangledName("4main1CC")!)
@@ -38,6 +40,32 @@ DemangleToMetadataTests.test("Objective-C protocols") {
 
 DemangleToMetadataTests.test("Classes that don't exist") {
   expectNil(_typeByMangledName("4main4BoomC"))
+}
+
+// FIXME: Shouldn't need this?
+extension CFArray: P2 { }
+
+DemangleToMetadataTests.test("CoreFoundation classes") {
+  expectEqual(CFArray.self, _typeByMangledName("So10CFArrayRefa")!)
+}
+
+DemangleToMetadataTests.test("Imported error types") {
+  expectEqual(URLError.self, _typeByMangledName("10Foundation8URLErrorV")!)
+  expectEqual(URLError.Code.self,
+    _typeByMangledName("10Foundation8URLErrorV4CodeV")!)
+}
+
+DemangleToMetadataTests.test("Imported swift_wrapper types") {
+  expectEqual(URLFileResourceType.self,
+    _typeByMangledName("So21NSURLFileResourceTypea")!)
+}
+
+extension URLSessionTask.State: P2 { }
+
+DemangleToMetadataTests.test("Imported enum types") {
+  // FIXME: Should work
+  // expectEqual(NSURLSessionTask.State.self,
+  //  _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
 runAllTests()

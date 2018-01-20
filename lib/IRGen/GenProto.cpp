@@ -2104,16 +2104,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = Conf->getType()->getCanonicalType();
-  if (NominalTypeDecl *Nominal = conformingType->getAnyNominal()) {
-    if (auto *clas = dyn_cast<ClassDecl>(Nominal)) {
-      if (clas->isForeign())
-        getAddrOfForeignTypeMetadataCandidate(conformingType);
-    } else if (isa<ClangModuleUnit>(Nominal->getModuleScopeContext())) {
-      getAddrOfForeignTypeMetadataCandidate(conformingType);
-    }
-  }
+  if (requiresForeignTypeMetadata(conformingType))
+    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
 }
-
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
 /// Generic functions and protocol witnesses carry polymorphic parameters.

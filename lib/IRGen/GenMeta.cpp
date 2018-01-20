@@ -451,7 +451,7 @@ static bool hasRequiredTypeMetadataAccessFunction(NominalTypeDecl *typeDecl) {
 
   case FormalLinkage::PublicNonUnique:
   case FormalLinkage::HiddenNonUnique:
-    return false;
+    return true;
   }
   llvm_unreachable("bad formal linkage");
 
@@ -1340,7 +1340,10 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                           CanNominalType type,
                                           llvm::Constant *cacheVariable,
                                     InPlaceMetadataInitializer &&initializer) {
-  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type, false);
+  llvm::Constant *metadata =
+    IGF.IGM.requiresForeignTypeMetadata(type)
+      ? IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type)
+      : IGF.IGM.getAddrOfTypeMetadata(type, false);
 
   // We might not have interesting initialization to do.
   assert((cacheVariable == nullptr) ==
@@ -4607,8 +4610,9 @@ static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
                                            CanNominalType type,
                                            llvm::Value *metadata) {
-  // All the value types are basically similar.
-  assert(isa<StructType>(type) || isa<EnumType>(type));
+  // All the value types are basically similar, as are foreign types.
+  assert(isa<StructType>(type) || isa<EnumType>(type) ||
+         IGF.IGM.requiresForeignTypeMetadata(type));
 
   // Set up the value witness table if it's dependent.
   SILType loweredType = IGF.IGM.getLoweredType(AbstractionPattern(type), type);
@@ -5081,6 +5085,22 @@ namespace {
     }
 
     Size getOffsetOfAddressPoint() const { return AddressPoint; }
+
+    void createMetadataAccessFunction() {
+      auto type = cast<NominalType>(asImpl().getTargetType());
+
+      (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           [&](IRGenFunction &IGF,
+                                               llvm::Constant *cacheVariable) {
+        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type,
+                                                         cacheVariable,
+          [&](IRGenFunction &IGF, llvm::Value *candidate) {
+            auto metadata = uniqueForeignTypeMetadataRef(IGF, candidate);
+            return emitInPlaceValueTypeMetadataInitialization(IGF, type,
+                                                              metadata);
+          });
+      });
+    }
   };
 
   class ForeignClassMetadataBuilder;
@@ -5140,8 +5160,17 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = ClassNominalTypeDescriptorBuilder(this->IGM, Target).emit();
-      B.add(descriptor);
+      // FIXME: Go through getAddrOfNominalTypeDescriptor once it's no
+      // longer required to define the nominal type descriptor.
+
+      auto entity = LinkEntity::forNominalTypeDescriptor(Target);
+      auto descriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                                             entity,
+                                             IGM.getPointerAlignment(),
+                                             IGM.ClassNominalTypeDescriptorTy);
+      assert(!descriptor.isIndirect() && "Should be defined here");
+      B.add(descriptor.getDirectValue());
     }
 
     void noteStartOfSuperClass() { }
@@ -5225,6 +5254,18 @@ namespace {
   };
 } // end anonymous namespace
 
+bool IRGenModule::requiresForeignTypeMetadata(CanType type) {
+  if (NominalTypeDecl *nominal = type->getAnyNominal()) {
+    if (auto *clas = dyn_cast<ClassDecl>(nominal)) {
+      return clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
+    }
+
+    return isa<ClangModuleUnit>(nominal->getModuleScopeContext());
+  }
+
+  return false;
+}
+
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // What we save in GlobalVars is actually the offsetted value.
@@ -5236,10 +5277,33 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   ConstantInitBuilder builder(*this);
   auto init = builder.beginStruct();
   init.setPacked(true);
-  
+
+  // Local function to create the global variable for the foreign type
+  // metadata candidate.
+  Size addressPoint;
+  llvm::Constant *result = nullptr;
+  auto createCandidateVariable = [&] {
+    auto definition = init.finishAndCreateFuture();
+
+    // Create the global variable.
+    LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+    auto var =
+        createVariable(*this, link, definition.getType(),
+                       getPointerAlignment());
+    definition.installInGlobal(var);
+
+    // Apply the offset.
+    result = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+    result = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        Int8Ty, result, getSize(addressPoint));
+    result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
+
+    // Only remember the offset.
+    GlobalVars[entity] = result;
+  };
+
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
-  Size addressPoint;
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
@@ -5248,6 +5312,11 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignClassMetadataBuilder builder(*this, classDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    ClassNominalTypeDescriptorBuilder(*this, classDecl).emit();
+
+    createCandidateVariable();
+    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
@@ -5255,6 +5324,9 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignStructMetadataBuilder builder(*this, structDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    createCandidateVariable();
+    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
   } else if (auto enumType = dyn_cast<EnumType>(type)) {
     auto enumDecl = enumType->getDecl();
     assert(enumDecl->hasClangNode());
@@ -5262,31 +5334,15 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignEnumMetadataBuilder builder(*this, enumDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    createCandidateVariable();
+    maybeEmitNominalTypeMetadataAccessFunction(enumDecl, builder);
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
 
-  auto definition = init.finishAndCreateFuture();
-  
-  // Create the global variable.
-  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-  auto var =
-      createVariable(*this, link, definition.getType(), getPointerAlignment());
-  definition.installInGlobal(var);
-  
-  // Apply the offset.
-  llvm::Constant *result = var;
-  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
-  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      Int8Ty, result, getSize(addressPoint));
-  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
-
-  // Only remember the offset.
-  GlobalVars[entity] = result;
-
-  if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
+  if (NominalTypeDecl *Nominal = type->getAnyNominal())
     addLazyConformances(Nominal);
-  }
 
   return result;
 }
