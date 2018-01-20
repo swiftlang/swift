@@ -485,9 +485,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
         context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
-      II.FilelistInfo = {Arguments.back(),
-                         context.Output.getPrimaryOutputType(),
-                         FilelistInfo::Output};
+      II.FilelistInfos.push_back({Arguments.back(),
+                                  context.Output.getPrimaryOutputType(),
+                                  FilelistInfo::WhichFiles::Output});
     } else {
       for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
@@ -693,8 +693,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
       context.Inputs.size() > TOO_MANY_FILES) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
-    II.FilelistInfo = {Arguments.back(), types::TY_SwiftModuleFile,
-                       FilelistInfo::Input};
+    II.FilelistInfos.push_back({Arguments.back(), types::TY_SwiftModuleFile,
+                                FilelistInfo::WhichFiles::Input});
 
     addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
   } else {
@@ -1249,7 +1249,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
       context.Inputs.size() > TOO_MANY_FILES) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfo = {Arguments.back(), types::TY_Object, FilelistInfo::Input};
+    II.FilelistInfos.push_back(
+        {Arguments.back(), types::TY_Object, FilelistInfo::WhichFiles::Input});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
   }
