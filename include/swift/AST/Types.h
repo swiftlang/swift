@@ -1480,6 +1480,8 @@ protected:
   SugarType(TypeKind K, const ASTContext *ctx,
             RecursiveTypeProperties properties)
       : TypeBase(K, nullptr, properties), Context(ctx) {
+    if (K != TypeKind::NameAlias)
+      assert(ctx != nullptr && "Context for SugarType should not be null");
     Bits.SugarType.HasCachedType = false;
   }
 
