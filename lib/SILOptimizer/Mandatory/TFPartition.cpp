@@ -595,6 +595,8 @@ private:
   void markArgument(SILArgument *arg, SILInstruction *user);
   void markValue(SILValue value, SILInstruction *user);
 
+  bool sinkValueIntoRegionForPromotion(SILInstruction *inst);
+
   // Rewriting the host function.
   PartitionedTensorProgram insertTensorProgramStartEndTerminate();
 };
@@ -790,24 +792,53 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
 }
 
 
-static bool shouldPartition(SILInstruction *I) {
+/// When considering whether we should promote a scalar operation to a tensor
+/// op in the graph, we have several cases.
+namespace {
+enum class ScalarPromoteClass {
+  NeverPromote,  ///< Do not promote this operation.
+  CanPromote,    ///< We can promote this operation, but an argument is also ok.
+  ShouldPromote, ///< This is cheaper to run in graph than on the host.
+};
+} // end anonymous namespace.
+
+/// Determine whether we can promote the specified scalar instruction to a
+/// tensor operation in the graph.
+static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
   // We can handle (tuple_extract x, 0) if x is an overflow-checking integer
   // operation.
-  if (auto *TE = dyn_cast<TupleExtractInst>(I)) {
+  if (auto *TE = dyn_cast<TupleExtractInst>(inst)) {
     auto *op = dyn_cast<SILInstruction>((SILNode*)TE->getOperand());
     if (!op || TE->getFieldNo() != 0 || !isOverflowCheckingIntegerOp(op))
-      return false;
+      return ScalarPromoteClass::NeverPromote;
 
     // We can only handle this tuple_extract if the underlying instruction can
     // be handled.  This can depend on dtype support, whether the overflow
     // flag is used, etc.
-    return shouldPartition(op);
+    return shouldPromoteToTensorOp(op);
   }
+
+  // Check to see if we know how to promote this to a tensor operation.  If not,
+  // we reject it.
+  if (getPartitionedScalarOpName(inst).empty())
+    return ScalarPromoteClass::NeverPromote;
 
   // TODO: We should do a bit more cost model analysis on this.  It doesn't make
   // sense to pull over a partial chain of computation when some root can't be
   // done there.  It is just shifting compute around.
-  return !getPartitionedScalarOpName(I).empty();
+
+  // If this is an integer or floating point literal, then it is cheaper to put
+  // this in graph than it is to pass it as an argument (because then TensorFlow
+  // can do constant propagation etc).  Don't attempt to hoist it ahead of the
+  // start point.
+  //
+  // Cases that are handled here should be handled by
+  // sinkValueIntoRegionForPromotion.
+  if (isa<LiteralInst>(inst))
+    return ScalarPromoteClass::ShouldPromote;
+
+  // Otherwise, we can promote this if desired.
+  return ScalarPromoteClass::CanPromote;
 }
 
 void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
@@ -976,6 +1007,28 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
   return false;
 }
 
+/// The specified instruction is known to dominate the start point for the
+/// program, and is known to be promotable to a tensor op.   Try to sink it down
+/// to be part of the tensor program and return true if successful.
+///
+/// NOTE: This trivially simple implementation currently can't fail, but when
+/// we generalize it later it can, so we return a bool to indicate success.
+bool TFFunctionPartition::
+sinkValueIntoRegionForPromotion(SILInstruction *inst) {
+  // If this is too complex, don't try to sink it.
+  // Right now, we just handle floating point and integer literals.
+  assert(isa<LiteralInst>(inst) &&
+         "can only handle 'ShouldPromote' cases identified by"
+         " shouldPromoteToTensorOp");
+
+  // Right now we just handle single instruction sinking, which makes it simple:
+  // Move it right before the existing start point and set it as the new start
+  // point.
+  inst->moveBefore(tensorStartPoint);
+  tensorStartPoint = inst;
+  return true;
+}
+
 /// Indicate that the specified value must be available on the accelerator.
 /// This can be done by moving the computation over, or by inserting a data
 /// transfer.
@@ -997,10 +1050,41 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   if (tensorOpsSet.count(inst))
     return;
 
+  // Determine whether the instruction is lexically before the tensor program
+  // start point, and whether it is something we can promote into the graph.
+  bool isBeforeStartPoint =
+    !DI.properlyDominates(tensorStartPoint, inst);
+  ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst);
+
+  // If this is a scalar operation that we really want to promote to a tensor
+  // operation, then try to do so.
+  if (promotionClass == ScalarPromoteClass::ShouldPromote) {
+    // If the value is defined before of the program region, is used by the
+    // tensor program, and if it is better to have it in the tensor program than
+    // for it to be an argument, sink it into the tensor program and mark it.
+    // This is useful for constants.  Consider code like this:
+    //
+    //   x = <opaque value>
+    //   y = tensor_literal [1,2,3]
+    //   z = x+y
+    //
+    // In this case, the operation "+" will be the start point, but we'd like to
+    // sink the constant '1' into the region (it will actually become the new
+    // start point).
+    if (isBeforeStartPoint &&
+        sinkValueIntoRegionForPromotion(inst))
+      isBeforeStartPoint = false;
+
+    // If the instruction is in the tensor program region (either because it was
+    // already or because we just moved it) then we can mark it to be copied in.
+    if (!isBeforeStartPoint)
+      return markInstruction(*inst, Marking::Copy);
+  }
+
   // If the value is defined outside of the region dominated by the tensor
   // operations (or it can be hoisted above it), then it is passed in as an
   // argument to the tensor function.
-  if (!DI.properlyDominates(tensorStartPoint, inst) ||
+  if (isBeforeStartPoint ||
       // If we can hoist it above the start point then it can be an argument.
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
@@ -1009,10 +1093,10 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
     return;
   }
 
-  // If this is a scalar operation that we can partition to the accelerator and
-  // if it makes sense, mark it as being copied over (this leads to its operands
+  // If this is a scalar operation that can be promoted to a tensor op on the
+  // accelerator, mark it as being copied over (this leads to its operands
   // being recursively copied as well).
-  if (shouldPartition(inst))
+  if (promotionClass == ScalarPromoteClass::CanPromote)
     return markInstruction(*inst, Marking::Copy);
 
   // Otherwise, insert a send from the host to the accelerator.
