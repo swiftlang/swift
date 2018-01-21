@@ -72,7 +72,7 @@ typealias CTFEOp = OpaquePointer
 //===----------------------------------------------------------------------===//
 
 #if os(macOS)
-let stderr = __strerrp
+let stderr = __stderrp
 #endif
 
 /// Log to standard error.
@@ -93,3 +93,4 @@ func debugLog(_ message: @autoclosure () -> String) {
     print(message())
   }
 }
+
