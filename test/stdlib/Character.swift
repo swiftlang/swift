@@ -254,7 +254,7 @@ func checkUnicodeScalars(_ s: String) {
 
 func checkRepresentation(_ s: String) {
   let expectSmall
-    = s.utf16.count < 4 || s.utf16.count == 4 && s._core[3] < 0x8000
+    = s.utf16.count < 4 || s.utf16.count == 4 && s._guts[3] < 0x8000
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"
