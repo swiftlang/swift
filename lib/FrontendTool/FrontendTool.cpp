@@ -63,6 +63,7 @@
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/APINotes/Types.h"
 
 #include "llvm/ADT/Statistic.h"
@@ -1170,7 +1171,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     Context.LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
-  Instance.freeContextAndSIL();
+  // NB: Don't free if we have a stats collector; it makes some use
+  // of the AST context during shutdown.
+  if (!Stats)
+    Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
@@ -1444,31 +1448,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  const std::string &StatsOutputDir =
-      Invocation.getFrontendOptions().StatsOutputDir;
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
-  if (!StatsOutputDir.empty()) {
-    auto &FEOpts = Invocation.getFrontendOptions();
-    auto &LangOpts = Invocation.getLangOptions();
-    auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName = FEOpts.Inputs.getNameOfUniquePrimaryInputFile();
-    StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-    StringRef OutFile = FEOpts.getSingleOutputFilename();
-    StringRef OutputType = llvm::sys::path::extension(OutFile);
-    std::string TripleName = LangOpts.Target.normalize();
-    auto &SM = Instance->getSourceMgr();
-    auto Trace = Invocation.getFrontendOptions().TraceStats;
-    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
-                                                            FEOpts.ModuleName,
-                                                            InputName,
-                                                            TripleName,
-                                                            OutputType,
-                                                            OptType,
-                                                            StatsOutputDir,
-                                                            &SM,
-                                                            Trace);
-  }
-
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance->getSourceMgr());
@@ -1486,7 +1465,35 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1);
   }
 
-  if (StatsReporter) {
+  const std::string &StatsOutputDir =
+      Invocation.getFrontendOptions().StatsOutputDir;
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
+  if (!StatsOutputDir.empty()) {
+    auto &FEOpts = Invocation.getFrontendOptions();
+    auto &LangOpts = Invocation.getLangOptions();
+    auto &SILOpts = Invocation.getSILOptions();
+    StringRef InputName = FEOpts.Inputs.getNameOfUniquePrimaryInputFile();
+    StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
+    StringRef OutFile = FEOpts.getSingleOutputFilename();
+    StringRef OutputType = llvm::sys::path::extension(OutFile);
+    std::string TripleName = LangOpts.Target.normalize();
+    SourceManager *SM = &Instance->getSourceMgr();
+    clang::SourceManager *CSM = nullptr;
+    if (auto *clangImporter = static_cast<ClangImporter *>(
+          Instance->getASTContext().getClangModuleLoader())) {
+      CSM = &clangImporter->getClangASTContext().getSourceManager();
+    }
+    auto Trace = Invocation.getFrontendOptions().TraceStats;
+    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
+                                                            FEOpts.ModuleName,
+                                                            InputName,
+                                                            TripleName,
+                                                            OutputType,
+                                                            OptType,
+                                                            StatsOutputDir,
+                                                            SM, CSM,
+                                                            Trace);
+
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure
     // accumulated work on completion (mostly: TypeChecker).
