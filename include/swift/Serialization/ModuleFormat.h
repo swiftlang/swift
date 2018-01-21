@@ -1435,7 +1435,7 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   // SWIFT_ENABLE_TENSORFLOW
-  using TFGradientDeclAttrLayout = BCRecordLayout<TFGradient_DECL_ATTR>;
+  using DifferentiableDeclAttrLayout = BCRecordLayout<Differentiable_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

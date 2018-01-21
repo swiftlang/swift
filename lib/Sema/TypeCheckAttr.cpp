@@ -113,7 +113,8 @@ public:
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WeakLinked)
-  IGNORED_ATTR(TFGradient)
+  // SWIFT_ENABLE_TENSORFLOW
+  IGNORED_ATTR(Differentiable)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -881,8 +882,8 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 
-  // TF_ENABLE_TENSORFLOW
-  void visitTFGradientAttr(TFGradientAttr *attr);
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitDifferentiableAttr(DifferentiableAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2097,7 +2098,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 }
 
-void AttributeChecker::visitTFGradientAttr(TFGradientAttr *attr) {
+// SWIFT_ENABLE_TENSORFLOW
+void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // FIXME: Implement
   llvm_unreachable("Unimplemented");
 }

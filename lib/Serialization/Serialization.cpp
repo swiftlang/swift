@@ -2179,7 +2179,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_RestatedObjCConformance:
   case DAK_ClangImporterSynthesizedType:
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_TFGradient:
+  case DAK_Differentiable:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:

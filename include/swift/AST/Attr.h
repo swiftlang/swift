@@ -1265,23 +1265,27 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Attribute that marks a declaration to be the gradient of another function,
-/// e.g. @differentiable(gradient: foo(_:_:seed:)).
-class TFGradientAttr : public DeclAttribute {
+/// Attribute that marks a function differentiable and specifies the adjoint
+/// of the function.
+/// e.g. @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
+class DifferentiableAttr : public DeclAttribute {
 public:
-  explicit TFGradientAttr(DeclName gradFuncName, DeclNameLoc gradFuncNameLoc)
-    : DeclAttribute(DAK_TFGradient, SourceLoc(), SourceRange(),
+  explicit DifferentiableAttr(DeclName gradFuncName, DeclNameLoc gradFuncNameLoc,
+                              TrailingWhereClause *whereClause)
+    : DeclAttribute(DAK_Differentiable, SourceLoc(), SourceRange(),
                     /*Implicit*/true),
-      GradFuncName(gradFuncName), GradFuncNameLoc(gradFuncNameLoc) {}
+      GradFuncName(gradFuncName), GradFuncNameLoc(gradFuncNameLoc),
+      WhereClause(whereClause) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TFGradient;
+    return DA->getKind() == DAK_Differentiable;
   }
 
 private:
   /// The function which the declared function differentiates.
   DeclName GradFuncName;
   DeclNameLoc GradFuncNameLoc;
+  TrailingWhereClause *WhereClause;
 
 public:
   DeclName getGradFuncName() const {
@@ -1290,6 +1294,10 @@ public:
 
   DeclNameLoc getGradFuncNameLoc() const {
     return GradFuncNameLoc;
+  }
+
+  TrailingWhereClause *getWhereClause() const {
+    return WhereClause;
   }
 };
 

@@ -781,8 +781,8 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Parse the @differentiable attribute.
-  ParserResult<TFGradientAttr> parseTFGradientAttribute(SourceLoc AtLoc,
-                                                        SourceLoc Loc);
+  ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
+                                                                SourceLoc Loc);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);

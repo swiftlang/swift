@@ -6503,8 +6503,8 @@ public:
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
 
-    // TF_ENABLE_TENSORFLOW
-    UNINTERESTING_ATTR(TFGradient)
+    // SWIFT_ENABLE_TENSORFLOW
+    UNINTERESTING_ATTR(Differentiable)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)

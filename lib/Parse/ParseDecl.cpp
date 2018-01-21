@@ -501,8 +501,8 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-ParserResult<TFGradientAttr>
-Parser::parseTFGradientAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+ParserResult<DifferentiableAttr>
+Parser::parseDifferentiableAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   StringRef AttrName = "differentiable";
   ParserStatus Status;
   SourceLoc lParenLoc, rParenLoc;
@@ -525,14 +525,15 @@ Parser::parseTFGradientAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   }
 
   // Parse 'gradient:' label.
-  if (parseSpecificIdentifier("gradient", Loc, diag::attr_tfgradient_missing_gradient_label))
+  if (parseSpecificIdentifier("gradient", Loc,
+                              diag::attr_differentiable_missing_gradient_label))
     return errorAndSkipToEnd();
   if (!consumeIf(tok::colon)) {
-    diagnose(Loc, diag::attr_tfgradient_expected_colon_after_label, "gradient");
+    diagnose(Loc, diag::attr_differentiable_expected_colon_after_label, "gradient");
     return errorAndSkipToEnd();
   }
 
-  // Parse the name of the gradient function.
+  // Parse the name of the adjoint function.
   DeclNameLoc gradFuncNameLoc;
   DeclName gradFuncName =
     parseUnqualifiedDeclName(/*afterDot=*/false, gradFuncNameLoc,
@@ -542,6 +543,17 @@ Parser::parseTFGradientAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   if (!gradFuncName)
     return errorAndSkipToEnd();
 
+  // Parse a trailing 'where' clause if any.
+  TrailingWhereClause *whereClause;
+  if (Tok.is(tok::kw_where)) {
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirements;
+    bool firstTypeInComplete;
+    parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
+                            /*AllowLayoutConstraints=*/true);
+    whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
+  }
+
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(Loc, diag::attr_expected_rparen, AttrName, /*DeclModifier=*/false);
@@ -549,8 +561,9 @@ Parser::parseTFGradientAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
-  return ParserResult<TFGradientAttr>(
-    new (Context) TFGradientAttr(gradFuncName, gradFuncNameLoc));
+  return ParserResult<DifferentiableAttr>(
+    new (Context) DifferentiableAttr(
+      gradFuncName, gradFuncNameLoc, whereClause));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1405,8 +1418,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  case DAK_TFGradient: {
-    ParserResult<TFGradientAttr> Attr = parseTFGradientAttribute(AtLoc, Loc);
+  case DAK_Differentiable: {
+    ParserResult<DifferentiableAttr> Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }

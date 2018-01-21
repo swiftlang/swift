@@ -649,7 +649,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ClangImporterSynthesizedType:
     return "_clangImporterSynthesizedType";
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_TFGradient:
+  case DAK_Differentiable:
     return "differentiable";
   }
   llvm_unreachable("bad DeclAttrKind");
