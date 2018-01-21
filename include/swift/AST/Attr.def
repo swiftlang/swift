@@ -226,8 +226,8 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
-SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
-                 OnClass, 53)
+SIMPLE_DECL_ATTR(_objc_non_lazy_realization, ObjCNonLazyRealization,
+                 OnClass | UserInaccessible, 53)
 
 DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
           OnStruct | OnEnum | OnClass | NotSerialized | RejectByParser,

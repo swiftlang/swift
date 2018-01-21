@@ -3142,7 +3142,7 @@ collections = [
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@objc_non_lazy_realization
+@_objc_non_lazy_realization
 internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
