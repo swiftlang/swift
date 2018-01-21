@@ -52,6 +52,7 @@ import DictionaryLiteral
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -191,6 +192,7 @@ registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
