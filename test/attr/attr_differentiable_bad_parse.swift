@@ -1,12 +1,15 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
-import Foundation
-
 /// Good
 
 @differentiable(gradient: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
+}
+
+@differentiable(gradient: foo(_:_:) where T : FloatingPoint) // okay
+func bar<T : Numeric>(_ x: T, _: T) -> T {
+    return 1 + x
 }
 
 /// Bad
@@ -24,4 +27,9 @@ func bar(_ x: Float, _: Float) -> Float {
 @differentiable(gradient: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
+}
+
+@differentiable(gradient: foo(_:_:) where T) // expected-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
+func bar<T : Numeric>(_ x: T, _: T) -> T {
+    return 1 + x
 }

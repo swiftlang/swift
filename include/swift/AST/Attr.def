@@ -378,8 +378,9 @@ SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
   LongAttribute | RejectByParser | UserInaccessible | NotSerialized,
   77)
 
+// SWIFT_ENABLE_TENSORFLOW
 // FIXME: Make it serialized
-DECL_ATTR(differentiable, TFGradient,
+DECL_ATTR(differentiable, Differentiable,
           OnFunc | LongAttribute | NotSerialized,
           /* Not serialized */ 78)
 
