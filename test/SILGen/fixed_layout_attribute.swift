@@ -48,3 +48,24 @@ private let privateGlobal = 0
 struct AnotherInternalStruct {
   var storedProperty = privateGlobal
 }
+
+// Static properties in fixed-layout type is still resilient
+
+@_fixed_layout
+public struct HasStaticProperty {
+  public static var staticProperty: Int = 0
+}
+
+// CHECK-LABEL: sil @$S22fixed_layout_attribute18usesStaticPropertyyyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$S22fixed_layout_attribute17HasStaticPropertyV06staticF0Sivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: return
+public func usesStaticProperty() {
+  _ = HasStaticProperty.staticProperty
+}
+
+// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute28usesStaticPropertyInlineableyyF : $@convention(thin) () -> ()
+
+@_inlineable
+public func usesStaticPropertyInlineable() {
+  _ = HasStaticProperty.staticProperty
+}

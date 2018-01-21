@@ -324,7 +324,7 @@ class GenericGizmo<T> : Gizmo {
 var sg = SwiftGizmo()
 sg.duplicate()
 
-@objc_non_lazy_realization
+@_objc_non_lazy_realization
 class SwiftGizmo2 : Gizmo {
   var sg : SwiftGizmo
 
