@@ -363,6 +363,14 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 #endif
 }
 
+@_inlineable
+@_versioned
+internal
+func _isValidAddress(_ address: UInt) -> Bool {
+  // TODO: define (and use) ABI max valid pointer value
+  return address >= _swift_abi_LeastValidPointerValue
+}
+
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
