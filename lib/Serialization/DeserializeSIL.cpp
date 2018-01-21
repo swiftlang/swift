@@ -469,6 +469,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
+    if (SILMod.getOptions().MergePartialModules)
+      fn->setLinkage(*linkage);
+
     // Don't override the transparency or linkage of a function with
     // an existing declaration, except if we deserialized a
     // PublicNonABI function, which has HiddenExternal when
