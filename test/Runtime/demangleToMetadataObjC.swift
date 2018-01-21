@@ -42,9 +42,6 @@ DemangleToMetadataTests.test("Classes that don't exist") {
   expectNil(_typeByMangledName("4main4BoomC"))
 }
 
-// FIXME: Shouldn't need this?
-extension CFArray: P2 { }
-
 DemangleToMetadataTests.test("CoreFoundation classes") {
   expectEqual(CFArray.self, _typeByMangledName("So10CFArrayRefa")!)
 }
@@ -59,9 +56,6 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
   expectEqual(URLFileResourceType.self,
     _typeByMangledName("So21NSURLFileResourceTypea")!)
 }
-
-// FIXME: Shouldn't need this?
-extension URLSessionTask.State: P2 { }
 
 DemangleToMetadataTests.test("Imported enum types") {
   expectEqual(NSURLSessionTask.State.self,

@@ -5307,8 +5307,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
 
-  if (NominalTypeDecl *Nominal = type->getAnyNominal())
-    addLazyConformances(Nominal);
+  // Keep type metadata around for all types.
+  addRuntimeResolvableType(type);
 
   return result;
 }
