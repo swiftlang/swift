@@ -196,10 +196,10 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 
   a += b
 
-  var count = 0  // expected-warning {{'Int' implicitly copied to the accelerator}}
-  while count < maxCount { // expected-note 2 {{value used here}}
+  var count = 0
+  while count < maxCount { // expected-note {{value used here}}
     a -= b
-    count += 1    // expected-warning {{'Int' implicitly copied to the accelerator}}
+    count += 1
   }
   a += b
   print(a.toHost())
@@ -209,6 +209,8 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK: sil private @{{.*}}test_while1{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT: builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
+// CHECK-NEXT: integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: builtin "__tfop_Const__cd:t__"(
 // CHECK-NEXT: builtin "__tfop_Less__tt:t__"(
 // CHECK-NEXT: builtin "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br %7, bb2, bb1
