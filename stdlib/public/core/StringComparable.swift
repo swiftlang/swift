@@ -74,7 +74,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 extension _StringGuts {
 
   //
-  // HACK HACK HACK: Work around for ARC :-(
+  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
   //
   @inline(never)
   @effects(readonly)

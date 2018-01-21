@@ -48,7 +48,7 @@ struct _StringObject {
   // provides us the runtime functionality we want.
   @_versioned
   internal
-  var _object: _BuiltinBridgeObject
+  var _object: Builtin.BridgeObject
 #endif
 
 #if arch(i386) || arch(arm)
@@ -66,7 +66,7 @@ struct _StringObject {
   @_inlineable
   @inline(__always)
   internal
-  init(_ object: _BuiltinBridgeObject) {
+  init(_ object: Builtin.BridgeObject) {
     self._object = object
     _invariantCheck()
   }

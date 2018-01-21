@@ -460,14 +460,10 @@ func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
     >> _objectPointerLowSpareBitShift
 }
 
-// TODO (StringGuts): remove
-public typealias _BuiltinBridgeObject = Builtin.BridgeObject
-public typealias _BuiltinNativeObject = Builtin.NativeObject
-
 // Values -> BridgeObject
 @inline(__always)
 @_inlineable
-public func _bridgeObject(fromNative x: AnyObject) -> _BuiltinBridgeObject {
+public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
   _sanityCheck(!_isObjCTaggedPointer(x))
   let object = Builtin.castToBridgeObject(x, 0._builtinWordValue)
   _sanityCheck(_isNativePointer(object))
@@ -478,7 +474,7 @@ public func _bridgeObject(fromNative x: AnyObject) -> _BuiltinBridgeObject {
 @_inlineable
 public func _bridgeObject(
   fromNonTaggedObjC x: AnyObject
-) -> _BuiltinBridgeObject {
+) -> Builtin.BridgeObject {
   _sanityCheck(!_isObjCTaggedPointer(x))
   let object = _makeObjCBridgeObject(x)
   _sanityCheck(_isNonTaggedObjCPointer(object))
@@ -487,16 +483,16 @@ public func _bridgeObject(
 
 @inline(__always)
 @_inlineable
-public func _bridgeObject(fromTagged x: UInt) -> _BuiltinBridgeObject {
+public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
   _sanityCheck(x & _objCTaggedPointerBits != 0)
-  let object: _BuiltinBridgeObject = Builtin.reinterpretCast(x)
+  let object: Builtin.BridgeObject = Builtin.reinterpretCast(x)
   _sanityCheck(_isTaggedObject(object))
   return object
 }
 
 @inline(__always)
 @_inlineable
-public func _bridgeObject(taggingPayload x: UInt) -> _BuiltinBridgeObject {
+public func _bridgeObject(taggingPayload x: UInt) -> Builtin.BridgeObject {
   let shifted = x &<< _objectPointerLowSpareBitShift
   _sanityCheck(x == (shifted &>> _objectPointerLowSpareBitShift),
     "out-of-range: limited bit range requires some zero top bits")
@@ -508,7 +504,7 @@ public func _bridgeObject(taggingPayload x: UInt) -> _BuiltinBridgeObject {
 // BridgeObject -> Values
 @inline(__always)
 @_inlineable
-public func _bridgeObject(toNative x: _BuiltinBridgeObject) -> AnyObject {
+public func _bridgeObject(toNative x: Builtin.BridgeObject) -> AnyObject {
   _sanityCheck(_isNativePointer(x))
   return Builtin.castReferenceFromBridgeObject(x)
 }
@@ -516,7 +512,7 @@ public func _bridgeObject(toNative x: _BuiltinBridgeObject) -> AnyObject {
 @inline(__always)
 @_inlineable
 public func _bridgeObject(
-  toNonTaggedObjC x: _BuiltinBridgeObject
+  toNonTaggedObjC x: Builtin.BridgeObject
 ) -> AnyObject {
   _sanityCheck(_isNonTaggedObjCPointer(x))
   return Builtin.castReferenceFromBridgeObject(x)
@@ -524,7 +520,7 @@ public func _bridgeObject(
 
 @inline(__always)
 @_inlineable
-public func _bridgeObject(toTagged x: _BuiltinBridgeObject) -> UInt {
+public func _bridgeObject(toTagged x: Builtin.BridgeObject) -> UInt {
   _sanityCheck(_isTaggedObject(x))
   let bits = _bitPattern(x)
   _sanityCheck(bits & _objCTaggedPointerBits != 0)
@@ -532,15 +528,15 @@ public func _bridgeObject(toTagged x: _BuiltinBridgeObject) -> UInt {
 }
 @inline(__always)
 @_inlineable
-public func _bridgeObject(toTagPayload x: _BuiltinBridgeObject) -> UInt {
+public func _bridgeObject(toTagPayload x: Builtin.BridgeObject) -> UInt {
   return _getNonTagBits(x)
 }
 
 @inline(__always)
 @_inlineable
 public func _bridgeObject(
-  fromNativeObject x: _BuiltinNativeObject
-) -> _BuiltinBridgeObject {
+  fromNativeObject x: Builtin.NativeObject
+) -> Builtin.BridgeObject {
   return _bridgeObject(fromNative: _nativeObject(toNative: x))
 }
 
@@ -550,7 +546,7 @@ public func _bridgeObject(
 
 @inline(__always)
 @_inlineable
-public func _nativeObject(fromNative x: AnyObject) -> _BuiltinNativeObject {
+public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
   _sanityCheck(!_isObjCTaggedPointer(x))
   let native = Builtin.unsafeCastToNativeObject(x)
   // _sanityCheck(native == Builtin.castToNativeObject(x))
@@ -559,14 +555,14 @@ public func _nativeObject(fromNative x: AnyObject) -> _BuiltinNativeObject {
 @inline(__always)
 @_inlineable
 public func _nativeObject(
-  fromBridge x: _BuiltinBridgeObject
-) -> _BuiltinNativeObject {
+  fromBridge x: Builtin.BridgeObject
+) -> Builtin.NativeObject {
   return _nativeObject(fromNative: _bridgeObject(toNative: x))
 }
 
 @inline(__always)
 @_inlineable
-public func _nativeObject(toNative x: _BuiltinNativeObject) -> AnyObject {
+public func _nativeObject(toNative x: Builtin.NativeObject) -> AnyObject {
   return Builtin.castFromNativeObject(x)
 }
 
@@ -575,7 +571,7 @@ extension ManagedBufferPointer {
   // FIXME: String Guts
   @inline(__always)
   @_inlineable
-  public init(_nativeObject buffer: _BuiltinNativeObject) {
+  public init(_nativeObject buffer: Builtin.NativeObject) {
     self._nativeBuffer = buffer
   }
 }

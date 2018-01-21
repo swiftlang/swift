@@ -210,8 +210,8 @@ extension _StringGuts {
 #if _runtime(_ObjC)
 extension _StringGuts {
   //
-  // HACK HACK HACK: Work around for ARC :-(
-  //  @inline(never) // Hide CF dependency
+  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
+  //
   @_versioned
   @effects(readonly)
   internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
@@ -568,69 +568,30 @@ extension _StringGuts {
   }
 }
 
-// Internal hex dumping function. Useful because `print` is implemented in the
-// stdlib through a series of very high level String calls, resulting in
-// infinite recursion.
-@_versioned
-internal func internalDumpHexImpl(_ x: UInt, newline: Bool) {
-  _swift_stdlib_print_hex(x, newline ? 1 : 0)
-}
-@_versioned
-internal func internalDumpHex(_ x: _BuiltinNativeObject, newline: Bool) {
-  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
-}
-@_versioned
-internal func internalDumpHex(_ x: UInt, newline: Bool = true) {
-  internalDumpHexImpl(x, newline: newline)
-}
-@_versioned
-internal func internalDumpHex(_ x: UInt64, newline: Bool = true) {
-#if arch(i386) || arch(arm)
-  internalDumpHexImpl(UInt(truncatingIfNeeded: x >> 32), newline: false)
-  internalDumpHexImpl(UInt(truncatingIfNeeded: x), newline: newline)
-#else
-  internalDumpHexImpl(UInt(x), newline: newline)
-#endif
-}
-@_versioned
-internal func internalDumpHex(_ x: AnyObject, newline: Bool = true) {
-  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
-}
-@_versioned
-internal func internalDumpHex(_ x: UnsafeRawPointer?, newline: Bool = true) {
-  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
-}
-@_versioned
-internal func internalDumpHex(_ x: Bool, newline: Bool = true) {
-  internalDumpHexImpl(x ? 1 : 0, newline: newline)
-}
-
 extension _StringGuts {
   // FIXME: Remove
   public func _dump() {
-    print("_StringGuts(", terminator: "")
-    internalDumpHex(rawBits.0, newline: false)
-    print(" ", terminator: "")
-    internalDumpHex(rawBits.1, newline: false)
-    print(": ", terminator: "")
-    _dumpContents()
-    if isASCII {
-      print(" <ascii>", terminator: "")
+    func printHex(_ uint: UInt, newline: Bool = true) {
+      print(String(uint, radix: 16), terminator: newline ? "\n" : "")
     }
-    else {
-      print(" <utf16>", terminator: "")
+    func fromAny(_ x: AnyObject) -> UInt {
+      return Builtin.reinterpretCast(x)
     }
-    print(")")
-  }
+    func fromPtr(_ x: UnsafeMutableRawPointer) -> UInt {
+      return Builtin.reinterpretCast(x)
+    }
 
-  // FIXME: Remove
-  internal func _dumpContents() {
+    print("_StringGuts(", terminator: "")
+    printHex(UInt(rawBits.0), newline: false)
+    print(" ", terminator: "")
+    printHex(UInt(rawBits.1), newline: false)
+    print(": ", terminator: "")
     if _object.isNative {
       let storage = _object.nativeRawStorage
       print("native ", terminator: "")
-      internalDumpHex(storage, newline: false)
+      printHex(Builtin.reinterpretCast(storage), newline: false)
       print(" start: ", terminator: "")
-      internalDumpHex(storage.rawStart, newline: false)
+      printHex(Builtin.reinterpretCast(storage.rawStart), newline: false)
       print(" count: ", terminator: "")
       print(storage.count, terminator: "")
       print("/", terminator: "")
@@ -640,10 +601,10 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     if _object.isCocoa {
       print("cocoa ", terminator: "")
-      internalDumpHex(_object.asCocoaObject, newline: false)
+      printHex(Builtin.reinterpretCast(_object.asCocoaObject), newline: false)
       print(" start: ", terminator: "")
       if _object.isContiguous {
-        internalDumpHex(_cocoaRawStart, newline: false)
+        printHex(Builtin.reinterpretCast(_cocoaRawStart), newline: false)
       } else {
         print("<opaque>", terminator: "")
       }
@@ -654,7 +615,7 @@ extension _StringGuts {
 #else
     if _object.isOpaque {
       print("opaque ", terminator: "")
-      internalDumpHex(_object.asOpaqueObject, newline: false)
+      printHex(Builtin.reinterpretCast(_object.asOpaqueObject), newline: false)
       print(" count: ", terminator: "")
       print(_opaqueCount, terminator: "")
       return
@@ -662,7 +623,7 @@ extension _StringGuts {
 #endif
     if _object.isUnmanaged {
       print("unmanaged ", terminator: "")
-      internalDumpHex(_unmanagedRawStart, newline: false)
+      printHex(Builtin.reinterpretCast(_unmanagedRawStart), newline: false)
       print(" count: ", terminator: "")
       print(_unmanagedCount, terminator: "")
       return
@@ -670,13 +631,20 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     if _object.isSmall {
       print("small cocoa ", terminator: "")
-      internalDumpHex(_taggedCocoaObject, newline: false)
+      printHex(Builtin.reinterpretCast(_taggedCocoaObject), newline: false)
       print(" count: ", terminator: "")
       print(_taggedCocoaCount, terminator: "")
       return
     }
 #endif
     print("error", terminator: "")
+    if isASCII {
+      print(" <ascii>", terminator: "")
+    }
+    else {
+      print(" <utf16>", terminator: "")
+    }
+    print(")")
   }
 }
 
