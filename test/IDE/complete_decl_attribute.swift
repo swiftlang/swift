@@ -48,7 +48,7 @@ func method(){}
 @#^KEYWORD3^#
 class C {}
 
-// KEYWORD3:                  Begin completions, 8 items
+// KEYWORD3:                  Begin completions, 7 items
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
@@ -56,7 +56,6 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       requires_stored_property_inits[#Class Attribute#]; name=requires_stored_property_inits{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objcMembers[#Class Attribute#]; name=objcMembers{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD4^#
@@ -76,7 +75,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 19 items
+// KEYWORD_LAST:                  Begin completions, 18 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -92,7 +91,6 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       nonobjc[#Declaration Attribute#]; name=nonobjc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}

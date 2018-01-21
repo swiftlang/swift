@@ -1472,16 +1472,10 @@ bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::isResilient() const {
-  // If we're in a nominal type, just query the type.
-  auto *dc = getDeclContext();
-
-  if (dc->isTypeContext()) {
-    auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    if (nominalDecl == nullptr)
-      return false;
-    return nominalDecl->isResilient();
-  }
+bool AbstractStorageDecl::isFormallyResilient() const {
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return false;
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
@@ -1489,12 +1483,19 @@ bool AbstractStorageDecl::isResilient() const {
                             /*respectVersionedAttr=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout attribute.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+  // If we're an instance property of a nominal type, query the type.
+  auto *dc = getDeclContext();
+  if (!isStatic())
+    if (auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+      return nominalDecl->isResilient();
+
+  return true;
+}
+
+bool AbstractStorageDecl::isResilient() const {
+  if (!isFormallyResilient())
     return false;
 
-  // Must use resilient access patterns.
-  assert(getDeclContext()->isModuleScopeContext());
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return true;

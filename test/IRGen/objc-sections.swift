@@ -14,7 +14,7 @@ extension C : P {
   }
 }
 
-@objc_non_lazy_realization
+@_objc_non_lazy_realization
 class D {
 }
 
