@@ -1,14 +1,11 @@
 
 #if BEFORE
 
+@_fixed_layout
 public struct ChangeStoredToComputed {
-  public init() {
-    celsius = 0
-  }
+  public static var celsius: Int = 0
 
-  public var celsius: Int
-
-  public var fahrenheit: Int {
+  public static var fahrenheit: Int {
     get {
       return (celsius * 9) / 5 + 32
     }
@@ -20,12 +17,9 @@ public struct ChangeStoredToComputed {
 
 #else
 
+@_fixed_layout
 public struct ChangeStoredToComputed {
-  public init() {
-    fahrenheit = 32
-  }
-
-  public var celsius: Int {
+  public static var celsius: Int {
     get {
       return ((fahrenheit - 32) * 5) / 9
     }
@@ -34,7 +28,7 @@ public struct ChangeStoredToComputed {
     }
   }
 
-  public var fahrenheit: Int
+  public static var fahrenheit: Int = 32
 }
 
 #endif
