@@ -29,8 +29,6 @@ import SwiftShims
 // FIXME: what about ppc64 and s390x?
 //
 
-
-
 @_fixed_layout
 public // FIXME
 struct _StringGuts {
@@ -78,7 +76,7 @@ extension _StringGuts {
     } else if _object.isUnmanaged {
     } else if _object.isCocoa {
       if _object.isContiguous {
-        _sanityCheck(_otherBits != 0) // TODO: in ABI's address space
+        _sanityCheck(_isValidAddress(_otherBits))
       } else {
         _sanityCheck(_otherBits == 0)
       }
@@ -238,7 +236,7 @@ extension _StringGuts {
     @inline(__always)
     get {
       _sanityCheck(_object.isContiguousCocoa)
-      _sanityCheck(Int(bitPattern: _otherBits) >= 1) // TODO: ABI's min address
+      _sanityCheck(_isValidAddress(_otherBits))
       return UnsafeRawPointer(
         bitPattern: _otherBits
       )._unsafelyUnwrappedUnchecked
