@@ -63,8 +63,8 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
-// CHECK-32-SAME: i32 16 }>
-// CHECK-64-SAME: i32 32 }>
+// CHECK-32-SAME: i32 20 }>
+// CHECK-64-SAME: i32 24 }>
 
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -99,8 +99,8 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_0018> }>
-// CHECK-64-SAME: <i32 0x4000_0030> }>
+// CHECK-32-SAME: <i32 0x4000_001C> }>
+// CHECK-64-SAME: <i32 0x4000_0028> }>
 
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -113,8 +113,8 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
-// CHECK-32-SAME: i32 16,
-// CHECK-64-SAME: i32 32,
+// CHECK-32-SAME: i32 20,
+// CHECK-64-SAME: i32 24,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- 0x4000_0000 (class) + offset of C.x
@@ -132,8 +132,8 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_0018>,
-// CHECK-64-SAME: <i32 0x4000_0030>,
+// CHECK-32-SAME: <i32 0x4000_001C>,
+// CHECK-64-SAME: <i32 0x4000_0028>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- offset of S.x

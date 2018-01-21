@@ -12,6 +12,25 @@
 
 import SwiftShims
 
+extension _StringVariant {
+  @_versioned
+  func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
+    _sanityCheck(count > 0)
+    let c = self.count
+    let storage = _copyToNativeStorage(
+      of: CodeUnit.self,
+      unusedCapacity: (count - 1) * c)
+    var p = storage.start + c
+    for _ in 1 ..< count {
+      p.initialize(from: storage.start, count: c)
+      p += c
+    }
+    _sanityCheck(p == storage.start + count * c)
+    storage.count = p - storage.start
+    return storage
+  }
+}
+
 extension String {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
@@ -31,23 +50,27 @@ extension String {
   public init(repeating repeatedValue: String, count: Int) {
     if count == 0 {
       self = ""
-      return
-    }
-    precondition(count > 0, "Negative count not allowed")
-    let s = repeatedValue
-    self = String(_storage: _StringBuffer(
-        capacity: s._core.count * count,
-        initialSize: 0,
-        elementWidth: s._core.elementWidth))
-    for _ in 0..<count {
-      self += s
+    } else if count == 1 {
+      self = repeatedValue
+    } else {
+      precondition(count > 0, "Negative count not allowed")
+      if _slowPath(repeatedValue._guts._isOpaque) {
+        let opaque = repeatedValue._guts._asOpaque()
+        self.init(_StringGuts(opaque._repeated(count)))
+      } else if repeatedValue._guts.isASCII {
+        let ascii = repeatedValue._guts._unmanagedASCIIView
+        self.init(_StringGuts(ascii._repeated(count)))
+      } else {
+        let utf16 = repeatedValue._guts._unmanagedUTF16View
+        self.init(_StringGuts(utf16._repeated(count)))
+      }
     }
   }
 
   /// A Boolean value indicating whether a string has no characters.
   @_inlineable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
-    return _core.count == 0
+    return _guts.count == 0
   }
 }
 
@@ -120,32 +143,38 @@ extension String {
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
-    let selfCore = self._core
-    let prefixCore = prefix._core
-    let prefixCount = prefixCore.count
+    let prefixCount = prefix._guts.count
     if prefixCount == 0 {
       return true
     }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let prefixASCIIBuffer = prefixCore.asciiBuffer {
-      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Prefix is longer than self.
-        return false
+    if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
+      let result: Bool
+      if self._guts.isASCII && prefix._guts.isASCII {
+        let selfASCII = self._guts._unmanagedASCIIView
+        let prefixASCII = prefix._guts._unmanagedASCIIView
+        if prefixASCII.count > selfASCII.count {
+          // Prefix is longer than self.
+          result = false
+        } else {
+          result = (0 as CInt) == _stdlib_memcmp(
+            selfASCII.rawStart,
+            prefixASCII.rawStart,
+            prefixASCII.count)
+        }
+      } else {
+        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
+        let rhsStr = _NSContiguousString(_unmanaged: prefix._guts)
+        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+          return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+        }
       }
-      return _stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.count) == (0 as CInt)
-    }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(prefixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
-      }
+      _fixLifetime(self)
+      _fixLifetime(prefix)
+      return result
     }
     return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
+      self._bridgeToObjectiveCImpl(),
+      prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -179,33 +208,38 @@ extension String {
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
-    let selfCore = self._core
-    let suffixCore = suffix._core
-    let suffixCount = suffixCore.count
+    let suffixCount = suffix._guts.count
     if suffixCount == 0 {
       return true
     }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let suffixASCIIBuffer = suffixCore.asciiBuffer {
-      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Suffix is longer than self.
-        return false
+    if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
+      let result: Bool
+      if self._guts.isASCII && suffix._guts.isASCII {
+        let selfASCII = self._guts._unmanagedASCIIView
+        let suffixASCII = suffix._guts._unmanagedASCIIView
+        if suffixASCII.count > self._guts.count {
+          // Suffix is longer than self.
+          result = false
+        } else {
+          result = (0 as CInt) == _stdlib_memcmp(
+            selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
+            suffixASCII.rawStart,
+            suffixASCII.count)
+        }
+      } else {
+        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
+        let rhsStr = _NSContiguousString(_unmanaged: suffix._guts)
+        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+          return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+        }
       }
-      return _stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!
-          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
-        suffixASCIIBuffer.baseAddress!,
-        suffixASCIIBuffer.count) == (0 as CInt)
-    }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(suffixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
-      }
+      _fixLifetime(self)
+      _fixLifetime(suffix)
+      return result
     }
     return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
+      self._bridgeToObjectiveCImpl(),
+      suffix._bridgeToObjectiveCImpl())
   }
 }
 #else

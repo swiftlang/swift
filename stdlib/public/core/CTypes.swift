@@ -229,7 +229,7 @@ extension CVaListPointer : CustomDebugStringConvertible {
 @_inlineable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
-  src: UnsafeMutableRawPointer,
+  src: UnsafeRawPointer,
   size: UInt
 ) {
   let dest = destination._rawValue
