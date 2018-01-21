@@ -115,7 +115,8 @@ public:
   IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(UsableFromInlineImport)
   IGNORED_ATTR(WeakLinked)
-  IGNORED_ATTR(TFGradient)
+  // SWIFT_ENABLE_TENSORFLOW
+  IGNORED_ATTR(Differentiable)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -885,8 +886,8 @@ public:
 
   void visitFrozenAttr(FrozenAttr *attr);
 
-  // TF_ENABLE_TENSORFLOW
-  void visitTFGradientAttr(TFGradientAttr *attr);
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitDifferentiableAttr(DifferentiableAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2090,7 +2091,12 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 }
 
-<<<<<<< 9c1e8e7c70b4d634528af441aafb495a9d1eaf26
+// SWIFT_ENABLE_TENSORFLOW
+void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  // FIXME: Implement
+  llvm_unreachable("Unimplemented");
+}
+
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   auto *ED = cast<EnumDecl>(D);
 
@@ -2107,11 +2113,6 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (access < AccessLevel::Public) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
   }
-=======
-void AttributeChecker::visitTFGradientAttr(TFGradientAttr *attr) {
-  // FIXME: Implement
-  llvm_unreachable("Unimplemented");
->>>>>>> Add '@differentiable(gradient:)' attribute on function declarations, which registers the gradient of a function so that the automatic differentiation pass can find the gradient of that function.
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
