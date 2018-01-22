@@ -101,6 +101,12 @@ PrintTrivialNodeKind("print-trivial-node-kind",
                      llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+VerifySyntaxTree("verify-syntax-tree",
+                 llvm::cl::desc("Emit warnings for unknown nodes"),
+                 llvm::cl::cat(Category),
+                 llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
 Visual("v",
        llvm::cl::desc("Print visually"),
        llvm::cl::cat(Category),
@@ -145,7 +151,7 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
-  Invocation.getLangOptions().VerifySyntaxTree = true;
+  Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getFrontendOptions().Inputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
