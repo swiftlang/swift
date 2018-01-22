@@ -22,21 +22,29 @@ func unsafePointerConversionAvailability(
   let oups: UnsafePointer<String>? = ups
 
   _ = UnsafeMutableRawPointer(mrp)
-  _ = UnsafeMutableRawPointer(rp)   // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(rp)   // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(umpv)
-  _ = UnsafeMutableRawPointer(upv)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(upv)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(umpi)
-  _ = UnsafeMutableRawPointer(upi)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(upi)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(umps)
-  _ = UnsafeMutableRawPointer(ups)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(ups)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(omrp)
-  _ = UnsafeMutableRawPointer(orp)   // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(orp)   // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(oumpv)
-  _ = UnsafeMutableRawPointer(oupv)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oupv)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(oumpi)
-  _ = UnsafeMutableRawPointer(oupi)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oupi)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
   _ = UnsafeMutableRawPointer(oumps)
-  _ = UnsafeMutableRawPointer(oups)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oups)  // expected-warning {{'init' is deprecated: replaced by 'init(mutating:)'}}
+  // expected-note@-1{{use 'init(mutating:)' instead}}
 
   // These all correctly pass with no error.
   _ = UnsafeRawPointer(mrp)
