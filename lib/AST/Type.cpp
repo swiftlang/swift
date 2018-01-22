@@ -2180,8 +2180,7 @@ namespace {
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                     ParameterPosition paramPosition,
-                    OptionalUnwrapping insideOptional,
-                    LazyResolver *resolver) {
+                    OptionalUnwrapping insideOptional) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
@@ -2193,7 +2192,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToOptional, resolver);
+                       OptionalUnwrapping::OptionalToOptional);
       }
 
       // Value-to-optional.
@@ -2204,7 +2203,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::ValueToOptional, resolver);
+                       OptionalUnwrapping::ValueToOptional);
       }
 
     } else if (matchMode.contains(
@@ -2212,7 +2211,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToValue, resolver);
+                       OptionalUnwrapping::OptionalToValue);
       }
     }
   }
@@ -2236,15 +2235,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       OptionalUnwrapping::None, resolver);
+                       OptionalUnwrapping::None);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, OptionalUnwrapping::None,
-                   resolver)){
+                   matchMode, elementPosition, OptionalUnwrapping::None)) {
         return false;
       }
     }
@@ -2287,11 +2285,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
     // Inputs are contravariant, results are covariant.
     return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, OptionalUnwrapping::None,
-                    resolver) &&
+                    ParameterPosition::Parameter, OptionalUnwrapping::None) &&
             matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                    resolver));
+                    ParameterPosition::NotParameter, OptionalUnwrapping::None));
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
@@ -2317,11 +2313,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   return false;
 }
 
-bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
-                       LazyResolver *resolver) {
+bool TypeBase::matches(Type other, TypeMatchOptions matchMode) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                   resolver);
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,
