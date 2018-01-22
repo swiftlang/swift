@@ -337,7 +337,6 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
 }
 
 static NSString *getValueDescription(_SwiftValue *self) {
-  String tmp;
   const Metadata *type;
   const OpaqueValue *value;
   std::tie(type, value) = getValueFromSwiftValue(self);
@@ -347,10 +346,9 @@ static NSString *getValueDescription(_SwiftValue *self) {
   auto copy = type->allocateBufferIn(&copyBuf);
   type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
 
-  swift_getSummary(&tmp, copy, type);
-
+  NSString *string = getDescription(copy, type);
   type->deallocateBufferIn(&copyBuf);
-  return convertStringToNSString(&tmp);
+  return string;
 }
 
 - (NSString *)description {

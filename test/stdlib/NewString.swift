@@ -14,45 +14,33 @@ func hexAddrVal<T>(_ x: T) -> String {
   return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
-func hexAddr(_ x: AnyObject?) -> String {
-  if let owner = x {
-    if let y = owner as? _HeapBufferStorage<_StringBufferIVars, UInt16> {
-      return ".native\(hexAddrVal(y))"
-    }
-    if let y = owner as? NSString {
-      return ".cocoa\(hexAddrVal(y))"
-    }
-    else {
-      return "?Uknown?\(hexAddrVal(owner))"
-    }
-  }
-  return "null"
-}
-
 func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(_ x: _StringCore) -> String {
-  if x.hasContiguousStorage {
-    if let b = x.nativeBuffer {
-    var offset = x.elementWidth == 2
-      ? b.start - UnsafeMutableRawPointer(x.startUTF16)
-      : b.start - UnsafeMutableRawPointer(x.startASCII)
-      return "Contiguous(owner: "
-      + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
-      + ", capacity = \(b.capacity))"
-    }
-    return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
-  }
-  else if let b2 = x.cocoaBuffer {
-    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
+func repr(_ x: _StringGuts) -> String {
+  if x._isNative {
+    return "Native("
+      + "owner: \(hexAddrVal(x._owner)), "
+      + "count: \(x.count), "
+      + "capacity: \(x.capacity))"
+  } else if x._isCocoa {
+    return "Cocoa("
+      + "owner: \(hexAddrVal(x._owner)), "
+      + "count: \(x.count))"
+  } else if x._isSmall {
+    return "Cocoa("
+      + "owner: <tagged>, "
+      + "count: \(x.count))"
+  } else if x._isUnmanaged {
+    return "Unmanaged("
+      + "count: \(x.count))"
   }
   return "?????"
 }
 
 func repr(_ x: String) -> String {
-  return "String(\(repr(x._core))) = \"\(x)\""
+  return "String(\(repr(x._guts))) = \"\(x)\""
 }
 
 // CHECK: Testing
@@ -64,13 +52,13 @@ print("Testing...")
 var nsb = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: Hello, snowy world: 🏂☃❅❆❄︎⛄️❄️
 print("Hello, snowy world: \(nsb)")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11))
+// CHECK-NEXT: String(Unmanaged(count: 11))
 print("  \(repr(nsb))")
 
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 0))
+// CHECK-NEXT: String(Unmanaged(count: 0))
 print("  \(repr(empty))")
 
 
@@ -80,7 +68,7 @@ func nonASCII() {
   // Cocoa stores non-ASCII in a UTF-16 buffer
   // Code units in each character: 2 1 1 1 2 2 2
   // Offset of each character:     0 2 3 4 5 7 9 11
-  var nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
+  let nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
   // CHECK-NEXT: has UTF-16: true
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)")
 
@@ -91,32 +79,34 @@ func nonASCII() {
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
   print("  \(repr(nsUTF16))")
 
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 11))
-  var newNSUTF16 = nsUTF16 as String
+  // CHECK-NEXT: String(Cocoa(owner: @[[utf16address]], count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+  let newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
   // CHECK-NEXT: __NSCFString@[[utf16address]] = "🏂☃❅❆❄︎⛄️❄️"
-  var nsRoundTripUTF16 = newNSUTF16 as NSString
+  let nsRoundTripUTF16 = newNSUTF16 as NSString
   print("  \(repr(nsRoundTripUTF16))")
 
   // CHECK: --- UTF-16 slicing ---
   print("--- UTF-16 slicing ---")
 
-  // Slicing the String does not allocate
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
+  // Slicing the String allocates a new buffer
+  // CHECK-NOT: String(Native(owner: @[[utf16address]],
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 6
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  print("  \(repr(newNSUTF16[i2..<i8]))")
+  let slice = newNSUTF16[i2..<i8]
+  print("  \(repr(slice))")
 
-  // Representing a slice as an NSString requires a new object
-  // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
-  var nsSliceUTF16 = newNSUTF16[i2..<i8] as NSString
-  print("  \(repr(nsSliceUTF16))")
+  // The storage of the slice implements NSString directly
+  // CHECK-NOT: @[[utf16address]] = "❅❆❄︎⛄️"
+  // CHECK-NEXT: _TtGCs19_SwiftStringStorageVs6UInt16_@[[sliceAddress]] = "❅❆❄︎⛄️"
+  let nsSlice = slice as NSString
+  print("  \(repr(nsSlice))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
-  print("  \(repr(nsSliceUTF16 as String))")
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress]], count: 6
+  print("  \(repr(nsSlice as String))")
 }
 nonASCII()
 
@@ -126,7 +116,7 @@ func ascii() {
   // Cocoa stores ASCII in a buffer of bytes.  This is an important case
   // because it doesn't provide a contiguous array of UTF-16, so we'll be
   // treating it as an opaque NSString.
-  var nsASCII = NSString(utf8String: "foobar")!
+  let nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, to: CFString.self)) != nil)")
   print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x0600) != nil)")
@@ -139,11 +129,11 @@ func ascii() {
   print("  \(repr(nsASCII))")
 
   // CHECK-NEXT NO: String(Opaque(buffer: @[[asciiaddress]][0...6]))
-  var newNSASCII = nsASCII as String
+  let newNSASCII = nsASCII as String
   // print("  \(repr(newNSASCII))")
 
   // CHECK-NEXT: [[nsstringclass]]@[[asciiaddress]] = "foobar"
-  var nsRoundTripASCII = newNSASCII as NSString
+  let nsRoundTripASCII = newNSASCII as NSString
   print("  \(repr(nsRoundTripASCII))")
 
   // CHECK: --- ASCII slicing ---
@@ -156,7 +146,7 @@ func ascii() {
   print("  \(repr(newNSASCII[i3..<i6]))")
 
   // Representing a slice as an NSString
-  var nsSliceASCII = newNSASCII[i3..<i6] as NSString
+  let nsSliceASCII = newNSASCII[i3..<i6] as NSString
   print("  \(repr(nsSliceASCII))")
 
   // Round-tripped back to Swift
@@ -171,17 +161,17 @@ ascii()
 // CHECK: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 6)) = "foobar"
+// CHECK-NEXT: String(Unmanaged(count: 6)) = "foobar"
 // CHECK-NEXT: true
-var asciiLiteral: String = "foobar"
+let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
-print("  \(asciiLiteral._core.isASCII)")
+print("  \(asciiLiteral._guts.isASCII)")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
-var nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
+let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
-print("  \(!asciiLiteral._core.isASCII)")
+print("  \(!asciiLiteral._guts.isASCII)")
 
 // ===------- Appending -------===
 
@@ -190,7 +180,7 @@ print("  \(!asciiLiteral._core.isASCII)")
 // ===---------- Comparison --------===
 
 var s = "ABCDEF"
-var s1 = s + "G"
+let s1 = s + "G"
 
 // CHECK-NEXT: true
 print("\(s) == \(s) => \(s == s)")

@@ -66,16 +66,6 @@ public protocol _Mirror {
   var disposition: _MirrorDisposition { get }
 }
 
-/// An entry point that can be called from C++ code to get the summary string
-/// for an arbitrary object. The memory pointed to by "out" is initialized with
-/// the summary string.
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_getSummary")
-public // COMPILER_INTRINSIC
-func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(to: String(reflecting: x))
-}
-
 /// Produce a mirror for any value.  The runtime produces a mirror that
 /// structurally reflects values of any type.
 @_inlineable // FIXME(sil-serialize-all)
