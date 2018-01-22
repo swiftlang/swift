@@ -484,32 +484,28 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Unicode.UTF8.CodeUnit? {
+    if _slowPath(_nextOffset == _endOffset) {
+      if _slowPath(_buffer.isEmpty) {
+        return nil
+      }
+    }
+    if _guts.isASCII {
+      defer { _nextOffset += 1 }
+      return _guts._unmanagedASCIIView.buffer[_nextOffset]
+    }
+
     if _fastPath(!_buffer.isEmpty) {
       return _buffer.removeFirst()
     }
-    if _nextOffset == _endOffset { return nil }
     return _fillBuffer()
   }
 
   @_versioned
   @inline(never)
   internal mutating func _fillBuffer() -> Unicode.UTF8.CodeUnit {
-    _sanityCheck(_buffer.isEmpty)
-    _sanityCheck(_nextOffset < _endOffset)
+    _sanityCheck(!_guts.isASCII, "next() already checks for known ASCII")
     defer { _fixLifetime(_guts) }
-    if _guts.isASCII {
-      // FIXME: Measure if it's worth inlining this path
-      let ascii = _guts._unmanagedASCIIView.buffer
-      let result = ascii[_nextOffset]
-      _nextOffset += 1
-      let fillCount = min(_buffer.capacity, _endOffset - _nextOffset)
-      for _ in 0 ..< fillCount {
-        _buffer.append(ascii[_nextOffset])
-        _nextOffset += 1
-      }
-      return result
-    }
-    if _guts._isContiguous {
+    if _fastPath(_guts._isContiguous) {
       return _fillBuffer(from: _guts._unmanagedUTF16View)
     }
     return _fillBuffer(from: _guts._asOpaque())
