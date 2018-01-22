@@ -2180,6 +2180,49 @@ namespace {
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                     ParameterPosition paramPosition,
+                    OptionalUnwrapping insideOptional);
+
+static bool matchFunctionTypes(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
+                               TypeMatchOptions matchMode,
+                               ParameterPosition paramPosition,
+                               OptionalUnwrapping insideOptional) {
+  // FIXME: Handle generic functions in non-ABI matches.
+  if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+    if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
+      return false;
+  }
+
+  // When checking overrides, allow the base type to be throwing even if the
+  // overriding type isn't.
+  auto ext1 = fn1->getExtInfo();
+  auto ext2 = fn2->getExtInfo();
+  if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
+    if (ext2.throws()) {
+      ext1 = ext1.withThrows(true);
+    }
+  }
+  // If specified, allow an escaping function parameter to override a
+  // non-escaping function parameter when the parameter is optional.
+  // Note that this is checking 'ext2' rather than 'ext1' because parameters
+  // must be contravariant for the containing function to be covariant.
+  if (matchMode.contains(
+          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
+      insideOptional == OptionalUnwrapping::OptionalToOptional) {
+    if (!ext2.isNoEscape())
+      ext1 = ext1.withNoEscape(false);
+  }
+  if (ext1 != ext2)
+    return false;
+
+  // Inputs are contravariant, results are covariant.
+  return (matches(fn2.getInput(), fn1.getInput(), matchMode,
+                  ParameterPosition::Parameter, OptionalUnwrapping::None) &&
+          matches(fn1.getResult(), fn2.getResult(), matchMode,
+                  ParameterPosition::NotParameter, OptionalUnwrapping::None));
+}
+
+static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
+                    ParameterPosition paramPosition,
                     OptionalUnwrapping insideOptional) {
   if (t1 == t2) return true;
 
@@ -2255,39 +2298,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!fn1)
       return false;
 
-    // FIXME: Handle generic functions in non-ABI matches.
-    if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
-      if (!isa<FunctionType>(t1) || !isa<FunctionType>(t2))
-        return false;
-    }
-
-    // When checking overrides, allow the base type to be throwing even if the
-    // overriding type isn't.
-    auto ext1 = fn1->getExtInfo();
-    auto ext2 = fn2->getExtInfo();
-    if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-      if (ext2.throws()) {
-        ext1 = ext1.withThrows(true);
-      }
-    }
-    // If specified, allow an escaping function parameter to override a
-    // non-escaping function parameter when the parameter is optional.
-    // Note that this is checking 'ext2' rather than 'ext1' because parameters
-    // must be contravariant for the containing function to be covariant.
-    if (matchMode.contains(
-          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
-        insideOptional == OptionalUnwrapping::OptionalToOptional) {
-      if (!ext2.isNoEscape())
-        ext1 = ext1.withNoEscape(false);
-    }
-    if (ext1 != ext2)
-      return false;
-
-    // Inputs are contravariant, results are covariant.
-    return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, OptionalUnwrapping::None) &&
-            matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, OptionalUnwrapping::None));
+    return matchFunctionTypes(fn1, fn2, matchMode, paramPosition,
+                              insideOptional);
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
