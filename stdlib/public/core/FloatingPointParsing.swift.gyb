@@ -128,15 +128,14 @@ extension ${Self} : LosslessStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   public init?<S: StringProtocol>(_ text: S) {
     let u16 = text.utf16
-    func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {
+
+    let (result, n) : (${Self}, Int) = text.withCString { chars in
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
       }
       return (result, endPtr == nil ? 0 : endPtr! - chars)
     }
-
-    let (result, n) = text._ephemeralString.withCString(parseNTBS)
 
     if n == 0 || n != u16.count
     || u16.contains(where: { $0 > 127 || _isspace_clocale($0) }) {

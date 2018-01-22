@@ -21,13 +21,38 @@ extension Unicode.UTF16 : Unicode.Encoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
   @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var _replacementCodeUnit: CodeUnit {
+    @inline(__always) get { return 0xfffd }
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  public static func _isASCII(_ x: CodeUnit) -> Bool  {
+    return x <= 0x7f
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _isScalar(_ x: CodeUnit) -> Bool  {
     return x & 0xf800 != 0xd800
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal static func _decodeSurrogates(
+    _ lead: CodeUnit,
+    _ trail: CodeUnit
+  ) -> Unicode.Scalar {
+    _sanityCheck(isLeadSurrogate(lead))
+    _sanityCheck(isTrailSurrogate(trail))
+    return Unicode.Scalar(
+      _unchecked: 0x10000 +
+        (UInt32(lead & 0x03ff) &<< 10 | UInt32(trail & 0x03ff)))
   }
 
   @_inlineable // FIXME(sil-serialize-all)

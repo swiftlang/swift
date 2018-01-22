@@ -458,6 +458,14 @@ func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
 }
 
 extension Unicode.Scalar {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var _replacementCharacter: Unicode.Scalar {
+    return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
+  }
+}
+
+extension Unicode.Scalar {
   /// Creates an instance of the NUL scalar value.
   @available(*, unavailable, message: "use 'Unicode.Scalar(0)'")
   public init() {

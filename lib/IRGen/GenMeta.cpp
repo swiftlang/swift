@@ -437,26 +437,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   return false;
 }
 
-static bool hasRequiredTypeMetadataAccessFunction(NominalTypeDecl *typeDecl) {
-  // This needs to be kept in sync with getTypeMetadataStrategy.
-
-  if (isa<ProtocolDecl>(typeDecl))
-    return false;
-
-  switch (getDeclLinkage(typeDecl)) {
-  case FormalLinkage::PublicUnique:
-  case FormalLinkage::HiddenUnique:
-  case FormalLinkage::Private:
-    return true;
-
-  case FormalLinkage::PublicNonUnique:
-  case FormalLinkage::HiddenNonUnique:
-    return false;
-  }
-  llvm_unreachable("bad formal linkage");
-
-}
-
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
 MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
@@ -1340,7 +1320,10 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                           CanNominalType type,
                                           llvm::Constant *cacheVariable,
                                     InPlaceMetadataInitializer &&initializer) {
-  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type, false);
+  llvm::Constant *metadata =
+    IGF.IGM.requiresForeignTypeMetadata(type)
+      ? IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type)
+      : IGF.IGM.getAddrOfTypeMetadata(type, false);
 
   // We might not have interesting initialization to do.
   assert((cacheVariable == nullptr) ==
@@ -1540,26 +1523,12 @@ static llvm::Constant *
 getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
                                       NominalTypeDecl *theDecl,
                                       ForDefinition_t shouldDefine) {
-  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
-    return nullptr;
-
   if (theDecl->isGenericContext()) {
     return getGenericTypeMetadataAccessFunction(IGM, theDecl, shouldDefine);
   }
 
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
   return getTypeMetadataAccessFunction(IGM, declaredType, shouldDefine);
-}
-
-/// Force a public metadata access function into existence if necessary
-/// for the given type.
-template <class BuilderTy>
-static void maybeEmitNominalTypeMetadataAccessFunction(NominalTypeDecl *theDecl,
-                                                       BuilderTy &builder) {
-  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
-    return;
-
-  builder.createMetadataAccessFunction();
 }
 
 /// Emit a call to the type metadata accessor for the given function.
@@ -4153,7 +4122,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
                                           layout, fieldLayout);
@@ -4161,7 +4130,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   } else {
     FixedClassMetadataBuilder builder(IGM, classDecl, init,
                                       layout, fieldLayout);
@@ -4169,7 +4138,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -4607,8 +4576,9 @@ static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
                                            CanNominalType type,
                                            llvm::Value *metadata) {
-  // All the value types are basically similar.
-  assert(isa<StructType>(type) || isa<EnumType>(type));
+  // All the value types are basically similar, as are foreign types.
+  assert(isa<StructType>(type) || isa<EnumType>(type) ||
+         IGF.IGM.requiresForeignTypeMetadata(type));
 
   // Set up the value witness table if it's dependent.
   SILType loweredType = IGF.IGM.getLoweredType(AbstractionPattern(type), type);
@@ -4793,14 +4763,14 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
+    builder.createMetadataAccessFunction();
   } else {
     StructMetadataBuilder builder(IGM, structDecl, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
@@ -4949,14 +4919,14 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
     isPattern = true;
     canBeConstant = false;
 
-    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
+    builder.createMetadataAccessFunction();
   } else {
     EnumMetadataBuilder builder(IGM, theEnum, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
+    builder.createMetadataAccessFunction();
   }
 
   CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
@@ -5081,6 +5051,22 @@ namespace {
     }
 
     Size getOffsetOfAddressPoint() const { return AddressPoint; }
+
+    void createMetadataAccessFunction() {
+      auto type = cast<NominalType>(asImpl().getTargetType());
+
+      (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           [&](IRGenFunction &IGF,
+                                               llvm::Constant *cacheVariable) {
+        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type,
+                                                         cacheVariable,
+          [&](IRGenFunction &IGF, llvm::Value *candidate) {
+            auto metadata = uniqueForeignTypeMetadataRef(IGF, candidate);
+            return emitInPlaceValueTypeMetadataInitialization(IGF, type,
+                                                              metadata);
+          });
+      });
+    }
   };
 
   class ForeignClassMetadataBuilder;
@@ -5140,8 +5126,17 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = ClassNominalTypeDescriptorBuilder(this->IGM, Target).emit();
-      B.add(descriptor);
+      // FIXME: Go through getAddrOfNominalTypeDescriptor once it's no
+      // longer required to define the nominal type descriptor.
+
+      auto entity = LinkEntity::forNominalTypeDescriptor(Target);
+      auto descriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                                             entity,
+                                             IGM.getPointerAlignment(),
+                                             IGM.ClassNominalTypeDescriptorTy);
+      assert(!descriptor.isIndirect() && "Should be defined here");
+      B.add(descriptor.getDirectValue());
     }
 
     void noteStartOfSuperClass() { }
@@ -5225,6 +5220,18 @@ namespace {
   };
 } // end anonymous namespace
 
+bool IRGenModule::requiresForeignTypeMetadata(CanType type) {
+  if (NominalTypeDecl *nominal = type->getAnyNominal()) {
+    if (auto *clas = dyn_cast<ClassDecl>(nominal)) {
+      return clas->isForeign();
+    }
+
+    return isa<ClangModuleUnit>(nominal->getModuleScopeContext());
+  }
+
+  return false;
+}
+
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // What we save in GlobalVars is actually the offsetted value.
@@ -5236,10 +5243,33 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   ConstantInitBuilder builder(*this);
   auto init = builder.beginStruct();
   init.setPacked(true);
-  
+
+  // Local function to create the global variable for the foreign type
+  // metadata candidate.
+  Size addressPoint;
+  llvm::Constant *result = nullptr;
+  auto createCandidateVariable = [&] {
+    auto definition = init.finishAndCreateFuture();
+
+    // Create the global variable.
+    LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+    auto var =
+        createVariable(*this, link, definition.getType(),
+                       getPointerAlignment());
+    definition.installInGlobal(var);
+
+    // Apply the offset.
+    result = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+    result = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        Int8Ty, result, getSize(addressPoint));
+    result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
+
+    // Only remember the offset.
+    GlobalVars[entity] = result;
+  };
+
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
-  Size addressPoint;
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
@@ -5248,6 +5278,11 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignClassMetadataBuilder builder(*this, classDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    ClassNominalTypeDescriptorBuilder(*this, classDecl).emit();
+
+    createCandidateVariable();
+    builder.createMetadataAccessFunction();
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
@@ -5255,6 +5290,9 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignStructMetadataBuilder builder(*this, structDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    createCandidateVariable();
+    builder.createMetadataAccessFunction();
   } else if (auto enumType = dyn_cast<EnumType>(type)) {
     auto enumDecl = enumType->getDecl();
     assert(enumDecl->hasClangNode());
@@ -5262,31 +5300,15 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignEnumMetadataBuilder builder(*this, enumDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
+
+    createCandidateVariable();
+    builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
 
-  auto definition = init.finishAndCreateFuture();
-  
-  // Create the global variable.
-  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-  auto var =
-      createVariable(*this, link, definition.getType(), getPointerAlignment());
-  definition.installInGlobal(var);
-  
-  // Apply the offset.
-  llvm::Constant *result = var;
-  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
-  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      Int8Ty, result, getSize(addressPoint));
-  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
-
-  // Only remember the offset.
-  GlobalVars[entity] = result;
-
-  if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
-    addLazyConformances(Nominal);
-  }
+  // Keep type metadata around for all types.
+  addRuntimeResolvableType(type);
 
   return result;
 }
