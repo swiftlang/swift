@@ -627,7 +627,7 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
       value = sei->getOperand();
 
   // Try to determine a good source location to report.
-  auto loc = getUserSourceLocation(value.getLoc(), value);
+  auto loc = getUserSourceLocation(value.getDebugLocation());
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -650,7 +650,7 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
     .highlight(loc.getSourceRange());
 
   // If the use is on a different line, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user->getLoc(), user);
+  auto userLoc = getUserSourceLocation(user->getDebugLocation());
   auto &SM = fn.getModule().getASTContext().SourceMgr;
 
   if (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
@@ -682,14 +682,14 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
   auto &ctx = fn.getModule().getASTContext();
 
   // Try to determine a good source location to report.
-  auto loc = getUserSourceLocation(value.getLoc(), value);
+  auto loc = getUserSourceLocation(value.getDebugLocation());
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
     .highlight(loc.getSourceRange());
 
   // If the use is at a different position, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user->getLoc(), user);
+  auto userLoc = getUserSourceLocation(user->getDebugLocation());
   if (loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
@@ -906,6 +906,10 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
       // Tensor operands are recursively marked.
       markValue(inst.getOperand(nextOperand++), &inst);
       break;
+    case OpCommand::Scalar:
+      // Scalar operands are recursively marked.
+      markValue(tfopInfo.getScalarOperand(nextOperand++), &inst);
+      break;
     case OpCommand::AddDType:
       // No operand to mark.
       break;
@@ -1021,11 +1025,24 @@ sinkValueIntoRegionForPromotion(SILInstruction *inst) {
          "can only handle 'ShouldPromote' cases identified by"
          " shouldPromoteToTensorOp");
 
-  // Right now we just handle single instruction sinking, which makes it simple:
-  // Move it right before the existing start point and set it as the new start
-  // point.
-  inst->moveBefore(tensorStartPoint);
+  // We can't generally sink this beyond other users, so we clone the
+  // instruction instead.
+  inst = inst->clone(tensorStartPoint);
   tensorStartPoint = inst;
+
+  // Replace uses of the original instruction with the new one, if they are
+  // within the tensor program.
+  for (auto result : inst->getResults()) {
+    for (auto it = result->use_begin(), e = result->use_end(); it != e; ) {
+      auto *operand = *it++;
+      auto user = operand->getUser();
+
+      // If the start point dominates this use, replace it.
+      if (DI.dominates(tensorStartPoint, user))
+        operand->set(cast<SingleValueInstruction>(inst));
+    }
+  }
+
   return true;
 }
 
@@ -1321,6 +1338,23 @@ public:
   void visitCondBranchInst(CondBranchInst *inst);
 
 private:
+  // Check to see if the argument was marked in a way that indicates we should
+  // copy it over to the tensor program.
+  bool shouldCloneArgument(SILArgument *arg) const {
+    auto it = FP.markedBBArguments.find(arg);
+    if (it == FP.markedBBArguments.end()) return false;
+
+    switch (it->second) {
+    case Marking::Copy:
+    case Marking::Move:
+      return true;
+    case Marking::Send:
+    case Marking::Argument:
+    case Marking::Delete:
+      return false;
+    }
+  }
+
   void initBlock(SILBasicBlock *BB);
   void cloneBlock(SILBasicBlock *BB);
 };
@@ -1336,7 +1370,7 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
 
   // If the basic block has arguments, map over any marked ones.
   for (auto *arg : BB->getArguments()) {
-    if (!FP.markedBBArguments.count(arg))
+    if (!shouldCloneArgument(arg))
       continue;
 
     // Create the argument and copy it into the ValueMap so future references
@@ -1365,7 +1399,7 @@ void PartitionCloner::visitBranchInst(BranchInst *inst) {
   auto destBB = inst->getDestBB();
   unsigned opNum = 0;
   for (auto &arg : inst->getAllOperands()) {
-    if (FP.markedBBArguments.count(destBB->getArgument(opNum++)))
+    if (shouldCloneArgument(destBB->getArgument(opNum++)))
       operands.push_back(remapValue(arg.get()));
   }
 
@@ -1409,6 +1443,19 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 // Transform ops builtin instructions to the one we need in the tensor program.
 void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
                                   TensorOpInfo &tfopInfo) {
+  // Handle special case "ops".
+  if (tfopInfo.opName == "tfc.scalarToTensor") {
+    assert(tfopInfo.operandDescriptorStr == "s" &&
+           tfopInfo.resultDescriptorStr == "t" &&
+           "invalid tfc.scalarToTensor!");
+
+    // We just lower the result as the input, since the scalar input will have
+    // been promoted to a tensor already.
+    ValueMap[inst] = remapValue(tfopInfo.getScalarOperand(0));
+    return;
+  }
+
+
   auto &B = getBuilder();
   SmallVector<SILValue, 4> args;
   auto loc = remapLocation(inst->getLoc());
@@ -1435,6 +1482,8 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
     case OpCommand::AddDType:
       // Nothing to do for this.
       break;
+    case OpCommand::Scalar:
+      llvm_unreachable("scalar operands should always be handled specially");
     }
   }
 
@@ -1565,7 +1614,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   SILBuilder BH(++SILBasicBlock::iterator(&inst)); // Builder for host.
   auto BA = getBuilder();        // Builder for accelerator.
 
-  auto loc = getUserSourceLocation(inst.getDebugLocation()).getLocation();
+  auto loc = getUserSourceLocation(inst.getDebugLocation());
 
   for (auto result : inst.getResults()) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
@@ -1608,7 +1657,7 @@ void PartitionCloner::insertReceive(SILValue value) {
 
   auto loc = value.getLoc();
   if (auto *inst = value->getDefiningInstruction())
-    loc = getUserSourceLocation(inst->getDebugLocation()).getLocation();
+    loc = getUserSourceLocation(inst->getDebugLocation());
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
@@ -2328,10 +2377,146 @@ static void contractUncondBranches(SILFunction *fn) {
   }
 }
 
+/// This struct provides a single utility which determines whether a type is or
+/// contains a TensorHandle that will be exposed after deabstraction.  This is a
+/// class instead of a simple function because we memoize state to avoid
+/// rechecking types over and over again.
+namespace {
+class TypeContainsTensorHandleChecker {
+  /// This map memoizes whether the specified type declaration is known to
+  /// contain a TensorHandle or not, used to accelerate queries against types
+  /// that are frequently referenced like Tensor.
+  llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+public:
+  TypeContainsTensorHandleChecker() {}
+
+  /// Return true if the specified type contains a TensorHandle that will be
+  /// exposed after deabstraction.
+  bool containsTensorHandle(Type ty);
+
+private:
+  bool structContainsTensorHandle(StructDecl *decl);
+};
+} // end anonymous namespace
+
+
+/// Return true if the specified type contains a TensorHandle that will be
+/// exposed after deabstraction.
+bool TypeContainsTensorHandleChecker::containsTensorHandle(Type ty) {
+  // If this type literally is TensorHandle, then yep, we contain it.  This is
+  // the base case.
+  if (isTensorHandle(ty))
+    return true;
+
+  // Deabstraction flattens tuples, so if a tuple contains any tensor handles,
+  // then the tuple itself does.
+  if (auto *tuple = ty->getAs<TupleType>()) {
+    for (auto &elt : tuple->getElements())
+      if (containsTensorHandle(elt.getType()))
+        return true;
+    return false;
+  }
+
+  // Deabstraction scalarizes structs.
+  if (auto *st = ty->getAs<StructType>())
+    return structContainsTensorHandle(st->getDecl());
+
+  // Deabstractions binds specialized generic structs.  Check if either the
+  // struct itself or one of the generic arguments contains a TensorHandle.
+  if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
+    // Check the generic arguments.
+    for (auto arg : bgst->getGenericArgs())
+      if (containsTensorHandle(arg))
+        return true;
+
+    return structContainsTensorHandle(bgst->getDecl());
+  }
+
+  // Handle still-generic types that may contain a TensorHandle.
+  if (auto *ugst = ty->getAs<UnboundGenericType>())
+    if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
+      return structContainsTensorHandle(decl);
+
+  // Otherwise we have a class or some other type that is opaque to
+  // deabstraction.
+  return false;
+}
+
+/// Determine whether the given struct contains a TensorHandle, caching the
+/// result.
+bool TypeContainsTensorHandleChecker::
+structContainsTensorHandle(StructDecl *decl) {
+  auto it = declContainsTensorHandle.find(decl);
+  if (it != declContainsTensorHandle.end())
+    return it->second;
+
+  bool hasTensorHandle = false;
+  for (auto p : decl->getStoredProperties())
+    if (containsTensorHandle(p->getType())) {
+      hasTensorHandle = true;
+      break;
+    }
+
+  return declContainsTensorHandle[decl] = hasTensorHandle;
+}
+
+/// Determine whether the specified function should be partitioned (assuming it
+/// contains tensor operations) or not.  This is important to determine up-front
+/// because we want people to build libraries and other abstractions out of
+/// tensor operations, and those tensor operations are not necessarily valid in
+/// their generic form: for example, an op may require a constant, but may be
+/// used inside layers of helpers: processing those helpers before they are
+/// inlined away, will lead to us rejecting the op as invalid.
+///
+static bool shouldTransformFunction(SILFunction *fn,
+                                    TypeContainsTensorHandleChecker &tcthc) {
+  // Ignore always inline and transparent functions.
+  if (fn->getInlineStrategy() == AlwaysInline || fn->isTransparent())
+    return false;
+
+  // If the function is marked public, but it isn't marked inlinable, then it is
+  // a public entrypoint that cannot be deabstracted through, so we must
+  // transform it.
+  //
+  // TODO: It will probably be a common error to forget to add the inlinable
+  // attributes, we should either infer the attribute or produce better QoI that
+  // suggests adding it when an error occurs.
+  if (fn->getLinkage() == SILLinkage::Public)
+    return true;
+
+  // Something is creating public thunks around 'shared' implementations, which
+  // prevents the above check from working.  Check for public functions.
+  // FIXME: This should go away when we get deabstraction.
+  if (fn->getLinkage() == SILLinkage::Shared)
+    if (auto *dc = fn->getDeclContext())
+      if (auto *fd = dyn_cast<FuncDecl>(dc))
+        if (fd->getFormalAccess() >= AccessLevel::Public)
+          return true;
+
+  // Otherwise, the function is either public and inlininable or it is internal
+  // to the current module.  In both cases, we check to see if the function
+  // takes TensorHandle values as arguments or results.  If so, then we know
+  // that it will be inlined away by deabstraction, and we don't need to touch
+  // it.
+  auto fnType = fn->getLoweredFunctionType();
+  for (auto &result : fnType->getResults())
+    if (tcthc.containsTensorHandle(result.getType()))
+      return false;
+
+  for (auto &param : fnType->getParameters())
+    if (tcthc.containsTensorHandle(param.getType()))
+      return false;
+
+  // If it contains no tensor inputs or results, then we are willing to
+  // transform it!
+  return true;
+}
+
 
 namespace {
 class TFPartition : public SILFunctionTransform {
   bool isTest = false;
+  TypeContainsTensorHandleChecker tcthc;
 public:
   TFPartition(bool isTest) : isTest(isTest) {}
 
@@ -2347,8 +2532,10 @@ public:
     if (!tfModule)
       return;
 
-    // If we're building the TensorFlow module itself, don't do anything.
-    if (fn->getModule().getSwiftModule() == tfModule)
+    // If this function is a building block of larger tensor programs (e.g.
+    // the ops defined in the TensorFlow module), then don't transform it in
+    // isolation.
+    if (!shouldTransformFunction(fn, tcthc))
       return;
 
     // If this function has no source location information, then it came from

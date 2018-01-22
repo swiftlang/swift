@@ -40,6 +40,7 @@ namespace tf {
   enum class OpCommand {
     Tensor,     // 't'
     Constant,   // 'c'
+    Scalar,     // 's'
     AddDType,   // 'd'
   };
 
@@ -68,6 +69,12 @@ namespace tf {
     /// should be partitioned out to run on the accelerator.
     bool decode();
 
+    /// Return the SILValue for the specified scalar operand.
+    SILValue getScalarOperand(unsigned operandNumber) {
+      return getScalarOperand(inst->getOperand(operandNumber));
+    }
+    SILValue getScalarOperand(SILValue v);
+
     /// If the specified value is a valid value for a constant operand, return
     /// the literal it is initialized to, otherwise null.
     LiteralInst *getTensorConstantOperand(unsigned operandNumber) {
@@ -86,10 +93,13 @@ namespace tf {
   /// of the tensor library code, which are all implementation details to the
   /// user.  As such, walk the inlining location of the specified node to return
   /// the first location *outside* of the tensor implementation goop.
-  SILDebugLocation getUserSourceLocation(SILDebugLocation loc);
+  SILDebugLocation skipInternalLocations(SILDebugLocation loc);
 
-  /// This form of getUserSourceLocation is useful when working with SILValue's.
-  SILLocation getUserSourceLocation(SILLocation loc, SILNode *value);
+  /// Skip over all the internal implementation details to get the source
+  ///  location in user code.
+  inline SILLocation getUserSourceLocation(SILDebugLocation loc) {
+    return skipInternalLocations(loc).getLocation();
+  }
 
   /// Lower the specified SIL function (which was formed by the partitioner)
   /// into a TensorFlow graph, and encode into a vector of bytes.
@@ -98,7 +108,12 @@ namespace tf {
 
   /// Return true if the specified type is a valid tensor element type.  For
   /// example, int128 and pointers are not.
-  bool isValidTensorFlowElementType(Type ty);
+  ///
+  /// TODO: This should eventually consider information about the target
+  /// deployment.
+  inline bool isValidTensorFlowElementType(Type ty) {
+    return convertSwiftTypeToTF(ty) != 0;
+  }
 
 } // end namespace tf
 } // end namespace swift

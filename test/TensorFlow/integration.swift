@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 import TensorFlow
 
@@ -43,9 +43,9 @@ public func testTensor() {
 // CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
-public func testScalar(f: Float) {
-  var x = Tensor<Float>(f)     // expected-warning {{'Tensor<Float>' implicitly copied to the accelerator}}
-          + // expected-note {{value used here}}
+public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied to the accelerator}}
+  var x = Tensor<Float>(f) // expected-note {{value used here}}
+          +
           Tensor<Float>(1.0)
   x += x
   print(x)
@@ -55,8 +55,8 @@ public func testScalar(f: Float) {
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
 // CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK-NEXT:   %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:   %4 = builtin "__tfop_Add__tt:t__"(%3 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %4 : $TensorHandle<Float>
 // CHECK-NEXT: }
@@ -96,8 +96,8 @@ public func testExitBranch(i : Int) {
 // CHECK: sil private @{{.*}}testExitBranch{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
 // CHECK-NEXT:   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%1 : $TensorHandle<Builtin.FPIEEE32>, %1 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %2 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
@@ -227,14 +227,44 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_while1{{.*}}
-// CHECK: [sequence
-// CHECK:   {condition Header: bb0
-// CHECK:     [sequence
-// CHECK:       block bb2
-// CHECK:       <while Header: bb3   exit: bb4
-// CHECK:         block bb5>
-// CHECK:       block bb4]
-// CHECK:     block bb1}
-// CHECK:   block bb6]
+// CHECK-NEXT: [sequence
+// CHECK-NEXT:   {condition Header: bb0
+// CHECK-NEXT:     [sequence
+// CHECK-NEXT:       block bb2
+// CHECK-NEXT:       <while Header: bb3   exit: bb4
+// CHECK-NEXT:         block bb5>
+// CHECK-NEXT:       block bb4]
+// CHECK-NEXT:     block bb1}
+// CHECK-NEXT:   block bb6]
 
+
+
+// This should turn into a single tensor program with no sends to the
+// accelerator.  Until we get shape inference though, we won't be able to
+// disprove away the optional check, so we'll need to send a bit back to the
+// host.
+public func scalar_manipulation(a : Float) -> Tensor<Float> {
+  // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}} expected-error {{GraphGen cannot lower a 'send' to the host yet}} expected-note {{value used here}}
+  let y = x.scalar! + 2.0    // expected-note {{value used here}}
+  // expected-warning @-1 {{value implicitly copied to the accelerator}}
+
+  let z = Tensor<Float>(y)
+  return z+z
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}scalar_manipulation{{.*}}
+// CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK-NEXT:  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:  %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:  %4 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%3 : $TensorHandle<Float>) : $()
+// CHECK-NEXT:  %5 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
+// CHECK-NEXT:  %6 = builtin "__tfop_Const__cd:t__"(%5 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %7 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %8 = builtin "__tfop_Add__tt:t__"(%7 : $TensorHandle<Builtin.FPIEEE32>, %6 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %9 = builtin "__tfop_Add__tt:t__"(%8 : $TensorHandle<Builtin.FPIEEE32>, %8 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:  return %9 : $TensorHandle<Float>
+// CHECK-NEXT:}
 

@@ -298,7 +298,7 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
   std::string name = baseName;
 
   // Skip over internal implementation details of the Tensor library.
-  loc = getUserSourceLocation(loc);
+  loc = skipInternalLocations(loc);
 
   auto &SM = SILFn->getASTContext().SourceMgr;
 
@@ -429,6 +429,9 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       TF_AddInput(op, opValue);
       break;
     }
+    case OpCommand::Scalar:
+      llvm_unreachable("Scalar operands should never reach graphgen");
+
     case OpCommand::Constant: {
       auto lit = tfopInfo.getTensorConstantOperand(nextOperand++);
 

@@ -129,6 +129,33 @@ const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
   llvm_unreachable("Invalid value for slow path");
 }
 
+// SWIFT_ENABLE_TENSORFLOW.
+// FIXME: Send upstream.  It would be nice for SILArguments to actually get a
+// loc...
+
+/// Infer an instruction whose value is ultimately passed into the specified
+/// SILArgument, allowing us to get sometimes correct location information.
+static SILInstruction *tryToGetArgumentInst(SILArgument *arg,
+                                        SmallPtrSet<SILArgument*, 4> &visited) {
+  // If we've already visited this argument, don't use it, we don't want to
+  // infinitely recurse through loops.
+  if (!visited.insert(arg).second)
+    return nullptr;
+
+  SmallVector<SILValue, 4> inputs;
+  arg->getIncomingValues(inputs);
+  for (auto input : inputs) {
+    if (auto *arg = dyn_cast<SILArgument>(input)) {
+      if (auto inst = tryToGetArgumentInst(arg, visited))
+        return inst;
+    } else if (auto *inst = dyn_cast<SILInstruction>((SILNode*)input)) {
+      return inst;
+    }
+  }
+
+  return nullptr;
+}
+
 /// Get a location for this value.
 SILLocation SILValue::getLoc() const {
   if (auto *instr = Value->getDefiningInstruction())
@@ -137,9 +164,38 @@ SILLocation SILValue::getLoc() const {
   if (auto *arg = dyn_cast<SILArgument>(*this)) {
     if (arg->getDecl())
       return RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
+
+    // Take one of the incoming operand locations if we have any.
+    SmallPtrSet<SILArgument*, 4> visitedSet;
+    auto inst = tryToGetArgumentInst(arg, visitedSet);
+    if (inst) return inst->getLoc();
   }
-  // TODO: bbargs should probably use one of their operand locations.
-  return Value->getFunction()->getLocation();
+
+  // If this is something that lives in a function, fall back to the function
+  // loc.  Otherwise, e.g. a SILUndef, return a null location.
+  auto fn = Value->getFunction();
+  return fn ? fn->getLocation() : SILLocation((Expr*)nullptr);
+}
+
+/// Get a debug location for this value.
+SILDebugLocation SILValue::getDebugLocation() const {
+  if (auto *instr = Value->getDefiningInstruction())
+    return instr->getDebugLocation();
+
+  if (auto *arg = dyn_cast<SILArgument>(*this)) {
+    if (arg->getDecl()) {
+      auto loc = RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
+      return SILDebugLocation(loc, nullptr);
+    }
+
+    // Take one of the incoming operand locations if we have any.
+    SmallPtrSet<SILArgument*, 4> visitedSet;
+    auto inst = tryToGetArgumentInst(arg, visitedSet);
+    if (inst) return inst->getDebugLocation();
+  }
+  auto fn = Value->getFunction();
+  auto loc = fn ? fn->getLocation() : SILLocation((Expr*)nullptr);
+  return SILDebugLocation(loc, nullptr);
 }
 
 
