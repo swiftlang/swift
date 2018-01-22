@@ -1011,24 +1011,7 @@ extension String {
   /// - Parameter other: Another string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
-    if self._guts._isEmptySingleton {
-      // We must be careful not to discard any capacity that
-      // may have been reserved for the append -- this is why
-      // we check for the empty string singleton rather than
-      // a zero `count` above.
-      self = other
-      return
-    }
-    defer { _fixLifetime(other) }
-    if _slowPath(other._guts._isOpaque) {
-      self._guts.append(other._guts._asOpaque())
-      return
-    }
-    if other._guts.isASCII {
-      self._guts.append(other._guts._unmanagedASCIIView)
-      return
-    }
-    self._guts.append(other._guts._unmanagedUTF16View)
+    self._guts.append(other._guts)
   }
 
   /// Appends the given Unicode scalar to the string.
