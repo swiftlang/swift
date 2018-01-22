@@ -4937,8 +4937,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
       base, decl, baseInterfaceTy);
 
   return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible,
-                                      /*resolver*/nullptr);
+                                      TypeMatchFlags::AllowABICompatible);
 }
 
 void AbstractFunctionDecl::computeNeedsNewVTableEntry() {

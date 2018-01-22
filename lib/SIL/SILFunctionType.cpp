@@ -2137,8 +2137,7 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
 // @guaranteed or whatever.
 static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
-  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
-                         /*resolver*/nullptr);
+  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible);
 }
 
 // FIXME: This makes me very upset. Can we do without this?

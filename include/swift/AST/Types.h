@@ -763,7 +763,7 @@ public:
 
   /// \brief Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
-  bool matches(Type other, TypeMatchOptions matchOptions, LazyResolver *resolver);
+  bool matches(Type other, TypeMatchOptions matchOptions);
 
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
