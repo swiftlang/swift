@@ -40,7 +40,7 @@ constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
 /// The Mach-O section name for the section containing type field references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeFieldRecordSection[] = "__swift3_fieldmd";
+constexpr const char TypeFieldRecordSection[] = "__swift5_fieldmd";
 
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>

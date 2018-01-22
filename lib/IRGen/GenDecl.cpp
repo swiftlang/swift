@@ -2859,13 +2859,13 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift3_fieldmd, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift3_fieldmd";
+    sectionName = "swift5_fieldmd";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".swift3_fieldmd";
+    sectionName = ".swift5_fieldmd";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
