@@ -80,8 +80,12 @@ public:
     return getRaw()->getTokenText();
   }
 
+  static bool kindof(SyntaxKind Kind) {
+    return isTokenKind(Kind);
+  }
+
   static bool classof(const Syntax *S) {
-    return S->isToken();
+    return kindof(S->getKind());
   }
 };
 

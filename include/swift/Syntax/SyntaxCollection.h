@@ -187,8 +187,12 @@ public:
     return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
+  static bool kindof(SyntaxKind Kind) {
+    return Kind == CollectionKind;
+  }
+
   static bool classof(const Syntax *S) {
-    return S->getKind() == CollectionKind;
+    return kindof(S->getKind());
   }
 };
 

@@ -35,14 +35,9 @@ static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
 }
 
 RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
-  // Convert RawSyntax to Syntax for SyntaxFactory.
-  llvm::SmallVector<Syntax, 8> Scratch;
-  std::transform(Parts.begin(), Parts.end(), std::back_inserter(Scratch),
-                 [](const RC<RawSyntax> &Raw) { return make<Syntax>(Raw); });
-
   // Try to create the node of the given syntax.
-  if (auto Node = SyntaxFactory::createSyntax(Kind, Scratch))
-    return Node->getRaw();
+  if (auto Node = SyntaxFactory::createRaw(Kind, Parts))
+    return Node;
 
   // Fallback to unknown syntax for the category.
   return makeUnknownSyntax(getUnknownKind(Kind), Parts);
@@ -246,32 +241,40 @@ public:
 void finalizeSourceFile(RootContextData &RootData,
                         ArrayRef<RC<RawSyntax>> Parts) {
   SourceFile &SF = RootData.SF;
-  std::vector<DeclSyntax> AllTopLevel;
-  llvm::Optional<TokenSyntax> EOFToken;
+  std::vector<RC<RawSyntax>> AllTopLevel;
+  RC<RawSyntax> EOFToken;
 
   if (SF.hasSyntaxRoot()) {
-    EOFToken.emplace(SF.getSyntaxRoot().getEOFToken());
-    for (auto It : SF.getSyntaxRoot().getTopLevelDecls()) {
-      AllTopLevel.push_back(It);
-    }
+    auto SourceRaw = SF.getSyntaxRoot().getRaw();
+    auto Decls = SourceRaw->getChild(SourceFileSyntax::Cursor::TopLevelDecls)
+                     ->getLayout();
+    std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
+    EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
   }
 
   if (!Parts.empty() && Parts.back()->isToken(tok::eof)) {
-    EOFToken.emplace(make<TokenSyntax>(Parts.back()));
+    EOFToken = Parts.back();
     Parts = Parts.drop_back();
   }
 
   for (auto RawNode : Parts) {
     if (RawNode->getKind() != SyntaxKind::StmtList)
-      // FIXME: Skip for now.
+      // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
+      // the first place.
       continue;
     AllTopLevel.push_back(
-        SyntaxFactory::makeTopLevelCodeDecl(make<StmtListSyntax>(RawNode)));
+        SyntaxFactory::createRaw(SyntaxKind::TopLevelCodeDecl, {RawNode}));
   }
-  SF.setSyntaxRoot(SyntaxFactory::makeSourceFile(
-      SyntaxFactory::makeDeclList(AllTopLevel),
-      EOFToken.hasValue() ? *EOFToken
-                          : TokenSyntax::missingToken(tok::eof, "")));
+
+  if (!EOFToken)
+    EOFToken = RawSyntax::missing(tok::eof, "");
+
+  auto newRaw = SyntaxFactory::createRaw(
+      SyntaxKind::SourceFile,
+      {
+          SyntaxFactory::createRaw(SyntaxKind::DeclList, AllTopLevel), EOFToken,
+      });
+  SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
     // Verify the added nodes if specified.
