@@ -1006,10 +1006,16 @@ extension _StringGuts {
   @_inlineable
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts) {
-    if _isEmptySingleton {
+    // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
+    if _isEmptySingleton || self.count == 0 && !_object.isNative {
+      // We must be careful not to discard any capacity that
+      // may have been reserved for the append -- this is why
+      // we check for the empty string singleton rather than
+      // a zero `count` above.
       self = other
       return
     }
+
     defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
       self.append(other._asOpaque())
