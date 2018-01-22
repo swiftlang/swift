@@ -207,7 +207,7 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
         compare_sizes(old_sizes, new_sizes, "__const", section_title)
         compare_sizes(old_sizes, new_sizes, "__objc_const", section_title)
         compare_sizes(old_sizes, new_sizes, "__data", section_title)
-        compare_sizes(old_sizes, new_sizes, "__swift1_proto", section_title)
+        compare_sizes(old_sizes, new_sizes, "__swift5_proto", section_title)
         compare_sizes(old_sizes, new_sizes, "__common", section_title)
         compare_sizes(old_sizes, new_sizes, "__bss", section_title)
 
