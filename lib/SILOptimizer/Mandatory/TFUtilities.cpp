@@ -158,6 +158,7 @@ static bool decodeTensorOperandInfo(StringRef name,
   for (auto c : name) {
     switch (c) {
     case 't': result.push_back(OpCommand::Tensor); break;
+    case 's': result.push_back(OpCommand::Scalar); break;
     case 'c': result.push_back(OpCommand::Constant); break;
     case 'd': result.push_back(OpCommand::AddDType); break;
     default: return true;
@@ -166,26 +167,45 @@ static bool decodeTensorOperandInfo(StringRef name,
   return false;
 }
 
-/// If the specified value is a valid value for a constant operand, return the
-/// literal it is initialized to, otherwise null.
-LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
-  // If this is an integer or fp literal, we succeed.
-  if (isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v))
-    return cast<LiteralInst>(v);
+SILValue TensorOpInfo::getScalarOperand(SILValue v) {
+  // We have to handle two kinds of operands: SIL address operands and normal
+  // values.
 
-  // Handle the form where a StructInst is wrapping a literal (e.g. Int/Float).
-  if (auto *SI = dyn_cast<StructInst>(v)) {
-    auto SO = SI->getNumOperands() == 1 ? SI->getOperand(0) : 0;
-    return SO ? getTensorConstantOperand(SO) : nullptr;
+  if (!v->getType().isAddress()) {
+    // If we have a normal operand, handle the form where a StructInst is
+    // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
+    if (auto *SI = dyn_cast<StructInst>(v))
+      if (SI->getNumOperands() == 1)
+        return SI->getOperand(0);
+
+    return v;
   }
 
-  // Because we're often coming from generic code, we frequently get a constant
+  // Because we're often coming from generic code, we frequently get a value
   // passed by-address.  Check for an alloc_stack with a single store to it and
   // consume the stored value.
   if (auto *ASI = dyn_cast<AllocStackInst>(v)) {
     if (auto *store = ASI->getSingleUserOfType<StoreInst>())
-      return getTensorConstantOperand(store->getSrc());
+      return getScalarOperand(store->getSrc());
   }
+
+  // Otherwise this is a by-address value that we can't handle:
+  // FIXME: The proper way to deal with this is with a deabstraction pass,
+  // which will guarantee generic specialization promotes the builtin operand
+  // to never be an address.
+  return SILValue();
+}
+
+/// If the specified value is a valid value for a constant operand, return the
+/// literal it is initialized to, otherwise null.
+LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
+  // Simplify scalar operands in general.
+  v = getScalarOperand(v);
+  if (!v) return nullptr;
+
+  // If this is an integer or fp literal, we succeed.
+  if (isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v))
+    return cast<LiteralInst>(v);
 
   return nullptr;
 }
@@ -274,7 +294,8 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
     switch (opInfo) {
     case OpCommand::Tensor: {
       auto op = getNextOperand();
-      if (!op || !isTensorHandle(op->getType().getSwiftRValueType())) {
+      if (!op) return false;  // diagnostic already emitted.
+      if (!isTensorHandle(op->getType().getSwiftRValueType())) {
         diagInvalid("expected " +
                     llvm::utostr(nextOperand-2) + " to be a tensor");
         return false;
@@ -289,16 +310,31 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       }
       break;
     }
+    case OpCommand::Scalar: {
+      // This requires a scalar value.
+      auto op = getNextOperand();
+      if (!op) return false; // diagnostic already emitted.
+
+      if (isTensorHandle(op->getType().getSwiftRValueType())) {
+        diagInvalid("'s' operand requires a scalar value");
+        return false;
+      }
+
+      assert(getScalarOperand(op) && "Invalid scalar operand");
+      break;
+    }
+
     case OpCommand::Constant: {
       // If this requires a constant value and doesn't have one (i.e., it's a
-      // variable), then we handle this as valid, but as a non-TensorOp.  The
-      // value will be computed on the host and be sent over.
+      // variable), then we reject it.
       auto op = getNextOperand();
-      if (!op) return false;
+      if (!op) return false; // diagnostic already emitted.
 
       // If it isn't a literal, don't treat it like a tensor op.
-      if (!getTensorConstantOperand(op))
+      if (!getTensorConstantOperand(op)) {
+        diagInvalid("tensor operation requires an immediate constant argument");
         return false;
+      }
       break;
     }
     }
@@ -334,27 +370,14 @@ bool TensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
 }
 
 
-
 /// The SIL location for operations we process are usually deep in the bowels
 /// of the tensor library code, which are all implementation details to the
 /// user.  As such, walk the inlining location of the specified node to return
 /// the first location *outside* of the tensor implementation goop.
-SILLocation tf::getUserSourceLocation(SILLocation loc, SILNode *value) {
-  // If we are dealing with a SILInstruction, we can produce the location
-  // that the instruction was inlined into, which is a better place to report
-  // as the location of the diagnostic.
-  auto *inst = dyn_cast<SILInstruction>(value);
-  if (!inst) return loc;
-
-  return getUserSourceLocation(inst->getDebugLocation()).getLocation();
-}
-
-/// The SIL location for operations we process are usually deep in the bowels
-/// of the tensor library code, which are all implementation details to the
-/// user.  As such, walk the inlining location of the specified node to return
-/// the first location *outside* of the tensor implementation goop.
-SILDebugLocation tf::getUserSourceLocation(SILDebugLocation loc) {
+SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
   auto ds = loc.getScope();
+
+  if (!ds) return loc;
 
   // If this location hasn't been inlined at all, just keep it unmodified.
   if (!ds->InlinedCallSite && loc.getLocation().getSourceLoc().isValid())
@@ -379,38 +402,3 @@ SILDebugLocation tf::getUserSourceLocation(SILDebugLocation loc) {
   return loc;
 }
 
-/// Return true if the specified type is a valid tensor element type.  For
-/// example, int128 and pointers are not.
-///
-/// TODO: This should eventually consider information about the target
-/// deployment.
-///
-bool tf::isValidTensorFlowElementType(Type ty) {
-  if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
-    switch (BIF->getFPKind()) {
-    case BuiltinFloatType::IEEE16:
-    case BuiltinFloatType::IEEE32:
-    case BuiltinFloatType::IEEE64: return true;
-    case BuiltinFloatType::IEEE80:
-    case BuiltinFloatType::IEEE128:
-    case BuiltinFloatType::PPC128:
-      return false;
-    }
-  }
-
-  if (auto *BII = ty->getAs<BuiltinIntegerType>()) {
-    if (BII->getWidth().isPointerWidth())
-      return true;
-
-    switch (BII->getFixedWidth()) {
-    case 1:
-    case 8:
-    case 16:
-    case 32:
-    case 64:
-      return true;
-    default: return false;
-    }
-  }
-  return false;
-}

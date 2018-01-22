@@ -90,14 +90,14 @@ TensorTests.test("MLPClassifierStruct") {
   struct MLPClassifier {
     // 2 x 4
     var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
-        [0.4, 0.3, 0.2, 0.1]])
+        [0.4, 0.3, 0.2, 0.1]]).toDevice()
     // 4 x 1
     var w2 = Tensor<Float>([[0.4],
         [0.4],
         [0.3],
-        [0.9]])
-    var b1 = Tensor<Float>.zeros(shape: [1, 4])
-    var b2 = Tensor<Float>.zeros(shape: [1, 1])
+        [0.9]]).toDevice()
+    var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
+    var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
 
     @_versioned
     @_inlineable
@@ -107,28 +107,39 @@ TensorTests.test("MLPClassifierStruct") {
     }
   }
   // TODO: Check results
-  _ = MLPClassifier().prediction(for: Tensor([[1, 0.5]]))
+  _ = MLPClassifier().prediction(for: Tensor([[1, 0.5]]).toDevice())
 }
 
-// FIXME: GraphGen crashes due to function being multi-BB when
-// partitioning `rank` and `shape` getters.
-//
-// @inline(never)
-// func testRankGetter() {
-//   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-//   expectEqual(x.rank, 2)
-//   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
-//   expectEqual(y.rank, 7)
-// }
-// TensorTests.test("RankGetter", testRankGetter)
-//
-// @inline(never)
-// func testShapeGetter() {
-//   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-//   expectEqual(x.shape, [2, 3])
-//   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
-//   expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
-// }
-// TensorTests.test("ShapeGetter", testShapeGetter)
+@inline(never)
+func testRankGetter() {
+  let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  expectEqual(x.rank, 2)
+}
+TensorTests.test("RankGetter", testRankGetter)
+
+// FIXME: Merge into the previous example when we support code motion to avoid
+// sends.
+@inline(never)
+func testRankGetter2() {
+  let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+  expectEqual(y.rank, 7)
+}
+TensorTests.test("RankGetter2", testRankGetter2)
+
+#if false  // FIXME(clattner) this crashes TFPartition due to an invalid SLoc.
+@inline(never)
+func testShapeGetter() {
+  let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+  expectEqual(x.shape, [2, 3])
+}
+TensorTests.test("ShapeGetter", testShapeGetter)
+
+@inline(never)
+func testShapeGetter2() {
+   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+   expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
+}
+TensorTests.test("ShapeGetter2", testShapeGetter2)
+#endif
 
 runAllTests()
