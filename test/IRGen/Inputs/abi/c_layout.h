@@ -97,8 +97,8 @@ static inline void doubleTrouble(void) {
   staticFloat *= 2.0;
 }
 
-#define SWIFT_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define SWIFT_ENUM(_type, _name) enum _name
 
 typedef SWIFT_ENUM(int, AmazingColor) {
   Cyan, Magenta, Yellow
-};
+} AmazingColor;
