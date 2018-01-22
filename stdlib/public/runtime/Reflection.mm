@@ -607,9 +607,10 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
   bool indirect = false;
 
   if (static_cast<unsigned>(tag) < payloadCases) {
-    auto payload = Description.GetCaseTypes(type)[tag];
-    payloadType = payload.getType();
-    indirect = payload.isIndirect();
+    swift_getFieldAt(type, tag, [&](llvm::StringRef caseName, FieldType info) {
+      payloadType = info.getType();
+      indirect = info.isIndirect();
+    });
   }
 
   if (tagPtr)
