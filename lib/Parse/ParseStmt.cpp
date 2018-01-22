@@ -53,6 +53,8 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
+  case tok::pound_warning:
+  case tok::pound_error:
   case tok::pound_sourceLocation:
     return true;
 
@@ -507,6 +509,8 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::pound_line:
   case tok::pound_sourceLocation:
   case tok::pound_if:
+  case tok::pound_error:
+  case tok::pound_warning:
     assert((LabelInfo || tryLoc.isValid()) &&
            "unlabeled directives should be handled earlier");
     // Bailout, and let parseBraceItems() parse them.
@@ -671,8 +675,9 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
-  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if,
-                tok::pound_endif, tok::pound_else, tok::pound_elseif) &&
+  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if, 
+                tok::pound_error, tok::pound_warning, tok::pound_endif,
+                tok::pound_else, tok::pound_elseif) &&
       !isStartOfStmt() && !isStartOfDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 

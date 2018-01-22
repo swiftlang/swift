@@ -2000,6 +2000,8 @@ bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_typealias:
   case tok::kw_var:
   case tok::pound_if:
+  case tok::pound_warning:
+  case tok::pound_error:
   case tok::identifier:
   case tok::pound_sourceLocation:
     return true;
@@ -2325,6 +2327,16 @@ Parser::parseDecl(ParseDeclOptions Flags,
       parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
       continue;
     }
+
+    case tok::pound_warning:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
+      DeclResult = parseDeclPoundDiagnostic();
+      break;
+    case tok::pound_error:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
+      DeclResult = parseDeclPoundDiagnostic();
+      break;
+
     // Context sensitive keywords.
     case tok::identifier: {
       Optional<DeclAttrKind> Kind;
@@ -2373,6 +2385,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // Otherwise this is not a context-sensitive keyword.
       LLVM_FALLTHROUGH;
     }
+
     case tok::pound_if:
     case tok::pound_sourceLocation:
     case tok::pound_line:
@@ -3099,6 +3112,46 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   return DCC.fixupParserResult(status, ext);
+}
+
+ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
+  bool isError = Tok.is(tok::pound_error);
+  SyntaxParsingContext LocalContext(SyntaxContext, 
+    isError ? SyntaxKind::PoundErrorDecl : SyntaxKind::PoundWarningDecl);
+  SourceLoc startLoc = 
+    consumeToken(isError ? tok::pound_error : tok::pound_warning);
+
+  SourceLoc lParenLoc;
+  if (parseToken(tok::l_paren, lParenLoc, 
+                 diag::pound_diagnostic_expected, "(", isError))
+    return makeParserError();
+
+  if (!Tok.is(tok::string_literal)) {
+    diagnose(startLoc, diag::pound_diagnostic_expected_string, isError);
+    return makeParserError();
+  }
+  
+  auto string = parseExprStringLiteral();
+  if (string.isNull())
+    return makeParserError();
+
+  auto messageExpr = string.get();
+  SourceLoc rParenLoc;
+  if (parseToken(tok::r_paren, rParenLoc,
+                 diag::pound_diagnostic_expected, ")", isError))
+    return makeParserError();
+
+  if (messageExpr->getKind() == ExprKind::InterpolatedStringLiteral) {
+    diagnose(messageExpr->getStartLoc(), diag::pound_diagnostic_interpolation,
+             isError);
+    return makeParserError();
+  }
+
+  ParserStatus Status;
+  return makeParserResult(Status,
+    new (Context) PoundDiagnosticDecl(CurDeclContext, isError,
+                                      startLoc, rParenLoc,
+                                      cast<StringLiteralExpr>(messageExpr)));
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {

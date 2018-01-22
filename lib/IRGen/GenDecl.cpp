@@ -1881,7 +1881,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::IfConfig:
+  case DeclKind::IfConfig: 
+  case DeclKind::PoundDiagnostic:
     return;
 
   case DeclKind::Enum:
@@ -3322,6 +3323,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       llvm_unreachable("decl not allowed in type context");
 
     case DeclKind::IfConfig:
+    case DeclKind::PoundDiagnostic:
       continue;
 
     case DeclKind::PatternBinding:

@@ -295,6 +295,7 @@ public:
 
     // Cannot have any attributes.
     OnMissingMember = 0,
+    OnPoundDiagnostic = 0,
 
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,

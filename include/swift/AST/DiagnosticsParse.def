@@ -68,6 +68,13 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
 
+ERROR(pound_diagnostic_expected_string,none,
+      "expected string literal in %select{#warning|#error}0 directive",(bool))
+ERROR(pound_diagnostic_expected,none,
+      "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
+ERROR(pound_diagnostic_interpolation,none,
+      "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
+
 ERROR(sourceLocation_expected,none,
       "expected '%0' in #sourceLocation directive", (StringRef))
 
