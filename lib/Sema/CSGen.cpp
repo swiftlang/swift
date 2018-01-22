@@ -1388,11 +1388,8 @@ namespace {
         if (lastTensorType)
           return false;
 
-        if (!lastTensorUnitType) {
-          tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
-                      "no way to infer result element type");
-          return true;
-        }
+        if (!lastTensorUnitType)
+          lastTensorUnitType = CS.createTypeVariable(locator, 0);
 
         lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
                                                {lastTensorUnitType});

@@ -2966,10 +2966,11 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   for (auto &elt : tuple->getElements().drop_front(2)) {
     args.push_back(visit(elt).getScalarValue().forward(SGF));
   }
-  auto resultTy = SGF.getLoweredLoadableType(E->getType());
+  auto &resultTL = SGF.getTypeLowering(E->getType());
+  auto resultTy = resultTL.getLoweredType();
   auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
                                  resultTy, {}, args);
-  return RValue(SGF, E, ManagedValue::forUnmanaged(res));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
 }
 
 RValue RValueEmitter::
