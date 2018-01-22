@@ -508,7 +508,8 @@ public:
     // FIXME: Need to also gather generic requirements.
     std::vector<BuiltType> allGenericArgsVec;
     ArrayRef<BuiltType> allGenericArgs;
-    if (typeDecl->GenericParams.NestingDepth > 1) {
+    if (typeDecl->GenericParams.NestingDepth > 1 &&
+        typeDecl->GenericParams.isGeneric()) {
       if (!parent) return BuiltType();
 
       // Dig out the parent nominal descriptor.

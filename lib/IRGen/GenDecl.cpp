@@ -752,6 +752,11 @@ hasExplicitProtocolConformance(NominalTypeDecl *decl) {
     if (conformance->getKind() == ProtocolConformanceKind::Inherited)
       continue;
 
+    // Ignore conformances synthesized by the Clang importer.
+    if (isa<ClangModuleUnit>(
+                conformance->getDeclContext()->getModuleScopeContext()))
+      continue;
+
     auto P = conformance->getProtocol();
 
     // @objc protocols do not have conformance records
@@ -2826,8 +2831,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
   
-  // Keep type metadata around for all types, although the runtime can currently
-  // only perform name lookup of non-generic types.
+  // Keep type metadata around for all types.
   addRuntimeResolvableType(concreteType);
 
   // For metadata patterns, we're done.

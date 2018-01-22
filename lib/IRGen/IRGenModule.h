@@ -500,6 +500,7 @@ public:
   llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
   llvm::PointerType *NominalTypeDescriptorPtrTy;
+  llvm::StructType *ClassNominalTypeDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
@@ -1080,6 +1081,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
+
+  /// Determine whether the given type requires foreign type metadata.
+  bool requiresForeignTypeMetadata(CanType type);
+
   llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
                                                  ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
