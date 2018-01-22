@@ -1039,6 +1039,12 @@ extension _StringGuts {
     }
   }
 
+
+  //
+  // FIXME (TODO JIRA): Appending a character onto the end of a string should
+  // really have a less generic implementation, then we can drop @specialize.
+  //
+  @_specialize(where C == Character._SmallUTF16)
   public // @testable
   mutating func append<C : Collection>(contentsOf other: C)
   where C.Element == UTF16.CodeUnit {
