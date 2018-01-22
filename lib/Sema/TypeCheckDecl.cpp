@@ -6139,7 +6139,7 @@ public:
               TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
-        if (declTy->matches(parentDeclTy, matchMode, &TC)) {
+        if (declTy->matches(parentDeclTy, matchMode)) {
           // If the Objective-C selectors match, always call it exact.
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
@@ -6373,10 +6373,9 @@ public:
       auto propertyTy = property->getInterfaceType();
       auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
           matchDecl, decl, matchDecl->getInterfaceType());
-      
+
       if (!propertyTy->matches(parentPropertyTy,
-                               TypeMatchFlags::AllowOverride,
-                               &TC)) {
+                               TypeMatchFlags::AllowOverride)) {
         TC.diagnose(property, diag::override_property_type_mismatch,
                     property->getName(), propertyTy, parentPropertyTy);
         noteFixableMismatchedTypes(TC, decl, matchDecl);
