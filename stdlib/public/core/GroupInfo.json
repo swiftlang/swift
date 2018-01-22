@@ -163,7 +163,6 @@
     "Print.swift",
     "REPL.swift",
     "Runtime.swift",
-    "RuntimeFunctionCounters.swift",
     "Shims.swift",
     "ThreadLocalStorage.swift",
     "Unmanaged.swift",
