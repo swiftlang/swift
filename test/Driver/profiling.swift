@@ -23,28 +23,28 @@
 // CHECK: -profile-generate
 
 // OSX: bin/ld{{"? }}
-// OSX: lib/swift/clang/lib/darwin/libclang_rt.profile_osx.a
+// OSX: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_osx.a}}
 
 // IOS: bin/ld{{"? }}
-// IOS: lib/swift/clang/lib/darwin/libclang_rt.profile_ios.a
+// IOS: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_ios.a}}
 
 // IOSSIM: bin/ld{{"? }}
-// IOSSIM: lib/swift/clang/lib/darwin/libclang_rt.profile_iossim.a
+// IOSSIM: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_iossim.a}}
 
 // tvOS: bin/ld{{"? }}
-// tvOS: lib/swift/clang/lib/darwin/libclang_rt.profile_tvos.a
+// tvOS: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_tvos.a}}
 
 // tvOS_SIM: bin/ld{{"? }}
-// tvOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.profile_tvossim.a
+// tvOS_SIM: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_tvossim.a}}
 
 // watchOS: bin/ld{{"? }}
-// watchOS: lib/swift/clang/lib/darwin/libclang_rt.profile_watchos.a
+// watchOS: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_watchos.a}}
 
 // watchOS_SIM: bin/ld{{"? }}
-// watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.profile_watchossim.a
+// watchOS_SIM: {{[^:]+/swift/clang/lib/darwin/libclang_rt.profile_watchossim.a}}
 
 // LINUX: clang++{{"? }}
-// LINUX: lib/swift/clang/lib/linux/libclang_rt.profile-x86_64.a
+// LINUX: {{[^:]+/swift/clang/lib/linux/libclang_rt.profile-x86_64.a}}
 // LINUX: -u__llvm_profile_runtime
 
 // RUN: not %swiftc_driver -driver-print-jobs -profile-generate -profile-use=/dev/null %s 2>&1 | %FileCheck -check-prefix=MIX_GEN_USE %s

@@ -102,6 +102,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                           -DCMAKE_SWIFT_COMPILER=$<TARGET_FILE:swift>c
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                           -DENABLE_SWIFT=YES
+                          -DSWIFT_LIBDIR_SUFFIX=${SWIFT_LIBDIR_SUFFIX}
                         BUILD_BYPRODUCTS
                           ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
                           ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}

@@ -122,7 +122,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(stdlib
     FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    DESTINATION "lib${SWIFT_LIBDIR_SUFFIX}/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 
   add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY

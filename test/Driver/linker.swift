@@ -74,7 +74,7 @@
 
 // CHECK-NEXT: bin/ld{{"? }}
 // CHECK-DAG: [[OBJECTFILE]]
-// CHECK-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift/macosx]]
+// CHECK-DAG: -L [[STDLIB_PATH:[^ ]+/swift/macosx]]
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
 // CHECK-DAG: -lSystem
 // CHECK-DAG: -arch x86_64
@@ -110,7 +110,7 @@
 
 // IOS_SIMPLE: bin/ld{{"? }}
 // IOS_SIMPLE-DAG: [[OBJECTFILE]]
-// IOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/iphonesimulator}}
+// IOS_SIMPLE-DAG: -L {{[^ ]+/swift/iphonesimulator}}
 // IOS_SIMPLE-DAG: -lSystem
 // IOS_SIMPLE-DAG: -arch x86_64
 // IOS_SIMPLE-DAG: -ios_simulator_version_min 7.1.{{[0-9]+}}
@@ -122,7 +122,7 @@
 
 // tvOS_SIMPLE: bin/ld{{"? }}
 // tvOS_SIMPLE-DAG: [[OBJECTFILE]]
-// tvOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/appletvsimulator}}
+// tvOS_SIMPLE-DAG: -L {{[^ ]+/swift/appletvsimulator}}
 // tvOS_SIMPLE-DAG: -lSystem
 // tvOS_SIMPLE-DAG: -arch x86_64
 // tvOS_SIMPLE-DAG: -tvos_simulator_version_min 9.0.{{[0-9]+}}
@@ -134,7 +134,7 @@
 
 // watchOS_SIMPLE: bin/ld{{"? }}
 // watchOS_SIMPLE-DAG: [[OBJECTFILE]]
-// watchOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/watchsimulator}}
+// watchOS_SIMPLE-DAG: -L {{[^ ]+/swift/watchsimulator}}
 // watchOS_SIMPLE-DAG: -lSystem
 // watchOS_SIMPLE-DAG: -arch i386
 // watchOS_SIMPLE-DAG: -watchos_simulator_version_min 2.0.{{[0-9]+}}
@@ -148,7 +148,7 @@
 // LINUX-x86_64-DAG: -pie
 // LINUX-x86_64-DAG: [[OBJECTFILE]]
 // LINUX-x86_64-DAG: -lswiftCore
-// LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-x86_64-DAG: -F foo -iframework car -F cdr
 // LINUX-x86_64-DAG: -framework bar
@@ -164,7 +164,7 @@
 // LINUX-armv6-DAG: -pie
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
-// LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // LINUX-armv6-DAG: -target armv6-unknown-linux-gnueabihf
 // LINUX-armv6-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-armv6-DAG: -F foo -iframework car -F cdr
@@ -181,7 +181,7 @@
 // LINUX-armv7-DAG: -pie
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
-// LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // LINUX-armv7-DAG: -target armv7-unknown-linux-gnueabihf
 // LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-armv7-DAG: -F foo -iframework car -F cdr
@@ -198,7 +198,7 @@
 // LINUX-thumbv7-DAG: -pie
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
-// LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // LINUX-thumbv7-DAG: -target thumbv7-unknown-linux-gnueabihf
 // LINUX-thumbv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-thumbv7-DAG: -F foo -iframework car -F cdr
@@ -215,7 +215,7 @@
 // ANDROID-armv7-DAG: -pie
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
-// ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
 // ANDROID-armv7-DAG: -F foo -iframework car -F cdr
 // ANDROID-armv7-DAG: -framework bar
@@ -231,7 +231,7 @@
 // CYGWIN-x86_64: clang++{{"? }}
 // CYGWIN-x86_64-DAG: [[OBJECTFILE]]
 // CYGWIN-x86_64-DAG: -lswiftCore
-// CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/swift]]
 // CYGWIN-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // CYGWIN-x86_64-DAG: -F foo -iframework car -F cdr
 // CYGWIN-x86_64-DAG: -framework bar
