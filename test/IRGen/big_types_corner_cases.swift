@@ -125,7 +125,7 @@ class Foo {
 public enum LargeEnum {
   public enum InnerEnum {
     case simple(Int64)
-    case hard(Int64, String?)
+    case hard(Int64, String?, Int64)
   }
   case Empty1
   case Empty2
