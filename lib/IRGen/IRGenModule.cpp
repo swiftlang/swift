@@ -305,6 +305,23 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
 
+  ClassNominalTypeDescriptorTy =
+        llvm::StructType::get(LLVMContext, {
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int16Ty,
+    Int16Ty,
+    Int32Ty,
+  }, /*packed=*/true);
+
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
       RelativeAddressTy,
