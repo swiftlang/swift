@@ -2682,6 +2682,12 @@ namespace {
 
 // protocol _ObjectiveCBridgeable {
 struct _ObjectiveCBridgeableWitnessTable {
+  /// The protocol conformance descriptor.
+  const void *protocolConformanceDescriptor;
+
+  static_assert(WitnessTableFirstRequirementOffset == 1,
+                "Witness table layout changed");
+
   // associatedtype _ObjectiveCType : class
   const Metadata * (*ObjectiveCType)(
                      const Metadata *parentMetadata,

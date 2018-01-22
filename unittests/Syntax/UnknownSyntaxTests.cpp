@@ -41,7 +41,7 @@ FunctionCallExprSyntax getCannedFunctionCall() {
   auto Args = SyntaxFactory::makeFunctionCallArgumentList({ Arg });
 
   return SyntaxFactory::makeFunctionCallExpr(getCannedSymbolicRef(), LParen,
-                                             Args, RParen);
+                                             Args, RParen, None);
 }
 
 TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
@@ -83,7 +83,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the UnknownExpr Kind.;
     auto Unknown = make<UnknownExprSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(2));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(3));
 
     // Get the second child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
@@ -113,7 +113,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the Unknown Kind.
     auto Unknown = make<UnknownSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(2));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(3));
 
     // Get the second child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
@@ -142,7 +142,7 @@ TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   auto CallWithKnownExpr = SyntaxFactory::makeFunctionCallExpr(SymbolicRef,
                                                                LParen,
                                                                EmptyArgs,
-                                                               RParen);
+                                                               RParen, None);
   CallWithKnownExpr.print(KnownOS);
 
   // Let's make a function call expression where the called expression is

@@ -304,16 +304,35 @@ bb4(%8 : $Builtin.Int32):
   return %9 : $Int32
 }
 
-// CHECK-LABEL: sil @testSwitchEnum
+// CHECK-LABEL: sil @testSwitchEnumArg
 // CHECK-NOT: apply
 // CHECK: builtin "assert_configuration"()
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
 
-// CHECK-LOG-LABEL: Inline into caller: testSwitchEnum
+// CHECK-LOG-LABEL: Inline into caller: testSwitchEnumArg
 // CHECK-LOG-NEXT: decision {{.*}}, b=50,
 
-sil @testSwitchEnum : $@convention(thin) () -> () {
+sil @testSwitchEnumArg : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%1 : $Builtin.Int32):
+  %0 = function_ref @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
+  %4 = apply %0(%3) : $@convention(thin) (Optional<Int32>) -> Int32
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @testSwitchEnumConst
+// CHECK-NOT: apply
+// CHECK: builtin "assert_configuration"()
+// CHECK-NOT: apply
+// CHECK: return %{{.*}} : $()
+
+// CHECK-LOG-LABEL: Inline into caller: testSwitchEnumConst
+// CHECK-LOG-NEXT: pure-call decision
+
+sil @testSwitchEnumConst : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
@@ -358,7 +377,7 @@ bb3(%7 : $Int32):
 // CHECK-PARTIAL-SPECIALIZATION-LABEL: sil @testSpecializationAfterGenericInlining
 // CHECK-PARTIAL-SPECIALIZATION-NOT: apply
 // Reference to the partial specialization of checkSpecializationAfterGenericInlining
-// CHECK-PARTIAL-SPECIALIZATION: function_ref @_T039checkSpecializationAfterGenericInlinings5Int64Vq_ACRszr0_lIetyi_Tp5
+// CHECK-PARTIAL-SPECIALIZATION: function_ref @$S39checkSpecializationAfterGenericInlinings5Int64Vq_ACRszr0_lIetyi_Tp5
 // CHECK-PARTIAL-SPECIALIZATION: apply
 // CHECK-PARTIAL-SPECIALIZATION-NOT: apply
 // CHECK-PARTIAL-SPECIALIZATION: return

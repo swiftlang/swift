@@ -155,10 +155,10 @@ NSString *swift::convertStringToNSString(String *swiftString) {
     MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringySo0E0CSSF)))));
 
   // If Foundation hasn't loaded yet, fall back to returning the static string
-  // "SwiftObject". The likelihood of someone invoking -description without
+  // "Swift._SwiftObject". The likelihood of someone invoking -description without
   // ObjC interop is low.
   if (!convertStringToNSString)
-    return @"SwiftObject";
+    return @"Swift._SwiftObject";
 
   return convertStringToNSString(swiftString->x,
                                  swiftString->y,
@@ -443,7 +443,7 @@ static NSString *_getClassDescription(Class cls) {
 bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   if (!theClass->isTypeMetadata()) return false;
-  return (theClass->getFlags() & ClassFlags::UsesSwift1Refcounting);
+  return (theClass->getFlags() & ClassFlags::UsesSwiftRefcounting);
 #else
   return true;
 #endif

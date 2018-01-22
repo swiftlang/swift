@@ -30,7 +30,7 @@ namespace syntax {
 % for node in SYNTAX_NODES:
 %   if node.is_buildable():
 class ${node.name}Builder {
-  RawSyntax::LayoutList Layout = {
+  std::vector<RC<RawSyntax>> Layout = {
 %     for child in node.children:
     ${make_missing_child(child)},
 %     end

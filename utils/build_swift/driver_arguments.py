@@ -437,6 +437,9 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
+    option('--enable-guaranteed-normal-arguments', store_true,
+           help='Enable guaranteed normal arguments')
+
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
                 'optimization')

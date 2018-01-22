@@ -85,6 +85,7 @@ extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
 }
 
 extension LazyFilterSequence: LazySequenceProtocol {
+  public typealias Element = Base.Element
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -380,6 +381,26 @@ extension LazyCollectionProtocol {
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(_base: self.elements, isIncluded)
+  }
+}
+
+extension LazyFilterSequence {
+  public func filter(
+    _ isIncluded: @escaping (Element) -> Bool
+  ) -> LazyFilterSequence<Base> {
+    return LazyFilterSequence(_base: _base) {
+      isIncluded($0) && self._predicate($0)
+    }
+  }
+}
+
+extension LazyFilterCollection {
+  public func filter(
+    _ isIncluded: @escaping (Element) -> Bool
+  ) -> LazyFilterCollection<Base> {
+    return LazyFilterCollection(_base: _base) {
+      isIncluded($0) && self._predicate($0)
+    }
   }
 }
 

@@ -33,6 +33,9 @@ SILValue swift::getUnderlyingObject(SILValue V) {
   }
 }
 
+/// Strip off casts and address projections into the interior of a value. Unlike
+/// getUnderlyingObject, this does not find the root of a heap object--a class
+/// property is itself an address root.
 SILValue swift::getUnderlyingAddressRoot(SILValue V) {
   while (true) {
     SILValue V2 = stripIndexingInsts(stripCasts(V));

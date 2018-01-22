@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_versioned
-internal protocol _ArrayProtocol
+internal protocol ArrayProtocol
   : RangeReplaceableCollection,
     ExpressibleByArrayLiteral
 {
@@ -72,7 +72,7 @@ internal protocol _ArrayProtocol
   var _buffer: _Buffer { get }
 }
 
-extension _ArrayProtocol {
+extension ArrayProtocol {
   // Since RangeReplaceableCollection now has a version of filter that is less
   // efficient, we should make the default implementation coming from Sequence
   // preferred.

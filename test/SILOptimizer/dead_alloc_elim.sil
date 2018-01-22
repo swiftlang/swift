@@ -14,7 +14,11 @@ class TrivialDestructor {
   deinit { }
 }
 
-sil @_T04main17TrivialDestructorCfD : $@convention(method) (@owned TrivialDestructor) -> () {
+class NontrivialDestructor {
+  init()
+}
+
+sil @$S4main17TrivialDestructorCfD : $@convention(method) (@owned TrivialDestructor) -> () {
 bb0(%0 : $TrivialDestructor):
   // Alloc/Dealloc stack should not disrupt elimination of the
   // alloc_ref.
@@ -56,6 +60,21 @@ sil @int_user : $@convention(thin) (Builtin.Int32) -> ()
 sil @trivial_destructor_trivial : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   strong_release %0 : $TrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// If the destructor is not called, we don't care about it.
+//
+// CHECK-LABEL: sil @devirtualized_destructor : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @devirtualized_destructor : $@convention(thin) () -> () {
+  %0 = alloc_ref $NontrivialDestructor
+  set_deallocating %0 : $NontrivialDestructor
+  fix_lifetime %0 : $NontrivialDestructor
+  dealloc_ref %0 : $NontrivialDestructor
   %1 = tuple()
   return %1 : $()
 }

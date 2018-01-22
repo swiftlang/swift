@@ -5,6 +5,7 @@ public enum Optional<T> {
   case some(T)
 }
 
+@_fixed_layout
 public struct B {
   @_inlineable
   public func amIConfused() {}
@@ -12,6 +13,7 @@ public struct B {
   public init() {}
 }
 
+@_fixed_layout
 public struct A {
   public var b : B
 

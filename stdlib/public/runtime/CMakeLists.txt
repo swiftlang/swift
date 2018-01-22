@@ -1,6 +1,11 @@
 set(swift_runtime_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 set(swift_runtime_linker_flags ${SWIFT_RUNTIME_CORE_LINK_FLAGS})
 
+if(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT)
+  list(APPEND swift_runtime_compile_flags
+      "-DSWIFT_DARWIN_ENABLE_STABLE_ABI_BIT=1")
+endif()
+
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
       "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
@@ -18,6 +23,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS")
+endif()
+
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
@@ -27,7 +37,9 @@ set(swift_runtime_objc_sources
     SwiftValue.mm
     Reflection.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
+    )
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp

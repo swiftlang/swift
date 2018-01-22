@@ -7,7 +7,7 @@ enum Downgradable {
   case fork
 }
 
-// CHECK-LABEL: sil hidden @_T029downgrade_exhaustivity_swift343testDowngradableOmittedPatternIsUnreachable3patyAA0E0OSg_tF
+// CHECK-LABEL: sil hidden @$S29downgrade_exhaustivity_swift343testDowngradableOmittedPatternIsUnreachable3patyAA0E0OSg_tF
 func testDowngradableOmittedPatternIsUnreachable(pat : Downgradable?) {
   // CHECK: switch_enum {{%.*}} : $Downgradable, case #Downgradable.spoon!enumelt: [[CASE1:bb[0-9]+]], case #Downgradable.hat!enumelt: [[CASE2:bb[0-9]+]], default [[DEFAULT_CASE:bb[0-9]+]]
   switch pat! {

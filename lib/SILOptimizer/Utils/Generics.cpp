@@ -2015,6 +2015,13 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     A->replaceAllUsesWith(NewAI);
     return NewAI;
   }
+  if (auto *A = dyn_cast<BeginApplyInst>(AI)) {
+    assert(!StoreResultTo);
+    auto *NewAI = Builder.createBeginApply(Loc, Callee, Subs, Arguments,
+                                           A->isNonThrowing());
+    A->replaceAllUsesPairwiseWith(NewAI);
+    return NewAI;
+  }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
@@ -2365,13 +2372,6 @@ void swift::trySpecializeApplyOfGeneric(
          == SpecializedF->getLoweredFunctionType() &&
          "Previously specialized function does not match expected type.");
 
-  // FIXME: Replace pre-specialization's "keep as public" hack with something
-  // more principled
-  assert((Serialized == SpecializedF->isSerialized() ||
-          SpecializedF->isKeepAsPublic()) &&
-         "Previously specialized function does not match expected "
-         "resilience level.");
-
   DeadApplies.insert(Apply.getInstruction());
 
   if (replacePartialApplyWithoutReabstraction) {
@@ -2428,27 +2428,6 @@ void swift::trySpecializeApplyOfGeneric(
 // This uses the SIL linker to checks for the does not load the body of the pres
 // =============================================================================
 
-static void keepSpecializationAsPublic(SILFunction *F) {
-  DEBUG(auto DemangledNameString =
-            swift::Demangle::demangleSymbolAsString(F->getName());
-        StringRef DemangledName = DemangledNameString;
-        llvm::dbgs() << "Keep specialization public: " << DemangledName << " : "
-                     << F->getName() << "\n");
-  // Make it public, so that others can refer to it.
-  //
-  // NOTE: This function may refer to non-public symbols, which may lead to
-  // problems, if you ever try to inline this function. Therefore, these
-  // specializations should only be used to refer to them, but should never
-  // be inlined!  The general rule could be: Never inline specializations
-  // from stdlib!
-  //
-  // NOTE: Making these specializations public at this point breaks
-  // some optimizations. Therefore, just mark the function.
-  // DeadFunctionElimination pass will check if the function is marked
-  // and preserve it if required.
-  F->setKeepAsPublic(true);
-}
-
 /// Link a specialization for generating prespecialized code.
 ///
 /// For now, it is performed only for specializations in the
@@ -2460,14 +2439,15 @@ static void keepSpecializationAsPublic(SILFunction *F) {
 /// the library, but only used only by client code compiled at -Onone. They
 /// should be never inlined.
 static bool linkSpecialization(SILModule &M, SILFunction *F) {
-  if (F->isKeepAsPublic())
+  if (F->getLinkage() == SILLinkage::Public)
     return true;
   // Do not remove functions that are known prespecializations.
   // Keep them around. Change their linkage to public, so that other
   // applications can refer to them.
   if (M.isOptimizedOnoneSupportModule()) {
     if (isKnownPrespecialization(F->getName())) {
-      keepSpecializationAsPublic(F);
+      F->setLinkage(SILLinkage::Public);
+      F->setSerialized(IsNotSerialized);
       return true;
     }
   }

@@ -53,7 +53,7 @@ bb0:
 sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 
 sil_vtable Bar {
-  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo!1: @_TFC4main3Bar3foofS0_FT_T_
 }
 
 private class Node {
@@ -106,7 +106,7 @@ bb0(%0 : $Node):
 }
 
 sil_vtable Node {
-  #Node.index!getter.1: transparent_target
+  #Node.index!getter.1: @transparent_target
 }
 
 private class B {
@@ -148,9 +148,9 @@ bb0(%0 : $@thick C.Type):
 // YAML-NEXT: ...
 
 sil_vtable B {
-  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }
 
 sil_vtable C {
-  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }

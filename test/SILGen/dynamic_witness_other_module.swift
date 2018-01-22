@@ -17,6 +17,6 @@ extension ExtremeLateBindingCounter : EvenMoreExtremeLateBindingCounter {}
 // Make sure we emit a direct reference to the witness's materializeForSet
 // instead of dispatching via class_method.
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0029dynamic_witness_other_module_C025ExtremeLateBindingCounterC0a1_b1_c1_D008EvenMoreefgH0A2dEP7counterSivmTW : $@convention(witness_method: EvenMoreExtremeLateBindingCounter) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ExtremeLateBindingCounter) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK: function_ref @_T0029dynamic_witness_other_module_C025ExtremeLateBindingCounterC7counterSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed ExtremeLateBindingCounter) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil private [transparent] [thunk] @$S029dynamic_witness_other_module_C025ExtremeLateBindingCounterC0a1_b1_c1_D008EvenMoreefgH0A2dEP7counterSivmTW : $@convention(witness_method: EvenMoreExtremeLateBindingCounter) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ExtremeLateBindingCounter) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK: function_ref @$S029dynamic_witness_other_module_C025ExtremeLateBindingCounterC7counterSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed ExtremeLateBindingCounter) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: return

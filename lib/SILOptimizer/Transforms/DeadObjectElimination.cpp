@@ -193,11 +193,16 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst) {
+static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
+  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
+    return true;
+
   // It is ok to eliminate various retains/releases. We are either removing
   // everything or nothing.
-  if (isa<RefCountingInst>(Inst) || isa<StrongPinInst>(Inst))
-    return true;
+  if (isa<RefCountingInst>(Inst) || isa<StrongPinInst>(Inst) ||
+      // dealloc_partial_ref invokes releases implicitly
+      isa<DeallocPartialRefInst>(Inst))
+    return acceptRefCountInsts;
 
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
@@ -227,7 +232,8 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
+                    bool acceptRefCountInsts) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -246,7 +252,7 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I)) {
+    if (!canZapInstruction(I, acceptRefCountInsts)) {
       DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
@@ -695,15 +701,11 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
     DestructorAnalysisCache[Type] = HasSideEffects;
   }
 
-  if (HasSideEffects) {
-    DEBUG(llvm::dbgs() << " Destructor had side effects. \n");
-    return false;
-  }
-
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ARI, UsersToRemove)) {
+  if (hasUnremovableUsers(ARI, UsersToRemove,
+                          /*acceptRefCountInsts=*/ !HasSideEffects)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -723,7 +725,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
 
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, UsersToRemove)) {
+  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -737,22 +739,60 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
+/// If AI is the version of an initializer where we pass in either an apply or
+/// an alloc_ref to initialize in place, validate that we are able to continue
+/// optimizing and return To
+static bool getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
+  assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
+                              "failure we can clear without worrying about the "
+                              "caller accumulating and thus our eliminating "
+                              "passed in state.");
+  SILValue Arg0 = AI->getArgument(0);
+
+  if (Arg0->getType().isExistentialType()) {
+    // This is a version of the initializer which receives a pre-allocated
+    // buffer as first argument. To completely eliminate the allocation, we must
+    // destroy the extra allocations as well as the initializer,
+    if (auto *Result = dyn_cast<ApplyInst>(Arg0)) {
+      ToDestroy.emplace_back(Result);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
+    if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
+          if (Op->getUser() == AI)
+            return true;
+          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
+            ToDestroy.emplace_back(SRI);
+            return true;
+          }
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  // We may have added elements to the array before we failed. To avoid such a
+  // problem, we clear the out array here. We assert at the beginning that the
+  // out array is empty, so this is safe.
+  ToDestroy.clear();
+  return true;
+}
+
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
 
-  ApplyInst *AllocBufferAI = nullptr;
-  SILValue Arg0 = AI->getArgument(0);
-  if (Arg0->getType().isExistentialType()) {
-    // This is a version of the initializer which receives a pre-allocated
-    // buffer as first argument. If we want to delete the initializer we also
-    // have to delete the allocation.
-    AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
-    if (!AllocBufferAI)
-      return false;
-  }
+  llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;
+  if (!getDeadInstsAfterInitializerRemoved(AI,
+                                           instsDeadAfterInitializerRemoved))
+    return false;
 
   if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
@@ -762,8 +802,9 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
   eraseUsesOfInstruction(AI);
   assert(AI->use_empty() && "All users should have been removed.");
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
-  if (AllocBufferAI) {
-    recursivelyDeleteTriviallyDeadInstructions(AllocBufferAI, true);
+  if (instsDeadAfterInitializerRemoved.size()) {
+    recursivelyDeleteTriviallyDeadInstructions(instsDeadAfterInitializerRemoved,
+                                               true);
   }
   ++DeadAllocApplyEliminated;
   return true;

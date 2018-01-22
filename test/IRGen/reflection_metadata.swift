@@ -10,7 +10,7 @@
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_reflstr
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_builtin
 
-// STRIP_REFLECTION_NAMES-DAG: @_T019reflection_metadata10MyProtocol_pMF = internal constant {{.*}}swift3_fieldmd
+// STRIP_REFLECTION_NAMES-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift3_fieldmd
 
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_reflect
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_fieldmd
@@ -39,14 +39,14 @@
 
 // CHECK-DAG: @"\01l__swift3_reflection_descriptor" = private constant { {{.*}} } { i32 1, i32 1, i32 2, {{.*}} }
 
-// CHECK-DAG: @_T019reflection_metadata10MyProtocol_pMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata7MyClassCMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata11ConformanceVAA10MyProtocolAAMA = internal constant {{.*}}swift3_assocty
-// CHECK-DAG: @_T019reflection_metadata8MyStructVMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata6MyEnumOMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata14MyGenericClassCMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata15MyGenericStructVMF = internal constant {{.*}}swift3_fieldmd
-// CHECK-DAG: @_T019reflection_metadata13MyGenericEnumOMF = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata7MyClassCMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}}swift3_assocty
+// CHECK-DAG: @"$S19reflection_metadata8MyStructVMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata6MyEnumOMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata15MyGenericStructVMF" = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata13MyGenericEnumOMF" = internal constant {{.*}}swift3_fieldmd
 
 public protocol MyProtocol {
   associatedtype Inner

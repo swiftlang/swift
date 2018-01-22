@@ -1787,9 +1787,10 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
     auto &score = bestNonGenericScore->Data;
     // Let's skip generic overload choices only in case if
     // non-generic score indicates that there were no forced
-    // unwrappings of optional(s) and no unavailable overload
-    // choices present in the solution.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0)
+    // unwrappings of optional(s), no unavailable overload
+    // choices present in the solution, and no fixes required.
+    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0
+        && score[SK_Fix] == 0)
       return true;
   }
 
@@ -1943,11 +1944,12 @@ bool ConstraintSystem::solveSimplified(
       auto *lastChoice = lastSolvedChoice->first.getConstraint();
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
+      bool hasFixes = score.Data[SK_Fix] > 0;
 
-      // Attempt to short-circuit disjunction only if
-      // score indicates that there are no unavailable
-      // overload choices present in the solution.
-      if (!hasUnavailableOverloads &&
+      // Attempt to short-circuit disjunction only if score indicates
+      // that there are no unavailable overload choices present in the
+      // solution, and the solution does not involve fixes.
+      if (!hasUnavailableOverloads && !hasFixes &&
           shortCircuitDisjunctionAt(&currentChoice, lastChoice,
                                     getASTContext()))
         break;

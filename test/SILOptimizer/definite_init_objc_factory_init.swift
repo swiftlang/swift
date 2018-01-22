@@ -5,7 +5,7 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So4HiveC5queenSQyABGSQySo3BeeCG_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo4HiveC5queenSQyABGSQySo3BeeCG_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -21,7 +21,7 @@ extension Hive {
   // initializer, not a convenience initializer, which means it does
   // not have an initializing entry point at all.
 
-  // CHECK-LABEL: sil hidden @_T0So4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfc : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
+  // CHECK-LABEL: sil hidden @$SSo4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfc : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
   convenience init(otherQueen other: Bee) {
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
     // CHECK: store [[OLD_SELF:%[0-9]+]] to [[SELF_ADDR]]
@@ -54,7 +54,7 @@ extension SomeClass {
 }
 
 class SubHive : Hive {
-  // CHECK-LABEL: sil hidden @_T0027definite_init_objc_factory_B07SubHiveC20delegatesToInheritedACyt_tcfc : $@convention(method) (@owned SubHive) -> @owned SubHive
+  // CHECK-LABEL: sil hidden @$S027definite_init_objc_factory_B07SubHiveC20delegatesToInheritedACyt_tcfc : $@convention(method) (@owned SubHive) -> @owned SubHive
   convenience init(delegatesToInherited: ()) {
     // CHECK: [[UPCAST:%.*]] = upcast %0 : $SubHive to $Hive
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST]] : $Hive

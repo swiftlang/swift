@@ -130,6 +130,9 @@ class alignas(8) Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
 
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+2+1,
     /// The subclass of Expr that this is.
     Kind : bitmax(NumExprKindBits,8),
@@ -287,8 +290,17 @@ class alignas(8) Expr {
 
   SWIFT_INLINE_BITFIELD_EMPTY(ImplicitConversionExpr, Expr);
 
-  SWIFT_INLINE_BITFIELD(TupleShuffleExpr, ImplicitConversionExpr, 2,
-    TypeImpact : 2
+  SWIFT_INLINE_BITFIELD_FULL(TupleShuffleExpr, ImplicitConversionExpr, 2+16+16+16,
+    TypeImpact : 2,
+    : NumPadBits,
+    NumCallerDefaultArgs : 16,
+    /// This contains an entry for each element in the Expr type.  Each element
+    /// specifies which index from the SubExpr that the destination element gets.
+    /// If the element value is DefaultInitialize, then the destination value
+    /// gets the default initializer for that tuple element value.
+    NumElementMappings : 16,
+    /// The arguments that are packed into the variadic element.
+    NumVariadicArgs : 16
   );
 
   SWIFT_INLINE_BITFIELD(InOutToPointerExpr, ImplicitConversionExpr, 1,
@@ -354,41 +366,6 @@ class alignas(8) Expr {
     NumElements : 32
   );
 
-protected:
-  union {
-    SWIFT_INLINE_BITS(Expr);
-    SWIFT_INLINE_BITS(NumberLiteralExpr);
-    SWIFT_INLINE_BITS(StringLiteralExpr);
-    SWIFT_INLINE_BITS(DeclRefExpr);
-    SWIFT_INLINE_BITS(UnresolvedDeclRefExpr);
-    SWIFT_INLINE_BITS(TupleExpr);
-    SWIFT_INLINE_BITS(TupleElementExpr);
-    SWIFT_INLINE_BITS(MemberRefExpr);
-    SWIFT_INLINE_BITS(UnresolvedDotExpr);
-    SWIFT_INLINE_BITS(SubscriptExpr);
-    SWIFT_INLINE_BITS(DynamicSubscriptExpr);
-    SWIFT_INLINE_BITS(UnresolvedMemberExpr);
-    SWIFT_INLINE_BITS(OverloadSetRefExpr);
-    SWIFT_INLINE_BITS(BooleanLiteralExpr);
-    SWIFT_INLINE_BITS(MagicIdentifierLiteralExpr);
-    SWIFT_INLINE_BITS(ObjectLiteralExpr);
-    SWIFT_INLINE_BITS(AbstractClosureExpr);
-    SWIFT_INLINE_BITS(ClosureExpr);
-    SWIFT_INLINE_BITS(BindOptionalExpr);
-    SWIFT_INLINE_BITS(ApplyExpr);
-    SWIFT_INLINE_BITS(CallExpr);
-    SWIFT_INLINE_BITS(CheckedCastExpr);
-    SWIFT_INLINE_BITS(TupleShuffleExpr);
-    SWIFT_INLINE_BITS(InOutToPointerExpr);
-    SWIFT_INLINE_BITS(ArrayToPointerExpr);
-    SWIFT_INLINE_BITS(ObjCSelectorExpr);
-    SWIFT_INLINE_BITS(KeyPathExpr);
-    SWIFT_INLINE_BITS(ParenExpr);
-    SWIFT_INLINE_BITS(SequenceExpr);
-    SWIFT_INLINE_BITS(CollectionExpr);
-    SWIFT_INLINE_BITS(ErasureExpr);
-    SWIFT_INLINE_BITS(UnresolvedSpecializeExpr);
-    SWIFT_INLINE_BITS(CaptureListExpr);
   } Bits;
 
 private:
@@ -401,6 +378,7 @@ private:
  
 protected:
   Expr(ExprKind Kind, bool Implicit, Type Ty = Type()) : Ty(Ty) {
+    Bits.OpaqueBits = 0;
     Bits.Expr.Kind = unsigned(Kind);
     Bits.Expr.Implicit = Implicit;
     Bits.Expr.LValueAccessKind = 0;
@@ -2842,7 +2820,20 @@ public:
 /// If hasScalarSource() is true, the subexpression should be treated
 /// as if it were implicitly injected into a single-element tuple
 /// type.  Otherwise, the subexpression is known to have a tuple type.
-class TupleShuffleExpr : public ImplicitConversionExpr {
+class TupleShuffleExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<TupleShuffleExpr, Expr *, int, unsigned> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return Bits.TupleShuffleExpr.NumCallerDefaultArgs;
+  }
+  size_t numTrailingObjects(OverloadToken<int>) const {
+    return Bits.TupleShuffleExpr.NumElementMappings;
+  }
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return Bits.TupleShuffleExpr.NumVariadicArgs;
+  }
+
 public:
   enum : int {
     /// The element mapping value indicating that a field of the destination
@@ -2877,12 +2868,6 @@ public:
   };
 
 private:
-  /// This contains an entry for each element in the Expr type.  Each element
-  /// specifies which index from the SubExpr that the destination element gets.
-  /// If the element value is DefaultInitialize, then the destination value
-  /// gets the default initializer for that tuple element value.
-  ArrayRef<int> ElementMapping;
-
   /// If we're doing a varargs shuffle, this is the array type to build.
   Type VarargsArrayTy;
 
@@ -2890,28 +2875,41 @@ private:
   /// declaration.
   ConcreteDeclRef DefaultArgsOwner;
 
-  /// The arguments that are packed into the variadic element.
-  ArrayRef<unsigned> VariadicArgs;
-
-  MutableArrayRef<Expr *> CallerDefaultArgs;
-
-public:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping,
                    TypeImpact typeImpact,
                    ConcreteDeclRef defaultArgsOwner,
                    ArrayRef<unsigned> VariadicArgs,
                    Type VarargsArrayTy,
-                   MutableArrayRef<Expr *> CallerDefaultArgs,
+                   ArrayRef<Expr *> CallerDefaultArgs,
                    Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
-      ElementMapping(elementMapping), VarargsArrayTy(VarargsArrayTy),
-      DefaultArgsOwner(defaultArgsOwner), VariadicArgs(VariadicArgs),
-      CallerDefaultArgs(CallerDefaultArgs)
-  {
+      VarargsArrayTy(VarargsArrayTy), DefaultArgsOwner(defaultArgsOwner) {
     Bits.TupleShuffleExpr.TypeImpact = typeImpact;
+    Bits.TupleShuffleExpr.NumCallerDefaultArgs = CallerDefaultArgs.size();
+    Bits.TupleShuffleExpr.NumElementMappings = elementMapping.size();
+    Bits.TupleShuffleExpr.NumVariadicArgs = VariadicArgs.size();
+    std::uninitialized_copy(CallerDefaultArgs.begin(), CallerDefaultArgs.end(),
+                            getTrailingObjects<Expr*>());
+    std::uninitialized_copy(elementMapping.begin(), elementMapping.end(),
+                            getTrailingObjects<int>());
+    std::uninitialized_copy(VariadicArgs.begin(), VariadicArgs.end(),
+                            getTrailingObjects<unsigned>());
   }
 
-  ArrayRef<int> getElementMapping() const { return ElementMapping; }
+public:
+  static TupleShuffleExpr *create(ASTContext &ctx, Expr *subExpr,
+                                  ArrayRef<int> elementMapping,
+                                  TypeImpact typeImpact,
+                                  ConcreteDeclRef defaultArgsOwner,
+                                  ArrayRef<unsigned> VariadicArgs,
+                                  Type VarargsArrayTy,
+                                  ArrayRef<Expr *> CallerDefaultArgs,
+                                  Type ty);
+
+  ArrayRef<int> getElementMapping() const {
+    return {getTrailingObjects<int>(),
+            Bits.TupleShuffleExpr.NumElementMappings};
+  }
 
   /// What is the type impact of this shuffle?
   TypeImpact getTypeImpact() const {
@@ -2935,16 +2933,25 @@ public:
   }
 
   /// Retrieve the argument indices for the variadic arguments.
-  ArrayRef<unsigned> getVariadicArgs() const { return VariadicArgs; }
+  ArrayRef<unsigned> getVariadicArgs() const {
+    return {getTrailingObjects<unsigned>(),
+            Bits.TupleShuffleExpr.NumVariadicArgs};
+  }
 
   /// Retrieve the owner of the default arguments.
   ConcreteDeclRef getDefaultArgsOwner() const { return DefaultArgsOwner; }
 
   /// Retrieve the caller-defaulted arguments.
-  ArrayRef<Expr *> getCallerDefaultArgs() const { return CallerDefaultArgs; }
+  ArrayRef<Expr *> getCallerDefaultArgs() const {
+    return {getTrailingObjects<Expr*>(),
+            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+  }
 
   /// Retrieve the caller-defaulted arguments.
-  MutableArrayRef<Expr *> getCallerDefaultArgs() { return CallerDefaultArgs; }
+  MutableArrayRef<Expr *> getCallerDefaultArgs() {
+    return {getTrailingObjects<Expr*>(),
+            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;
@@ -3023,6 +3030,26 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CovariantReturnConversion;
+  }
+};
+
+/// Perform a function conversion from a function returning an
+/// Optional<T> to a function returning T.
+///
+/// This is generated during expression type checking in places where
+/// we need to force the result type of a function being called. When
+/// we go to rewrite the call, we remove this node and force the
+/// result of the call to the underlying function. It should never
+/// exist outside of this final stage of expression type checking.
+class ImplicitlyUnwrappedFunctionConversionExpr
+    : public ImplicitConversionExpr {
+public:
+  ImplicitlyUnwrappedFunctionConversionExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::ImplicitlyUnwrappedFunctionConversion,
+                               subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ImplicitlyUnwrappedFunctionConversion;
   }
 };
 
@@ -3362,7 +3389,7 @@ public:
 
 
 /// \brief A base class for closure expressions.
-class AbstractClosureExpr : public Expr, public DeclContext {
+class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
 
   /// \brief The set of parameters.
@@ -3371,8 +3398,8 @@ class AbstractClosureExpr : public Expr, public DeclContext {
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       unsigned Discriminator, DeclContext *Parent)
-      : Expr(Kind, Implicit, FnType),
-        DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+      : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
+        Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }

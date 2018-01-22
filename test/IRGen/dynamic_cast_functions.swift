@@ -54,12 +54,14 @@ let j: (__shared Int) -> Void = { _ in }
 let k: (Int, inout Int) -> Void = { _,_ in }
 let l: (inout Int, Float, inout String) -> Void = { _,_,_ in }
 let m: (__shared Int, String, inout Float, Double) -> Void = { _,_,_,_ in }
+let n: () -> Int = { 42 }
 
 let i_any: Any = i
 let j_any: Any = j
 let k_any: Any = k
 let l_any: Any = l
 let m_any: Any = m
+let n_any: Any = n
 
 // CHECK: ok
 print((i_any as? (Int) -> Void) != nil ? "fail" : "ok")
@@ -117,3 +119,9 @@ print((m_any as? (__shared Int, String, Float, inout Double) -> Void) != nil ? "
 print((m_any as? (Int, __shared String, inout Float, Double) -> Void) != nil ? "fail" : "ok")
 // CHECK: ok
 print((m_any as? (__shared Int, String, inout Float, Double) -> Void) != nil ? "ok" : "fail")
+// CHECK: ok
+print((n_any as? () -> Int) != nil ? "ok" : "fail")
+// CHECK: ok
+print((n_any as? () -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((n_any as? (Int) -> Int) != nil ? "fail" : "ok")

@@ -285,6 +285,7 @@ public:
     OnConstructor      = 1 << 24,
     OnDestructor       = 1 << 25,
     OnFunc             = 1 << 26,
+    OnAccessor         = OnFunc,
     OnEnumElement      = 1 << 27,
 
     OnGenericTypeParam = 1 << 28,

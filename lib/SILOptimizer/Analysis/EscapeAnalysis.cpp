@@ -295,6 +295,8 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
       } else {
         Node->pointsTo = pointsTo;
       }
+      // Update use-points if the use-point information is already calculated.
+      pointsTo->mergeUsePoints(Node);
     }
 
     // Add all adjacent nodes to the WorkList.
@@ -1384,6 +1386,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::DeallocRefInst:
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
+    case SILInstructionKind::ClassifyBridgeObjectInst:
       // These instructions don't have any effect on escaping.
       return;
     case SILInstructionKind::StrongReleaseInst:

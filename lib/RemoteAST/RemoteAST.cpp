@@ -16,6 +16,7 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
 #include "swift/AST/IRGenOptions.h"
@@ -81,6 +83,7 @@ public:
 /// just finds and builds things in the AST.
 class RemoteASTTypeBuilder {
   ASTContext &Ctx;
+  Demangle::NodeFactory Factory;
 
   /// The notional context in which we're writing and type-checking code.
   /// Created lazily.
@@ -90,7 +93,8 @@ class RemoteASTTypeBuilder {
 
 public:
   using BuiltType = swift::Type;
-  using BuiltNominalTypeDecl = swift::NominalTypeDecl*;
+  using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
+  using BuiltProtocolDecl = swift::ProtocolDecl *;
   explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   std::unique_ptr<IRGenContext> createIRGenContext() {
@@ -120,6 +124,8 @@ public:
                std::forward<DefaultFailureArgTys>(defaultFailureArgs)...);
   }
 
+  Demangle::NodeFactory &getNodeFactory() { return Factory; }
+
   Type createBuiltinType(const std::string &mangledName) {
     // TODO
     return Type();
@@ -134,6 +140,10 @@ public:
   }
 
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
+
+  ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
+    return dyn_cast_or_null<ProtocolDecl>(createNominalTypeDecl(node));
+  }
 
   Type createNominalType(NominalTypeDecl *decl) {
     // If the declaration is generic, fail.
@@ -197,10 +207,12 @@ public:
 
     // Make a generic type repr that's been resolved to this decl.
     TypeReprList genericArgReprs(args);
-    GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
-                                     genericArgReprs.getList(), SourceRange());
+    auto genericRepr = GenericIdentTypeRepr::create(Ctx, SourceLoc(),
+                                                    decl->getName(),
+                                                    genericArgReprs.getList(),
+                                                    SourceRange());
     // FIXME
-    genericRepr.setValue(decl, nullptr);
+    genericRepr->setValue(decl, nullptr);
 
     Type genericType;
 
@@ -217,21 +229,21 @@ public:
 
       struct GenericRepr {
         TypeReprList GenericArgs;
-        GenericIdentTypeRepr Ident;
+        GenericIdentTypeRepr *Ident;
 
-        GenericRepr(BoundGenericType *type)
+        GenericRepr(const ASTContext &Ctx, BoundGenericType *type)
           : GenericArgs(type->getGenericArgs()),
-            Ident(SourceLoc(), type->getDecl()->getName(),
-                  GenericArgs.getList(), SourceRange()) {
+            Ident(GenericIdentTypeRepr::create(Ctx, SourceLoc(),
+                                               type->getDecl()->getName(),
+                                               GenericArgs.getList(),
+                                               SourceRange())) {
           // FIXME
-          Ident.setValue(type->getDecl(), nullptr);
+          Ident->setValue(type->getDecl(), nullptr);
         }
 
         // SmallVector::emplace_back will never need to call this because
         // we reserve the right size, but it does try statically.
-        GenericRepr(const GenericRepr &other)
-          : GenericArgs({}),
-            Ident(SourceLoc(), Identifier(), {}, SourceRange()) {
+        GenericRepr(const GenericRepr &other) : GenericArgs({}), Ident(nullptr) {
           llvm_unreachable("should not be called dynamically");
         }
       };
@@ -248,8 +260,8 @@ public:
       for (size_t i = ancestry.size(); i != 0; --i) {
         Type p = ancestry[i - 1];
         if (auto boundGeneric = p->getAs<BoundGenericType>()) {
-          genericComponents.emplace_back(boundGeneric);
-          componentReprs.push_back(&genericComponents.back().Ident);
+          genericComponents.emplace_back(Ctx, boundGeneric);
+          componentReprs.push_back(genericComponents.back().Ident);
         } else {
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
@@ -259,12 +271,12 @@ public:
           componentReprs.push_back(&simpleComponents.back());
         }
       }
-      componentReprs.push_back(&genericRepr);
+      componentReprs.push_back(genericRepr);
 
-      CompoundIdentTypeRepr compoundRepr(componentReprs);
-      genericType = checkTypeRepr(&compoundRepr);
+      auto compoundRepr = CompoundIdentTypeRepr::create(Ctx, componentReprs);
+      genericType = checkTypeRepr(compoundRepr);
     } else {
-      genericType = checkTypeRepr(&genericRepr);
+      genericType = checkTypeRepr(genericRepr);
     }
 
     // If type-checking failed, we've failed.
@@ -345,33 +357,15 @@ public:
     return FunctionType::get(funcParams, output, einfo);
   }
 
-  Type createProtocolType(StringRef mangledName,
-                          StringRef moduleName,
-                          StringRef privateDiscriminator,
-                          StringRef name) {
-    auto module = Ctx.getModuleByName(moduleName);
-    if (!module) return Type();
-
-    auto decl = findNominalTypeDecl(module,
-                                    Ctx.getIdentifier(name),
-                                    (privateDiscriminator.empty()
-                                     ? Identifier()
-                                     : Ctx.getIdentifier(privateDiscriminator)),
-                                    Demangle::Node::Kind::Protocol);
-    if (!decl) return Type();
-
-    return decl->getDeclaredType();
-  }
-
-  Type createProtocolCompositionType(ArrayRef<Type> members,
-                                     bool hasExplicitAnyObject) {
-    for (auto member : members) {
-      if (!member->isExistentialType() &&
-          !member->getClassOrBoundGenericClass())
-        return Type();
-    }
-
-    return ProtocolCompositionType::get(Ctx, members, hasExplicitAnyObject);
+  Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
+                                     Type superclass,
+                                     bool isClassBound) {
+    std::vector<Type> members;
+    for (auto protocol : protocols)
+      members.push_back(protocol->getDeclaredType());
+    if (superclass && superclass->getClassOrBoundGenericClass())
+      members.push_back(superclass);
+    return ProtocolCompositionType::get(Ctx, members, isClassBound);
   }
 
   Type createExistentialMetatypeType(Type instance) {
@@ -390,11 +384,18 @@ public:
     return GenericTypeParamType::get(depth, index, Ctx);
   }
 
-  Type createDependentMemberType(StringRef member, Type base, Type protocol) {
+  Type createDependentMemberType(StringRef member, Type base,
+                                 ProtocolDecl *protocol) {
     if (!base->isTypeParameter())
       return Type();
-    // TODO: look up protocol?
-    return DependentMemberType::get(base, Ctx.getIdentifier(member));
+
+    for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
+                                              /*ignoreNew=*/true)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
+        return DependentMemberType::get(base, assocType);
+    }
+
+    return Type();
   }
 
   Type createUnownedStorageType(Type base) {
@@ -422,7 +423,8 @@ public:
   Type createObjCClassType(StringRef name) {
     Identifier ident = Ctx.getIdentifier(name);
     auto typeDecl =
-      findForeignNominalTypeDecl(ident, Demangle::Node::Kind::Class);
+        findForeignNominalTypeDecl(ident, ForeignModuleKind::Imported,
+                                   Demangle::Node::Kind::Class);
     if (!typeDecl) return Type();
     return createNominalType(typeDecl, /*parent*/ Type());
   }
@@ -465,13 +467,21 @@ private:
   DeclContext *findDeclContext(const Demangle::NodePointer &node);
   ModuleDecl *findModule(const Demangle::NodePointer &node);
   Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
-  bool isForeignModule(const Demangle::NodePointer &node);
+
+  enum class ForeignModuleKind {
+    Imported,
+    SynthesizedByImporter
+  };
+
+  Optional<ForeignModuleKind>
+  getForeignModuleKind(const Demangle::NodePointer &node);
 
   NominalTypeDecl *findNominalTypeDecl(DeclContext *dc,
                                        Identifier name,
                                        Identifier privateDiscriminator,
                                        Demangle::Node::Kind kind);
   NominalTypeDecl *findForeignNominalTypeDecl(Identifier name,
+                                              ForeignModuleKind lookupKind,
                                               Demangle::Node::Kind kind);
 
   Type checkTypeRepr(TypeRepr *repr) {
@@ -561,14 +571,19 @@ RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
   return findModuleNode(child->getFirstChild());
 }
 
-bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
+Optional<RemoteASTTypeBuilder::ForeignModuleKind>
+RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
-    return isForeignModule(node->getFirstChild());
+    return getForeignModuleKind(node->getFirstChild());
 
   if (node->getKind() != Demangle::Node::Kind::Module)
-    return false;
+    return None;
 
-  return (node->getText() == "__ObjC");
+  return llvm::StringSwitch<Optional<ForeignModuleKind>>(node->getText())
+      .Case(MANGLING_MODULE_OBJC, ForeignModuleKind::Imported)
+      .Case(MANGLING_MODULE_CLANG_IMPORTER,
+            ForeignModuleKind::SynthesizedByImporter)
+      .Default(None);
 }
 
 DeclContext *
@@ -584,7 +599,8 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
   case Demangle::Node::Kind::Protocol:
-  case Demangle::Node::Kind::Structure: {
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::TypeAlias: {
     const auto &declNameNode = node->getChild(1);
 
     // Handle local declarations.
@@ -622,16 +638,20 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
     DeclContext *dc = findDeclContext(node->getChild(0));
     if (!dc) {
       // Do some backup logic for foreign type declarations.
-      if (privateDiscriminator.empty() &&
-          isForeignModule(node->getChild(0))) {
-        return findForeignNominalTypeDecl(name, node->getKind());
-      } else {
-        return nullptr;
+      if (privateDiscriminator.empty()) {
+        if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
+          return findForeignNominalTypeDecl(name, foreignModuleKind.getValue(),
+                                            node->getKind());
+        }
       }
+      return nullptr;
     }
 
     return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
   }
+
+  case Demangle::Node::Kind::Global:
+    return findDeclContext(node->getChild(0));
 
   // Bail out on other kinds of contexts.
   // TODO: extensions
@@ -674,6 +694,7 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
 
 NominalTypeDecl *
 RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
+                                                 ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
   auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
@@ -689,11 +710,9 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
 
     void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
       if (HadError) return;
-      auto typeDecl = getAcceptableNominalTypeCandidate(decl, ExpectedKind);
-      if (!typeDecl) return;
-      if (typeDecl == Result) return;
+      if (decl == Result) return;
       if (!Result) {
-        Result = typeDecl;
+        Result = cast<NominalTypeDecl>(decl);
       } else {
         HadError = true;
         Result = nullptr;
@@ -701,7 +720,36 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
     }
   } consumer(kind);
 
-  importer->lookupValue(name, consumer);
+  switch (foreignKind) {
+  case ForeignModuleKind::SynthesizedByImporter:
+    importer->lookupValue(name, consumer);
+    if (consumer.Result)
+      consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
+    break;
+  case ForeignModuleKind::Imported: {
+    ClangTypeKind lookupKind;
+    switch (kind) {
+    case Demangle::Node::Kind::Protocol:
+      lookupKind = ClangTypeKind::ObjCProtocol;
+      break;
+    case Demangle::Node::Kind::Class:
+      lookupKind = ClangTypeKind::ObjCClass;
+      break;
+    case Demangle::Node::Kind::TypeAlias:
+      lookupKind = ClangTypeKind::Typedef;
+      break;
+    case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Enum:
+      lookupKind = ClangTypeKind::Tag;
+      break;
+    default:
+      return nullptr;
+    }
+    importer->lookupTypeDecl(name.str(), lookupKind, [&](TypeDecl *found) {
+      consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
+    });
+  }
+  }
 
   return consumer.Result;
 }

@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/Config.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
@@ -128,6 +129,10 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
+    /// classes instead of the stable ABI's bit.
+    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
+
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
     /// This is enabled by default because SILGen can crash in such a case, but
@@ -194,11 +199,6 @@ namespace swift {
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
 
-    /// \brief Staging flag for class resilience, which we do not want to enable
-    /// fully until more code is in place, to allow the standard library to be
-    /// tested with value type resilience only.
-    bool EnableClassResilience = false;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -255,6 +255,9 @@ namespace swift {
     /// Whether to create and keep track of a libSyntax tree associated with
     /// this source file.
     bool KeepSyntaxInfoInSourceFile = false;
+
+    /// Whether to verify the parsed syntax tree and emit related diagnostics.
+    bool VerifySyntaxTree = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

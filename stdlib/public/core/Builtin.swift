@@ -360,7 +360,6 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
 // calls
-
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 internal var _objCTaggedPointerBits: UInt {

@@ -122,7 +122,7 @@ extension _ValidUTF8Buffer : BidirectionalCollection {
 }
 
 extension _ValidUTF8Buffer : RandomAccessCollection {
-  public typealias Indices = DefaultRandomAccessIndices<_ValidUTF8Buffer>
+  public typealias Indices = DefaultIndices<_ValidUTF8Buffer>
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)

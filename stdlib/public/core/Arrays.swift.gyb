@@ -1020,7 +1020,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
+extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -1945,7 +1945,7 @@ extension ${Self} {
 
     let oldCount = _buffer.count
     let eraseCount = subrange.count
-    let insertCount = numericCast(newElements.count) as Int
+    let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
     if _buffer.requestUniqueMutableBackingBuffer(

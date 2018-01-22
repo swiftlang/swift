@@ -9,6 +9,8 @@ enum Foo {
 if Foo.A == .B { }
 var aHash: Int = Foo.A.hashValue
 
+Foo.A == Foo.B // expected-warning {{result of operator '==' is unused}}
+
 enum Generic<T> {
   case A, B
 

@@ -226,7 +226,7 @@ public:
   /// Fixed-size types never need dynamic value witness table instantiation.
   void initializeMetadata(IRGenFunction &IGF,
                           llvm::Value *metadata,
-                          llvm::Value *vwtable,
+                          bool isVWTMutable,
                           SILType T) const override {}
 
   void collectArchetypeMetadata(

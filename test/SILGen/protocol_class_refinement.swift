@@ -25,7 +25,7 @@ extension ObjectUID {
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @_T025protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S25protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
@@ -37,8 +37,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
@@ -52,11 +51,10 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$S25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
 
@@ -71,10 +69,9 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
 
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @$S25protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
   // CHECK: end_borrow [[BORROWED_X1]] from [[X1]]
   // CHECK: destroy_value [[X1]]
@@ -84,7 +81,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_T025protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$S25protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
 func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>
@@ -96,8 +93,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
@@ -111,11 +107,10 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSivs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$S25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)

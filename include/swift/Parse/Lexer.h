@@ -126,13 +126,13 @@ class Lexer {
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::TriviaList LeadingTrivia;
+  syntax::Trivia LeadingTrivia;
 
   /// The current trailing trivia for the next token.
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::TriviaList TrailingTrivia;
+  syntax::Trivia TrailingTrivia;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -255,7 +255,7 @@ public:
       TokStart = Tok.getLoc();
     auto S = getStateForBeginningOfTokenLoc(TokStart);
     if (TriviaRetention == TriviaRetentionMode::WithTrivia)
-      S.LeadingTrivia = LeadingTrivia.Pieces;
+      S.LeadingTrivia = LeadingTrivia;
     return S;
   }
 
@@ -406,6 +406,7 @@ public:
     SourceLoc getEndLoc() {
       return Loc.getAdvancedLoc(Length);
     }
+
   };
   
   /// \brief Compute the bytes that the actual string literal should codegen to.
@@ -484,6 +485,7 @@ private:
   }
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
+  void formEscapedIdentifierToken(const char *TokStart);
 
   /// Advance to the end of the line.
   /// If EatNewLine is true, CurPtr will be at end of newline character.
@@ -503,7 +505,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::TriviaList &T, bool IsForTrailingTrivia);
+  void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,

@@ -511,6 +511,32 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 ///         myStorage.update(withValue: value)
 ///     }
 ///
+/// Use care when calling `isKnownUniquelyReferenced(_:)` from within a Boolean
+/// expression. In debug builds, an instance in the left-hand side of a `&&`
+/// or `||` expression may still be referenced when evaluating the right-hand
+/// side, inflating the instance's reference count. For example, this version
+/// of the `update(withValue)` method will re-copy `myStorage` on every call:
+///
+///     // Copies too frequently:
+///     mutating func badUpdate(withValue value: T) {
+///         if myStorage.shouldCopy || !isKnownUniquelyReferenced(&myStorage) {
+///             myStorage = self.copiedStorage()
+///         }
+///         myStorage.update(withValue: value)
+///     }
+///
+/// To avoid this behavior, swap the call `isKnownUniquelyReferenced(_:)` to
+/// the left-hand side or store the result of the first expression in a local
+/// constant:
+///
+///     mutating func goodUpdate(withValue value: T) {
+///         let shouldCopy = myStorage.shouldCopy
+///         if shouldCopy || !isKnownUniquelyReferenced(&myStorage) {
+///             myStorage = self.copiedStorage()
+///         }
+///         myStorage.update(withValue: value)
+///     }
+///
 /// `isKnownUniquelyReferenced(_:)` checks only for strong references to the
 /// given object---if `object` has additional weak or unowned references, the
 /// result may still be `true`. Because weak and unowned references cannot be

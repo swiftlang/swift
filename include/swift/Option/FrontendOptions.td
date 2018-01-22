@@ -442,10 +442,6 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
 
-def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
-   HelpText<"Compile the module to export resilient interfaces for all "
-            "public classes by default (doesn't work yet)">;
-
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 

@@ -3,6 +3,7 @@
   return x
 }
 
+@_fixed_layout
 public struct NoInlineInitStruct {
   @_versioned
   var x: Bool

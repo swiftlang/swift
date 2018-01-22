@@ -18,16 +18,16 @@
 import Typedefs
 import Lib
 
-// CHECK-SIL-LABEL: sil hidden @_T08typedefs11testSymbolsyyF
+// CHECK-SIL-LABEL: sil hidden @$S8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @_T03Lib1xs5Int32Vvau
+  // CHECK-SIL: function_ref @$S3Lib1xs5Int32Vvau
   _ = Lib.x
-  // CHECK-SIL: function_ref @_T03Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: function_ref @$S3Lib9usesAssocs5Int32VSgvau
   _ = Lib.usesAssoc
-} // CHECK-SIL: end sil function '_T08typedefs11testSymbolsyyF'
+} // CHECK-SIL: end sil function '$S8typedefs11testSymbolsyyF'
 
-// CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuilding4usery3Lib4UserC_tF
+// CHECK-IR-LABEL: define{{.*}} void @"$S8typedefs18testVTableBuilding4usery3Lib4UserC_tF
 public func testVTableBuilding(user: User) {
   // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
@@ -90,29 +90,6 @@ public class UserSub : User {} // expected-error {{cannot inherit from class 'Us
 import Typedefs
 
 prefix operator ***
-
-// CHECK-LABEL: extension WrappedInt : WrappedProto {
-// CHECK-NEXT: func wrappedMethod()
-// CHECK-NEXT: prefix static func *** (x: WrappedInt)
-// CHECK-NEXT: }
-// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
-extension WrappedInt: WrappedProto {
-  public func wrappedMethod() {}
-  public static prefix func ***(x: WrappedInt) {}
-}
-// CHECK-LABEL: extension Int32 : UnwrappedProto {
-// CHECK-NEXT: func unwrappedMethod()
-// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
-// CHECK-NEXT: }
-// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
-// CHECK-RECOVERY-NEXT: func unwrappedMethod()
-// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
-// CHECK-RECOVERY-NEXT: }
-// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
-extension UnwrappedInt: UnwrappedProto {
-  public func unwrappedMethod() {}
-  public static prefix func ***(x: UnwrappedInt) {}
-}
 
 // CHECK-LABEL: class User {
 // CHECK-RECOVERY-LABEL: class User {
@@ -396,5 +373,29 @@ public typealias UnwrappedAlias = UnwrappedInt
 
 public typealias ConstrainedWrapped<T: HasAssoc> = T where T.Assoc == WrappedInt
 public typealias ConstrainedUnwrapped<T: HasAssoc> = T where T.Assoc == UnwrappedInt
+
+// CHECK-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-NEXT: func unwrappedMethod()
+// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-RECOVERY-NEXT: func unwrappedMethod()
+// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
+// CHECK-RECOVERY-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
+extension UnwrappedInt: UnwrappedProto {
+  public func unwrappedMethod() {}
+  public static prefix func ***(x: UnwrappedInt) {}
+}
+
+// CHECK-LABEL: extension WrappedInt : WrappedProto {
+// CHECK-NEXT: func wrappedMethod()
+// CHECK-NEXT: prefix static func *** (x: WrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
+extension WrappedInt: WrappedProto {
+  public func wrappedMethod() {}
+  public static prefix func ***(x: WrappedInt) {}
+}
 
 #endif // TEST

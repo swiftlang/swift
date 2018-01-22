@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
-
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-testing
 @_inlineable struct TestInlineableStruct {}
 // expected-error@-1 {{'@_inlineable' attribute cannot be applied to this declaration}}
 
@@ -185,19 +186,48 @@ enum InternalEnum {
 
 // Inherited initializers - <rdar://problem/34398148>
 @_versioned
+@_fixed_layout
 class Base {
   @_versioned
   init(x: Int) {}
 }
 
 @_versioned
+@_fixed_layout
 class Middle : Base {}
 
 @_versioned
+@_fixed_layout
 class Derived : Middle {
   @_versioned
   @_inlineable
   init(y: Int) {
     super.init(x: y)
   }
+}
+
+// Stored property initializer expressions.
+//
+// Note the behavior here does not depend on the state of the -enable-resilience
+// flag; the test runs with both the flag on and off. Only the explicit
+// presence of a '@_fixed_layout' attribute determines the behavior here.
+
+let internalGlobal = 0
+// expected-note@-1 {{let 'internalGlobal' is not '@_versioned' or public}}
+public let publicGlobal = 0
+
+struct InternalStructWithInit {
+  var x = internalGlobal // OK
+  var y = publicGlobal // OK
+}
+
+public struct PublicResilientStructWithInit {
+  var x = internalGlobal // OK
+  var y = publicGlobal // OK
+}
+
+@_fixed_layout
+public struct PublicFixedStructWithInit {
+  var x = internalGlobal // expected-error {{let 'internalGlobal' is internal and cannot be referenced from a property initializer in a '@_fixed_layout' type}}
+  var y = publicGlobal // OK
 }

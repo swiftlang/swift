@@ -583,6 +583,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::Constructor;
   case DeclKind::Destructor:
     return CodeCompletionDeclKind::Destructor;
+  case DeclKind::Accessor:
   case DeclKind::Func: {
     auto DC = D->getDeclContext();
     auto FD = cast<FuncDecl>(D);
@@ -1546,9 +1547,14 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
     OneArg = (NonDefault == 0);
   }
 
-  if (OneArg)
-    if (auto Fn = funcType->getParams().back().getType()->getAs<AnyFunctionType>())
-      return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+  if (OneArg) {
+    auto param = funcType->getParams().back();
+    if (!param.isAutoClosure()) {
+      if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
+        return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+      }
+    }
+  }
 
   return false;
 }
@@ -1633,7 +1639,7 @@ private:
     Type In = AFT->getInput();
     if (!In)
       return;
-    if (isa<ParenType>(In.getPointer())) {
+    if (In->hasParenSugar()) {
       FoundFunctionsWithoutFirstKeyword = true;
       return;
     }
@@ -2886,7 +2892,7 @@ public:
 
         // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
-        if (FD->isAccessor())
+        if (isa<AccessorDecl>(FD))
           return;
 
         // Do we want compound function names here?
@@ -2955,7 +2961,7 @@ public:
 
         // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
-        if (FD->isAccessor())
+        if (isa<AccessorDecl>(FD))
           return;
 
         // Do we want compound function names here?
@@ -3696,7 +3702,7 @@ public:
     }
 
     void unboxType(Type T) {
-      if (isa<ParenType>(T.getPointer())) {
+      if (T->hasParenSugar()) {
         unboxType(T->getDesugaredType());
       } else if (T->is<TupleType>()) {
         for (auto Ele : T->getAs<TupleType>()->getElements()) {
@@ -4298,7 +4304,7 @@ public:
         return;
 
       // We cannot override individual accessors.
-      if (FD->isAccessor())
+      if (isa<AccessorDecl>(FD))
         return;
 
       if (hasFuncIntroducer || (!hasIntroducer && !hasInitializerModifier))
@@ -5508,6 +5514,11 @@ void PrintingCodeCompletionConsumer::handleResults(
     llvm::raw_svector_ostream NameOs(Name);
     Result->getCompletionString()->getName(NameOs);
     OS << "; name=" << Name;
+
+    StringRef comment = Result->getBriefDocComment();
+    if (IncludeComments && !comment.empty()) {
+      OS << "; comment=" << comment;
+    }
 
     OS << "\n";
   }

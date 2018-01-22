@@ -50,7 +50,6 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
     OS << "willSet:" << ASD->getFullName() ;
     return false;
 
-  case AccessorKind::NotAccessor:
   case AccessorKind::IsMaterializeForSet:
   case AccessorKind::IsAddressor:
   case AccessorKind::IsMutableAddressor:
@@ -62,10 +61,10 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
 
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   if (!D->hasName() && !isa<ParamDecl>(D)) {
-    auto *FD = dyn_cast<FuncDecl>(D);
-    if (!FD || FD->getAccessorKind() == AccessorKind::NotAccessor)
+    auto *FD = dyn_cast<AccessorDecl>(D);
+    if (!FD)
       return true;
-    return printArtificialName(FD->getAccessorStorageDecl(), FD->getAccessorKind(), OS);
+    return printArtificialName(FD->getStorage(), FD->getAccessorKind(), OS);
   }
 
   OS << D->getFullName();
@@ -179,7 +178,6 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   }
 
   bool getPseudoAccessorNameAndUSR(AbstractStorageDecl *D, AccessorKind AK, StringRef &Name, StringRef &USR) {
-    assert(AK != AccessorKind::NotAccessor);
     assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
     DeclAccessorPair key(D, static_cast<int>(AK));
     auto &result = accessorNameAndUSRCache[key];
@@ -256,9 +254,9 @@ private:
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
-    if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       auto *Parent = getParentDecl();
-      if (FD->isAccessor() && Parent && Parent != FD->getAccessorStorageDecl())
+      if (Parent && Parent != AD->getStorage())
         return false; // already handled as part of the var decl.
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {

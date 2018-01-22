@@ -65,6 +65,16 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
+/// Which bits in the class metadata are used to distinguish Swift classes
+/// from ObjC classes?
+#ifndef SWIFT_CLASS_IS_SWIFT_MASK
+# if __APPLE__ && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+# else
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+# endif
+#endif
+
 // We try to avoid global constructors in the runtime as much as possible.
 // These macros delimit allowed global ctors.
 #if __clang__
@@ -237,6 +247,18 @@
 #define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
+#endif
+
+// These are temporary macros during the +0 cc exploration to cleanly support
+// both +0 and +1 in the runtime.
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+#define SWIFT_NS_RELEASES_ARGUMENT NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...) do { __VA_ARGS__ ; } while (0)
+#define SWIFT_CC_PLUSZERO_GUARD(...)
+#else
+#define SWIFT_NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...)
+#define SWIFT_CC_PLUSZERO_GUARD(...)  do { __VA_ARGS__ ; } while (0)
 #endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H

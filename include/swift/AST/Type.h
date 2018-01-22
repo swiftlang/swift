@@ -25,6 +25,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Compiler.h"
 #include <functional>
 #include <string>
 
@@ -536,7 +537,9 @@ template <class X> inline CanTypeWrapper<X> cast_or_null(CanType type) {
   return CanTypeWrapper<X>(cast_or_null<X>(type.getPointer()));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast(CanType type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast_or_null(CanType type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
@@ -554,7 +557,9 @@ inline CanTypeWrapper<X> cast(CanTypeWrapper<P> type) {
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast(CanTypeWrapper<P> type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {

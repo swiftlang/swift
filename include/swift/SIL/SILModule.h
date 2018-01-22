@@ -42,6 +42,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -220,7 +221,10 @@ private:
   /// constructed. In certain cases this was before all Modules had been loaded
   /// causing us to not
   std::unique_ptr<SerializedSILLoader> SILLoader;
-  
+
+  /// The indexed profile data to be used for PGO, or nullptr.
+  std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
+
   /// True if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
@@ -449,20 +453,6 @@ public:
   using coverage_map_const_iterator = CoverageMapListType::const_iterator;
   CoverageMapListType &getCoverageMapList() { return coverageMaps; }
   const CoverageMapListType &getCoverageMapList() const { return coverageMaps; }
-  coverage_map_iterator coverage_map_begin() { return coverageMaps.begin(); }
-  coverage_map_iterator coverage_map_end() { return coverageMaps.end(); }
-  coverage_map_const_iterator coverage_map_begin() const {
-    return coverageMaps.begin();
-  }
-  coverage_map_const_iterator coverage_map_end() const {
-    return coverageMaps.end();
-  }
-  iterator_range<coverage_map_iterator> getCoverageMaps() {
-    return {coverageMaps.begin(), coverageMaps.end()};
-  }
-  iterator_range<coverage_map_const_iterator> getCoverageMaps() const {
-    return {coverageMaps.begin(), coverageMaps.end()};
-  }
 
   llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
@@ -624,6 +614,12 @@ public:
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
+  }
+
+  llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
+
+  void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
+    PGOReader = std::move(IPR);
   }
 
   /// \brief Run the SIL verifier to make sure that all Functions follow

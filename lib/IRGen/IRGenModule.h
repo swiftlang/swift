@@ -110,6 +110,7 @@ namespace irgen {
   class EnumMetadataLayout;
   class ExplosionSchema;
   class FixedTypeInfo;
+  class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
   class HeapLayout;
@@ -283,6 +284,10 @@ public:
   /// they are externally visible.
   void emitGlobalTopLevel();
 
+  /// Emit references to each of the protocol descriptors defined in this
+  /// IR module.
+  void emitSwiftProtocols();
+
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
@@ -413,6 +418,9 @@ public:
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
+  /// Is the current target using the Darwin pre-stable ABI's class marker bit?
+  bool UseDarwinPreStableABIBit = true;
+
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
@@ -426,6 +434,10 @@ public:
   union {
     llvm::IntegerType *Int32Ty;          /// i32
     llvm::IntegerType *RelativeAddressTy;
+  };
+  union {
+    llvm::PointerType *Int32PtrTy;            /// i32 *
+    llvm::PointerType *RelativeAddressPtrTy;
   };
   llvm::IntegerType *Int64Ty;          /// i64
   union {
@@ -482,8 +494,10 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
-  llvm::StructType *ProtocolConformanceRecordTy;
-  llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::StructType *ProtocolRecordTy;
+  llvm::PointerType *ProtocolRecordPtrTy;
+  llvm::StructType *ProtocolConformanceDescriptorTy;
+  llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
   llvm::PointerType *NominalTypeDescriptorPtrTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
@@ -664,10 +678,12 @@ public:
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
-  NominalMetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  MetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  NominalMetadataLayout &getNominalMetadataLayout(NominalTypeDecl *decl);
   StructMetadataLayout &getMetadataLayout(StructDecl *decl);
-  ClassMetadataLayout &getMetadataLayout(ClassDecl *decl);
+  ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
+  ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
 private:
   TypeConverter &Types;
@@ -706,12 +722,13 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
-  void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
+  llvm::Constant *emitSwiftProtocols();
   llvm::Constant *emitProtocolConformances();
+  void addProtocolConformance(const NormalProtocolConformance *conformance);
   llvm::Constant *emitTypeMetadataRecords();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
@@ -818,8 +835,10 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
+  /// List of non-ObjC protocols described by this module.
+  SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate records for.
-  SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
+  SmallVector<const NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
@@ -1008,7 +1027,7 @@ public:
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
-
+  void emitProtocolConformance(const NormalProtocolConformance *conformance);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
@@ -1024,8 +1043,15 @@ public:
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
 
-  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
-                               ForDefinition_t forDefinition);
+  /// Cast the given constant to i8*.
+  llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
+
+  llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
+                                         ForDefinition_t forDefinition);
+
+  llvm::Function *emitDispatchThunk(SILDeclRef declRef);
+
+  Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
@@ -1061,6 +1087,9 @@ public:
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                               ConstantInit definition =
                                                 ConstantInit());
+  llvm::Constant *getAddrOfProtocolConformanceDescriptor(
+                                  const NormalProtocolConformance *conformance,
+                                  ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
@@ -1068,6 +1097,7 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);

@@ -71,15 +71,30 @@ extension String {
 ///     // numericPrefix is the substring "126"
 ///
 /// When you need to store a substring or pass it to a function that requires a
-/// `String` instance, convert it using the `String.init(_:)` initializer.
+/// `String` instance, you can convert it to a `String` by using the
+/// `String(_:)` initializer. Calling this initializer copies the contents of
+/// the substring to a new string.
 ///
-///     _ = Int(numericPrefix, radix: 10)
+///     func parseAndAddOne(_ s: String) -> Int {
+///         return Int(s, radix: 10)! + 1
+///     }
+///     _ = parseAndAddOne(numericPrefix)
 ///     // error: cannot convert value...
-///     let prefix = Int(String(numericPrefix), radix: 10)
-///     // prefix == 126
+///     let incrementedPrefix = parseAndAddOne(String(numericPrefix))
+///     // incrementedPrefix == 127
 ///
-/// Calling this initializer copies the contents of the substring to a new
-/// string.
+/// Alternatively, you can convert the function that takes a `String` to one
+/// that is generic over the `StringProtocol` protocol. The following code
+/// declares a generic version of the `parseAndAddOne(_:)` function:
+///
+///     func genericParseAndAddOne<S: StringProtocol>(_ s: S) -> Int {
+///         return Int(s, radix: 10)! + 1
+///     }
+///     let genericallyIncremented = genericParseAndAddOne(numericPrefix)
+///     // genericallyIncremented == 127
+///
+/// You can call this generic function with an instance of either `String` or
+/// `Substring`.
 ///
 /// - Important: Don't store substrings longer than you need them to perform a
 ///   specific operation. A substring holds a reference to the entire storage

@@ -6,12 +6,12 @@ enum HasAnyCase {
   case any(_: Any)
 }
 
-// CHECK-LABEL: sil hidden @_T023argument_shuffle_swift31g1xyyp_tF : $@convention(thin) (@in Any) -> () {
+// CHECK-LABEL: sil hidden @$S23argument_shuffle_swift31g1xyyp_tF : $@convention(thin) (@in Any) -> () {
 func g(x: Any) {
-  // CHECK: [[FN:%.*]] = function_ref @_T023argument_shuffle_swift32fnyyypF : $@convention(thin) (@in Any) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$S23argument_shuffle_swift32fnyyypF : $@convention(thin) (@in Any) -> ()
   // CHECK: apply [[FN:%.*]]({{.*}}) : $@convention(thin) (@in Any) -> ()
   fn(data: 123)
-  // CHECK: [[FN:%.*]] = function_ref @_T023argument_shuffle_swift32fnyyypF : $@convention(thin) (@in Any) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$S23argument_shuffle_swift32fnyyypF : $@convention(thin) (@in Any) -> ()
   // CHECK: apply [[FN:%.*]]({{.*}}) : $@convention(thin) (@in Any) -> ()
   fn(data: x)
 

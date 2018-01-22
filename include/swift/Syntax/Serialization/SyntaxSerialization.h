@@ -40,13 +40,8 @@ struct ScalarEnumerationTraits<syntax::SourcePresence> {
 template <>
 struct ScalarEnumerationTraits<tok> {
   static void enumeration(Output &out, tok &value) {
-#define EXPAND(Str, Case) \
-    out.enumCase(value, Str, Case);
-#define LITERAL(X) EXPAND(#X, tok::X)
-#define MISC(X) EXPAND(#X, tok::X)
-#define KEYWORD(X) EXPAND("kw_" #X, tok::kw_##X)
-#define PUNCTUATOR(X, Y) EXPAND(#X, tok::X)
-#define POUND_KEYWORD(X) EXPAND("pound_" #X, tok::pound_##X)
+#define TOKEN(name) \
+    out.enumCase(value, #name, tok::name);
 #include "swift/Syntax/TokenKinds.def"
   }
 };
@@ -61,23 +56,27 @@ struct ScalarEnumerationTraits<tok> {
 template<>
 struct ObjectTraits<syntax::TriviaPiece> {
   static void mapping(Output &out, syntax::TriviaPiece &value) {
-    out.mapRequired("kind", value.Kind);
-    switch (value.Kind) {
+    auto kind = value.getKind();
+    out.mapRequired("kind", kind);
+    switch (kind) {
       case syntax::TriviaKind::Space:
       case syntax::TriviaKind::Tab:
       case syntax::TriviaKind::VerticalTab:
       case syntax::TriviaKind::Formfeed:
       case syntax::TriviaKind::Newline:
       case syntax::TriviaKind::CarriageReturn:
-      case syntax::TriviaKind::Backtick:
-        out.mapRequired("value", value.Count);
+      case syntax::TriviaKind::CarriageReturnLineFeed:
+      case syntax::TriviaKind::Backtick: {
+        auto count = value.getCount();
+        out.mapRequired("value", count);
         break;
+      }
       case syntax::TriviaKind::LineComment:
       case syntax::TriviaKind::BlockComment:
       case syntax::TriviaKind::DocLineComment:
       case syntax::TriviaKind::DocBlockComment:
       case syntax::TriviaKind::GarbageText: {
-        auto text = value.Text.str();
+        auto text = value.getText();
         out.mapRequired("value", text);
         break;
       }
@@ -95,6 +94,7 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
     out.enumCase(value, "Formfeed", syntax::TriviaKind::Formfeed);
     out.enumCase(value, "Newline", syntax::TriviaKind::Newline);
     out.enumCase(value, "CarriageReturn", syntax::TriviaKind::CarriageReturn);
+    out.enumCase(value, "CarriageReturnLineFeed", syntax::TriviaKind::CarriageReturnLineFeed);
     out.enumCase(value, "LineComment", syntax::TriviaKind::LineComment);
     out.enumCase(value, "BlockComment", syntax::TriviaKind::BlockComment);
     out.enumCase(value, "DocLineComment", syntax::TriviaKind::DocLineComment);
@@ -107,13 +107,25 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
 /// Serialization traits for Trivia.
 /// Trivia will serialize as an array of the underlying TriviaPieces.
 template<>
-struct ArrayTraits<syntax::Trivia> {
-  static size_t size(Output &out, syntax::Trivia &seq) {
-    return seq.Pieces.size();
+struct ArrayTraits<ArrayRef<syntax::TriviaPiece>> {
+  static size_t size(Output &out, ArrayRef<syntax::TriviaPiece> &seq) {
+    return seq.size();
   }
-  static syntax::TriviaPiece& element(Output &out, syntax::Trivia &seq,
-                                      size_t index) {
-    return seq.Pieces[index];
+  static syntax::TriviaPiece &
+  element(Output &out, ArrayRef<syntax::TriviaPiece> &seq, size_t index) {
+    return const_cast<syntax::TriviaPiece &>(seq[index]);
+  }
+};
+
+/// Serialization traits for RawSyntax list.
+template<>
+struct ArrayTraits<ArrayRef<RC<syntax::RawSyntax>>> {
+  static size_t size(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq) {
+    return seq.size();
+  }
+  static RC<syntax::RawSyntax> &
+  element(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq, size_t index) {
+    return const_cast<RC<syntax::RawSyntax> &>(seq[index]);
   }
 };
 
@@ -140,6 +152,7 @@ struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
     switch (value.Kind) {
+      case tok::contextual_keyword:
       case tok::integer_literal:
       case tok::floating_literal:
       case tok::string_literal:
@@ -152,6 +165,7 @@ struct ObjectTraits<TokenDescription> {
       case tok::oper_prefix:
       case tok::dollarident:
       case tok::comment:
+      case tok::string_segment:
         out.mapRequired("text", value.Text);
         break;
       default:
@@ -182,32 +196,25 @@ struct ObjectTraits<TokenDescription> {
 template<>
 struct ObjectTraits<RC<syntax::RawSyntax>> {
   static void mapping(Output &out, RC<syntax::RawSyntax> &value) {
-    auto kind = value->Kind;
-    switch (kind) {
-    case syntax::SyntaxKind::Token: {
-      auto Tok = cast<syntax::RawTokenSyntax>(value);
-      auto tokenKind = Tok->getTokenKind();
-      auto text = Tok->getText();
+    if (value->isToken()) {
+      auto tokenKind = value->getTokenKind();
+      auto text = value->getTokenText();
       auto description = TokenDescription { tokenKind, text };
       out.mapRequired("tokenKind", description);
 
-      auto leadingTrivia = Tok->LeadingTrivia;
+      auto leadingTrivia = value->getLeadingTrivia();
       out.mapRequired("leadingTrivia", leadingTrivia);
 
-      auto trailingTrivia = Tok->TrailingTrivia;
+      auto trailingTrivia = value->getTrailingTrivia();
       out.mapRequired("trailingTrivia", trailingTrivia);
-      break;
-    }
-    default: {
+    } else {
+      auto kind = value->getKind();
       out.mapRequired("kind", kind);
 
-      auto layout = value->Layout;
+      auto layout = value->getLayout();
       out.mapRequired("layout", layout);
-
-      break;
     }
-    }
-    auto presence = value->Presence;
+    auto presence = value->getPresence();
     out.mapRequired("presence", presence);
   }
 };

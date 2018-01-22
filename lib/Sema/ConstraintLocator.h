@@ -127,6 +127,8 @@ public:
     ConditionalRequirement,
     /// A single requirement placed on the type parameters.
     TypeParameterRequirement,
+    /// \brief Locator for a binding from an IUO disjunction choice.
+    ImplicitlyUnwrappedDisjunctionChoice,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -159,6 +161,7 @@ public:
     case Requirement:
     case Witness:
     case OpenedGeneric:
+    case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 
     case GenericArgument:
@@ -221,6 +224,7 @@ public:
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
+    case ImplicitlyUnwrappedDisjunctionChoice:
       return 0;
 
     case FunctionArgument:

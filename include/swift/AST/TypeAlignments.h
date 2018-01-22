@@ -52,7 +52,7 @@ namespace swift {
 
   /// We frequently use three tag bits on all of these types.
   constexpr size_t DeclAlignInBits = 3;
-  constexpr size_t DeclContextAlignInBits = 4;
+  constexpr size_t DeclContextAlignInBits = 3;
   constexpr size_t ExprAlignInBits = 3;
   constexpr size_t StmtAlignInBits = 3;
   constexpr size_t TypeAlignInBits = 3;

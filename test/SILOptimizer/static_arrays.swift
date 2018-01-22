@@ -8,13 +8,6 @@
 
 // Check if the optimizer is able to convert array literals to statically initialized arrays.
 
-// CHECK-LABEL: sil_global private @{{.*}}main{{.*}} = {
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 100
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 101
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 102
-// CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}}, {{[^,]*}})
-// CHECK-NEXT:  }
-
 // CHECK-LABEL: outlined variable #0 of arrayLookup(_:)
 // CHECK-NEXT:  sil_global private @{{.*}}arrayLookup{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 10
@@ -57,11 +50,10 @@
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: outlined variable #0 of overwriteLiteral(_:)
-// CHECK-NEXT:  sil_global private @{{.*}}overwriteLiteral{{.*}} = {
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 1
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 2
-// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 3
+// CHECK-LABEL: sil_global private @{{.*}}main{{.*}} = {
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 100
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 101
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 102
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
@@ -120,18 +112,6 @@ public func storeArray() {
   gg = [227, 228]
 }
 
-// CHECK-LABEL: sil {{.*}}overwriteLiteral{{.*}} : $@convention(thin) (Int) -> @owned Array<Int> {
-// CHECK:   global_value @{{.*}}overwriteLiteral{{.*}}
-// CHECK:   is_unique
-// CHECK:   store
-// CHECK:   return
-@inline(never)
-func overwriteLiteral(_ x: Int) -> [Int] {
-  var a = [ 1, 2, 3 ]
-  a[x] = 0
-  return a
-}
-
 struct Empty { }
 
 // CHECK-LABEL: sil {{.*}}arrayWithEmptyElements{{.*}} : $@convention(thin) () -> @owned Array<Empty> {
@@ -155,7 +135,33 @@ print(gg!)
 storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
-// CHECK-OUTPUT-NEXT: [0, 2, 3]
-print(overwriteLiteral(0))
-// CHECK-OUTPUT-NEXT: [1, 0, 3]
-print(overwriteLiteral(1))
+
+
+
+
+
+
+public class SwiftClass {}
+
+@inline(never)
+func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
+  print(ptr, len)  // Use the arguments somehow so they don't get removed.
+}
+
+// This should be a single basic block, and the array should end up being stack
+// allocated.
+//
+// CHECK-LABEL: sil @{{.*}}passArrayOfClasses
+// CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
+// CHECK-NOT: bb1(
+// CHECK: alloc_ref {{.*}}[tail_elems $SwiftClass *
+// CHECK-NOT: bb1(
+// CHECK:   return
+public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
+  let arr = [a, b, c]
+  takeUnsafePointer(ptr: arr, len: arr.count)
+}
+
+
+
+

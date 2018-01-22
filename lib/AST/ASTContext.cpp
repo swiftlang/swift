@@ -194,8 +194,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
-  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
+  /// func _combineHashValues(Int, Int) -> Int
+  FuncDecl *CombineHashValuesDecl = nullptr;
 
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
@@ -651,14 +651,6 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
   llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
-static EnumElementDecl *findEnumElement(EnumDecl *e, Identifier name) {
-  for (auto elt : e->getAllElements()) {
-    if (elt->getName() == name)
-      return elt;
-  }
-  return nullptr;
-}
-
 EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
   switch (kind) {
   case OTK_Optional:
@@ -685,27 +677,27 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!Impl.OptionalSomeDecl)
-    Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), Id_some);
+    Impl.OptionalSomeDecl = getOptionalDecl()->getUniqueElement(/*hasVal*/true);
   return Impl.OptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
-    Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), Id_none);
+    Impl.OptionalNoneDecl =getOptionalDecl()->getUniqueElement(/*hasVal*/false);
   return Impl.OptionalNoneDecl;
 }
 
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
     Impl.ImplicitlyUnwrappedOptionalSomeDecl =
-      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_some);
+      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/true);
   return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
     Impl.ImplicitlyUnwrappedOptionalNoneDecl =
-      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_none);
+      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/false);
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
@@ -1048,9 +1040,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
-  if (Impl.MixForSynthesizedHashValueDecl)
-    return Impl.MixForSynthesizedHashValueDecl;
+FuncDecl *ASTContext::getCombineHashValuesDecl() const {
+  if (Impl.CombineHashValuesDecl)
+    return Impl.CombineHashValuesDecl;
 
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
@@ -1066,8 +1058,8 @@ FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
   };
 
   auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_mixForSynthesizedHashValue", resolver, callback);
-  Impl.MixForSynthesizedHashValueDecl = decl;
+      *this, "_combineHashValues", resolver, callback);
+  Impl.CombineHashValuesDecl = decl;
   return decl;
 }
 
@@ -2234,32 +2226,33 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   if (isa<DestructorDecl>(member))
     return { 2 + member->isImplicit(), member->getFullName() };
 
-  auto func = cast<FuncDecl>(member);
-  switch (func->getAccessorKind()) {
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsDidSet:
-  case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsWillSet:
-    llvm_unreachable("Not an Objective-C entry point");
+  if (auto accessor = dyn_cast<AccessorDecl>(member)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::IsWillSet:
+      llvm_unreachable("Not an Objective-C entry point");
 
-  case AccessorKind::IsGetter:
-    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
-      return { 5, var->getFullName() };
+    case AccessorKind::IsGetter:
+      if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
+        return { 5, var->getFullName() };
 
-    return { 6, Identifier() };
+      return { 6, Identifier() };
 
-  case AccessorKind::IsSetter:
-    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
-      return { 7, var->getFullName() };
-    return { 8, Identifier() };
+    case AccessorKind::IsSetter:
+      if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
+        return { 7, var->getFullName() };
+      return { 8, Identifier() };
+    }
 
-  case AccessorKind::NotAccessor:
-    // Normal method.
-    return { 4, func->getFullName() };
+    llvm_unreachable("Unhandled AccessorKind in switch.");
   }
 
-  llvm_unreachable("Unhandled AccessorKind in switch.");
+  // Normal method.
+  auto func = cast<FuncDecl>(member);
+  return { 4, func->getFullName() };
 }
 
 bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
@@ -2603,9 +2596,8 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
                      ->getDeclaredInterfaceType());
     const ValueDecl *overriddenDecl = overriddenMethod;
     if (overriddenMethod->isImplicit())
-      if (auto func = dyn_cast<FuncDecl>(overriddenMethod))
-        if (auto storage = func->getAccessorStorageDecl())
-          overriddenDecl = storage;
+      if (auto accessor = dyn_cast<AccessorDecl>(overriddenMethod))
+        overriddenDecl = accessor->getStorage();
     Diags.diagnose(overriddenDecl, diag::objc_declared_here,
                    overriddenDiagInfo.first, overriddenDiagInfo.second);
 
@@ -2646,13 +2638,8 @@ static void removeValidObjCConflictingMethods(
                                  if (method->isInvalid())
                                    return true;
 
-                                 if (auto func = dyn_cast<FuncDecl>(method)) {
-                                   if (func->isAccessor()) {
-                                     return func->getAccessorStorageDecl()
-                                             ->isInvalid();
-                                   }
-
-                                   return false;
+                                 if (auto ad = dyn_cast<AccessorDecl>(method)) {
+                                   return ad->getStorage()->isInvalid();
                                  } 
                                  
                                  if (auto ctor 
@@ -2770,9 +2757,8 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
       const ValueDecl *originalDecl = originalMethod;
       if (originalMethod->isImplicit())
-        if (auto func = dyn_cast<FuncDecl>(originalMethod))
-          if (auto storage = func->getAccessorStorageDecl())
-            originalDecl = storage;
+        if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
+          originalDecl = accessor->getStorage();
 
       if (diagInfo == origDiagInfo) {
         Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
@@ -2872,28 +2858,19 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    selector,
                    protocolName);
 
-    /// Local function to determine if the given declaration is an accessor.
-    auto isAccessor = [](ValueDecl *decl) -> bool {
-      if (auto func = dyn_cast<FuncDecl>(decl))
-        return func->isAccessor();
-
-      return false;
-    };
-
     // Fix the name of the witness, if we can.
     if (req->getFullName() != conflicts[0]->getFullName() &&
         req->getKind() == conflicts[0]->getKind() &&
-        isAccessor(req) == isAccessor(conflicts[0])) {
+        isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
       // They're of the same kind: fix the name.
       unsigned kind;
       if (isa<ConstructorDecl>(req))
         kind = 1;
-      else if (auto func = dyn_cast<FuncDecl>(req)) {
-        if (func->isAccessor())
-          kind = isa<SubscriptDecl>(func->getAccessorStorageDecl()) ? 3 : 2;
-        else
-          kind = 0;
-      } else {
+      else if (auto accessor = dyn_cast<AccessorDecl>(req))
+        kind = isa<SubscriptDecl>(accessor->getStorage()) ? 3 : 2;
+      else if (isa<FuncDecl>(req))
+        kind = 0;
+      else {
         llvm_unreachable("unhandled @objc declaration kind");
       }
 
@@ -3243,9 +3220,8 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    ArrayRef<Type> genericArgs,
                                    const ASTContext *context,
                                    RecursiveTypeProperties properties)
-  : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent)
-{
+    : NominalOrBoundGenericNominalType(theDecl, parent, theKind, context,
+                                       properties) {
   Bits.BoundGenericType.GenericArgCount = genericArgs.size();
   // Subtypes are required to provide storage for the generic arguments
   std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
@@ -3942,6 +3918,13 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              && "interface type of result should not contain error types");
       assert(!getErrorResult().getType()->hasArchetype()
              && "interface type of result should not contain context archetypes");
+    }
+  }
+  for (auto result : getResults()) {
+    (void)result;
+    if (auto *FnType = result.getType()->getAs<SILFunctionType>()) {
+      assert(!FnType->isNoEscape() &&
+             "Cannot return an @noescape function type");
     }
   }
 #endif

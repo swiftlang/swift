@@ -39,7 +39,7 @@ public:
 private:
   explicit LexerState(SourceLoc Loc) : Loc(Loc) {}
   SourceLoc Loc;
-  llvm::Optional<syntax::TriviaList> LeadingTrivia;
+  llvm::Optional<syntax::Trivia> LeadingTrivia;
   friend class Lexer;
 };
 

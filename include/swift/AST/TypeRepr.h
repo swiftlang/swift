@@ -49,6 +49,9 @@ class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(TypeRepr, bitmax(NumTypeReprKindBits,8)+1+1,
     /// The subclass of TypeRepr that this is.
     Kind : bitmax(NumTypeReprKindBits,8),
@@ -63,19 +66,32 @@ class alignas(8) TypeRepr {
     Warned : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+32,
     /// Whether this tuple has '...' and its position.
     HasEllipsis : 1,
     : NumPadBits,
     /// The number of elements contained.
-    NumElements : 16
+    NumElements : 32
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(TypeRepr);
-    SWIFT_INLINE_BITS(TupleTypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, TypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, IdentTypeRepr);
+
+  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, ComponentIdentTypeRepr, 32,
+    : NumPadBits,
+    NumGenericArgs : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CompoundIdentTypeRepr, IdentTypeRepr, 32,
+    : NumPadBits,
+    NumComponents : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
+    : NumPadBits,
+    NumTypes : 32
+  );
+
   } Bits;
 
   TypeRepr(TypeReprKind K) {
@@ -321,24 +337,37 @@ private:
 /// \code
 ///   Bar<Gen>
 /// \endcode
-class GenericIdentTypeRepr : public ComponentIdentTypeRepr {
-  ArrayRef<TypeRepr*> GenericArgs;
+class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
+    private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+  friend TrailingObjects;
   SourceRange AngleBrackets;
 
-public:
   GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
                        ArrayRef<TypeRepr*> GenericArgs,
                        SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-      GenericArgs(GenericArgs), AngleBrackets(AngleBrackets) {
+      AngleBrackets(AngleBrackets) {
+    Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
     assert(!GenericArgs.empty());
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
       assert(arg != nullptr);
 #endif
+    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                            getTrailingObjects<TypeRepr*>());
   }
 
-  ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
+public:
+  static GenericIdentTypeRepr *create(const ASTContext &C,
+                                      SourceLoc Loc,
+                                      Identifier Id,
+                                      ArrayRef<TypeRepr*> GenericArgs,
+                                      SourceRange AngleBrackets);
+
+  ArrayRef<TypeRepr*> getGenericArgs() const {
+    return {getTrailingObjects<TypeRepr*>(),
+            Bits.GenericIdentTypeRepr.NumGenericArgs};
+  }
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
   static bool classof(const TypeRepr *T) {
@@ -356,15 +385,27 @@ private:
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
-class CompoundIdentTypeRepr : public IdentTypeRepr {
-public:
-  const ArrayRef<ComponentIdentTypeRepr *> Components;
+class CompoundIdentTypeRepr final : public IdentTypeRepr,
+    private llvm::TrailingObjects<CompoundIdentTypeRepr,
+                                  ComponentIdentTypeRepr *> {
+  friend TrailingObjects;
 
-  explicit CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
-    : IdentTypeRepr(TypeReprKind::CompoundIdent),
-      Components(Components) {
+  CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
+      : IdentTypeRepr(TypeReprKind::CompoundIdent) {
+    Bits.CompoundIdentTypeRepr.NumComponents = Components.size();
     assert(Components.size() > 1 &&
            "should have just used the single ComponentIdentTypeRepr directly");
+    std::uninitialized_copy(Components.begin(), Components.end(),
+                            getTrailingObjects<ComponentIdentTypeRepr*>());
+  }
+
+public:
+  static CompoundIdentTypeRepr *create(const ASTContext &Ctx,
+                                  ArrayRef<ComponentIdentTypeRepr*> Components);
+
+  ArrayRef<ComponentIdentTypeRepr*> getComponents() const {
+    return {getTrailingObjects<ComponentIdentTypeRepr*>(),
+            Bits.CompoundIdentTypeRepr.NumComponents};
   }
 
   static bool classof(const TypeRepr *T) {
@@ -373,9 +414,15 @@ public:
   static bool classof(const CompoundIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Components.front()->getStartLoc();}
-  SourceLoc getEndLocImpl() const { return Components.back()->getEndLoc(); }
-  SourceLoc getLocImpl() const { return Components.back()->getLoc(); }
+  SourceLoc getStartLocImpl() const {
+    return getComponents().front()->getStartLoc();
+  }
+  SourceLoc getEndLocImpl() const {
+    return getComponents().back()->getEndLoc();
+  }
+  SourceLoc getLocImpl() const {
+    return getComponents().back()->getLoc();
+  }
 
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
@@ -394,13 +441,13 @@ public:
   iterator begin() const {
     if (isa<ComponentIdentTypeRepr>(IdT))
       return reinterpret_cast<iterator>(&IdT);
-    return cast<CompoundIdentTypeRepr>(IdT)->Components.begin();
+    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().begin();
   }
 
   iterator end() const {
     if (isa<ComponentIdentTypeRepr>(IdT))
       return reinterpret_cast<iterator>(&IdT) + 1;
-    return cast<CompoundIdentTypeRepr>(IdT)->Components.end();
+    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().end();
   }
 
   bool empty() const { return begin() == end(); }
@@ -737,24 +784,30 @@ private:
 /// \code
 ///   Foo & Bar
 /// \endcode
-class CompositionTypeRepr : public TypeRepr {
-  ArrayRef<TypeRepr *> Types;
+class CompositionTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
+  friend TrailingObjects;
   SourceLoc FirstTypeLoc;
   SourceRange CompositionRange;
 
-public:
   CompositionTypeRepr(ArrayRef<TypeRepr *> Types,
                       SourceLoc FirstTypeLoc,
                       SourceRange CompositionRange)
-    : TypeRepr(TypeReprKind::Composition), Types(Types),
-    FirstTypeLoc(FirstTypeLoc), CompositionRange(CompositionRange) {
+      : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
+        CompositionRange(CompositionRange) {
+    Bits.CompositionTypeRepr.NumTypes = Types.size();
+    std::uninitialized_copy(Types.begin(), Types.end(),
+                            getTrailingObjects<TypeRepr*>());
   }
 
-  ArrayRef<TypeRepr *> getTypes() const { return Types; }
+public:
+  ArrayRef<TypeRepr *> getTypes() const {
+    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+  }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
-  static CompositionTypeRepr *create(ASTContext &C,
+  static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
                                      SourceRange CompositionRange);

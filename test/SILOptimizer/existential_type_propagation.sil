@@ -227,7 +227,7 @@ sil_witness_table hidden X: P module nix {
 
 
 sil_vtable ArrayClassReaderWriter {
-  #ArrayClassReaderWriter.init!initializer.1: _TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_
+  #ArrayClassReaderWriter.init!initializer.1: @_TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_
 }
 
 sil_witness_table public_external ArrayClassReaderWriter: ReaderWriterType module main {

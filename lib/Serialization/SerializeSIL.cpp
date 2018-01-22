@@ -64,6 +64,7 @@ toStableConstStringEncoding(ConstStringLiteralInst::Encoding encoding) {
 static unsigned toStableSILLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
+  case SILLinkage::PublicNonABI: return SIL_LINKAGE_PUBLIC_NON_ABI;
   case SILLinkage::Hidden: return SIL_LINKAGE_HIDDEN;
   case SILLinkage::Shared: return SIL_LINKAGE_SHARED;
   case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
@@ -278,7 +279,7 @@ void SILSerializer::addMandatorySILFunction(const SILFunction *F,
 
   // Function body should be serialized unless it is a KeepAsPublic function
   // (which is typically a pre-specialization).
-  if (!emitDeclarationsForOnoneSupport && !F->isKeepAsPublic())
+  if (!emitDeclarationsForOnoneSupport)
     Worklist.push_back(F);
 }
 
@@ -351,19 +352,6 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   SILLinkage Linkage = F.getLinkage();
-
-  // We serialize shared_external linkage as shared since:
-  //
-  // 1. shared_external linkage is just a hack to tell the optimizer that a
-  // shared function was deserialized.
-  //
-  // 2. We cannot just serialize a declaration to a shared_external function
-  // since shared_external functions still have linkonce_odr linkage at the LLVM
-  // level. This means they must be defined not just declared.
-  //
-  // TODO: When serialization is reworked, this should be removed.
-  if (hasSharedVisibility(Linkage))
-    Linkage = SILLinkage::Shared;
 
   // Check if we need to emit a body for this function.
   bool NoBody = DeclOnly || isAvailableExternally(Linkage) ||
@@ -1112,6 +1100,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::LoadUnownedInst:
   case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::CopyBlockInst:

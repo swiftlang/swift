@@ -13,6 +13,7 @@
 #ifndef SWIFT_SYNTAX_PARSING_CONTEXT_H
 #define SWIFT_SYNTAX_PARSING_CONTEXT_H
 
+#include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -21,10 +22,10 @@ namespace swift {
 class SourceLoc;
 class SourceFile;
 class Token;
+class DiagnosticEngine;
 
 namespace syntax {
-struct RawTokenSyntax;
-struct RawSyntax;
+class RawSyntax;
 enum class SyntaxKind;
 
 enum class SyntaxContextKind {
@@ -35,6 +36,8 @@ enum class SyntaxContextKind {
   Pattern,
   Syntax,
 };
+
+constexpr size_t SyntaxAlignInBits = 3;
 
 /// Indicates what action should be performed on the destruction of
 ///  SyntaxParsingContext
@@ -60,6 +63,29 @@ enum class AccumulationMode {
   NotSet,
 };
 
+/// The shared data for all syntax parsing contexts with the same root.
+/// This should be accessible from the root context only.
+struct alignas(1 << SyntaxAlignInBits) RootContextData {
+  // The source file under parsing.
+  SourceFile &SF;
+
+  // Where to issue diagnostics.
+  DiagnosticEngine &Diags;
+
+  SourceManager &SourceMgr;
+
+  unsigned BufferID;
+
+  // Storage for Collected parts.
+  std::vector<RC<RawSyntax>> Storage;
+
+  RootContextData(SourceFile &SF,
+                  DiagnosticEngine &Diags,
+                  SourceManager &SourceMgr,
+                  unsigned BufferID): SF(SF), Diags(Diags),
+                    SourceMgr(SourceMgr), BufferID(BufferID) {}
+};
+
 /// RAII object which receive RawSyntax parts. On destruction, this constructs
 /// a specified syntax node from received parts and propagate it to the parent
 /// context.
@@ -75,15 +101,19 @@ enum class AccumulationMode {
 ///     // Now the context holds { '(' Expr ')' }.
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
-class SyntaxParsingContext {
-  // Parent context. Only the root context has nullptr.
-  SyntaxParsingContext *Parent;
+class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
+  // When this context is a root, this points to an instance of RootContextData;
+  // When this context isn't a root, this points to the parent context.
+  const llvm::PointerUnion<RootContextData *, SyntaxParsingContext *>
+      RootDataOrParent;
 
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
 
-  // Collected parts.
-  std::vector<RC<RawSyntax>> Parts;
+  std::vector<RC<RawSyntax>> &Storage;
+
+  // Offet for 'Storage' this context owns from.
+  const size_t Offset;
 
   // Operation on destruction.
   AccumulationMode Mode = AccumulationMode::NotSet;
@@ -94,8 +124,6 @@ class SyntaxParsingContext {
     SyntaxKind SynKind;
     // For AccumulationMode::CoerceKind; desired syntax node category.
     SyntaxContextKind CtxtKind;
-    // For AccumulationMode::Root; the parsing source file.
-    SourceFile *SF;
   };
 
   // If false, context does nothing.
@@ -105,14 +133,20 @@ class SyntaxParsingContext {
   /// replace those parts with the single result.
   void createNodeInPlace(SyntaxKind Kind, size_t N);
 
+  ArrayRef<RC<RawSyntax>> getParts() const {
+    return makeArrayRef(Storage).drop_front(Offset);
+  }
+
 public:
   /// Construct root context.
-  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF);
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
+    DiagnosticEngine &Diags, SourceManager &SourceMgr, unsigned BufferID);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
-      : Parent(CtxtHolder), CtxtHolder(CtxtHolder),
-        Enabled(Parent->isEnabled()) {
+      : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
+        Storage(CtxtHolder->Storage), Offset(Storage.size()),
+        Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     CtxtHolder = this;
@@ -132,8 +166,16 @@ public:
 
   void disable() { Enabled = false; }
   bool isEnabled() const { return Enabled; }
-  bool isRoot() const { return !Parent; }
+  bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
+
+  SyntaxParsingContext *getParent() {
+    return RootDataOrParent.get<SyntaxParsingContext*>();
+  }
+
+  RootContextData &getRootData() {
+    return *getRoot()->RootDataOrParent.get<RootContextData*>();
+  }
 
   SyntaxParsingContext *getRoot();
 
@@ -146,24 +188,22 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(Syntax Node);
 
-  RC<RawSyntax> popBack() {
-    auto Raw = std::move(Parts.back());
-    Parts.pop_back();
-    return Raw;
-  }
-
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
-    if (auto Node = make<Syntax>(Parts.back()).getAs<SyntaxNode>()) {
-      Parts.pop_back();
+    assert(Storage.size() > Offset);
+    if (auto Node = make<Syntax>(Storage.back()).getAs<SyntaxNode>()) {
+      Storage.pop_back();
       return Node;
     }
     return None;
   }
 
   TokenSyntax popToken() {
-    assert(Parts.back()->Kind == SyntaxKind::Token);
-    return make<TokenSyntax>(popBack());
+    assert(Storage.size() > Offset);
+    assert(Storage.back()->getKind() == SyntaxKind::Token);
+    auto Node = make<TokenSyntax>(std::move(Storage.back()));
+    Storage.pop_back();
+    return Node;
   }
 
   /// Create a node using the tail of the collected parts. The number of parts
@@ -197,6 +237,12 @@ public:
 
   /// Discard collected parts on this context.
   void setDiscard() { Mode = AccumulationMode::Discard; }
+
+  /// Explicitly finalizing syntax tree creation.
+  /// This function will be called during the destroying of a root syntax
+  /// parsing context. However, we can explicitly call this function to get
+  /// the syntax tree before closing the root context.
+  void finalizeRoot();
 
 };
 

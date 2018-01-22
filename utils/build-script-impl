@@ -83,6 +83,7 @@ KNOWN_SETTINGS=(
     swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
+    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
@@ -1832,6 +1833,20 @@ function set_lldb_xcodebuild_options() {
             "${lldb_xcodebuild_options[@]}"
             DEBUGSERVER_USE_FROM_SYSTEM="1"
         )
+    fi
+    if [[ "${ENABLE_ASAN}" ]] ; then
+	lldb_xcodebuild_options=(
+	    "${lldb_xcodebuild_options[@]}"
+	    ENABLE_ADDRESS_SANITIZER="YES"
+	    -enableAddressSanitizer=YES
+	)
+    fi
+    if [[ "${ENABLE_UBSAN}" ]] ; then
+	lldb_xcodebuild_options=(
+	    "${lldb_xcodebuild_options[@]}"
+	    ENABLE_UNDEFINED_BEHAVIOR_SANITIZER="YES"
+	    -enableUndefinedBehaviorSanitizer=YES
+	)
     fi
 }
 

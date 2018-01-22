@@ -243,9 +243,8 @@ private:
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
         continue;
-      if (auto FD = dyn_cast<FuncDecl>(VD))
-        if (FD->isAccessor())
-          continue;
+      if (isa<AccessorDecl>(VD))
+        continue;
       if (!AllowDelayed && delayedMembers.count(VD)) {
         os << "// '" << VD->getFullName() << "' below\n";
         continue;
@@ -299,6 +298,25 @@ private:
       }
     }
     if (includeQuotes) os << '"';
+  }
+
+  // For a given Decl and Type, if the type is not an optional return
+  // the type and OTK_None as the optionality. If the type is
+  // optional, return the underlying object type, and an optionality
+  // that is based on the type but overridden by the
+  // ImplicitlyUnwrappedOptionalAttr on the decl.
+  static std::pair<Type, OptionalTypeKind>
+  getObjectTypeAndOptionality(const Decl *D, Type ty) {
+    OptionalTypeKind kind;
+    if (auto objTy =
+            ty->getReferenceStorageReferent()->getAnyOptionalObjectType(kind)) {
+      if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        kind = OTK_ImplicitlyUnwrappedOptional;
+
+      return {objTy, kind};
+    }
+
+    return {ty, OTK_None};
   }
 
   // Ignore other declarations.
@@ -434,7 +452,11 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getInterfaceType(), OTK_None, Identifier(), IsFunctionParam);
+      OptionalTypeKind kind;
+      Type objTy;
+      std::tie(objTy, kind) =
+          getObjectTypeAndOptionality(param, param->getInterfaceType());
+      print(objTy, kind, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -541,10 +563,12 @@ private:
                          NullabilityPrintKind::ContextSensitive);
       } else {
         auto func = cast<FuncDecl>(AFD);
-        OptionalTypeKind optionalKind;
-        (void)func->getResultInterfaceType()
-            ->getAnyOptionalObjectType(optionalKind);
-        printNullability(optionalKind,
+        OptionalTypeKind kind;
+        Type objTy;
+        std::tie(objTy, kind) =
+          getObjectTypeAndOptionality(func, func->getResultInterfaceType());
+
+        printNullability(kind,
                          NullabilityPrintKind::ContextSensitive);
       }
 
@@ -555,7 +579,10 @@ private:
     } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
       os << "NSUInteger";
     } else {
-      print(resultTy, OTK_None);
+      OptionalTypeKind kind;
+      Type objTy;
+      std::tie(objTy, kind) = getObjectTypeAndOptionality(AFD, resultTy);
+      print(objTy, kind);
     }
 
     os << ")";
@@ -668,9 +695,8 @@ private:
       printAvailability(AFD);
     }
 
-    if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->isAccessor()) {
-      printSwift3ObjCDeprecatedInference(
-                              cast<FuncDecl>(AFD)->getAccessorStorageDecl());
+    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+      printSwift3ObjCDeprecatedInference(accessor->getStorage());
     } else {
       printSwift3ObjCDeprecatedInference(AFD);
     }
@@ -704,8 +730,12 @@ private:
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
-    visitPart(resultTy, OTK_None);
-    
+
+    OptionalTypeKind kind;
+    Type objTy;
+    std::tie(objTy, kind) = getObjectTypeAndOptionality(FD, resultTy);
+    visitPart(objTy, kind);
+
     assert(FD->getAttrs().hasAttribute<CDeclAttr>()
            && "not a cdecl function");
     
@@ -716,10 +746,13 @@ private:
     if (params->size()) {
       interleave(*params,
                  [&](const ParamDecl *param) {
-                   print(param->getInterfaceType(), OTK_None, param->getName(),
-                         IsFunctionParam);
+                   OptionalTypeKind kind;
+                   Type objTy;
+                   std::tie(objTy, kind) = getObjectTypeAndOptionality(
+                       param, param->getInterfaceType());
+                   print(objTy, kind, param->getName(), IsFunctionParam);
                  },
-                 [&]{ os << ", "; });
+                 [&] { os << ", "; });
     } else {
       os << "void";
     }
@@ -1005,6 +1038,7 @@ private:
       OptionalTypeKind optionalType;
       if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
+
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
         if (nominal == ctx.getArrayDecl() ||
@@ -1076,7 +1110,10 @@ private:
       if (hasReservedName)
         os << "_";
     } else {
-      print(ty, OTK_None, objCName);
+      OptionalTypeKind kind;
+      Type objTy;
+      std::tie(objTy, kind) = getObjectTypeAndOptionality(VD, ty);
+      print(objTy, kind, objCName);
     }
 
     printSwift3ObjCDeprecatedInference(VD);
@@ -1824,11 +1861,6 @@ private:
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDictionaryType(DictionaryType *DT, 
-                           Optional<OptionalTypeKind> optionalKind) {
-    visitPart(DT->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitDynamicSelfType(DynamicSelfType *DST, 
                             Optional<OptionalTypeKind> optionalKind) {
     printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
@@ -1961,10 +1993,6 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     visit(sugar->getSinglyDesugaredType());
   }
 
-  void visitDictionaryType(DictionaryType *DT) {
-    visit(DT->getSinglyDesugaredType());
-  }
-
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
     auto layout = composition->getExistentialLayout();
     if (layout.superclass)
@@ -2034,7 +2062,7 @@ using SmallSetVector =
 template <typename T>
 struct PointerLikeComparator {
   using Traits = llvm::PointerLikeTypeTraits<T>;
-  bool operator()(T lhs, T rhs) {
+  bool operator()(T lhs, T rhs) const {
     return std::less<void*>()(Traits::getAsVoidPointer(lhs),
                               Traits::getAsVoidPointer(rhs));
   }

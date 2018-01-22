@@ -163,16 +163,27 @@ private:
   DemanglerPrinter Printer;
   DemangleOptions Options;
   bool SpecializationPrefixPrinted = false;
+  bool isValid = true;
 
 public:
   NodePrinter(DemangleOptions options) : Options(options) {}
   
   std::string printRoot(NodePointer root) {
+    isValid = true;
     print(root);
-    return std::move(Printer).str();
+    if (isValid)
+      return std::move(Printer).str();
+    return "";
   }
 
-private:  
+private:
+  /// Called when the node tree in valid.
+  ///
+  /// The demangler already catches most error cases and mostly produces valid
+  /// node trees. But some cases are difficult to catch in the demangler and
+  /// instead the NodePrinter bails.
+  void setInvalid() { isValid = false; }
+
   void printChildren(Node::iterator begin,
                      Node::iterator end,
                      const char *sep = nullptr) {
@@ -296,6 +307,7 @@ private:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
+    case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
@@ -376,6 +388,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::ProtocolConformance:
+    case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
@@ -553,7 +566,10 @@ private:
 
   void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
                                bool showTypes) {
-    assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
+    if (ParameterType->getKind() != Node::Kind::ArgumentTuple) {
+      setInvalid();
+      return;
+    }
 
     NodePointer Parameters = ParameterType->getFirstChild();
     assert(Parameters->getKind() == Node::Kind::Type);
@@ -609,7 +625,10 @@ private:
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+    if (node->getNumChildren() != 2 && node->getNumChildren() != 3) {
+      setInvalid();
+      return;
+    }
     unsigned startIndex = 0;
     if (node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation)
       startIndex = 1;
@@ -1025,7 +1044,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     print(Type);
 
-    if (auto isVariadic = getChildIf(Node, Node::Kind::VariadicMarker))
+    if (getChildIf(Node, Node::Kind::VariadicMarker))
       Printer << "...";
     return nullptr;
   }
@@ -1355,6 +1374,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "metaclass for ";
     print(Node->getFirstChild());
     return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptor:
+    Printer << "protocol conformance descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
     print(Node->getChild(0));
@@ -1395,6 +1418,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::CoroutineContinuationPrototype:
+    Printer << "coroutine continuation prototype for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ValueWitness:
@@ -1925,6 +1952,10 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = getChildIf(Entity, Node::Kind::Type);
     assert(type && "malformed entity");
+    if (!type) {
+      setInvalid();
+      return nullptr;
+    }
     type = type->getChild(0);
     if (TypePr == TypePrinting::FunctionStyle) {
       // We expect to see a function type here, but if we don't, use the colon.

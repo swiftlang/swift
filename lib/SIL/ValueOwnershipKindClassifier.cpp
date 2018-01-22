@@ -62,6 +62,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, AllocStack)
 CONSTANT_OWNERSHIP_INST(Trivial, BeginAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(Trivial, ClassMethod)
+CONSTANT_OWNERSHIP_INST(Trivial, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, FloatLiteral)
@@ -367,6 +368,9 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
+// This returns a value at +1 that is destroyed strictly /after/ the
+// UnsafeGuaranteedEnd. This provides the guarantee that we want.
+CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
@@ -443,6 +447,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromNativeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToBridgeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReferenceFromBridgeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CastBitPatternFromBridgeObject)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, BridgeToRawPointer)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, BridgeFromRawPointer)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReference)
@@ -535,18 +540,6 @@ UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT
-
-ValueOwnershipKind
-ValueOwnershipKindBuiltinVisitor::visitUnsafeGuaranteed(BuiltinInst *BI,
-                                                        StringRef Attr) {
-  assert(!BI->getType().isTrivial(BI->getModule()) &&
-         "Only non trivial types can have non trivial ownership");
-  auto Kind = BI->getArguments()[0].getOwnershipKind();
-  assert((Kind == ValueOwnershipKind::Owned ||
-          Kind == ValueOwnershipKind::Guaranteed) &&
-         "Invalid ownership kind for unsafe guaranteed?!");
-  return Kind;
-}
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {

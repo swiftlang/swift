@@ -38,7 +38,7 @@
       ]
     },
     {
-      key.kind: source.lang.swift.stmt.brace,
+      key.kind: source.lang.swift.expr.closure,
       key.offset: 57,
       key.length: 24,
       key.nameoffset: 0,
@@ -47,15 +47,26 @@
       key.bodylength: 22,
       key.substructure: [
         {
-          key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.private,
-          key.name: "MyCoolClass",
-          key.offset: 59,
-          key.length: 22,
-          key.nameoffset: 65,
-          key.namelength: 11,
-          key.bodyoffset: 78,
-          key.bodylength: 2
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 57,
+          key.length: 24,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 58,
+          key.bodylength: 22,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.class,
+              key.accessibility: source.lang.swift.accessibility.private,
+              key.name: "MyCoolClass",
+              key.offset: 59,
+              key.length: 22,
+              key.nameoffset: 65,
+              key.namelength: 11,
+              key.bodyoffset: 78,
+              key.bodylength: 2
+            }
+          ]
         }
       ]
     }

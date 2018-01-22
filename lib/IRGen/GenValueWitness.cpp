@@ -1063,16 +1063,27 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
 /// Emit a value-witness table for the given type, which is assumed to
 /// be non-dependent.
 llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
-                                             CanType abstractType) {
+                                             CanType abstractType,
+                                             bool isPattern) {
   // We shouldn't emit global value witness tables for generic type instances.
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
+
+  // We should never be making a pattern if the layout isn't fixed.
+  // The reverse can be true for types whose layout depends on
+  // resilient types.
+  assert((!isPattern || hasDependentValueWitnessTable(IGM, abstractType)) &&
+         "emitting VWT pattern for fixed-layout type");
 
   ConstantInitBuilder builder(IGM);
   auto witnesses = builder.beginArray(IGM.Int8PtrTy);
 
   bool canBeConstant = false;
   addValueWitnessesForAbstractType(IGM, witnesses, abstractType, canBeConstant);
+
+  // If this is just an instantiation pattern, we should never be modifying
+  // it in-place.
+  if (isPattern) canBeConstant = true;
 
   auto addr = IGM.getAddrOfValueWitnessTable(abstractType,
                                              witnesses.finishAndCreateFuture());
@@ -1161,25 +1172,6 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
 
   PrivateFixedLayouts.insert({key, layout});
   return layout;
-}
-
-/// Emit the elements of a dependent value witness table template into a
-/// vector.
-void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
-                                                  ConstantStructBuilder &B,
-                                                  CanType abstractType) {
-  // We shouldn't emit global value witness tables for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting VWT for generic instance");
-
-  // We shouldn't emit global value witness tables for fixed-layout types.
-  assert(hasDependentValueWitnessTable(IGM, abstractType) &&
-         "emitting VWT pattern for fixed-layout type");
-
-  bool canBeConstant = false;
-  auto witnesses = B.beginArray(IGM.Int8PtrTy);
-  addValueWitnessesForAbstractType(IGM, witnesses, abstractType, canBeConstant);
-  witnesses.finishAndAddTo(B);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {

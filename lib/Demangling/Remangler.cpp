@@ -626,6 +626,11 @@ void Remangler::mangleConstructor(Node *node) {
   mangleAnyConstructor(node, 'c');
 }
 
+void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TC";
+}
+
 void Remangler::mangleDeallocator(Node *node) {
   mangleChildNodes(node);
   Buffer << "fD";
@@ -1333,7 +1338,7 @@ void Remangler::mangleModule(Node *node) {
     Buffer << 's';
   } else if (node->getText() == MANGLING_MODULE_OBJC) {
     Buffer << "So";
-  } else if (node->getText() == MANGLING_MODULE_C) {
+  } else if (node->getText() == MANGLING_MODULE_CLANG_IMPORTER) {
     Buffer << "SC";
   } else {
     mangleIdentifier(node);
@@ -1448,6 +1453,11 @@ void Remangler::mangleProtocolConformance(Node *node) {
 void Remangler::mangleProtocolDescriptor(Node *node) {
   manglePureProtocol(getSingleChild(node));
   Buffer << "Mp";
+}
+
+void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
+  mangleProtocolConformance(node->getChild(0));
+  Buffer << "Mc";
 }
 
 void Remangler::mangleProtocolList(Node *node, Node *superclass,

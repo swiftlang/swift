@@ -166,7 +166,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   auto typeBytes = reinterpret_cast<const char *>(type);
   auto genericArgs = reinterpret_cast<const Metadata * const *>(
-               typeBytes + sizeof(void*) * description->GenericParams.Offset);
+      typeBytes + sizeof(void*) * description->GenericParams.getOffset(type));
 
   return _applyGenericArguments(genericArgs, description, node,
                                 description->GenericParams.NestingDepth,
@@ -190,9 +190,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName(objcWrapper->getObjCClassObject());
     
-    // ObjC classes mangle as being in the magic "__ObjC" module.
-    auto module = Dem.createNode(Node::Kind::Module, "__ObjC");
-    
+    auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     auto node = Dem.createNode(Node::Kind::Class);
     node->addChild(module, Dem);
     node->addChild(Dem.createNode(Node::Kind::Identifier,
@@ -243,16 +241,21 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         continue;
       }
 
-      // FIXME: We have to dig through a ridiculous number of nodes to get
-      // to the Protocol node here.
-      protocolNode = protocolNode->getChild(0); // Global -> TypeMangling
-      protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
-      protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
-      protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
-      protocolNode = protocolNode->getChild(0); // TypeList -> Type
-      
-      assert(protocolNode->getKind() == Node::Kind::Type);
-      assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+      // Dig out the protocol node.
+      // Global -> (Protocol|TypeMangling)
+      protocolNode = protocolNode->getChild(0);
+      if (protocolNode->getKind() == Node::Kind::TypeMangling) {
+        protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+        protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+        protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+        protocolNode = protocolNode->getChild(0); // TypeList -> Type
+
+        assert(protocolNode->getKind() == Node::Kind::Type);
+        assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+      } else {
+        assert(protocolNode->getKind() == Node::Kind::Protocol);
+      }
+
       type_list->addChild(protocolNode, Dem);
     }
 

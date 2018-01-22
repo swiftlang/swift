@@ -58,7 +58,7 @@ namespace swift {
   
   namespace syntax {
     class AbsolutePosition;
-    struct RawTokenSyntax;
+    class RawSyntax;
     enum class SyntaxKind;
     class TypeSyntax;
   }// end of syntax namespace
@@ -355,6 +355,13 @@ public:
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
+
+  /// Calling this function to finalize libSyntax tree creation without destroying
+  /// the parser instance.
+  void finalizeSyntaxTree() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    SyntaxContext->finalizeRoot();
+  }
 
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
@@ -710,11 +717,6 @@ public:
   /// Options that control the parsing of declarations.
   typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
 
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
-
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
@@ -836,12 +838,12 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
-    FuncDecl *Get = nullptr;
-    FuncDecl *Set = nullptr;
-    FuncDecl *Addressor = nullptr;
-    FuncDecl *MutableAddressor = nullptr;
-    FuncDecl *WillSet = nullptr;
-    FuncDecl *DidSet = nullptr;
+    AccessorDecl *Get = nullptr;
+    AccessorDecl *Set = nullptr;
+    AccessorDecl *Addressor = nullptr;
+    AccessorDecl *MutableAddressor = nullptr;
+    AccessorDecl *WillSet = nullptr;
+    AccessorDecl *DidSet = nullptr;
 
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
@@ -857,6 +859,7 @@ public:
                        ParameterList *Indices,
                        TypeLoc ElementTy,
                        ParsedAccessors &accessors,
+                       AbstractStorageDecl *storage,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
@@ -865,6 +868,7 @@ public:
                    ParameterList *Indices,
                    TypeLoc ElementTy,
                    ParsedAccessors &accessors,
+                   AbstractStorageDecl *storage,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
@@ -930,9 +934,9 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
-  SyntaxParserResult<syntax::TypeSyntax, CompositionTypeRepr> parseAnyType();
+  ParserResult<CompositionTypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          const TypeAttributes &attrs,
                                          Optional<Scope> &GenericsScope);
@@ -1177,6 +1181,10 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
+  ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
+                                   SmallVectorImpl<Expr*> &Exprs,
+                                   Token EntireTok);
+
   /// Parse an argument label `identifier ':'`, if it exists.
   ///
   /// \param name The parsed name of the label (empty if it doesn't exist, or is
@@ -1295,6 +1303,10 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
+  ParserStatus
+  parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
+                            Diag<> DefaultID, StmtKind ParentKind,
+                            StringRef &BindingKindStr);
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
@@ -1423,7 +1435,7 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+std::vector<std::pair<RC<syntax::RawSyntax>,
                                  syntax::AbsolutePosition>>
 tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,

@@ -210,22 +210,18 @@ template <typename Synthesizer>
 static ValueDecl *deriveProperty(TypeChecker &tc, Decl *parentDecl,
                                  EnumDecl *enumDecl, Type type, Identifier name,
                                  const Synthesizer &synthesizer) {
-  // Define the getter.
-  auto *getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                  type, type,
-                                                  /*isStatic=*/false,
-                                                  /*isFinal=*/false);
-
-  // Synthesize the body.
-  synthesizer(getterDecl);
-
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl, name, type, type,
-                                     getterDecl, /*isStatic=*/false,
-                                     /*isFinal=*/false);
+    = declareDerivedProperty(tc, parentDecl, enumDecl, name, type, type,
+                             /*isStatic=*/false, /*isFinal=*/false);
+
+  // Define the getter.
+  auto *getterDecl = addGetterToReadOnlyDerivedProperty(tc, propDecl, type);
+
+  // Synthesize the body.
+  synthesizer(getterDecl);
 
   auto *dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
@@ -468,7 +464,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
   } else if (name == C.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
     auto intType = C.getIntDecl()->getDeclaredType();
-    auto optionalIntType = OptionalType::get(OTK_Optional, intType);
+    auto optionalIntType = OptionalType::get(intType);
 
     auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
       if (rawType && rawType->isEqual(intType)) {

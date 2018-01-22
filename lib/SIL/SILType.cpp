@@ -119,6 +119,10 @@ bool SILType::isPointerSizeAndAligned() {
 // struct {A, B, C} -> struct {A, B} is castable
 // struct { struct {A, B}, C} -> struct {A, B} is castable
 // struct { A, B, C} -> struct { struct {A, B}, C} is NOT castable
+//
+// FIXME: This is unnecessarily conservative given the current ABI
+// (TypeLayout.rst). It would be simpler to flatten both `from` and `to` types,
+// exploding all structs and tuples, then trivially check if `to` is a prefix.
 static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
                                 SILType toType, SILModule &M) {
   auto fromRange = fromStruct->getStoredProperties();
@@ -127,7 +131,7 @@ static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
 
   // Can the first element of fromStruct be cast by value into toType?
   SILType fromEltTy = fromType.getFieldType(*fromRange.begin(), M);
-  if (SILType::canUnsafeCastValue(fromEltTy, toType, M))
+  if (SILType::canPerformABICompatibleUnsafeCastValue(fromEltTy, toType, M))
     return true;
   
   // Otherwise, flatten one level of struct elements on each side.
@@ -145,7 +149,7 @@ static bool canUnsafeCastStruct(SILType fromType, StructDecl *fromStruct,
       
     SILType fromEltTy = fromType.getFieldType(*fromI, M);
     SILType toEltTy = toType.getFieldType(*toI, M);
-    if (!SILType::canUnsafeCastValue(fromEltTy, toEltTy, M))
+    if (!SILType::canPerformABICompatibleUnsafeCastValue(fromEltTy, toEltTy, M))
       return false;
   }
   // fromType's overlapping elements are compatible.
@@ -158,8 +162,9 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
                                SILType toType, SILModule &M) {
   unsigned numFromElts = fromTupleTy->getNumElements();
   // Can the first element of fromTupleTy be cast by value into toType?
-  if (numFromElts != 0 && SILType::canUnsafeCastValue(
-        fromType.getTupleElementType(0), toType, M)) {
+  if (numFromElts != 0
+      && SILType::canPerformABICompatibleUnsafeCastValue(
+             fromType.getTupleElementType(0), toType, M)) {
     return true;
   }
   // Otherwise, flatten one level of tuple elements on each side.
@@ -172,8 +177,9 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
     return false;
 
   for (unsigned i = 0; i != numToElts; ++i) {
-    if (!SILType::canUnsafeCastValue(fromType.getTupleElementType(i),
-                                      toType.getTupleElementType(i), M)) {
+    if (!SILType::canPerformABICompatibleUnsafeCastValue(
+            fromType.getTupleElementType(i), toType.getTupleElementType(i),
+            M)) {
       return false;
     }
   }
@@ -217,7 +223,8 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
-    if (SILType::canUnsafeCastValue(fromElementTy, toElementTy, M))
+    if (SILType::canPerformABICompatibleUnsafeCastValue(fromElementTy,
+                                                        toElementTy, M))
       return true;
   }
   return false;
@@ -259,8 +266,9 @@ static bool canUnsafeCastScalars(SILType fromType, SILType toType,
   return LeastFromWidth >= GreatestToWidth;
 }
 
-bool SILType::canUnsafeCastValue(SILType fromType, SILType toType,
-                                 SILModule &M) {
+bool SILType::canPerformABICompatibleUnsafeCastValue(SILType fromType,
+                                                     SILType toType,
+                                                     SILModule &M) {
   if (fromType == toType)
     return true;
 

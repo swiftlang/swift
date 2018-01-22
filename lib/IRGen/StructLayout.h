@@ -406,12 +406,7 @@ enum class FieldAccess : uint8_t {
   
   /// Instance variable offsets are kept in fields in metadata, but
   /// the offsets of those fields within the metadata are constant.
-  ConstantIndirect,
-  
-  /// Instance variable offsets are kept in fields in metadata, and
-  /// the offsets of those fields within the metadata must be loaded
-  /// from "indirect offset" global variables.
-  NonConstantIndirect
+  ConstantIndirect
 };
 
 struct ClassLayout {

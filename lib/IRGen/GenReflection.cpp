@@ -227,6 +227,23 @@ protected:
     B.addRelativeAddress(mangledName);
   }
 
+  /// Add a 32-bit relative offset to a mangled nominal type string
+  /// in the typeref reflection section.
+  void addNominalRef(const NominalTypeDecl *nominal) {
+    IRGenMangler mangler;
+    std::string mangledStr;
+    if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+      mangledStr = mangler.mangleBareProtocol(proto);
+    } else {
+      CanType type = nominal->getDeclaredType()->getCanonicalType();
+      mangledStr =
+        mangler.mangleTypeForReflection(type, nominal->getModuleContext(),
+                                        /*isSingleFieldOfBox=*/false);
+    }
+    auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
+    B.addRelativeAddress(mangledName);
+  }
+
   llvm::GlobalVariable *emit(Optional<LinkEntity> entity,
                              const char *section) {
     layout();
@@ -279,9 +296,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto *M = IGM.getSILModule().getSwiftModule();
 
     addTypeRef(M, Nominal->getDeclaredType()->getCanonicalType());
-
-    auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
-    addTypeRef(M, ProtoTy->getCanonicalType());
+    addNominalRef(Conformance->getProtocol());
 
     B.addInt32(AssociatedTypes.size());
     B.addInt32(AssociatedTypeRecordSize);
@@ -422,8 +437,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       return;
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
-    auto type = NTD->getDeclaredType()->getCanonicalType();
-    addTypeRef(NTD->getModuleContext(), type);
+    addNominalRef(NTD);
 
     auto *CD = dyn_cast<ClassDecl>(NTD);
     if (CD && CD->getSuperclass()) {

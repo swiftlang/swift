@@ -48,6 +48,9 @@ template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
+    // The protocol conformance descriptor gets added first.
+    asDerived().addProtocolConformanceDescriptor();
+
     // Associated types get added after the inherited conformances, but
     // before all the function requirements.
     bool haveAddedAssociatedTypes = false;
@@ -136,10 +139,12 @@ public:
     asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
-  void visitFuncDecl(FuncDecl *func) {
+  void visitAccessorDecl(AccessorDecl *func) {
     // Accessors are emitted by visitAbstractStorageDecl, above.
-    if (func->isAccessor())
-      return;
+  }
+
+  void visitFuncDecl(FuncDecl *func) {
+    assert(!isa<AccessorDecl>(func));
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 

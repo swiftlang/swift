@@ -838,8 +838,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
             KeyPathComponentHeader::forClassComponentWithUnresolvedIndirectOffset();
           fields.addInt32(header.getData());
           fields.addAlignmentPadding(getPointerAlignment());
-          auto offsetVar = getAddrOfFieldOffset(property, /*indirect*/ false,
-                                                NotForDefinition);
+          auto offsetVar = getAddrOfFieldOffset(property, NotForDefinition);
           fields.add(cast<llvm::Constant>(offsetVar.getAddress()));
           break;
         }
@@ -855,11 +854,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           fields.addInt32(fieldOffset.getValue());
           break;
         }
-        case FieldAccess::NonConstantIndirect:
-          // An offset that depends on the instance's generic parameterization,
-          // whose vtable offset is also unknown.
-          // TODO: This doesn't happen until class resilience is enabled.
-          llvm_unreachable("not implemented");
         }
         break;
       }
@@ -903,11 +897,11 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         } else {
           idKind = KeyPathComponentHeader::VTableOffset;
           auto dc = declRef.getDecl()->getDeclContext();
-          if (isa<ClassDecl>(dc)) {
+          if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
             auto overridden = declRef.getOverriddenVTableEntry();
             auto declaringClass =
               cast<ClassDecl>(overridden.getDecl()->getDeclContext());
-            auto &metadataLayout = getMetadataLayout(declaringClass);
+            auto &metadataLayout = getClassMetadataLayout(declaringClass);
             // FIXME: Resilience. We don't want vtable layout to be ABI, so this
             // should be encoded as a reference to the method dispatch thunk
             // instead.
@@ -954,8 +948,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
               getClassFieldIndex(*this,
                            SILType::getPrimitiveAddressType(baseTy), property));
             break;
-          case FieldAccess::NonConstantIndirect:
-            llvm_unreachable("not implemented");
           }
           
         } else {

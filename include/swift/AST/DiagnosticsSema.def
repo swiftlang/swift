@@ -613,6 +613,12 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
+WARNING(deprecated_redecl_by_optionality, none,
+        "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
+        (DeclName, Type, Type))
+NOTE(deprecated_redecl_by_optionality_note, none,
+     "overloading by kind of optional is deprecated and will be removed in a future release", ())
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,none,
@@ -3697,7 +3703,8 @@ ERROR(versioned_dynamic_not_supported,none,
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
   "an '@_inlineable' function|" \
-  "a default argument value}"
+  "a default argument value|" \
+  "a property initializer in a '@_fixed_layout' type}"
 
 ERROR(local_type_in_inlineable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
@@ -3715,15 +3722,6 @@ NOTE(resilience_decl_declared_here,
 
 NOTE(resilience_decl_declared_here_versioned,
      none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
-
-ERROR(designated_init_in_extension_resilient,none,
-      "initializer declared in an extension of "
-      "non-'@_fixed_layout' type %0 must delegate to another initializer", (Type))
-
-ERROR(designated_init_inlineable_resilient,none,
-      "initializer for non-'@_fixed_layout' type %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
-      "delegate to another initializer", (Type, unsigned))
 
 ERROR(class_designated_init_inlineable_resilient,none,
       "initializer for class %0 is "
@@ -3859,11 +3857,6 @@ WARNING(redundant_particular_literal_case,none,
         "consider removing it",())
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
-
-ERROR(cannot_prove_exhaustive_switch,none,
-      "analysis of uncovered switch statement is too complex to perform in a "
-      "reasonable amount of time; "
-      "insert a 'default' clause to cover this switch statement", ())
 
 // HACK: Downgrades the above to warnings if any of the cases is marked
 // @_downgrade_exhaustivity_check.

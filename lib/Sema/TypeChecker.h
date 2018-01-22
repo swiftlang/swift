@@ -2297,7 +2297,8 @@ public:
     Transparent,
     InlineAlways,
     Inlineable,
-    DefaultArgument
+    DefaultArgument,
+    PropertyInitializer
   };
 
   /// Given that \p DC is within a fragile context for some reason, describe
@@ -2394,7 +2395,7 @@ public:
   /// Emits a diagnostic for a reference to a storage accessor that is
   /// potentially unavailable.
   void diagnosePotentialAccessorUnavailability(
-      FuncDecl *Accessor, SourceRange ReferenceRange,
+      AccessorDecl *Accessor, SourceRange ReferenceRange,
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
 

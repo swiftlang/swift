@@ -87,6 +87,9 @@ def write_catapult_trace(args):
     vargs = vars_of_args(args)
     for path in args.remainder:
         allstats += load_stats_dir(path, **vargs)
+    allstats.sort(key=attrgetter('start_usec'))
+    for i in range(len(allstats)):
+        allstats[i].jobid = i
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
 
 

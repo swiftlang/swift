@@ -49,6 +49,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
   
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
+protected:
+  union { uint64_t OpaqueBits;
+
   SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
     Kind : bitmax(NumPatternKindBits,8),
     isImplicit : 1,
@@ -64,12 +67,15 @@ class alignas(8) Pattern {
     IsPropagatedType : 1
   );
 
-protected:
-  union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITS(Pattern);
-    SWIFT_INLINE_BITS(TuplePattern);
-    SWIFT_INLINE_BITS(TypedPattern);
+  SWIFT_INLINE_BITFIELD(BoolPattern, Pattern, 1,
+    Value : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(VarPattern, Pattern, 1,
+    /// True if this is a let pattern, false if a var pattern.
+    IsLet : 1
+  );
+
   } Bits;
 
   Pattern(PatternKind kind) {
@@ -584,15 +590,15 @@ public:
 /// matched against the associated value for the case.
 class BoolPattern : public Pattern {
   SourceLoc NameLoc;
-  bool Value;
 
 public:
   BoolPattern(SourceLoc NameLoc, bool Value)
-    : Pattern(PatternKind::Bool), NameLoc(NameLoc), Value(Value) {
+      : Pattern(PatternKind::Bool), NameLoc(NameLoc) {
+    Bits.BoolPattern.Value = Value;
   }
 
-  bool getValue() const { return Value; }
-  void setValue(bool v) { Value = v; }
+  bool getValue() const { return Bits.BoolPattern.Value; }
+  void setValue(bool v) { Bits.BoolPattern.Value = v; }
 
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -706,17 +712,17 @@ public:
 /// parsed as expressions referencing existing entities.
 class VarPattern : public Pattern {
   SourceLoc VarLoc;
-  bool IsLet;  // True if this is a let pattern, false if a var pattern.
   Pattern *SubPattern;
 public:
   VarPattern(SourceLoc loc, bool isLet, Pattern *sub,
              Optional<bool> implicit = None)
-    : Pattern(PatternKind::Var), VarLoc(loc), IsLet(isLet), SubPattern(sub) {
+      : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
+    Bits.VarPattern.IsLet = isLet;
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
 
-  bool isLet() const { return IsLet; }
+  bool isLet() const { return Bits.VarPattern.IsLet; }
   
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {

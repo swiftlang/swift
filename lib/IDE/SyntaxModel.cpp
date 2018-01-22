@@ -526,6 +526,16 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 
       pushStructureNode(SN, Tup);
     }
+  } else if (auto *Closure = dyn_cast<ClosureExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ClosureExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+    if (Closure->hasExplicitResultType())
+      SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                          Closure->getExplicitResultTypeLoc().getSourceRange());
+
+    pushStructureNode(SN, Closure);
   }
 
   return { true, E };
@@ -685,36 +695,36 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (!handleAttrs(D->getAttrs()))
     return false;
 
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+  if (isa<AccessorDecl>(D)) {
+    // Don't push structure nodes for accessors.
+  } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // Pass Function / Method structure node.
+    SyntaxStructureNode SN;
+    setDecl(SN, D);
+    const DeclContext *DC = AFD->getDeclContext();
     auto *FD = dyn_cast<FuncDecl>(AFD);
-    if (!FD || !FD->isAccessor()) {
-      // Pass Function / Method structure node.
-      SyntaxStructureNode SN;
-      setDecl(SN, D);
-      const DeclContext *DC = AFD->getDeclContext();
-      if (DC->isTypeContext()) {
-        if (FD && FD->isStatic()) {
-          if (FD->getStaticSpelling() == StaticSpellingKind::KeywordClass)
-            SN.Kind = SyntaxStructureKind::ClassFunction;
-          else
-            SN.Kind = SyntaxStructureKind::StaticFunction;
-        } else {
-          SN.Kind = SyntaxStructureKind::InstanceFunction;
-        }
+    if (DC->isTypeContext()) {
+      if (FD && FD->isStatic()) {
+        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordClass)
+          SN.Kind = SyntaxStructureKind::ClassFunction;
+        else
+          SN.Kind = SyntaxStructureKind::StaticFunction;
+      } else {
+        SN.Kind = SyntaxStructureKind::InstanceFunction;
       }
-      else
-        SN.Kind = SyntaxStructureKind::FreeFunction;
-      SN.Range = charSourceRangeFromSourceRange(SM, AFD->getSourceRange());
-      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
-                                                     AFD->getBodySourceRange());
-      SN.NameRange = charSourceRangeFromSourceRange(SM,
-                          AFD->getSignatureSourceRange());
-      if (FD) {
-        SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                                      FD->getReturnTypeLoc().getSourceRange());
-      }
-      pushStructureNode(SN, AFD);
     }
+    else
+      SN.Kind = SyntaxStructureKind::FreeFunction;
+    SN.Range = charSourceRangeFromSourceRange(SM, AFD->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                   AFD->getBodySourceRange());
+    SN.NameRange = charSourceRangeFromSourceRange(SM,
+                        AFD->getSignatureSourceRange());
+    if (FD) {
+      SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                                    FD->getReturnTypeLoc().getSourceRange());
+    }
+    pushStructureNode(SN, AFD);
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
     setDecl(SN, D);
@@ -909,6 +919,22 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.NameRange = CharSourceRange(AssociatedTypeD->getNameLoc(),
                                    AssociatedTypeD->getName().getLength());
     pushStructureNode(SN, AssociatedTypeD);
+  } else if (auto *GenericParamD = dyn_cast<GenericTypeParamDecl>(D)) {
+    SyntaxStructureNode SN;
+    setDecl(SN, D);
+    SN.Kind = SyntaxStructureKind::GenericTypeParam;
+    SN.Range = charSourceRangeFromSourceRange(SM,
+                                              GenericParamD->getSourceRange());
+    SN.NameRange = CharSourceRange(GenericParamD->getNameLoc(),
+                                   GenericParamD->getName().getLength());
+    for (const TypeLoc &TL : GenericParamD->getInherited()) {
+      CharSourceRange TR = charSourceRangeFromSourceRange(SM,
+                                                          TL.getSourceRange());
+      SN.InheritedTypeRanges.push_back(TR);
+      SN.Elements.emplace_back(SyntaxStructureElementKind::TypeRef, TR);
+    }
+
+    pushStructureNode(SN, GenericParamD);
   }
 
   return true;

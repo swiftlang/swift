@@ -2,6 +2,8 @@
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
+// RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
 
 import ABC
 import A.B.C
@@ -64,6 +66,21 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+  }
+
+  func superExpr() {
+    _ = super.foo
+    super.bar()
+    super[12] = 1
+    super.init()
+  }
+
+  func implictMember() {
+    _ = .foo
+    _ = .foo(x: 12)
+    _ = .foo { 12 }
+    _ = .foo[12]
+    _ = .foo.bar
   }
 }
 
@@ -165,31 +182,52 @@ func tryfoo() {
 }
 #else
 func closure() {
-  {[weak a,
+  _ = {[weak a,
     unowned(safe) self,
     b = 3,
     unowned(unsafe) c = foo().bar] in
   }
-  {[] in }
+  _ = {[] in }
 
-  { [] a, b, _ -> Int in
+  _ = { [] a, b, _ -> Int in
     return 2
   }
-  { [] (a: Int, b: Int, _: Int) -> Int in
+  _ = { [] (a: Int, b: Int, _: Int) -> Int in
     return 2
   }
-  { [] a, b, _ throws -> Int in
+  _ = { [] a, b, _ throws -> Int in
     return 2
   }
-  { [] (a: Int, _ b: Int) throws -> Int in
+  _ = { [] (a: Int, _ b: Int) throws -> Int in
     return 2
   }
-  { a, b in }
-  {}
-  { s1, s2 in s1 > s2 }
-  { $0 > $1 }
+  _ = { a, b in }
+  _ = {}
+  _ = { s1, s2 in s1 > s2 }
+  _ = { $0 > $1 }
 }
 #endif
+
+func postfix() {
+  foo()
+  foo() {}
+  foo {}
+  foo.bar()
+  foo.bar() {}
+  foo.bar {}
+  foo[]
+  foo[1]
+  foo[] {}
+  foo[1] {}
+  foo[1][2,x:3]
+  foo?++.bar!(baz)
+
+  foo(x:y:)()
+  _ = .foo(x:y:)
+  _ = x.foo(x:y:)
+  _ = foo(&d)
+  _ = <#Placeholder#> + <#T##(Int) -> Int#>
+}
 
 #if blah
 #else
@@ -235,4 +273,94 @@ do {
     case let a as Int: break
     case let a?: break
   }
+}
+
+func statementTests() {
+  do {
+  } catch (var x, let y) {
+  } catch where false {
+  } catch let e where e.foo == bar {
+  } catch {
+  }
+  repeat { } while true
+  LABEL: repeat { } while false
+  LABEL: do {}
+  LABEL: switch foo {
+    case 1:
+      fallthrough
+    case 2:
+      break LABEL
+    case 3:
+      break
+  }
+
+  for a in b {
+    defer { () }
+    if c {
+      throw MyError()
+      continue
+    } else {
+      continue LABEL
+    }
+  }
+
+  if
+    foo,
+    let a = foo,
+    let b: Int = foo,
+    var c = foo,
+    case (let v, _) = foo,
+    case (let v, _): (Int, Int) = foo {
+  } else if foo {
+  } else {
+  }
+
+  guard let a = b else {}
+
+  for var i in foo where i.foo {}
+  for case is Int in foo {}
+}
+
+// MARK: - ExtensionDecl
+
+extension ext {
+  var s: Int {
+    return 42
+  }
+}
+
+@available(*, unavailable)
+fileprivate extension ext {}
+
+extension ext : extProtocol {}
+
+extension ext where A == Int, B: Numeric {}
+
+extension ext.a.b {}
+
+func foo() {
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = """
+  abc \( foo() + bar() )
+  de \(3 + 3 + "abc \(foo()) def")
+  fg
+  """
+}
+
+func keypath() {
+  _ = \a.?.b
+  _ = \a.b.c
+  _ = \a.b[1]
+  _ = \.a.b
+  _ = #keyPath(a.b.c)
+}
+
+func objectLiterals() {
+  #fileLiteral(a)
+  #colorLiteral(a, b)
+  #imageLiteral(a, b, c)
+  #column
+  #file
+  #function
+  #dsohandle
 }

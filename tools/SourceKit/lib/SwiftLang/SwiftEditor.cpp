@@ -35,6 +35,8 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -669,6 +671,7 @@ public:
       P.parseTopLevel();
       Done = P.Tok.is(tok::eof);
     }
+    P.finalizeSyntaxTree();
   }
 
   SourceFile &getSourceFile() {
@@ -1201,7 +1204,8 @@ public:
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
     if (Node.Kind != SyntaxStructureKind::Parameter &&
-        Node.Kind != SyntaxStructureKind::LocalVariable) {
+        Node.Kind != SyntaxStructureKind::LocalVariable &&
+        Node.Kind != SyntaxStructureKind::GenericTypeParam) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
@@ -1789,6 +1793,15 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
+
+  if (Consumer.syntaxTreeEnabled()) {
+    std::string SyntaxContent;
+    llvm::raw_string_ostream OS(SyntaxContent);
+    json::Output JsonOut(OS);
+    auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
+    JsonOut << Root;
+    Consumer.handleSerializedSyntaxTree(OS.str());
+  }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 

@@ -117,7 +117,7 @@ DECL_NODES = [
     #                      generic-parameter-clause?
     #                      type-inheritance-clause?
     #                      generic-where-clause?
-    #                     '{' class-members ''
+    #                     '{' class-members '}'
     # class-name -> identifier
     Node('ClassDecl', kind='Decl',
          children=[
@@ -141,7 +141,7 @@ DECL_NODES = [
     #                         generic-parameter-clause?
     #                           type-inheritance-clause?
     #                         generic-where-clause?
-    #                         '{' struct-members ''
+    #                         '{' struct-members '}'
     # struct-name -> identifier
     Node('StructDecl', kind='Decl',
          children=[
@@ -168,6 +168,27 @@ DECL_NODES = [
                    is_optional=True),
              Child('ProtocolKeyword', kind='ProtocolToken'),
              Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
+    # extension-declaration -> attributes? access-level-modifier?
+    #                            'extension' extended-type
+    #                              type-inheritance-clause?
+    #                            generic-where-clause?
+    #                            '{' extension-members '}'
+    # extension-name -> identifier
+    Node('ExtensionDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ExtensionKeyword', kind='ExtensionToken'),
+             Child('ExtendedType', kind='Type'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
                    is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
@@ -371,7 +392,7 @@ DECL_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
              Child('Initializer', kind='InitializerClause', is_optional=True),
-             Child('Accesor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='AccessorBlock', is_optional=True),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
