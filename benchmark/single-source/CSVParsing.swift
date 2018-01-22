@@ -15,16 +15,16 @@ let quote = "\"".utf16.first!
 
 func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
     var result: Substring = "" // we accumulate the result
-    
+
     while !remainder.isEmpty {
         guard let nextQuoteIndex = remainder.index(of: "\"") else {
             throw ParseError(message: "Expected a closing \"")
         }
-        
+
         // Append until the next quote
         result += remainder.prefix(upTo: nextQuoteIndex)
         remainder.remove(upToAndIncluding: nextQuoteIndex)
-        
+
         if let peek = remainder.utf16.first {
             switch peek {
             case quote: // two quotes after each other is an escaped quote
@@ -41,7 +41,7 @@ func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
             return result
         }
     }
-    
+
     throw ParseError(message: "Expected a closing quote")
 }
 
@@ -80,7 +80,7 @@ extension Substring {
     mutating func remove(upTo index: Index) {
         self = suffix(from: index)
     }
-    
+
     mutating func remove(upToAndIncluding index: Index) {
         self = suffix(from: self.index(after: index))
     }
@@ -133,10 +133,10 @@ public func run_CSVParsing(_ N: Int) {
 
     for _ in 0..<N {
         var remainder = contents[...]
-        
+
         var result: Int = 0
         var x: () = ()
-        
+
         while !remainder.isEmpty {
             blackHole(try? parseLine(&remainder, result: &x, processField: { state, _, field in
                 ()
