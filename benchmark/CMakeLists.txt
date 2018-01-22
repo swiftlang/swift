@@ -65,6 +65,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
