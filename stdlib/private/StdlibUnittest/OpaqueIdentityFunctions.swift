@@ -11,20 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("getPointer")
-func _getPointer(_ x: OpaquePointer) -> OpaquePointer
+func _getPointer(_ x: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer
 
 public func _opaqueIdentity<T>(_ x: T) -> T {
   let ptr = UnsafeMutablePointer<T>.allocate(capacity: 1)
   ptr.initialize(to: x)
-  let result =
-    UnsafeMutablePointer<T>(_getPointer(OpaquePointer(ptr))).pointee
+  let mutablePointer =
+    UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: T.self)
+  let result = mutablePointer.pointee
   ptr.deinitialize(count: 1)
   ptr.deallocate()
   return result
 }
 
 func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
-  _ = _getPointer(OpaquePointer(x))
+  _ = _getPointer(UnsafeMutableRawPointer(mutating: x))
 }
 
 public func _blackHole<T>(_ x: T) {

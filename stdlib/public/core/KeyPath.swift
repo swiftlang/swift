@@ -2177,7 +2177,7 @@ internal func _getKeyPath_instantiateInline(
   _instantiateKeyPathBuffer(buffer, bufferData, rootType, bufferPtr)
 
   _swift_instantiateInertHeapObject(objectPtr,
-    unsafeBitCast(keyPathClass, to: OpaquePointer.self))
+    unsafeBitCast(keyPathClass, to: UnsafeRawPointer.self))
 }
 
 internal typealias MetadataAccessor =

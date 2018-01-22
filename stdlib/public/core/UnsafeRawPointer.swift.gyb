@@ -259,34 +259,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
     self._rawValue = _rawValue
   }
 
-  /// Creates a new raw pointer from the given opaque pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The opaque pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ other: OpaquePointer) {
-    _rawValue = other._rawValue
-  }
-
-  /// Creates a new raw pointer from the given opaque pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The opaque pointer to convert. If `other` is `nil`,
-  ///   the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ other: OpaquePointer?) {
-    guard let unwrapped = other else { return nil }
-    _rawValue = unwrapped._rawValue
-  }
-
   /// Creates a new raw pointer from the given address, specified as a bit
   /// pattern.
   ///
@@ -1008,19 +980,6 @@ extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
-  }
-}
-
-extension OpaquePointer {
-  @_inlineable
-  public init(_ from: Unsafe${Mutable}RawPointer) {
-    self._rawValue = from._rawValue
-  }
-
-  @_inlineable
-  public init?(_ from: Unsafe${Mutable}RawPointer?) {
-    guard let unwrapped = from else { return nil }
-    self._rawValue = unwrapped._rawValue
   }
 }
 

@@ -55,7 +55,7 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   _ = dynamic?.voidReturning()
   // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeMutableRawPointer to $Optional
   _ = dynamic?.voidPointerReturning()
-  // CHECK: unchecked_trivial_bit_cast {{.*}} $OpaquePointer to $Optional
+  // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeRawPointer to $Optional
   _ = dynamic?.opaquePointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeMutablePointer{{.*}} to $Optional
   _ = dynamic?.pointerReturning()
@@ -73,7 +73,7 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   _ = dynamic?.voidReturning
   // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafeMutableRawPointer>, #Optional.some
   _ = dynamic?.voidPointerReturning
-  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> OpaquePointer>, #Optional.some
+  // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafeRawPointer>, #Optional.some
   _ = dynamic?.opaquePointerReturning
   // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> UnsafeMutablePointer{{.*}}>, #Optional.some
   _ = dynamic?.pointerReturning

@@ -14,14 +14,14 @@ bb0(%0 : $UnsafeMutablePointer<Optional<AnyObject>>):
   %21 = function_ref @callee2 : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
   %22 = function_ref @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (OpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
   %23 = metatype $@thin Unmanaged<AnyObject>.Type
-  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (OpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
-  %24 = apply %22<AnyObject>(%4, %23) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (OpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (UnsafeRawPointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+  %24 = apply %22<AnyObject>(%4, %23) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (UnsafeRawPointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
   // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}) : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
   %25 = apply %21<AnyObject>(%24) : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
   %26 = tuple ()
   return %26 : $()
 }
 
-sil @callee1 : $@convention(thin) (UnsafeMutablePointer<OpaquePointer>) -> OpaquePointer
+sil @callee1 : $@convention(thin) (UnsafeMutablePointer<UnsafeRawPointer>) -> UnsafeRawPointer
 sil @callee2 : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
-sil @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (OpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+sil @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (UnsafeRawPointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>

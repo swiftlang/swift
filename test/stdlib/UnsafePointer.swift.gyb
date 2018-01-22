@@ -50,30 +50,7 @@ var UnsafePointerTestSuite = TestSuite("UnsafePointer")
 var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
 var UnsafeRawPointerTestSuite = TestSuite("UnsafeRawPointer")
 var UnsafeMutableRawPointerTestSuite = TestSuite("UnsafeMutableRawPointer")
-var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 
-% for (SelfName, SelfType) in [
-%         ('UnsafePointer', 'UnsafePointer<Float>'),
-%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
-%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
-%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
-
-${SelfName}TestSuite.test("initFromOpaquePointer") {
-  let other = OpaquePointer(bitPattern: 0x12345678)!
-  let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
-
-  let optionalOther: Optional = other
-  let optionalPointer = ${SelfType}(optionalOther)
-  expectNotNil(optionalPointer)
-  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
-
-  let nilOther: Optional<OpaquePointer> = nil
-  let nilPointer = ${SelfType}(nilOther)
-  expectNil(nilPointer)
-}
-
-% end
 
 % for (SelfName, SelfType) in [
 %         ('UnsafeRawPointer', 'UnsafeRawPointer'),
@@ -98,8 +75,7 @@ UnsafeMutableRawPointerTestSuite.test("initFromMutating") {
 %         ('UnsafePointer', 'UnsafePointer<Float>'),
 %         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
 %         ('UnsafeRawPointer', 'UnsafeRawPointer'),
-%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer'),
-%         ('OpaquePointer', 'OpaquePointer')]:
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType}? = nil

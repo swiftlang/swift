@@ -36,7 +36,7 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollation(
 @_inlineable // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
 public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
-  _ lhs: OpaquePointer, _ rhs: OpaquePointer
+  _ lhs: UnsafeRawPointer, _ rhs: UnsafeRawPointer
 ) -> Int32
 #endif
 

@@ -66,7 +66,6 @@ KNOWN_STDLIB_TYPE_DECL(UnsafeMutableRawPointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(UnsafeRawPointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(UnsafeMutablePointer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(UnsafePointer, NominalTypeDecl, 1)
-KNOWN_STDLIB_TYPE_DECL(OpaquePointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(AutoreleasingUnsafeMutablePointer, NominalTypeDecl, 1)
 
 KNOWN_STDLIB_TYPE_DECL(Unmanaged, NominalTypeDecl, 1)

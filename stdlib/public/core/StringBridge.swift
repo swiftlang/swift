@@ -318,9 +318,9 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @_versioned // FIXME(sil-serialize-all)
   @_semantics("self_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointer<Result>(
-    _ body: (OpaquePointer) throws -> Result
+    _ body: (UnsafeRawPointer) throws -> Result
   ) rethrows -> Result {
-    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
+    let selfAsPointer = unsafeBitCast(self, to: UnsafeRawPointer.self)
     defer {
       _fixLifetime(self)
     }
@@ -336,10 +336,10 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @_semantics("pair_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointerPair<Result>(
     _ rhs: _NSContiguousString,
-    _ body: (OpaquePointer, OpaquePointer) throws -> Result
+    _ body: (UnsafeRawPointer, UnsafeRawPointer) throws -> Result
   ) rethrows -> Result {
-    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
-    let rhsAsPointer = unsafeBitCast(rhs, to: OpaquePointer.self)
+    let selfAsPointer = unsafeBitCast(self, to: UnsafeRawPointer.self)
+    let rhsAsPointer = unsafeBitCast(rhs, to: UnsafeRawPointer.self)
     defer {
       _fixLifetime(self)
       _fixLifetime(rhs)

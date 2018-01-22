@@ -10,8 +10,8 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   let _: UnsafeMutablePointer<Int8>? = pointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafePointer<Int8> to $Optional<UnsafePointer<Int8>>
   let _: UnsafePointer<Int8>? = constPointerReturning()
-  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $OpaquePointer to $Optional<OpaquePointer>
-  let _: OpaquePointer? = opaquePointerReturning()
+  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeRawPointer to $Optional<UnsafeRawPointer>
+  let _: UnsafeRawPointer? = opaquePointerReturning()
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   a?.voidReturning()
@@ -21,7 +21,7 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   a?.pointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafePointer<Int8> to $Optional<UnsafePointer<Int8>>
   a?.constPointerReturning()
-  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $OpaquePointer to $Optional<OpaquePointer>
+  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeRawPointer to $Optional<UnsafeRawPointer>
   a?.opaquePointerReturning()
 }
 

@@ -146,16 +146,16 @@
 // PRINT-NEXT:  }
 //
 // PRINT-NEXT: struct TRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
-// PRINT-NEXT:   init(rawValue: OpaquePointer)
-// PRINT-NEXT:   let rawValue: OpaquePointer
-// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT:   init(_ rawValue: UnsafeRawPointer)
+// PRINT-NEXT:   init(rawValue: UnsafeRawPointer)
+// PRINT-NEXT:   let rawValue: UnsafeRawPointer
+// PRINT-NEXT:   typealias RawValue = UnsafeRawPointer
 // PRINT-NEXT: }
 // PRINT-NEXT: struct ConstTRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
-// PRINT-NEXT:   init(rawValue: OpaquePointer)
-// PRINT-NEXT:   let rawValue: OpaquePointer
-// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT:   init(_ rawValue: UnsafeRawPointer)
+// PRINT-NEXT:   init(rawValue: UnsafeRawPointer)
+// PRINT-NEXT:   let rawValue: UnsafeRawPointer
+// PRINT-NEXT:   typealias RawValue = UnsafeRawPointer
 // PRINT-NEXT: }
 // PRINT-NEXT: func create_T() -> TRef
 // PRINT-NEXT: func create_ConstT() -> ConstTRef
@@ -170,16 +170,16 @@
 // PRINT-NEXT: }
 //
 // PRINT-NEXT: struct TRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<OpaquePointer>)
-// PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<OpaquePointer>)
-// PRINT-NEXT:   let rawValue: UnsafeMutablePointer<OpaquePointer>
-// PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<OpaquePointer>
+// PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<UnsafeRawPointer>)
+// PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<UnsafeRawPointer>)
+// PRINT-NEXT:   let rawValue: UnsafeMutablePointer<UnsafeRawPointer>
+// PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<UnsafeRawPointer>
 // PRINT-NEXT: }
 // PRINT-NEXT: struct ConstTRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: UnsafePointer<OpaquePointer>)
-// PRINT-NEXT:   init(rawValue: UnsafePointer<OpaquePointer>)
-// PRINT-NEXT:   let rawValue: UnsafePointer<OpaquePointer>
-// PRINT-NEXT:   typealias RawValue = UnsafePointer<OpaquePointer>
+// PRINT-NEXT:   init(_ rawValue: UnsafePointer<UnsafeRawPointer>)
+// PRINT-NEXT:   init(rawValue: UnsafePointer<UnsafeRawPointer>)
+// PRINT-NEXT:   let rawValue: UnsafePointer<UnsafeRawPointer>
+// PRINT-NEXT:   typealias RawValue = UnsafePointer<UnsafeRawPointer>
 // PRINT-NEXT: }
 // PRINT-NEXT: func create_TRef() -> TRefRef
 // PRINT-NEXT: func create_ConstTRef() -> ConstTRefRef

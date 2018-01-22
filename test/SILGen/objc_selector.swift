@@ -13,8 +13,8 @@ class Foo {
 // CHECK-LABEL: sil hidden @$S13objc_selector14createSelector{{[_0-9a-zA-Z]*}}F
 func createSelector(foo: Foo) -> Selector {
   // CHECK: [[LITERAL:%[0-9]+]] = string_literal objc_selector "methodForInt:"
-  // CHECK-NEXT: [[PTR:%[0-9]+]] = struct $OpaquePointer ([[LITERAL]] : $Builtin.RawPointer)
-  // CHECK-NEXT: [[SEL:%[0-9]+]] = struct $Selector (%3 : $OpaquePointer)
+  // CHECK-NEXT: [[PTR:%[0-9]+]] = struct $UnsafeRawPointer ([[LITERAL]] : $Builtin.RawPointer)
+  // CHECK-NEXT: [[SEL:%[0-9]+]] = struct $Selector (%3 : $UnsafeRawPointer)
   // CHECK-: return [[SEL]] : $Selector
   return #selector(foo.method)
 }

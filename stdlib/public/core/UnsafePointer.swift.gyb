@@ -287,26 +287,6 @@ public struct ${Self}<Pointee>: _Pointer {
     self._rawValue = _rawValue
   }
 
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ from : OpaquePointer) {
-    _rawValue = from._rawValue
-  }
-
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer. If
-  ///   `from` is `nil`, the result of this initializer is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ from : OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
-  }
-
   /// Creates a new typed pointer from the given address, specified as a bit
   /// pattern.
   ///

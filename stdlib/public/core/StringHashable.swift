@@ -23,13 +23,13 @@ internal func _stdlib_NSStringHashValue(
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHashValuePointer")
 internal func _stdlib_NSStringHashValuePointer(
-  _ str: OpaquePointer, isASCII: Bool) -> Int
+  _ str: UnsafeRawPointer, isASCII: Bool) -> Int
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_CFStringHashCString")
 internal func _stdlib_CFStringHashCString(
-  _ str: OpaquePointer, _ len: Int) -> Int
+  _ str: UnsafeRawPointer, _ len: Int) -> Int
 #endif
 
 extension Unicode {

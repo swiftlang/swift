@@ -40,7 +40,7 @@ internal struct _ThreadLocalStorage {
   //
   // private
   @_versioned // FIXME(sil-serialize-all)
-  internal var uBreakIterator: OpaquePointer
+  internal var uBreakIterator: UnsafeRawPointer
 
   // TODO: Consider saving two, e.g. for character-by-character comparison
 
@@ -60,7 +60,7 @@ internal struct _ThreadLocalStorage {
   // private: Should only be called by _initializeThreadLocalStorage
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_uBreakIterator: OpaquePointer) {
+  internal init(_uBreakIterator: UnsafeRawPointer) {
     self.uBreakIterator = _uBreakIterator
   }
 
@@ -85,7 +85,7 @@ internal struct _ThreadLocalStorage {
   static internal func getUBreakIterator(
     start: UnsafePointer<UTF16.CodeUnit>,
     count: Int32
-  ) -> OpaquePointer {
+  ) -> UnsafeRawPointer {
     let tlsPtr = getPointer()
     let brkIter = tlsPtr[0].uBreakIterator
 

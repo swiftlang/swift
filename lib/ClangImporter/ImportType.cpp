@@ -366,12 +366,12 @@ namespace {
             Bridgeability::None);
 
       // If the pointed-to type is unrepresentable in Swift, import as
-      // OpaquePointer.
+      // RawPointer.
       if (!pointeeType) {
-        auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
-        if (!opaquePointer)
+        auto pointerTypeDecl = Impl.SwiftContext.getUnsafeRawPointerDecl();
+        if (!pointerTypeDecl)
           return Type();
-        return {opaquePointer->getDeclaredType(),
+        return {pointerTypeDecl->getDeclaredType(),
                 ImportHint::OtherPointer};
       }
       

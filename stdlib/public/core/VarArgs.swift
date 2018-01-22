@@ -293,15 +293,6 @@ extension UInt8 : CVarArg {
   }
 }
 
-extension OpaquePointer : CVarArg {
-  /// Transform `self` into a series of machine words that can be
-  /// appropriately interpreted by C varargs.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(self)
-  }
-}
-
 extension UnsafePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
@@ -312,6 +303,24 @@ extension UnsafePointer : CVarArg {
 }
 
 extension UnsafeMutablePointer : CVarArg {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _cVarArgEncoding: [Int] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
+extension UnsafeRawPointer : CVarArg {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _cVarArgEncoding: [Int] {
+    return _encodeBitsAsWords(self)
+  }
+}
+
+extension UnsafeMutableRawPointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)

@@ -10,9 +10,9 @@ func test(_ value: SwiftEnum) {
     } // no error
 }
 
-let _: Int = forwardBarePointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}
-let _: Int = forwardWithUnderlyingPointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}
-let _: Int = forwardObjCPointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}
+let _: Int = forwardBarePointer // expected-error {{cannot convert value of type '(UnsafeRawPointer) -> Void' to specified type 'Int'}}
+let _: Int = forwardWithUnderlyingPointer // expected-error {{cannot convert value of type '(UnsafeRawPointer) -> Void' to specified type 'Int'}}
+let _: Int = forwardObjCPointer // expected-error {{cannot convert value of type '(UnsafeRawPointer) -> Void' to specified type 'Int'}}
 
 // FIXME: It would be nice to import these as unavailable somehow instead.
 let _: Int = forwardWithUnderlyingValue // expected-error {{use of unresolved identifier 'forwardWithUnderlyingValue'}}

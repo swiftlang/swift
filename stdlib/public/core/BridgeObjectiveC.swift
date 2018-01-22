@@ -404,7 +404,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       let newAnyObject = unsafeBitCast(newValue, to: OptionalAnyObject.self)
       Builtin.retain(newAnyObject)
       Builtin.autorelease(newAnyObject)
-      // Trivially assign it as an OpaquePointer; the pointer references an
+      // Trivially assign it as an UnsafeRawPointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
       typealias OptionalUnmanaged = Unmanaged<AnyObject>?

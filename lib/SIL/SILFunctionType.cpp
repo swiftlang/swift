@@ -459,14 +459,6 @@ private:
         return isClangTypeMoreIndirectThanSubstType(
                       clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
 
-      if (substTy->getAnyNominal() ==
-            M.getASTContext().getOpaquePointerDecl())
-        // TODO: We could conceivably have an indirect opaque ** imported
-        // as COpaquePointer. That shouldn't ever happen today, though,
-        // since we only ever indirect the 'self' parameter of functions
-        // imported as methods.
-        return false;
-
       if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
         // CF type as foreign class
         if (substTy->getClassOrBoundGenericClass() &&

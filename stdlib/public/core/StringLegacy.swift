@@ -97,7 +97,7 @@ internal func _stdlib_NSStringHasPrefixNFD(
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
 internal func _stdlib_NSStringHasPrefixNFDPointer(
-  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
+  _ theString: UnsafeRawPointer, _ prefix: UnsafeRawPointer) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
@@ -110,7 +110,7 @@ internal func _stdlib_NSStringHasSuffixNFD(
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
 internal func _stdlib_NSStringHasSuffixNFDPointer(
-  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
+  _ theString: UnsafeRawPointer, _ suffix: UnsafeRawPointer) -> Bool
 
 extension String {
   /// Returns a Boolean value indicating whether the string begins with the

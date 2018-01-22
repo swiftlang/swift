@@ -97,7 +97,7 @@ func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 /// The compiler has special knowledge of this type.
 @_fixed_layout
 public struct Selector : ExpressibleByStringLiteral {
-  var ptr: OpaquePointer
+  var ptr: UnsafeRawPointer
 
   /// Create a selector from a string.
   public init(_ str : String) {
@@ -157,7 +157,7 @@ extension Selector : CustomReflectable {
 
 @_fixed_layout
 public struct NSZone {
-  var pointer: OpaquePointer
+  var pointer: UnsafeRawPointer
 }
 
 // Note: NSZone becomes Zone in Swift 3.
