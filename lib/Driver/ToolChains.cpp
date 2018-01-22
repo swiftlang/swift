@@ -102,6 +102,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -211,7 +212,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   const char *FrontendModeOption = nullptr;
   switch (context.OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::SingleCompile: {
+  case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile: {
     switch (context.Output.getPrimaryOutputType()) {
     case types::TY_Object:
       FrontendModeOption = "-c";
@@ -291,32 +293,48 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add input arguments.
   switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile: {
+  case OutputInfo::Mode::StandardCompile:
     assert(context.InputActions.size() == 1 &&
-           "The Swift frontend expects exactly one input (the primary file)!");
-
-    auto *IA = cast<InputAction>(context.InputActions[0]);
-    const Arg &PrimaryInputArg = IA->getInputArg();
-
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+           "Standard-compile mode takes exactly one input (the primary file)");
+    LLVM_FALLTHROUGH;
+  case OutputInfo::Mode::BatchModeCompile: {
+    bool UseFileList =
+      (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+       context.getTopLevelInputFiles().size() > TOO_MANY_FILES);
+    bool UsePrimaryFileList =
+      ((context.OI.CompilerMode == OutputInfo::Mode::BatchModeCompile) &&
+       (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.InputActions.size() > TOO_MANY_FILES));
+    if (UseFileList) {
       Arguments.push_back("-filelist");
       Arguments.push_back(context.getAllSourcesPath());
-      Arguments.push_back("-primary-file");
-      PrimaryInputArg.render(context.Args, Arguments);
-    } else {
-      bool FoundPrimaryInput = false;
+    }
+    if (UsePrimaryFileList) {
+      Arguments.push_back("-primary-filelist");
+      Arguments.push_back(context.getTemporaryFilePath("primaryInputs", ""));
+      II.FilelistInfos.push_back({Arguments.back(), types::TY_Swift,
+                                  FilelistInfo::WhichFiles::PrimaryInputs});
+    }
+    if (!UseFileList || !UsePrimaryFileList) {
+      llvm::StringSet<> primaries;
+      for (const Action *A : context.InputActions) {
+        const auto *IA = cast<InputAction>(A);
+        primaries.insert(IA->getInputArg().getValue());
+      }
       for (auto inputPair : context.getTopLevelInputFiles()) {
         if (!types::isPartOfSwiftCompilation(inputPair.first))
           continue;
-
-        // See if this input should be passed with -primary-file.
-        if (!FoundPrimaryInput &&
-            PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
-          Arguments.push_back("-primary-file");
-          FoundPrimaryInput = true;
+        const char *inputName = inputPair.second->getValue();
+        if (primaries.count(inputName)) {
+          if (!UsePrimaryFileList) {
+            Arguments.push_back("-primary-file");
+            Arguments.push_back(inputName);
+          }
+        } else {
+          if (!UseFileList) {
+            Arguments.push_back(inputName);
+          }
         }
-        Arguments.push_back(inputPair.second->getValue());
       }
     }
     break;
@@ -344,7 +362,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     break;
   }
-
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
@@ -607,6 +624,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     }
     break;
   }
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
@@ -637,6 +655,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     Arguments.push_back(OutNames[job.getInputIndex()].c_str());
     break;
   }
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");

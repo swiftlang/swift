@@ -1524,6 +1524,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     AllLinkerInputs.push_back(CA);
     break;
   }
+  case OutputInfo::Mode::BatchModeCompile: {
+    llvm_unreachable("Batch mode should not be used to build actions");
+  }
   case OutputInfo::Mode::Immediate: {
     if (Inputs.empty())
       return;

@@ -65,6 +65,9 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
+    /// A single process that batches together multiple StandardCompile jobs.
+    BatchModeCompile,
+
     /// Invoke the REPL
     REPL,
 
