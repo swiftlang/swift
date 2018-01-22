@@ -1,6 +1,12 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 
+// FIXME(TODO: JIRA): As i386 string is now big enough to be a by-address type,
+// and due to the peculiarities of debug info ordering and limitations of CHECK-
+// DAG and Posix regexes (without going crazy), temporarily disable for i386.
+//
+// REQUIRES: CPU=x86_64
+
 class UIWindow {}
 class AppDelegate {
   var window: UIWindow?

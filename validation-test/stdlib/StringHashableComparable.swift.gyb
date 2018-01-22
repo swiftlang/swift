@@ -16,14 +16,14 @@ func assertASCIIRepresentationIfPossible(_ s: String) {
       return
     }
   }
-  precondition(s._core.isASCII)
+  precondition(s._guts.isASCII)
 }
 
 func forceUTF16Representation(_ s: String) -> String {
   var s = s
   s += "\u{fffd}"
   s.removeSubrange(s.index(before: s.endIndex)..<s.endIndex)
-  precondition(!s._core.isASCII)
+  precondition(!s._guts.isASCII)
   return s
 }
 
