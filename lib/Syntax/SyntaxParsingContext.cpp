@@ -217,16 +217,14 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 
 /// This verifier traverses a syntax node to emit proper diagnostics.
 class SyntaxVerifier: public SyntaxVisitor {
-  SourceFileSyntax Root;
   RootContextData &RootData;
   template<class T>
   SourceLoc getSourceLoc(T Node) {
     return RootData.SourceMgr.getLocForOffset(RootData.BufferID,
-      Node.getAbsolutePosition(Root).getOffset());
+      Node.getAbsolutePosition().getOffset());
   }
 public:
-  SyntaxVerifier(SourceFileSyntax Root, RootContextData &RootData) :
-    Root(Root), RootData(RootData) {}
+  SyntaxVerifier(RootContextData &RootData) : RootData(RootData) {}
   void visit(UnknownDeclSyntax Node) override {
     RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
                             "declaration");
@@ -275,10 +273,8 @@ void finalizeSourceFile(RootContextData &RootData,
 
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
     // Verify the added nodes if specified.
-    SyntaxVerifier Verifier(SF.getSyntaxRoot(), RootData);
-    for (auto RawNode: Parts) {
-      Verifier.verify(make<Syntax>(RawNode));
-    }
+    SyntaxVerifier Verifier(RootData);
+    Verifier.verify(SF.getSyntaxRoot());
   }
 }
 } // End of anonymous namespace
