@@ -1136,6 +1136,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (Tok.is(tok::integer_literal)) {
         DeclName name = Context.getIdentifier(Tok.getText());
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
+        SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
         // Don't allow '.<integer literal>' following a numeric literal
         // expression (unless in #if env, for 1.2.3.4 version numbers)
