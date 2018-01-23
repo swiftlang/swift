@@ -3927,8 +3927,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       if (!choices[i].isDecl()) {
         return SolutionKind::Error;
       }
+      auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
+      if (!storage) {
+        return SolutionKind::Error;
+      }
       
-      auto storage = cast<AbstractStorageDecl>(choices[i].getDecl());
       if (!storage->isSettable(DC)) {
         // A non-settable component makes the key path read-only, unless
         // a reference-writable component shows up later.
