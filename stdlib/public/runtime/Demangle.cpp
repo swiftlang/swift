@@ -173,6 +173,55 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
                                 Dem);
 }
 
+static Demangle::NodePointer
+_buildDemanglingForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
+  if (type == &METADATA_SYM(Bi8_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int8");
+  if (type == &METADATA_SYM(Bi16_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int16");
+  if (type == &METADATA_SYM(Bi32_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int32");
+  if (type == &METADATA_SYM(Bi64_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int64");
+  if (type == &METADATA_SYM(Bi128_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int128");
+  if (type == &METADATA_SYM(Bi256_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int256");
+  if (type == &METADATA_SYM(Bi512_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Int512");
+
+  if (type == &METADATA_SYM(Bf16_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Float16");
+  if (type == &METADATA_SYM(Bf32_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Float32");
+  if (type == &METADATA_SYM(Bf64_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Float64");
+  if (type == &METADATA_SYM(Bf80_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Float80");
+  if (type == &METADATA_SYM(Bf128_).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.Float128");
+
+  if (type == &METADATA_SYM(Bo).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.NativeObject");
+
+  if (type == &METADATA_SYM(Bb).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.BridgeObject");
+
+  if (type == &METADATA_SYM(Bp).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.RawPointer");
+
+  if (type == &METADATA_SYM(BB).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName,
+                          "Builtin.UnsafeValueBuffer");
+
+#if SWIFT_OBJC_INTEROP
+  if (type == &METADATA_SYM(BO).base)
+    return Dem.createNode(Node::Kind::BuiltinTypeName, "Builtin.UnknownObject");
+#endif
+
+  return nullptr;
+}
+
 // Build a demangled type tree for a type.
 Demangle::NodePointer
 swift::_swift_buildDemanglingForMetadata(const Metadata *type,
@@ -451,9 +500,13 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     return tupleNode;
   }
-  case MetadataKind::Opaque:
+  case MetadataKind::Opaque: {
+    if (auto builtinType = _buildDemanglingForBuiltinType(type, Dem))
+      return builtinType;
     // FIXME: Some opaque types do have manglings, but we don't have enough info
     // to figure them out.
+    break;
+  }
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
