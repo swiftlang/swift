@@ -73,6 +73,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
+    lldb-build-with-xcode       "1"              "Use xcodebuild to build LLDB, instead of CMake"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     libdispatch-build-type      "Debug"          "the build variant for libdispatch"
@@ -2405,12 +2406,32 @@ for host in "${ALL_HOSTS[@]}"; do
                         )
                         ;;
                     macosx-*)
-                        # Set up flags to pass to xcodebuild
-                        set_lldb_xcodebuild_options
-                        set_lldb_build_mode
-                        with_pushd ${source_dir} \
-                            call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                        continue
+                        if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                            # Set up flags to pass to xcodebuild
+                            set_lldb_xcodebuild_options
+                            set_lldb_build_mode
+                            with_pushd ${source_dir} \
+                                call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                            continue
+		        else
+                            cmake_options=(
+                                "${cmake_options[@]}"
+                                -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                                -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                                -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                                -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                                -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                                -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                                -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                                -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                                -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                                -DLLDB_ALLOW_STATIC_BINDINGS=1
+                                -DLLDB_CODESIGN_IDENTITY=""
+                            )
+                        fi
                         ;;
                 esac
                 ;;
@@ -2799,7 +2820,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_build_dir=$(build_directory ${host} lldb)
 
                 # Run the gtests.
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
@@ -2810,14 +2831,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         exit 1
                     fi
                 else
-                    # FIXME run the gtests on other platforms.
-                    # There should be a CMake target for this already.
-                    echo Run LLDB gtests here.
+                    with_pushd ${lldb_build_dir} \
+                        ninja check-lldb-unit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
                 else
                     lldb_executable="${lldb_build_dir}"/bin/lldb
