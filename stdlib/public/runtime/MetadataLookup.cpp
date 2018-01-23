@@ -584,7 +584,41 @@ public:
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
-    // FIXME: Implement.
+    if (mangledName.equals("Bi8_"))
+      return &METADATA_SYM(Bi8_).base;
+    if (mangledName.equals("Bi16_"))
+      return &METADATA_SYM(Bi16_).base;
+    if (mangledName.equals("Bi32_"))
+      return &METADATA_SYM(Bi32_).base;
+    if (mangledName.equals("Bi64_"))
+      return &METADATA_SYM(Bi64_).base;
+    if (mangledName.equals("Bi128_"))
+      return &METADATA_SYM(Bi128_).base;
+    if (mangledName.equals("Bi256_"))
+      return &METADATA_SYM(Bi256_).base;
+    if (mangledName.equals("Bi512_"))
+      return &METADATA_SYM(Bi512_).base;
+    if (mangledName.equals("Bf16_"))
+      return &METADATA_SYM(Bf16_).base;
+    if (mangledName.equals("Bf32_"))
+      return &METADATA_SYM(Bf32_).base;
+    if (mangledName.equals("Bf64_"))
+      return &METADATA_SYM(Bf64_).base;
+    if (mangledName.equals("Bf80_"))
+      return &METADATA_SYM(Bf80_).base;
+    if (mangledName.equals("Bf128_"))
+      return &METADATA_SYM(Bf128_).base;
+    if (mangledName.equals("Bo"))
+      return &METADATA_SYM(Bo).base;
+    if (mangledName.equals("Bb"))
+      return &METADATA_SYM(Bb).base;
+    if (mangledName.equals("Bp"))
+      return &METADATA_SYM(Bp).base;
+    if (mangledName.equals("BB"))
+      return &METADATA_SYM(BB).base;
+    if (mangledName.equals("BO"))
+      return &METADATA_SYM(BO).base;
+
     return BuiltType();
   }
 
