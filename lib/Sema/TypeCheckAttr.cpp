@@ -2100,8 +2100,59 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // FIXME: Implement
-  llvm_unreachable("Unimplemented");
+  auto *module = D->getModuleContext();
+  /// '@differentiable' attribute is OnFunc only.
+  auto *fn = dyn_cast<FuncDecl>(D);
+  assert(fn && "Not a function decl!");
+
+  // Look up referenced gradient function.
+  // FIXME: Rework name lookup.
+  SmallVector<ValueDecl *, 8> lookupResults;
+  NLOptions nlOpts = NL_IgnoreAccessControl | NL_UnqualifiedDefault;
+  auto found = module->lookupQualified(module->getInterfaceType(),
+                                       attr->getGradFuncName(),
+                                       nlOpts, &TC, lookupResults);
+  if (!found) {
+    TC.diagnose(attr->getGradFuncNameLoc().getStartLoc(),
+                diag::differentiable_attr_cannot_resolve_gradient_function,
+                attr->getGradFuncName())
+      .highlight(attr->getGradFuncNameLoc().getSourceRange());
+    return;
+  }
+
+  // Compute adjoint function type.
+  // The first few arguments are the same as those of the primal func.
+  SmallVector<FunctionType::Param, 8> argTypes;
+  transform(*fn->getParameterList(0), argTypes.begin(),
+            [&](const ParamDecl *param) {
+              return FunctionType::Param(param->getType());
+            });
+  // The rest are the result of primal and the seed, both of the same type
+  // as the primal result.
+  FunctionType::Param seedTy = FunctionType::Param(fn->getResultInterfaceType());
+  argTypes.append(2, seedTy);
+  // The return type is a tuple of elements of the same type as primal's
+  // arguments.
+  SmallVector<TupleTypeElt, 8> retElts;
+  transform(*fn->getParameterList(0), retElts.begin(),
+            [&](const ParamDecl *param) { return param->getType(); });
+  auto retTy = TupleType::get(retElts, fn->getASTContext());
+  auto adjointFnTy = FunctionType::get(argTypes, retTy,
+                                       FunctionType::ExtInfo());
+
+  // TODO: Handle generic functions.
+  for (auto &candidate : lookupResults) {
+    if (adjointFnTy->isEqual(candidate->getInterfaceType())) {
+      // TODO: Remember the adjoint in primal decl.
+      // Found candidate. We are good to go.
+      return;
+    }
+  }
+
+  TC.diagnose(attr->getGradFuncNameLoc().getStartLoc(),
+              diag::differentiable_attr_cannot_resolve_gradient_function,
+              attr->getGradFuncName())
+    .highlight(attr->getGradFuncNameLoc().getSourceRange());
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

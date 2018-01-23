@@ -1270,10 +1270,11 @@ public:
 /// e.g. @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
 class DifferentiableAttr : public DeclAttribute {
 public:
-  explicit DifferentiableAttr(DeclName gradFuncName, DeclNameLoc gradFuncNameLoc,
+  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                              DeclName gradFuncName,
+                              DeclNameLoc gradFuncNameLoc,
                               TrailingWhereClause *whereClause)
-    : DeclAttribute(DAK_Differentiable, SourceLoc(), SourceRange(),
-                    /*Implicit*/true),
+    : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
       GradFuncName(gradFuncName), GradFuncNameLoc(gradFuncNameLoc),
       WhereClause(whereClause) {}
 

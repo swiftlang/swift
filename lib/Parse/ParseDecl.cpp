@@ -502,7 +502,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
 /// SWIFT_ENABLE_TENSORFLOW
 ParserResult<DifferentiableAttr>
-Parser::parseDifferentiableAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   ParserStatus Status;
   SourceLoc lParenLoc, rParenLoc;
@@ -519,17 +519,18 @@ Parser::parseDifferentiableAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   };
 
   if (!consumeIf(tok::l_paren, lParenLoc)) {
-    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+    diagnose(Tok, diag::attr_expected_lparen, AttrName,
              /*DeclModifier=*/false);
     return errorAndSkipToEnd();
   }
 
   // Parse 'gradient:' label.
-  if (parseSpecificIdentifier("gradient", Loc,
+  SourceLoc gradientLabelLoc;
+  if (parseSpecificIdentifier("gradient", gradientLabelLoc,
                               diag::attr_differentiable_missing_gradient_label))
     return errorAndSkipToEnd();
   if (!consumeIf(tok::colon)) {
-    diagnose(Loc, diag::attr_differentiable_expected_colon_after_label, "gradient");
+    diagnose(Tok, diag::attr_differentiable_expected_colon_after_label, "gradient");
     return errorAndSkipToEnd();
   }
 
@@ -556,14 +557,16 @@ Parser::parseDifferentiableAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(Loc, diag::attr_expected_rparen, AttrName, /*DeclModifier=*/false);
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
     Status.setIsParseError();
     return Status;
   }
 
   return ParserResult<DifferentiableAttr>(
-    new (Context) DifferentiableAttr(
-      gradFuncName, gradFuncNameLoc, whereClause));
+    new (Context) DifferentiableAttr(atLoc, SourceRange(loc, rParenLoc),
+                                     gradFuncName, gradFuncNameLoc,
+                                     whereClause));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
