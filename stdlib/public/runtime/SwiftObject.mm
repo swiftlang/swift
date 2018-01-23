@@ -576,10 +576,20 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
+/// Is the given value a tagged bridge object?
+static bool isTaggedBridgeObject(void *object) {
+#if SWIFT_OBJC_INTEROP
+  return (((uintptr_t)object) & heap_object_abi::TaggedBridgeObjectMask);
+#else
+  assert(!(((uintptr_t)object) & heap_object_abi::TaggedBridgeObjectMask));
+  return false;
+#endif
+}
+
 void *swift::swift_bridgeObjectRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return object;
 #endif
 
@@ -601,7 +611,7 @@ SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return object;
 #endif
 
@@ -623,7 +633,7 @@ SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return;
 #endif
 
@@ -641,7 +651,7 @@ void swift::swift_bridgeObjectRelease(void *object)
 void swift::swift_nonatomic_bridgeObjectRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return;
 #endif
 
@@ -659,7 +669,7 @@ void swift::swift_nonatomic_bridgeObjectRelease(void *object)
 void *swift::swift_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return object;
 #endif
 
@@ -683,7 +693,7 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n)
 void swift::swift_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return;
 #endif
 
@@ -702,7 +712,7 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n)
 void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return object;
 #endif
 
@@ -726,7 +736,7 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
 void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isTaggedBridgeObject(object))
     return;
 #endif
 

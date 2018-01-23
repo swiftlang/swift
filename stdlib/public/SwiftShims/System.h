@@ -48,6 +48,9 @@
 /// By default we assume the ObjC runtime doesn't use tagged pointers.
 #define SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK 0
 
+/// The bitmask of a tagged pointer as used by BridgeObject.
+#define SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAGGED_MASK 0x1
+
 /// The number of low bits in an Objective-C object pointer that
 /// are reserved by the Objective-C runtime.
 #define SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS 0
