@@ -73,6 +73,7 @@ EXPR_NODES = [
                        'IdentifierToken',
                        'SelfToken',
                        'CapitalSelfToken',
+                       'DollarIdentifierToken',
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),

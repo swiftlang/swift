@@ -2880,6 +2880,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
 ///   expr-anon-closure-argument:
 ///     dollarident
 Expr *Parser::parseExprAnonClosureArg() {
+  SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::IdentifierExpr);
   StringRef Name = Tok.getText();
   SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
