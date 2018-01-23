@@ -22,26 +22,68 @@
 using namespace swift;
 using namespace swift::driver;
 
-void CommandOutput::setAdditionalOutputForType(types::ID type,
+void CommandOutput::addAdditionalOutputForType(types::ID type,
                                                StringRef OutputFilename) {
-  AdditionalOutputsMap[type] = OutputFilename;
+  // FIXME: dmu called multiple times for same type for BatchMode
+  // xxx uses an additional lookup, should not
+  assert(type != PrimaryOutputType && "avoid redundancy");
+  if (AdditionalOutputsMap.count(type) == 0)
+    AdditionalOutputsMap[type] = std::vector<std::string>();
+  else
+    assert(doesBatchModeProduceMultiples(type) &&
+           "Even batch mode only supplies one of these types");
+
+  AdditionalOutputsMap[type].push_back(OutputFilename);
 }
 
-const std::string &
-CommandOutput::getAdditionalOutputForType(types::ID type) const {
+ArrayRef<std::string> CommandOutput::getAdditionalOutputsForType(
+    types::ID type) const { // xxx additional?!
   auto iter = AdditionalOutputsMap.find(type);
   if (iter != AdditionalOutputsMap.end())
     return iter->second;
 
-  static const std::string empty;
+  static const std::vector<std::string> empty;
   return empty;
+}
+
+const std::string &CommandOutput::getAdditionalDependenciesOutput() const {
+  auto deps = getAdditionalOutputsForType(types::TY_SwiftDeps);
+  assert(deps.size() < 2 && "should never have >1 dependencies output");
+  static const std::string empty;
+  return deps.empty() ? empty : deps[0];
+}
+const std::string &
+CommandOutput::getAdditionalSerializedDiagnosticsOutput() const {
+  auto deps = getAdditionalOutputsForType(types::TY_SerializedDiagnostics);
+  assert(deps.size() < 2 &&
+         "should never have >1 serialized diagnostics output");
+  static const std::string empty;
+  return deps.empty() ? empty : deps[0];
 }
 
 const std::string &
 CommandOutput::getAnyOutputForType(types::ID type) const {
   if (PrimaryOutputType == type)
     return PrimaryOutputFilenames[0];
-  return getAdditionalOutputForType(type);
+  static const std::string empty;
+  const auto &outs = getAdditionalOutputsForType(type);
+  return outs.empty() ? empty : outs[0];
+}
+
+void CommandOutput::forEachOutputOfType(
+    types::ID type, llvm::function_ref<void(const std::string &)> fn) const {
+  if (PrimaryOutputType == type) {
+    for (const auto &f : PrimaryOutputFilenames) {
+      fn(f);
+    }
+  }
+  for (const auto &f : getAdditionalOutputsForType(type)) {
+    fn(f);
+  }
+}
+
+bool CommandOutput::doesBatchModeProduceMultiples(types::ID type) {
+  return type != types::TY_SwiftDeps && type != types::TY_SerializedDiagnostics;
 }
 
 static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
