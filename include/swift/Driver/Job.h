@@ -184,6 +184,31 @@ public:
                              const llvm::opt::ArgStringList &Args);
 };
 
+/// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
+/// to the others that the whole set can be combined into a single subprocess
+/// (and thus run potentially more-efficiently than running each Job in the set
+/// individually).
+///
+/// Not all Jobs can be combined into a BatchJob: at present, only those Jobs
+/// that come from CompileJobActions, and which otherwise have the exact same
+/// input file list and arguments as one another, aside from their primary-file.
+/// See ToolChain::jobsAreBatchCombinable for details.
+
+class BatchJob : public Job {
+  SmallVector<const Job *, 4> CombinedJobs;
+public:
+  BatchJob(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
+           std::unique_ptr<CommandOutput> Output, const char *Executable,
+           llvm::opt::ArgStringList Arguments,
+           EnvironmentVector ExtraEnvironment,
+           std::vector<FilelistInfo> Infos,
+           ArrayRef<const Job *> Combined);
+
+  ArrayRef<const Job*> getCombinedJobs() const {
+    return CombinedJobs;
+  }
+};
+
 } // end namespace driver
 } // end namespace swift
 
