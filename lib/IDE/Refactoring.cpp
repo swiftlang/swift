@@ -1684,16 +1684,25 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
 }
 
 static std::unique_ptr<llvm::SetVector<Expr*>>
-  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
-  if (Info.Kind != RangeKind::SingleExpression
-      && Info.Kind != RangeKind::PartOfExpression)
-    return nullptr;
+findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
+  Expr *E = nullptr;
 
-  // FIXME: We should always have a valid node.
-  if (Info.ContainedNodes.empty())
+  switch (Info.Kind) {
+  case RangeKind::SingleExpression:
+    // FIXME: the range info kind should imply non-empty list.
+    if (!Info.ContainedNodes.empty())
+      E = Info.ContainedNodes[0].get<Expr*>();
+    else
+      return nullptr;
+    break;
+  case RangeKind::PartOfExpression:
+    E = Info.CommonExprParent;
+    break;
+  default:
     return nullptr;
+  }
 
-  Expr *E = Info.ContainedNodes[0].get<Expr*>();
+  assert(E);
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
     std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
