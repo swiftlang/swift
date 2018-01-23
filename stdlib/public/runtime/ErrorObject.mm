@@ -161,7 +161,7 @@ static Class getSwiftNativeNSErrorClass() {
 }
 
 /// Allocate a catchable error object.
-BoxPair
+BoxPair::Return
 swift::swift_allocError(const Metadata *type,
                         const WitnessTable *errorConformance,
                         OpaqueValue *initialValue,
