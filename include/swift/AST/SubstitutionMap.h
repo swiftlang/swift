@@ -60,7 +60,7 @@ class SubstitutionMap {
 
   // FIXME: Switch to a more efficient representation that corresponds to
   // the conformance requirements in the GenericSignature.
-  llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
+  llvm::DenseMap<CanType, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
 
   /// Retrieve the array of replacement types, which line up with the
