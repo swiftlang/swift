@@ -63,6 +63,17 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi256_) =
 const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi512_) =
   ValueWitnessTableForBox<NativeBox<int512_like, 64>>::table;
 
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bf16_) =
+  ValueWitnessTableForBox<NativeBox<float, 2>>::table;
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bf32_) =
+  ValueWitnessTableForBox<NativeBox<float, 4>>::table;
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bf64_) =
+  ValueWitnessTableForBox<NativeBox<double, 8>>::table;
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bf80_) =
+  ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bf128_) =
+  ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
+
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bo) =
   ValueWitnessTableForBox<SwiftRetainableBox>::table;
@@ -163,6 +174,11 @@ OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bi256_)
 OPAQUE_METADATA(Bi512_)
+OPAQUE_METADATA(Bf16_)
+OPAQUE_METADATA(Bf32_)
+OPAQUE_METADATA(Bf64_)
+OPAQUE_METADATA(Bf80_)
+OPAQUE_METADATA(Bf128_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
 OPAQUE_METADATA(Bp)
