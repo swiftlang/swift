@@ -299,9 +299,9 @@ private:
                                      llvm::SmallString<128> &Buf,
                                      CommandOutput *Output) const;
 
-  void chooseSaveOptimizationPath(Compilation &C, const OutputInfo &OI,
-                                  llvm::SmallString<128> &Buf,
-                                  CommandOutput *Output) const;
+  void chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
+                                    llvm::SmallString<128> &Buf,
+                                    CommandOutput *Output) const;
 
   void chooseObjectiveCHeaderOutputPath(Compilation &C, const OutputInfo &OI,
                                         const TypeToPathMap *OutputMap,

@@ -2078,7 +2078,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   if (C.getArgs().hasArg(options::OPT_save_optimization_record,
                          options::OPT_save_optimization_record_path))
-    chooseSaveOptimizationPath(C, OI, Buf, Output.get());
+    chooseOptimizationRecordPath(C, OI, Buf, Output.get());
 
   if ((isa<MergeModuleJobAction>(JA) ||
        (isa<CompileJobAction>(JA) &&
@@ -2399,9 +2399,9 @@ void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
   }
 }
 
-void Driver::chooseSaveOptimizationPath(Compilation &C, const OutputInfo &OI,
-                                        llvm::SmallString<128> &Buf,
-                                        CommandOutput *Output) const {
+void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
+                                          llvm::SmallString<128> &Buf,
+                                          CommandOutput *Output) const {
   if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
         OI, C.getArgs(), options::OPT_save_optimization_record_path,
