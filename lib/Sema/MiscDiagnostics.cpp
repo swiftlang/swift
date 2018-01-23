@@ -241,6 +241,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         });
       }
 
+      if (auto *AE = dyn_cast<CollectionExpr>(E)) {
+        visitCollectionElements(AE, [&](unsigned argIndex, Expr *arg) {
+          arg = lookThroughArgument(arg);
+          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
+            checkNoEscapeParameterUse(DRE, AE, OperandKind::Argument);
+        });
+      }
+
       // Check decl refs in withoutActuallyEscaping blocks.
       if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
         if (auto DRE =
@@ -415,6 +423,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                llvm::function_ref<void(unsigned, Expr*)> fn) {
       auto *arg = apply->getArg();
       argExprVisitArguments(arg, fn);
+    }
+
+    static void visitCollectionElements(CollectionExpr *collection,
+                               llvm::function_ref<void(unsigned, Expr*)> fn) {
+      auto elts = collection->getElements();
+      for (auto i : indices(elts))
+        fn(i, elts[i]);
     }
 
     static Expr *lookThroughArgument(Expr *arg) {
