@@ -39,7 +39,7 @@ set(SWIFTLIB_ESSENTIAL
   CocoaArray.swift
   Codable.swift.gyb
   Collection.swift
-  CollectionAlgorithms.swift.gyb
+  CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
   ClosedRange.swift
