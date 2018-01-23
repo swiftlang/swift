@@ -317,16 +317,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           FoundPrimaryInput = true;
         }
         Arguments.push_back(inputPair.second->getValue());
-
-        // Forward migrator flags.
-        if (auto DataPath = context.Args.getLastArg(options::
-                                                    OPT_api_diff_data_file)) {
-          Arguments.push_back("-api-diff-data-file");
-          Arguments.push_back(DataPath->getValue());
-        }
-        if (context.Args.hasArg(options::OPT_dump_usr)) {
-          Arguments.push_back("-dump-usr");
-        }
       }
     }
     break;
@@ -358,6 +348,16 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
+
+  // Forward migrator flags.
+  if (auto DataPath = context.Args.getLastArg(options::
+                                              OPT_api_diff_data_file)) {
+    Arguments.push_back("-api-diff-data-file");
+    Arguments.push_back(DataPath->getValue());
+  }
+  if (context.Args.hasArg(options::OPT_dump_usr)) {
+    Arguments.push_back("-dump-usr");
   }
 
   if (context.Args.hasArg(options::OPT_parse_stdlib))
