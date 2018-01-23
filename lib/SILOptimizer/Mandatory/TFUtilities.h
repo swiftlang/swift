@@ -18,10 +18,13 @@
 #ifndef SWIFT_SILOPTIMIZER_TENSORFLOW_H
 #define SWIFT_SILOPTIMIZER_TENSORFLOW_H
 
+#include "swift/AST/TensorFlow.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
 namespace tf {
+  struct SILTensorOpInfo;
+
   /// This returns true if we should dump out intermediate results to standard
   /// out.  This is used for integration unit tests.
   bool shouldDumpIntermediates();
@@ -34,19 +37,9 @@ namespace tf {
   /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
   unsigned convertSwiftTypeToTF(Type ty);
 
-
-  /// This is the interpretation of the operand passed into a SILInstruction for
-  /// an op in the host program.
-  enum class OpCommand {
-    Tensor,     // 't'
-    Constant,   // 'c'
-    Scalar,     // 's'
-    AddDType,   // 'd'
-  };
-
   /// Represent information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
-  struct TensorOpInfo {
+  struct SILTensorOpInfo : public TensorOpInfo {
     /// The instruction being analyzed.
     SILInstruction *inst;
 
@@ -56,18 +49,10 @@ namespace tf {
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
-    /// This is the string representation of the operand & result descriptors.
-    StringRef operandDescriptorStr;
-    StringRef resultDescriptorStr;
-
-    /// These are decoded descriptors for operands.
-    SmallVector<OpCommand, 4> operandDescriptors;
-
-    TensorOpInfo(SILInstruction &inst) : inst(&inst) {}
-
-    /// Return true and fill in this struct if this is a tensor operation that
-    /// should be partitioned out to run on the accelerator.
-    bool decode();
+    /// Analyze the specified SIL instruction and return a SILTensorOpInfo
+    /// result if the instruction is a valid tensor operation.  This is the
+    /// way that SILTensorOpInfo's are created.
+    static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
 
     /// Return the SILValue for the specified scalar operand.
     SILValue getScalarOperand(unsigned operandNumber) {
@@ -83,10 +68,10 @@ namespace tf {
     LiteralInst *getTensorConstantOperand(SILValue v);
 
   private:
+    SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
     bool decodeBuiltin(BuiltinInst *inst);
     bool decodeTFInitScalar(ApplyInst *inst);
   };
-
 
 
   /// The SIL location for operations we process are usually deep in the bowels

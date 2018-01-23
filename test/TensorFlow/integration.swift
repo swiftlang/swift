@@ -268,3 +268,24 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:  return %9 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
+
+public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float>)
+  -> Tensor<Float> {
+  let conds = conds1.toDevice()
+  let x = x1.toDevice()
+  let y = y1.toDevice()
+
+  let result = conds.selecting(x+x, y)*y
+
+  return result.toHost()
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
+// CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
+// CHECK-NEXT:  %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  %4 = builtin "__tfop_Select__ttt:t__"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT: %5 = builtin "__tfop_Mul__tt:t__"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  return %5 : $TensorHandle<Float>
+// CHECK-NEXT:}
+

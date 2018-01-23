@@ -406,10 +406,7 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
 /// Lower a builtin for a TFOp instruction into a TensorFlow op node.
 ///
 void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
-  TensorOpInfo tfopInfo(*inst);
-  bool isValid = tfopInfo.decode();
-  assert(isValid && "Invalid tfop formed by partitioning?"); (void)isValid;
-
+  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
   auto &graphFn = getCurrentGraphFunction();
 
   // The name label we put on the op is summarized from the "stack trace" of
@@ -423,16 +420,16 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   unsigned nextOperand = 0;
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
-    case OpCommand::Tensor: {
+    case OpDescriptor::Tensor: {
       auto opValue = getOperandValue(inst->getOperand(nextOperand++));
       if (!opValue.oper) return;  // Error occurred.
       TF_AddInput(op, opValue);
       break;
     }
-    case OpCommand::Scalar:
+    case OpDescriptor::Scalar:
       llvm_unreachable("Scalar operands should never reach graphgen");
 
-    case OpCommand::Constant: {
+    case OpDescriptor::Constant: {
       auto lit = tfopInfo.getTensorConstantOperand(nextOperand++);
 
       auto dtype = getTensorFlowDataType(lit->getType(), inst->getLoc());
@@ -446,7 +443,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       break;
     }
 
-    case OpCommand::AddDType: {
+    case OpDescriptor::AddDType: {
       // This command adds the dtype of the result tensor as a dtype attribute.
       auto type = isTensorHandle(inst->getType().getSwiftRValueType());
       assert(type && "Not a valid builtin");

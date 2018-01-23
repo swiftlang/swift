@@ -149,28 +149,10 @@ static bool decodeTensorOpName(StringRef name, StringRef &opName,
   return true;
 }
 
-/// This decodes the type information mangled into the SIL name for a
-/// function.  This takes the operand description itself, not the fn name.  It
-/// returns true on failure.
-static bool decodeTensorOperandInfo(StringRef name,
-                                    SmallVectorImpl<OpCommand> &result) {
-  result.clear();
-  for (auto c : name) {
-    switch (c) {
-    case 't': result.push_back(OpCommand::Tensor); break;
-    case 's': result.push_back(OpCommand::Scalar); break;
-    case 'c': result.push_back(OpCommand::Constant); break;
-    case 'd': result.push_back(OpCommand::AddDType); break;
-    default: return true;
-    }
-  }
-  return false;
-}
 
-SILValue TensorOpInfo::getScalarOperand(SILValue v) {
+SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
   // We have to handle two kinds of operands: SIL address operands and normal
   // values.
-
   if (!v->getType().isAddress()) {
     // If we have a normal operand, handle the form where a StructInst is
     // Swift stdlib type (e.g. Int/Float) wrapping an underlying LLVM value.
@@ -198,7 +180,7 @@ SILValue TensorOpInfo::getScalarOperand(SILValue v) {
 
 /// If the specified value is a valid value for a constant operand, return the
 /// literal it is initialized to, otherwise null.
-LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
+LiteralInst *SILTensorOpInfo::getTensorConstantOperand(SILValue v) {
   // Simplify scalar operands in general.
   v = getScalarOperand(v);
   if (!v) return nullptr;
@@ -211,21 +193,24 @@ LiteralInst *TensorOpInfo::getTensorConstantOperand(SILValue v) {
 }
 
 
-/// Return true and fill in this struct if this is a tensor operation that
-/// should be partitioned out to run on the accelerator.
-bool TensorOpInfo::decode() {
+/// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
+/// the instruction is a valid tensor operation.  This is the way that
+/// SILTensorOpInfo's are created.
+Optional<SILTensorOpInfo>
+SILTensorOpInfo::decode(SILInstruction *inst) {
   // Tuple extracts of tensor ops are considered to be themselves Tensor
   // operations, since they are part of the core representation of nodes that
   // produce multiple results.
   if (auto *ti = dyn_cast<TupleExtractInst>(inst))
-    if (auto *ai = dyn_cast<BuiltinInst>(ti->getOperand())) {
-      inst = ai;
-      return decode();
-    }
+    if (auto *ai = dyn_cast<BuiltinInst>(ti->getOperand()))
+      return decode(ai);
+
+  SILTensorOpInfo toiInfo(*inst);
 
   // Tensor operations are builtin instructions and apply instructions.
   if (auto *builtinInst = dyn_cast<BuiltinInst>(inst))
-    return decodeBuiltin(builtinInst);
+    if (toiInfo.decodeBuiltin(builtinInst))
+      return toiInfo;
 
   // Operations which can conditionally run on the host or the accelerator are
   // modeled as well-known function calls.  If they satisfy the requirements
@@ -235,15 +220,16 @@ bool TensorOpInfo::decode() {
     if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
       auto callee = fnRef->getReferencedFunction()->getName();
       if (callee == "__tf_init_scalar")
-        return decodeTFInitScalar(applyInst);
+        if (toiInfo.decodeTFInitScalar(applyInst))
+          return toiInfo;
     }
 
-  return false;
+  return None;
 }
 
 /// The vast majority of interesting tensor operations are builtin instructions,
 /// which come from the user-exposed #tfop() syntax.
-bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
+bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   builtinName = inst->getName().str();
 
   // If the name is valid, it isn't an op.
@@ -264,19 +250,11 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
     return false;
   }
 
-  operandDescriptorStr = typeDescriptorStr.take_front(colonLoc);
-  resultDescriptorStr = typeDescriptorStr.drop_front(colonLoc+1);
-
-  if (operandDescriptorStr.empty()) {
-    diagInvalid("no type descriptor string found");
+  auto errInfo = decodeDescriptorString(typeDescriptorStr);
+  if (errInfo.isError()) {
+    diagInvalid(errInfo.message);
     return false;
   }
-
-  if (decodeTensorOperandInfo(operandDescriptorStr, operandDescriptors)) {
-    diagInvalid("unknown letter");
-    return false;
-  }
-
 
   // Validate that this instruction is ok.
   unsigned nextOperand = 0;
@@ -292,7 +270,7 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 
   for (auto opInfo : operandDescriptors) {
     switch (opInfo) {
-    case OpCommand::Tensor: {
+    case OpDescriptor::Tensor: {
       auto op = getNextOperand();
       if (!op) return false;  // diagnostic already emitted.
       if (!isTensorHandle(op->getType().getSwiftRValueType())) {
@@ -302,7 +280,7 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       }
       break;
     }
-    case OpCommand::AddDType: {
+    case OpDescriptor::AddDType: {
       // 'd' doesn't correspond to an operand, but requires a tensor result.
       if (!isTensorHandle(inst->getType().getSwiftRValueType())) {
         diagInvalid("'d' operand requires a Tensor result");
@@ -310,7 +288,7 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       }
       break;
     }
-    case OpCommand::Scalar: {
+    case OpDescriptor::Scalar: {
       // This requires a scalar value.
       auto op = getNextOperand();
       if (!op) return false; // diagnostic already emitted.
@@ -324,7 +302,7 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       break;
     }
 
-    case OpCommand::Constant: {
+    case OpDescriptor::Constant: {
       // If this requires a constant value and doesn't have one (i.e., it's a
       // variable), then we reject it.
       auto op = getNextOperand();
@@ -351,7 +329,7 @@ bool TensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 
 /// Handle calls to __tf_init_scalar, which take a pointer to a stack slot
 /// and return a TensorHandle<T>.
-bool TensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
+bool SILTensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
   assert(inst->getNumOperands() == 2 &&
          isTensorHandle(inst->getType().getSwiftRValueType()) &&
          "Unexpected type signature for __tf_init_scalar");
@@ -365,9 +343,11 @@ bool TensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
   operandDescriptorStr = "cd";
   resultDescriptorStr = "t";
   builtinName = "__tfop_Const__cd:t__";
-  operandDescriptors = { OpCommand::Constant, OpCommand::AddDType };
+  operandDescriptors = { OpDescriptor::Constant, OpDescriptor::AddDType };
   return true;
 }
+
+
 
 
 /// The SIL location for operations we process are usually deep in the bowels

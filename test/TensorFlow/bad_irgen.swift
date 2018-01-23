@@ -9,7 +9,7 @@ public func testTensor() {
   // The #tfop builtins used in Tensor ops are compiled when building the swift
   // library module, so their IR code is not easily accessible during unit
   // testing.
-  _ = #tfop("Const", "dc:t", 1.0)
+  _ = #tfop("Const", "dc:t", 1.0) as TensorHandle<Float>
 }
 
 testTensor()

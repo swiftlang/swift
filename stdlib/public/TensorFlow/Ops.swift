@@ -46,13 +46,12 @@
 //    c: the next operand is a standard library integer or FP type.  We should
 //       pass the value(s) as the 'value' attribute.  [TODO: Use param label to
 //       genericize to names other than 'value'].
+//    s: the next operand is a standard library integer or FP scalar.
 //
 // The codes for the results are currently:
 //
 //    t: the result is a TensorHandle<T>, where the T is the same type as one
 //       of the tensor input operands, or the type of the last dtype specified.
-//    t<type>: the result is a TensorHandle<T>, where T is written out manually
-//       using the same type names that TensorFlow ops use.
 //
 
 
@@ -261,7 +260,7 @@ public extension Tensor where Unit : Numeric {
 public extension Tensor where Unit : Comparable {
   @_inlineable
   static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Less", "tt:t<bool>", lhs.handle, rhs.handle))
+    return Tensor<Bool>(#tfop("Less", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
@@ -276,7 +275,7 @@ public extension Tensor where Unit : Comparable {
 
   @_inlineable
   static func <= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("LessEqual", "tt:t<bool>",
+    return Tensor<Bool>(#tfop("LessEqual", "tt:t",
                         lhs.handle, rhs.handle))
   }
 
@@ -292,7 +291,7 @@ public extension Tensor where Unit : Comparable {
 
   @_inlineable
   static func > (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Greater", "tt:t<bool>", lhs.handle, rhs.handle))
+    return Tensor<Bool>(#tfop("Greater", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
@@ -307,7 +306,7 @@ public extension Tensor where Unit : Comparable {
 
   @_inlineable
   static func >= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("GreaterEqual", "tt:t<bool>",
+    return Tensor<Bool>(#tfop("GreaterEqual", "tt:t",
                        lhs.handle, rhs.handle))
   }
 
@@ -325,7 +324,7 @@ public extension Tensor where Unit : Comparable {
 public extension Tensor where Unit : Equatable {
   @_inlineable
   static func == (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Equal", "tt:t<bool>", lhs.handle, rhs.handle))
+    return Tensor<Bool>(#tfop("Equal", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
@@ -489,12 +488,9 @@ public func max<Unit : Numeric & Comparable>(
 }
 
 public extension Tensor where Unit == Bool {
-  @inline(never) // Change to @_inlineable when implemented
+  @_inlineable
   public func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
-    // FIXME(clattner?): Add support for 't<bool>' in arguments.
-    // return Tensor(#tfop("Select", "t<bool>tt:t",
-    //               handle, left.handle, right.handle))
-    fatalError("Unimplemented")
+    return Tensor<T>(#tfop("Select", "ttt:t", handle, left.handle, right.handle))
   }
 
   @_inlineable
@@ -547,17 +543,17 @@ public extension Tensor2D where Unit : Numeric {
 public extension Tensor {
   @_inlineable
   var shapeTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Shape", "t:t<int32>", handle))
+    return Tensor<Int32>(#tfop("Shape", "t:t", handle))
   }
 
   @_inlineable
   var rankTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Rank", "t:t<int32>", handle))
+    return Tensor<Int32>(#tfop("Rank", "t:t", handle))
   }
 
   @_inlineable
   var unitCountTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Size", "t:t<int32>", handle))
+    return Tensor<Int32>(#tfop("Size", "t:t", handle))
   }
 }
 
