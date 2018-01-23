@@ -76,3 +76,15 @@ func nonobjcExtensionOfObjCClass() {
   _ = \NSObject.dynamic
 
 }
+
+@objc protocol ObjCProto {
+  var objcRequirement: Int { get set }
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}ProtocolRequirement
+func objcProtocolRequirement<T: ObjCProto>(_: T) {
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  _ = \T.objcRequirement
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  _ = \ObjCProto.objcRequirement
+}
