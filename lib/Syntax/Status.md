@@ -26,6 +26,7 @@
   * ClosureExpr
   * FunctionCallExpr
   * SubscriptExpr
+  * DotSelfExpr
   * PostfixUnaryExpr
   * ForcedValueExpr
   * SuperRefExpr
@@ -40,7 +41,6 @@
 
 ### Not-started (UnknownExpr):
   * UnresolvedSpecializeExpr
-  * DotSelfExpr
   * KeyPathApplicationExpr
   * CaptureListExpr
   * AutoClosureExpr

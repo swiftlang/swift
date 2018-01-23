@@ -68,7 +68,13 @@ EXPR_NODES = [
     # An identifier expression.
     Node('IdentifierExpr', kind='Expr',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'SelfToken',
+                       'CapitalSelfToken',
+                       'DollarIdentifierToken',
+                   ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),
          ]),
@@ -282,6 +288,17 @@ EXPR_NODES = [
              Child("Name", kind='Token'),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),
+         ]),
+
+    # dot-self-expr -> expr '.' 'self'
+    Node('DotSelfExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('Dot', kind='Token',
+                   token_choices=[
+                       'PeriodToken', 'PrefixPeriodToken'
+                   ]),
+             Child('SelfKeyword', kind='SelfToken'),
          ]),
 
     # is TypeName
