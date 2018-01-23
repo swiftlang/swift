@@ -66,6 +66,8 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+    _ = self
+    _ = Self
   }
 
   func superExpr() {
@@ -220,7 +222,8 @@ func postfix() {
   foo[] {}
   foo[1] {}
   foo[1][2,x:3]
-  foo?++.bar!(baz)
+  foo?++.bar!(baz).self
+  foo().0
 
   foo(x:y:)()
   _ = .foo(x:y:)
