@@ -327,6 +327,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.KeepSyntaxInfoInSourceFile |= Args.hasArg(OPT_parse_syntax_info);
+  Opts.VerifySyntaxTree |= Args.hasArg(OPT_verify_syntax_tree);
+
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
   Opts.UseDarwinPreStableABIBit = false;
 #else

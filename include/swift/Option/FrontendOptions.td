@@ -413,6 +413,10 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
+def parse_syntax_info: Flag<["-"], "parse-syntax-info">,
+  HelpText<"Parse Syntax tree">;
+def verify_syntax_tree: Flag<["-"], "verify-syntax-tree">,
+  HelpText<"Verify Syntax tree if parsed">;
 
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
