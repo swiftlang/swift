@@ -8,10 +8,9 @@ class E : B { }
 
 // CHECK: sil @patatino : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  %0 = global_value @patatinoTv_ : $B             // user: %1
-// CHECK:  strong_retain %0 : $B                           // id: %1
-// CHECK: %2 = tuple ()                                   // user: %3
-// CHECK: return %2 : $()                                 // id: %3
+// CHECK:   %0 = global_value @patatinoTv_ : $B
+// CHECK:   %1 = tuple ()
+// CHECK:   return %1 : $()
 // CHECK: }
 
 sil @patatino : $@convention(thin) () -> () {
