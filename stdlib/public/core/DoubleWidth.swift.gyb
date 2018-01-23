@@ -45,8 +45,7 @@
 /// instances, in particular, can result in undesirable performance.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct DoubleWidth<Base : FixedWidthInteger>
-  : _ExpressibleByBuiltinIntegerLiteral
-  where Base.Words : Collection, Base.Magnitude.Words : Collection {    
+  : _ExpressibleByBuiltinIntegerLiteral {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
@@ -180,39 +179,8 @@ extension DoubleWidth : Numeric {
 
 extension DoubleWidth : FixedWidthInteger {
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Words : Collection {
-    @_fixed_layout // FIXME(sil-serialize-all)
-    public enum _IndexValue {
-      case low(Low.Words.Index)
-      case high(High.Words.Index)
-    }
-    
-    @_fixed_layout // FIXME(sil-serialize-all)
-    public struct Index : Comparable {
-      public var _value: _IndexValue
-
-      @_inlineable // FIXME(sil-serialize-all)
-      public init(_ _value: _IndexValue) { self._value = _value }
-
-      @_inlineable // FIXME(sil-serialize-all)
-      public static func ==(lhs: Index, rhs: Index) -> Bool {
-        switch (lhs._value, rhs._value) {
-        case let (.low(l), .low(r)): return l == r
-        case let (.high(l), .high(r)): return l == r
-        default: return false
-        }
-      }
-
-      @_inlineable // FIXME(sil-serialize-all)
-      public static func <(lhs: Index, rhs: Index) -> Bool {
-        switch (lhs._value, rhs._value) {
-        case let (.low(l), .low(r)): return l < r
-        case (.low(_), .high(_)): return true
-        case (.high(_), .low(_)): return false
-        case let (.high(l), .high(r)): return l < r
-        }
-      }
-    }
+  public struct Words : RandomAccessCollection {
+    public typealias Index = Int
 
     public var _high: High.Words
     public var _low: Low.Words
@@ -232,12 +200,12 @@ extension DoubleWidth : FixedWidthInteger {
 
     @_inlineable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      return Index(.low(_low.startIndex))
+      return 0
     }
 
     @_inlineable // FIXME(sil-serialize-all)
     public var endIndex: Index {
-      return Index(.high(_high.endIndex))
+      return _high.count + _low.count
     }
     
     @_inlineable // FIXME(sil-serialize-all)
@@ -245,35 +213,34 @@ extension DoubleWidth : FixedWidthInteger {
       if Base.bitWidth < UInt.bitWidth { return 1 }
       return Int(_low.count) + Int(_high.count)
     }
-  
+
     @_inlineable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
-      switch i._value {
-      case let .low(li):
-        if Base.bitWidth < UInt.bitWidth {
-          return Index(.high(_high.endIndex)) 
-        }
-        let next = _low.index(after: li)
-        if next == _low.endIndex { 
-          return Index(.high(_high.startIndex)) 
-        }
-        return Index(.low(next))
-      case let .high(hi):
-        return Index(.high(_high.index(after: hi)))
-      }
+      return i + 1
     }
-  
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public func index(before i: Index) -> Index {
+      return i - 1
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public func index(_ i: Index, offsetBy n: Int) -> Index {
+      return i + n
+    }
+
     @_inlineable // FIXME(sil-serialize-all)
     public subscript(_ i: Index) -> UInt {
       if Base.bitWidth < UInt.bitWidth {
-        _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
+        _precondition(i == 0, "Invalid index")
         _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
         return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
       }
-      switch i._value {
-      case let .low(li): return _low[li]
-      case let .high(hi): return _high[hi]
+      let lc = _low.count
+      if i < lc {
+        return _low[_low.index(_low.startIndex, offsetBy: i)]
       }
+      return _high[_high.index(_high.startIndex, offsetBy: i - lc)]
     }
   }
 
@@ -300,6 +267,11 @@ extension DoubleWidth : FixedWidthInteger {
   @_inlineable // FIXME(sil-serialize-all)
   public static var bitWidth: Int {
     return High.bitWidth + Low.bitWidth
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var bitWidth: Int {
+    return DoubleWidth.bitWidth
   }
 
 % for (operator, name) in [('+', 'adding'), ('-', 'subtracting')]:
