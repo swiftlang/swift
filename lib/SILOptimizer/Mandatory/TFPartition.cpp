@@ -895,25 +895,22 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
-  TensorOpInfo tfopInfo(inst);
-  bool isTensor = tfopInfo.decode();
-  assert(isTensor && "Expected a tensor op"); (void)isTensor;
-
+  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
   unsigned nextOperand = 0;
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
-    case OpCommand::Tensor:
+    case OpDescriptor::Tensor:
       // Tensor operands are recursively marked.
       markValue(inst.getOperand(nextOperand++), &inst);
       break;
-    case OpCommand::Scalar:
+    case OpDescriptor::Scalar:
       // Scalar operands are recursively marked.
       markValue(tfopInfo.getScalarOperand(nextOperand++), &inst);
       break;
-    case OpCommand::AddDType:
+    case OpDescriptor::AddDType:
       // No operand to mark.
       break;
-    case OpCommand::Constant:
+    case OpDescriptor::Constant:
       // No need to mark these operands.
       ++nextOperand;
       break;
@@ -1172,7 +1169,7 @@ bool TFFunctionPartition::markFunction() {
   SmallVector<SILInstruction*, 32> tensorOps;
   for (auto *BB : llvm::depth_first(&fn)) {
     for (auto &inst : *BB) {
-      if (TensorOpInfo(inst).decode()) {
+      if (SILTensorOpInfo::decode(&inst)) {
         tensorOps.push_back(&inst);
         tensorOpsSet.insert(&inst);
       }
@@ -1321,7 +1318,7 @@ public:
     return convertToTensorHandleType(ty);
   }
 
-  void visitOpInst(SingleValueInstruction *inst, TensorOpInfo &tfopInfo);
+  void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
   void visitBuiltinInst(BuiltinInst *inst);
   void visitApplyInst(ApplyInst *inst);
   void visitLiteralInst(LiteralInst *inst);
@@ -1442,7 +1439,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 
 // Transform ops builtin instructions to the one we need in the tensor program.
 void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
-                                  TensorOpInfo &tfopInfo) {
+                                  SILTensorOpInfo &tfopInfo) {
   // Handle special case "ops".
   if (tfopInfo.opName == "tfc.scalarToTensor") {
     assert(tfopInfo.operandDescriptorStr == "s" &&
@@ -1470,19 +1467,19 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   unsigned nextOperand = isa<ApplyInst>(inst);  // Skip callee.
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
-    case OpCommand::Tensor:
+    case OpDescriptor::Tensor:
       // Tensor operands just become operands.
       args.push_back(remapValue(inst->getOperand(nextOperand++)));
       break;
-    case OpCommand::Constant: {
+    case OpDescriptor::Constant: {
       auto cst = tfopInfo.getTensorConstantOperand(nextOperand++);
       args.push_back(cloneSingleInst(cst)->getResults()[0]);
       break;
     }
-    case OpCommand::AddDType:
+    case OpDescriptor::AddDType:
       // Nothing to do for this.
       break;
-    case OpCommand::Scalar:
+    case OpDescriptor::Scalar:
       llvm_unreachable("scalar operands should always be handled specially");
     }
   }
@@ -1497,9 +1494,8 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 // that corresponds to an LLVM IR instruction.
 void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
   // Check to see if this is an op.
-  TensorOpInfo tfopInfo(*inst);
-  if (tfopInfo.decode())
-    return visitOpInst(inst, tfopInfo);
+  if (auto tfopInfo = SILTensorOpInfo::decode(inst))
+    return visitOpInst(inst, tfopInfo.getValue());
 
   // Otherwise, this is some other builtin we're partitioning, like an LLVM IR
   // instruction.
@@ -1543,11 +1539,9 @@ void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
 // If we're copying over an apply instruction, it is a function that we're
 // promoting to a builtin in the graph.
 void PartitionCloner::visitApplyInst(ApplyInst *inst) {
-  // Check to see if this is an op.
-  TensorOpInfo tfopInfo(*inst);
-  bool isTensorOp = tfopInfo.decode();
-  assert(isTensorOp && "Cloning a non-tensor apply?"); (void)isTensorOp;
-  return visitOpInst(inst, tfopInfo);
+  // We know that this is an op, otherwise it won't have been marked.
+  auto tfOpInfo = SILTensorOpInfo::decode(inst).getValue();
+  return visitOpInst(inst, tfOpInfo);
 }
 
 
@@ -2470,9 +2464,34 @@ structContainsTensorHandle(StructDecl *decl) {
 ///
 static bool shouldTransformFunction(SILFunction *fn,
                                     TypeContainsTensorHandleChecker &tcthc) {
-  // Ignore always inline and transparent functions.
-  if (fn->getInlineStrategy() == AlwaysInline || fn->isTransparent())
+  // Ignore transparent functions.
+  if (fn->isTransparent())
     return false;
+
+  auto hasInlinableAttrs = [&](Decl *decl) -> bool {
+    if (decl->getAttrs().hasAttribute<InlineableAttr>())
+      return true;
+    if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Always)
+        return true;
+    return false;
+  };
+
+  // Don't transform functions that are marked @_inlineable or inline(always)
+  if (auto dc = fn->getDeclContext()) {
+    if (auto fnDecl = dc->getInnermostDeclarationDeclContext()) {
+      if (hasInlinableAttrs(fnDecl))
+        return false;
+
+      // If this is an accessor for a computed property, check the property for
+      // @_inlineable as well.
+      if (auto *fd = dyn_cast<FuncDecl>(fnDecl)) {
+        if (fd->isAccessor())
+          if (hasInlinableAttrs(fd->getAccessorStorageDecl()))
+            return false;
+      }
+    }
+  }
 
   // If the function is marked public, but it isn't marked inlinable, then it is
   // a public entrypoint that cannot be deabstracted through, so we must
@@ -2546,6 +2565,28 @@ public:
     TFFunctionPartition partitioner(*fn, PM, *tfModule);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
+
+    // Check to see if we cannot transform the function but should.  In this
+    // case we emit a compiler error.  This is a limitation of the compiler that
+    // will need to be resolved in the future (possibly through a model change),
+    // it's not clear if we should allow partitioning to work on unspecialized
+    // generics.
+    if (fn->getLoweredFunctionType()->isPolymorphic()) {
+      diagnose(ctx, fn->getLocation().getSourceLoc(),
+               diag::tf_internal_error,
+              "TensorFlow partitioning does not work on generic functions yet");
+      return;
+    }
+
+    // Because we're in active development, it is common to do something wrong
+    // in the TensorFlow module.  Detect and reject things here.
+    if (fn->getModule().getSwiftModule() == tfModule) {
+      diagnose(ctx, fn->getLocation().getSourceLoc(),
+               diag::tf_internal_error,
+               "nothing in the TensorFlow module should require partitioning, "
+               "did you forget @_inlineable on '" + fn->getName().str() + "'?");
+      return;
+    }
 
     if (shouldDumpIntermediates()) {
       llvm::outs() << "---- INPUT FUNCTION " << fn->getName() <<" ----------\n";

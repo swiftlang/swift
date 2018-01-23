@@ -21,6 +21,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TensorFlow.h"   // SWIFT_ENABLE_TENSORFLOW
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1317,13 +1318,20 @@ namespace {
       }
 
       auto constraintStr = constraints->getValue();
-      auto colonLoc = constraintStr.find(':');
-      if (colonLoc == StringRef::npos) {
-        tc.diagnose(constraints->getLoc(), diag::invalid_tfop,
-                    "constraint string must have a ':' to indicate results");
+
+      // Parse the constraint characters into a more semantic form.
+      tf::TensorOpInfo opInfo;
+      auto errorInfo = opInfo.decodeDescriptorString(constraintStr);
+
+      // Emit errors if any occurred.
+      if (errorInfo.isError()) {
+        auto loc = constraints->getLoc();
+        loc = loc.getAdvancedLoc(errorInfo.loc-constraintStr.data());
+        tc.diagnose(loc, diag::invalid_tfop, errorInfo.message);
         return nullptr;
       }
 
+      // Infer the argument types based on the constraint characters.
       SmallVector<TupleTypeElt, 4> argTypes;
 
       // The first two operands should type check as strings.
@@ -1331,45 +1339,26 @@ namespace {
       argTypes.push_back(TupleTypeElt(stringType));
       argTypes.push_back(TupleTypeElt(stringType));
 
-      Type lastTensorUnitType;
-      Type lastTensorType;
       auto locator = CS.getConstraintLocator(expr);
-
-      auto constraintStartPtr = constraintStr.data();
 
       // Loop over all of the argument constraints, building the expected list
       // of parameter types.
-      // FIXME: Move this constraint parsing logic into TensorFlow.cpp, and move
-      // that part of TensorFlow.cpp into the AST module.
-      auto inputConstraints = constraintStr.take_front(colonLoc);
-      while (!inputConstraints.empty()) {
-        char ch = inputConstraints.front();
-        inputConstraints = inputConstraints.drop_front();
-        switch (ch) {
-        case 't': {   // TensorHandle<T> with an unbound T.
-          Type openedType =
+      for (auto descriptor : opInfo.operandDescriptors) {
+        switch (descriptor) {
+        case tf::OpDescriptor::Tensor: {   // TensorHandle<T> with an unbound T.
+          Type tensorType =
             CS.openUnboundGenericType(tensorHandle->getDeclaredType(), locator);
-          argTypes.push_back(TupleTypeElt(openedType));
-          lastTensorType = openedType;
+          argTypes.push_back(TupleTypeElt(tensorType));
           break;
         }
-        case 's':     // Scalar operand.
-        case 'c': {   // Constant integer or fp value.
+        case tf::OpDescriptor::Scalar:       // Scalar operand.
+        case tf::OpDescriptor::Constant: {   // Constant integer or fp value.
           auto ty = CS.createTypeVariable(locator, 0);
           argTypes.push_back(TupleTypeElt(ty));
-          lastTensorUnitType = ty;
           break;
         }
-        case 'd':     // Dtype - no operand added.
-          break;
-        default:
-          auto charLoc =
-            constraints->getLoc()
-              .getAdvancedLoc(inputConstraints.data()-constraintStartPtr);
-          tc.diagnose(charLoc, diag::invalid_tfop,
-                      "unknown constraint character: '" + std::string(1, ch) +
-                      "'");
-          return nullptr;
+        case tf::OpDescriptor::AddDType:
+          break;  // Nothing to do here.
         }
       }
 
@@ -1381,66 +1370,26 @@ namespace {
                        CS.getConstraintLocator(expr,
                                          ConstraintLocator::ApplyArgument));
 
-      /// Check to see if lastTensorType is inferrable.  Emit a diagnostic and
-      /// return true if not.  If so, fill in lastTensorType.
-      auto checkLastTensorType = [&]() -> bool {
-        // We need to have either a tensor input, a metatype value.
-        if (lastTensorType)
-          return false;
-
-        if (!lastTensorUnitType)
-          lastTensorUnitType = CS.createTypeVariable(locator, 0);
-
-        lastTensorType = BoundGenericType::get(tensorHandle, nullptr,
-                                               {lastTensorUnitType});
-        return false;
-      };
-
-      // FIXME: Apply type constraints to the input operands to check the
-      // constraint string.  Until we implement this, people can just implement
-      // perfect constraints. :-)
-
-      // Otherwise, we need to determine the types of the results, so we parse
-      // the constraints string.
+      // Determine the types of the results.
       SmallVector<TupleTypeElt, 2> resultTypes;
-      auto resultConstraints = constraintStr.drop_front(colonLoc+1);
-      while (!resultConstraints.empty()) {
-        char ch = resultConstraints.front();
-        resultConstraints = resultConstraints.drop_front();
-        switch (ch) {
-        case 't':   // Result is a tensor.
-          // If the result type is explicit, parse it.
-          // FIXME: Generalize this.
-          if (resultConstraints.startswith("<bool>")) {
-            resultConstraints = resultConstraints.drop_front(strlen("<bool>"));
-            auto boolType = tc.Context.getBoolDecl()->getDeclaredType();
-            auto resolved = BoundGenericType::get(tensorHandle, nullptr,
-                                                  {boolType});
-            resultTypes.push_back(TupleTypeElt(resolved));
-            continue;
-          } else if (resultConstraints.startswith("<int32>")) {
-            resultConstraints = resultConstraints.drop_front(strlen("<int32>"));
-            auto int32Type = tc.Context.getInt32Decl()->getDeclaredType();
-            auto resolved = BoundGenericType::get(tensorHandle, nullptr,
-                                                  {int32Type});
-            resultTypes.push_back(TupleTypeElt(resolved));
-            continue;
-          }
-
-          if (checkLastTensorType())
-            return nullptr;
-          resultTypes.push_back(TupleTypeElt(lastTensorType));
+      unsigned resultNo = 0;
+      for (auto descriptor : opInfo.resultDescriptors) {
+        switch (descriptor) {
+        case tf::OpDescriptor::Tensor: {   // TensorHandle<T> with an unbound T.
+          Type tensorType =
+            CS.openUnboundGenericType(tensorHandle->getDeclaredType(), locator);
+          resultTypes.push_back(TupleTypeElt(tensorType));
           break;
+        }
         default:
           // Point to the exact character in question.
           auto charLoc =
-            constraints->getLoc()
-              .getAdvancedLoc(resultConstraints.data()-constraintStartPtr);
+            constraints->getLoc().getAdvancedLoc(resultNo);
           tc.diagnose(charLoc, diag::invalid_tfop,
-                      "unknown constraint character: '" + std::string(1, ch) +
-                      "'");
+                      "tensor ops may only return tensor values with 't'");
           return nullptr;
         }
+        ++resultNo;
       }
 
       // Map the list of result types into a single result type for the op.
