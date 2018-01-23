@@ -811,10 +811,10 @@ static bool performCompile(CompilerInstance &Instance,
         // have a primary serialized input.
         for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
-            if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
-                  InputFile::
-                    convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
-                      SASTF->getFilename()))) {
+            if (Invocation.getFrontendOptions().Inputs.isInputPrimary(
+                    InputFile::
+                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                            SASTF->getFilename()))) {
               assert(PSGIs.empty() && "Can only handle one primary AST input");
               auto SM = performSILGeneration(*SASTF, SILOpts, None);
               PSGIs.push_back(
