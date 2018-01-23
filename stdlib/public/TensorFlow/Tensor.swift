@@ -311,6 +311,17 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
+// Safe data type conversion
+//===----------------------------------------------------------------------===//
+
+public extension Tensor where Unit : Numeric {
+  @inline(never)
+  init(_ other: Tensor<Bool>) {
+    fatalError("FIXME: implement boolean conversion")
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Scalar conversion
 //===----------------------------------------------------------------------===//
 

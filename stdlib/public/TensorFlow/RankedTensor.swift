@@ -92,7 +92,7 @@ public extension RankedTensor {
 // Each of these extensions on RankedTensor adds APIs to each of the specific
 // ranks, implemented in terms of the underlying untyped Tensor APIs.
 
-/// RankedTensor - Arithmetic Operators.
+/// Arithmetic operators
 public extension RankedTensor where Unit : Numeric {
   @_inlineable
   static func +(lhs: Self, rhs: Self) -> Self {
@@ -224,7 +224,7 @@ public extension RankedTensor where Unit : Equatable {
   }
 }
 
-/// RankedTensor - Arithmetic methods.
+/// Transposition and concatenation
 public extension RankedTensor {
   @_inlineable
   var transpose: Self {
