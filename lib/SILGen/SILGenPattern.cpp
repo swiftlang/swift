@@ -1075,7 +1075,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
   bool hasMultipleItems = false;
   if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-    hasMultipleItems = caseStmt->getCaseLabelItems().size() > 1;
+    hasMultipleItems = clauses[row].hasFallthroughTo() ||
+      caseStmt->getCaseLabelItems().size() > 1;
   }
 
   // Bind the rest of the patterns.
@@ -2383,7 +2384,20 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
           return;
 
         SILType ty = SGF.getLoweredType(V->getType());
-
+        if (ty.isNull()) {
+          // If we're making the shared block on behalf of a previous case's
+          // fallthrough, caseBlock's VarDecl's won't be in the SGF yet, so
+          // determine phi types by using current vars of the same name.
+          for (auto var : SGF.VarLocs) {
+            auto varDecl = dyn_cast<VarDecl>(var.getFirst());
+            if (varDecl && varDecl->hasName() && varDecl->getName() == V->getName()) {
+              ty = var.getSecond().value->getType();
+              if (var.getSecond().box) {
+                ty = ty.getObjectType();
+              }
+            }
+          }
+        }
         if (ty.isAddressOnly(SGF.F.getModule())) {
           assert(!Temporaries[V]);
           Temporaries[V] = SGF.emitTemporaryAllocation(V, ty);
@@ -2617,7 +2631,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       // statement.
       JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
-    } else if (caseBlock->getCaseLabelItems().size() > 1) {
+    } else if (row.hasFallthroughTo() || caseBlock->getCaseLabelItems().size() > 1) {
       JumpDest sharedDest =
           emission.getSharedCaseBlockDest(caseBlock);
 
@@ -2630,15 +2644,15 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
       SmallVector<SILValue, 4> args;
       SmallVector<VarDecl *, 4> expectedVarOrder;
-      SmallVector<VarDecl *, 4> Vars;
+      SmallVector<VarDecl *, 4> vars;
       labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-      row.getCasePattern()->collectVariables(Vars);
+      row.getCasePattern()->collectVariables(vars);
 
       SILModule &M = F.getModule();
       for (auto expected : expectedVarOrder) {
         if (!expected->hasName())
           continue;
-        for (auto var : Vars) {
+        for (auto *var : vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
             SILValue value = VarLocs[var].value;
             SILType type = value->getType();
@@ -2754,8 +2768,42 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   // Get the destination block.
   CaseStmt *caseStmt = S->getFallthroughDest();
   JumpDest sharedDest =
-    context->Emission.getSharedCaseBlockDest(caseStmt);
-  Cleanups.emitBranchAndCleanups(sharedDest, S);
+  context->Emission.getSharedCaseBlockDest(caseStmt);
+
+  if (!caseStmt->hasBoundDecls()) {
+    Cleanups.emitBranchAndCleanups(sharedDest, S);
+  } else {
+    // Generate branch args to pass along current vars to fallthrough case.
+    SILModule &M = F.getModule();
+    ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
+    SmallVector<SILValue, 4> args;
+    SmallVector<VarDecl *, 4> expectedVarOrder;
+    labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+    
+    for (auto *expected : expectedVarOrder) {
+      if (!expected->hasName())
+        continue;
+      for (auto var : VarLocs) {
+        auto varDecl = dyn_cast<VarDecl>(var.getFirst());
+        if (varDecl && varDecl->hasName() && varDecl->getName() == expected->getName()) {
+          SILValue value = var.getSecond().value;
+
+          if (value->getType().isAddressOnly(M)) {
+            context->Emission.emitAddressOnlyInitialization(expected, value);
+          } else if (var.getSecond().box) {
+            auto &lowering = getTypeLowering(value->getType());
+            auto argValue = lowering.emitLoad(B, CurrentSILLoc, value, LoadOwnershipQualifier::Copy);
+            args.push_back(argValue);
+          } else {
+            auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+            args.push_back(argValue);
+          }
+          break;
+        }
+      }
+    }
+    Cleanups.emitBranchAndCleanups(sharedDest, S, args);
+  }
 }
 
 
