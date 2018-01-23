@@ -147,7 +147,8 @@ public:
   /// requirements, first canonicalizing the types.
   static CanGenericSignature getCanonical(
                                       ArrayRef<GenericTypeParamType *> params,
-                                      ArrayRef<Requirement> requirements);
+                                      ArrayRef<Requirement> requirements,
+                                      bool skipValidation = false);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
