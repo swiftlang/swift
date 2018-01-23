@@ -621,7 +621,7 @@ extension Unicode.Scalar : TextOutputStreamable {
 }
 
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
+public var _playgroundPrintHook : ((String) -> Void)? = nil
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
