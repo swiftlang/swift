@@ -117,7 +117,7 @@ func testRankGetter() {
 }
 TensorTests.test("RankGetter", testRankGetter)
 
-// FIXME: Merge into the previous example when we support code motion to avoid
+// TODO: Merge into the previous example when we support code motion to avoid
 // sends.
 @inline(never)
 func testRankGetter2() {
@@ -126,7 +126,6 @@ func testRankGetter2() {
 }
 TensorTests.test("RankGetter2", testRankGetter2)
 
-#if false  // FIXME(clattner) this crashes TFPartition due to an invalid SLoc.
 @inline(never)
 func testShapeGetter() {
   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -140,6 +139,5 @@ func testShapeGetter2() {
    expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
 }
 TensorTests.test("ShapeGetter2", testShapeGetter2)
-#endif
 
 runAllTests()
