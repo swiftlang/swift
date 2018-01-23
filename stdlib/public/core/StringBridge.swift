@@ -163,9 +163,12 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   }
 
   let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
+
+  let length = _StringGuts.getCocoaLength(
+    _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
   return _StringGuts(
     _nonTaggedCocoaObject: immutableCopy,
-    count: _stdlib_binary_CFStringGetLength(immutableCopy),
+    count: length,
     isSingleByte: !isUTF16,
     start: start)
 }

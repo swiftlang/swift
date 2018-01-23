@@ -255,7 +255,6 @@ extension _StringGuts {
     return _UnmanagedString(start: start, count: _cocoaCount)
   }
 
-  @inline(never)
   @_versioned
   internal
   init(
