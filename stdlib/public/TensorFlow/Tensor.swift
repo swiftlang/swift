@@ -209,7 +209,15 @@ public extension Tensor {
 public extension Tensor {
   @_inlineable
   var shape: [Int] {
-    return shapeTensor.array.units.map(Int.init)
+    // TODO: Until we have mandatory deabstraction, we need to force the
+    // performance inliner to inline this, even though it is apparently too
+    // big to want to do so for performance reasons.
+    @inline(__always)
+    get {
+      // TODO: When we get type conversion ops, it would be better to run the
+      // UInt->Int cast in-graph than using map.
+      return shapeTensor.array.units.map(Int.init)
+    }
   }
 
   @_inlineable
@@ -374,6 +382,8 @@ extension Tensor : CustomPlaygroundQuickLookable {
 public extension Tensor {
   @_inlineable
   var array: ShapedArray<Unit> {
-    return handle.makeHostCopy()
+    // This is considered to be a well known way to produce a copy to the host,
+    // so we never way to produce an "implicit copy to host" warning.
+    return toHost().handle.makeHostCopy()
   }
 }
