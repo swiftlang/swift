@@ -78,7 +78,11 @@ extern "C" void swift_stringFromUTF8InRawMemory(String *out,
 
 struct String {
   // Keep the details of String's implementation opaque to the runtime.
-  const uint64_t x, y;
+  const void *x = nullptr;
+  const void *y = nullptr;
+#if __POINTER_WIDTH__ == 32
+  const void *z = nullptr;
+#endif
 
   /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
@@ -90,8 +94,7 @@ struct String {
   }
 
   /// Copy an ASCII string into a swift String on the heap.
-  explicit String(const char *ptr, size_t size)
-    : x(0), y(0) {
+  explicit String(const char *ptr, size_t size) {
     swift_stringFromUTF8InRawMemory(this, ptr, size);
   }
 
