@@ -2436,6 +2436,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     auto &Availability = CDElt.Availability;
 
     B.setInsertionPoint(Release);
+    B.setCurrentDebugScope(Release->getDebugScope());
 
     // Value types and root classes don't require any fancy handling.
     // Just conditionally destroy each memory element, and for classes,
@@ -2507,10 +2508,12 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
         // If true, self.init or super.init was called and self was consumed.
         B.setInsertionPoint(ConsumedBlock->begin());
+        B.setCurrentDebugScope(ConsumedBlock->begin()->getDebugScope());
         processUninitializedRelease(Release, true, B.getInsertionPoint());
 
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
@@ -2541,11 +2544,13 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
         // If true, self was consumed or is fully initialized.
         B.setInsertionPoint(LiveBlock->begin());
+        B.setCurrentDebugScope(LiveBlock->begin()->getDebugScope());
         emitReleaseOfSelfWhenNotConsumed(Loc, Release);
         isDeadRelease = false;
 
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
