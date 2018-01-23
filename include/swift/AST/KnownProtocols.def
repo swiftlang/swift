@@ -66,6 +66,8 @@ PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
+// SWIFT_ENABLE_TENSORFLOW
+PROTOCOL(AccelerableTensorUnit)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
