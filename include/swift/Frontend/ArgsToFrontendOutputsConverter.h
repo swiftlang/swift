@@ -15,8 +15,9 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "swift/Option/Options.h"
 #include "llvm/Option/ArgList.h"
 
@@ -38,14 +39,16 @@ class ArgsToFrontendOutputsConverter {
 
 public:
   ArgsToFrontendOutputsConverter(const ArgList &args, StringRef moduleName,
-                                 FrontendInputsAndOutputs &inputs,
+                                 FrontendInputsAndOutputs &inputsAndOutputs,
                                  DiagnosticEngine &diags)
-      : Args(args), ModuleName(moduleName), InputsAndOutputs(inputs),
+      : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
-  Optional<std::pair<std::vector<std::string>, SupplementaryOutputPaths>>
+  Optional<std::pair<std::vector<std::string>,
+                     std::vector<SupplementaryOutputPaths>>>
   convert();
 
-  static std::vector<std::string>
+  /// None -> could not open
+  static Optional<std::vector<std::string>>
   readOutputFileList(const StringRef filelistPath, DiagnosticEngine &diags);
 
   static bool isOutputAUniqueOrdinaryFile(ArrayRef<std::string> outputs);
@@ -56,7 +59,7 @@ class OutputFilesComputer {
   DiagnosticEngine &Diags;
   const FrontendInputsAndOutputs &InputsAndOutputs;
 
-  const std::vector<std::string> OutputFileArguments;
+  const Optional<std::vector<std::string>> OutputFileArguments;
   const StringRef OutputDirectoryArgument;
   const bool DoOutputFileArgumentsMatchInputs;
   const StringRef FirstInput;
@@ -69,10 +72,10 @@ public:
   OutputFilesComputer(const ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs);
 
-  /// Returns the output filenames on the command line or in the output
+  /// \return the output filenames on the command line or in the output
   /// filelist. If there
-  /// were neither -o's nor an output filelist, returns an empty vector.
-  static std::vector<std::string>
+  /// were neither -o's nor an output filelist, \return an empty vector.
+  static Optional<std::vector<std::string>>
   getOutputFilenamesFromCommandLineOrFilelist(const ArgList &args,
                                               DiagnosticEngine &diags);
 
@@ -82,7 +85,7 @@ private:
   Optional<std::string> computeOutputFile(StringRef outputArg,
                                           const InputFile &input) const;
 
-  /// Determine the correct output filename when none was specified.
+  /// \return the correct output filename when none was specified.
   ///
   /// Such an absence should only occur when invoking the frontend
   /// without the driver,
@@ -90,7 +93,7 @@ private:
   /// if output is required for the requested action.
   Optional<std::string> deriveOutputFileFromInput(const InputFile &input) const;
 
-  /// Determine the correct output filename when a directory was specified.
+  /// \return the correct output filename when a directory was specified.
   ///
   /// Such a specification should only occur when invoking the frontend
   /// directly, because the driver will always pass -o with an appropriate
@@ -114,19 +117,35 @@ class OutputPathsComputer {
 
 public:
   OutputPathsComputer(const ArgList &args, DiagnosticEngine &diags,
-                      const FrontendInputsAndOutputs &inputs,
+                      const FrontendInputsAndOutputs &inputsAndOutputs,
                       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  Optional<SupplementaryOutputPaths> computeOutputPaths() const;
+  Optional<std::vector<SupplementaryOutputPaths>> computeOutputPaths() const;
 
 private:
-  Optional<SupplementaryOutputPaths>
-  computeOutputPathsForOneInput(StringRef outputFilename,
-                                const InputFile &) const;
+  /// \return None if error
+  Optional<std::vector<SupplementaryOutputPaths>>
+  getSupplementaryFilenamesFromArgumentsOrFilelists() const;
+
+  /// \return None if error
+  /// Otherwise return a vector with one entry per file producing supplementary
+  /// outputs.
+  Optional<std::vector<std::string>> readSupplementaryOutputArgumentsOrFileList(
+      swift::options::ID path_id, swift::options::ID filelist_id) const;
+
+  std::pair<bool, Optional<std::vector<std::string>>>
+  readSupplementaryOutputFileList(swift::options::ID id) const;
+
+  Optional<SupplementaryOutputPaths> computeOutputPathsForOneInput(
+      StringRef outputFilename,
+      const SupplementaryOutputPaths &pathsFromFilelists,
+      const InputFile &) const;
+
   StringRef deriveImplicitBasis(StringRef outputFilename,
                                 const InputFile &) const;
   Optional<std::string> determineSupplementaryOutputFilename(
-      options::ID pathOpt, options::ID emitOpt, StringRef extension,
-      StringRef mainOutputIfUsable, StringRef implicitBasis) const;
+      options::ID emitOpt, std::string pathFromArgumentsOrFilelists,
+      StringRef extension, StringRef mainOutputIfUsable,
+      StringRef implicitBasis) const;
 
   void deriveModulePathParameters(options::ID &emitOption,
                                   std::string &extension,

@@ -14,10 +14,10 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 #include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
@@ -116,7 +116,7 @@ bool ArgsToFrontendOptionsConverter::convert() {
   if (computeOutputFilenamesAndSupplementaryFilenames())
     return true;
 
-  if (checkUnusedOutputPaths())
+  if (checkUnusedSupplementaryOutputPaths())
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
@@ -421,13 +421,17 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  ArrayRef<std::string> outputFilenames =
-      getOutputFilenamesFromCommandLineOrFilelist();
 
-  auto nameToStem = ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
-                        outputFilenames)
-                        ? outputFilenames.front()
-                        : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+  Optional<std::vector<std::string>> outputFilenames =
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                       Diags);
+
+  auto nameToStem =
+      outputFilenames &&
+              ArgsToFrontendOutputsConverter::isOutputAUniqueOrdinaryFile(
+                  *outputFilenames)
+          ? outputFilenames->front()
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
@@ -438,7 +442,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-                                    !Opts.ModuleOutputPath.empty();
+                                    Opts.InputsAndOutputs.hasModuleOutputPath();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
@@ -455,70 +459,48 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
 }
 bool ArgsToFrontendOptionsConverter::
     computeOutputFilenamesAndSupplementaryFilenames() {
-  Optional<std::pair<std::vector<std::string>, SupplementaryOutputPaths>> outs =
-      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
-                                     Opts.InputsAndOutputs, Diags)
-          .convert();
+  Optional<std::pair<std::vector<std::string>,
+                     std::vector<SupplementaryOutputPaths>>>
+      outs = ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
+                                            Opts.InputsAndOutputs, Diags)
+                 .convert();
   if (!outs)
     return true;
-  Opts.OutputFilenames = outs->first;
-
-  Opts.ObjCHeaderOutputPath = outs->second.ObjCHeaderOutputPath;
-  Opts.ModuleOutputPath = outs->second.ModuleOutputPath;
-  Opts.ModuleDocOutputPath = outs->second.ModuleDocOutputPath;
-  Opts.DependenciesFilePath = outs->second.DependenciesFilePath;
-  Opts.ReferenceDependenciesFilePath =
-      outs->second.ReferenceDependenciesFilePath;
-  Opts.SerializedDiagnosticsPath = outs->second.SerializedDiagnosticsPath;
-  Opts.LoadedModuleTracePath = outs->second.LoadedModuleTracePath;
-  Opts.TBDPath = outs->second.TBDPath;
+  if (FrontendOptions::doesActionProduceOutput(Opts.RequestedAction))
+    Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(outs->first,
+                                                         outs->second);
 
   return false;
 }
 
-bool ArgsToFrontendOptionsConverter::checkUnusedOutputPaths() const {
-FrontendInputs, ArgsToFrontendInputsConverter into separate files.
-  if (Opts.hasUnusedDependenciesFilePath()) {
+bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
+    const {
+  if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasDependenciesPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusedLoadedModuleTracePath()) {
+  if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusedModuleOutputPath()) {
+  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusedModuleDocOutputPath()) {
+  if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
-  return false;
-}
 
-void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
-  using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.hasPrimaryInputs() && !Opts.ModuleOutputPath.empty();
-  }
-}
-void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
-  using namespace options;
-  for (const Arg *A : Args.filtered(OPT_import_module)) {
-    Opts.ImplicitImportModuleNames.push_back(A->getValue());
-  }
-}
-void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
-  using namespace options;
-  for (const Arg *A : Args.filtered(OPT_Xllvm)) {
-    Opts.LLVMArgs.push_back(A->getValue());
-  }
+  return false;
 }

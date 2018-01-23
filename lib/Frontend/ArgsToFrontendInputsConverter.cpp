@@ -56,6 +56,9 @@ bool ArgsToFrontendInputsConverter::convert() {
   // Must be set before we iterate over inputs needing outputs.
   InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
 
+  InputsAndOutputs.setBypassBatchModeChecks(
+      Args.hasArg(options::OPT_bypass_batch_mode_checks));
+
   return false;
 }
 
@@ -110,11 +113,12 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
                    filelistBufferOrError.getError().message());
     return true;
   }
+  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
   for (auto file :
-       llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
+       llvm::make_range(llvm::line_iterator(*BuffersToKeepAlive.back()),
                         llvm::line_iterator()))
     fn(file);
-  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
+
   return false;
 }
 
@@ -162,8 +166,9 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
 }
 
 bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                       Diags);
   return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
-         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
-                                                                          Diags)
-                 .size() == 1;
+         userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1;
 }

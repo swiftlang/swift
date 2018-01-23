@@ -30,6 +30,17 @@ def primary_filelist : Separate<["-"], "primary-filelist">,
   HelpText<"Specify primary inputs in a file rather than on the command line">;
 def output_filelist : Separate<["-"], "output-filelist">,
   HelpText<"Specify outputs in a file rather than on the command line">;
+  
+  // FIXME: dmu so many filelists!
+def objCHeaderOutput_filelist: Separate<["-"], " objCHeaderOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def moduleOutput_filelist: Separate<["-"], " moduleOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def moduleDocOutput_filelist: Separate<["-"], " moduleDocOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def dependenciesFile_filelist: Separate<["-"], " dependenciesFile-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def referenceDependenciesFile_filelist: Separate<["-"], " referenceDependenciesFile-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def serializedDiagnostics_filelist: Separate<["-"], " serializedDiagnostics-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def loadedModuleTrace_filelist: Separate<["-"], " loadedModuleTrace-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+def TBD_filelist: Separate<["-"], " TBD-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
+  
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -456,5 +467,8 @@ def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
 // This is used to guard preemptive testing for the fix-it.
 def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
     HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
+    
+def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
+    HelpText<"Bypass checks for batch-mode errors.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

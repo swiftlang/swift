@@ -170,9 +170,10 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
-                                      /*alwaysSetModuleToMain*/ true,
-                                      /*bePrimary*/ false, extendedInfo);
+      Invocation.setUpInputAndOutputForSILTool(
+          InputFilename, StringRef(), ModuleName,
+          /*alwaysSetModuleToMain*/ true,
+          /*bePrimary*/ false, extendedInfo);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
@@ -200,7 +201,8 @@ int main(int argc, char **argv) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
     CI.setSILModule(
-        SILModule::createEmptyModule(CI.getMainModule(), CI.getSILOptions()));
+        SILModule::createEmptyModule(CI.getMainModule(), CI.getSILOptions(),
+                                     CI.getPSPsForAtMostOnePrimary()));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

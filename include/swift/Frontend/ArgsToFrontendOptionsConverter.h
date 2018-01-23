@@ -42,6 +42,9 @@ private:
   bool computeModuleName();
 
   bool computeOutputFilenamesAndSupplementaryFilenames();
+  bool computeOutputFilenamesForPrimary(StringRef primaryOrEmpty,
+                                        StringRef correspondingOutputFile);
+
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -54,42 +57,11 @@ private:
   void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
                                   unsigned &valueToSet);
 
-  FrontendOptions::ActionType determineRequestedAction() const;
-
   bool setUpForSILOrLLVM();
 
-  /// Determine the correct output filename when none was specified.
-  ///
-  /// Such an absence should only occur when invoking the frontend
-  /// without the driver,
-  /// because the driver will always pass -o with an appropriate filename
-  /// if output is required for the requested action.
-  bool deriveOutputFilenameFromInputFile();
-
-  /// Determine the correct output filename when a directory was specified.
-  ///
-  /// Such a specification should only occur when invoking the frontend
-  /// directly, because the driver will always pass -o with an appropriate
-  /// filename if output is required for the requested action.
-  bool deriveOutputFilenameForDirectory(StringRef outputDir);
-
-  std::string determineBaseNameOfOutput() const;
-
-  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
-
-  void determineSupplementaryOutputFilenames();
-
-  /// Returns the output filenames on the command line or in the output
-  /// filelist. If there
-  /// were neither -o's nor an output filelist, returns an empty vector.
-  ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
-
-  bool checkForUnusedOutputPaths() const;
-
-  std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
-  bool setUpForSILOrLLVM();
-
-  bool checkUnusedOutputPaths() const;
+  bool checkUnusedSupplementaryOutputPaths() const;
+  bool checkUnusedSupplementaryOutputPathsPerInput(
+      const SupplementaryOutputPaths &outputs) const;
 
 public:
   ArgsToFrontendOptionsConverter(DiagnosticEngine &Diags,
@@ -102,7 +74,6 @@ public:
   static FrontendOptions::ActionType
   determineRequestedAction(const llvm::opt::ArgList &);
 };
-
 } // namespace swift
 
 #endif /* SWIFT_FRONTEND_ARGSTOFRONTENDOPTIONSCONVERTER_H */

@@ -670,9 +670,8 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
     return std::make_pair(nullptr, nullptr);
 
   // Create the IR emitter.
-  IRGenModule *IGM =
-      new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.getSingleOutputFilename());
+  IRGenModule *IGM = new IRGenModule(*irgen, std::move(targetMachine), nullptr,
+                                     LLVMContext, "", SILMod->getPSPs());
 
   initLLVMModule(*IGM);
 
@@ -724,8 +723,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  LLVMContext, ModuleName, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
+                  ModuleName, SILMod->getPSPs());
 
   initLLVMModule(IGM);
 
@@ -825,7 +824,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
                     IGM.Context.LangOpts.EffectiveLanguageVersion,
-                    IGM.OutputFilename, IGM.Context.Stats))
+                    IGM.PSPs.OutputFilename, IGM.Context.Stats))
       return nullptr;
   }
 
@@ -835,17 +834,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
   while (IRGenModule *IGM = irgen->fetchFromQueue()) {
-    DEBUG(
-      DiagMutex->lock();
-      dbgs() << "thread " << ThreadIdx << ": fetched " << IGM->OutputFilename <<
-          "\n";
-      DiagMutex->unlock();
-    );
+    DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx << ": fetched "
+                                    << IGM->PSPs.OutputFilename << "\n";
+          DiagMutex->unlock(););
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, &IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
                 IGM->getModule(), IGM->TargetMachine.get(),
                 IGM->Context.LangOpts.EffectiveLanguageVersion,
-                IGM->OutputFilename, IGM->Context.Stats);
+                IGM->PSPs.OutputFilename, IGM->Context.Stats);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -879,13 +875,14 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       }
     }
   } _igmDeleter(irgen);
-  
-  auto OutputIter = Opts.OutputFilenames.begin();
+
+  auto OutputIter = Opts.IRGOutputFilenames.begin();
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   bool DidRunSILCodeGenPreparePasses = false;
+  // FIXME: eliminate IRGOutputFilenames by putting more in M?
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
     if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
@@ -893,7 +890,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
-    if (OutputIter == Opts.OutputFilenames.end()) {
+    if (OutputIter == Opts.IRGOutputFilenames.end()) {
       // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
@@ -907,9 +904,11 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
-                                       nextSF, *Context,
-                                       ModuleName, *OutputIter++);
+    IRGenModule *IGM = new IRGenModule(
+        irgen, std::move(targetMachine), nextSF, *Context, ModuleName,
+        PrimarySpecificPaths(*OutputIter++,
+                             SILMod->getPSPs().SupplementaryOutputs,
+                             nextSF->getFilename()));
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -1098,9 +1097,9 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                                LLVMContext, &SF, outModuleHash, StartElem);
 }
 
-void
-swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
-                                   StringRef OutputPath) {
+void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+                                        StringRef OutputPath,
+                                        const PrimarySpecificPaths PSPs) {
   LLVMContext VMContext;
 
   auto &Ctx = SILMod.getASTContext();
@@ -1114,7 +1113,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, Opts.getSingleOutputFilename());
+                  OutputPath, PSPs);
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -1143,13 +1142,12 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(),
-                Ctx.LangOpts.EffectiveLanguageVersion,
-                OutputPath);
+                IGM.TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
+                PSPs.OutputFilename);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module,
+                        llvm::Module *Module, StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
@@ -1158,9 +1156,8 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(),
-                    Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleOutputFilename(), Stats))
+                    TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
+                    OutputFilename, Stats))
     return true;
   return false;
 }

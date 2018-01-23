@@ -673,7 +673,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    StringRef BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -814,18 +814,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  // TODO: investigate whether these should be removed, in favor of definitions
-  // in other classes.
-  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const InputFile *input =
-                 FrontendOpts.InputsAndOutputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->file();
-  } else if (FrontendOpts.InputsAndOutputs.hasSingleInput()) {
-    Opts.MainInputFilename =
-        FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
-  }
-  Opts.OutputFilenames = FrontendOpts.OutputFilenames;
+  Opts.IRGOutputFilenames = FrontendOpts.InputsAndOutputs.copyOutputFilenames();
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
@@ -1053,8 +1042,8 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-CompilerInvocation::setUpInputForSILTool(
-    StringRef inputFilename, StringRef moduleNameArg,
+CompilerInvocation::setUpInputAndOutputForSILTool(
+    StringRef inputFilename, StringRef OutputFilename, StringRef moduleNameArg,
     bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
@@ -1066,8 +1055,8 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
+  getFrontendOptions().InputsAndOutputs.addInput(InputFile(
+      inputFilename, bePrimary, fileBufOrErr.get().get(), OutputFilename));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);

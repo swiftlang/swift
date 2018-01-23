@@ -13,6 +13,11 @@
 #ifndef SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
+
+#include <string>
+
 namespace swift {
 struct SupplementaryOutputPaths {
   /// The path to which we should emit an Objective-C header for the module.
