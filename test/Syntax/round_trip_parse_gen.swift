@@ -66,6 +66,8 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+    _ = self
+    _ = Self
   }
 
   func superExpr() {

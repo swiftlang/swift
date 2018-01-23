@@ -68,7 +68,12 @@ EXPR_NODES = [
     # An identifier expression.
     Node('IdentifierExpr', kind='Expr',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'SelfToken',
+                       'CapitalSelfToken',
+                   ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),
          ]),
