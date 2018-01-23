@@ -70,16 +70,19 @@ infix operator ⊗ : MultiplicationPrecedence
 /// Arithmetic Operators.
 extension Tensor /*: Numeric*/ where Unit : Numeric {
   @_inlineable
+  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
   public static func +(lhs: Tensor, rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Add", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
+  // @differentiable(gradient: _adjointSubtract(_:_:primal:seed:))
   public static func -(lhs: Tensor, rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Sub", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable
+  // @differentiable(gradient: _adjointMultiply(_:_:primal:seed:))
   public static func *(lhs: Tensor, rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Mul", "tt:t", lhs.handle, rhs.handle))
   }
@@ -87,11 +90,13 @@ extension Tensor /*: Numeric*/ where Unit : Numeric {
 
 public extension Tensor where Unit : Numeric {
   @_inlineable
+  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
   static func +(lhs: Tensor, rhs: Unit) -> Tensor {
     return lhs + Tensor(rhs)
   }
 
   @_inlineable
+  // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
   static func +(lhs: Unit, rhs: Tensor) -> Tensor {
     return Tensor(lhs) + rhs
   }
@@ -102,6 +107,7 @@ public extension Tensor where Unit : Numeric {
   }
 
   @_inlineable
+  // @differentiable(gradient: _adjointNegate(_:primal:seed:))
   static prefix func -(rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Neg", "t:t", rhs.handle))
   }
@@ -247,13 +253,12 @@ public extension Tensor where Unit : Numeric {
   }
 
   @_inlineable
-  func square() -> Tensor {
-    // TODO: Is the TF op for this more efficient?
-    return self ⊗ transpose
+  func squared() -> Tensor {
+    return Tensor(#tfop("Square", "t:t", handle))
   }
 }
 
-public extension Tensor /*: Comparable*/ where Unit : Comparable {
+public extension Tensor where Unit : Comparable {
   @_inlineable
   static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
     return Tensor<Bool>(#tfop("Less", "tt:t<bool>", lhs.handle, rhs.handle))
@@ -268,9 +273,56 @@ public extension Tensor /*: Comparable*/ where Unit : Comparable {
   static func < (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
     return Tensor(lhs) < rhs
   }
+
+  @_inlineable
+  static func <= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor<Bool>(#tfop("LessEqual", "tt:t<bool>",
+                        lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  static func <= (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
+    return lhs <= Tensor(rhs)
+  }
+
+  @_inlineable
+  static func <= (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) <= rhs
+  }
+
+  @_inlineable
+  static func > (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor<Bool>(#tfop("Greater", "tt:t<bool>", lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  static func > (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
+    return lhs > Tensor(rhs)
+  }
+
+  @_inlineable
+  static func > (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) > rhs
+  }
+
+  @_inlineable
+  static func >= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor<Bool>(#tfop("GreaterEqual", "tt:t<bool>",
+                       lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  static func >= (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
+    return lhs >= Tensor(rhs)
+  }
+
+  @_inlineable
+  static func >= (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) >= rhs
+  }
 }
 
-public extension Tensor /*: Equatable*/ where Unit : Equatable {
+public extension Tensor where Unit : Equatable {
   @_inlineable
   static func == (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
     return Tensor<Bool>(#tfop("Equal", "tt:t<bool>", lhs.handle, rhs.handle))
@@ -287,7 +339,7 @@ public extension Tensor /*: Equatable*/ where Unit : Equatable {
   }
 }
 
-/// Arithmetic methods.
+/// Transposition and concatenation
 public extension Tensor {
   @_inlineable
   var transpose: Tensor {
@@ -308,6 +360,7 @@ public func abs<Unit: Numeric>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointLog(_:primal:seed:))
 public func log<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -315,6 +368,7 @@ public func log<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointSin(_:primal:seed:))
 public func sin<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -322,6 +376,7 @@ public func sin<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointCos(_:primal:seed:))
 public func cos<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -329,6 +384,7 @@ public func cos<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointTan(_:primal:seed:))
 public func tan<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -336,6 +392,7 @@ public func tan<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointSinh(_:primal:seed:))
 public func sinh<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -343,6 +400,7 @@ public func sinh<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointCosh(_:primal:seed:))
 public func cosh<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -350,6 +408,7 @@ public func cosh<Unit: FloatingPoint>(
 }
 
 @_inlineable
+// @differentiable(gradient: _adjointTanh(_:primal:seed:))
 public func tanh<Unit: FloatingPoint>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
@@ -364,22 +423,89 @@ public func exp<Unit: FloatingPoint>(
 }
 
 @_inlineable
-public func pow<Unit>(_ x: Tensor<Unit>) -> Tensor<Unit> {
-  return Tensor(#tfop("Pow", "t:t", x.handle))
+// @differentiable(gradient: _adjointPow(_:_:primal:seed:))
+public func pow<Unit : Numeric>(
+  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
+  return Tensor(#tfop("Pow", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable
-public func min<Unit: Comparable>(
+public func pow<Unit : Numeric>(
+  _ lhs: Unit, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
+  return pow(Tensor(lhs), rhs)
+}
+
+@_inlineable
+public func pow<Unit : Numeric>(
+  _ lhs: Tensor<Unit>, _ rhs: Unit
+) -> Tensor<Unit> {
+  return pow(lhs, Tensor(rhs))
+}
+
+@_inlineable
+// @differentiable(gradient: _adjointMin(_:_:primal:seed:))
+public func min<Unit : Numeric & Comparable>(
   _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
 ) -> Tensor<Unit> {
   return Tensor(#tfop("Min", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable
-public func max<Unit: Comparable>(
+public func min<Unit : Numeric & Comparable>(
+  _ lhs: Unit, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
+  return min(Tensor(lhs), rhs)
+}
+
+@_inlineable
+public func min<Unit : Numeric & Comparable>(
+  _ lhs: Tensor<Unit>, _ rhs: Unit
+) -> Tensor<Unit> {
+  return min(lhs, Tensor(rhs))
+}
+
+@_inlineable
+// @differentiable(gradient: _adjointMax(_:_:primal:seed:))
+public func max<Unit : Numeric & Comparable>(
   _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
 ) -> Tensor<Unit> {
   return Tensor(#tfop("Max", "tt:t", lhs.handle, rhs.handle))
+}
+
+@_inlineable
+public func max<Unit : Numeric & Comparable>(
+  _ lhs: Unit, _ rhs: Tensor<Unit>
+) -> Tensor<Unit> {
+  return max(Tensor(lhs), rhs)
+}
+
+@_inlineable
+public func max<Unit : Numeric & Comparable>(
+  _ lhs: Tensor<Unit>, _ rhs: Unit
+) -> Tensor<Unit> {
+  return max(lhs, Tensor(rhs))
+}
+
+public extension Tensor where Unit == Bool {
+  @inline(never) // Change to @_inlineable when implemented
+  public func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
+    // FIXME(clattner?): Add support for 't<bool>' in arguments.
+    // return Tensor(#tfop("Select", "t<bool>tt:t",
+    //               handle, left.handle, right.handle))
+    fatalError("Unimplemented")
+  }
+
+  @_inlineable
+  public func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
+    return selecting(Tensor<T>(left), right)
+  }
+
+  @_inlineable
+  public func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
+    return selecting(left, Tensor<T>(right))
+  }
 }
 
 public extension Tensor2D where Unit : Numeric {
