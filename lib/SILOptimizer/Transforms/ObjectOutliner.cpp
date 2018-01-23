@@ -377,18 +377,23 @@ bool ObjectOutliner::optimizeObjectAllocation(
   // Replace the alloc_ref by global_value + strong_retain instructions.
   SILBuilder B(ARI);
   GlobalValueInst *GVI = B.createGlobalValue(ARI->getLoc(), Glob);
-  B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
+  bool hasToRetain = true;
   llvm::SmallVector<Operand *, 8> Worklist(ARI->use_begin(), ARI->use_end());
   while (!Worklist.empty()) {
     auto *Use = Worklist.pop_back_val();
     SILInstruction *User = Use->getUser();
     switch (User->getKind()) {
       case SILInstructionKind::DeallocRefInst:
+      case SILInstructionKind::SetDeallocatingInst:
+        hasToRetain = false;
         ToRemove.push_back(User);
         break;
       default:
         Use->set(GVI);
     }
+  }
+  if (hasToRetain) {
+    B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
   }
   if (FindStringCall && NumTailElems > 16) {
     assert(&*std::next(ARI->getIterator()) != FindStringCall &&
