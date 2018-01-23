@@ -121,6 +121,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     break;
   }
   case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
