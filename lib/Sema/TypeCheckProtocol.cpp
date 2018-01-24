@@ -2655,8 +2655,12 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
+  if (type->hasError())
+    return ErrorType::get(tc.Context);
+
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
+
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
@@ -2780,7 +2784,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     [nonViable](NormalProtocolConformance *conformance) {
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredInterfaceType()->hasError())
+        if (candidate.first->getDeclaredInterfaceType()->hasError() ||
+            candidate.second.isError())
           continue;
 
         diags.diagnose(

@@ -550,8 +550,9 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   if (Loader)
     resolveLazyInfo();
 
-  if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
-    return true;
+  auto found = TypeWitnesses.find(assocType);
+  if (found != TypeWitnesses.end()) {
+    return !found->getSecond().first.isNull();
   }
   if (resolver) {
     PrettyStackTraceRequirement trace("resolving", this, assocType);
@@ -594,6 +595,9 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
   assert(resolver && "Unable to resolve type witness");
+
+  // Block recursive resolution of this type witness.
+  TypeWitnesses[assocType] = { Type(), nullptr };
   resolver->resolveTypeWitness(this, assocType);
 
   known = TypeWitnesses.find(assocType);
@@ -606,7 +610,9 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
                                                TypeDecl *typeDecl) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
-  assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
+  assert((TypeWitnesses.count(assocType) == 0 ||
+          TypeWitnesses[assocType].first.isNull()) &&
+         "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
