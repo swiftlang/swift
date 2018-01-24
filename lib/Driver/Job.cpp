@@ -147,3 +147,14 @@ void Job::printSummary(raw_ostream &os) const {
   }
   os << "}";
 }
+
+BatchJob::BatchJob(const JobAction &Source,
+                   SmallVectorImpl<const Job *> &&Inputs,
+                   std::unique_ptr<CommandOutput> Output,
+                   const char *Executable, llvm::opt::ArgStringList Arguments,
+                   EnvironmentVector ExtraEnvironment,
+                   std::vector<FilelistInfo> Infos,
+                   ArrayRef<const Job *> Combined)
+    : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
+          ExtraEnvironment, Infos),
+      CombinedJobs(Combined.begin(), Combined.end()) {}

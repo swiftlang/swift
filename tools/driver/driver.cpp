@@ -22,6 +22,7 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/ToolChain.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/FrontendTool/FrontendTool.h"
@@ -194,8 +195,17 @@ int main(int argc_, const char **argv_) {
     break;
   }
 
-  std::unique_ptr<Compilation> C = TheDriver.buildCompilation(argv);
+  std::unique_ptr<llvm::opt::InputArgList> ArgList =
+    TheDriver.parseArgStrings(ArrayRef<const char*>(argv).slice(1));
+  if (Diags.hadAnyError())
+    return 1;
 
+  std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
+  if (Diags.hadAnyError())
+    return 1;
+
+  std::unique_ptr<Compilation> C =
+      TheDriver.buildCompilation(*TC, std::move(ArgList));
   if (Diags.hadAnyError())
     return 1;
 
