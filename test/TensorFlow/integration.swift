@@ -38,9 +38,9 @@ public func testTensor() {
 // CHECK: [[ALLOC:%.*]] = alloc_stack $OpaquePointer
 // CHECK: ref_element_addr
 // CHECK: begin_access [read] [static] [[ALLOC]] : $*OpaquePointer
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
+// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied to the accelerator}}
@@ -69,13 +69,13 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK: string_literal bytes "{{.....}}
 // CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
 
-// StartTensorProgram is called with one input tensor
+// StartTensorComputation is called with one input tensor
 // CHECK: [[TENSORS:%.*]] = struct $UnsafePointer<OpaquePointer> ({{%.*}} : $Builtin.RawPointer)
 // CHECK-NEXT: [[TENSOR_COUNT:%.*]] = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: [[TENSOR_COUNT_STRUCT:%.*]] = struct $Int ([[TENSOR_COUNT]] : $Builtin.Int64)
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN]]({{%.*}}, {{%.*}}, [[TENSORS]], [[TENSOR_COUNT_STRUCT]]
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
+// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 
@@ -106,17 +106,17 @@ public func testExitBranch(i : Int) {
 // and finish it on the normal path.
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testExitBranch{{.*}}
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN]](
 // CHECK: cond_br
 
 // CHECK: bb1:
-// CHECK: [[TERMFN:%.*]] = function_ref @_swift_tfc_TerminateTensorProgram
-// CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@owned TensorProgram) -> ()
+// CHECK: [[TERMFN:%.*]] = function_ref @_swift_tfc_TerminateTensorComputation
+// CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@owned _TensorComputation) -> ()
 // CHECK: br bb3
 
 // CHECK: bb2:
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
+// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 // CHECK: bb3:
@@ -183,7 +183,7 @@ public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitl
 // CHECK: function_ref @_swift_tfc_CreateCTensorHandle
 // CHECK: [[BOOLADDR:%.*]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT: store [[BOOLVAL]] to [[BOOLADDR]] : $*Builtin.Int1
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: cond_br [[BOOLVAL]],
 
