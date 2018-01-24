@@ -33,8 +33,8 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
-  typedef llvm::StringMap<unsigned> InputFileMap;
-  InputFileMap PrimaryInputs;
+
+  llvm::StringMap<unsigned> PrimaryInputs;
 
 public:
   FrontendInputsAndOutputs() = default;
@@ -42,6 +42,8 @@ public:
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
 
   // Readers:
+
+  // All inputs:
 
   ArrayRef<InputFile> getAllInputs() const { return AllInputs; }
 
@@ -53,22 +55,25 @@ public:
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
+  const InputFile &firstInput() const { return AllInputs[0]; }
+  InputFile &firstInput() { return AllInputs[0]; }
+
+  const InputFile &lastInput() const { return AllInputs.back(); }
+
   StringRef getFilenameOfFirstInput() const;
 
   bool isReadingFromStdin() const;
 
-  // If we have exactly one input filename, and its extension is "bc" or "ll",
-  // treat the input as LLVM_IR.
-  bool shouldTreatAsLLVM() const;
+  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const;
 
-  // Primary input readers
+  // Primaries:
 
-private:
-  void assertMustNotBeMoreThanOnePrimaryInput() const;
+  const InputFile &firstPrimaryInput() const;
+  const InputFile &lastPrimaryInput() const;
 
-  bool areAllNonPrimariesSIB() const;
+  void
+  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const;
 
-public:
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:
@@ -78,6 +83,9 @@ public:
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() const { return !hasPrimaryInputs(); }
+
+  // FIXME: dmu fix uses / remove these when batch mode works
+  void assertMustNotBeMoreThanOnePrimaryInput() const;
 
   // Count-dependend readers:
 
@@ -96,28 +104,25 @@ public:
 
   // Multi-facet readers
 
+  // If we have exactly one input filename, and its extension is "bc" or "ll",
+  // treat the input as LLVM_IR.
+  bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+
+  bool areAllNonPrimariesSIB() const;
 
   /// \return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
-  // Writers
+  // Changing inputs
 
-  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, false, buffer));
-  }
-  void addPrimaryInputFile(StringRef file,
-                           llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file, true, buffer));
-  }
-
+public:
+  void clearInputs();
   void addInput(const InputFile &input);
-
-  void clearInputs() {
-    AllInputs.clear();
-    PrimaryInputs.clear();
-  }
+  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
+  void addPrimaryInputFile(StringRef file,
+                           llvm::MemoryBuffer *buffer = nullptr);
 };
 
 } // namespace swift
