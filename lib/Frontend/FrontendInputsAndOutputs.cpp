@@ -58,6 +58,45 @@ bool FrontendInputsAndOutputs::isReadingFromStdin() const {
   return hasSingleInput() && getFilenameOfFirstInput() == "-";
 }
 
+StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
+  assert(hasInputs());
+  const InputFile &inp = AllInputs[0];
+  StringRef f = inp.file();
+  assert(!f.empty());
+  return f;
+}
+
+void FrontendInputsAndOutputs::forEachInput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  for (const InputFile &input : AllInputs)
+    fn(input);
+}
+
+// Primaries:
+
+const InputFile &FrontendInputsAndOutputs::firstPrimaryInput() const {
+  assert(!PrimaryInputs.empty());
+  for (const auto &f : AllInputs)
+    if (f.isPrimary())
+      return f;
+  llvm_unreachable("no first primary?!");
+}
+
+const InputFile &FrontendInputsAndOutputs::lastPrimaryInput() const {
+  assert(!PrimaryInputs.empty());
+  for (const auto &f : reversed(AllInputs))
+    if (f.isPrimary())
+      return f;
+  llvm_unreachable("no last primary?!");
+}
+
+void FrontendInputsAndOutputs::forEachPrimaryInput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  for (auto &f : AllInputs)
+    if (f.isPrimary())
+      fn(f);
+}
+
 void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
   assert(primaryInputCount() < 2 &&
          "have not implemented >1 primary input yet");
@@ -87,13 +126,17 @@ bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
          AllInputs[iterator->second].isPrimary();
 }
 
-StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
-  assert(hasInputs());
-  const InputFile &inp = AllInputs[0];
-  StringRef f = inp.file();
-  assert(!f.empty());
-  return f;
+unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
+    const char *extension) const {
+  return count_if(
+      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
+        StringRef filename = AllInputs[elem.second].file();
+
+        return llvm::sys::path::extension(filename).endswith(extension);
+      });
 }
+
+// Input queries
 
 bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
@@ -124,19 +167,15 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
-void FrontendInputsAndOutputs::addInput(const InputFile &input) {
-  if (!input.file().empty() && input.isPrimary())
-    PrimaryInputs.insert(std::make_pair(input.file(), AllInputs.size()));
-  AllInputs.push_back(input);
-}
-
-unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
-    const char *extension) const {
-  return count_if(
-      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
-        StringRef filename = AllInputs[elem.second].file();
-        return llvm::sys::path::extension(filename).endswith(extension);
-      });
+bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
+  for (const InputFile &input : AllInputs) {
+    if (input.isPrimary())
+      continue;
+    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
@@ -171,13 +210,25 @@ bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
   return false;
 }
 
-bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
-  for (const InputFile &input : AllInputs) {
-    if (input.isPrimary())
-      continue;
-    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
-      return false;
-    }
-  }
-  return true;
+// Changing inputs
+
+void FrontendInputsAndOutputs::clearInputs() {
+  AllInputs.clear();
+  PrimaryInputs.clear();
+}
+
+void FrontendInputsAndOutputs::addInput(const InputFile &input) {
+  if (!input.file().empty() && input.isPrimary())
+    PrimaryInputs.insert(std::make_pair(input.file(), AllInputs.size()));
+  AllInputs.push_back(input);
+}
+
+void FrontendInputsAndOutputs::addInputFile(StringRef file,
+                                            llvm::MemoryBuffer *buffer) {
+  addInput(InputFile(file, false, buffer));
+}
+
+void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
+                                                   llvm::MemoryBuffer *buffer) {
+  addInput(InputFile(file, true, buffer));
 }
