@@ -145,9 +145,22 @@ extension _UnmanagedOpaqueString {
 }
 
 extension _StringGuts {
+  //
+  // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
+  //
   @_versioned
+  @effects(readonly)
   @inline(never) // Hide the CF dependency
+  internal static func _computeHashValue(
+    _unsafeBitPattern: _RawBitPattern
+  ) -> Int {
+    return _StringGuts(rawBits: _unsafeBitPattern)._computeHashValue()
+  }
+
+  @_versioned
+  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
   internal func _computeHashValue() -> Int {
+    defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
       return _asOpaque().computeHashValue()
     }
@@ -158,8 +171,9 @@ extension _StringGuts {
   }
 
   @_versioned
-  @inline(never) // Hide the CF dependency
+  // TODO: After removing above hack: @inline(never) // Hide the CF dependency
   internal func _computeHashValue(_ range: Range<Int>) -> Int {
+    defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
       return _asOpaque()[range].computeHashValue()
     }
@@ -177,7 +191,9 @@ extension String : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _guts._computeHashValue()
+    defer { _fixLifetime(self) }
+    let gutsBits = _guts.rawBits
+    return _StringGuts._computeHashValue(_unsafeBitPattern: gutsBits)
   }
 }
 
