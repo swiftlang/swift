@@ -25,7 +25,6 @@ import Glibc
 public enum ParserError: Error {
   case swiftcFailed(Int, String)
   case invalidFile
-  case jsonDecodeError(input: String, originalError: Error);
 }
 
 extension Syntax {
@@ -43,16 +42,8 @@ extension Syntax {
     guard result.wasSuccessful else {
       throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
-    let jsonData = result.stdoutData
     let decoder = JSONDecoder()
-    let raw: RawSyntax
-    do {
-      raw = try decoder.decode(RawSyntax.self, from: jsonData)
-    } catch let err {
-      throw ParserError.jsonDecodeError(
-          input: String(data: jsonData, encoding: .utf8) ?? jsonData.base64EncodedString(),
-          originalError: err)
-    }
+    let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
     guard let file = Syntax.fromRaw(raw) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
