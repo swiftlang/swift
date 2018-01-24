@@ -584,7 +584,10 @@ public:
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
-    // FIXME: Implement.
+#define BUILTIN_TYPE(Symbol, _) \
+    if (mangledName.equals(#Symbol)) \
+      return &METADATA_SYM(Symbol).base;
+#include "swift/Runtime/BuiltinTypes.def"
     return BuiltType();
   }
 
