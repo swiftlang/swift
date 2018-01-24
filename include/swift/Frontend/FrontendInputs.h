@@ -32,7 +32,7 @@ namespace swift {
 class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
-  std::vector<InputFile> AllFiles;
+  std::vector<InputFile> AllInputs;
   typedef llvm::StringMap<unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
 
@@ -45,13 +45,13 @@ public:
 
   // Readers:
 
-  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-
+  ArrayRef<InputFile> getAllInputs() const { return AllInputs; }
+  
   std::vector<std::string> getInputFilenames() const;
 
-  unsigned inputCount() const { return getAllFiles().size(); }
+  unsigned inputCount() const { return AllInputs.size(); }
 
-  bool hasInputs() const { return !AllFiles.empty(); }
+  bool hasInputs() const { return !AllInputs.empty(); }
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
@@ -92,7 +92,7 @@ public:
   /// there isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const;
 
-  bool isFilePrimary(StringRef file) const;
+  bool isInputPrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
@@ -117,7 +117,7 @@ public:
   void addInput(const InputFile &input);
 
   void clearInputs() {
-    AllFiles.clear();
+    AllInputs.clear();
     PrimaryInputs.clear();
   }
 };
