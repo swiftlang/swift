@@ -29,8 +29,9 @@ using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args, FrontendInputs &inputs)
-    : Diags(diags), Args(args), Inputs(inputs),
+    DiagnosticEngine &diags, const ArgList &args,
+    FrontendInputsAndOutputs &inputsAndOutputs)
+    : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
@@ -131,7 +132,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
     std::set<StringRef> primaryFiles) {
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    Inputs.addInput(InputFile(file, isPrimary));
+    InputsAndOutputs.addInput(InputFile(file, isPrimary));
     if (isPrimary)
       primaryFiles.erase(file);
   }
