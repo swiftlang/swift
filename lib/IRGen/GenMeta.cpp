@@ -1045,12 +1045,14 @@ static bool isLoadFrom(llvm::Value *value, Address address) {
 void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
                                         llvm::Function *accessor,
                                         llvm::GlobalVariable *cacheVariable,
-         const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue) {
+         const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue,
+         bool isReadNone) {
   accessor->setDoesNotThrow();
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
-  accessor->setDoesNotAccessMemory();
+  if (isReadNone)
+    accessor->setDoesNotAccessMemory();
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
@@ -1509,10 +1511,15 @@ static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   if (IGM.getOptions().optimizeForSize())
     accessor->addFnAttr(llvm::Attribute::NoInline);
 
+  bool isReadNone =
+      (genericArgs.Types.size() <= NumDirectGenericTypeMetadataAccessFunctionArgs);
+
   emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
-                              [&](IRGenFunction &IGF) -> llvm::Value* {
-    return emitGenericMetadataAccessFunction(IGF, nominal, genericArgs);
-  });
+                              [&](IRGenFunction &IGF) -> llvm::Value * {
+                                return emitGenericMetadataAccessFunction(
+                                    IGF, nominal, genericArgs);
+                              },
+                              isReadNone);
 
   return accessor;
 }
