@@ -65,6 +65,9 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
+    /// A single process that batches together multiple StandardCompile jobs.
+    BatchModeCompile,
+
     /// Invoke the REPL
     REPL,
 
@@ -175,13 +178,28 @@ public:
 
   void setCheckInputFilesExist(bool Value) { CheckInputFilesExist = Value; }
 
-  /// Construct a compilation object for a command line argument vector.
+  /// Creates an appropriate ToolChain for a given driver, given the target
+  /// specified in \p Args (or the default target). Sets the value of \c
+  /// DefaultTargetTriple from \p Args as a side effect.
+  ///
+  /// \return A ToolChain, or nullptr if an unsupported target was specified
+  /// (in which case a diagnostic error is also signalled).
+  ///
+  /// This uses a std::unique_ptr instead of returning a toolchain by value
+  /// because ToolChain has virtual methods.
+  std::unique_ptr<ToolChain>
+  buildToolChain(const llvm::opt::InputArgList &ArgList);
+
+  /// Construct a compilation object for a given ToolChain and command line
+  /// argument vector.
   ///
   /// \return A Compilation, or nullptr if none was built for the given argument
   /// vector. A null return value does not necessarily indicate an error
   /// condition; the diagnostics should be queried to determine if an error
   /// occurred.
-  std::unique_ptr<Compilation> buildCompilation(ArrayRef<const char *> Args);
+  std::unique_ptr<Compilation>
+  buildCompilation(const ToolChain &TC,
+                   std::unique_ptr<llvm::opt::InputArgList> ArgList);
 
   /// Parse the given list of strings into an InputArgList.
   std::unique_ptr<llvm::opt::InputArgList>
@@ -296,9 +314,9 @@ private:
                                      llvm::SmallString<128> &Buf,
                                      CommandOutput *Output) const;
 
-  void chooseSaveOptimizationPath(Compilation &C, const OutputInfo &OI,
-                                  llvm::SmallString<128> &Buf,
-                                  CommandOutput *Output) const;
+  void chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
+                                    llvm::SmallString<128> &Buf,
+                                    CommandOutput *Output) const;
 
   void chooseObjectiveCHeaderOutputPath(Compilation &C, const OutputInfo &OI,
                                         const TypeToPathMap *OutputMap,
