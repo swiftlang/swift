@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
+// REQUIRES: rdar36740859
 
 import Foundation
 import StdlibUnittest
