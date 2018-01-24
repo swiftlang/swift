@@ -31,10 +31,10 @@ VisitorTests.test("Basic") {
   expectDoesNotThrow({
     let parsed = try Syntax.parse(getInput("visitor.swift"))
     let counter = FuncCounter()
-    let hashBefore = parsed.hashValue
+    let idBefore = parsed.uniqueIdentifier
     counter.visit(parsed)
     expectEqual(counter.funcCount, 3)
-    expectEqual(hashBefore, parsed.hashValue)
+    expectEqual(idBefore, parsed.uniqueIdentifier)
   })
 }
 

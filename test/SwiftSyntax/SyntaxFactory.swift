@@ -52,15 +52,18 @@ SyntaxFactoryAPI.test("Generated") {
               }
               """)
 
-  expectNotEqual(structDecl.members, renamed.members)
-  expectEqual(structDecl, structDecl.root)
+  expectNotEqual(structDecl.members.uniqueIdentifier, 
+                 renamed.members.uniqueIdentifier)
+  expectEqual(structDecl.uniqueIdentifier, structDecl.root.uniqueIdentifier)
   expectNil(structDecl.parent)
   expectNotNil(structDecl.members.parent)
-  expectEqual(structDecl.members.parent, structDecl)
+  expectEqual(structDecl.members.parent?.uniqueIdentifier, 
+              structDecl.uniqueIdentifier)
 
   // Ensure that accessing children via named identifiers is exactly the
   // same as accessing them as their underlying data.
-  expectEqual(structDecl.members, structDecl.child(at: 7))
+  expectEqual(structDecl.members.uniqueIdentifier, 
+              structDecl.child(at: 7)?.uniqueIdentifier)
   
   expectEqual("\(structDecl.members.rightBrace)",
               """

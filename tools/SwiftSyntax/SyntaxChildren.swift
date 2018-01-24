@@ -15,7 +15,7 @@ import Foundation
 public struct SyntaxChildren: Sequence {
   public struct Iterator: IteratorProtocol {
     let node: Syntax
-    var indexIterator: Syntax.PresentChildIndicesSequence.Iterator
+    var indexIterator: _SyntaxBase.PresentChildIndicesSequence.Iterator
 
     init(node: Syntax) {
       self.indexIterator = node.presentChildIndices.makeIterator()

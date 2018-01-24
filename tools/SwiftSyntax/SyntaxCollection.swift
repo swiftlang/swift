@@ -15,7 +15,19 @@ import Foundation
 /// Represents a collection of Syntax nodes of a specific type. SyntaxCollection
 /// behaves as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
-public class SyntaxCollection<SyntaxElement: Syntax>: Syntax {
+public class SyntaxCollection<SyntaxElement: Syntax>: _SyntaxBase {
+  var _root: SyntaxData
+  unowned var _data: SyntaxData 
+
+  /// Creates a Syntax node from the provided root and data.
+  internal init(root: SyntaxData, data: SyntaxData) {
+    self._root = root
+    self._data = data
+#if DEBUG
+    validate()
+#endif
+  }
+
   /// Creates a new SyntaxCollection by replacing the underlying layout with
   /// a different set of raw syntax nodes.
   ///

@@ -15,7 +15,8 @@ LazyCaching.test("Pathological") {
   let tuple = SyntaxFactory.makeVoidTupleType()
 
   DispatchQueue.concurrentPerform(iterations: 100) { _ in
-    expectEqual(tuple.leftParen, tuple.leftParen)
+    expectEqual(tuple.leftParen.uniqueIdentifier, 
+                tuple.leftParen.uniqueIdentifier)
   }
 }
 
@@ -41,9 +42,9 @@ LazyCaching.test("TwoAccesses") {
 
   expectNotNil(node1)
   expectNotNil(node2)
-  expectEqual(node1, node2)
-  expectEqual(node1, final)
-  expectEqual(node2, final)
+  expectEqual(node1?.uniqueIdentifier, node2?.uniqueIdentifier)
+  expectEqual(node1?.uniqueIdentifier, final.uniqueIdentifier)
+  expectEqual(node2?.uniqueIdentifier, final.uniqueIdentifier)
 }
 
 runAllTests()
