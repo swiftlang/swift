@@ -2310,9 +2310,18 @@ public:
         if (inst->isTypeDependentOperand(*use))
           continue;
         switch (inst->getKind()) {
+        case SILInstructionKind::MarkDependenceInst:
+          break;
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst:
         case SILInstructionKind::PartialApplyInst:
+          // Non-Mutating set pattern that allows a inout (that can't really
+          // write back.
+          if (auto *AI = dyn_cast<ApplyInst>(inst)) {
+            if (isa<PointerToThinFunctionInst>(AI->getCallee())) {
+              break;
+            }
+          }
           if (isConsumingOrMutatingApplyUse(use))
             return true;
           else
