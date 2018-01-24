@@ -42,8 +42,8 @@ class Node(object):
 
         # Since Syntax, and all the base kinds, are protocols, we can't
         # directly instantiate them or use them as concrete types.
-        # Instead, all collection elements with a 'base' kind actually have type
-        # Any<kind>Syntax in SwiftSyntax.
+        # Instead, all collection elements with a 'base' kind actually have
+        # type Any<kind>Syntax in SwiftSyntax.
         if self.collection_element in SYNTAX_BASE_KINDS:
             self.swift_collection_element_type = \
                 'Any' + self.collection_element_type
