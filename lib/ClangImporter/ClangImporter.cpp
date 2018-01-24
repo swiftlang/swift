@@ -2342,13 +2342,16 @@ ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
 void ClangImporter::lookupRelatedEntity(
     StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
     llvm::function_ref<void(TypeDecl*)> receiver) {
-  if (relatedEntityKind.size() != 1)
-    return;
-  if (relatedEntityKind[0] == ERROR_ENUM_MANGLING_KEY ||
-      relatedEntityKind[0] == ERROR_ENUM_ANON_MANGLING_KEY) {
+  using CISTAttr = ClangImporterSynthesizedTypeAttr;
+  if (relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapper) ||
+      relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
     auto underlyingKind = ClangTypeKind::Tag;
-    if (relatedEntityKind[0] == ERROR_ENUM_ANON_MANGLING_KEY)
+    if (relatedEntityKind ==
+          CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
       underlyingKind = ClangTypeKind::Typedef;
+    }
     lookupTypeDecl(rawName, underlyingKind,
                    [this, receiver] (const TypeDecl *foundType) {
       auto *enumDecl =

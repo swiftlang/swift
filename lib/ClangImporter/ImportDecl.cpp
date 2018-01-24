@@ -2690,16 +2690,18 @@ namespace {
             new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
           StringRef nameForMangling;
-          char relatedEntityKind;
+          ClangImporterSynthesizedTypeAttr::Kind relatedEntityKind;
           if (decl->getDeclName().isEmpty()) {
             nameForMangling = decl->getTypedefNameForAnonDecl()->getName();
-            relatedEntityKind = ERROR_ENUM_ANON_MANGLING_KEY;
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon;
           } else {
             nameForMangling = decl->getName();
-            relatedEntityKind = ERROR_ENUM_MANGLING_KEY;
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper;
           }
-          errorWrapper->getAttrs().add(new (C) CustomTypeNameManglingAttr(
-              C.getIdentifier(nameForMangling), relatedEntityKind));
+          errorWrapper->getAttrs().add(new (C) ClangImporterSynthesizedTypeAttr(
+              nameForMangling, relatedEntityKind));
 
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,

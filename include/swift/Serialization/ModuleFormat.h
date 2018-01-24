@@ -1422,8 +1422,8 @@ namespace decls_block {
     = BCRecordLayout<ObjCRuntimeName_DECL_ATTR>;
   using RestatedObjCConformanceDeclAttrLayout
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
-  using CustomTypeNameManglingDeclAttrLayout
-    = BCRecordLayout<CustomTypeNameMangling_DECL_ATTR>;
+  using ClangImporterSynthesizedTypeDeclAttrLayout
+    = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

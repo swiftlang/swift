@@ -506,15 +506,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_downgrade_exhaustivity_check");
     break;
 
-  case DAK_CustomTypeNameMangling: {
-    Printer.printAttrName("@_customTypeNameMangling");
-    auto *attr = cast<CustomTypeNameManglingAttr>(this);
-    Printer << "(name: \"" << attr->Name << "\"";
-    if (!attr->getRelatedEntityKind().empty()) {
-      Printer << ", relatedEntityKind: \"" << attr->getRelatedEntityKind()
-              << "\"";
-    }
-    Printer << ")";
+  case DAK_ClangImporterSynthesizedType: {
+    Printer.printAttrName("@_clangImporterSynthesizedType");
+    auto *attr = cast<ClangImporterSynthesizedTypeAttr>(this);
+    Printer << "(originalTypeName: \"" << attr->originalTypeName
+            << "\", manglingForKind: \"" << attr->getManglingName() << "\")";
     break;
   }
 
@@ -647,8 +643,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_specialize";
   case DAK_Implements:
     return "_implements";
-  case DAK_CustomTypeNameMangling:
-    return "_customTypeNameMangling";
+  case DAK_ClangImporterSynthesizedType:
+    return "_clangImporterSynthesizedType";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

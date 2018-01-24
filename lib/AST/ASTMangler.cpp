@@ -598,19 +598,17 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  DeclBaseName name;
-
-  auto *customNameAttr =
-      decl->getAttrs().getAttribute<CustomTypeNameManglingAttr>();
-
-  if (customNameAttr)
-    name = customNameAttr->Name;
-  else
-    name = decl->getBaseName();
-
+  DeclBaseName name = decl->getBaseName();
   assert(!name.isSpecial() && "Cannot print special names");
 
-  if (name.isOperator()) {
+  auto *synthesizedTypeAttr =
+      decl->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
+
+  if (synthesizedTypeAttr) {
+    assert(!isDigit(synthesizedTypeAttr->originalTypeName[0]) &&
+           "synthesized type's original name must be a valid Swift identifier");
+    appendIdentifier(synthesizedTypeAttr->originalTypeName);
+  } else if (name.isOperator()) {
     appendIdentifier(translateOperator(name.getIdentifier().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
@@ -643,8 +641,15 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
 
-  if (customNameAttr && !customNameAttr->getRelatedEntityKind().empty())
-    return appendOperatorParam("L", customNameAttr->getRelatedEntityKind());
+  if (synthesizedTypeAttr) {
+    StringRef relatedEntityKind = synthesizedTypeAttr->getManglingName();
+    assert(relatedEntityKind.size() == 1 &&
+           "'L' operator only supports a single letter payload");
+    assert(((relatedEntityKind[0] >= 'a' && relatedEntityKind[0] <= 'j') ||
+            (relatedEntityKind[0] >= 'A' && relatedEntityKind[0] <= 'J')) &&
+           "Only [a-jA-J] are reserved for related entity kinds");
+    return appendOperatorParam("L", synthesizedTypeAttr->getManglingName());
+  }
 
   StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
   if (!privateDiscriminator.empty()) {
