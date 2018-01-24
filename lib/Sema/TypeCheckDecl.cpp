@@ -9159,7 +9159,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
       if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
-          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)) {
+          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
+          || isa<ExtensionDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
