@@ -32,8 +32,8 @@ import CTensorFlow
 /// TODO(hongm): Revisit the longer-term design.
 public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in _TFCStartTensorComputation(),
-  /// instead of running it in a thread.
-  /// Set to true only for debugging purposes.
+  /// instead of running it on a separate thread.
+  /// - Note: Set to true only for debugging purposes.
   static public var usesSynchronousExecution = false
 
   /// When true, prints various debug messages on the runtime state.
@@ -55,9 +55,8 @@ public final class _ExecutionContext {
   private let status: CTFStatus = TF_NewStatus()
 
 #if os(Linux) || os(FreeBSD)
-  /// The mutex for asynchronous execution.
-  private var mutex: pthread_mutex_t? =
-    _RuntimeConfig.usesSynchronousExecution ? nil : pthread_mutex_t()
+  /// The mutex for preventing potential concurrent access.
+  private var mutex: pthread_mutex_t = pthread_mutex_t()
 #endif
 
   /// Initializes a new execution context by initializing available devices.
@@ -68,9 +67,7 @@ public final class _ExecutionContext {
     checkOk(status)
     // Initialize the mutex.
 #if os(Linux) || os(FreeBSD)
-    if mutex != nil {
-      pthread_mutex_init(&mutex!, nil)
-    }
+    pthread_mutex_init(&mutex, nil)
 #endif
   }
 
@@ -79,9 +76,7 @@ public final class _ExecutionContext {
     checkOk(status)
     TF_DeleteStatus(status)
 #if os(Linux) || os(FreeBSD)
-    if mutex != nil {
-      pthread_mutex_destroy(&mutex!)
-    }
+    pthread_mutex_destroy(&mutex)
 #endif
   }
 }
@@ -110,13 +105,17 @@ internal extension _ExecutionContext {
   private func sync<Result>(
     execute body: () throws -> Result
   ) rethrows -> Result {
-    guard let _ = mutex else {
-      return try body()
+#if os(Linux) || os(FreeBSD)
+    let lockStatus = pthread_mutex_lock(&mutex)
+    internalConsistencyCheck(lockStatus == 0)
+    defer {
+      let unlockStatus = pthread_mutex_unlock(&mutex)
+      internalConsistencyCheck(unlockStatus == 0)
+      // Create a cancellation point.
+      pthread_testcancel()
     }
-    pthread_mutex_lock(&mutex!)
-    let result = try body()
-    pthread_mutex_unlock(&mutex!)
-    return result
+#endif // Async mode does not support other platforms, so it's already sync.
+    return try body()
   }
 
   /// Invokes the given closure with the underlying C context. Access to the C
@@ -132,52 +131,52 @@ internal extension _ExecutionContext {
 
 fileprivate extension _ExecutionContext {
   /// Load a serialized TensorFlow program in binary proto format to the
-  /// context. If the program has already been loaded, this function does nothing.
+  /// context. If the program has already been loaded, this function does
+  /// nothing.
   /// - Parameters:
   ///   - address: The address of the serialized program in memory.
   ///   - count: The size of the program in bytes.
   func loadProgramInBytes(_ address: UnsafeRawPointer, count: Int) {
-    // If the program is already loaded, do nothing.
-    if loadedPrograms.contains(address) { return }
+    sync { [unowned self] in
+      // If the program is already loaded, do nothing.
+      if self.loadedPrograms.contains(address) { return }
 
-    // Here we have to do a fairly awkward dance to load the graph functions
-    // and populate them into the TFE_Context.  We load the program as a
-    // TF_Graph, then copy the functions out of it, then copy them into the
-    // TFE_Context.
-    let graph = TF_NewGraph()
-    defer { TF_DeleteGraph(graph) }
+      // Here we have to do a fairly awkward dance to load the graph functions
+      // and populate them into the TFE_Context.  We load the program as a
+      // TF_Graph, then copy the functions out of it, then copy them into the
+      // TFE_Context.
+      let graph = TF_NewGraph()
+      // TensorFlow loads things through TF_Buffer.  Create one that avoids
+      // redundantly copying the program bytes.
+      var programBuf = TF_Buffer(data: address, length: count,
+                                 data_deallocator: nil)
+      let graphDefOptions = TF_NewImportGraphDefOptions()
+      TF_GraphImportGraphDef(graph, &programBuf, graphDefOptions, self.status)
+      TF_DeleteImportGraphDefOptions(graphDefOptions)
+      checkOk(self.status)
+      // Now that we have all of the TF_Function objects in the graph, copy them
+      // to standalone TF_Function's.
+      let funcCount = TF_GraphNumFunctions(graph)
+      // Allocate a buffer to accept functions.
+      let funcs =
+        UnsafeMutablePointer<CTFFunction?>.allocate(capacity: Int(funcCount))
+      TF_GraphGetFunctions(graph, funcs, funcCount, self.status)
+      checkOk(self.status)
+      // Delete the graph as it's no longer needed.
+      TF_DeleteGraph(graph)
 
-    // TensorFlow loads things through TF_Buffer.  Create one that avoids
-    // redundantly copying the program bytes.
-    var programBuffer = TF_Buffer(data: address, length: count,
-      data_deallocator: nil)
-
-    let graphDefOptions = TF_NewImportGraphDefOptions()
-    TF_GraphImportGraphDef(graph, &programBuffer, graphDefOptions, status)
-    TF_DeleteImportGraphDefOptions(graphDefOptions)
-    checkOk(status)
-
-    // Now that we have all of the TF_Function objects in the graph, copy them
-    // to standalone TF_Function's.
-    let functionCount = TF_GraphNumFunctions(graph)
-    let funcs =
-    UnsafeMutablePointer<CTFFunction?>.allocate(capacity: Int(functionCount))
-    TF_GraphGetFunctions(graph, funcs, functionCount, status)
-    checkOk(status)
-
-    withMutableCContext { [unowned self] ctx in
       // Add functions to the context.
-      for function in UnsafeBufferPointer(start: funcs,
-                                          count: Int(functionCount)) {
-        TFE_ContextAddFunction(ctx, function, self.status)
+      for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
+        TFE_ContextAddFunction(self.cContext, function, self.status)
         checkOk(self.status)
         TF_DeleteFunction(function)
       }
-    }
 
-    funcs.deallocate()
-    // Memorize the loaded program by address.
-    loadedPrograms.insert(address)
+      // Deallocate the function buffer as it's no longer used.
+      funcs.deallocate()
+      // Memorize the loaded program by address.
+      loadedPrograms.insert(address)
+    }
   }
 }
 
@@ -268,6 +267,8 @@ public final class _TensorComputation {
       func threadBody(
         _ arg: UnsafeMutableRawPointer?
       ) -> UnsafeMutableRawPointer? {
+        // Set the cancelability of the detached thread.
+        pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
         // Execute the tensor computation.
         let computation: _TensorComputation =
           Unmanaged.fromOpaque(arg!).takeRetainedValue()
@@ -374,11 +375,11 @@ public func _TFCStartTensorComputation(
   _ resultCount: Int
 ) -> _TensorComputation {
   return _TensorComputation(programByteAddress: programByteAddress,
-                           programByteCount: programByteCount,
-                           entryFunctionNameAddress: entryFunctionNameAddress,
-                           tensorArgumentAddress: tensorArgumentAddress,
-                           tensorArgumentCount: tensorArgumentCount,
-                           resultCount: resultCount)
+                            programByteCount: programByteCount,
+                            entryFunctionNameAddress: entryFunctionNameAddress,
+                            tensorArgumentAddress: tensorArgumentAddress,
+                            tensorArgumentCount: tensorArgumentCount,
+                            resultCount: resultCount)
 }
 
 /// Wait for completion the computation as given by 'program', and returns
@@ -402,10 +403,7 @@ public func _TFCFinishTensorComputation(
   let results = computation.finish()
   internalConsistencyCheck(results.count == tensorResultCount,
     "internal compiler error: result count mismatch!")
-
-  let resultBuffer = UnsafeMutableBufferPointer(start: tensorResultAddress,
-    count: tensorResultCount)
-  _ = resultBuffer.initialize(from: results)
+  tensorResultAddress.initialize(from: results, count: tensorResultCount)
 }
 
 /// Terminate the computation as given by 'program', and clean up the state.
@@ -427,8 +425,8 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
 /// - Precondition: T must conform to AccelerableTensorUnit and 'dtype' must be
 ///   equal to T's corresponding data type.
 /// - TODO(rxwei): Constrain T to AccelerableTensorUnit and remove the
-///   precondition and the assertion. This requires the compiler to emit a call
-///   to the generic function.
+///   precondition. This requires the compiler to emit a call to the generic
+///   function.
 @_inlineable
 @_silgen_name("_swift_tfc_CreateCTensorHandle")
 public func _TFCCreateCTensorHandle<T>(_ value : T,

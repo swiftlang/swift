@@ -7,39 +7,24 @@ import TensorFlow
 
 var RuntimeTests = TestSuite("Runtime")
 
-// The C Type of s is TF_Status*.
 func checkOk(_ s: OpaquePointer?) {
   precondition(TF_OK == TF_GetCode(s), String(cString: TF_Message(s)))
 }
 
-func createFloatTensorHandle(_ f: Float) -> CTensorHandle {
-  let s = TF_NewStatus()
-  let in_t = TF_AllocateTensor(TF_FLOAT, nil, 0, 4)
-
-  // This chunk of code does: *reinterpret_cast<float*>(TF_TensorData(in_t)) = f
-  let inputRawPtr: UnsafeMutableRawPointer = TF_TensorData(in_t)!
-  let inputPtr = inputRawPtr.bindMemory(to: CFloat.self, capacity: 1)
-  inputPtr.pointee = CFloat(f)
-
-  let cTensorHandle = TFE_NewTensorHandle(in_t, s)!
-  checkOk(s)
-  TF_DeleteTensor(in_t)
-  TF_DeleteStatus(s)
-  return cTensorHandle
+func makeTensorHandle(_ value: Float) -> CTensorHandle {
+  return _TFCCreateCTensorHandle(value, TF_FLOAT)
 }
 
-func checkFloatValueNear(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
+func expectNearlyEqual(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
   let s = TF_NewStatus()
-  let out_t = TFE_TensorHandleResolve(outputTensor, s)
+  let tensor = TFE_TensorHandleResolve(outputTensor, s)
   checkOk(s)
   TF_DeleteStatus(s)
-
-  precondition(TF_TensorByteSize(out_t) == 4)
-  // This does: actualValue = *(float*)TF_TensorData(out_t)
-  let actualValue: CFloat = TF_TensorData(out_t)!.bindMemory(to: CFloat.self, capacity: 1).pointee
+  assert(TF_TensorByteSize(tensor) == MemoryLayout<Float>.stride)
+  let actualValue = TF_TensorData(tensor).assumingMemoryBound(to: Float.self).pointee
   print("The actual output float value is \(actualValue)")
-  precondition(expectedVal - actualValue < 0.0001, String(actualValue))
-  TF_DeleteTensor(out_t)
+  expectLT(abs(expectedVal - actualValue), 0.0001)
+  TF_DeleteTensor(tensor)
 }
 
 func decodeHex(_ string: String) -> [UInt8] {
@@ -85,7 +70,7 @@ func runProgram(_ progName: String,
     outputBuffer.deallocate()
   }
 
-  if (shouldAbort) {
+  if shouldAbort {
     _TFCTerminateTensorComputation(computation)
     return []
   }
@@ -137,9 +122,9 @@ func runTanh() {
   // TODO: Regenerate a proto that's not using "the_function".
   let graphProto = "12E8010AE5010A3A0A0C7468655F66756E6374696F6E12090A056172675F3018011A1F0A1B6F705F5F7430317431673576616C75657973665F74665F335F313318011A320A076172675F305F30120B506C616365686F6C6465722A0D0A05736861706512043A0218012A0B0A056474797065120230011A330A1B6F702E5F5430317431673576616C75657953665F74462E332E3133120454616E681A056172675F302A070A015412023001223E0A1B6F705F5F7430317431673576616C75657973665F74665F335F3133121F6F702E5F5430317431673576616C75657953665F74462E332E31333A793A3022020818"
 
-  let outputTensors = runProgram("Tanh", graphProto, "the_function", [createFloatTensorHandle(1.2)])
+  let outputTensors = runProgram("Tanh", graphProto, "the_function", [makeTensorHandle(1.2)])
 
-  checkFloatValueNear(outputTensors[0], 0.833655)
+  expectNearlyEqual(outputTensors[0], 0.833655)
 }
 
 func runAdd(shouldAbort: Bool) {
@@ -154,12 +139,12 @@ func runAdd(shouldAbort: Bool) {
   let graphProto = "1289020A86020A3C0A0C7468655F66756E6374696F6E12090A056172675F30180112090A056172675F3118011A160A126F705F5F7430317431667979665F335F313318011A320A076172675F305F30120B506C616365686F6C6465722A0B0A056474797065120230012A0D0A05736861706512043A0218011A320A076172675F315F30120B506C616365686F6C6465722A0B0A056474797065120230012A0D0A05736861706512043A0218011A300A126F702E5F5430317431667979462E332E313312034164641A056172675F301A056172675F312A070A015412023001222C0A126F705F5F7430317431667979665F335F313312166F702E5F5430317431667979462E332E31333A7A3A3022020818"
 
   let outputTensors = runProgram("Add", graphProto, "the_function",
-                                 [createFloatTensorHandle(1.2),
-                                  createFloatTensorHandle(3.4)],
+                                 [makeTensorHandle(1.2),
+                                  makeTensorHandle(3.4)],
                                  shouldAbort: shouldAbort)
 
-  if (!shouldAbort) {
-    checkFloatValueNear(outputTensors[0], 1.2+3.4)
+  if !shouldAbort {
+    expectNearlyEqual(outputTensors[0], 1.2+3.4)
   }
 }
 
@@ -181,18 +166,9 @@ RuntimeTests.test("Runtime/BasicAddTest") {
   runAdd(shouldAbort: false)
 }
 
-// FIXME: 80% flaky: The program traps within pthread_cancel.
+// FIXME: 80% flaky: The program traps when pthread_cancel is called.
 // RuntimeTests.test("Runtime/AddThenAbbortTest") {
 //   runAdd(shouldAbort: true)
 // }
-
-RuntimeTests.test("Runtime/BasicTanhSyncTest") {
-  _RuntimeConfig.usesSynchronousExecution = true
-  runTanh()
-}
-
-// Tests are currently executed sequentially, so if there are any subsequent
-// tests intended for async runtime, set _RuntimeConfig.usesSynchronousExecution = false
-// for those tests.
 
 runAllTests()
