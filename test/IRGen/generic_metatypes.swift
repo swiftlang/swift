@@ -168,12 +168,13 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @"$S17generic_metatypes3BarCMa"()
 // CHECK:   call %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8**
 
-// CHECK-LABEL: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**)
+// CHECK: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**) [[NOUNWIND_OPT:#[0-9]+]]
 // CHECK-NOT: alloc
 // CHECK:   call %swift.type* @swift_rt_swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FiveArgsVMP" {{.*}}, i8*
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.type*
 
 // CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK: attributes [[NOUNWIND_OPT]] = { nounwind "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 // CHECK: attributes [[NOUNWIND_ARGMEM]] = { inaccessiblemem_or_argmemonly nounwind }
