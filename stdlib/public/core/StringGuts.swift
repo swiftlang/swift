@@ -84,6 +84,19 @@ extension _StringGuts {
     } else {
       fatalError("Unimplemented string form")
     }
+
+#if arch(i386) || arch(arm)
+  _sanityCheck(MemoryLayout<String>.size == 12, """
+    the runtime is depending on this, update Reflection.mm and \
+    this if you change it
+    """)
+#else
+  _sanityCheck(MemoryLayout<String>.size == 16, """
+    the runtime is depending on this, update Reflection.mm and \
+    this if you change it
+    """)
+#endif
+
 #endif // INTERNAL_CHECKS_ENABLED
   }
 
