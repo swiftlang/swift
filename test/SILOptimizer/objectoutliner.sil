@@ -76,7 +76,9 @@ bb0:
 
 // CHECK-LABEL: sil @handle_deallocation
 // CHECK:      global_value
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @handle_deallocation : $@convention(thin) () -> () {
