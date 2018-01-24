@@ -157,8 +157,10 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
-      NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
-                                             CastSuccessBB, ConvFailBB);
+      auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
+                                      SILBridgedTy, CastSuccessBB, ConvFailBB);
+      NewI = CCBI;
+      splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getArgument(0);
     } else {
