@@ -813,7 +813,7 @@ extension ObjCInitRequirement {
 // rdar://problem/21370992 - delegation from an initializer in a
 // protocol extension to an @objc initializer in a class.
 class ObjCInitClass {
-  @objc init() { }
+  @objc required init() { }
 }
 
 protocol ProtoDelegatesToObjC { }

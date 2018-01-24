@@ -267,6 +267,22 @@ extension ExtendedProtocol where Self : DerivedWithAlias {
   func f4(x: NestedNominal) {}
 }
 
+// rdar://problem/21991470 & https://bugs.swift.org/browse/SR-5022
+class NonPolymorphicInit {
+  init() { } // expected-note {{selected non-required initializer 'init()'}}
+}
+
+protocol EmptyProtocol { }
+
+// The diagnostic is not very accurate, but at least we reject this.
+
+extension EmptyProtocol where Self : NonPolymorphicInit {
+  init(string: String) {
+    self.init()
+    // expected-error@-1 {{constructing an object of class type 'Self' with a metatype value must use a 'required' initializer}}
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Using protocol extensions to satisfy requirements
 // ----------------------------------------------------------------------------
