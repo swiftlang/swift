@@ -40,7 +40,7 @@ public func testTanh() {
 }
 
 RuntimeTests.test("e2e/BasicTanhTest") {
-  _TFCRuntimeConfig.printsDebugLog = true
+  _RuntimeConfig.printsDebugLog = true
   testTanh()
 }
 

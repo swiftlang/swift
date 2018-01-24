@@ -170,7 +170,7 @@ public:
   /// to generate the TF_Function itself and put it into the resultGraph.
   ///
   /// This emits an error and returns true on error.
-  bool buildGraphFunction(const GraphFunctionBody &graphBody, const char *name);
+  bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name);
 
 private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
@@ -730,10 +730,10 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
   // Create the graph functions for the true/false code.
   auto trueFnName = getUniqueName(loc, "true");
-  if (buildGraphFunction(trueCodeFn, trueFnName.c_str()))
+  if (buildGraphFunction(trueCodeFn, trueFnName))
     return;
   auto falseFnName = getUniqueName(loc, "false");
-  if (buildGraphFunction(falseCodeFn, falseFnName.c_str()))
+  if (buildGraphFunction(falseCodeFn, falseFnName))
     return;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -893,7 +893,7 @@ lowerToFunction(SESERegionTree *r, bool isTopLevel) {
 ///
 /// This emits an error and returns true on error.
 bool TFGraphLowering::
-buildGraphFunction(const GraphFunctionBody &graphBody, const char *name) {
+buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name) {
   if (errorOccurred)
     return true;
 
@@ -906,7 +906,7 @@ buildGraphFunction(const GraphFunctionBody &graphBody, const char *name) {
     outs.push_back(elt.second);
 
   auto resultFn =
-    TF_GraphToFunction(graphBody.getGraph(), name,
+    TF_GraphToFunction(graphBody.getGraph(), name.data(),
                        /*append_hash_to_fn_name*/false,
                        /*num_opers*/graphBody.operations.size(),
                        /*opers*/graphBody.operations.data(),
@@ -982,7 +982,8 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   auto graphFnBody = graphGen.lowerToFunction(structure.get(),
                                               /*isTopLevel*/true);
   // Create the graph function for the top level code.
-  if (graphGen.buildGraphFunction(graphFnBody, "the_function"))
+  auto fnName = graphGen.SILFn->getName();
+  if (graphGen.buildGraphFunction(graphFnBody, fnName))
     return {};
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.
