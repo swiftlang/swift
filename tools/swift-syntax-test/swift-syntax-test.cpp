@@ -100,6 +100,11 @@ PrintTrivialNodeKind("print-trivial-node-kind",
                      llvm::cl::cat(Category),
                      llvm::cl::init(false));
 
+static llvm::cl::opt<int>
+Iteration("iteration",
+          llvm::cl::desc("Repeat the action specified times"),
+          llvm::cl::cat(Category), llvm::cl::init(1));
+
 static llvm::cl::opt<bool>
 VerifySyntaxTree("verify-syntax-tree",
                  llvm::cl::desc("Emit warnings for unknown nodes"),
@@ -301,33 +306,36 @@ int main(int argc, char *argv[]) {
     return ExitCode;
   }
 
-  switch (options::Action) {
-  case ActionType::DumpRawTokenSyntax:
-    ExitCode = doDumpRawTokenSyntax(options::InputSourceFilename);
-    break;
-  case ActionType::FullLexRoundTrip:
-    ExitCode = doFullLexRoundTrip(options::InputSourceFilename);
-    break;
-  case ActionType::FullParseRoundTrip:
-    ExitCode = doFullParseRoundTrip(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::SerializeRawTree:
-    ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::ParseOnly:
-    ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::ParserGen:
-    ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::EOFPos:
-    ExitCode = dumpEOFSourceLoc(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::None:
-    llvm::errs() << "an action is required\n";
-    llvm::cl::PrintHelpMessage();
-    ExitCode = EXIT_FAILURE;
-    break;
+  int N = options::Iteration;
+  while (ExitCode == EXIT_SUCCESS && N--) {
+    switch (options::Action) {
+    case ActionType::DumpRawTokenSyntax:
+      ExitCode = doDumpRawTokenSyntax(options::InputSourceFilename);
+      break;
+    case ActionType::FullLexRoundTrip:
+      ExitCode = doFullLexRoundTrip(options::InputSourceFilename);
+      break;
+    case ActionType::FullParseRoundTrip:
+      ExitCode = doFullParseRoundTrip(argv[0], options::InputSourceFilename);
+      break;
+    case ActionType::SerializeRawTree:
+      ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
+      break;
+    case ActionType::ParseOnly:
+      ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
+      break;
+    case ActionType::ParserGen:
+      ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
+      break;
+    case ActionType::EOFPos:
+      ExitCode = dumpEOFSourceLoc(argv[0], options::InputSourceFilename);
+      break;
+    case ActionType::None:
+      llvm::errs() << "an action is required\n";
+      llvm::cl::PrintHelpMessage();
+      ExitCode = EXIT_FAILURE;
+      break;
+    }
   }
 
   return ExitCode;
