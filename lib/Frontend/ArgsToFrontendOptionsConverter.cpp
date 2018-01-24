@@ -1,4 +1,4 @@
-//===--- ArgsToFrontendOptionsConverter -------------------------*- C++ -*-===//
+//===--- ArgsToFrontendOptionsConverter -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -83,7 +83,8 @@ bool ArgsToFrontendOptionsConverter::convert() {
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
   computeHelpOptions();
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
+          .convert())
     return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
@@ -96,7 +97,7 @@ bool ArgsToFrontendOptionsConverter::convert() {
   Opts.RequestedAction = determineRequestedAction();
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.Inputs.hasPrimaryInputs()) {
+      Opts.InputsAndOutputs.hasPrimaryInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -333,10 +334,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction() const {
 bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   using namespace options;
   bool treatAsSIL =
-      Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
-  bool treatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
+      Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL();
+  bool treatAsLLVM = Opts.InputsAndOutputs.shouldTreatAsLLVM();
 
-  if (Opts.Inputs.verifyInputs(
+  if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
           Opts.RequestedAction == FrontendOptions::ActionType::REPL,
           Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
@@ -344,7 +345,7 @@ bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   }
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate) {
     Opts.ImmediateArgv.push_back(
-        Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
+        Opts.InputsAndOutputs.getFilenameOfFirstInput()); // argv[0]
     if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         Opts.ImmediateArgv.push_back(A->getValue(i));
@@ -405,7 +406,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     return false;
   }
   // In order to pass some tests, must leave ModuleName empty.
-  if (!Opts.Inputs.hasInputs()) {
+  if (!Opts.InputsAndOutputs.hasInputs()) {
     Opts.ModuleName = StringRef();
     // FIXME: This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
@@ -418,9 +419,10 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
       !llvm::sys::fs::is_directory(outputFilenames[0]);
-  std::string nameToStem = isOutputAUniqueOrdinaryFile
-                               ? outputFilenames[0]
-                               : Opts.Inputs.getFilenameOfFirstInput().str();
+  std::string nameToStem =
+      isOutputAUniqueOrdinaryFile
+          ? outputFilenames[0]
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }
@@ -458,7 +460,7 @@ bool ArgsToFrontendOptionsConverter::computeOutputFilenames() {
 }
 
 bool ArgsToFrontendOptionsConverter::deriveOutputFilenameFromInputFile() {
-  if (Opts.Inputs.isReadingFromStdin() ||
+  if (Opts.InputsAndOutputs.isReadingFromStdin() ||
       FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
     Opts.setOutputFilenameToStdout();
     return false;
@@ -503,13 +505,13 @@ void ArgsToFrontendOptionsConverter::deriveOutputFilenameFromParts(
 
 std::string ArgsToFrontendOptionsConverter::determineBaseNameOfOutput() const {
   std::string nameToStem;
-  if (Opts.Inputs.hasPrimaryInputs()) {
-    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().file();
+  if (Opts.InputsAndOutputs.hasPrimaryInputs()) {
+    nameToStem = Opts.InputsAndOutputs.getRequiredUniquePrimaryInput().file();
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = UserSpecifiedModuleName->getValue();
-  } else if (Opts.Inputs.hasSingleInput()) {
-    nameToStem = Opts.Inputs.getFilenameOfFirstInput();
+  } else if (Opts.InputsAndOutputs.hasSingleInput()) {
+    nameToStem = Opts.InputsAndOutputs.getFilenameOfFirstInput();
   } else
     nameToStem = "";
 
@@ -646,8 +648,8 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.hasPrimaryInputs() && !Opts.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs() &&
+                                    !Opts.ModuleOutputPath.empty();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {

@@ -75,9 +75,9 @@ private:
 
   void determineSupplementaryOutputFilenames();
 
-  /// Returns the output filenames on the command line or in the output
-  /// filelist. If there
-  /// were neither -o's nor an output filelist, returns an empty vector.
+  /// \returns the output filenames on the command line or in the output
+  /// filelist, or an empty vector if there were neither -o's nor an output
+  /// filelist.
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
   bool checkForUnusedOutputPaths() const;
