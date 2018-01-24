@@ -96,7 +96,7 @@ updated without updating swift.py?")
 
     @property
     def _benchmark_flags(self):
-        if not self.args.benchmark:
+        if not self.args.build_benchmarks and not self.args.test_benchmarks:
             return []
 
         onone_iters = self.args.benchmark_num_onone_iterations
