@@ -84,7 +84,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
 }
 
 
-Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
+Compilation::Compilation(DiagnosticEngine &Diags,
+                         const ToolChain &TC, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
@@ -95,7 +96,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
-  : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
+  : Diags(Diags), TheToolChain(TC), Level(Level),
+    RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),

@@ -197,41 +197,45 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
   }
 }
 
-/// Creates an appropriate ToolChain for a given driver and target triple.
-///
-/// This uses a std::unique_ptr instead of returning a toolchain by value
-/// because ToolChain has virtual methods.
-static std::unique_ptr<const ToolChain>
-makeToolChain(Driver &driver, const llvm::Triple &target) {
+std::unique_ptr<ToolChain>
+Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
+
+  if (const Arg *A = ArgList.getLastArg(options::OPT_target))
+    DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
+
+  const llvm::Triple target(DefaultTargetTriple);
+
   switch (target.getOS()) {
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
-    return llvm::make_unique<toolchains::Darwin>(driver, target);
+    return llvm::make_unique<toolchains::Darwin>(*this, target);
     break;
   case llvm::Triple::Linux:
     if (target.isAndroid()) {
-      return llvm::make_unique<toolchains::Android>(driver, target);
+      return llvm::make_unique<toolchains::Android>(*this, target);
     } else {
-      return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+      return llvm::make_unique<toolchains::GenericUnix>(*this, target);
     }
     break;
   case llvm::Triple::FreeBSD:
-    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
     break;
   case llvm::Triple::Win32:
-    return llvm::make_unique<toolchains::Cygwin>(driver, target);
+    return llvm::make_unique<toolchains::Cygwin>(*this, target);
     break;
   case llvm::Triple::Haiku:
-    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
     break;
   default:
-    return nullptr;
+    Diags.diagnose(SourceLoc(), diag::error_unknown_target,
+                   ArgList.getLastArg(options::OPT_target)->getValue());
+    break;
   }
+  return nullptr;
 }
-
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
@@ -501,15 +505,12 @@ static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
   }
 }
 
-std::unique_ptr<Compilation> Driver::buildCompilation(
-    ArrayRef<const char *> Args) {
+std::unique_ptr<Compilation>
+Driver::buildCompilation(const ToolChain &TC,
+                         std::unique_ptr<llvm::opt::InputArgList> ArgList) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
-
-  std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
-  if (Diags.hadAnyError())
-    return nullptr;
 
   // Claim --driver-mode here, since it's already been handled.
   (void) ArgList->hasArg(options::OPT_driver_mode);
@@ -552,36 +553,25 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
 
-  if (const Arg *A = ArgList->getLastArg(options::OPT_target))
-    DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
-
   validateArgs(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;
-  
-  std::unique_ptr<const ToolChain> TC =
-      makeToolChain(*this, llvm::Triple(DefaultTargetTriple));
-  if (!TC) {
-    Diags.diagnose(SourceLoc(), diag::error_unknown_target,
-                   ArgList->getLastArg(options::OPT_target)->getValue());
-    return nullptr;
-  }
 
-  if (!handleImmediateArgs(*TranslatedArgList, *TC)) {
+  if (!handleImmediateArgs(*TranslatedArgList, TC)) {
     return nullptr;
   }
 
   // Construct the list of inputs.
   InputFileList Inputs;
-  buildInputs(*TC, *TranslatedArgList, Inputs);
+  buildInputs(TC, *TranslatedArgList, Inputs);
 
   if (Diags.hadAnyError())
     return nullptr;
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(*TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -686,7 +676,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, Level,
+  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),
@@ -699,7 +689,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, *TC, OI, OFM.get(),
+  buildActions(TopLevelActions, TC, OI, OFM.get(),
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -710,7 +700,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM.get(), *TC, *C);
+  buildJobs(TopLevelActions, OI, OFM.get(), TC, *C);
 
   // For getting bulk fixits, or for when users explicitly request to continue
   // building despite errors.
