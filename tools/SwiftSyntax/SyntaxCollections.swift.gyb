@@ -1,4 +1,11 @@
-//===-------------- SyntaxCollection.swift - Syntax Collection ------------===//
+%{
+  from gyb_syntax_support import *
+  # -*- mode: Swift -*-
+  # Ignore the following admonition it applies to the resulting .swift file only
+}%
+//// Automatically Generated From SyntaxCollections.swift.gyb.
+//// Do Not Edit Directly!
+//===------------ SyntaxCollections.swift.gyb - Syntax Collection ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,12 +19,15 @@
 
 import Foundation
 
+% for node in SYNTAX_NODES:
+%   if node.collection_element:
+
 /// Represents a collection of Syntax nodes of a specific type. SyntaxCollection
 /// behaves as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
-public class SyntaxCollection<SyntaxElement: Syntax>: _SyntaxBase {
+public struct ${node.name}: _SyntaxBase {
   var _root: SyntaxData
-  unowned var _data: SyntaxData 
+  unowned var _data: SyntaxData
 
   /// Creates a Syntax node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
@@ -28,52 +38,52 @@ public class SyntaxCollection<SyntaxElement: Syntax>: _SyntaxBase {
 #endif
   }
 
-  /// Creates a new SyntaxCollection by replacing the underlying layout with
+  /// Creates a new `${node.name}` by replacing the underlying layout with
   /// a different set of raw syntax nodes.
   ///
   /// - Parameter layout: The new list of raw syntax nodes underlying this
   ///                     collection.
-  /// - Returns: A new SyntaxCollection with the new layout underlying it.
+  /// - Returns: A new `${node.name}` with the new layout underlying it.
   internal func replacingLayout(
-    _ layout: [RawSyntax]) -> SyntaxCollection<SyntaxElement> {
+    _ layout: [RawSyntax]) -> ${node.name} {
     let newRaw = data.raw.replacingLayout(layout)
     let (newRoot, newData) = data.replacingSelf(newRaw)
-    return SyntaxCollection<SyntaxElement>(root: newRoot, data: newData)
+    return ${node.name}(root: newRoot, data: newData)
   }
 
-  /// Creates a new SyntaxCollection by appending the provided syntax element
+  /// Creates a new `${node.name}` by appending the provided syntax element
   /// to the children.
   ///
   /// - Parameter syntax: The element to append.
-  /// - Returns: A new SyntaxCollection with that element appended to the end.
+  /// - Returns: A new `${node.name}` with that element appended to the end.
   public func appending(
-    _ syntax: SyntaxElement) -> SyntaxCollection<SyntaxElement> {
+    _ syntax: ${node.collection_element_type}) -> ${node.name} {
     var newLayout = data.raw.layout
     newLayout.append(syntax.raw)
     return replacingLayout(newLayout)
   }
 
-  /// Creates a new SyntaxCollection by prepending the provided syntax element
+  /// Creates a new `${node.name}` by prepending the provided syntax element
   /// to the children.
   ///
   /// - Parameter syntax: The element to prepend.
-  /// - Returns: A new SyntaxCollection with that element prepended to the
+  /// - Returns: A new `${node.name}` with that element prepended to the
   ///            beginning.
   public func prepending(
-    _ syntax: SyntaxElement) -> SyntaxCollection<SyntaxElement> {
+    _ syntax: ${node.collection_element_type}) -> ${node.name} {
     return inserting(syntax, at: 0)
   }
 
-  /// Creates a new SyntaxCollection by inserting the provided syntax element
+  /// Creates a new `${node.name}` by inserting the provided syntax element
   /// at the provided index in the children.
   ///
   /// - Parameters:
   ///   - syntax: The element to insert.
   ///   - index: The index at which to insert the element in the collection.
   ///
-  /// - Returns: A new SyntaxCollection with that element appended to the end.
-  public func inserting(_ syntax: SyntaxElement,
-                        at index: Int) -> SyntaxCollection<SyntaxElement> {
+  /// - Returns: A new `${node.name}` with that element appended to the end.
+  public func inserting(_ syntax: ${node.collection_element_type},
+                        at index: Int) -> ${node.name} {
     var newLayout = data.raw.layout
     /// Make sure the index is a valid insertion index (0 to 1 past the end)
     precondition((newLayout.startIndex...newLayout.endIndex).contains(index),
@@ -82,67 +92,71 @@ public class SyntaxCollection<SyntaxElement: Syntax>: _SyntaxBase {
     return replacingLayout(newLayout)
   }
 
-  /// Creates a new SyntaxCollection by removing the syntax element at the
+  /// Creates a new `${node.name}` by removing the syntax element at the
   /// provided index.
   ///
   /// - Parameter index: The index of the element to remove from the collection.
-  /// - Returns: A new SyntaxCollection with the element at the provided index
+  /// - Returns: A new `${node.name}` with the element at the provided index
   ///            removed.
-  public func removing(childAt index: Int) -> SyntaxCollection<SyntaxElement> {
+  public func removing(childAt index: Int) -> ${node.name} {
     var newLayout = data.raw.layout
     newLayout.remove(at: index)
     return replacingLayout(newLayout)
   }
 
-  /// Creates a new SyntaxCollection by removing the first element.
+  /// Creates a new `${node.name}` by removing the first element.
   ///
-  /// - Returns: A new SyntaxCollection with the first element removed.
-  public func removingFirst() -> SyntaxCollection<SyntaxElement> {
+  /// - Returns: A new `${node.name}` with the first element removed.
+  public func removingFirst() -> ${node.name} {
     var newLayout = data.raw.layout
     newLayout.removeFirst()
     return replacingLayout(newLayout)
   }
 
-  /// Creates a new SyntaxCollection by removing the last element.
+  /// Creates a new `${node.name}` by removing the last element.
   ///
-  /// - Returns: A new SyntaxCollection with the last element removed.
-  public func removingLast() -> SyntaxCollection<SyntaxElement> {
+  /// - Returns: A new `${node.name}` with the last element removed.
+  public func removingLast() -> ${node.name} {
     var newLayout = data.raw.layout
     newLayout.removeLast()
     return replacingLayout(newLayout)
   }
 
   /// Returns an iterator over the elements of this syntax collection.
-  public func makeIterator() -> SyntaxCollectionIterator<SyntaxElement> {
-    return SyntaxCollectionIterator(collection: self)
+  public func makeIterator() -> ${node.name}Iterator {
+    return ${node.name}Iterator(collection: self)
   }
 }
 
-/// Conformance for SyntaxCollection to the Collection protocol.
-extension SyntaxCollection: Collection {
+/// Conformance for `${node.name}`` to the Collection protocol.
+extension ${node.name}: Collection {
   public var startIndex: Int {
     return data.childCaches.startIndex
   }
-  
+
   public var endIndex: Int {
     return data.childCaches.endIndex
   }
-  
+
   public func index(after i: Int) -> Int {
     return data.childCaches.index(after: i)
   }
-  
-  public subscript(_ index: Int) -> SyntaxElement {
-    return child(at: index)! as! SyntaxElement
+
+  public subscript(_ index: Int) -> ${node.collection_element_type} {
+%   cast = '' if node.collection_element_type == 'Syntax' \
+%          else 'as! ' + node.collection_element_type
+    return child(at: index)! ${cast}
   }
 }
 
-/// A type that iterates over a syntax collection using its indices.
-public struct SyntaxCollectionIterator<Element: Syntax>: IteratorProtocol {
-  private let collection: SyntaxCollection<Element>
-  private var index: SyntaxCollection<Element>.Index
+/// A type that iterates over a `${node.name}` using its indices.
+public struct ${node.name}Iterator: IteratorProtocol {
+  public typealias Element = ${node.collection_element_type}
 
-  fileprivate init(collection: SyntaxCollection<Element>) {
+  private let collection: ${node.name}
+  private var index: ${node.name}.Index
+
+  fileprivate init(collection: ${node.name}) {
     self.collection = collection
     self.index = collection.startIndex
   }
@@ -160,3 +174,5 @@ public struct SyntaxCollectionIterator<Element: Syntax>: IteratorProtocol {
   }
 }
 
+%   end
+% end

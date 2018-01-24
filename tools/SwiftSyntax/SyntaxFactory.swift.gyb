@@ -40,13 +40,15 @@ public enum SyntaxFactory {
     let data = SyntaxData(raw: .node(.unknown, 
                                      tokens.map { $0.data.raw },
                                      .present))
-    return AnySyntax(root: data, data: data)
+    return UnknownSyntax(root: data, data: data)
   }
 
 /// MARK: Syntax Node Creation APIs
 
 % for node in SYNTAX_NODES:
-%   if node.children:
+%   if node.is_base():
+%     pass
+%   elif node.children:
 %     child_params = []
 %     for child in node.children:
 %         param_type = child.type_name
@@ -64,25 +66,27 @@ public enum SyntaxFactory {
 %       end
 %     end
     ], .present))
-    return ${node.swift_type_name}(root: data, data: data)
+    return ${node.name}(root: data, data: data)
   }
 %   elif node.is_syntax_collection():
   public static func make${node.syntax_kind}(
     _ elements: [${node.collection_element_type}]) -> ${node.name} {
     let data = SyntaxData(raw: .node(.${node.swift_syntax_kind},
                                      elements.map { $0.data.raw }, .present))
-    return ${node.swift_type_name}(root: data, data: data)
+    return ${node.name}(root: data, data: data)
   }
 %   end
 
+%   if not node.is_base():
   public static func makeBlank${node.syntax_kind}() -> ${node.name} {
     let data = SyntaxData(raw: .node(.${node.swift_syntax_kind}, [
-%   for child in node.children:
+%     for child in node.children:
       ${make_missing_swift_child(child)},
-%   end
+%     end
     ], .present))
-    return ${node.swift_type_name}(root: data, data: data)
+    return ${node.name}(root: data, data: data)
   }
+%   end
 % end
 
 /// MARK: Token Creation APIs

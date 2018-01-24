@@ -71,10 +71,14 @@ internal func makeSyntax(root: SyntaxData?, data: SyntaxData) -> Syntax {
   let root = root ?? data
   switch data.raw.kind {
   case .token: return TokenSyntax(root: root, data: data)
-  case .unknown: return AnySyntax(root: root, data: data)
+  case .unknown: return UnknownSyntax(root: root, data: data)
 % for node in SYNTAX_NODES:
   case .${node.swift_syntax_kind}:
-    return ${node.swift_type_name}(root: root, data: data)
+%   if node.is_base():
+    return Unknown${node.name}(root: root, data: data)
+%   else:
+    return ${node.name}(root: root, data: data)
+%   end
 % end
   }
 }

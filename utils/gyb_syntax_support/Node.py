@@ -21,9 +21,6 @@ class Node(object):
         self.syntax_kind = name
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
-        self.swift_type_name = self.name
-        if self.is_base():
-            self.swift_type_name = 'Any' + self.swift_type_name
 
         self.children = children or []
         self.base_kind = kind
@@ -38,16 +35,6 @@ class Node(object):
         # from its supertype, use that.
         self.collection_element_name = element_name or self.collection_element
         self.collection_element_type = kind_to_type(self.collection_element)
-        self.swift_collection_element_type = self.collection_element_type
-
-        # Since Syntax, and all the base kinds, are protocols, we can't
-        # directly instantiate them or use them as concrete types.
-        # Instead, all collection elements with a 'base' kind actually have
-        # type Any<kind>Syntax in SwiftSyntax.
-        if self.collection_element in SYNTAX_BASE_KINDS:
-            self.swift_collection_element_type = \
-                'Any' + self.collection_element_type
-
         self.collection_element_choices = element_choices or []
 
     def is_base(self):

@@ -15,14 +15,6 @@ class Child(object):
         self.syntax_kind = kind
         self.swift_syntax_kind = lowercase_first_word(self.syntax_kind)
         self.type_name = kind_to_type(self.syntax_kind)
-        self.swift_type_name = self.type_name
-
-        # Since Syntax, and all the base kinds, are protocols, we can't
-        # directly instantiate them or use them as concrete types.
-        # Instead, all children with a 'base' kind actually have type
-        # Any<kind>Syntax in SwiftSyntax.
-        if self.syntax_kind in SYNTAX_BASE_KINDS:
-            self.swift_type_name = 'Any' + self.type_name
 
         # If the child has "token" anywhere in the kind, it's considered
         # a token node. Grab the existing reference to that token from the

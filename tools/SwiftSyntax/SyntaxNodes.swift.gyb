@@ -38,22 +38,18 @@ Each node will have:
 """
 }%
 
-public struct AnySyntax: _SyntaxBase, Hashable {
+/// A wrapper around a raw Syntax layout.
+public struct UnknownSyntax: _SyntaxBase {
   var _root: SyntaxData
-  unowned var _data: SyntaxData
+  unowned var _data: SyntaxData 
 
-  /// Creates an `AnySyntax`` node from the provided root and data.
+  /// Creates an `UnknownSyntax` node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
-  }
-  
-  public static func ==(lhs: AnySyntax, rhs: AnySyntax) -> Bool {
-    return lhs._data === rhs._data
-  }
-
-  public var hashValue: Int {
-    return ObjectIdentifier(_data).hashValue
+#if DEBUG
+    validate()
+#endif
   }
 }
 
@@ -61,28 +57,9 @@ public struct AnySyntax: _SyntaxBase, Hashable {
 %   base_type = node.base_type
 %   if node.is_base():
 public protocol ${node.name}: Syntax {}
-public struct ${node.swift_type_name}: ${node.name}, _SyntaxBase, Hashable {
-  var _root: SyntaxData
-  unowned var _data: SyntaxData
-
-  /// Creates an `${node.swift_type_name}` node from the provided root and data.
-  internal init(root: SyntaxData, data: SyntaxData) {
-    self._root = root
-    self._data = data
-  }
-
-  public static func ==(lhs: ${node.swift_type_name},
-                        rhs: ${node.swift_type_name}) -> Bool {
-    return lhs._data === rhs._data
-  }
-
-  public var hashValue: Int {
-    return ObjectIdentifier(_data).hashValue
-  }
-}
 
 %   elif node.collection_element:
-public typealias ${node.name} = SyntaxCollection<${node.swift_collection_element_type}>
+%     pass
 %   else:
 public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %     if node.children:
@@ -141,18 +118,21 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 #endif
 %     end
 %     for child in node.children:
+%       ret_type = child.type_name
+%       cast_symbol = 'as!'
 %       if child.is_optional:
-  public var ${child.swift_name}: ${child.swift_type_name}? {
-    guard raw[Cursor.${child.swift_name}].isPresent else { return nil }
-    return ${child.swift_type_name}(root: _root,
-      data: data.cachedChild(at: Cursor.${child.swift_name}))
-  }
-%       else:
-  public var ${(child.swift_name)}: ${child.swift_type_name} {
-    return ${child.swift_type_name}(root: _root,
-      data: data.cachedChild(at: Cursor.${child.swift_name}))
-  }
+%         ret_type += '?'
+%         cast_symbol = 'as?'
 %       end
+%       cast = '' if child.type_name == 'Syntax' \
+%                 else '%s %s' % (cast_symbol, child.type_name)
+  public var ${child.swift_name}: ${ret_type} {
+%       if child.is_optional:
+    guard raw[Cursor.${child.swift_name}].isPresent else { return nil }
+%       end
+    let child = data.cachedChild(at: Cursor.${child.swift_name})
+    return makeSyntax(root: _root, data: child) ${cast}
+  }
 %       child_node = NODE_MAP.get(child.syntax_kind)
 %       if child_node and child_node.is_syntax_collection():
 %         child_elt = child_node.collection_element_name
@@ -167,7 +147,7 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %       end
 
   public func with${child.name}(
-    _ newChild: ${child.swift_type_name}?) -> ${node.name} {
+    _ newChild: ${child.type_name}?) -> ${node.name} {
     let raw = newChild?.raw ?? ${make_missing_swift_child(child)}
     let (root, newData) = data.replacingChild(raw,
                                               at: Cursor.${child.swift_name})
@@ -175,8 +155,7 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
   }
 %     end
 
-  public static func ==(lhs: ${node.swift_type_name},
-                        rhs: ${node.swift_type_name}) -> Bool {
+  public static func ==(lhs: ${node.name}, rhs: ${node.name}) -> Bool {
     return lhs._data === rhs._data
   }
 
