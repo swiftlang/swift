@@ -38,7 +38,7 @@ Each node will have:
 """
 }%
 
-public struct AnySyntax: _SyntaxBase {
+public struct AnySyntax: _SyntaxBase, Hashable {
   var _root: SyntaxData
   unowned var _data: SyntaxData
 
@@ -47,27 +47,44 @@ public struct AnySyntax: _SyntaxBase {
     self._root = root
     self._data = data
   }
+  
+  public static func ==(lhs: AnySyntax, rhs: AnySyntax) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
+  }
 }
 
 % for node in SYNTAX_NODES:
 %   base_type = node.base_type
 %   if node.is_base():
 public protocol ${node.name}: Syntax {}
-public struct Any${node.name}: ${node.name}, _SyntaxBase {
+public struct ${node.swift_type_name}: ${node.name}, _SyntaxBase, Hashable {
   var _root: SyntaxData
   unowned var _data: SyntaxData
 
-  /// Creates an `Any${node.name}`` node from the provided root and data.
+  /// Creates an `${node.swift_type_name}` node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
+  }
+
+  public static func ==(lhs: ${node.swift_type_name},
+                        rhs: ${node.swift_type_name}) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
   }
 }
 
 %   elif node.collection_element:
 public typealias ${node.name} = SyntaxCollection<${node.swift_collection_element_type}>
 %   else:
-public struct ${node.name}: ${base_type}, _SyntaxBase {
+public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %     if node.children:
   enum Cursor: Int {
 %       for child in node.children:
@@ -157,6 +174,15 @@ public struct ${node.name}: ${base_type}, _SyntaxBase {
     return ${node.name}(root: root, data: newData)
   }
 %     end
+
+  public static func ==(lhs: ${node.swift_type_name},
+                        rhs: ${node.swift_type_name}) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
+  }
 }
 
 %   end

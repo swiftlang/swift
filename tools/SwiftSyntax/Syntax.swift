@@ -63,10 +63,6 @@ extension Syntax {
     return data.raw
   }
 
-  public var uniqueIdentifier: Int {
-    return ObjectIdentifier(data).hashValue
-  }
-
   /// An iterator over children of this node.
   public var children: SyntaxChildren {
     return SyntaxChildren(node: self)
@@ -158,13 +154,13 @@ extension Syntax {
 
 /// Determines if two nodes are equal to each other.
 public func ==(lhs: Syntax, rhs: Syntax) -> Bool {
-  return lhs.uniqueIdentifier == rhs.uniqueIdentifier
+  return lhs.data === rhs.data
 }
 
 /// MARK: - Nodes
 
 /// A Syntax node representing a single token.
-public struct TokenSyntax: _SyntaxBase {
+public struct TokenSyntax: _SyntaxBase, Hashable {
   var _root: SyntaxData
   unowned var _data: SyntaxData 
 
@@ -250,5 +246,13 @@ public struct TokenSyntax: _SyntaxBase {
       fatalError("TokenSyntax must have token as its raw")
     }
     return kind
+  }
+
+  public static func ==(lhs: TokenSyntax, rhs: TokenSyntax) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
   }
 }
