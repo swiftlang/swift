@@ -232,7 +232,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
 
   auto Root = SF->getSyntaxRoot().getRaw();
   swift::json::Output out(llvm::outs());
-  out << Root;
+  out << *Root;
   llvm::outs() << "\n";
 
   return EXIT_SUCCESS;

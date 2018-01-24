@@ -72,7 +72,9 @@ protected:
 
 public:
   Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Root(Root), Data(Data) {}
+  : Root(Root), Data(Data) {
+    assert(Data != nullptr);
+  }
 
   virtual ~Syntax() {}
 
@@ -87,7 +89,7 @@ public:
   size_t getNumChildren() const;
 
   /// Get the Nth child of this piece of syntax.
-  Syntax getChild(const size_t N) const;
+  llvm::Optional<Syntax> getChild(const size_t N) const;
 
   /// Returns true if the syntax node is of the given type.
   template <typename T>

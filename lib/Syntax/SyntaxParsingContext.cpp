@@ -140,8 +140,7 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind) {
   auto Parts = getParts();
   auto Count = 0;
   for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
-    if (!SyntaxFactory::canServeAsCollectionMember(ColletionKind,
-                                                   make<Syntax>(*I)))
+    if (!SyntaxFactory::canServeAsCollectionMemberRaw(ColletionKind, *I))
       break;
     ++Count;
   }

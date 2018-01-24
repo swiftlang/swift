@@ -32,7 +32,7 @@ namespace syntax {
 class ${node.name}Builder {
   std::vector<RC<RawSyntax>> Layout = {
 %     for child in node.children:
-    ${make_missing_child(child)},
+    nullptr,
 %     end
   };
 

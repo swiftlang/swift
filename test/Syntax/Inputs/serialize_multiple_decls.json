@@ -16,16 +16,8 @@
                     {
                       "kind": "StructDecl",
                       "layout": [
-                        {
-                          "kind": "AttributeList",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "DeclModifier",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -70,21 +62,9 @@
                           ],
                           "presence": "Present"
                         },
-                        {
-                          "kind": "GenericParameterClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "TypeInheritanceClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "GenericWhereClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
+                        null,
                         {
                           "kind": "MemberDeclBlock",
                           "layout": [
@@ -120,14 +100,7 @@
                       ],
                       "presence": "Present"
                     },
-                    {
-                      "tokenKind": {
-                        "kind": "semi"
-                      },
-                      "leadingTrivia": [],
-                      "trailingTrivia": [],
-                      "presence": "Missing"
-                    }
+                    null
                   ],
                   "presence": "Present"
                 },
@@ -137,16 +110,8 @@
                     {
                       "kind": "StructDecl",
                       "layout": [
-                        {
-                          "kind": "AttributeList",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "DeclModifier",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -179,21 +144,9 @@
                           ],
                           "presence": "Present"
                         },
-                        {
-                          "kind": "GenericParameterClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "TypeInheritanceClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "GenericWhereClause",
-                          "layout": [],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
+                        null,
                         {
                           "kind": "MemberDeclBlock",
                           "layout": [
@@ -229,14 +182,7 @@
                       ],
                       "presence": "Present"
                     },
-                    {
-                      "tokenKind": {
-                        "kind": "semi"
-                      },
-                      "leadingTrivia": [],
-                      "trailingTrivia": [],
-                      "presence": "Missing"
-                    }
+                    null
                   ],
                   "presence": "Present"
                 }
