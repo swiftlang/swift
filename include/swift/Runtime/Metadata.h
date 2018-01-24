@@ -984,32 +984,10 @@ using OpaqueMetadata = TargetOpaqueMetadata<InProcess>;
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
 using FullOpaqueMetadata = FullMetadata<OpaqueMetadata>;
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi8_);      // Builtin.Int8
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi16_);     // Builtin.Int16
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi32_);     // Builtin.Int32
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi64_);     // Builtin.Int64
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi128_);    // Builtin.Int128
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi256_);    // Builtin.Int256
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bi512_);    // Builtin.Int512
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bo);        // Builtin.NativeObject
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bb);        // Builtin.BridgeObject
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(Bp);        // Builtin.RawPointer
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(BB);        // Builtin.UnsafeValueBuffer
-#if SWIFT_OBJC_INTEROP
-SWIFT_RUNTIME_EXPORT
-const FullOpaqueMetadata METADATA_SYM(BO);        // Builtin.UnknownObject
-#endif
+#define BUILTIN_TYPE(Symbol, Name) \
+    SWIFT_RUNTIME_EXPORT \
+    const FullOpaqueMetadata METADATA_SYM(Symbol);
+#include "swift/Runtime/BuiltinTypes.def"
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {
