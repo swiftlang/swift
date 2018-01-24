@@ -177,6 +177,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SILOptions SILOpts;
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, SILOpts);
   createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),
-                              Invocation.getOutputFilename());
+                              Invocation.getOutputFilename(),
+                              Instance.getPSPsForAtMostOnePrimary());
   return 0;
 }

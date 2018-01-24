@@ -13,7 +13,10 @@
 #ifndef SWIFT_FRONTEND_INPUTFILE_H
 #define SWIFT_FRONTEND_INPUTFILE_H
 
+#include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
+
 #include <string>
 #include <vector>
 
@@ -36,13 +39,27 @@ class InputFile {
   /// Null if the contents are not overridden.
   llvm::MemoryBuffer *Buffer;
 
+  /// The specified output file.
+  /// If only a single outputfile is generated,
+  /// the name of the last specified file is taken.
+  std::string OutputFilename;
+
+  /// The supplementary outputs associated with this input:
+  /// Temporarily keep in the first output-producing input.
+  SupplementaryOutputPaths SupplementaryPaths;
+
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(!name.empty());
+            llvm::MemoryBuffer *buffer = nullptr,
+            StringRef outputFilename = StringRef())
+      : Filename(
+            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
+        IsPrimary(isPrimary), Buffer(buffer), OutputFilename(outputFilename),
+        SupplementaryPaths(SupplementaryOutputPaths()) {
+    assert(name.begin() != Filename.c_str());
+    assert(!name.empty() && "Empty strings signify no inputs in other places");
   }
 
   bool isPrimary() const { return IsPrimary; }
@@ -58,8 +75,32 @@ public:
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
   }
-};
 
+  const std::string &outputFilename() const { return OutputFilename; }
+
+  void setOutputFilename(StringRef outputFilename) {
+    OutputFilename = outputFilename;
+  }
+
+  const SupplementaryOutputPaths &supplementaryOutputs() const {
+    return SupplementaryPaths;
+  }
+
+  void setSupplementaryOutputs(const SupplementaryOutputPaths &outs) {
+    SupplementaryPaths = outs;
+  }
+
+  void setOutputFileNameAndSupplementaryOutputPaths(
+      StringRef outputFilename, const SupplementaryOutputPaths &outs) {
+    setOutputFilename(outputFilename);
+    setSupplementaryOutputs(outs);
+  }
+
+  PrimarySpecificPaths getPSPs() const {
+    return PrimarySpecificPaths(outputFilename(), supplementaryOutputs(),
+                                file());
+  }
+};
 } // namespace swift
 
 #endif /* SWIFT_FRONTEND_INPUTFILE_H */
