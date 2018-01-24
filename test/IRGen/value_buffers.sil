@@ -64,7 +64,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
 // CHECK-NEXT: [[ADDR:%.*]] = bitcast i8* [[T0]] to %T13value_buffers9BigStructV*
 // CHECK-NEXT: [[PARAM1:%.*]] = bitcast %T13value_buffers9BigStructV* [[ADDR]] to i8*
 // CHECK-NEXT: [[PARAM2:%.*]] = bitcast %T13value_buffers9BigStructV* %1 to i8*
-// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[PARAM1]], i8* [[PARAM2]], i64 48, i32 8, i1 false)
+// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[PARAM1]], i8* align 8 [[PARAM2]], i64 48, i1 false)
 // CHECK-NEXT: ret void
 
 sil @project_big : $(@inout Builtin.UnsafeValueBuffer, BigStruct) -> () {
@@ -80,7 +80,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
 // CHECK-NEXT: [[ADDR:%.*]] = load %T13value_buffers9BigStructV*, %T13value_buffers9BigStructV** [[T0]], align 8
 // CHECK-NEXT: [[PARAM1:%.*]] = bitcast %T13value_buffers9BigStructV* [[ADDR]] to i8*
 // CHECK-NEXT: [[PARAM2:%.*]] = bitcast %T13value_buffers9BigStructV* %1 to i8*
-// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[PARAM1]], i8* [[PARAM2]], i64 48, i32 8, i1 false)
+// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[PARAM1]], i8* align 8 [[PARAM2]], i64 48, i1 false)
 // CHECK-NEXT: ret void
 
 sil @dealloc_big : $(@inout Builtin.UnsafeValueBuffer) -> () {
