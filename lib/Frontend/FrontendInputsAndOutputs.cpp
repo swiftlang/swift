@@ -1,4 +1,4 @@
-//===--- FrontendInputs.cpp -------------------------------------*- C++ -*-===//
+//===--- FrontendInputsAndOutputs.cpp ----------------------------*-C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -29,19 +28,25 @@
 using namespace swift;
 using namespace llvm::opt;
 
-FrontendInputs::FrontendInputs(const FrontendInputs &other) {
+// Constructors
+
+FrontendInputsAndOutputs::FrontendInputsAndOutputs(
+    const FrontendInputsAndOutputs &other) {
   for (InputFile input : other.AllInputs)
     addInput(input);
 }
 
-FrontendInputs &FrontendInputs::operator=(const FrontendInputs &other) {
+FrontendInputsAndOutputs &FrontendInputsAndOutputs::
+operator=(const FrontendInputsAndOutputs &other) {
   clearInputs();
   for (InputFile input : other.AllInputs)
     addInput(input);
   return *this;
 }
 
-std::vector<std::string> FrontendInputs::getInputFilenames() const {
+// All inputs:
+
+std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
   std::vector<std::string> filenames;
   for (auto &input : AllInputs) {
     filenames.push_back(input.file());
@@ -49,39 +54,40 @@ std::vector<std::string> FrontendInputs::getInputFilenames() const {
   return filenames;
 }
 
-bool FrontendInputs::isReadingFromStdin() const {
+bool FrontendInputsAndOutputs::isReadingFromStdin() const {
   return hasSingleInput() && getFilenameOfFirstInput() == "-";
 }
 
-void FrontendInputs::assertMustNotBeMoreThanOnePrimaryInput() const {
+void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
   assert(primaryInputCount() < 2 &&
          "have not implemented >1 primary input yet");
 }
 
-const InputFile *FrontendInputs::getUniquePrimaryInput() const {
+const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
   assertMustNotBeMoreThanOnePrimaryInput();
   const auto b = PrimaryInputs.begin();
   return b == PrimaryInputs.end() ? nullptr : &AllInputs[b->second];
 }
 
-const InputFile &FrontendInputs::getRequiredUniquePrimaryInput() const {
+const InputFile &
+FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
   if (const auto *input = getUniquePrimaryInput())
     return *input;
   llvm_unreachable("No primary when one is required");
 }
 
-StringRef FrontendInputs::getNameOfUniquePrimaryInputFile() const {
+StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
   const auto *input = getUniquePrimaryInput();
   return input == nullptr ? StringRef() : input->file();
 }
 
-bool FrontendInputs::isInputPrimary(StringRef file) const {
+bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
   auto iterator = PrimaryInputs.find(file);
   return iterator != PrimaryInputs.end() &&
          AllInputs[iterator->second].isPrimary();
 }
 
-StringRef FrontendInputs::getFilenameOfFirstInput() const {
+StringRef FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
   assert(hasInputs());
   const InputFile &inp = AllInputs[0];
   StringRef f = inp.file();
@@ -89,7 +95,7 @@ StringRef FrontendInputs::getFilenameOfFirstInput() const {
   return f;
 }
 
-bool FrontendInputs::shouldTreatAsLLVM() const {
+bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
@@ -98,7 +104,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
   return false;
 }
 
-bool FrontendInputs::shouldTreatAsSIL() const {
+bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
@@ -118,14 +124,14 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
-void FrontendInputs::addInput(const InputFile &input) {
+void FrontendInputsAndOutputs::addInput(const InputFile &input) {
   if (!input.file().empty() && input.isPrimary())
     PrimaryInputs.insert(std::make_pair(input.file(), AllInputs.size()));
   AllInputs.push_back(input);
 }
 
-unsigned
-FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
+unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
+    const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
         StringRef filename = AllInputs[elem.second].file();
@@ -133,9 +139,10 @@ FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
       });
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                                  bool isREPLRequested,
-                                  bool isNoneRequested) const {
+bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
+                                            bool treatAsSIL,
+                                            bool isREPLRequested,
+                                            bool isNoneRequested) const {
   if (isREPLRequested) {
     if (hasInputs()) {
       diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -164,7 +171,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
   return false;
 }
 
-bool FrontendInputs::areAllNonPrimariesSIB() const {
+bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : AllInputs) {
     if (input.isPrimary())
       continue;

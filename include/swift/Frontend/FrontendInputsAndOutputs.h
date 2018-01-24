@@ -14,7 +14,6 @@
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Frontend/FrontendInputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
@@ -28,8 +27,9 @@ class MemoryBuffer;
 
 namespace swift {
 
-/// Information about all the inputs to the frontend.
-class FrontendInputs {
+/// Information about all the inputs and outputs to the frontend.
+
+class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
@@ -37,16 +37,14 @@ class FrontendInputs {
   InputFileMap PrimaryInputs;
 
 public:
-  FrontendInputs() = default;
-
-  FrontendInputs(const FrontendInputs &other);
-
-  FrontendInputs &operator=(const FrontendInputs &other);
+  FrontendInputsAndOutputs() = default;
+  FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
+  FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
 
   // Readers:
 
   ArrayRef<InputFile> getAllInputs() const { return AllInputs; }
-  
+
   std::vector<std::string> getInputFilenames() const;
 
   unsigned inputCount() const { return AllInputs.size(); }
