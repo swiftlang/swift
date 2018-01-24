@@ -5468,7 +5468,8 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
     objTy = LValueType::get(objTy);
 
   expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr,
-                                                          expr->getEndLoc());
+                                                          expr->getEndLoc(),
+                                                          /* forcedIUO=*/ true);
   cs.setType(expr, objTy);
   expr->setImplicit();
   return expr;
