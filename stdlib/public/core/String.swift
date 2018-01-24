@@ -307,6 +307,17 @@ extension _StringGuts {
   }
 }
 
+@inline(never)
+@_versioned
+internal func sleep(microseconds: Int) {
+  _stdlib_usleep(UInt32(microseconds))
+}
+@inline(never)
+@_versioned
+internal func sleep(milliseconds: Int) {
+  _stdlib_usleep(UInt32(milliseconds * 1_000))
+}
+
 extension String {
   @_inlineable
   @_versioned
@@ -320,6 +331,7 @@ extension String {
     minimumCapacity: Int = 0
   ) -> (String?, hadError: Bool)
   where Input.Element == Encoding.CodeUnit {
+    sleep(milliseconds: 1)
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isASCII) = UTF16.transcodedLength(

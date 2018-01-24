@@ -91,6 +91,9 @@ __swift_ssize_t _stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _stdlib_close(int fd);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _stdlib_usleep(unsigned micros);
+
 // Semaphores <semaphore.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
 // We can't use sem_t itself here, nor is there a platform-consistent
