@@ -1423,13 +1423,10 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
   return object->refCounts.isUniquelyReferencedOrPinned();
 }
 
-struct ClassExtents {
-  size_t negative;
-  size_t positive; 
-};
+using ClassExtents = TwoWordPair<size_t, size_t>;
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-ClassExtents
+ClassExtents::Return
 _getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
@@ -1442,7 +1439,7 @@ _getSwiftClassInstanceExtents(const Metadata *c) {
 #if SWIFT_OBJC_INTEROP
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-ClassExtents
+ClassExtents::Return
 _getObjCClassInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
