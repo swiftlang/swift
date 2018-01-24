@@ -19,10 +19,10 @@ sil [noinline] @__tf_init_scalar : $@convention(thin) <τ_0_0 where τ_0_0 : Acc
 
 // CHECK-LABEL: --- TFPartition Host Result: simple_test
 // CHECK-NOT: = apply
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorProgram
+// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]]
 // CHECK-NOT: = apply
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorProgram
+// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]]
 
 sil @simple_test : $@convention(thin) () -> TensorHandle<Swift.Float> {

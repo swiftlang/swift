@@ -577,11 +577,13 @@ public:
     /// tensor function is lowered to a TF graph.
     StringLiteralInst *programPlaceholder;
     IntegerLiteralInst *programLengthPlaceholder;
+    StringLiteralInst *entryFunctionNamePlaceholder;
 
-    /// This is the "TensorFlow.TensorProgram" object returned by the
-    /// 'startProgram' runtime API entrypoint.  This is returned as null if the
-    /// tensorflow module is invalid and no transformation has been made.
-    SILValue theTensorProgram;
+    /// This is the "TensorFlow.TensorComputation" object returned by the
+    /// '_swift_tfc_StartTensorComputation' runtime API entrypoint.  This is
+    /// returned as null if the tensorflow module is invalid and no
+    /// transformation has been made.
+    SILValue theTensorComputation;
   };
   PartitionedTensorProgram partition();
 
@@ -598,7 +600,7 @@ private:
   bool sinkValueIntoRegionForPromotion(SILInstruction *inst);
 
   // Rewriting the host function.
-  PartitionedTensorProgram insertTensorProgramStartEndTerminate();
+  PartitionedTensorProgram insertTensorComputationStartEndTerminate();
 };
 } // end anonymous namespace
 
@@ -1960,59 +1962,62 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
   return result;
 }
 
-/// Rewrite the host program, inserting a call to _TFCStartTensorProgram at the
-/// start point of the tensor function, passing in the tensor program itself,
-/// input tensor arguments etc.
+/// Rewrite the host program, inserting a call to _TFCStartTensorComputation at
+/// the start point of the tensor function, passing in the tensor program
+/// itself, input tensor arguments etc.
 auto TFFunctionPartition::
-insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
+insertTensorComputationStartEndTerminate() -> PartitionedTensorProgram {
   auto &ctx = fn.getASTContext();
   auto loc = fn.getLocation();
 
   // We are going to create a call to this function to kick off the tensor
-  // program:
+  // computation:
   //
   // The C type is TF_TensorHandle*
   // public typealias CTensorHandle = OpaquePointer
   //
-  // @_silgen_name("_swift_tfc_StartTensorProgram")
-  // public func _TFCStartTensorProgram(
+  // @_silgen_name("_swift_tfc_StartTensorComputation")
+  // public func _TFCStartTensorComputation(
   //   _ programByteAddress: UnsafeRawPointer,
   //   _ programByteCount: Int,
+  //   _ entryFunctionName: UnsafePointer<Int8>,
   //   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   //   _ tensorArgumentCount: Int,
   //   _ resultCount: Int
-  // ) -> TensorProgram {
-  auto startProgramFn =
-    fn.getModule().findFunction("_swift_tfc_StartTensorProgram",
+  // ) -> TensorComputation {
+  auto startComputationFn =
+    fn.getModule().findFunction("_swift_tfc_StartTensorComputation",
                                 SILLinkage::PublicExternal);
 
   // We are going to create a call to this function to syncronize with the
-  // completed tensor program and collect the results.
+  // completed tensor computation and collect the results.
   //
-  // @_silgen_name("_swift_tfc_FinishTensorProgram") public
-  // func _TFCFinishTensorProgram(
-  //    _ program: TensorProgram,
+  // @_silgen_name("_swift_tfc_FinishTensorComputation") public
+  // func _TFCFinishTensonComputation(
+  //    _ computation: TensorComputation,
   //    _ resultAddress: UnsafeMutablePointer<CTensorHandle>,
   //    _ tensorResultCount: Int) {...}
-  auto finishProgramFn =
-    fn.getModule().findFunction("_swift_tfc_FinishTensorProgram",
+  auto finishComputationFn =
+    fn.getModule().findFunction("_swift_tfc_FinishTensorComputation",
                                 SILLinkage::PublicExternal);
 
-  // We may also generate a call to this function to kill the tensor program if
-  // the host execution goes awry:
+  // We may also generate a call to this function to kill the tensor computation
+  // if the host execution goes away:
   //
-  // @_silgen_name("_swift_tfc_TerminateTensorProgram")
-  // public func _TFCTerminateTensorProgram(_ program: TensorProgram) {...}
+  // @_silgen_name("_swift_tfc_TerminateTensorComputation")
+  // public func _TFCTerminateTensorComputation(
+  //   _ computation: TensorComputation
+  // ) {...}
   //
-  auto terminateProgramFn =
-    fn.getModule().findFunction("_swift_tfc_TerminateTensorProgram",
+  auto terminateComputationFn =
+    fn.getModule().findFunction("_swift_tfc_TerminateTensorComputation",
                                 SILLinkage::PublicExternal);
 
-  if (!startProgramFn || !finishProgramFn || !terminateProgramFn) {
+  if (!startComputationFn || !finishComputationFn || !terminateComputationFn) {
     diagnose(ctx, fn.getLocation().getSourceLoc(),
              diag::tf_internal_error,
              "'_swift_tfc_' entrypoints not found in TensorFlow module");
-    return { nullptr, nullptr, nullptr, SILValue()};
+    return { nullptr, nullptr, nullptr, nullptr, SILValue() };
   }
 
   // Create various types and SIL types that we'll be using below.
@@ -2029,6 +2034,11 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
                           cTensorHandleTy);
   auto unsafeMutPointerSILType =
     SILType::getPrimitiveObjectType(unsafeMutPointerType->getCanonicalType());
+  auto int8PointerType =
+    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
+                          ctx.getInt8Decl()->getDeclaredType());
+  auto int8PointerSILType =
+    SILType::getPrimitiveObjectType(int8PointerType->getCanonicalType());
 
   // This assumes that the first member of TensorHandle is the CTensorHandle.
   auto tensorHandleDecl = ctx.getTensorHandleDecl();
@@ -2054,6 +2064,10 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
     B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::Bytes);
   auto program = wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(),
                               B, loc);
+  auto entryFunctionNamePlaceholder =
+    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
+  auto entryFunctionName = B.createStruct(loc, int8PointerSILType,
+                                          { entryFunctionNamePlaceholder });
 
   // Pass a length of zero for now, it will be filled in later.
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
@@ -2122,15 +2136,20 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // The first two arguments are the program, the rest of the arguments are the
   // parameters passed in.
   SILValue startArgs[] = {
-    program, programLength, firstPtr, numTensorArguments, numTensorResults
+    program,            // programByteAddress: UnsafeRawPointer
+    programLength,      // programByteCount: Int
+    entryFunctionName,  // entryFunctionName: UnsafePointer<Int8>
+    firstPtr,           // tensorArgumentAddress: UnsafePointer<CTensorHandle>
+    numTensorArguments, // tensorArgumentCount: Int
+    numTensorResults    // resultCount: Int
   };
 
   // Now that we have our argument list, create a call.
-  auto startProgramFnRef = B.createFunctionRef(loc, startProgramFn);
+  auto startProgramFnRef = B.createFunctionRef(loc, startComputationFn);
 
   // Create the runtime call in the host program that kicks off the tensor
   // program, setting the argument values we provide as the tensor params.
-  auto tensorProgram =
+  auto tensorComputation =
     B.createApply(loc, startProgramFnRef, /*no substitutions*/{}, startArgs,
                   /*isNonThrowing*/false);
 
@@ -2179,12 +2198,12 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   // %4 = struct $UnsafeMutablePointer<CTensorHandle>(%3: $Builtin.RawPointer)
   firstPtr = B.createStruct(loc, unsafeMutPointerSILType, firstPtr);
 
-  auto finishProgramFnRef = B.createFunctionRef(loc, finishProgramFn);
+  auto finishComputationFnRef = B.createFunctionRef(loc, finishComputationFn);
 
   // Create the builtin in the host program that kicks off the tensor program,
   // setting the argument values.
-  B.createApply(loc, finishProgramFnRef, /*no substitutions*/{},
-                /*args*/ {tensorProgram, firstPtr, numTensorResults},
+  B.createApply(loc, finishComputationFnRef, /*no substitutions*/{},
+                /*args*/ {tensorComputation, firstPtr, numTensorResults},
                 /*isNonThrowing*/false);
 
   // end_access %1 : $*(CTensorHandle, CTensorHandle)
@@ -2243,7 +2262,7 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
 
 
 
-  // tensorProgram is the return value of _TFCStartTensorProgram.  By
+  // tensorComputation is the return value of _TFCStartTensorComputation.  By
   // construction, it is known to dominate all abort points and the finish point
   // point of the program.
   //
@@ -2252,19 +2271,21 @@ insertTensorProgramStartEndTerminate() -> PartitionedTensorProgram {
   for (auto *killBB : tensorKillBlocks) {
     B.setInsertionPoint(&killBB->front());
 
-    auto terminateProgramFnRef = B.createFunctionRef(loc, terminateProgramFn);
+    auto terminateComputationFnRef =
+      B.createFunctionRef(loc, terminateComputationFn);
 
     // Create the builtin in the host program that kicks off the tensor program,
     // setting the argument values.
-    B.createApply(loc, terminateProgramFnRef, /*no substitutions*/{},
-                  /*args*/{ tensorProgram }, /*isNonThrowing*/false);
+    B.createApply(loc, terminateComputationFnRef, /*no substitutions*/{},
+                  /*args*/{ tensorComputation }, /*isNonThrowing*/false);
   }
 
   return {
     nullptr,  // New function hasn't been created yet.
     programPlaceholder,
     programLengthPlaceholder,
-    tensorProgram
+    entryFunctionNamePlaceholder,
+    tensorComputation
   };
 }
 
@@ -2284,10 +2305,10 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
          "Shouldn't run on functions with no tensor ops");
 
   // Insert the start/finish and any terminate runtime calls.
-  auto result = insertTensorProgramStartEndTerminate();
+  auto result = insertTensorComputationStartEndTerminate();
 
   // If the TensorFlow module is malformed, bail out without breaking the code.
-  if (!result.theTensorProgram)
+  if (!result.theTensorComputation)
     return result;
 
   // Calculate the parameter list for the new function.
@@ -2651,10 +2672,15 @@ public:
       auto len = B.createIntegerLiteral(fn->getLocation(),
                               tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
+      auto name = B.createStringLiteral(fn->getLocation(),
+                                        tensorProgram.fn->getName(),
+                                        StringLiteralInst::Encoding::UTF8);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();
       tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
       tensorProgram.programLengthPlaceholder->eraseFromParent();
+      tensorProgram.entryFunctionNamePlaceholder->replaceAllUsesWith(name);
+      tensorProgram.entryFunctionNamePlaceholder->eraseFromParent();
     }
 
     if (shouldDumpIntermediates()) {

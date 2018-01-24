@@ -135,8 +135,8 @@ TensorTests.test("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
-   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
-   expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
+  let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
+  expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
 }
 TensorTests.test("ShapeGetter2", testShapeGetter2)
 

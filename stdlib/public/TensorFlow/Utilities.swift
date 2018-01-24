@@ -61,8 +61,8 @@ typealias CTFFunction = OpaquePointer
 /// TF_Tensor* type.
 typealias CTensor = OpaquePointer
 
-/// TF_Context* type.
-typealias CTFContext = OpaquePointer
+/// TFE_Context* type.
+typealias CTFEContext = OpaquePointer
 
 /// TFE_Op* type.
 typealias CTFEOp = OpaquePointer
@@ -89,7 +89,7 @@ func logToStderr(_ message: String) {
 }
 
 func debugLog(_ message: @autoclosure () -> String) {
-  if _TFCRuntimeConfig.printsDebugLog {
+  if _RuntimeConfig.printsDebugLog {
     print(message())
   }
 }

@@ -24,12 +24,12 @@ public typealias CTensorHandle = OpaquePointer
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
 public final class TensorHandle<Unit: AccelerableTensorUnit> {
-  // This is the underlying "TF_TensorHandle*" which this TensorHandle
-  // represents.
-  //
-  // NOTE: The compiler knows that TensorHandle has a single stored property,
-  // and assumes that this is it.  Changing the design of TensorHandle will
-  // require tweaking the compiler.
+  /// This is the underlying "TF_TensorHandle*" which this TensorHandle
+  /// represents.
+  ///
+  /// - Note: The compiler knows that TensorHandle has a single stored property,
+  /// and assumes that this is it.  Changing the design of TensorHandle will
+  /// require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
   public init(cTensorHandle: CTensorHandle) {
@@ -42,11 +42,22 @@ public final class TensorHandle<Unit: AccelerableTensorUnit> {
 }
 
 extension TensorHandle {
+  /// Create a shaped array with contents of the underlying tensor. If the
+  /// tensor is on the accelerator, it will be copied to the host.
+  /// - Returns: A shaped array.
   @_versioned
   @inline(never)
   func makeHostCopy() -> ShapedArray<Unit> {
     let status = TF_NewStatus()
-    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    // If the tensor is on the accelerator, we need to copy it to the host.
+    // NOTE: This will not perform a copy if the handle is already on the host.
+    let context = _ExecutionContext.global
+    let hostHandle: CTensorHandle = context.withMutableCContext { ctx in
+      defer { checkOk(status) }
+      return TFE_TensorHandleCopyToDevice(cTensorHandle, ctx, "CPU:0", status)
+    }
+    // Materialize the tensor on the host.
+    let cTensor = TFE_TensorHandleResolve(hostHandle, status)
     checkOk(status)
     TF_DeleteStatus(status)
     return ShapedArray(moving: cTensor!)
