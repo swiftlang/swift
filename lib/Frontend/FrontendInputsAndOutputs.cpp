@@ -122,8 +122,11 @@ StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
   auto iterator = PrimaryInputs.find(file);
-  return iterator != PrimaryInputs.end() &&
-         AllInputs[iterator->second].isPrimary();
+  if (iterator == PrimaryInputs.end())
+    return false;
+  assert(AllInputs[iterator->second].isPrimary() &&
+         "PrimaryInputs should only hold primaries");
+  return true;
 }
 
 unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
