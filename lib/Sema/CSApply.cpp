@@ -2409,13 +2409,6 @@ namespace {
     bool shouldForceUnwrapResult(Decl *decl, ConstraintLocatorBuilder locator) {
       // FIXME: Disable parts of the new IUO implementation for now.
       return false;
-      if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        return false;
-
-      auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
-          ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
-
-      return solution.getDisjunctionChoice(choiceLocator);
     }
 
     Expr *forceUnwrapResult(Expr *newExpr) {
