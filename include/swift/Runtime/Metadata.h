@@ -620,6 +620,17 @@ const ValueWitnessTable VALUE_WITNESS_SYM(Bi256_); // Builtin.Int256
 SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
 
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bf16_);  // Builtin.Float16
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bf32_);  // Builtin.Float32
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bf64_);  // Builtin.Float64
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bf80_);  // Builtin.Float80
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bf128_); // Builtin.Float128
+
 // The object-pointer table can be used for arbitrary Swift refcounted
 // pointer types.
 SWIFT_RUNTIME_EXPORT
@@ -998,6 +1009,16 @@ SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bi256_);    // Builtin.Int256
 SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bi512_);    // Builtin.Int512
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bf16_);     // Builtin.Float8
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bf32_);     // Builtin.Float32
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bf64_);     // Builtin.Float64
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bf80_);     // Builtin.Float80
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bf128_);    // Builtin.Float128
 SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bo);        // Builtin.NativeObject
 SWIFT_RUNTIME_EXPORT
