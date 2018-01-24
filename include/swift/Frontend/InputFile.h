@@ -41,7 +41,9 @@ public:
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+      : Filename(
+            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
+        IsPrimary(isPrimary), Buffer(buffer) {
     assert(!name.empty());
   }
 

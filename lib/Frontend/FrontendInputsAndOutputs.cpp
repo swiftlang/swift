@@ -121,7 +121,10 @@ StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
 }
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
-  auto iterator = PrimaryInputs.find(file);
+  StringRef correctedFile =
+      InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+          file);
+  auto iterator = PrimaryInputs.find(correctedFile);
   if (iterator == PrimaryInputs.end())
     return false;
   assert(AllInputs[iterator->second].isPrimary() &&
