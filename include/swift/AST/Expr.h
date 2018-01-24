@@ -303,6 +303,10 @@ protected:
     NumVariadicArgs : 16
   );
 
+  SWIFT_INLINE_BITFIELD(ForceValueExpr, Expr, 1,
+    ForcedIUO : 1
+  );
+
   SWIFT_INLINE_BITFIELD(InOutToPointerExpr, ImplicitConversionExpr, 1,
     IsNonAccessing : 1
   );
@@ -2507,9 +2511,11 @@ class ForceValueExpr : public Expr {
   SourceLoc ExclaimLoc;
 
 public:
-  ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc)
+  ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc, bool forcedIUO = false)
     : Expr(ExprKind::ForceValue, /*Implicit=*/exclaimLoc.isInvalid(), Type()),
-      SubExpr(subExpr), ExclaimLoc(exclaimLoc) {}
+      SubExpr(subExpr), ExclaimLoc(exclaimLoc) {
+    Bits.ForceValueExpr.ForcedIUO = forcedIUO;
+  }
 
   SourceRange getSourceRange() const {
     if (ExclaimLoc.isInvalid())
@@ -2533,6 +2539,10 @@ public:
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  bool isForceOfImplicitlyUnwrappedOptional() const {
+    return Bits.ForceValueExpr.ForcedIUO;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ForceValue;
