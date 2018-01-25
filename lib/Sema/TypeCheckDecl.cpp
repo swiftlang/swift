@@ -8297,6 +8297,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // Validate the nominal type declaration being extended.
   auto nominal = extendedType->getAnyNominal();
   validateDecl(nominal);
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+    requestNominalLayout(classDecl);
 
   if (nominal->getGenericParamsOfContext()) {
     auto genericParams = ext->getGenericParams();
