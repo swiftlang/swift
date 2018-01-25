@@ -427,7 +427,7 @@ public func test(_ p: Proto) {
   p.val.x += 1
 }
 
-// CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in Proto) -> ()
+// CHECK-LABEL: sil @_T09protocols4testyyAA5Proto_pF : $@convention(thin) (@in Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!materializeForSet
 // CHECK: [[BUF:%.*]] = apply [[MAT]]
