@@ -259,14 +259,6 @@ public:
 
   enum class LoweringStyle { Shallow, Deep };
 
-  /// Given the result of the expansion heuristic,
-  /// return appropriate lowering style.
-  static LoweringStyle getLoweringStyle(bool shouldExpand) {
-    if (shouldExpand)
-      return TypeLowering::LoweringStyle::Deep;
-    return TypeLowering::LoweringStyle::Shallow;
-  }
-
   //===--------------------------------------------------------------------===//
   // DestroyValue
   //===--------------------------------------------------------------------===//
