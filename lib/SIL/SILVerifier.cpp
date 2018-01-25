@@ -2313,7 +2313,8 @@ public:
         case SILInstructionKind::TryApplyInst:
         case SILInstructionKind::PartialApplyInst:
           // Non-Mutating set pattern that allows a inout (that can't really
-          // write back.
+          // write back. Only SILGen generates PointerToThinkFunction
+          // instructions in the writeback code.
           if (auto *AI = dyn_cast<ApplyInst>(inst)) {
             if (isa<PointerToThinFunctionInst>(AI->getCallee())) {
               break;
