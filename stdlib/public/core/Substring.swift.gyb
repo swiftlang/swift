@@ -376,29 +376,32 @@ extension Substring : LosslessStringConvertible {
 %   ('characters', 'Character')
 % ]:
 %   View = ViewPrefix + 'View'
-%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
+%   _View = '_CharacterView' if property == 'characters' else View
+%   _property = '_characters' if property == 'characters' else property
+% 
 extension Substring {
   % if View == 'CharacterView':
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
+  public typealias CharacterView = _CharacterView
   % end
+
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct ${View} {
+  public struct ${_View} {
     @_versioned // FIXME(sil-serialize-all)
-    internal var _slice: Slice<String.${View}>
+    internal var _slice: Slice<String.${_View}>
   }
 }
 
-extension Substring.${View} : BidirectionalCollection {
+extension Substring.${_View} : BidirectionalCollection {
   public typealias Index = String.Index
-  public typealias SubSequence = Substring.${View}
 
   /// Creates an instance that slices `base` at `_bounds`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_ base: String.${View}, _bounds: Range<Index>) {
+  internal init(_ base: String.${_View}, _bounds: Range<Index>) {
     _slice = Slice(
-      base: String(base._guts).${property},
+      base: String(base._guts).${_property},
       bounds: _bounds)
   }
 
@@ -432,26 +435,40 @@ extension Substring.${View} : BidirectionalCollection {
     return _slice[i]
   }
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(r: Range<Index>) -> SubSequence {
+  % if property == 'characters':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
+  public subscript(r: Range<Index>) -> Substring.${View} {
     // FIXME(strings): tests.
     _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
       "${View} index range out of bounds")
-    return Substring.${View}(_wholeString.${property}, _bounds: r)
+    return Substring.${_View}(_wholeString.${_property}, _bounds: r)
   }
 }
 
 extension Substring {
   % if View == 'CharacterView':
+  @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
-  % end
-  @_inlineable // FIXME(sil-serialize-all)
-  public var ${property}: ${View} {
+  public var characters: CharacterView {
     get {
-      return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
+      return _characters
     }
     set {
-      self = Substring(newValue)
+      _characters = newValue
+    }
+  }
+  % end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var ${_property}: ${_View} {
+    get {
+      return ${_View}(_wholeString.${_property}, _bounds: startIndex..<endIndex)
+    }
+    set {
+      self = Substring(_base: _wholeString, startIndex..<endIndex)
     }
   }
 
@@ -459,6 +476,10 @@ extension Substring {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
+  % if property == 'characters':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
   public init(_ content: ${View}) {
     self = content._wholeString[content.startIndex..<content.endIndex]
   }
@@ -487,6 +508,10 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   @_inlineable // FIXME(sil-serialize-all)
+  % if property == 'characters':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
   public init(_ content: Substring.${View}) {
     self = String(Substring(content))
   }
