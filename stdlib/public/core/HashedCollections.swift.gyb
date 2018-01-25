@@ -3903,13 +3903,10 @@ extension _Native${Self}Buffer
   @_versioned // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(bucketCount: Int) {
-    // Actual bucket count is the next power of 2 >= bucketCount.
-    // Make sure that is representable.
+    // Actual bucket count is the next power of 2 greater than or equal to
+    // bucketCount. Make sure that is representable.
     _sanityCheck(bucketCount <= (Int.max >> 1) + 1)
-    var buckets = 2
-    while buckets < bucketCount {
-      buckets <<= 1
-    }
+    let buckets = 1 &<< ((Swift.max(bucketCount, 2) - 1)._binaryLogarithm() + 1)
     self.init(_exactBucketCount: buckets)
   }
 
