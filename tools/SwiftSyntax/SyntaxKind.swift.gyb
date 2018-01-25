@@ -52,30 +52,33 @@ internal enum SyntaxKind: String, Codable {
   }
 }
 
-extension Syntax {
-  /// Creates a Syntax node from the provided RawSyntax using the appropriate
-  /// Syntax type, as specified by its kind.
-  /// - Parameters:
-  ///   - raw: The raw syntax with which to create this node.
-  ///   - root: The root of this tree, or `nil` if the new node is the root.
-  static func fromRaw(_ raw: RawSyntax) -> Syntax {
-    let data = SyntaxData(raw: raw)
-    return make(root: nil, data: data)
-  }
+/// Creates a Syntax node from the provided RawSyntax using the appropriate
+/// Syntax type, as specified by its kind.
+/// - Parameters:
+///   - raw: The raw syntax with which to create this node.
+///   - root: The root of this tree, or `nil` if the new node is the root.
+internal func makeSyntax(_ raw: RawSyntax) -> Syntax {
+  let data = SyntaxData(raw: raw)
+  return makeSyntax(root: nil, data: data)
+}
 
-  /// Creates a Syntax node from the provided SyntaxData using the appropriate
-  /// Syntax type, as specified by its kind.
-  /// - Parameters:
-  ///   - root: The root of this tree, or `nil` if the new node is the root.
-  ///   - data: The data for this new node.
-  static func make(root: SyntaxData?, data: SyntaxData) -> Syntax {
-    let root = root ?? data
-    switch data.raw.kind {
-    case .token: return TokenSyntax(root: root, data: data)
-    case .unknown: return Syntax(root: root, data: data)
+/// Creates a Syntax node from the provided SyntaxData using the appropriate
+/// Syntax type, as specified by its kind.
+/// - Parameters:
+///   - root: The root of this tree, or `nil` if the new node is the root.
+///   - data: The data for this new node.
+internal func makeSyntax(root: SyntaxData?, data: SyntaxData) -> Syntax {
+  let root = root ?? data
+  switch data.raw.kind {
+  case .token: return TokenSyntax(root: root, data: data)
+  case .unknown: return UnknownSyntax(root: root, data: data)
 % for node in SYNTAX_NODES:
-    case .${node.swift_syntax_kind}: return ${node.name}(root: root, data: data)
+  case .${node.swift_syntax_kind}:
+%   if node.is_base():
+    return Unknown${node.name}(root: root, data: data)
+%   else:
+    return ${node.name}(root: root, data: data)
+%   end
 % end
-    }
   }
 }

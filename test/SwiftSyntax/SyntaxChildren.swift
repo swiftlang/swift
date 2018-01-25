@@ -28,7 +28,7 @@ var SyntaxChildrenAPI = TestSuite("SyntaxChildrenAPI")
 SyntaxChildrenAPI.test("IterateWithAllPresent") {
   let returnStmt = SyntaxFactory.makeReturnStmt(
     returnKeyword: SyntaxFactory.makeReturnKeyword(),
-    expression: SyntaxFactory.makeBlankExpr(),
+    expression: SyntaxFactory.makeBlankUnknownExpr(),
     semicolon: SyntaxFactory.makeSemicolonToken())
 
   var iterator = returnStmt.children.makeIterator()
