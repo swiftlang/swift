@@ -143,12 +143,19 @@ internal func _getCocoaStringPointer(
 @inline(never) // Hide the CF dependency
 internal
 func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
-  if let ascii = cocoaString as? _ASCIIStringStorage {
-    return _StringGuts(ascii)
-  } else if let utf16 = cocoaString as? _UTF16StringStorage {
-    return _StringGuts(utf16)
-  } else if let wrapped = cocoaString as? _NSContiguousString {
-    return wrapped._guts
+  let cocoaType = type(of: cocoaString)
+  if cocoaType == _ASCIIStringStorage.self {
+    return _StringGuts(
+      _unsafeUncheckedDowncast(cocoaString, to: _ASCIIStringStorage.self))
+  }
+  else if cocoaType == _UTF16StringStorage.self {
+    return _StringGuts(
+      _unsafeUncheckedDowncast(cocoaString, to: _UTF16StringStorage.self))
+  }
+  else if cocoaType == _NSContiguousString.self {
+    return  _unsafeUncheckedDowncast(
+      cocoaString, to: _NSContiguousString.self
+    )._guts
   } else if _isObjCTaggedPointer(cocoaString) {
     return _StringGuts(_taggedCocoaObject: cocoaString)
   }
