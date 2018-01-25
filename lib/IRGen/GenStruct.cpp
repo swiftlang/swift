@@ -845,12 +845,13 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     emitStructMetadata(*this, st);
 
   emitNestedTypeDecls(st->getMembers());
-  emitFieldMetadataRecord(st);
 
   if (shouldEmitOpaqueTypeMetadataRecord(st)) {
     emitOpaqueTypeMetadataRecord(st);
     return;
   }
+
+  emitFieldMetadataRecord(st);
 }
 
 namespace {
