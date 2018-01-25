@@ -389,9 +389,15 @@ extension DoubleWidth : FixedWidthInteger {
 
     if rhs.high == (0 as Low) {
       let a = lhs.high.high % rhs.low
-      let (_, b) = rhs.low.dividingFullWidth((a, lhs.high.low))
-      let (x, c) = rhs.low.dividingFullWidth((b, lhs.low.high))
-      let (y, d) = rhs.low.dividingFullWidth((c, lhs.low.low))
+      let b = a == (0 as Low)
+        ? lhs.high.low % rhs.low
+        : rhs.low.dividingFullWidth((a, lhs.high.low)).remainder
+      let (x, c) = b == (0 as Low)
+        ? lhs.low.high.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((b, lhs.low.high))
+      let (y, d) = c == (0 as Low)
+        ? lhs.low.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((c, lhs.low.low))
       return (Magnitude(x, y), Magnitude(0, d))
     }
 
@@ -435,7 +441,9 @@ extension DoubleWidth : FixedWidthInteger {
 
     if rhs.high == (0 as Low) {
       let (x, a) = lhs.high.quotientAndRemainder(dividingBy: rhs.low)
-      let (y, b) = rhs.low.dividingFullWidth((a, lhs.low))
+      let (y, b) = a == (0 as Low)
+        ? lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((a, lhs.low))
       return (Magnitude(x, y), Magnitude(0, b))
     }
 
