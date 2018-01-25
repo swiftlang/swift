@@ -2137,6 +2137,7 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
 // @guaranteed or whatever.
 static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
+  // FIXME: IUO
   return !type1->matches(type2, TypeMatchFlags::AllowABICompatible);
 }
 
