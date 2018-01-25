@@ -44,7 +44,7 @@ extension Syntax {
     }
     let decoder = JSONDecoder()
     let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
-    guard let file = Syntax.fromRaw(raw) as? SourceFileSyntax else {
+    guard let file = makeSyntax(raw) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
     return file
