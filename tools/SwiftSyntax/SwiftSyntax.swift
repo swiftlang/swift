@@ -42,14 +42,14 @@ extension Syntax {
     guard result.wasSuccessful else {
       throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
-    return try deserializeSourceFileSyntax(result.stdoutData)
+    return try decodeSourceFileSyntax(result.stdoutData)
   }
 
-  /// Deserialize a serialized form of SourceFileSyntax to a syntax node.
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
   /// - Parameter content: The data of the serialized SourceFileSyntax.
   /// - Returns: A top-level Syntax node representing the contents of the tree,
   ///            if the parse was successful.
-  fileprivate static func deserializeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
+  fileprivate static func decodeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
     let decoder = JSONDecoder()
     let raw = try decoder.decode(RawSyntax.self, from: content)
     guard let file = makeSyntax(raw) as? SourceFileSyntax else {
@@ -58,11 +58,11 @@ extension Syntax {
     return file
   }
 
-  /// Deserialize a serialized form of SourceFileSyntax to a syntax node.
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
   /// - Parameter content: The string content of the serialized SourceFileSyntax.
   /// - Returns: A top-level Syntax node representing the contents of the tree,
   ///            if the parse was successful.
-  public static func deserializeSourceFileSyntax(_ content: String) throws -> SourceFileSyntax {
-    return try deserializeSourceFileSyntax(content.data(using: .utf8)!)
+  public static func decodeSourceFileSyntax(_ content: String) throws -> SourceFileSyntax {
+    return try decodeSourceFileSyntax(content.data(using: .utf8)!)
   }
 }
