@@ -51,7 +51,7 @@ extension Syntax {
   ///            if the parse was successful.
   fileprivate static func deserializeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
     let decoder = JSONDecoder()
-    let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
+    let raw = try decoder.decode(RawSyntax.self, from: content)
     guard let file = makeSyntax(raw) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
