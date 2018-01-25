@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -419,6 +420,9 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       // but that gets tricky with synthesized function bodies.
       if (AFD->isBodyTypeChecked()) continue;
 
+      UnifiedStatsReporter::FrontendStatsTracer Tracer;
+      if (TC.Context.Stats)
+        Tracer = TC.Context.Stats->getStatsTracer("typecheck-fn", AFD);
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
 
