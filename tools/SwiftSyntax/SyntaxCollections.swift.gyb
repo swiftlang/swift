@@ -22,8 +22,9 @@ import Foundation
 % for node in SYNTAX_NODES:
 %   if node.collection_element:
 
-/// Represents a collection of Syntax nodes of a specific type. SyntaxCollection
-/// behaves as a regular Swift collection, and has accessors that return new
+/// `${node.name}` represents a collection of one or more
+/// `${node.collection_element_type}` nodes. ${node.name} behaves
+/// as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
 public struct ${node.name}: _SyntaxBase {
   var _root: SyntaxData
