@@ -1,6 +1,6 @@
 # flake8: noqa I201
 from Token import SYNTAX_TOKEN_MAP
-from kinds import kind_to_type, lowercase_first_word
+from kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
 
 
 class Child(object):
