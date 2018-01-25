@@ -57,6 +57,23 @@ CompareFunctionTypes(const AnyFunctionType *f, const AnyFunctionType *g,
                      bool *input_matches = nullptr,
                      bool *output_matches = nullptr);
 
+static Optional<ClangTypeKind>
+GetClangTypeKindFromSwiftKind(DeclKind decl_kind) {
+  Optional<ClangTypeKind> clangTypeKind;
+  switch (decl_kind) {
+  case DeclKind::Class:
+    return ClangTypeKind::ObjCClass;
+  case DeclKind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case DeclKind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case DeclKind::Struct:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 class DeclsLookupSource {
 public:
   typedef SmallVectorImpl<ValueDecl *> ValueDecls;
@@ -152,23 +169,8 @@ public:
         if (!swift_clang_importer)
           return;
 
-        Optional<ClangTypeKind> clangTypeKind;
-        switch (decl_kind) {
-        case DeclKind::Class:
-          clangTypeKind = ClangTypeKind::ObjCClass;
-          break;
-        case DeclKind::Protocol:
-          clangTypeKind = ClangTypeKind::ObjCProtocol;
-          break;
-        case DeclKind::TypeAlias:
-          clangTypeKind = ClangTypeKind::Typedef;
-          break;
-        case DeclKind::Struct:
-          clangTypeKind = ClangTypeKind::Tag;
-          break;
-        default:
-          break;
-        }
+        Optional<ClangTypeKind> clangTypeKind =
+            GetClangTypeKindFromSwiftKind(decl_kind);
         if (clangTypeKind) {
           swift_clang_importer->lookupTypeDecl(name.getIdentifier().str(),
                                                clangTypeKind.getValue(),
@@ -192,6 +194,37 @@ public:
                       result);
     }
     return;
+  }
+
+  void lookupRelatedEntity(StringRef name, StringRef related_entity_kind,
+                           DeclKind decl_kind, ValueDecls &result) {
+    switch (_type) {
+    case LookupKind::ClangImporter: {
+      ASTContext *ast_ctx = _clang_crawler._ast;
+      if (!ast_ctx)
+        return;
+      ClangImporter *swift_clang_importer =
+          (ClangImporter *)ast_ctx->getClangModuleLoader();
+      if (!swift_clang_importer)
+        return;
+      Optional<ClangTypeKind> clang_kind =
+          GetClangTypeKindFromSwiftKind(decl_kind);
+      if (!clang_kind)
+        return;
+      swift_clang_importer->lookupRelatedEntity(name, clang_kind.getValue(),
+                                                related_entity_kind,
+                                                [&](TypeDecl *found) {
+        result.push_back(found);
+      });
+      return;
+    }
+    case LookupKind::SwiftModule:
+    case LookupKind::Decl:
+    case LookupKind::Extension:
+      return;
+    case LookupKind::Invalid:
+      return;
+    }
   }
 
   void lookupValue(ModuleDecl::AccessPathTy path, DeclBaseName name, NLKind kind,
@@ -500,9 +533,8 @@ static bool FindFirstNamedDeclWithKind(
   } else if (result._module) {
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(
-          name, ast->getIdentifier(priv_decl_id.getValue().c_str()),
-          decls);
+      result._module.lookupMember(name, GetIdentifier(ast, priv_decl_id),
+                                  decls);
     else
       result._module.lookupByMangledName(name, decl_kind, decls);
     if (FilterDeclsForKind(decl_kind, decls, result))
@@ -580,8 +612,8 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
     ModuleDecl::AccessPathTy access_path;
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
-      result._module.lookupMember(name,
-          ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
+      result._module.lookupMember(
+          name, ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
     else
       result._module.lookupValue(access_path, name, NLKind::QualifiedLookup,
                                  decls);
@@ -1626,6 +1658,44 @@ static void VisitNodePrivateDeclName(
   }
 }
 
+static void VisitNodeRelatedEntityDeclName(
+    ASTContext *ast,
+    Demangle::NodePointer parent_node,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
+
+  if (cur_node->getNumChildren() != 1 || !cur_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::RelatedEntityDeclName");
+    return;
+  }
+
+  Demangle::NodePointer id_node(cur_node->getChild(0));
+
+  if (!id_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::RelatedEntityDeclName");
+    return;
+  }
+
+  SmallVector<ValueDecl *, 4> decls;
+  if (result._module) {
+    result._module.lookupRelatedEntity(id_node->getText(), cur_node->getText(),
+                                       decl_kind, decls);
+  }
+
+  if (!FilterDeclsForKind(decl_kind, decls, result)) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to find Node::Kind::RelatedEntityDeclName '%s' for '%s'",
+          cur_node->getText().str().c_str(),
+          id_node->getText().str().c_str());
+    return;
+  }
+}
+
 static void VisitNodeNominal(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1644,6 +1714,9 @@ static void VisitNodeNominal(
       break;
     case Demangle::Node::Kind::PrivateDeclName:
       VisitNodePrivateDeclName(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::RelatedEntityDeclName:
+      VisitNodeRelatedEntityDeclName(ast, cur_node, child, result);
       break;
     default:
       VisitNode(ast, child, result);
@@ -1683,6 +1756,9 @@ static void VisitNodeTypeAlias(
       break;
     case Demangle::Node::Kind::PrivateDeclName:
       VisitNodePrivateDeclName(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::RelatedEntityDeclName:
+      VisitNodeRelatedEntityDeclName(ast, cur_node, child, result);
       break;
     default:
       VisitNode(ast, child, result);

@@ -42,7 +42,11 @@ func testObjC(
   d: SNCollisionProtocol,
   e: CFTypeRef,
   f: CCItem,
-  g: SomeClassAlias
+  g: SomeClassAlias,
+  h: SomeError,
+  i: SomeError.Code,
+  j: SomeRenamedError,
+  k: SomeRenamedError.Code
 ) {
   // CHECK-objc: type: SomeClass	for 'a' mangled=$SSo11SNSomeClassCD
   _ = a
@@ -58,5 +62,13 @@ func testObjC(
   _ = f
   // CHECK-objc: type: SomeClassAlias	for 'g' mangled=$SSo14SomeClassAliasaD
   _ = g
+  // CHECK-objc: type: SomeError	for 'h' mangled=$SSC9SomeErrorLeVD
+  _ = h
+  // CHECK-objc: type: SomeError.Code	for 'i' mangled=$SSo9SomeErrorVD
+  _ = i
+  // CHECK-objc: type: SomeRenamedError	for 'j' mangled=$SSC14SomeOtherErrorLEVD
+  _ = j
+  // CHECK-objc: type: SomeRenamedError.Code	for 'k' mangled=$SSo14SomeOtherErroraD
+  _ = k
 }
 #endif // _ObjC

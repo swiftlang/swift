@@ -1561,6 +1561,13 @@ void Remangler::mangleReturnType(Node *node) {
   mangleArgumentTuple(node);
 }
 
+void Remangler::mangleRelatedEntityDeclName(Node *node) {
+  mangleChildNodes(node);
+  if (node->getText().size() != 1)
+    unreachable("cannot handle multi-byte related entities");
+  Buffer << "L" << node->getText();
+}
+
 void Remangler::mangleSILBoxType(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Xb";

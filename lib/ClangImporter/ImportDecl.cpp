@@ -2689,6 +2689,20 @@ namespace {
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
 
+          StringRef nameForMangling;
+          ClangImporterSynthesizedTypeAttr::Kind relatedEntityKind;
+          if (decl->getDeclName().isEmpty()) {
+            nameForMangling = decl->getTypedefNameForAnonDecl()->getName();
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon;
+          } else {
+            nameForMangling = decl->getName();
+            relatedEntityKind =
+                ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper;
+          }
+          errorWrapper->getAttrs().add(new (C) ClangImporterSynthesizedTypeAttr(
+              nameForMangling, relatedEntityKind));
+
           // Add inheritance clause.
           addSynthesizedProtocolAttrs(Impl, errorWrapper,
                                       {KnownProtocolKind::BridgedStoredNSError});
