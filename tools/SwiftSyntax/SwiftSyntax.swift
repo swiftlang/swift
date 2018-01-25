@@ -42,11 +42,27 @@ extension Syntax {
     guard result.wasSuccessful else {
       throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
+    return try decodeSourceFileSyntax(result.stdoutData)
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
+  /// - Parameter content: The data of the serialized SourceFileSyntax.
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  fileprivate static func decodeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
     let decoder = JSONDecoder()
-    let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
+    let raw = try decoder.decode(RawSyntax.self, from: content)
     guard let file = makeSyntax(raw) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
     return file
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax node.
+  /// - Parameter content: The string content of the serialized SourceFileSyntax.
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  public static func decodeSourceFileSyntax(_ content: String) throws -> SourceFileSyntax {
+    return try decodeSourceFileSyntax(content.data(using: .utf8)!)
   }
 }
