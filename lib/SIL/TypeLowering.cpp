@@ -780,6 +780,10 @@ namespace {
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue aggValue,
                                   TypeExpansionKind style) const override {
+      if (style == TypeExpansionKind::None) {
+        return emitCopyValue(B, loc, aggValue);
+      }
+
       llvm::SmallVector<SILValue, 8> loweredChildValues;
       for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
@@ -933,21 +937,7 @@ namespace {
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  TypeExpansionKind style) const override {
       // Enums, we never want to expand.
-      //
-      // TODO: This is a final class. I don't understand why we can't just
-      // delegate to emitDestroyValue in all cases.
-      switch (style) {
-      case TypeExpansionKind::None:
-      case TypeExpansionKind::DirectChildren:
-        return emitDestroyValue(B, loc, value);
-      case TypeExpansionKind::MostDerivedDescendents:
-        if (B.getFunction().hasQualifiedOwnership()) {
-          B.createDestroyValue(loc, value);
-          return;
-        }
-        B.emitReleaseValueAndFold(loc, value);
-        return;
-      }
+      return emitDestroyValue(B, loc, value);
     }
   };
 
