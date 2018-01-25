@@ -23,7 +23,7 @@ func hasAClosure() {
 }
 
 protocol Racoon {
-  associatedtype Stripes
+  associatedtype Stripes // expected-note{{protocol requires nested type 'Stripes'; do you want to add it?}}
 }
 
 // Types inside generic functions -- not supported yet
@@ -117,7 +117,7 @@ struct OuterGenericStruct<A> {
   }
 
   func middleFunction() {
-    struct ConformingType : Racoon {
+    struct ConformingType : Racoon { // expected-error{{type 'ConformingType' does not conform to protocol 'Racoon'}}
     // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction()'}}
       typealias Stripes = A
     }
