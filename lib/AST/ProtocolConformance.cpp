@@ -557,18 +557,16 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
   if (known != TypeWitnesses.end())
     return known->second;
 
-  // If this conformance is in a state where it is inferring type witnesses,
-  // check tentative witnesses.
-  if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
-    // If there is a tentative-type-witness function, use it.
-    if (options.getTentativeTypeWitness) {
-     if (Type witnessType =
-           Type(options.getTentativeTypeWitness(this, assocType)))
-       return { witnessType, nullptr };
-    }
+  // If there is a tentative-type-witness function, use it.
+  if (options.getTentativeTypeWitness) {
+   if (Type witnessType =
+         Type(options.getTentativeTypeWitness(this, assocType)))
+     return { witnessType, nullptr };
+  }
 
-    // Otherwise, we fail; this is the only case in which we can return a
-    // null type.
+  // If this conformance is in a state where it is inferring type witnesses but
+  // we didn't find anything, fail.
+  if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
     return { Type(), nullptr };
   }
 
