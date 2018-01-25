@@ -7870,6 +7870,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
+  UnifiedStatsReporter::FrontendStatsTracer Tracer;
+  if (SwiftContext.Stats)
+    Tracer = SwiftContext.Stats->getStatsTracer("import-clang-decl",
+                                                ClangDecl);
+
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 

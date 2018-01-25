@@ -4007,8 +4007,7 @@ public:
   void visit(Decl *decl) {
     UnifiedStatsReporter::FrontendStatsTracer Tracer;
     if (TC.Context.Stats)
-      Tracer = TC.Context.Stats->getStatsTracer("type-checking",
-                                                decl->getSourceRange());
+      Tracer = TC.Context.Stats->getStatsTracer("typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
