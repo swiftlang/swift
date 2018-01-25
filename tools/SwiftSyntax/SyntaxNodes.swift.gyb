@@ -40,8 +40,8 @@ Each node will have:
 
 /// A wrapper around a raw Syntax layout.
 public struct UnknownSyntax: _SyntaxBase {
-  var _root: SyntaxData
-  unowned var _data: SyntaxData 
+  let _root: SyntaxData
+  unowned let _data: SyntaxData 
 
   /// Creates an `UnknownSyntax` node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
@@ -70,8 +70,8 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
   }
 %     end
 
-  var _root: SyntaxData
-  unowned var _data: SyntaxData 
+  let _root: SyntaxData
+  unowned let _data: SyntaxData 
 
   /// Creates a `${node.name}` node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {

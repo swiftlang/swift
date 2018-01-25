@@ -161,8 +161,8 @@ public func ==(lhs: Syntax, rhs: Syntax) -> Bool {
 
 /// A Syntax node representing a single token.
 public struct TokenSyntax: _SyntaxBase, Hashable {
-  var _root: SyntaxData
-  unowned var _data: SyntaxData 
+  let _root: SyntaxData
+  unowned let _data: SyntaxData 
 
   /// Creates a Syntax node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
