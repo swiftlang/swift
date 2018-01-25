@@ -1930,6 +1930,32 @@ public:
       Builder.addTypeAnnotation(T.getString());
   }
 
+  void addTypeAnnotationForImplicitlyUnwrappedOptional(
+      CodeCompletionResultBuilder &Builder, Type T,
+      bool dynamicOrOptional = false) {
+
+    std::string suffix;
+    // FIXME: This retains previous behavior, but in reality the type of dynamic
+    // lookups is IUO, not Optional as it is for the @optional attribute.
+    if (dynamicOrOptional) {
+      T = T->getOptionalObjectType();
+      suffix = "!?";
+    } else {
+      suffix = "!";
+    }
+
+    // FIXME: This goes away when IUOs are removed from the type system.
+    assert(T->getReferenceStorageReferent()->getImplicitlyUnwrappedOptionalObjectType());
+
+    Type ObjectType =
+        T->getReferenceStorageReferent()->getAnyOptionalObjectType();
+
+    if (ObjectType->isVoid())
+      Builder.addTypeAnnotation("Void" + suffix);
+    else
+      Builder.addTypeAnnotation(ObjectType.getStringAsComponent() + suffix);
+  }
+
   /// For printing in code completion results, replace archetypes with
   /// protocol compositions.
   ///
@@ -2070,12 +2096,18 @@ public:
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
     }
-    if (IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>()) {
+    auto DynamicOrOptional =
+        IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>();
+    if (DynamicOrOptional) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.  Same applies to optional members.
       VarType = OptionalType::get(VarType);
     }
-    addTypeAnnotation(Builder, VarType);
+    if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, VarType,
+                                                      DynamicOrOptional);
+    else
+      addTypeAnnotation(Builder, VarType);
   }
 
   void addParameters(CodeCompletionResultBuilder &Builder,
@@ -2090,9 +2122,12 @@ public:
       if (param->isVariadic())
         type = ParamDecl::getVarargBaseTy(type);
 
+      auto isIUO =
+          param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
       Builder.addCallParameter(param->getArgumentName(), type,
-                               param->isVariadic(), /*Outermost*/true,
-                               param->isInOut());
+                               param->isVariadic(), /*Outermost*/ true,
+                               param->isInOut(), isIUO);
     }
   }
 
@@ -2126,8 +2161,9 @@ public:
       else if (IsTopLevel)
         Builder.addAnnotatedLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
-                               /*IsVarArg*/false, IsTopLevel,
-                               PT->getParameterFlags().isInOut());
+                               /*IsVarArg*/ false, IsTopLevel,
+                               PT->getParameterFlags().isInOut(),
+                               /*isIUO*/ false);
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -2138,7 +2174,8 @@ public:
     else if (IsTopLevel)
       Builder.addAnnotatedLeftParen();
 
-    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel, /*isInOut*/false);
+    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel, /*isInOut*/ false,
+                             /*isIUO*/ false);
     if (IsTopLevel)
       Builder.addRightParen();
   }
@@ -2239,14 +2276,19 @@ public:
         if (NeedComma)
           Builder.addComma();
         if (BodyParams) {
+          auto *PD = BodyParams->get(i);
           // If we have a local name for the parameter, pass in that as well.
-          auto argName = BodyParams->get(i)->getArgumentName();
-          auto bodyName = BodyParams->get(i)->getName();
-          Builder.addCallParameter(argName, bodyName, ParamType, TupleElt.isVararg(),
-                                   true, TupleElt.isInOut());
+          auto argName = PD->getArgumentName();
+          auto bodyName = PD->getName();
+          auto isIUO =
+              PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+          Builder.addCallParameter(argName, bodyName, ParamType,
+                                   TupleElt.isVararg(), true,
+                                   TupleElt.isInOut(), isIUO);
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(),
-                                   /*TopLevel*/true, TupleElt.isInOut());
+                                   /*TopLevel*/ true, TupleElt.isInOut(),
+                                   /*isIUO*/ false);
         }
         modifiedBuilder = true;
         NeedComma = true;
@@ -2263,13 +2305,18 @@ public:
 
       modifiedBuilder = true;
       if (BodyParams) {
-        auto argName = BodyParams->get(0)->getArgumentName();
-        auto bodyName = BodyParams->get(0)->getName();
+        auto *PD = BodyParams->get(0);
+        auto argName = PD->getArgumentName();
+        auto bodyName = PD->getName();
+        auto isIUO =
+            PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
         Builder.addCallParameter(argName, bodyName, T,
-                                 /*IsVarArg*/false, /*Toplevel*/true, isInOut);
+                                 /*IsVarArg*/ false, /*Toplevel*/ true, isInOut,
+                                 isIUO);
       } else
-        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false,
-                                 /*TopLevel*/true, isInOut);
+        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/ false,
+                                 /*TopLevel*/ true, isInOut,
+                                 /*isIUO*/ false);
     }
 
     return modifiedBuilder;
@@ -2374,7 +2421,12 @@ public:
 
       addThrows(Builder, AFT, AFD);
 
-      addTypeAnnotation(Builder, AFT->getResult());
+      if (AFD &&
+          AFD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
+                                                        AFT->getResult());
+      else
+        addTypeAnnotation(Builder, AFT->getResult());
     };
 
     if (hasInterestingDefaultValues(AFD))
@@ -2466,8 +2518,8 @@ public:
 
         Builder.addLeftParen();
         Builder.addCallParameter(Ctx.Id_self, FirstInputType,
-                                 /*IsVarArg*/ false, /*TopLevel*/true,
-                                 isInOut);
+                                 /*IsVarArg*/ false, /*TopLevel*/ true, isInOut,
+                                 /*isIUO*/ false);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
@@ -2491,10 +2543,19 @@ public:
           OS << " -> ";
         }
         // What's left is the result type.
-        if (ResultType->isVoid())
+        if (ResultType->isVoid()) {
           OS << "Void";
-        else
+        } else if (!IsImplicitlyCurriedInstanceMethod
+                   && FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          // As we did with parameters in addParamPatternFromFunction,
+          // for regular methods we'll print '!' after implicitly
+          // unwrapped optional results.
+          auto ObjectType = ResultType->getAnyOptionalObjectType();
+          OS << ObjectType->getStringAsComponent();
+          OS << "!";
+        } else {
           ResultType.print(OS);
+        }
       }
       Builder.addTypeAnnotation(TypeStr);
     };
@@ -3090,11 +3151,18 @@ public:
     return false;
   }
 
-  bool tryStdlibOptionalCompletions(Type ExprType) {
+  bool tryStdlibOptionalCompletions(Type ExprType, bool isIUO) {
     // FIXME: consider types convertible to T?.
 
     ExprType = ExprType->getRValueType();
-    if (Type Unwrapped = ExprType->getOptionalObjectType()) {
+    if (isIUO) {
+      if (Type Unwrapped = ExprType->getAnyOptionalObjectType()) {
+        lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+                                 TypeResolver.get(), IncludeInstanceMembers);
+      } else {
+        llvm_unreachable("IUOs should always be optionals.");
+      }
+    } else if (Type Unwrapped = ExprType->getOptionalObjectType()) {
       llvm::SaveAndRestore<bool> ChangeNeedOptionalUnwrap(NeedOptionalUnwrap,
                                                           true);
       if (DotLoc.isValid()) {
@@ -3165,7 +3233,9 @@ public:
       getTupleExprCompletions(TT);
       Done = true;
     }
-    tryStdlibOptionalCompletions(ExprType);
+    bool isIUO =
+        VD && VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    tryStdlibOptionalCompletions(ExprType, isIUO);
     if (!Done) {
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                                TypeResolver.get(),
@@ -3287,8 +3357,8 @@ public:
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
     builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/false, /*TopLevel*/true,
-                             /*IsInOut*/false);
+                             /*IsVarArg*/ false, /*TopLevel*/ true,
+                             /*IsInOut*/ false, /*isIUO*/ false);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3310,8 +3380,8 @@ public:
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType, false,
-                               true, /*IsInOut*/false);
+      builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true,
+                               /*IsInOut*/ false, /*isIUO*/ false);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3562,17 +3632,21 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"),
-                               floatType, false, true, /*IsInOut*/false);
+      builder.addCallParameter(context.getIdentifier("red"), floatType, false,
+                               true, /*IsInOut*/ false,
+                               /*isIUO*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               false, true, /*IsInOut*/false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType, false,
+                               true, /*IsInOut*/ false,
+                               /*isIUO*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType,
-                               false, true, /*IsInOut*/false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType, false,
+                               true, /*IsInOut*/ false,
+                               /*isIUO*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               false, true, /*IsInOut*/false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType, false,
+                               true, /*IsInOut*/ false,
+                               /*isIUO*/ false);
       builder.addRightParen();
     });
 
@@ -3581,7 +3655,8 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, false, true, /*IsInOut*/false);
+                               stringType, false, true, /*IsInOut*/ false,
+                               /*isIUO*/ false);
       builder.addRightParen();
     });
 

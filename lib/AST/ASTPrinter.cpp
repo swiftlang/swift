@@ -3063,6 +3063,35 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
   Printer.printPattern(this);
 }
 
+static bool isSimple(Type type) {
+  switch (type->getKind()) {
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
+
+  case TypeKind::Archetype: {
+    auto arch = type->getAs<ArchetypeType>();
+    return !arch->isOpenedExistential();
+  }
+
+  case TypeKind::ProtocolComposition: {
+    // 'Any', 'AnyObject' and single protocol compositions are simple
+    auto composition = type->getAs<ProtocolCompositionType>();
+    auto memberCount = composition->getMembers().size();
+    if (composition->hasExplicitAnyObject())
+      return memberCount == 0;
+    return memberCount <= 1;
+  }
+
+  default:
+    return true;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -3081,35 +3110,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Printer << "<";
     interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
     Printer << ">";
-  }
-
-  static bool isSimple(Type type) {
-    switch (type->getKind()) {
-    case TypeKind::Function:
-    case TypeKind::GenericFunction:
-      return false;
-
-    case TypeKind::Metatype:
-    case TypeKind::ExistentialMetatype:
-      return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
-
-    case TypeKind::Archetype: {
-      auto arch = type->getAs<ArchetypeType>();
-      return !arch->isOpenedExistential();
-    }
-
-    case TypeKind::ProtocolComposition: {
-      // 'Any', 'AnyObject' and single protocol compositions are simple
-      auto composition = type->getAs<ProtocolCompositionType>();
-      auto memberCount = composition->getMembers().size();
-      if (composition->hasExplicitAnyObject())
-        return memberCount == 0;
-      return memberCount <= 1;
-    }
-
-    default:
-      return true;
-    }
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -4141,6 +4141,36 @@ std::string TypeBase::getString(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   print(OS, PO);
+  return OS.str();
+}
+
+std::string Type::getStringAsComponent(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  if (!isSimple(*this)) {
+    OS << "(";
+    print(OS, PO);
+    OS << ")";
+  } else {
+    print(OS, PO);
+  }
+
+  return OS.str();
+}
+
+std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  if (!isSimple(const_cast<TypeBase *>(this))) {
+    OS << "(";
+    print(OS, PO);
+    OS << ")";
+  } else {
+    print(OS, PO);
+  }
+
   return OS.str();
 }
 
