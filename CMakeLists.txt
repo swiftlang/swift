@@ -300,6 +300,10 @@ option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   "Build the standard libraries, overlays, and runtime with normal arguments at +0"
   FALSE)
 
+option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
+  "Enable runtime function counters and expose the API. Defaults to on if assertions are on."
+  ${SWIFT_STDLIB_ASSERTIONS})
+
 #
 # End of user-configurable options.
 #

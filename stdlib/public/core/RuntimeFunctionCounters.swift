@@ -18,6 +18,13 @@
 //  number of invocations, or per-object counters, which represent the
 //  number of runtime functions calls for a specific object.
 
+// By default, this feature is enabled only when assertions are enabled. To enable when
+// assertions are off, use this option with build-script:
+// --extra-cmake-options='-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=TRUE'
+// Or to disable in debug builds:
+// --extra-cmake-options='-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=FALSE'
+#if SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
+
 /// Collect all references inside the object using Mirrors.
 /// - Parameter value: the value to be inspected
 /// - Parameter references: the array which should contain the collected
@@ -541,3 +548,5 @@ func _measureRuntimeFunctionCountersDiffs(
       mode: savedMode)
     return (globalCountersBefore.diff(globalCountersAfter), objectsCountersDiff)
 }
+
+#endif
