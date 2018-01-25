@@ -485,3 +485,18 @@ extension P18 where Self: P19 {
 }
 
 struct X18<A> : P18 { }
+
+// rdar://problem/16316115
+protocol HasAssoc {
+  associatedtype Assoc
+}
+
+struct DefaultAssoc {}
+
+protocol RefinesAssocWithDefault: HasAssoc {
+  associatedtype Assoc = DefaultAssoc
+}
+
+struct Foo: RefinesAssocWithDefault {
+}
+
