@@ -140,6 +140,8 @@ extension String {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3.2, message:
+    "Please mutate String or Substring directly")
   public mutating func withMutableCharacters<R>(
     _ body: (inout CharacterView) -> R
   ) -> R {
@@ -374,6 +376,8 @@ extension String._CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public subscript(bounds: Range<Index>) -> String.CharacterView {
     let offsetRange: Range<Int> =
       _toBaseIndex(bounds.lowerBound).encodedOffset ..<
