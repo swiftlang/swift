@@ -115,6 +115,10 @@ int swift::_stdlib_close(int fd) {
 #endif
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_stdlib_usleep(unsigned micros) {
+  usleep(micros);
+}
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 // Windows
