@@ -62,8 +62,9 @@
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/APINotes/Types.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Frontend/CompilerInstance.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -1186,7 +1187,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     Context.LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
-  Instance.freeContextAndSIL();
+  // NB: Don't free if we have a stats collector; it makes some use
+  // of the AST context during shutdown.
+  if (!Stats)
+    Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
@@ -1315,7 +1319,8 @@ silOptModeArgStr(OptimizationMode mode) {
 }
 
 static std::unique_ptr<UnifiedStatsReporter>
-computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
+computeStatsReporter(const CompilerInvocation &Invocation,
+                     CompilerInstance *Instance) {
   const std::string &StatsOutputDir =
       Invocation.getFrontendOptions().StatsOutputDir;
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
@@ -1332,10 +1337,16 @@ computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   StringRef OutputType = llvm::sys::path::extension(OutFile);
   std::string TripleName = LangOpts.Target.normalize();
+  SourceManager *SM = &Instance->getSourceMgr();
+  clang::SourceManager *CSM = nullptr;
+  if (auto *clangImporter = static_cast<ClangImporter *>(
+          Instance->getASTContext().getClangModuleLoader())) {
+    CSM = &clangImporter->getClangASTContext().getSourceManager();
+  }
   auto Trace = Invocation.getFrontendOptions().TraceStats;
   return llvm::make_unique<UnifiedStatsReporter>(
       "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
-      OptType, StatsOutputDir, &SM, Trace);
+      OptType, StatsOutputDir, SM, CSM, Trace);
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
@@ -1485,9 +1496,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter =
-      computeStatsReporter(Invocation, Instance->getSourceMgr());
-
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance->getSourceMgr());
@@ -1505,12 +1513,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1);
   }
 
-  if (StatsReporter) {
-    // Install stats-reporter somewhere visible for subsystems that
-    // need to bump counters as they work, rather than measure
-    // accumulated work on completion (mostly: TypeChecker).
-    Instance->getASTContext().Stats = StatsReporter.get();
-  }
+  // Install stats-reporter somewhere visible for subsystems that
+  // need to bump counters as they work, rather than measure
+  // accumulated work on completion (mostly: TypeChecker).
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter =
+      computeStatsReporter(Invocation, Instance.get());
+  Instance->getASTContext().Stats = StatsReporter.get();
 
   // The compiler instance has been configured; notify our observer.
   if (observer) {

@@ -11,27 +11,28 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "silgen"
+#include "ManagedValue.h"
+#include "RValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
-#include "ManagedValue.h"
-#include "RValue.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -716,6 +717,9 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
+    UnifiedStatsReporter::FrontendStatsTracer Tracer;
+    if (getASTContext().Stats)
+      Tracer = getASTContext().Stats->getStatsTracer("emit-SIL", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
