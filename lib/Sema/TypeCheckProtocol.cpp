@@ -1795,8 +1795,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType, nullptr)
-             ->isEqual(type) && "Conflicting type witness deductions");
+    assert(Conformance->getTypeWitness(assocType, nullptr)->isEqual(type) &&
+           "Conflicting type witness deductions");
     return;
   }
 
@@ -2749,6 +2749,16 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       viable.push_back(candidate);
     }
   }
+
+  // If there are no viable witnesses, and all nonviable candidates came from
+  // protocol extensions, treat this as "missing".
+  if (viable.empty() &&
+      std::find_if(nonViable.begin(), nonViable.end(),
+                   [](const std::pair<TypeDecl *, CheckTypeWitnessResult> &x) {
+                     return x.first->getDeclContext()
+                        ->getAsProtocolOrProtocolExtensionContext() == nullptr;
+                   }) == nonViable.end())
+    return ResolveWitnessResult::Missing;
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
