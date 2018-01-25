@@ -2272,15 +2272,9 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2) {
     type2 = object;
   }
 
-  // Forcing IUOs always requires a thunk.
-  if (type1WasOptional && !type2WasOptional)
-    return ABIDifference::NeedsThunk;
-  
-  // Except for the above case, we should not be making a value less optional.
-  
-  // If we're introducing a level of optionality, only certain types are
+  // If we're changing the level of optionality, only certain types are
   // ABI-compatible -- check below.
-  bool optionalityChange = (!type1WasOptional && type2WasOptional);
+  bool optionalityChange = type1WasOptional != type2WasOptional;
 
   // If the types are identical and there was no optionality change,
   // we're done.
