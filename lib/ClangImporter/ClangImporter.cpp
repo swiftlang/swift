@@ -2300,6 +2300,36 @@ ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
   }
 }
 
+void ClangImporter::lookupRelatedEntity(
+    StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
+    llvm::function_ref<void(TypeDecl*)> receiver) {
+  using CISTAttr = ClangImporterSynthesizedTypeAttr;
+  if (relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapper) ||
+      relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
+    auto underlyingKind = ClangTypeKind::Tag;
+    if (relatedEntityKind ==
+          CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
+      underlyingKind = ClangTypeKind::Typedef;
+    }
+    lookupTypeDecl(rawName, underlyingKind,
+                   [this, receiver] (const TypeDecl *foundType) {
+      auto *enumDecl =
+          dyn_cast_or_null<clang::EnumDecl>(foundType->getClangDecl());
+      if (!enumDecl)
+        return;
+      if (!Impl.getEnumInfo(enumDecl).isErrorEnum())
+        return;
+      auto *enclosingType =
+          dyn_cast<NominalTypeDecl>(foundType->getDeclContext());
+      if (!enclosingType)
+        return;
+      receiver(enclosingType);
+    });
+  }
+}
+
 void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {

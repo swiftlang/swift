@@ -6506,6 +6506,7 @@ public:
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
+    UNINTERESTING_ATTR(ClangImporterSynthesizedType)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

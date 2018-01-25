@@ -368,7 +368,6 @@ private:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
-    case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
@@ -387,6 +386,7 @@ private:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
+    case Node::Kind::PrivateDeclName:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
@@ -395,6 +395,7 @@ private:
     case Node::Kind::ProtocolWitnessTableAccessor:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
+    case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::Setter:
     case Node::Kind::Shared:
     case Node::Kind::SILBoxLayout:
@@ -1003,6 +1004,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
         Printer << "(in " << Node->getChild(0)->getText() << ')';
       }
     }
+    return nullptr;
+  case Node::Kind::RelatedEntityDeclName:
+    Printer << "related decl '" << Node->getText() << "' for ";
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::Module:
     if (Options.DisplayModuleNames)

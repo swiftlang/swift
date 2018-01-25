@@ -302,6 +302,11 @@ DECL_ATTR(_optimize, Optimize,
           OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |
           UserInaccessible, 73)
 
+DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
+          OnClass | OnStruct | OnEnum | OnProtocol | OnTypeAlias |
+          LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
+          /*Not serialized*/74)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR
