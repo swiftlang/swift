@@ -29,7 +29,7 @@ private typealias Int1024 = DoubleWidth<Int512>
 @inline(never)
 public func run_DoubleWidthDivision(_ N: Int) {
   var sum = 0
-  for _ in 1...N {
+  for _ in 1...5*N {
     let (q, r) =
       (Int128(Int64.max) * 16)
         .quotientAndRemainder(dividingBy: numericCast(getInt(16)))
