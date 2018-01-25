@@ -78,7 +78,9 @@ public:
   bool isConformanceRequirement() const {
     return Requirement->isExistentialType();
   }
-
+  bool isError() const {
+    return Requirement->is<ErrorType>();
+  }
   explicit operator bool() const { return !Requirement.isNull(); }
 };
 
