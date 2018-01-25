@@ -505,7 +505,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_DowngradeExhaustivityCheck:
     Printer.printAttrName("@_downgrade_exhaustivity_check");
     break;
-    
+
+  case DAK_ClangImporterSynthesizedType: {
+    Printer.printAttrName("@_clangImporterSynthesizedType");
+    auto *attr = cast<ClangImporterSynthesizedTypeAttr>(this);
+    Printer << "(originalTypeName: \"" << attr->originalTypeName
+            << "\", manglingForKind: \"" << attr->getManglingName() << "\")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -635,6 +643,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_specialize";
   case DAK_Implements:
     return "_implements";
+  case DAK_ClangImporterSynthesizedType:
+    return "_clangImporterSynthesizedType";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
