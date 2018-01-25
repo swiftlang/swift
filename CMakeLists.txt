@@ -129,7 +129,7 @@ set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
 # Indicate whether Swift should attempt to use the lld linker.
-set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
+set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
     "Enable using the lld linker when available")
 
 # Indicate whether Swift should attempt to use the gold linker.

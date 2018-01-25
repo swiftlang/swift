@@ -411,7 +411,6 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_SDK=
     SWIFT_HOST_VARIANT_ARCH=
     SWIFT_HOST_TRIPLE=
-    USE_GOLD_LINKER=
     local host="$1"
 
     # Hosts which can be cross-compiled must specify:
@@ -422,7 +421,6 @@ function set_build_options_for_host() {
             SWIFT_HOST_VARIANT="freebsd"
             SWIFT_HOST_VARIANT_SDK="FREEBSD"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
-            USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
             SWIFT_HOST_VARIANT="cygwin"
@@ -437,7 +435,6 @@ function set_build_options_for_host() {
         linux-*)
             SWIFT_HOST_VARIANT="linux"
             SWIFT_HOST_VARIANT_SDK="LINUX"
-            USE_GOLD_LINKER=1
             case ${host} in
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
@@ -1922,22 +1919,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
         cmake_options=("${common_cmake_options_host[@]}")
 
-        # Add in gold linker support if requested.
-        if [[ "${USE_GOLD_LINKER}" ]]; then
-            echo "${product}: using gold linker"
-            if [[ "${product}" != "swift" ]]; then
-                # All other projects override the linker flags to add in
-                # gold linker support.
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    -DCMAKE_EXE_LINKER_FLAGS:STRING="-fuse-ld=gold"
-                    -DCMAKE_SHARED_LINKER_FLAGS:STRING="-fuse-ld=gold"
-                )
-            fi
-        else
-            echo "${product}: using standard linker"
-        fi
-
         llvm_build_dir=$(build_directory ${host} llvm)
         module_cache="${build_dir}/module-cache"
 
@@ -2034,17 +2015,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             swift)
-
-                if [[ "${USE_GOLD_LINKER}" ]]; then
-                    # Swift will selectively use the gold linker on all
-                    # parts except building the standard library.  We
-                    # let the Swift cmake setup figure out how to apply
-                    # that.
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_ENABLE_GOLD_LINKER=TRUE
-                    )
-                fi
 
                 if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
                     cmake_options=(
@@ -2443,10 +2413,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS="-DLIBDISPATCH_SOURCE_DIR=${LIBDISPATCH_SOURCE_DIR} -DLIBDISPATCH_BUILD_DIR=${LIBDISPATCH_BUILD_DIR}"
-                fi
-
-                if [[ "${USE_GOLD_LINKER}" ]]; then
-                    SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
 
                 # FIXME CROSSCOMPILING:
