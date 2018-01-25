@@ -874,7 +874,7 @@ def overflowOperationComment(operator):
   ///   component is `false`, the `partialValue` component contains the entire
   ///   remainder. If the `overflow` component is `true`, an overflow occurred
   ///   during division and the `partialValue` component contains either the
-  ///   entire remainder or, if the quotient is undefined, the dividend.
+  ///   entire remainder or, if the remainder is undefined, the dividend.
 """,
     }
     return comments[operator]
