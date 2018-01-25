@@ -468,21 +468,24 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printType(Type T) {
-    if (Options.TransformContext) {
+  void printTypeWithOptions(Type T, PrintOptions options) {
+    if (options.TransformContext) {
       // FIXME: it's not clear exactly what we want to keep from the existing
       // options, and what we want to discard.
       PrintOptions FreshOptions;
-      FreshOptions.ExcludeAttrList = Options.ExcludeAttrList;
-      FreshOptions.ExclusiveAttrList = Options.ExclusiveAttrList;
+      FreshOptions.ExcludeAttrList = options.ExcludeAttrList;
+      FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
+      FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
       T.print(Printer, FreshOptions);
       return;
     }
 
-    T.print(Printer, Options);
+    T.print(Printer, options);
   }
 
-  void printTransformedType(Type T) {
+  void printType(Type T) { printTypeWithOptions(T, Options); }
+
+  void printTransformedTypeWithOptions(Type T, PrintOptions options) {
     if (CurrentType) {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
@@ -506,12 +509,16 @@ class PrintAST : public ASTVisitor<PrintAST> {
                   SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
     }
 
-    printType(T);
+    printTypeWithOptions(T, options);
+  }
+
+  void printTransformedType(Type T) {
+    printTransformedTypeWithOptions(T, Options);
   }
 
   void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
     if (CurrentType && TL.getType()) {
-      printTransformedType(TL.getType());
+      printTransformedTypeWithOptions(TL.getType(), options);
       return;
     }
 
