@@ -694,7 +694,6 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
 static bool passCursorInfoForDecl(SourceFile* SF,
                                   const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
-                                  const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   bool RetrieveRefactoring,
@@ -710,7 +709,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     return true;
 
   SmallString<64> SS;
-  auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
+  auto BaseType = findBaseTypeForReplacingArchetype(VD, ContainerTy);
   bool InSynthesizedExtension = false;
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
@@ -1293,11 +1292,17 @@ static void resolveCursor(SwiftLangSupport &Lang,
                                 CompInvok, Receiver);
         return;
       case CursorInfoKind::ValueRef: {
-        ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+        ValueDecl *VD = CursorInfo.ValueD;
+        Type ContainerType = CursorInfo.ContainerType;
+        if (CursorInfo.CtorTyRef) {
+          // Treat constructor calls, e.g. MyType(), as the type itself,
+          // rather than its constructor.
+          VD = CursorInfo.CtorTyRef;
+          ContainerType = Type();
+        }
         bool Failed = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
                                             VD, MainModule,
-                                            CursorInfo.ContainerType,
-                                            CursorInfo.ContainerType,
+                                            ContainerType,
                                             CursorInfo.IsRef,
                                             Actionables,
                                             CursorInfo,
@@ -1589,7 +1594,7 @@ void SwiftLangSupport::getCursorInfo(
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
           passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr, Type(),
+              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr,
               Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
               /*OrigBufferID=*/None, SourceLoc(),
               {}, *this, Invok, {}, Receiver);
@@ -1780,7 +1785,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
-                                  Type(), /*IsRef=*/false, false, ResolvedCursorInfo(),
+                                  /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {
