@@ -546,6 +546,7 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 internal class _SwiftNativeNSArray {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  @nonobjc
   internal init() {}
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -558,7 +559,7 @@ internal class _SwiftNativeNSArray {
 internal class _SwiftNativeNSDictionary {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  @objc
+  @nonobjc
   internal init() {}
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -571,7 +572,7 @@ internal class _SwiftNativeNSDictionary {
 internal class _SwiftNativeNSSet {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  @objc
+  @nonobjc
   internal init() {}
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -584,7 +585,7 @@ internal class _SwiftNativeNSSet {
 internal class _SwiftNativeNSEnumerator {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  @objc
+  @nonobjc
   internal init() {}
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
