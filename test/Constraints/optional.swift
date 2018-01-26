@@ -259,3 +259,27 @@ class Bar {
     let _: Int = result // expected-error{{cannot convert value of type 'X?' to specified type 'Int'}}
   }
 }
+
+func takesInOutIUO(_ i: inout Int!) {}
+func takesInOutOpt(_ o: inout Int?) {}
+
+func overloadedByOptionality(_ a: inout Int!) {}
+// expected-note@-1 {{'overloadedByOptionality' previously declared here}}
+// expected-note@-2 {{'overloadedByOptionality' previously declared here}}
+func overloadedByOptionality(_ a: inout Int?) {}
+// expected-warning@-1 {{invalid redeclaration of 'overloadedByOptionality' which differs only by the kind of optional passed as an inout argument ('Int?' vs. 'Int!')}}
+// expected-warning@-2 {{invalid redeclaration of 'overloadedByOptionality' which differs only by the kind of optional passed as an inout argument ('Int?' vs. 'Int!')}}
+// expected-note@-3 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+// expected-note@-4 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+
+func testInOutOptionality() {
+  var i: Int! = 1
+  var o: Int? = 2
+
+  takesInOutIUO(&i)
+  takesInOutOpt(&i)
+  takesInOutIUO(&o)
+  takesInOutOpt(&o)
+
+  overloadedByOptionality(&o)
+}
