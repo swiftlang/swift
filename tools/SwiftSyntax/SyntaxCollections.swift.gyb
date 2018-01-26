@@ -27,8 +27,8 @@ import Foundation
 /// as a regular Swift collection, and has accessors that return new
 /// versions of the collection with different children.
 public struct ${node.name}: _SyntaxBase {
-  var _root: SyntaxData
-  unowned var _data: SyntaxData
+  let _root: SyntaxData
+  unowned let _data: SyntaxData
 
   /// Creates a Syntax node from the provided root and data.
   internal init(root: SyntaxData, data: SyntaxData) {
