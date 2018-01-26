@@ -916,7 +916,7 @@ extension ${Self}: Strideable {
   ///   `MemoryLayout<Pointee>.stride` bytes.
   @_inlineable
   public func successor() -> ${Self} {
-    return self + 1
+    return advanced(by: 1)
   }
 
   /// Returns a pointer to the previous consecutive instance.
@@ -950,7 +950,10 @@ extension ${Self}: Strideable {
   ///   `MemoryLayout<Pointee>.stride`.
   @_inlineable
   public func distance(to end: ${Self}) -> Int {
-    return end - self
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
+                           Builtin.ptrtoint_Word(_rawValue)))
+      / MemoryLayout<Pointee>.stride
   }
 
   /// Returns a pointer offset from this pointer by the specified number of
@@ -970,7 +973,8 @@ extension ${Self}: Strideable {
   ///   `Pointee` type.
   @_inlineable
   public func advanced(by n: Int) -> ${Self} {
-    return self + n
+    return ${Self}(Builtin.gep_Word(
+      self._rawValue, n._builtinWordValue, Pointee.self))
   }
 }
 
@@ -1002,128 +1006,6 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
-  }
-}
-
-// - Note: The following family of operator overloads are redundant
-//   with Strideable. However, optimizer improvements are needed
-//   before they can be removed without affecting performance.
-extension ${Self} {
-  /// Creates a new pointer, offset from a pointer by a specified number of
-  /// instances of the pointer's `Pointee` type.
-  ///
-  /// You use the addition operator (`+`) to advance a pointer by a number of
-  /// contiguous instances. The resulting pointer must be within the bounds of
-  /// the same allocation as `lhs`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
-  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
-  ///   `Pointee` type.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-    return ${Self}(Builtin.gep_Word(
-      lhs._rawValue, rhs._builtinWordValue, Pointee.self))
-  }
-
-  /// Creates a new pointer, offset from a pointer by a specified number of
-  /// instances of the pointer's `Pointee` type.
-  ///
-  /// You use the addition operator (`+`) to advance a pointer by a number of
-  /// contiguous instances. The resulting pointer must be within the bounds of
-  /// the same allocation as `rhs`.
-  ///
-  /// - Parameters:
-  ///   - lhs: The number of strides of the pointer's `Pointee` type to offset
-  ///     `rhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  ///   - rhs: A pointer.
-  /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
-  ///   `Pointee` type.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
-    return rhs + lhs
-  }
-
-  /// Creates a new pointer, offset backward from a pointer by a specified
-  /// number of instances of the pointer's `Pointee` type.
-  ///
-  /// You use the subtraction operator (`-`) to shift a pointer backward by a
-  /// number of contiguous instances. The resulting pointer must be within the
-  /// bounds of the same allocation as `lhs`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
-  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
-  ///   the `Pointee` type.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-    return lhs + -rhs
-  }
-
-  /// Returns the distance between two pointers, counted as instances of the
-  /// pointers' `Pointee` type.
-  ///
-  /// Typed pointers are required to be properly aligned for their `Pointee`
-  /// type. Proper alignment ensures that the result of the subtraction
-  /// operator (`-`) accurately measures the distance between the two
-  /// pointers, counted in strides of `Pointee`. To find the distance in bytes
-  /// between two pointers, convert them to `UnsafeRawPointer` instances
-  /// before subtracting.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
-  ///   `Pointee` type. To access the stride, use
-  ///   `MemoryLayout<Pointee>.stride`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
-    return
-      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                           Builtin.ptrtoint_Word(rhs._rawValue)))
-      / MemoryLayout<Pointee>.stride
-  }
-
-  /// Advances a pointer by a specified number of instances of the pointer's
-  /// `Pointee` type.
-  ///
-  /// You use the addition assignment operator (`+=`) to advance a pointer by a
-  /// number of contiguous instances. The resulting pointer must be within the
-  /// bounds of the same allocation as `rhs`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer to advance in place.
-  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
-  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
-    lhs = lhs + rhs
-  }
-
-  /// Shifts a pointer backward by a specified number of instances of the
-  /// pointer's `Pointee` type.
-  ///
-  /// You use the subtraction assignment operator (`-=`) to shift a pointer
-  /// backward by a number of contiguous instances. The resulting pointer must
-  /// be within the bounds of the same allocation as `rhs`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer to advance in place.
-  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
-  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
-    lhs = lhs - rhs
   }
 }
 

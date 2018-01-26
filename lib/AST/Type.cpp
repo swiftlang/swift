@@ -1269,7 +1269,6 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
 
 Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *Context;
   NominalTypeDecl *implDecl;
 
   // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
@@ -1291,16 +1290,16 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     return UTy;
   }
   case TypeKind::ArraySlice:
-    implDecl = ctx.getArrayDecl();
+    implDecl = Context->getArrayDecl();
     break;
   case TypeKind::Optional:
-    implDecl = ctx.getOptionalDecl();
+    implDecl = Context->getOptionalDecl();
     break;
   case TypeKind::ImplicitlyUnwrappedOptional:
-    implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
+    implDecl = Context->getImplicitlyUnwrappedOptionalDecl();
     break;
   case TypeKind::Dictionary:
-    implDecl = ctx.getDictionaryDecl();
+    implDecl = Context->getDictionaryDecl();
     break;
   }
   assert(implDecl && "Type has not been set yet");
@@ -1383,6 +1382,10 @@ bool TypeBase::mayHaveSuperclass() {
     return (bool)archetype->requiresClass();
 
   return is<DynamicSelfType>();
+}
+
+bool TypeBase::satisfiesClassConstraint() {
+  return mayHaveSuperclass() || isObjCExistentialType();
 }
 
 Type TypeBase::getSuperclass() {
@@ -2179,10 +2182,44 @@ namespace {
   };
 } // end anonymous namespace
 
+static bool matchFunctionTypes(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
+                               TypeMatchOptions matchMode,
+                               OptionalUnwrapping insideOptional,
+                               std::function<bool()> paramsAndResultMatch) {
+  // FIXME: Handle generic functions in non-ABI matches.
+  if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+    if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
+      return false;
+  }
+
+  // When checking overrides, allow the base type to be throwing even if the
+  // overriding type isn't.
+  auto ext1 = fn1->getExtInfo();
+  auto ext2 = fn2->getExtInfo();
+  if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
+    if (ext2.throws()) {
+      ext1 = ext1.withThrows(true);
+    }
+  }
+  // If specified, allow an escaping function parameter to override a
+  // non-escaping function parameter when the parameter is optional.
+  // Note that this is checking 'ext2' rather than 'ext1' because parameters
+  // must be contravariant for the containing function to be covariant.
+  if (matchMode.contains(
+          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
+      insideOptional == OptionalUnwrapping::OptionalToOptional) {
+    if (!ext2.isNoEscape())
+      ext1 = ext1.withNoEscape(false);
+  }
+  if (ext1 != ext2)
+    return false;
+
+  return paramsAndResultMatch();
+}
+
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                     ParameterPosition paramPosition,
-                    OptionalUnwrapping insideOptional,
-                    LazyResolver *resolver) {
+                    OptionalUnwrapping insideOptional) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
@@ -2194,7 +2231,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToOptional, resolver);
+                       OptionalUnwrapping::OptionalToOptional);
       }
 
       // Value-to-optional.
@@ -2205,7 +2242,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::ValueToOptional, resolver);
+                       OptionalUnwrapping::ValueToOptional);
       }
 
     } else if (matchMode.contains(
@@ -2213,7 +2250,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToValue, resolver);
+                       OptionalUnwrapping::OptionalToValue);
       }
     }
   }
@@ -2237,15 +2274,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       OptionalUnwrapping::None, resolver);
+                       OptionalUnwrapping::None);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, OptionalUnwrapping::None,
-                   resolver)){
+                   matchMode, elementPosition, OptionalUnwrapping::None)) {
         return false;
       }
     }
@@ -2258,41 +2294,17 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!fn1)
       return false;
 
-    // FIXME: Handle generic functions in non-ABI matches.
-    if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
-      if (!isa<FunctionType>(t1) || !isa<FunctionType>(t2))
-        return false;
-    }
+    std::function<bool()> paramsAndResultMatch = [=]() {
+      // Inputs are contravariant, results are covariant.
+      return (matches(fn2.getInput(), fn1.getInput(), matchMode,
+                      ParameterPosition::Parameter, OptionalUnwrapping::None) &&
+              matches(fn1.getResult(), fn2.getResult(), matchMode,
+                      ParameterPosition::NotParameter,
+                      OptionalUnwrapping::None));
+    };
 
-    // When checking overrides, allow the base type to be throwing even if the
-    // overriding type isn't.
-    auto ext1 = fn1->getExtInfo();
-    auto ext2 = fn2->getExtInfo();
-    if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-      if (ext2.throws()) {
-        ext1 = ext1.withThrows(true);
-      }
-    }
-    // If specified, allow an escaping function parameter to override a
-    // non-escaping function parameter when the parameter is optional.
-    // Note that this is checking 'ext2' rather than 'ext1' because parameters
-    // must be contravariant for the containing function to be covariant.
-    if (matchMode.contains(
-          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
-        insideOptional == OptionalUnwrapping::OptionalToOptional) {
-      if (!ext2.isNoEscape())
-        ext1 = ext1.withNoEscape(false);
-    }
-    if (ext1 != ext2)
-      return false;
-
-    // Inputs are contravariant, results are covariant.
-    return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, OptionalUnwrapping::None,
-                    resolver) &&
-            matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                    resolver));
+    return matchFunctionTypes(fn1, fn2, matchMode, insideOptional,
+                              paramsAndResultMatch);
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
@@ -2318,11 +2330,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   return false;
 }
 
-bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
-                       LazyResolver *resolver) {
+bool TypeBase::matches(Type other, TypeMatchOptions matchMode) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                   resolver);
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,

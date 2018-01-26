@@ -743,13 +743,6 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
     ObjCNonLazyClasses.push_back(classPtr);
 }
 
-/// Add the given protocol conformance to the list of conformances for which
-/// runtime records will be emitted in this translation unit.
-void IRGenModule::addProtocolConformanceRecord(
-                                       NormalProtocolConformance *conformance) {
-  ProtocolConformances.push_back(conformance);
-}
-
 static bool
 hasExplicitProtocolConformance(NominalTypeDecl *decl) {
   auto conformances = decl->getAllConformances();
@@ -757,6 +750,11 @@ hasExplicitProtocolConformance(NominalTypeDecl *decl) {
     // inherited protocols do not emit explicit conformance records
     // TODO any special handling required for Specialized conformances?
     if (conformance->getKind() == ProtocolConformanceKind::Inherited)
+      continue;
+
+    // Ignore conformances synthesized by the Clang importer.
+    if (isa<ClangModuleUnit>(
+                conformance->getDeclContext()->getModuleScopeContext()))
       continue;
 
     auto P = conformance->getProtocol();
@@ -1329,6 +1327,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::ProtocolConformanceDescriptor:
     return getLinkageAsConformance();
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
@@ -1417,6 +1416,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
@@ -1478,6 +1478,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+  case SILLinkage::PublicNonABI:
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
@@ -2400,6 +2401,125 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   return var;
 }
 
+namespace {
+  /// Builds a protocol conformance descriptor.
+  class ProtocolConformanceDescriptorBuilder {
+    IRGenModule &IGM;
+    ConstantStructBuilder &B;
+    const NormalProtocolConformance *Conformance;
+    ConformanceFlags Flags;
+
+  public:
+    ProtocolConformanceDescriptorBuilder(
+                                 IRGenModule &IGM,
+                                 ConstantStructBuilder &B,
+                                 const NormalProtocolConformance *conformance)
+    : IGM(IGM), B(B), Conformance(conformance) { }
+
+    void layout() {
+      addProtocol();
+      addConformingType();
+      addWitnessTable();
+      addFlags();
+
+      B.suggestType(IGM.ProtocolConformanceDescriptorTy);
+    }
+
+    void addProtocol() {
+      // Relative reference to the protocol descriptor.
+      auto protocol = Conformance->getProtocol();
+      auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                    LinkEntity::forProtocolDescriptor(protocol),
+                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+      B.addRelativeAddress(descriptorRef);
+    }
+
+    void addConformingType() {
+      // Relative reference to the type entity info, with the type reference
+      // kind mangled in the lower bits.
+      auto typeEntity =
+        getTypeEntityInfo(IGM, Conformance->getType()->getCanonicalType());
+      auto typeRef =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          typeEntity.entity, IGM.getPointerAlignment(), typeEntity.defaultTy);
+      typeEntity.adjustForKnownRef(typeRef);
+      B.addRelativeAddress(typeRef.getValue());
+      Flags = Flags.withTypeReferenceKind(typeEntity.typeKind);
+    }
+
+    void addWitnessTable() {
+      using ConformanceKind = ConformanceFlags::ConformanceKind;
+
+     // Figure out what kind of witness table we have.
+      auto proto = Conformance->getProtocol();
+      llvm::Constant *witnessTableVar;
+      if (!IGM.isResilient(proto, ResilienceExpansion::Maximal) &&
+          Conformance->getConditionalRequirements().empty()) {
+        Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+
+        // If the conformance is in this object's table, then the witness table
+        // should also be in this object file, so we can always directly
+        // reference it.
+        witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+      } else {
+        if (Conformance->getConditionalRequirements().empty()) {
+          Flags = Flags.withConformanceKind(
+                                        ConformanceKind::WitnessTableAccessor);
+        } else {
+          Flags =
+            Flags.withConformanceKind(
+                ConformanceKind::ConditionalWitnessTableAccessor)
+              .withNumConditionalRequirements(
+                              Conformance->getConditionalRequirements().size());
+        }
+
+        witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+            Conformance, ForDefinition);
+      }
+
+      // Relative reference to the witness table.
+      auto witnessTableRef =
+        ConstantReference(witnessTableVar, ConstantReference::Direct);
+      B.addRelativeAddress(witnessTableRef);
+    }
+
+    void addFlags() {
+      // Miscellaneous flags.
+      Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
+      Flags = Flags.withIsSynthesizedNonUnique(
+                isa<ClangModuleUnit>(
+                      Conformance->getDeclContext()->getModuleScopeContext()));
+
+      // Add the flags.
+      B.addInt32(Flags.getIntValue());
+    }
+  };
+}
+
+void IRGenModule::emitProtocolConformance(
+                                const NormalProtocolConformance *conformance) {
+  // Emit additional metadata to be used by reflection.
+  emitAssociatedTypeMetadataRecord(conformance);
+
+  // Form the protocol conformance descriptor.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, conformance);
+  builder.layout();
+
+  auto var =
+    cast<llvm::GlobalVariable>(
+          getAddrOfProtocolConformanceDescriptor(conformance,
+                                                 init.finishAndCreateFuture()));
+  var->setConstant(true);
+}
+
+void IRGenModule::addProtocolConformance(
+                                const NormalProtocolConformance *conformance) {
+  // Add this protocol conformance.
+  ProtocolConformances.push_back(conformance);
+}
+
 /// Emit the protocol conformance list and return it.
 llvm::Constant *IRGenModule::emitProtocolConformances() {
   // Do nothing if the list is empty.
@@ -2409,73 +2529,26 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   // Define the global variable for the conformance list.
 
   ConstantInitBuilder builder(*this);
-  auto recordsArray = builder.beginArray(ProtocolConformanceRecordTy);
+  auto descriptorArray = builder.beginArray(RelativeAddressTy);
 
   for (auto *conformance : ProtocolConformances) {
-    auto record = recordsArray.beginStruct(ProtocolConformanceRecordTy);
+    // Emit the protocol conformance now.
+    emitProtocolConformance(conformance);
 
-    emitAssociatedTypeMetadataRecord(conformance);
-
-    // Relative reference to the protocol descriptor.
-    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
-                  LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
-                  getPointerAlignment(), ProtocolDescriptorStructTy);
-    record.addRelativeAddress(descriptorRef);
-
-    // Relative reference to the type entity info, with the type reference
-    // kind mangled in the lower bits.
-    auto typeEntity =
-      getTypeEntityInfo(*this, conformance->getType()->getCanonicalType());
-
-    auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
-      typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
-    typeEntity.adjustForKnownRef(typeRef);
-    record.addTaggedRelativeOffset(RelativeAddressTy,
-                                   typeRef.getValue(),
-                                   static_cast<unsigned>(typeEntity.typeKind));
-
-    // Figure out what kind of witness table we have.
-    llvm::Constant *witnessTableVar;
-    ProtocolConformanceReferenceKind conformanceKind;
-
-    if (!isResilient(conformance->getProtocol(),
-                     ResilienceExpansion::Maximal) &&
-        conformance->getConditionalRequirements().empty()) {
-      conformanceKind = ProtocolConformanceReferenceKind::WitnessTable;
-
-      // If the conformance is in this object's table, then the witness table
-      // should also be in this object file, so we can always directly reference
-      // it.
-      witnessTableVar = getAddrOfWitnessTable(conformance);
-    } else {
-      if (conformance->getConditionalRequirements().empty()) {
-        conformanceKind =
-          ProtocolConformanceReferenceKind::WitnessTableAccessor;
-      } else {
-        conformanceKind =
-          ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor;
-      }
-
-      witnessTableVar = getAddrOfWitnessTableAccessFunction(
-          conformance, ForDefinition);
-    }
-
-    // Relative reference to the witness table.
-    record.addTaggedRelativeOffset(RelativeAddressTy, witnessTableVar,
-                                   static_cast<unsigned>(conformanceKind));
-
-    // Reserved.
-    record.addInt(Int32Ty, 0);
-
-    record.finishAndAddTo(recordsArray);
+    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+    auto descriptor =
+      getAddrOfLLVMVariableOrGOTEquivalent(entity, getPointerAlignment(),
+                                           ProtocolConformanceDescriptorTy);
+    descriptorArray.addRelativeAddress(descriptor);
   }
 
   // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
   // resolve relocations relative to it.
 
-  auto var = recordsArray.finishAndCreateGlobal("\x01l_protocol_conformances",
-                                                Alignment(4),
-                                                /*isConstant*/ true,
+  auto var = descriptorArray.finishAndCreateGlobal(
+                                          "\x01l_protocol_conformances",
+                                          Alignment(4),
+                                          /*isConstant*/ true,
                                           llvm::GlobalValue::PrivateLinkage);
 
   StringRef sectionName;
@@ -2672,7 +2745,23 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  // If we have more arguments than can be passed directly, the remaining
+  // arguments are packed into an array.
+  ArrayRef<llvm::Type *> paramTypes;
+  llvm::Type *paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs+1];
+  if (genericArgs.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
+    // Copy direct parameter types.
+    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs))
+      paramTypesArray[i] = genericArgs[i];
+
+    paramTypesArray[NumDirectGenericTypeMetadataAccessFunctionArgs] =
+      Int8PtrPtrTy;
+    paramTypes = paramTypesArray;
+  } else {
+    paramTypes = genericArgs;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
@@ -2742,8 +2831,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
   
-  // Keep type metadata around for all types, although the runtime can currently
-  // only perform name lookup of non-generic types.
+  // Keep type metadata around for all types.
   addRuntimeResolvableType(concreteType);
 
   // For metadata patterns, we're done.
@@ -2955,6 +3043,15 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
   auto entity = LinkEntity::forProtocolDescriptor(D);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
+                                const NormalProtocolConformance *conformance,
+                                ConstantInit definition) {
+  auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
+                               ProtocolConformanceDescriptorTy,
+                               DebugTypeInfo());
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.

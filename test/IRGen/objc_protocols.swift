@@ -11,7 +11,7 @@ import objc_protocols_Bas
 
 // -- Protocol "Frungible" inherits only objc protocols and should have no
 //    out-of-line inherited witnesses in its witness table.
-// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@"\$S14objc_protocols3ZimCAA9FrungibleAAWP"]] = hidden constant [1 x i8*] [
+// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@"\$S14objc_protocols3ZimCAA9FrungibleAAWP"]] = hidden constant [2 x i8*] [
 // CHECK:    i8* bitcast (void (%T14objc_protocols3ZimC*, %swift.type*, i8**)* @"$S14objc_protocols3ZimCAA9FrungibleA2aDP6frungeyyFTW" to i8*)
 // CHECK: ]
 
@@ -125,7 +125,7 @@ class ImplementingClass : InheritingProtocol { }
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
   return x
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* {{%.*}}, 0
-  // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
+  // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"$S14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T) {{.*}} {

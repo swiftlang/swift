@@ -1,5 +1,6 @@
+set(line_directive "#line" "%(line)d" "\"%(file)s\"")
 set(SWIFT_GYB_FLAGS
-  --line-directive "''")
+  --line-directive "'${line_directive}'")
 
 add_swift_library(swiftSyntax STATIC
   SyntaxNodes.cpp.gyb
@@ -9,7 +10,6 @@ add_swift_library(swiftSyntax STATIC
   SyntaxVisitor.cpp.gyb
   Trivia.cpp
   RawSyntax.cpp
-  RawTokenSyntax.cpp
   Syntax.cpp
   SyntaxData.cpp
   UnknownSyntax.cpp

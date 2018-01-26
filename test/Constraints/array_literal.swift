@@ -105,7 +105,7 @@ func longArray() {
 [1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
 
 
-// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
+// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
   var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
   // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}

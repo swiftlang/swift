@@ -562,13 +562,10 @@ internal struct _Stdout : TextOutputStream {
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if let asciiBuffer = string._core.asciiBuffer {
+    if _fastPath(string._guts.isASCII) {
       defer { _fixLifetime(string) }
-
-      _stdlib_fwrite_stdout(
-        UnsafePointer(asciiBuffer.baseAddress!),
-        asciiBuffer.count,
-        1)
+      let ascii = string._guts._unmanagedASCIIView
+      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
       return
     }
 
@@ -624,7 +621,7 @@ extension Unicode.Scalar : TextOutputStreamable {
 }
 
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
+public var _playgroundPrintHook : ((String) -> Void)? = nil
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)

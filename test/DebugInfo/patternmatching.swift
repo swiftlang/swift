@@ -23,7 +23,7 @@ switch p {
       markUsed(x)
       // SIL-CHECK:  dealloc_stack{{.*}}line:[[@LINE-1]]:17:cleanup
       // Verify that the branch has a location >= the cleanup.
-      // SIL-CHECK-NEXT:  br{{.*}}no_loc
+      // SIL-CHECK-NEXT:  br{{.*}}auto_gen
       // CHECK-SCOPES: call void @llvm.dbg
       // CHECK-SCOPES: call void @llvm.dbg
       // CHECK-SCOPES: call void @llvm.dbg

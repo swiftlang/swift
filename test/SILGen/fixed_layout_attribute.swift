@@ -20,7 +20,7 @@ public struct NonFixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... okay to directly reference the addressor here:
 // CHECK: function_ref @$S22fixed_layout_attribute6globalSivau
@@ -31,7 +31,7 @@ public struct FixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @$S22fixed_layout_attribute11FixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// CHECK-LABEL: sil non_abi [transparent] [serialized] @$S22fixed_layout_attribute11FixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... a fragile build can still reference the addressor:
 // FRAGILE: function_ref @$S22fixed_layout_attribute6globalSivau
@@ -47,4 +47,25 @@ private let privateGlobal = 0
 
 struct AnotherInternalStruct {
   var storedProperty = privateGlobal
+}
+
+// Static properties in fixed-layout type is still resilient
+
+@_fixed_layout
+public struct HasStaticProperty {
+  public static var staticProperty: Int = 0
+}
+
+// CHECK-LABEL: sil @$S22fixed_layout_attribute18usesStaticPropertyyyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$S22fixed_layout_attribute17HasStaticPropertyV06staticF0Sivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: return
+public func usesStaticProperty() {
+  _ = HasStaticProperty.staticProperty
+}
+
+// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute28usesStaticPropertyInlineableyyF : $@convention(thin) () -> ()
+
+@_inlineable
+public func usesStaticPropertyInlineable() {
+  _ = HasStaticProperty.staticProperty
 }

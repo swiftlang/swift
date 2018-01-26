@@ -39,7 +39,7 @@ set(SWIFTLIB_ESSENTIAL
   CocoaArray.swift
   Codable.swift.gyb
   Collection.swift
-  CollectionAlgorithms.swift.gyb
+  CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
   ClosedRange.swift
@@ -53,7 +53,6 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
-  Existential.swift
   Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift
@@ -124,18 +123,20 @@ set(SWIFTLIB_ESSENTIAL
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
-  StringBuffer.swift
   StringComparable.swift
-  StringCore.swift
+  StringGuts.swift
+  StringObject.swift
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
+  StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  StringVariant.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
@@ -144,6 +145,8 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeEncoding.swift
   UnicodeParser.swift
   Unmanaged.swift
+  UnmanagedOpaqueString.swift
+  UnmanagedString.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
@@ -154,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
+  StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
   )

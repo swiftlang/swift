@@ -48,10 +48,10 @@ struct MetadataSections {
   Range swift5_protocols;
   Range swift5_protocol_conformances;
   Range swift5_type_metadata;
-  Range swift3_typeref;
-  Range swift3_reflstr;
-  Range swift3_fieldmd;
-  Range swift3_assocty;
+  Range swift5_typeref;
+  Range swift5_reflstr;
+  Range swift5_fieldmd;
+  Range swift5_assocty;
 };
 } // namespace swift
 

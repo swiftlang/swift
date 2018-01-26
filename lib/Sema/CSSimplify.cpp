@@ -1297,14 +1297,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (auto layoutConstraint = layout.getLayoutConstraint()) {
     if (layoutConstraint->isClass()) {
       if (kind == ConstraintKind::ConformsTo) {
-        // Conformance to AnyObject is defined by having a single
-        // retainable pointer representation:
-        //
-        // - @objc existentials
-        // - class constrained archetypes
-        // - classes
-        if (!type1->isObjCExistentialType() &&
-            !type1->mayHaveSuperclass())
+        if (!type1->satisfiesClassConstraint())
           return getTypeMatchFailure(locator);
       } else {
         // Subtype relation to AnyObject also allows class-bound
@@ -3900,8 +3893,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       if (!choices[i].isDecl()) {
         return SolutionKind::Error;
       }
+      auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
+      if (!storage) {
+        return SolutionKind::Error;
+      }
       
-      auto storage = cast<AbstractStorageDecl>(choices[i].getDecl());
       if (!storage->isSettable(DC)) {
         // A non-settable component makes the key path read-only, unless
         // a reference-writable component shows up later.

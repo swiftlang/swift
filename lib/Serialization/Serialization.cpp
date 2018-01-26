@@ -2158,6 +2158,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_Implements:
   case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
+  case DAK_ClangImporterSynthesizedType:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:

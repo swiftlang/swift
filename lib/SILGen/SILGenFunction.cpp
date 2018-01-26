@@ -108,7 +108,6 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::Destroyer:
     return getMagicFunctionName(cast<DestructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
@@ -432,8 +431,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     CanType NSStringTy = SGM.Types.getNSStringType();
     CanType OptNSStringTy
       = OptionalType::get(NSStringTy)->getCanonicalType();
-    CanType IUOptNSStringTy
-      = ImplicitlyUnwrappedOptionalType::get(NSStringTy)->getCanonicalType();
 
     // Look up UIApplicationMain.
     // FIXME: Doing an AST lookup here is gross and not entirely sound;
@@ -499,21 +496,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(nameArgTy == fnConv.getSILArgumentType(2));
     auto managedName = ManagedValue::forUnmanaged(optName);
     SILValue nilValue;
-    if (optName->getType() == nameArgTy) {
-      nilValue = getOptionalNoneValue(mainClass,
-                                      getTypeLowering(OptNSStringTy));
-    } else {
-      assert(nameArgTy.getSwiftRValueType() == IUOptNSStringTy);
-      nilValue = getOptionalNoneValue(mainClass,
-                                      getTypeLowering(IUOptNSStringTy));
-      managedName = emitOptionalToOptional(
-          mainClass, managedName,
-          SILType::getPrimitiveObjectType(IUOptNSStringTy),
-          [](SILGenFunction &, SILLocation, ManagedValue input, SILType,
-             SGFContext) {
-        return input;
-      });
-    }
+    assert(optName->getType() == nameArgTy);
+    nilValue = getOptionalNoneValue(mainClass,
+                                    getTypeLowering(OptNSStringTy));
 
     // Fix up argv to have the right type.
     auto argvTy = fnConv.getSILArgumentType(1);

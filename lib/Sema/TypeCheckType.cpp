@@ -223,8 +223,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
                                                Type valueType) {
   // We can only bridge from class or Objective-C existential types.
-  if (!dynamicType->isObjCExistentialType() &&
-      !dynamicType->mayHaveSuperclass())
+  if (!dynamicType->satisfiesClassConstraint())
     return Type();
 
   // If the value type cannot be bridged, we're done.

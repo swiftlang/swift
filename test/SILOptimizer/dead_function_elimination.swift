@@ -190,7 +190,7 @@ internal func donotEliminate() {
 // CHECK: notInDerived
 // CHECK-NOT: notInOther
 
-// CHECK-TESTING-LABEL: sil_vtable [serialized] Base
+// CHECK-TESTING-LABEL: sil_vtable Base
 // CHECK-TESTING: DeadMethod
 
 // CHECK-LABEL: sil_vtable Derived
@@ -200,7 +200,7 @@ internal func donotEliminate() {
 // CHECK: notInDerived
 // CHECK: notInOther
 
-// CHECK-TESTING-LABEL: sil_vtable [serialized] Derived
+// CHECK-TESTING-LABEL: sil_vtable Derived
 // CHECK-TESTING: DeadMethod
 
 // CHECK-LABEL: sil_vtable Other
@@ -214,5 +214,5 @@ internal func donotEliminate() {
 // CHECK: aliveWitness!1: {{.*}} : @{{.*}}aliveWitness
 // CHECK: DeadWitness!1: {{.*}} : nil
 
-// CHECK-TESTING-LABEL: sil_witness_table [serialized] Adopt: Prot
+// CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness

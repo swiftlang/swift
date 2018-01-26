@@ -84,11 +84,6 @@ ERROR(writeback_overlap_subscript,none,
 NOTE(writebackoverlap_note,none,
       "concurrent writeback occurred here", ())
 
-ERROR(addressonly_type_used_in_multipattern_case,none,
-      "matching %select{type '%1'|a protocol value|a generic value}0 in multiple patterns "
-      "is not yet supported; use separate cases instead",
-      (unsigned, Type))
-
 ERROR(inout_argument_alias,none,
       "inout arguments are not allowed to alias each other", ())
 NOTE(previous_inout_alias,none,
@@ -244,7 +239,7 @@ WARNING(unreachable_code_after_stmt,none,
         "code after '%select{return|break|continue|throw}0' will never "
         "be executed", (unsigned))
 WARNING(unreachable_case,none,
-        "case will never be executed", ())
+        "%select{case|default}0 will never be executed", (bool))
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())

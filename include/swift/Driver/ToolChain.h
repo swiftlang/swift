@@ -90,7 +90,7 @@ protected:
     const char *ExecutableName;
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
-    FilelistInfo FilelistInfo;
+    std::vector<FilelistInfo> FilelistInfos;
 
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})

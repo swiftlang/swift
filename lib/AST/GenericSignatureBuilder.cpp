@@ -3026,6 +3026,12 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
     TypeDecl *nestedTypeDecl;
     SmallVector<TypeDecl *, 4> concreteDecls;
     if (auto assocType = depMemTy->getAssocType()) {
+      // Check whether this associated type references a protocol to which
+      // the base conforms. If not, it's unresolved.
+      if (baseEquivClass->conformsTo.find(assocType->getProtocol())
+            == baseEquivClass->conformsTo.end())
+        return ResolvedType::forUnresolved(baseEquivClass);
+
       nestedTypeDecl = assocType;
     } else {
       nestedTypeDecl =

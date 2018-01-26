@@ -32,6 +32,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Projection.h"
@@ -1122,6 +1123,54 @@ static void checkForViolationsInNoEscapeClosures(
                                                /*DiagnoseAsWarning=*/false);
 }
 
+#ifndef NDEBUG
+// If a partial apply has @inout_aliasable arguments, it may only be used as
+// a @noescape function type in a way that is recognized by
+// DiagnoseStaticExclusivity.
+static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
+  SmallVector<Operand *, 8> uses(PAI->getUses());
+  while (!uses.empty()) {
+    Operand *oper = uses.pop_back_val();
+    SILInstruction *user = oper->getUser();
+
+    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+      continue;
+
+    if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
+      uses.append(copy->getUses().begin(), copy->getUses().end());
+      continue;
+    }
+    if (auto apply = isa<ApplySite>(user)) {
+      SILValue arg = oper->get();
+      auto ArgumentFnType = arg->getType().getAs<SILFunctionType>();
+      if (ArgumentFnType && ArgumentFnType->isNoEscape())
+        continue;
+
+      llvm::dbgs() << "Argument must be @noescape function type: " << *arg;
+      llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                       "used as a @noescape function type argument.");
+    }
+    auto *store = dyn_cast<StoreInst>(user);
+    if (store && oper->getOperandNumber() == StoreInst::Src) {
+      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(store->getDest())) {
+        SILValue storageAddr = PBSI->getOperand();
+        // The closure is stored to block storage. Recursively visit all
+        // uses of any initialized block storage values derived from this
+        // storage address..
+        for (Operand *oper : storageAddr->getUses()) {
+          if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
+            uses.append(IBS->getUses().begin(), IBS->getUses().end());
+        }
+        continue;
+      }
+    }
+    llvm::dbgs() << "Unexpected partial_apply use: " << *user;
+    llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                     "used as a @noescape function type argument.");
+  }
+}
+#endif
+
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                    AccessSummaryAnalysis *ASA) {
   // The implementation relies on the following SIL invariants:
@@ -1229,6 +1278,21 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                              ConflictingAccesses);
         continue;
       }
+#ifndef NDEBUG
+      // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
+      // closure types, move this PartialApply verification into the
+      // SILVerifier to better pinpoint the offending pass.
+      if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
+        ApplySite apply(PAI);
+        if (llvm::any_of(range(apply.getNumArguments()),
+                         [apply](unsigned argIdx) {
+                           return apply.getArgumentConvention(argIdx)
+                             == SILArgumentConvention::Indirect_InoutAliasable;
+                         })) {
+          checkNoEscapePartialApply(PAI);
+        }
+      }
+#endif
       // Sanity check to make sure entries are properly removed.
       assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
              "Entries were not properly removed?!");

@@ -58,6 +58,7 @@ namespace swift {
   class LiteralExpr;
   class BraceStmt;
   class DeclAttributes;
+  class GenericContext;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -846,6 +847,9 @@ public:
 
     return getClangNodeImpl().getAsMacro();
   }
+
+  /// \brief Return the GenericContext if the Decl has one.
+  const GenericContext *getAsGenericContext() const;
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
@@ -3075,6 +3079,11 @@ public:
     return result;
   }
 
+  /// If this enum has a unique element, return it. A unique element can
+  /// either hold a value or not, and the existence of one unique element does
+  /// not imply the existence or non-existence of the opposite unique element.
+  EnumElementDecl *getUniqueElement(bool hasValue) const;
+
   /// Return a range that iterates over all the cases of an enum.
   CaseRange getAllCases() const {
     return CaseRange(getMembers());
@@ -4301,12 +4310,19 @@ public:
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind) const;
 
-  /// \brief Do we need to use resilient access patterns outside of this type's
-  /// resilience domain?
+  /// \brief Should this declaration behave as if it must be accessed
+  /// resiliently, even when we're building a non-resilient module?
+  ///
+  /// This is used for diagnostics, because we do not want a behavior
+  /// change between builds with resilience enabled and disabled.
+  bool isFormallyResilient() const;
+
+  /// \brief Do we need to use resilient access patterns outside of this
+  /// property's resilience domain?
   bool isResilient() const;
 
   /// \brief Do we need to use resilient access patterns when accessing this
-  /// type from the given module?
+  /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Does the storage use a behavior?
@@ -6200,6 +6216,9 @@ public:
   Identifier getName() const { return name; }
   
   static bool classof(const Decl *D) {
+    // Workaround: http://llvm.org/PR35906
+    if (DeclKind::Last_Decl == DeclKind::Last_OperatorDecl)
+      return D->getKind() >= DeclKind::First_OperatorDecl;
     return D->getKind() >= DeclKind::First_OperatorDecl
         && D->getKind() <= DeclKind::Last_OperatorDecl;
   }
@@ -6479,6 +6498,55 @@ inline bool Decl::isPotentiallyOverridable() const {
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
   : Depth(d->getDepth()), Index(d->getIndex()) { }
+
+inline const GenericContext *Decl::getAsGenericContext() const {
+  switch (getKind()) {
+  default: return nullptr;
+#define DECL(Id, Parent) // See previous line
+#define GENERIC_DECL(Id, Parent) \
+  case DeclKind::Id: \
+    return static_cast<const Id##Decl*>(this);
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline bool DeclContext::classof(const Decl *D) {
+  switch (D->getKind()) { //
+  default: return false;
+#define DECL(ID, PARENT) // See previous line
+#define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
+  // XXX -- ModuleDecl is not defined in Decl.h, but because DeclContexts
+  // preface decls in memory, any DeclContext type will due.
+  const DeclContext *DC = static_cast<const ExtensionDecl*>(D);
+  switch (D->getKind()) {
+  default: llvm_unreachable("Not a DeclContext");
+#define DECL(ID, PARENT) // See previous line
+#define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    return const_cast<DeclContext *>(DC);
+  }
+}
+
+inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
+  EnumElementDecl *result = nullptr;
+  bool found = false;
+  for (auto elt : getAllElements()) {
+    if (elt->hasAssociatedValues() == hasValue) {
+      if (found)
+        return nullptr;
+      found = true;
+      result = elt;
+    }
+  }
+  return result;
+}
 
 } // end namespace swift
 

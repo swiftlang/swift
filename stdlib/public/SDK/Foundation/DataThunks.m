@@ -112,7 +112,7 @@ static NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_ARGUMENT url, NSDataWritingOptions writingOptions, NSError **_Nullable errorPtr) {
+BOOL __NSDataWriteToURL(NSData *SWIFT_NS_RELEASES_ARGUMENT data, NSURL *SWIFT_NS_RELEASES_ARGUMENT url, NSDataWritingOptions writingOptions, NSError **_Nullable errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
 
     NSString *path = url.path;
@@ -120,6 +120,8 @@ BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_AR
 
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
+        [data release];
+        [url release];
         return NO;
     }
 

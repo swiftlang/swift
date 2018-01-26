@@ -496,10 +496,11 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolRecordTy;
   llvm::PointerType *ProtocolRecordPtrTy;
-  llvm::StructType *ProtocolConformanceRecordTy;
-  llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::StructType *ProtocolConformanceDescriptorTy;
+  llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
   llvm::PointerType *NominalTypeDescriptorPtrTy;
+  llvm::StructType *ClassNominalTypeDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
@@ -722,13 +723,13 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
-  void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
   llvm::Constant *emitSwiftProtocols();
   llvm::Constant *emitProtocolConformances();
+  void addProtocolConformance(const NormalProtocolConformance *conformance);
   llvm::Constant *emitTypeMetadataRecords();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
@@ -838,7 +839,7 @@ private:
   /// List of non-ObjC protocols described by this module.
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate records for.
-  SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
+  SmallVector<const NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
@@ -1027,7 +1028,7 @@ public:
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
-
+  void emitProtocolConformance(const NormalProtocolConformance *conformance);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
@@ -1080,6 +1081,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
+
+  /// Determine whether the given type requires foreign type metadata.
+  bool requiresForeignTypeMetadata(CanType type);
+
   llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
                                                  ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
@@ -1087,6 +1092,9 @@ public:
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                               ConstantInit definition =
                                                 ConstantInit());
+  llvm::Constant *getAddrOfProtocolConformanceDescriptor(
+                                  const NormalProtocolConformance *conformance,
+                                  ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);

@@ -197,9 +197,7 @@ internal func _decodeCString<Encoding : _UnicodeEncoding>(
   let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
     start: cString, count: length)
 
-  let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
+  let (guts, hadError) = _StringGuts.fromCodeUnits(
     buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
-  return stringBuffer.map {
-    (result: String(_storage: $0), repairsMade: hadError)
-  }
+  return guts.map { (result: String($0), repairsMade: hadError) }
 }

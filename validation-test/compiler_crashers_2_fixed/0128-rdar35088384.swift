@@ -1,4 +1,4 @@
-// RUN: %swift-target-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 protocol Command {}
 

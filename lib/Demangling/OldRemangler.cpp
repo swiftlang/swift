@@ -717,6 +717,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
+  Out << "Mc";
+  mangleProtocolConformance(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global
@@ -1092,6 +1097,13 @@ void Remangler::mangleLocalDeclName(Node *node) {
 void Remangler::manglePrivateDeclName(Node *node) {
   Out << 'P';
   mangleChildNodes(node); // identifier, identifier
+}
+
+void Remangler::mangleRelatedEntityDeclName(Node *node) {
+  // Non-round-trip mangling: pretend we have a private discriminator "$A" for a
+  // related entity "A".
+  Out << 'P' << (node->getText().size() + 1) << '$' << node->getText();
+  mangleChildNodes(node);
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
