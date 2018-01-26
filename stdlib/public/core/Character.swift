@@ -227,8 +227,7 @@ extension Character
         | UInt64(utf16[3]) &<< 48
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
-      _representation = Character(
-        _largeRepresentationString: String(_StringGuts(utf16)))._representation
+      _representation = .large(_StringGuts(utf16)._extractNativeStorage())
     }
   }
 
