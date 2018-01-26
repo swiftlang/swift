@@ -167,8 +167,8 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-/* FIXME: compiler crash
-extension ClosedRange.Index: Hashable where Bound: Hashable {
+extension ClosedRange.Index: Hashable 
+where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   public var hashValue: Int {
     switch self {
     case .inRange(let value):
@@ -178,7 +178,6 @@ extension ClosedRange.Index: Hashable where Bound: Hashable {
     }
   }
 }
-*/
 
 // FIXME: this should only be conformance to RandomAccessCollection but
 // the compiler balks without all 3
