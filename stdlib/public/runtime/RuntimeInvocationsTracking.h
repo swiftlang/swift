@@ -112,7 +112,7 @@ _swift_setGlobalRuntimeFunctionCountersUpdateHandler(
 
 #else
 
-/// Let runtime functions uncoditionally use this define by making it a NOP if
+/// Let runtime functions unconditionally use this define by making it a NOP if
 /// counters are not enabled.
 #define SWIFT_RT_TRACK_INVOCATION(OBJ, RT_FUNCTION)
 
