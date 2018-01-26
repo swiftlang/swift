@@ -103,12 +103,12 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
 RawSyntax::~RawSyntax() {
   if (isToken()) {
     getTrailingObjects<OwnedString>()->~OwnedString();
-    for (auto trivia : getLeadingTrivia())
+    for (auto &trivia : getLeadingTrivia())
       trivia.~TriviaPiece();
-    for (auto trivia : getTrailingTrivia())
+    for (auto &trivia : getTrailingTrivia())
       trivia.~TriviaPiece();
   } else {
-    for (auto child : getLayout())
+    for (auto &child : getLayout())
       child.~RC<RawSyntax>();
   }
 }
@@ -265,4 +265,25 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << "line=" << getLine() << " ";
   OS << "column=" << getColumn();
   OS << ')';
+}
+
+void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
+                        OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+                        ArrayRef<TriviaPiece> TrailingTrivia) {
+  ID.AddInteger(unsigned(TokKind));
+  switch (TokKind) {
+#define TOKEN_DEFAULT(NAME) case tok::NAME:
+#define PUNCTUATOR(NAME, X) TOKEN_DEFAULT(NAME)
+#define KEYWORD(KW) TOKEN_DEFAULT(kw_##KW)
+#define POUND_KEYWORD(KW) TOKEN_DEFAULT(pound_##KW)
+#include "swift/Syntax/TokenKinds.def"
+    break;
+  default:
+    ID.AddString(Text.str());
+    break;
+  }
+  for (auto &Piece : LeadingTrivia)
+    Piece.Profile(ID);
+  for (auto &Piece : TrailingTrivia)
+    Piece.Profile(ID);
 }

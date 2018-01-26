@@ -273,7 +273,7 @@ bool Parser::parseTopLevel() {
 
   // If we are done parsing the whole file, finalize the token receiver.
   if (Tok.is(tok::eof)) {
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+    SyntaxContext->addToken(Context, Tok, LeadingTrivia, TrailingTrivia);
     TokReceiver->finalize();
   }
 

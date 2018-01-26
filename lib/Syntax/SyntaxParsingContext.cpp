@@ -69,14 +69,15 @@ SyntaxParsingContext *SyntaxParsingContext::getRoot() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
+void SyntaxParsingContext::addToken(ASTContext &C, Token &Tok,
+                                    Trivia &LeadingTrivia,
                                     Trivia &TrailingTrivia) {
   if (!Enabled)
     return;
 
-  addRawSyntax(RawSyntax::make(Tok.getKind(), Tok.getText(),
-                               SourcePresence::Present, LeadingTrivia.Pieces,
-                               TrailingTrivia.Pieces));
+  addRawSyntax(C.getRawTokenSyntax(Tok.getKind(), Tok.getText(),
+                                   LeadingTrivia.Pieces,
+                                   TrailingTrivia.Pieces));
 }
 
 /// Add Syntax to the parts.

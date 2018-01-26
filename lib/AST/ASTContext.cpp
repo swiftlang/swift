@@ -37,6 +37,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "swift/Syntax/RawSyntax.h"
 #include "swift/Strings.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -91,6 +92,19 @@ namespace {
     Import = 1 << 0,
     Framework = 1 << 1
   };
+} // end anonymous namespace
+
+namespace {
+class RCRSCacheNode : public llvm::FastFoldingSetNode {
+  const RC<syntax::RawSyntax> Raw;
+
+public:
+  RCRSCacheNode(const RC<syntax::RawSyntax> Raw,
+                const llvm::FoldingSetNodeID &ID)
+      : FastFoldingSetNode(ID), Raw(Raw) {}
+
+  RC<syntax::RawSyntax> get() { return Raw; }
+};
 } // end anonymous namespace
 
 using AssociativityCacheType =
@@ -372,6 +386,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     ForeignRepresentableCache;
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
+
+  /// The set of cached "token" raw syntax nodes.
+  llvm::FoldingSet<RCRSCacheNode> RawSyntaxTokens;
 
   /// \brief The permanent arena.
   Arena Permanent;
@@ -4874,4 +4891,38 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
+RC<syntax::RawSyntax> ASTContext::getRawTokenSyntax(
+    tok TokKind, OwnedString Text,
+    llvm::ArrayRef<syntax::TriviaPiece> LeadingTrivia,
+    llvm::ArrayRef<syntax::TriviaPiece> TrailingTrivia) {
 
+  // If it's not worth to reuse the token, just create a token.
+  if (
+      // String literal with lenght >24.
+      (TokKind == tok::string_literal && Text.size() > 16) ||
+      // Tokens contains comment trivia et al.
+      any_of(LeadingTrivia,
+             [](const syntax::TriviaPiece &T) { return T.getText().size(); }) ||
+      // Tokens contains comment triiva et al.
+      any_of(TrailingTrivia,
+             [](const syntax::TriviaPiece &T) { return T.getText().size(); })) {
+    return syntax::RawSyntax::make(TokKind, Text,
+                                   syntax::SourcePresence::Present,
+                                   LeadingTrivia, TrailingTrivia);
+  }
+
+  llvm::FoldingSetNodeID ID;
+  syntax::RawSyntax::Profile(ID, TokKind, Text, LeadingTrivia, TrailingTrivia);
+  
+  void *insertPos;
+  auto &CachedTokens = Impl.RawSyntaxTokens;
+
+  if (auto existing = CachedTokens.FindNodeOrInsertPos(ID, insertPos))
+    return existing->get();
+
+  auto Raw =
+      syntax::RawSyntax::make(TokKind, Text, syntax::SourcePresence::Present,
+                              LeadingTrivia, TrailingTrivia);
+  CachedTokens.InsertNode(new RCRSCacheNode(Raw, ID), insertPos);
+  return Raw;
+}

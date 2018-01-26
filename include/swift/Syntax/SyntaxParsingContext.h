@@ -183,7 +183,8 @@ public:
   void addRawSyntax(RC<RawSyntax> Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(Token &Tok, Trivia &LeadingTrivia, Trivia &TrailingTrivia);
+  void addToken(ASTContext &C, Token &Tok, Trivia &LeadingTrivia,
+                Trivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
   void addSyntax(Syntax Node);

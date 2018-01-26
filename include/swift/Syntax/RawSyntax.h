@@ -34,6 +34,7 @@
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Syntax/Trivia.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Casting.h"
@@ -48,7 +49,7 @@ using llvm::StringRef;
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
   ({                                                                           \
-    if (auto &__Child = Raw->getChild(Cursor::CursorName))                     \
+    if (auto &__Child = Raw->getChild(Cursor))                                 \
       assert(__Child->getKind() == ExpectedKind);                              \
   })
 #else
@@ -111,6 +112,8 @@ using llvm::StringRef;
 #endif
 
 namespace swift {
+class ASTContext;
+
 namespace syntax {
 
 using CursorIndex = uint32_t;
@@ -441,6 +444,10 @@ public:
 
   /// Dump this piece of syntax recursively.
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  static void Profile(llvm::FoldingSetNodeID &ID, tok TokKind, OwnedString Text,
+                      ArrayRef<TriviaPiece> LeadingTrivia,
+                      ArrayRef<TriviaPiece> TrailingTrivia);
 };
 
 } // end namespace syntax

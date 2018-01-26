@@ -516,7 +516,7 @@ void Parser::consumeExtraToken(Token Extra) {
 
 SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
-  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  SyntaxContext->addToken(Context, Tok, LeadingTrivia, TrailingTrivia);
   return consumeTokenWithoutFeedingReceiver();
 }
 
@@ -552,7 +552,7 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
   Trivia EmptyTrivia;
-  SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
+  SyntaxContext->addToken(Context, SplitTokens.back(), LeadingTrivia, EmptyTrivia);
   LeadingTrivia.empty();
   TokReceiver->receive(SplitTokens.back());
 }
