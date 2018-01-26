@@ -265,16 +265,6 @@ public:
     auto result = baseToIndexMap.insert(std::make_pair(member, index));
     assert(result.second);
     (void) result;
-
-    // Emit a method dispatch thunk if the method is public and the
-    // class is resilient.
-    auto *func = cast<AbstractFunctionDecl>(member.getDecl());
-    if (func->getDeclContext() == theClass) {
-      if (isResilient &&
-          func->getEffectiveAccess() >= AccessLevel::Public) {
-        SGM.emitDispatchThunk(member);
-      }
-    }
   }
 
   void addPlaceholder(MissingMemberDecl *m) {
@@ -448,6 +438,10 @@ public:
     return SILWitnessTable::create(SGM.M, Linkage, Serialized, Conformance,
                                    Entries, ConditionalConformances);
   }
+
+  void addProtocolConformanceDescriptor() {
+  }
+
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
     assert(Lowering::TypeConverter::protocolRequiresWitnessTable(baseProtocol));
@@ -734,6 +728,8 @@ public:
   void addMissingDefault() {
     DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
   }
+
+  void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
     addMissingDefault();

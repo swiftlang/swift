@@ -200,6 +200,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int16Ty,                // mandatory requirement count
     Int16Ty,                // total requirement count
     Int32Ty,                // requirements array
+    RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
   });
   
@@ -289,20 +290,37 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     });
   ProtocolRecordPtrTy = ProtocolRecordTy->getPointerTo();
 
-  ProtocolConformanceRecordTy
-    = createStructType(*this, "swift.protocol_conformance", {
+  ProtocolConformanceDescriptorTy
+    = createStructType(*this, "swift.protocol_conformance_descriptor", {
       RelativeAddressTy,
       RelativeAddressTy,
       RelativeAddressTy,
       Int32Ty
     });
-  ProtocolConformanceRecordPtrTy
-    = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
+  ProtocolConformanceDescriptorPtrTy
+    = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
   NominalTypeDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+
+  ClassNominalTypeDescriptorTy =
+        llvm::StructType::get(LLVMContext, {
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int16Ty,
+    Int16Ty,
+    Int32Ty,
+  }, /*packed=*/true);
 
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
@@ -614,10 +632,6 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_SwiftCC(ID, NAME, SYMBOL, CC,        \
                                                   RETURNS, ARGS, ATTRS)        \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 

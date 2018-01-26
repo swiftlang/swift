@@ -2409,13 +2409,6 @@ namespace {
     bool shouldForceUnwrapResult(Decl *decl, ConstraintLocatorBuilder locator) {
       // FIXME: Disable parts of the new IUO implementation for now.
       return false;
-      if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        return false;
-
-      auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
-          ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
-
-      return solution.getDisjunctionChoice(choiceLocator);
     }
 
     Expr *forceUnwrapResult(Expr *newExpr) {
@@ -4175,6 +4168,24 @@ namespace {
           continue;
         }
         
+        auto getObjectType = [](Type optionalTy) -> Type {
+          Type objectTy;
+          if (auto lvalue = optionalTy->getAs<LValueType>()) {
+            objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
+            if (optionalTy->hasUnresolvedType() && !objectTy) {
+              objectTy = optionalTy;
+            }
+            objectTy = LValueType::get(objectTy);
+          } else {
+            objectTy = optionalTy->getAnyOptionalObjectType();
+            if (optionalTy->hasUnresolvedType() && !objectTy) {
+              objectTy = optionalTy;
+            }
+          }
+          assert(objectTy);
+          return objectTy;
+        };
+
         KeyPathExpr::Component component;
         switch (auto kind = origComponent.getKind()) {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
@@ -4220,8 +4231,9 @@ namespace {
             else
               baseTy = objTy;
 
+            auto loc = origComponent.getLoc();
             resolvedComponents.push_back(
-                 KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
+                KeyPathExpr::Component::forOptionalForce(baseTy, loc));
           }
 
           cs.TC.requestMemberLayout(property);
@@ -4241,6 +4253,17 @@ namespace {
           component = KeyPathExpr::Component::forProperty(ref,
                                                        resolvedTy,
                                                        origComponent.getLoc());
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
+
+          if (shouldForceUnwrapResult(property, locator)) {
+            auto objectTy = getObjectType(baseTy);
+            auto loc = origComponent.getLoc();
+            component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
+            baseTy = component.getComponentType();
+            resolvedComponents.push_back(component);
+          }
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4268,8 +4291,9 @@ namespace {
             else
               baseTy = objTy;
 
+            auto loc = origComponent.getLoc();
             resolvedComponents.push_back(
-                 KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
+                KeyPathExpr::Component::forOptionalForce(baseTy, loc));
           }
 
           cs.TC.requestMemberLayout(subscript);
@@ -4306,6 +4330,17 @@ namespace {
           // Save a reference to the component so we can do a post-pass to check
           // the Hashable conformance of the indexes.
           KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
+
+          if (shouldForceUnwrapResult(subscript, locator)) {
+            auto objectTy = getObjectType(baseTy);
+            auto loc = origComponent.getLoc();
+            component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
+            baseTy = component.getComponentType();
+            resolvedComponents.push_back(component);
+          }
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -4318,33 +4353,27 @@ namespace {
           }
           assert(objectTy);
           
-          component = KeyPathExpr::Component::forOptionalChain(objectTy,
-                                                        origComponent.getLoc());
+          auto loc = origComponent.getLoc();
+          component = KeyPathExpr::Component::forOptionalChain(objectTy, loc);
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalForce: {
-          Type objectTy;
-          if (auto lvalue = baseTy->getAs<LValueType>()) {
-            objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
-            if (baseTy->hasUnresolvedType() && !objectTy) {
-              objectTy = baseTy;
-            }
-            objectTy = LValueType::get(objectTy);
-          } else {
-            objectTy = baseTy->getAnyOptionalObjectType();
-            if (baseTy->hasUnresolvedType() && !objectTy) {
-              objectTy = baseTy;
-            }
-            assert(objectTy);
-          }
-          
-          component = KeyPathExpr::Component::forOptionalForce(objectTy,
-                                                        origComponent.getLoc());
+          auto objectTy = getObjectType(baseTy);
+          auto loc = origComponent.getLoc();
+          component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
           break;
         }
         case KeyPathExpr::Component::Kind::Invalid:
           component = origComponent;
           component.setComponentType(leafTy);
+
+          baseTy = component.getComponentType();
+          resolvedComponents.push_back(component);
           break;
           
         case KeyPathExpr::Component::Kind::Property:
@@ -4352,9 +4381,6 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalWrap:
           llvm_unreachable("already resolved");
         }
-
-        baseTy = component.getComponentType();
-        resolvedComponents.push_back(component);
       }
       
       // Wrap a non-optional result if there was chaining involved.
@@ -4389,7 +4415,8 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!baseTy || baseTy->hasUnresolvedType()
+             || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
       return E;
     }
 
@@ -7618,8 +7645,7 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
                              return getType(expr);
                            },
                            [&](Expr *expr, Type type) {
-                             expr->setType(type);
-                             cacheType(expr);
+                             setType(expr, type);
                            });
 }
 

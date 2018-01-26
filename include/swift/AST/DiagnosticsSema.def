@@ -2889,14 +2889,16 @@ ERROR(fallthrough_outside_switch,none,
 ERROR(fallthrough_from_last_case,none,
       "'fallthrough' without a following 'case' or 'default' block", ())
 ERROR(fallthrough_into_case_with_var_binding,none,
-      "'fallthrough' cannot transfer control to a case label that declares variables",
-      ())
+      "'fallthrough' from a case which doesn't bind variable %0",
+      (Identifier))
 
 ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
 
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
+ERROR(type_mismatch_fallthrough_pattern_list,none,
+      "pattern variable bound to type %0, fallthrough case bound to type %1", (Type, Type))
 
 WARNING(where_on_one_item, none,
         "'where' only applies to the second pattern match in this case", ())
@@ -3857,11 +3859,6 @@ WARNING(redundant_particular_literal_case,none,
         "consider removing it",())
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
-
-ERROR(cannot_prove_exhaustive_switch,none,
-      "analysis of uncovered switch statement is too complex to perform in a "
-      "reasonable amount of time; "
-      "insert a 'default' clause to cover this switch statement", ())
 
 // HACK: Downgrades the above to warnings if any of the cases is marked
 // @_downgrade_exhaustivity_check.

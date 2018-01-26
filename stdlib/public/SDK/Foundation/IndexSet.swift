@@ -656,7 +656,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
 
     /// For a positive delta, shifts the indexes in [index, INT_MAX] to the right, thereby inserting an "empty space" [index, delta], for a negative delta, shifts the indexes in [index, INT_MAX] to the left, thereby deleting the indexes in the range [index - delta, delta].
-    public mutating func shift(startingAt integer: Element, by delta: IndexSet.IndexDistance) {
+    public mutating func shift(startingAt integer: Element, by delta: Int) {
         _applyMutation { $0.shiftIndexesStarting(at: integer, by: delta) }
     }
     

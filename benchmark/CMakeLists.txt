@@ -40,6 +40,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfRef
     single-source/ArraySetElement
     single-source/ArraySubscript
+    single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BitCount
     single-source/ByteSwap
     single-source/COWTree
@@ -64,6 +65,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile

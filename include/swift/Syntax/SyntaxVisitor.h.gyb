@@ -40,11 +40,14 @@ struct SyntaxVisitor {
 
   virtual void visit(TokenSyntax token) {}
 
+  virtual void visitPre(Syntax node) {}
+  virtual void visitPost(Syntax node) {}
   void visit(Syntax node);
 
   void visitChildren(Syntax node) {
-    for (auto C: node.getRaw()->Layout)
-      visit(make<Syntax>(C));
+    for (unsigned i = 0, e = node.getNumChildren(); i != e; ++i) {
+      visit(node.getChild(i));
+    }
   }
 };
 }

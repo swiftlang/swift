@@ -9,8 +9,10 @@ struct MyStruct {
 let Global = 27
 
 func testit() -> Int {
-  return MyStruct.StaticVar + Global
+  return MyStruct.StaticVar + Global + PublicGlobal
 }
+
+public let PublicGlobal = 27
 
 _ = testit()
 
@@ -21,3 +23,6 @@ _ = testit()
 
 // CHECK:      // Global.getter
 // CHECK-NEXT: sil private @$S{{.*}}Global
+
+// CHECK:      // PublicGlobal.getter
+// CHECK-NEXT: sil non_abi @$S{{.*}}PublicGlobal

@@ -121,7 +121,15 @@ public:
   ClassDecl *getClass() const { return Class; }
 
   /// Returns true if this vtable is going to be (or was) serialized.
-  IsSerialized_t isSerialized() const;
+  IsSerialized_t isSerialized() const {
+    return Serialized ? IsSerialized : IsNotSerialized;
+  }
+
+  /// Sets the serialized flag.
+  void setSerialized(IsSerialized_t serialized) {
+    assert(serialized != IsSerializable);
+    Serialized = (serialized ? 1 : 0);
+  }
 
   /// Return all of the method entries.
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }

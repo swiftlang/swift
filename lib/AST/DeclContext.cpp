@@ -153,135 +153,52 @@ Type DeclContext::getDeclaredInterfaceType() const {
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return nullptr;
-
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::AbstractClosureExpr:
-      // Closures and initializers can't themselves be generic, but they
-      // can occur in generic contexts.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      if (auto GP = cast<SubscriptDecl>(dc)->getGenericParams())
-        return GP;
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      if (auto GP = cast<AbstractFunctionDecl>(dc)->getGenericParams())
-        return GP;
-      continue;
-
-    case DeclContextKind::GenericTypeDecl:
-      if (auto GP = cast<GenericTypeDecl>(dc)->getGenericParams())
-        return GP;
-      continue;
-
-    case DeclContextKind::ExtensionDecl:
-      // Extensions do not capture outer generic parameters.
-      return cast<ExtensionDecl>(dc)->getGenericParams();
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext()) {
+      if (auto GC = decl->getAsGenericContext()) {
+        auto GP = GC->getGenericParams();
+        // Extensions do not capture outer generic parameters.
+        if (GP != nullptr || isa<ExtensionDecl>(decl))
+          return GP;
+      }
     }
-    llvm_unreachable("bad DeclContextKind");
-  }
-  llvm_unreachable("unknown parent");
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return nullptr;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext())
+      if (auto GC = decl->getAsGenericContext())
+        return GC->getGenericSignature();
+  } while ((dc = dc->getParent()));
 
-    case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-      // Closures and initializers can't themselves be generic, but they
-      // can occur in generic contexts.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      return cast<SubscriptDecl>(dc)->getGenericSignature();
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(dc)->getGenericSignature();
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(dc)->getGenericSignature();
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(dc)->getGenericSignature();
-    }
-    llvm_unreachable("bad DeclContextKind");
-  }
+  return nullptr;
 }
 
 GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return nullptr;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext())
+      if (auto GC = decl->getAsGenericContext())
+        return GC->getGenericEnvironment();
+  } while ((dc = dc->getParent()));
 
-    case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-      // Closures and initializers can't themselves be generic, but they
-      // can occur in generic contexts.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      return cast<SubscriptDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(dc)->getGenericEnvironment();
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(dc)->getGenericEnvironment();
-    }
-    llvm_unreachable("bad DeclContextKind");
-  }
+  return nullptr;
 }
 
 bool DeclContext::contextHasLazyGenericEnvironment() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return false;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext())
+      if (auto GC = decl->getAsGenericContext())
+        return GC->hasLazyGenericEnvironment();
+  } while ((dc = dc->getParent()));
 
-    case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-      // Closures and initializers can't themselves be generic, but they
-      // can occur in generic contexts.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      return cast<SubscriptDecl>(dc)->hasLazyGenericEnvironment();
-
-    case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(dc)->hasLazyGenericEnvironment();
-
-    case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(dc)->hasLazyGenericEnvironment();
-
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(dc)->hasLazyGenericEnvironment();
-    }
-    llvm_unreachable("bad DeclContextKind");
-  }
+  return false;
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
@@ -298,76 +215,40 @@ DeclContext *DeclContext::getLocalContext() {
 }
 
 AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
-  DeclContext *result = this;
-  while (true) {
-    switch (result->getContextKind()) {
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
-      // Look through closures, initial values.
-      result = result->getParent();
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl: {
-      // If this function is a method, we found our result.
-      auto func = dyn_cast<AbstractFunctionDecl>(result);
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext()) {
+      auto func = dyn_cast<AbstractFunctionDecl>(decl);
+      // If we found a non-func decl, we're done.
+      if (func == nullptr)
+        return nullptr;
       if (func->getDeclContext()->isTypeContext())
         return func;
-
-      // This function isn't a method; look through it.
-      result = func->getDeclContext();
-      continue;
     }
+  } while ((dc = dc->getParent()));
 
-    case DeclContextKind::ExtensionDecl:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::Module:
-    case DeclContextKind::GenericTypeDecl:
-    case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::SubscriptDecl:
-      // Not in a method context.
-      return nullptr;
-    }
-  }
+  return nullptr;
 }
 
 bool DeclContext::isTypeContext() const {
-  return isa<NominalTypeDecl>(this) ||
-         getContextKind() == DeclContextKind::ExtensionDecl;
+  if (auto decl = getAsDeclOrDeclExtensionContext())
+    return isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl);
+  return false;
 }
 
 DeclContext *DeclContext::getInnermostTypeContext() {
-  DeclContext *Result = this;
-  while (true) {
-    switch (Result->getContextKind()) {
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::AbstractFunctionDecl:
-    case DeclContextKind::SubscriptDecl:
-    case DeclContextKind::SerializedLocal:
-      Result = Result->getParent();
-      continue;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDeclOrDeclExtensionContext())
+      if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl))
+        return dc;
+  } while ((dc = dc->getParent()));
 
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-      return nullptr;
-
-    case DeclContextKind::GenericTypeDecl:
-      if (isa<TypeAliasDecl>(Result)) {
-        Result = Result->getParent();
-        continue;
-      }
-      return Result;
-
-    case DeclContextKind::ExtensionDecl:
-      return Result;
-    }
-  }
+  return nullptr;
 }
 
 Decl *DeclContext::getInnermostDeclarationDeclContext() {
-  DeclContext *DC = this;
+  auto DC = this;
   do {
     if (auto decl = DC->getAsDeclOrDeclExtensionContext())
       return isa<ModuleDecl>(decl) ? nullptr : decl;
@@ -424,61 +305,23 @@ SourceFile *DeclContext::getParentSourceFile() const {
 }
 
 DeclContext *DeclContext::getModuleScopeContext() const {
-  const DeclContext *DC = this;
+  auto DC = const_cast<DeclContext*>(this);
+
   while (true) {
-    switch (DC->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-      return const_cast<DeclContext*>(DC);
-    default:
-      break;
+    if (DC->ParentAndKind.getInt() == ASTHierarchy::FileUnit)
+      return DC;
+    if (auto NextDC = DC->getParent()) {
+      DC = NextDC;
+    } else {
+      assert(isa<ModuleDecl>(DC->getAsDeclOrDeclExtensionContext()));
+      return DC;
     }
-    DC = DC->getParent();
   }
 }
 
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
-    switch (dc->getContextKind()) {
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-    case DeclContextKind::TopLevelCodeDecl:
-      return false;
-
-    case DeclContextKind::Initializer:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::SerializedLocal:
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::SubscriptDecl:
-      if (cast<SubscriptDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::GenericTypeDecl:
-      if (cast<GenericTypeDecl>(dc)->getGenericParams())
-        return true;
-      // Check parent context.
-      continue;
-
-    case DeclContextKind::ExtensionDecl:
-      if (cast<ExtensionDecl>(dc)->getGenericParams())
-        return true;
-      // Extensions do not capture outer generic parameters.
-      return false;
-    }
-    llvm_unreachable("bad decl context kind");
-  }
-  llvm_unreachable("illegal declcontext hierarchy");
+  return getGenericParamsOfContext() != nullptr;
 }
 
 /// Get the most optimal resilience expansion for the body of this function.
@@ -551,19 +394,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
 /// Determine whether the innermost context is generic.
 bool DeclContext::isInnermostContextGeneric() const {
-  switch (getContextKind()) {
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(this)->isGeneric();
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(this)->isGeneric();
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->isGeneric();
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(this)->isGeneric();
-  default:
-    return false;
-  }
-  llvm_unreachable("bad DeclContextKind");
+  if (auto Decl = getAsDeclOrDeclExtensionContext())
+    if (auto GC = Decl->getAsGenericContext())
+      return GC->isGeneric();
+  return false;
 }
 
 bool
@@ -672,32 +506,6 @@ static unsigned getLineNumber(DCType *DC) {
 
   const ASTContext &ctx = static_cast<const DeclContext *>(DC)->getASTContext();
   return ctx.SourceMgr.getLineAndColumn(loc).first;
-}
-
-bool DeclContext::classof(const Decl *D) {
-  switch (D->getKind()) { //
-#define DECL(ID, PARENT)               case DeclKind::ID: return false;
-#define CONTEXT_DECL(ID, PARENT)       case DeclKind::ID: return true;
-#define CONTEXT_VALUE_DECL(ID, PARENT) case DeclKind::ID: return true;
-#include "swift/AST/DeclNodes.def"
-  }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
-}
-
-DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
-  switch (D->getKind()) {
-#define DECL(ID, PARENT) \
-  case DeclKind::ID: llvm_unreachable("not a decl context");
-#define CONTEXT_DECL(ID, PARENT) \
-  case DeclKind::ID: \
-    return const_cast<DeclContext *>( \
-        static_cast<const DeclContext*>(cast<ID##Decl>(D)));
-#define CONTEXT_VALUE_DECL(ID, PARENT) CONTEXT_DECL(ID, PARENT)
-#include "swift/AST/DeclNodes.def"
-  }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
@@ -957,32 +765,25 @@ bool IterableDeclContext::wasDeserialized() const {
 
 bool IterableDeclContext::classof(const Decl *D) {
   switch (D->getKind()) {
-#define DECL(ID, PARENT)              case DeclKind::ID: return false;
-#define NOMINAL_TYPE_DECL(ID, PARENT) case DeclKind::ID: return true;
-#define EXTENSION_DECL(ID, PARENT)    case DeclKind::ID: return true;
+  default: return false;
+#define DECL(ID, PARENT) // See previous line
+#define ITERABLE_DECL(ID, PARENT) \
+  case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 IterableDeclContext *
 IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   switch (D->getKind()) {
-#define DECL(ID, PARENT) \
-  case DeclKind::ID: llvm_unreachable("not a decl context");
-#define NOMINAL_TYPE_DECL(ID, PARENT) \
-  case DeclKind::ID: \
-    return const_cast<IterableDeclContext *>( \
-        static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
-#define EXTENSION_DECL(ID, PARENT) \
+  default: llvm_unreachable("Decl is not a IterableDeclContext.");
+#define DECL(ID, PARENT) // See previous line
+#define ITERABLE_DECL(ID, PARENT) \
   case DeclKind::ID: \
     return const_cast<IterableDeclContext *>( \
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 /// Return the DeclContext to compare when checking private access in
@@ -1074,6 +875,13 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   }
 
   return false;
+}
+
+DeclContext *Decl::getDeclContextForModule() const {
+  if (auto module = dyn_cast<ModuleDecl>(this))
+    return const_cast<ModuleDecl *>(module);
+
+  return nullptr;
 }
 
 DeclContextKind DeclContext::getContextKind() const {

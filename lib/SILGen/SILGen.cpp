@@ -20,6 +20,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -716,6 +717,9 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
+    UnifiedStatsReporter::FrontendStatsTracer Tracer;
+    if (getASTContext().Stats)
+      Tracer = getASTContext().Stats->getStatsTracer("emit-SIL", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
@@ -1034,20 +1038,6 @@ void SILGenModule::emitGlobalAccessor(VarDecl *global,
     PrettyStackTraceSILFunction X("silgen emitGlobalAccessor", f);
     SILGenFunction(*this, *f)
       .emitGlobalAccessor(global, onceToken, onceFunc);
-    postEmitFunction(accessor, f);
-  });
-}
-
-void SILGenModule::emitGlobalGetter(VarDecl *global,
-                                    SILGlobalVariable *onceToken,
-                                    SILFunction *onceFunc) {
-  SILDeclRef accessor(global, SILDeclRef::Kind::GlobalGetter);
-  emitOrDelayFunction(*this, accessor,
-                      [this,accessor,global,onceToken,onceFunc](SILFunction *f){
-    preEmitFunction(accessor, global, f, global);
-    PrettyStackTraceSILFunction X("silgen emitGlobalGetter", f);
-    SILGenFunction(*this, *f)
-      .emitGlobalGetter(global, onceToken, onceFunc);
     postEmitFunction(accessor, f);
   });
 }

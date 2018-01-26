@@ -35,6 +35,7 @@ static bool isDeclName(Node::Kind kind) {
     case Node::Kind::Identifier:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
     case Node::Kind::InfixOperator:
@@ -738,6 +739,15 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer discriminator = popNode(Node::Kind::Identifier);
     return createWithChild(Node::Kind::PrivateDeclName, discriminator);
   }
+  if ((peekChar() >= 'a' && peekChar() <= 'j') ||
+      (peekChar() >= 'A' && peekChar() <= 'J')) {
+    char relatedEntityKind = nextChar();
+    NodePointer name = popNode();
+    NodePointer result = createNode(Node::Kind::RelatedEntityDeclName,
+                                    StringRef(&relatedEntityKind, 1));
+    result->addChild(name, *this);
+    return result;
+  }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
   return createWithChildren(Node::Kind::LocalDeclName, discriminator, name);
@@ -1240,6 +1250,9 @@ NodePointer Demangler::demangleImplFunctionType() {
 
 NodePointer Demangler::demangleMetatype() {
   switch (nextChar()) {
+    case 'c':
+      return createWithChild(Node::Kind::ProtocolConformanceDescriptor,
+                             popProtocolConformance());
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
     case 'P':

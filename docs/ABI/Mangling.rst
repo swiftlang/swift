@@ -57,6 +57,7 @@ Globals
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
+  global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
   global ::= type 'MB'                   // metadata for remote mirrors: builtin type descriptor
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
@@ -216,18 +217,27 @@ Entities
   ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner)
 
   decl-name ::= identifier
-  decl-name ::= identifier 'L' INDEX         // locally-discriminated declaration
-  decl-name ::= identifier identifier 'LL'   // file-discriminated declaration
+  decl-name ::= identifier 'L' INDEX                  // locally-discriminated declaration
+  decl-name ::= identifier identifier 'LL'            // file-discriminated declaration
+  decl-name ::= identifier 'L' RELATED-DISCRIMINATOR  // related declaration
+
+  RELATED-DISCRIMINATOR ::= [a-j]
+  RELATED-DISCRIMINATOR ::= [A-J]
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 
-The identifier in a ``<file-discriminator>`` and the first identifier in a
+The identifier in a ``<file-discriminator>`` and the second identifier in a
 file-discriminated ``<decl-name>`` is a string that represents the file the
 original declaration came from. It should be considered unique within the
-enclosing module. The second identifier is the name of the entity. Not all
+enclosing module. The first identifier is the name of the entity. Not all
 declarations marked ``private`` declarations will use this mangling; if the
 entity's context is enough to uniquely identify the entity, the simple
 ``identifier`` form is preferred.
+
+Twenty operators of the form 'LA', 'LB', etc. are reserved to described
+entities related to the entity whose name is provided. For example, 'LE' and
+'Le' in the "SC" module are used to represent the structs synthesized by the
+Clang importer for various "error code" enums.
 
 Outlined bridged Objective C method call mangling includes which parameters and
 return value are bridged and the type of pattern outlined.
@@ -274,8 +284,8 @@ destructor, the non-allocating or non-deallocating variant is used.
   module ::= known-module                    // abbreviation
 
   known-module ::= 's'                       // Swift
-  known-module ::= 'SC'                      // C
-  known-module ::= 'So'                      // Objective-C
+  known-module ::= 'SC'                      // Clang-importer-synthesized
+  known-module ::= 'So'                      // C and Objective-C
 
 The Objective-C module is used as the context for mangling Objective-C
 classes as ``<type>``\ s.

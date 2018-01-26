@@ -56,6 +56,10 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+static llvm::cl::opt<bool> VerifyDIHoles(
+                              "verify-di-holes",
+                              llvm::cl::init(false));
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 
@@ -1372,8 +1376,9 @@ public:
                 Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+    // FIXME: When the work to force MUI to be on Allocations/SILArguments
+    // complete, turn on this assertion.
 #if 0
-    // This will be turned back on in a couple of commits.
     require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
             "Mark Uninitialized should always be on the storage location");
 #endif
@@ -1624,8 +1629,10 @@ public:
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
                                                         F.getModule());
-      require(caseTy == UI->getOperand()->getType(),
-              "EnumInst operand type does not match type of case");
+      if (UI->getModule().getStage() != SILStage::Lowered) {
+        require(caseTy == UI->getOperand()->getType(),
+                "EnumInst operand type does not match type of case");
+      }
     }
   }
 
@@ -2303,9 +2310,18 @@ public:
         if (inst->isTypeDependentOperand(*use))
           continue;
         switch (inst->getKind()) {
+        case SILInstructionKind::MarkDependenceInst:
+          break;
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst:
         case SILInstructionKind::PartialApplyInst:
+          // Non-Mutating set pattern that allows a inout (that can't really
+          // write back.
+          if (auto *AI = dyn_cast<ApplyInst>(inst)) {
+            if (isa<PointerToThinFunctionInst>(AI->getCallee())) {
+              break;
+            }
+          }
           if (isConsumingOrMutatingApplyUse(use))
             return true;
           else
@@ -4337,6 +4353,78 @@ public:
     }
   }
 
+  /// This pass verifies that there are no hole in debug scopes at -Onone.
+  void verifyDebugScopeHoles(SILBasicBlock *BB) {
+    if (!VerifyDIHoles)
+      return;
+
+    // This check only makes sense at -Onone. Optimizations,
+    // e.g. inlining, can move scopes around.
+    llvm::DenseSet<const SILDebugScope *> AlreadySeenScopes;
+    if (BB->getParent()->getEffectiveOptimizationMode() !=
+        OptimizationMode::NoOptimization)
+      return;
+
+    // Exit early if this BB is empty.
+    if (BB->empty())
+      return;
+
+    const SILDebugScope *LastSeenScope = nullptr;
+    for (SILInstruction &SI : *BB) {
+      if (isa<AllocStackInst>(SI))
+        continue;
+      LastSeenScope = SI.getDebugScope();
+      AlreadySeenScopes.insert(LastSeenScope);
+      break;
+    }
+    for (SILInstruction &SI : *BB) {
+      // `alloc_stack` can create false positive, so we skip it
+      // for now.
+      if (isa<AllocStackInst>(SI))
+        continue;
+
+      // If we haven't seen this debug scope yet, update the
+      // map and go on.
+      auto *DS = SI.getDebugScope();
+      assert(DS && "Each instruction should have a debug scope");
+      if (!AlreadySeenScopes.count(DS)) {
+        AlreadySeenScopes.insert(DS);
+        LastSeenScope = DS;
+        continue;
+      }
+
+      // Otherwise, we're allowed to re-enter a scope only if
+      // the scope is an ancestor of the scope we're currently leaving.
+      auto isAncestorScope = [](const SILDebugScope *Cur,
+                                const SILDebugScope *Previous) {
+        const SILDebugScope *Tmp = Previous;
+        assert(Tmp && "scope can't be null");
+        while (Tmp) {
+          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
+              Tmp->Parent;
+          auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
+          if (!ParentScope)
+            break;
+          if (ParentScope == Cur)
+            return true;
+          Tmp = ParentScope;
+        }
+        return false;
+      };
+
+      if (isAncestorScope(DS, LastSeenScope)) {
+        LastSeenScope = DS;
+        continue;
+      }
+      if (DS != LastSeenScope) {
+        DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        require(
+            DS == LastSeenScope,
+            "Basic block contains a non-contiguous lexical scope at -Onone");
+      }
+    }
+  }
+
   void visitSILBasicBlock(SILBasicBlock *BB) {
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
@@ -4359,6 +4447,7 @@ public:
     }
     
     SILInstructionVisitor::visitSILBasicBlock(BB);
+    verifyDebugScopeHoles(BB);
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {

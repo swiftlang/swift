@@ -129,7 +129,7 @@ extension _UIntBuffer : BidirectionalCollection {
 }
 
 extension _UIntBuffer : RandomAccessCollection {
-  public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
+  public typealias Indices = DefaultIndices<_UIntBuffer>
   
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
@@ -198,10 +198,13 @@ extension _UIntBuffer : RangeReplaceableCollection {
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public mutating func removeFirst() {
+  @discardableResult
+  public mutating func removeFirst() -> Element {
     _debugPrecondition(!isEmpty)
+    let result = Element(truncatingIfNeeded: _storage)
     _bitCount = _bitCount &- _elementWidth
     _storage = _storage._fullShiftRight(_elementWidth)
+    return result
   }
   
   @_inlineable // FIXME(sil-serialize-all)

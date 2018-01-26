@@ -125,8 +125,8 @@
 // convention.
 #define SWIFT_LLVM_CC(CC) SWIFT_LLVM_CC_##CC
 
-// Currently, RuntimeFunctions.def uses the following calling conventions:
-// DefaultCC, RegisterPreservingCC, SwiftCC.
+// Currently, RuntimeFunction.def uses the following calling conventions:
+// DefaultCC, RegisterPreservingCC.
 // If new runtime calling conventions are added later, they need to be mapped
 // here to something appropriate.
 
@@ -134,8 +134,6 @@
 #define SWIFT_CC_DefaultCC SWIFT_CC_c
 #define SWIFT_CC_DefaultCC_IMPL SWIFT_CC_c
 #define SWIFT_LLVM_CC_DefaultCC llvm::CallingConv::C
-
-#define SWIFT_CC_SwiftCC SWIFT_CC_swift
 
 #define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
@@ -247,6 +245,18 @@
 #define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
+#endif
+
+// These are temporary macros during the +0 cc exploration to cleanly support
+// both +0 and +1 in the runtime.
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+#define SWIFT_NS_RELEASES_ARGUMENT NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...) do { __VA_ARGS__ ; } while (0)
+#define SWIFT_CC_PLUSZERO_GUARD(...)
+#else
+#define SWIFT_NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...)
+#define SWIFT_CC_PLUSZERO_GUARD(...)  do { __VA_ARGS__ ; } while (0)
 #endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H

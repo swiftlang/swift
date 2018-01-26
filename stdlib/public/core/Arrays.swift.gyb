@@ -1020,7 +1020,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
+extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -1232,7 +1232,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// element. Otherwise, `nil`.
   @_inlineable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
-    return _buffer.firstElementAddressIfContiguous
+    @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
+    get { return _buffer.firstElementAddressIfContiguous }
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage

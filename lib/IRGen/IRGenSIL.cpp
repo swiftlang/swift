@@ -759,44 +759,31 @@ public:
                           Storage.getAlignment());
   }
 
-  void emitShadowCopy(ArrayRef<llvm::Value *> vals, const SILDebugScope *Scope,
+  void emitShadowCopy(SILValue &SILVal, const SILDebugScope *Scope,
                       StringRef Name, unsigned ArgNo, bool IsAnonymous,
                       llvm::SmallVectorImpl<llvm::Value *> &copy) {
+    Explosion e = getLoweredExplosion(SILVal);
+
     // Only do this at -O0.
     if (IGM.IRGen.Opts.shouldOptimize() || IsAnonymous) {
+      auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
       return;
     }
 
     // Single or empty values.
-    if (vals.size() <= 1) {
+    if (e.size() <= 1) {
+      auto vals = e.claimAll();
       for (auto val : vals)
         copy.push_back(emitShadowCopy(val, Scope, Name, ArgNo, IsAnonymous));
       return;
     }
 
-    // Create a single aggregate alloca for explosions.
-    // TODO: why are we doing this instead of using the TypeInfo?
-    llvm::StructType *aggregateType = [&] {
-      SmallVector<llvm::Type *, 8> eltTypes;
-      for (auto val : vals)
-        eltTypes.push_back(val->getType());
-      return llvm::StructType::get(IGM.LLVMContext, eltTypes);
-    }();
-
-    auto layout = IGM.DataLayout.getStructLayout(aggregateType);
-    Alignment align(layout->getAlignment());
-
-    auto alloca = createAlloca(aggregateType, align, Name + ".debug");
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
-    size_t i = 0;
-    for (auto val : vals) {
-      auto addr = Builder.CreateStructGEP(alloca, i,
-                                          Size(layout->getElementOffset(i)));
-      Builder.CreateStore(val, addr);
-      i++;
-    }
-    copy.push_back(alloca.getAddress());
+    SILType Type = SILVal->getType();
+    auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
+    auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
+    LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
+    copy.push_back(Alloca.getAddressPointer());
   }
 
   /// Determine whether a generic variable has been inlined.
@@ -3633,10 +3620,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy; 
-  Explosion e = getLoweredExplosion(SILVal);
   unsigned ArgNo = i->getVarInfo().ArgNo;
-  emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, ArgNo, IsAnonymous,
-                 Copy);
+  emitShadowCopy(SILVal, i->getDebugScope(), Name, ArgNo, IsAnonymous, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
                                i->getDecl(), Name, ArgNo);
 }
@@ -5377,6 +5362,19 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 
   SILDeclRef method = i->getMember();
   auto methodType = i->getType().castTo<SILFunctionType>();
+
+  auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  if (IGM.isResilient(classDecl,
+                      ResilienceExpansion::Maximal)) {
+    method = method.getOverriddenVTableEntry();
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+    auto sig = IGM.getSignature(methodType);
+    FunctionPointer fn(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
 
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.
