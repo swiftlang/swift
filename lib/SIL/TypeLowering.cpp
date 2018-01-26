@@ -2248,7 +2248,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 /// Given that type1 is known to be a subtype of type2, check if the two
 /// types have the same calling convention representation.
 TypeConverter::ABIDifference
-TypeConverter::checkForABIDifferences(SILType type1, SILType type2) {
+TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
+                                      bool thunkOptionals) {
   // Unwrap optionals, but remember that we did.
   bool type1WasOptional = false;
   bool type2WasOptional = false;
@@ -2261,15 +2262,23 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2) {
     type2 = object;
   }
 
-  // Forcing IUOs always requires a thunk.
-  if (type1WasOptional && !type2WasOptional)
-    return ABIDifference::NeedsThunk;
+  bool optionalityChange;
+  if (thunkOptionals) {
+    // Forcing IUOs always requires a thunk.
+    if (type1WasOptional && !type2WasOptional)
+      return ABIDifference::NeedsThunk;
   
-  // Except for the above case, we should not be making a value less optional.
-  
-  // If we're introducing a level of optionality, only certain types are
-  // ABI-compatible -- check below.
-  bool optionalityChange = (!type1WasOptional && type2WasOptional);
+    // Except for the above case, we should not be making a value less optional.
+    
+    // If we're introducing a level of optionality, only certain types are
+    // ABI-compatible -- check below.
+    optionalityChange = (!type1WasOptional && type2WasOptional);
+  } else {
+    // We haven't implemented codegen for optional thunking at all levels
+    // (particularly objc_blocks at depth). Just accept ABI compatibility
+    // in either direction in these cases.
+    optionalityChange = type1WasOptional != type2WasOptional;
+  }
 
   // If the types are identical and there was no optionality change,
   // we're done.
@@ -2374,7 +2383,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(result1.getSILStorageType(),
-                               result2.getSILStorageType())
+                             result2.getSILStorageType(),
+              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
@@ -2389,7 +2399,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(error1.getSILStorageType(),
-                               error2.getSILStorageType())
+                               error2.getSILStorageType(),
+              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
@@ -2405,7 +2416,8 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     std::swap(param1, param2);
 
     if (checkForABIDifferences(param1.getSILStorageType(),
-                               param2.getSILStorageType())
+                               param2.getSILStorageType(),
+              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }
