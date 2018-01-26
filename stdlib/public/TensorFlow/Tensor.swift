@@ -382,6 +382,7 @@ extension Tensor : CustomPlaygroundQuickLookable {
 public extension Tensor {
   @_inlineable
   var array: ShapedArray<Unit> {
+    debugLog("Returning a host copy of array.")
     // This is considered to be a well known way to produce a copy to the host,
     // so we never way to produce an "implicit copy to host" warning.
     return toHost().handle.makeHostCopy()
