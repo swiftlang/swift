@@ -1041,6 +1041,11 @@ def main_normal():
     shell.dry_run = args.dry_run
 
     # Prepare and validate toolchain
+    env_toolchain = os.environ.get('TOOLCHAINS')
+    if args.darwin_xcrun_toolchain is None:
+        diagnostics.note('using toolchain {}'.format(env_toolchain))
+        args.darwin_xcrun_toolchain = env_toolchain
+
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
     os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
