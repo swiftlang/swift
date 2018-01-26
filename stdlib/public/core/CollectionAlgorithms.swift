@@ -110,6 +110,35 @@ extension Collection {
 // partition(by:)
 //===----------------------------------------------------------------------===//
 
+extension Collection {
+  /// Returns the index of the first element in the collection
+  /// that matches the predicate.
+  ///
+  /// The collection must already be partitioned according to the
+  /// predicate, as if `self.partition(by: predicate)` had already
+  /// been called.
+  @_inlineable
+  @_versioned
+  func _partitionPoint(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index {
+    var n = distance(from: startIndex, to: endIndex)
+    var l = startIndex
+
+    while n > 0 {
+      let half = n / 2
+      let mid = index(l, offsetBy: half)
+      if try predicate(self[mid]) {
+        n = half
+      } else {
+        l = index(after: mid)
+        n -= half + 1
+      }
+    }
+    return l
+  }
+}
+
 extension MutableCollection {
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't
@@ -418,11 +447,16 @@ extension MutableCollection
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> Void in
-      bufferPointer.sort()
+      bufferPointer._mergeSortImpl()
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex)
+      let sortedElements = self.sorted()
+      var i = startIndex
+      for j in 0..<sortedElements.count {
+        self[i] = sortedElements[j]
+        formIndex(after: &i)
+      }
     }
   }
 }
@@ -501,18 +535,22 @@ extension MutableCollection where Self : RandomAccessCollection {
     by areInIncreasingOrder:
       (Element, Element) throws -> Bool
   ) rethrows {
-
+    // FIXME: This approach will end up performing the merge in the buffer of
+    // an array but fall back to the copying behavior for an actual
+    // UnsafeMutableBufferPointer. :hmmm:
     let didSortUnsafeBuffer: Void? =
       try _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> Void in
-      try bufferPointer.sort(by: areInIncreasingOrder)
+      try bufferPointer._mergeSortImpl(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      try _introSort(
-        &self,
-        subRange: startIndex..<endIndex,
-        by: areInIncreasingOrder)
+      let sortedElements = try self.sorted(by: areInIncreasingOrder)
+      var i = startIndex
+      for j in 0..<sortedElements.count {
+        self[i] = sortedElements[j]
+        formIndex(after: &i)
+      }
     }
   }
 }
