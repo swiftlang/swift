@@ -1762,12 +1762,6 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     bool exhaustive = false;
     auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
 
-    // The SIL values will range over Optional, so count against
-    // Optional's cases.
-    if (enumDecl == SGF.getASTContext().getImplicitlyUnwrappedOptionalDecl()) {
-      enumDecl = SGF.getASTContext().getOptionalDecl();
-    }
-
     if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
                                SGF.F.getResilienceExpansion())) {
       exhaustive = true;
@@ -1989,12 +1983,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
     // switch is not exhaustive.
     bool exhaustive = false;
     auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
-
-    // The SIL values will range over Optional, so count against
-    // Optional's cases.
-    if (enumDecl == SGF.getASTContext().getImplicitlyUnwrappedOptionalDecl()) {
-      enumDecl = SGF.getASTContext().getOptionalDecl();
-    }
 
     if (!enumDecl->isResilient(SGF.SGM.M.getSwiftModule(),
                                SGF.F.getResilienceExpansion())) {

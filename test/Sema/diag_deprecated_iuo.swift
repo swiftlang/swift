@@ -24,15 +24,15 @@ struct Fine {
   }
 }
 
-let _: ImplicitlyUnwrappedOptional<Int> = 1 // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{8-36=}} {{39-39=!}} {{39-40=}}
-let _: ImplicitlyUnwrappedOptional = 1 // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use an explicit type followed by '!'}}
+let _: ImplicitlyUnwrappedOptional<Int> = 1 // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{8-35=Optional}}
+let _: ImplicitlyUnwrappedOptional = 1 // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}
 
-extension ImplicitlyUnwrappedOptional { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{11-38=Optional}}
+extension ImplicitlyUnwrappedOptional { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{11-38=Optional}}
 }
 
 func functionSpelling(
-  _: ImplicitlyUnwrappedOptional<Int> // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{6-34=}} {{37-37=!}} {{37-38=}}
-) -> ImplicitlyUnwrappedOptional<Int> { // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{6-34=}} {{37-37=!}} {{37-38=}}
+  _: ImplicitlyUnwrappedOptional<Int> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{6-33=Optional}}
+) -> ImplicitlyUnwrappedOptional<Int> { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{6-33=Optional}}
   return 1
 }
 
@@ -45,14 +45,14 @@ func functionSigil(
 
 // Not okay because '!' is not at the top level of the type.
 func functionSigilArray(
-  _: [Int!] // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{10-11=?}}
-) -> [Int!] { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{10-11=?}}
+  _: [Int!] // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{10-11=?}}
+) -> [Int!] { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{10-11=?}}
   return [1]
 }
 
 func genericFunction<T>(
-  iuo: ImplicitlyUnwrappedOptional<T> // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{8-36=}} {{37-37=!}} {{37-38=}}
-) -> ImplicitlyUnwrappedOptional<T> { // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{6-34=}} {{35-35=!}} {{35-36=}}
+  iuo: ImplicitlyUnwrappedOptional<T> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{8-35=Optional}}
+) -> ImplicitlyUnwrappedOptional<T> { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{6-33=Optional}}
   return iuo
 }
 
@@ -65,139 +65,181 @@ func genericFunctionSigil<T>(
 
 func genericFunctionSigilArray<T>(
   // FIXME: We validate these types multiple times resulting in multiple diagnostics
-  iuo: [T!] // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{10-11=?}}
-  // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{10-11=?}}
-  // expected-warning@-2 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{10-11=?}}
-) -> [T!] { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
-  // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
-  // expected-warning@-2 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
+  iuo: [T!] // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{10-11=?}}
+  // expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}{{10-11=?}}
+  // expected-warning@-2 {{using '!' is not allowed here; treating this as '?' instead}}{{10-11=?}}
+) -> [T!] { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
+  // expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
+  // expected-warning@-2 {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
   return iuo
 }
 
 protocol P {
-  associatedtype T
-  associatedtype U
+  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype U // expected-note {{protocol requires nested type 'U'; do you want to add it?}}
 }
 
-struct S : P {
-  typealias T = ImplicitlyUnwrappedOptional<Int> // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{17-45=}} {{48-48=?}} {{48-49=}}
-  typealias U = Optional<ImplicitlyUnwrappedOptional<Int>> // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{26-54=}} {{57-57=?}} {{57-58=}}
+struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
+  typealias T = ImplicitlyUnwrappedOptional<Int> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{17-44=Optional}}
+  typealias U = Optional<ImplicitlyUnwrappedOptional<Int>> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{26-53=Optional}}
 
-  typealias V = Int!  // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{20-21=?}}
-  typealias W = Int!? // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{20-21=?}}
+  typealias V = Int!  // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{20-21=?}}
+  typealias W = Int!? // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{20-21=?}}
 
   var x: V
   var y: W
-  var fn1: (Int!) -> Int // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{16-17=?}}
-  var fn2: (Int) -> Int! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{24-25=?}}
+  var fn1: (Int!) -> Int // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{16-17=?}}
+  var fn2: (Int) -> Int! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{24-25=?}}
 
   subscript (
-    index: ImplicitlyUnwrappedOptional<Int> // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{12-40=}} {{43-43=!}} {{43-44=}}
-  )     -> ImplicitlyUnwrappedOptional<Int> { // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{12-40=}} {{43-43=!}} {{43-44=}}
+    index: ImplicitlyUnwrappedOptional<Int> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{12-39=Optional}}
+  )     -> ImplicitlyUnwrappedOptional<Int> { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{12-39=Optional}}
     return index
   }
 
   subscript<T> (
-    index: ImplicitlyUnwrappedOptional<T> // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{12-40=}} {{41-41=!}} {{41-42=}}
-  )     -> ImplicitlyUnwrappedOptional<T> { // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{12-40=}} {{41-41=!}} {{41-42=}}
+    index: ImplicitlyUnwrappedOptional<T> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{12-39=Optional}}
+  )     -> ImplicitlyUnwrappedOptional<T> { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{12-39=Optional}}
     return index
   }
 }
 
-func generic<T : P>(_: T) where T.T == ImplicitlyUnwrappedOptional<Int> { } // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{40-68=}} {{71-71=?}} {{71-72=}}
-func genericOptIUO<T : P>(_: T) where T.U == Optional<ImplicitlyUnwrappedOptional<Int>> {} // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{55-83=}} {{86-86=?}} {{86-87=}}
+func generic<T : P>(_: T) where T.T == ImplicitlyUnwrappedOptional<Int> { } // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{40-67=Optional}}
+func genericOptIUO<T : P>(_: T) where T.U == Optional<ImplicitlyUnwrappedOptional<Int>> {} // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{55-82=Optional}}
 
 func testClosure() -> Int {
   return {
-    (i: ImplicitlyUnwrappedOptional<Int>) // expected-warning {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{9-37=}} {{40-40=!}} {{40-41=}}
-     -> ImplicitlyUnwrappedOptional<Int> in // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{9-37=}} {{40-40=?}} {{40-41=}}
+    (i: ImplicitlyUnwrappedOptional<Int>) // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{9-36=Optional}}
+     -> ImplicitlyUnwrappedOptional<Int> in // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{9-36=Optional}}
     return i
   }(1)!
 }
 
-_ = Array<Int!>() // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{14-15=?}}
-let _: Array<Int!> = [1] // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{17-18=?}}
-_ = [Int!]() // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{9-10=?}}
-let _: [Int!] = [1] // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{12-13=?}}
-_ = Optional<Int!>(nil) // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{17-18=?}}
-let _: Optional<Int!> = nil // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{20-21=?}}
-_ = Int!?(0) // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
-let _: Int!? = 0 // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{11-12=?}}
+_ = Array<Int!>() // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{14-15=?}}
+let _: Array<Int!> = [1] // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{17-18=?}}
+_ = [Int!]() // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{9-10=?}}
+let _: [Int!] = [1] // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{12-13=?}}
+_ = Optional<Int!>(nil) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{17-18=?}}
+let _: Optional<Int!> = nil // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{20-21=?}}
+_ = Int!?(0) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
+let _: Int!? = 0 // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{11-12=?}}
 _ = (
-  Int!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{6-7=?}}
-  Float!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
-  String! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{9-10=?}}
+  Int!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{6-7=?}}
+  Float!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
+  String! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{9-10=?}}
 )(1, 2.0, "3")
 let _: (
-  Int!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{6-7=?}}
-  Float!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{8-9=?}}
-  String! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{9-10=?}}
+  Int!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{6-7=?}}
+  Float!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{8-9=?}}
+  String! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{9-10=?}}
 ) = (1, 2.0, "3")
 
 struct Generic<T, U, C> {
   init(_ t: T, _ u: U, _ c: C) {}
 }
-_ = Generic<Int!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{16-17=?}}
-            Float!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{18-19=?}}
-            String!>(1, 2.0, "3") // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{19-20=?}}
-let _: Generic<Int!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{19-20=?}}
-               Float!, // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{21-22=?}}
-               String!> = Generic(1, 2.0, "3") // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{22-23=?}}
+_ = Generic<Int!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{16-17=?}}
+            Float!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{18-19=?}}
+            String!>(1, 2.0, "3") // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{19-20=?}}
+let _: Generic<Int!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{19-20=?}}
+               Float!, // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{21-22=?}}
+               String!> = Generic(1, 2.0, "3") // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{22-23=?}}
 
-func vararg(_ first: Int, more: Int!...) { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{36-37=?}}
+func vararg(_ first: Int, more: Int!...) { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{36-37=?}}
 }
 
-func varargIdentifier(_ first: Int, more: ImplicitlyUnwrappedOptional<Int>...) { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{43-71=}} {{74-74=?}} {{74-75=}}
+func varargIdentifier(_ first: Int, more: ImplicitlyUnwrappedOptional<Int>...) { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{43-70=Optional}}
 }
 
-func iuoInTuple() -> (Int!) { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{26-27=?}}
+func iuoInTuple() -> (Int!) { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{26-27=?}}
   return 1
 }
 
-func iuoInTupleIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{33-61=}} {{64-64=?}} {{64-65=}}
+func iuoInTupleIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{33-60=Optional}}
   return 1
 }
 
-func iuoInTuple2() -> (Float, Int!) { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{34-35=?}}
+func iuoInTuple2() -> (Float, Int!) { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{34-35=?}}
   return (1.0, 1)
 }
 
-func iuoInTuple2Identifier() -> (Float, ImplicitlyUnwrappedOptional<Int>) { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{41-69=}} {{72-72=?}} {{72-73=}}
+func iuoInTuple2Identifier() -> (Float, ImplicitlyUnwrappedOptional<Int>) { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{41-68=Optional}}
   return (1.0, 1)
 }
 
-func takesFunc(_ fn: (Int!) -> Int) -> Int { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{26-27=?}}
+func takesFunc(_ fn: (Int!) -> Int) -> Int { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{26-27=?}}
   return fn(0)
 }
 
-func takesFuncIdentifier(_ fn: (ImplicitlyUnwrappedOptional<Int>) -> Int) -> Int { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{33-61=}} {{64-64=?}} {{64-65=}}
+func takesFuncIdentifier(_ fn: (ImplicitlyUnwrappedOptional<Int>) -> Int) -> Int { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{33-60=Optional}}
   return fn(0)
 }
 
-func takesFunc2(_ fn: (Int) -> Int!) -> Int { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{35-36=?}}
+func takesFunc2(_ fn: (Int) -> Int!) -> Int { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{35-36=?}}
   return fn(0)!
 }
 
-func takesFunc2Identifier(_ fn: (Int) -> ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{42-70=}} {{73-73=?}} {{73-74=}}
+func takesFunc2Identifier(_ fn: (Int) -> ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{42-69=Optional}}
   return fn(0)!
 }
 
-func returnsFunc() -> (Int!) -> Int { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{27-28=?}}
+func returnsFunc() -> (Int!) -> Int { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{27-28=?}}
   return { $0! }
 }
 
-func returnsFuncIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{34-62=}} {{65-65=?}} {{65-66=}}
+func returnsFuncIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{34-61=Optional}}
   return { $0! }
 }
 
-func returnsFunc2() -> (Int) -> Int! { // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}{{36-37=?}}
+func returnsFunc2() -> (Int) -> Int! { // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{36-37=?}}
   return { $0 }
 }
 
-func returnsFunc2Identifier() -> (Int) -> ImplicitlyUnwrappedOptional<Int> { // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{43-71=}} {{74-74=?}} {{74-75=}}
+func returnsFunc2Identifier() -> (Int) -> ImplicitlyUnwrappedOptional<Int> { // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{43-70=Optional}}
   return { $0 }
 }
 
-let x = 1 as ImplicitlyUnwrappedOptional // expected-warning {{using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead}}{{14-41=Optional}}
-let y = x!
-let z: Int = x // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{15-15=!}}
+let x0 = 1 as ImplicitlyUnwrappedOptional // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{15-42=Optional}}
+
+let x: Int? = 1
+let y0: Int = x as Int! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{23-24=?}}
+let y1: Int = (x as Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{24-25=?}}
+let z0: Int = x as! Int! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{24-25=?}}
+// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
+let z1: Int = (x as! Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
+// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
+let w0: Int = (x as? Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
+// expected-warning@-1 {{conditional cast from 'Int?' to 'Int?' always succeeds}}
+let w1: Int = (x as? Int!)!! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
+// expected-warning@-1 {{conditional cast from 'Int?' to 'Int?' always succeeds}}
+
+func overloadedByOptionality(_ a: inout Int!) {}
+// expected-note@-1 {{'overloadedByOptionality' previously declared here}}
+func overloadedByOptionality(_ a: inout Int?) {}
+// expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality'}}
+
+func takesInOutIUO(_ i: inout Int!) {}
+func takesInOutOpt(_ o: inout Int?) {}
+
+func testInOutOptionality() {
+  var i: Int! = 1
+  var o: Int? = 2
+
+  takesInOutIUO(&i)
+  takesInOutOpt(&i)
+  takesInOutIUO(&o)
+  takesInOutOpt(&o)
+
+  overloadedByOptionality(&i)
+  overloadedByOptionality(&o)
+}
+
+struct T {
+  let i: Int!
+  var j: Int!
+  let k: Int
+}
+
+func select(i: Int!, m: Int, t: T) {
+  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
+  let _ = t.i ? t.j : t.k // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
+}
