@@ -13,6 +13,7 @@
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -46,7 +47,16 @@ bool ArgsToFrontendInputsConverter::convert() {
     return true;
   std::set<StringRef> unusedPrimaryFiles =
       createInputFilesConsumingPrimaries(*primaryFiles);
-  return checkForMissingPrimaryFiles(unusedPrimaryFiles);
+
+  if (checkForMissingPrimaryFiles(unusedPrimaryFiles))
+    return true;
+
+  // Must be set before we iterate over inputs needing outputs.
+  InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
+
+  InputsAndOutputs.setBypassBatchModeChecks(
+      Args.hasArg(options::OPT_bypass_batch_mode_checks));
+  return false;
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -149,4 +159,12 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
                    FilelistPathArg->getValue());
   }
   return !primaryFiles.empty();
+}
+
+bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                       Diags);
+  return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
+         userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1;
 }
