@@ -2692,11 +2692,9 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     }
   }
 
-  if (genericSig->requiresClass(depTy)) {
-    if (!contextType->isObjCExistentialType() &&
-        !contextType->mayHaveSuperclass())
-      return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
-  }
+  if (genericSig->requiresClass(depTy) &&
+      !contextType->satisfiesClassConstraint())
+    return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
 
   // Success!
   return CheckTypeWitnessResult();
