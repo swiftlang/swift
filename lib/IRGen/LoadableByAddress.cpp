@@ -79,24 +79,16 @@ static bool shouldTransformFunctionType(GenericEnvironment *env,
                                         CanSILFunctionType fnType,
                                         irgen::IRGenModule &IGM);
 
+static SILParameterInfo getNewParameter(GenericEnvironment *env,
+                                        SILParameterInfo param,
+                                        irgen::IRGenModule &IGM);
+
 static bool shouldTransformParameter(GenericEnvironment *env,
                                      SILParameterInfo param,
                                      irgen::IRGenModule &IGM) {
-  SILType storageType = param.getSILStorageType();
 
-  // FIXME: only function types and not recursively-transformable types?
-  if (auto fnType = storageType.getAs<SILFunctionType>())
-    return shouldTransformFunctionType(env, fnType, IGM);
-
-  switch (param.getConvention()) {
-  case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_In:
-    return false;
-  default:
-    return isLargeLoadableType(env, storageType, IGM);
-  }
+  auto newParam = getNewParameter(env, param, IGM);
+  return (param != newParam);
 }
 
 static bool shouldTransformFunctionType(GenericEnvironment *env,
@@ -2557,6 +2549,10 @@ void LoadableByAddress::run() {
           auto dest = SI->getDest();
           if (isa<ProjectBlockStorageInst>(dest)) {
             storeToBlockStorageInstrs.insert(SI);
+          }
+        } else if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
+          if (modApplies.count(PAI) == 0) {
+            modApplies.insert(PAI);
           }
         }
       }
