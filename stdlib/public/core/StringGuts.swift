@@ -66,6 +66,22 @@ struct _StringGuts {
 }
 
 extension _StringGuts {
+  // To make native and unmanaged encoded forms align, we bias unmanaged
+  // pointers when we encode them in String. For both forms, to get a pointer to
+  // the code units add pointerBias. This removes the need for a branch
+  // discerning native vs unmanaged in almost all use cases (append being a
+  // notable exception). In effect, unmanaged string form can be thought of as
+  // an immortal immutable native string form: it just sets the isValue bit.
+  //
+  // NOTE: However, we do not guarantee that the unmanaged form points to a real
+  // StringStorage header. E.g. we should never try to load `capacity` from it,
+  // which is unnecessary in an immortal immutable string anyways. Similarly,
+  // it's not guaranteed to have an isa field and refcount, so never bitcast
+  // this to a real reference.
+  @_versioned
+  internal static
+  let _pointerBias = _SwiftRawStringStorage._storageOffset
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
@@ -309,8 +325,8 @@ extension _StringGuts {
   @_inlineable
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
-      _sanityCheck(_object.isUnmanaged)
-      return _object.asUnmanagedRawStart
+      _sanityCheck(_object.isUnmanagedOrNative)
+      return _object.asUnmanagedRawStart + _StringGuts._pointerBias
     }
   }
 
@@ -318,7 +334,8 @@ extension _StringGuts {
   @_inlineable
   internal var _unmanagedCount: Int {
     @inline(__always) get {
-      _sanityCheck(_object.isUnmanaged)
+      _sanityCheck(_object.isUnmanagedOrNative)
+      _sanityCheck(Int(self._otherBits) >= 0)
       return Int(bitPattern: _otherBits)
     }
   }
@@ -331,7 +348,7 @@ extension _StringGuts {
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_object.isUnmanaged)
+    _sanityCheck(_object.isUnmanagedOrNative)
     _sanityCheck(CodeUnit.bitWidth == _object.bitWidth)
     let start = _unmanagedRawStart.assumingMemoryBound(to: CodeUnit.self)
     let count = _unmanagedCount
@@ -345,10 +362,13 @@ extension _StringGuts {
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(s.count >= 0)
     self.init(
-      object: _StringObject(unmanaged: s.start),
+      object: _StringObject(
+        unmanaged: (
+          UnsafeRawPointer(s.start) - _StringGuts._pointerBias
+        ).assumingMemoryBound(to: CodeUnit.self)),
       otherBits: UInt(bitPattern: s.count))
     _sanityCheck(_object.isUnmanaged)
-    _sanityCheck(_unmanagedRawStart == s.rawStart)
+    _sanityCheck(_unmanagedRawStart == s.rawStart + _StringGuts._pointerBias)
     _sanityCheck(_unmanagedCount == s.count)
     _invariantCheck()
   }
@@ -411,18 +431,16 @@ extension _StringGuts {
     @effects(readonly)
     get {
       _sanityCheck(_object.isContiguousASCII)
-      if _object.isUnmanaged {
+      if _object.isUnmanagedOrNative {
         return _asUnmanaged()
-      } else if _object.isNative {
-        return _object.nativeStorage(of: UInt8.self).unmanagedView
-      } else {
-#if _runtime(_ObjC)
-        _sanityCheck(_object.isContiguousCocoa)
-        return _asContiguousCocoa(of: UInt8.self)
-#else
-        Builtin.unreachable()
-#endif
       }
+
+#if _runtime(_ObjC)
+      _sanityCheck(_object.isContiguousCocoa)
+      return _asContiguousCocoa(of: UInt8.self)
+#else
+      Builtin.unreachable()
+#endif
     }
   }
 
@@ -433,18 +451,16 @@ extension _StringGuts {
     @effects(readonly)
     get {
       _sanityCheck(_object.isContiguousUTF16)
-      if _object.isUnmanaged {
+      if _object.isUnmanagedOrNative {
         return _asUnmanaged()
-      } else if _object.isNative {
-        return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
-      } else {
+      } 
+
 #if _runtime(_ObjC)
-        _sanityCheck(_object.isContiguousCocoa)
-        return _asContiguousCocoa(of: UTF16.CodeUnit.self)
+      _sanityCheck(_object.isContiguousCocoa)
+      return _asContiguousCocoa(of: UTF16.CodeUnit.self)
 #else
-        Builtin.unreachable()
+      Builtin.unreachable()
 #endif
-      }
     }
   }
 }
@@ -851,8 +867,7 @@ extension _StringGuts {
       return _asOpaque().count
     }
 #endif
-    _sanityCheck(Int(self._otherBits) >= 0)
-    return Int(bitPattern: self._otherBits)
+    return _unmanagedCount
   }
 
   @_inlineable

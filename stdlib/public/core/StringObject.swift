@@ -136,7 +136,7 @@ extension _StringObject {
 //   isNative: the native StringStorage object
 //   isCocoa: the Cocoa object
 //   isOpaque & !isCocoa: the _OpaqueString object
-//   isUnmanaged: the pointer to code units
+//   isUnmanaged: a biased (see StringGuts._pointerBias) pointer to code units
 //   isSmall: opaque bits used for inline storage // TODO: use them!
 //
 extension _StringObject {
@@ -498,6 +498,25 @@ extension _StringObject {
       }
 #else
       return _variantBits == _StringObject._isValueBit
+#endif
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
+  var isUnmanagedOrNative: Bool {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      switch _variant {
+      case .unmanagedSingleByte, .unmanagedDoubleByte, .strong():
+        return true
+      default:
+        return false
+      }
+#else
+      return _variantBits & _StringObject._subVariantBit == 0
 #endif
     }
   }
