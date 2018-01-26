@@ -154,22 +154,22 @@ extension Character
     let utf8 = UnsafeBufferPointer(
       start: UnsafePointer<Unicode.UTF8.CodeUnit>(start),
       count: Int(utf8CodeUnitCount))
-    
+
     if utf8.count == 1 {
       _representation = .smallUTF16(
         Builtin.zext_Int8_Int63(utf8.first._unsafelyUnwrappedUnchecked._value))
       return
     }
 
-  FastPath: 
+  FastPath:
     repeat {
       var shift = 0
       let maxShift = 64 - 16
       var bits: UInt64 = 0
-      
+
       for s8 in Unicode._ParsingIterator(
         codeUnits: utf8.makeIterator(), parser: UTF8.ForwardParser()) {
-        
+
         let s16
           = UTF16.transcode(s8, from: UTF8.self)._unsafelyUnwrappedUnchecked
 
@@ -186,7 +186,7 @@ extension Character
       return
     }
     while false
-    
+
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
     self = Character(_largeRepresentationString:
@@ -231,7 +231,7 @@ extension Character
         _largeRepresentationString: String(_StringGuts(utf16)))._representation
     }
   }
-  
+
   /// Creates a character with the specified value.
   ///
   /// Do not call this initalizer directly. It is used by the compiler when
@@ -485,7 +485,7 @@ extension Character : Equatable {
         if l == r { return true }
       }
     }
-    
+
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
     return String(lhs) == String(rhs)
