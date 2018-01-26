@@ -48,6 +48,9 @@ template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
+    // The protocol conformance descriptor gets added first.
+    asDerived().addProtocolConformanceDescriptor();
+
     // Associated types get added after the inherited conformances, but
     // before all the function requirements.
     bool haveAddedAssociatedTypes = false;

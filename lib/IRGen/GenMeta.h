@@ -67,7 +67,8 @@ namespace irgen {
   void emitLazyCacheAccessFunction(IRGenModule &IGM,
                                    llvm::Function *accessor,
                                    llvm::GlobalVariable *cacheVariable,
-        const llvm::function_ref<llvm::Value *(IRGenFunction &IGF)> &getValue);
+        const llvm::function_ref<llvm::Value *(IRGenFunction &IGF)> &getValue,
+        bool isReadNone = true);
 
   /// Emit a declaration reference to a metatype object.
   void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

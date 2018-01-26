@@ -3,6 +3,8 @@
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 
 import Metal

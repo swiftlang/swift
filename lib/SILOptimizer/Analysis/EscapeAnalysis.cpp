@@ -295,6 +295,8 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
       } else {
         Node->pointsTo = pointsTo;
       }
+      // Update use-points if the use-point information is already calculated.
+      pointsTo->mergeUsePoints(Node);
     }
 
     // Add all adjacent nodes to the WorkList.

@@ -592,8 +592,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
   BoxPair refAndValueAddr(swift_allocBox(metatype));
-  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.object;
-  return refAndValueAddr.buffer;
+  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.first;
+  return refAndValueAddr.second;
 }
 
 /// Generic tuple value witness for 'destroy'.
@@ -2638,8 +2638,8 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
 
   // Allocate the box.
   BoxPair refAndValueAddr(swift_allocBox(this));
-  buffer->PrivateData[0] = refAndValueAddr.object;
-  return refAndValueAddr.buffer;
+  buffer->PrivateData[0] = refAndValueAddr.first;
+  return refAndValueAddr.second;
 }
 
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
@@ -2749,7 +2749,8 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   if (genericTable->Instantiator.isNull() &&
       genericTable->WitnessTablePrivateSizeInWords == 0 &&
       genericTable->WitnessTableSizeInWords ==
-        genericTable->Protocol->NumRequirements) {
+        (genericTable->Protocol->NumRequirements +
+           WitnessTableFirstRequirementOffset)) {
     return true;
   }
 
@@ -2770,11 +2771,13 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // The number of mandatory requirements, i.e. requirements lacking
   // default implementations.
-  size_t numMandatoryRequirements = protocol->NumMandatoryRequirements;
+  size_t numMandatoryRequirements =
+    protocol->NumMandatoryRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses >= numMandatoryRequirements);
 
   // The total number of requirements.
-  size_t numRequirements = protocol->NumRequirements;
+  size_t numRequirements =
+    protocol->NumRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses <= numRequirements);
 
   // Number of bytes for any private storage used by the conformance itself.
@@ -2807,7 +2810,9 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // Fill in any default requirements.
   for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    void *defaultImpl = requirements[i].DefaultImplementation.get();
+    size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
+    void *defaultImpl =
+      requirements[requirementIndex].DefaultImplementation.get();
     assert(defaultImpl &&
            "no default implementation for missing requirement");
     table[i] = defaultImpl;

@@ -100,7 +100,7 @@ public func single_concrete() {
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 
 // CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1)
 // CHECK-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$S42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
@@ -214,7 +214,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** %X.P2, i8*** [[B_P2_PTR]], align 8
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 1
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
 
 // CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type* %1, i8*** [[CONDITIONAL_REQUIREMENTS]], i64 2)
 // CHECK-NEXT:    call swiftcc void @"$S42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
@@ -246,9 +246,9 @@ public func double_concrete_concrete() {
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[B_P2_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[B_P2_PTR]], align 8
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 1
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
 
 // CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 2)
 // CHECK-NEXT:    store atomic i8** [[Double_P1]], i8*** @"$S42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGACyxq_GAA2P1A2A0G0RzAA0H0R_rlWL" release, align 8

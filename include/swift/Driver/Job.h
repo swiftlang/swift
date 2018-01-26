@@ -115,7 +115,7 @@ private:
   EnvironmentVector ExtraEnvironment;
 
   /// Whether the job wants a list of input or output files created.
-  FilelistInfo FilelistFileInfo;
+  std::vector<FilelistInfo> FilelistFileInfos;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
@@ -127,12 +127,12 @@ public:
       const char *Executable,
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
-      FilelistInfo Info = {})
+      std::vector<FilelistInfo> Infos = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfo(std::move(Info)) {}
+        FilelistFileInfos(std::move(Infos)) {}
 
   const JobAction &getSource() const {
     return *SourceAndCondition.getPointer();
@@ -140,7 +140,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
-  FilelistInfo getFilelistInfo() const { return FilelistFileInfo; }
+  ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
@@ -182,6 +182,31 @@ public:
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
+};
+
+/// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
+/// to the others that the whole set can be combined into a single subprocess
+/// (and thus run potentially more-efficiently than running each Job in the set
+/// individually).
+///
+/// Not all Jobs can be combined into a BatchJob: at present, only those Jobs
+/// that come from CompileJobActions, and which otherwise have the exact same
+/// input file list and arguments as one another, aside from their primary-file.
+/// See ToolChain::jobsAreBatchCombinable for details.
+
+class BatchJob : public Job {
+  SmallVector<const Job *, 4> CombinedJobs;
+public:
+  BatchJob(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
+           std::unique_ptr<CommandOutput> Output, const char *Executable,
+           llvm::opt::ArgStringList Arguments,
+           EnvironmentVector ExtraEnvironment,
+           std::vector<FilelistInfo> Infos,
+           ArrayRef<const Job *> Combined);
+
+  ArrayRef<const Job*> getCombinedJobs() const {
+    return CombinedJobs;
+  }
 };
 
 } // end namespace driver

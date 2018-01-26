@@ -112,7 +112,7 @@ int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
                       DiagnosticEngine &Diags,
-                      std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+                      std::vector<std::pair<RC<syntax::RawSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
   Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -124,7 +124,7 @@ getTokensFromFile(const StringRef InputFilename,
                   LangOptions &LangOpts,
                   SourceManager &SourceMgr,
                   DiagnosticEngine &Diags,
-                  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+                  std::vector<std::pair<RC<syntax::RawSyntax>,
                                         syntax::AbsolutePosition>> &Tokens) {
   auto Buffer = llvm::MemoryBuffer::getFile(InputFilename);
   if (!Buffer) {
@@ -179,7 +179,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawSyntax>,
                                    syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -187,7 +187,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   }
 
   for (auto TokAndPos : Tokens) {
-    TokAndPos.first->print(llvm::outs());
+    TokAndPos.first->print(llvm::outs(), {});
   }
 
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -200,7 +200,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -264,7 +264,7 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
   auto BufferId = *SF->getBufferID();
   SyntaxPrintOptions Opts;
   auto Root = SF->getSyntaxRoot();
-  auto AbPos = Root.getEOFToken().getAbsolutePosition(Root);
+  auto AbPos = Root.getEOFToken().getAbsolutePosition();
 
   SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
   auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);

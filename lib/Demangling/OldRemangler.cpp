@@ -1099,6 +1099,13 @@ void Remangler::manglePrivateDeclName(Node *node) {
   mangleChildNodes(node); // identifier, identifier
 }
 
+void Remangler::mangleRelatedEntityDeclName(Node *node) {
+  // Non-round-trip mangling: pretend we have a private discriminator "$A" for a
+  // related entity "A".
+  Out << 'P' << (node->getText().size() + 1) << '$' << node->getText();
+  mangleChildNodes(node);
+}
+
 void Remangler::mangleTypeMangling(Node *node) {
   Out << 't';
   mangleSingleChildNode(node); // type

@@ -98,7 +98,7 @@ public func subclassgeneric_concrete() {
 // CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = call %swift.type* @"$S32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"()
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1)
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$S32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGAA4BaseCyxGAA2P1A2A0G0RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
@@ -131,7 +131,7 @@ public func subclassconcrete() {
 // CHECK-NEXT:    [[SubclassConcrete_TYPE:%.*]] = call %swift.type* @"$S32conditional_conformance_subclass16SubclassConcreteCMa"()
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1)
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$S32conditional_conformance_subclass16SubclassConcreteCAA4BaseCyxGAA2P1A2A2P2RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
@@ -164,7 +164,7 @@ public func subclassgenericconcrete() {
 // CHECK-NEXT:    [[SubclassGenericConcrete_TYPE:%.*]] = call %swift.type* @"$S32conditional_conformance_subclass23SubclassGenericConcreteCMa"()
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
-// CHECK-NEXT:    store i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]], i64 1)
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$S32conditional_conformance_subclass23SubclassGenericConcreteCAA4BaseCyxGAA2P1A2A2P2RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont

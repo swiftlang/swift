@@ -8,13 +8,6 @@ public protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @"\01l_protocols" = private constant [
-
-// CHECK: %swift.protocolref {
-// CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
-// CHECK-SAME: %swift.protocolref {
-// CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
-
 // CHECK-LABEL: @"$S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE:@"\$S28protocol_conformance_records8RuncibleMp"]]
@@ -119,6 +112,13 @@ extension NativeGenericType : Spoon where T: Spoon {
 // CHECK-SAME:         }
 extension Int : OtherResilientProtocol { }
 
+// CHECK-LABEL: @"\01l_protocols" = private constant [
+
+// CHECK: %swift.protocolref {
+// CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
+// CHECK-SAME: %swift.protocolref {
+// CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
+
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant
 // CHECK-SAME: @"$S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"
 // CHECK-SAME: @"$S28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc"
@@ -126,4 +126,6 @@ extension Int : OtherResilientProtocol { }
 // CHECK-SAME: @"$S16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc"
 // CHECK-SAME: @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc"
 // CHECK-SAME: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc"
+
+
 

@@ -125,6 +125,9 @@ public:
   /// Return the parent of this node, if it has one.
   llvm::Optional<Syntax> getParent() const;
 
+  /// Return the root syntax of this node.
+  Syntax getRoot() const;
+
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
   CursorIndex getIndexInParent() const;
@@ -181,7 +184,7 @@ public:
 
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
-  AbsolutePosition getAbsolutePosition(SourceFileSyntax Root) const;
+  AbsolutePosition getAbsolutePosition() const;
 
   // TODO: hasSameStructureAs ?
 };

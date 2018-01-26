@@ -12,7 +12,13 @@ func main() -> Void
     var backward_ptr  =
     // CHECK: define internal {{.*}} i1 @"$S4mainAAyyFSbSS_SStcfU_"(
     // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %TSS*, align {{(4|8)}}
-    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %TSS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !DIExpression()), !dbg
+
+    // FIXME(TODO: JIRA): i386 String is temporarily larger, and that causes the
+    // value to be by-address. When that is fixed, remove the optional
+    // DW_OP_deref below.
+    //
+    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %TSS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !DIExpression({{(DW_OP_deref)?}})), !dbg
+
     // CHECK: store %TSS* %{{.*}}, %TSS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
     // CHECK-DAG: !DILocalVariable(name: "lhs",{{.*}} line: [[@LINE+5]],
     // CHECK-DAG: !DILocalVariable(name: "rhs",{{.*}} line: [[@LINE+4]],

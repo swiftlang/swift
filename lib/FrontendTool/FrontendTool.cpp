@@ -63,6 +63,7 @@
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/APINotes/Types.h"
 
 #include "llvm/ADT/Statistic.h"
@@ -1186,7 +1187,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     Context.LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
-  Instance.freeContextAndSIL();
+  // NB: Don't free if we have a stats collector; it makes some use
+  // of the AST context during shutdown.
+  if (!Stats)
+    Instance.freeContextAndSIL();
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
@@ -1315,7 +1319,8 @@ silOptModeArgStr(OptimizationMode mode) {
 }
 
 static std::unique_ptr<UnifiedStatsReporter>
-computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
+computeStatsReporter(const CompilerInvocation &Invocation,
+                     CompilerInstance *Instance) {
   const std::string &StatsOutputDir =
       Invocation.getFrontendOptions().StatsOutputDir;
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
@@ -1340,15 +1345,8 @@ computeStatsReporter(const CompilerInvocation &Invocation, SourceManager &SM) {
   }
   auto Trace = Invocation.getFrontendOptions().TraceStats;
   return llvm::make_unique<UnifiedStatsReporter>(
-      "swift-frontend",
-                                                 FEOpts.ModuleName,
-                                                 InputName,
-                                                 TripleName,
-                                                 OutputType,
-                                                 OptType,
-                                                 StatsOutputDir,
-                                                 &SM, CSM,
-                                                 Trace);
+      "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
+      OptType, StatsOutputDir, SM, CSM, Trace);
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
@@ -1516,7 +1514,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   std::unique_ptr<UnifiedStatsReporter> StatsReporter =
-  computeStatsReporter(Invocation, Instance->getSourceMgr());
+      computeStatsReporter(Invocation, Instance.get());
   if (StatsReporter) {
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure

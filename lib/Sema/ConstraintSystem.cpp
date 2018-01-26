@@ -954,6 +954,29 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
+static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
+                                                 DeclContext *DC,
+                                                 ProtocolDecl *protocol) {
+  do {
+    if (DC->isTypeContext()) {
+      auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto type = NTD->getDeclaredType();
+
+      ConformanceCheckOptions options;
+      options |= ConformanceCheckFlags::InExpression;
+      options |= ConformanceCheckFlags::SuppressDependencyTracking;
+      options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+      auto result =
+          TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
+
+      if (result)
+        return NTD;
+    }
+  } while ((DC = DC->getParent()));
+
+  return nullptr;
+}
 /// Bind type variables for archetypes that are determined from
 /// context.
 ///
@@ -1015,8 +1038,18 @@ static void bindArchetypesFromContext(
       // parameters, or because this generic parameter was constrained
       // away into a concrete type.
       if (found != replacements.end()) {
+        Type contextTy;
+
+        if (genericEnv) {
+          contextTy = genericEnv->mapTypeIntoContext(paramTy);
+        } else {
+          auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
+          auto conformingDC = getInnermostConformingDC(cs.TC, cs.DC, protocol);
+          assert(conformingDC);
+          contextTy = conformingDC->getDeclaredTypeInContext();
+        }
+
         auto typeVar = found->second;
-        auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
         cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
                          locatorPtr);
       }
@@ -1852,6 +1885,4 @@ DeclName OverloadChoice::getName() const {
 bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   // FIXME: Disable parts of the new IUO implementation for now.
   return false;
-  return isDecl() &&
-         getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }

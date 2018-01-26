@@ -69,7 +69,7 @@ func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
 // CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$S17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type*) #0
 func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
-  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
+  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
   // CHECK: ret { %swift.type*, i8** } [[RET2]]
   return z
 }
@@ -168,12 +168,13 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @"$S17generic_metatypes3BarCMa"()
 // CHECK:   call %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, i8**
 
-// CHECK-LABEL: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**)
+// CHECK: define hidden %swift.type* @"$S17generic_metatypes8FiveArgsVMa"(%swift.type*, %swift.type*, %swift.type*, i8**) [[NOUNWIND_OPT:#[0-9]+]]
 // CHECK-NOT: alloc
 // CHECK:   call %swift.type* @swift_rt_swift_getGenericMetadata(%swift.type_pattern* {{.*}} @"$S17generic_metatypes8FiveArgsVMP" {{.*}}, i8*
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.type*
 
 // CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK: attributes [[NOUNWIND_OPT]] = { nounwind "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 // CHECK: attributes [[NOUNWIND_ARGMEM]] = { inaccessiblemem_or_argmemonly nounwind }

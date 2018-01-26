@@ -16,7 +16,6 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
@@ -32,8 +31,7 @@ namespace {
 static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
                                        ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  RawSyntax::LayoutList Layout(Parts);
-  return RawSyntax::make(Kind, Layout, SourcePresence::Present);
+  return RawSyntax::make(Kind, Parts, SourcePresence::Present);
 }
 
 RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
@@ -80,9 +78,9 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  addRawSyntax(RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
-                                    SourcePresence::Present, LeadingTrivia,
-                                    TrailingTrivia));
+  addRawSyntax(RawSyntax::make(Tok.getKind(), Tok.getText(),
+                               SourcePresence::Present, LeadingTrivia.Pieces,
+                               TrailingTrivia.Pieces));
 }
 
 /// Add Syntax to the parts.
@@ -123,6 +121,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     break;
   }
   case SyntaxKind::MemberAccessExpr:
+  case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
@@ -219,16 +218,14 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 
 /// This verifier traverses a syntax node to emit proper diagnostics.
 class SyntaxVerifier: public SyntaxVisitor {
-  SourceFileSyntax Root;
   RootContextData &RootData;
   template<class T>
   SourceLoc getSourceLoc(T Node) {
     return RootData.SourceMgr.getLocForOffset(RootData.BufferID,
-      Node.getAbsolutePosition(Root).getOffset());
+      Node.getAbsolutePosition().getOffset());
   }
 public:
-  SyntaxVerifier(SourceFileSyntax Root, RootContextData &RootData) :
-    Root(Root), RootData(RootData) {}
+  SyntaxVerifier(RootContextData &RootData) : RootData(RootData) {}
   void visit(UnknownDeclSyntax Node) override {
     RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
                             "declaration");
@@ -258,14 +255,13 @@ void finalizeSourceFile(RootContextData &RootData,
     }
   }
 
-  if (Parts.back()->isToken() &&
-      cast<RawTokenSyntax>(Parts.back())->is(tok::eof)) {
+  if (!Parts.empty() && Parts.back()->isToken(tok::eof)) {
     EOFToken.emplace(make<TokenSyntax>(Parts.back()));
     Parts = Parts.drop_back();
   }
 
   for (auto RawNode : Parts) {
-    if (RawNode->Kind != SyntaxKind::StmtList)
+    if (RawNode->getKind() != SyntaxKind::StmtList)
       // FIXME: Skip for now.
       continue;
     AllTopLevel.push_back(
@@ -278,13 +274,24 @@ void finalizeSourceFile(RootContextData &RootData,
 
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
     // Verify the added nodes if specified.
-    SyntaxVerifier Verifier(SF.getSyntaxRoot(), RootData);
-    for (auto RawNode: Parts) {
-      Verifier.verify(make<Syntax>(RawNode));
-    }
+    SyntaxVerifier Verifier(RootData);
+    Verifier.verify(SF.getSyntaxRoot());
   }
 }
 } // End of anonymous namespace
+
+void SyntaxParsingContext::finalizeRoot() {
+  if (!Enabled)
+    return;
+  assert(isTopOfContextStack() && "some sub-contexts are not destructed");
+  assert(isRoot() && "only root context can finalize the tree");
+  assert(Mode == AccumulationMode::Root);
+  finalizeSourceFile(getRootData(), getParts());
+
+  // Clear the parts because we will call this function again when destroying
+  // the root context.
+  getRootData().Storage.clear();
+}
 
 SyntaxParsingContext::~SyntaxParsingContext() {
   assert(isTopOfContextStack() && "destructed in wrong order");
@@ -334,8 +341,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
 
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
-    assert(isRoot() && "AccumulationMode::Root is only for root context");
-    finalizeSourceFile(getRootData(), getParts());
+    finalizeRoot();
     break;
 
   // Never.

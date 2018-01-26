@@ -616,6 +616,48 @@ SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
 void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
                              DominanceInfo *DomTree);
 
+/// Utility class for cloning init values into the static initializer of a
+/// SILGlobalVariable.
+class StaticInitCloner : public SILCloner<StaticInitCloner> {
+  friend class SILInstructionVisitor<StaticInitCloner>;
+  friend class SILCloner<StaticInitCloner>;
+
+  /// The number of not yet cloned operands for each instruction.
+  llvm::DenseMap<SILInstruction *, int> NumOpsToClone;
+
+  /// List of instructions for which all operands are already cloned (or which
+  /// don't have any operands).
+  llvm::SmallVector<SILInstruction *, 8> ReadyToClone;
+
+public:
+  StaticInitCloner(SILGlobalVariable *GVar)
+      : SILCloner<StaticInitCloner>(GVar) { }
+
+  /// Add \p InitVal and all its operands (transitively) for cloning.
+  ///
+  /// Note: all init values must are added, before calling clone().
+  void add(SILInstruction *InitVal);
+
+  /// Clone \p InitVal and all its operands into the initializer of the
+  /// SILGlobalVariable.
+  ///
+  /// \return Returns the cloned instruction in the SILGlobalVariable.
+  SingleValueInstruction *clone(SingleValueInstruction *InitVal);
+
+  /// Convenience function to clone a single \p InitVal.
+  static void appendToInitializer(SILGlobalVariable *GVar,
+                                  SingleValueInstruction *InitVal) {
+    StaticInitCloner Cloner(GVar);
+    Cloner.add(InitVal);
+    Cloner.clone(InitVal);
+  }
+
+protected:
+  SILLocation remapLocation(SILLocation Loc) {
+    return ArtificialUnreachableLocation();
+  }
+};
+
 } // end namespace swift
 
 #endif

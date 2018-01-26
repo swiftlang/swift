@@ -15,7 +15,7 @@ entry(%b : $Error):
   // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %o = open_existential_box %b : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000000") Error
-  // CHECK: [[CODE_ADDR:%.*]] = getelementptr {{.*}} [[WITNESS]], i32 1
+  // CHECK: [[CODE_ADDR:%.*]] = getelementptr {{.*}} [[WITNESS]], i32 2
   // CHECK: [[CODE:%.*]] = load {{.*}} [[CODE_ADDR]]
   %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") Error, #Error._code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") Error : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
   // CHECK: [[CODE_FN:%.*]] = bitcast i8* [[CODE]] to [[INT:i[0-9]+]] (%swift.opaque*, %swift.type*, i8**)*

@@ -27,6 +27,7 @@ import ArrayOfPOD
 import ArrayOfRef
 import ArraySetElement
 import ArraySubscript
+import BinaryFloatingPointConversionFromBinaryInteger
 import BitCount
 import ByteSwap
 import COWTree
@@ -51,6 +52,7 @@ import DictionaryLiteral
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -162,11 +164,14 @@ registerBenchmark(ArrayOfPOD)
 registerBenchmark(ArrayOfRef)
 registerBenchmark(ArraySetElement)
 registerBenchmark(ArraySubscript)
+registerBenchmark(BinaryFloatingPointConversionFromBinaryInteger)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
+registerBenchmark(CSVParsingAlt)
+registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
 registerBenchmark(CharacterLiteralsLarge)
@@ -189,6 +194,7 @@ registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)

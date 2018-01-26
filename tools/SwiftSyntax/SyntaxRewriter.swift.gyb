@@ -31,7 +31,7 @@ open class SyntaxRewriter {
 %   if is_visitable(node):
   open func visit(_ node: ${node.name}) -> ${node.base_type} {
 %   cast = ('as! ' + node.base_type) if node.base_type != 'Syntax' else ''
-    return visitChildren(node)${cast}
+    return visitChildren(node) ${cast}
   }
 
 %   end
@@ -54,7 +54,7 @@ open class SyntaxRewriter {
 
   func visitChildren(_ node: Syntax) -> Syntax {
     let newLayout = node.children.map { visit($0).raw }
-    return Syntax.fromRaw(node.raw.replacingLayout(newLayout))
+    return makeSyntax(node.raw.replacingLayout(newLayout))
   }
 }
 

@@ -27,7 +27,7 @@ bb0(%0 : $*S):
 // CHECK-LABEL: define internal swiftcc %T23partial_apply_forwarder1DCyAA1CCG* @"$S23unspecialized_uncurriedTA"(%swift.refcounted*
 // CHECK: [[TYPE:%.*]] = call %swift.type* @"$S23partial_apply_forwarder1CCMa"()
 // CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder1EC*
-// CHECK: [[CALL:%.*]] = call swiftcc %T23partial_apply_forwarder1DC* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @"$S23partial_apply_forwarder1CCAA1PAAWP", i32 0, i32 0), %T23partial_apply_forwarder1EC* swiftself [[CAST]])
+// CHECK: [[CALL:%.*]] = call swiftcc %T23partial_apply_forwarder1DC* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S23partial_apply_forwarder1CCAA1PAAWP", i32 0, i32 0), %T23partial_apply_forwarder1EC* swiftself [[CAST]])
 
 sil hidden @specialized_curried : $@convention(thin) (@owned E) -> @owned @callee_owned () -> @owned D<C> {
 bb0(%0 : $E):

@@ -315,7 +315,8 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool Outermost, bool IsInOut) {
+                        bool IsVarArg, bool Outermost, bool IsInOut,
+                        bool IsIUO) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
@@ -371,8 +372,15 @@ public:
 
     PrintOptions PO;
     PO.SkipAttributes = true;
+    std::string TypeName;
+    if (IsIUO) {
+      assert(Ty->getAnyOptionalObjectType());
+      TypeName = Ty->getAnyOptionalObjectType()->getStringAsComponent(PO) + "!";
+    } else {
+      TypeName = Ty->getString(PO);
+    }
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     Ty->getString(PO));
+                     TypeName);
 
     // Look through optional types and type aliases to find out if we have
     // function/closure parameter type that is not an autoclosure.
@@ -394,9 +402,10 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg,
-                        bool Outermost, bool IsInOut) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool Outermost,
+                        bool IsInOut, bool IsIUO) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut,
+                     IsIUO);
   }
 
   void addGenericParameter(StringRef Name) {

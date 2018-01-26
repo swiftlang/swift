@@ -25,8 +25,7 @@ class Token;
 class DiagnosticEngine;
 
 namespace syntax {
-struct RawTokenSyntax;
-struct RawSyntax;
+class RawSyntax;
 enum class SyntaxKind;
 
 enum class SyntaxContextKind {
@@ -201,7 +200,7 @@ public:
 
   TokenSyntax popToken() {
     assert(Storage.size() > Offset);
-    assert(Storage.back()->Kind == SyntaxKind::Token);
+    assert(Storage.back()->getKind() == SyntaxKind::Token);
     auto Node = make<TokenSyntax>(std::move(Storage.back()));
     Storage.pop_back();
     return Node;
@@ -238,6 +237,12 @@ public:
 
   /// Discard collected parts on this context.
   void setDiscard() { Mode = AccumulationMode::Discard; }
+
+  /// Explicitly finalizing syntax tree creation.
+  /// This function will be called during the destroying of a root syntax
+  /// parsing context. However, we can explicitly call this function to get
+  /// the syntax tree before closing the root context.
+  void finalizeRoot();
 
 };
 

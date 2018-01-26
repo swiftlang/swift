@@ -1,6 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+import Swift
 import StdlibUnittest
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
@@ -211,6 +214,20 @@ DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(
     CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
     _typeByMangledName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
+}
+
+DemangleToMetadataTests.test("demangle built-in types") {
+  expectEqual(Builtin.Int8.self,     _typeByMangledName("Bi8_")!)
+  expectEqual(Builtin.Int16.self,    _typeByMangledName("Bi16_")!)
+  expectEqual(Builtin.Int32.self,    _typeByMangledName("Bi32_")!)
+  expectEqual(Builtin.Int64.self,    _typeByMangledName("Bi64_")!)
+  expectEqual(Builtin.Int128.self,   _typeByMangledName("Bi128_")!)
+  expectEqual(Builtin.Int256.self,   _typeByMangledName("Bi256_")!)
+  expectEqual(Builtin.Int512.self,   _typeByMangledName("Bi512_")!)
+
+  expectEqual(Builtin.NativeObject.self, _typeByMangledName("Bo")!)
+  expectEqual(Builtin.BridgeObject.self, _typeByMangledName("Bb")!)
+  expectEqual(Builtin.UnsafeValueBuffer.self, _typeByMangledName("BB")!)
 }
 
 runAllTests()

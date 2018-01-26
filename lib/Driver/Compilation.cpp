@@ -84,7 +84,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
 }
 
 
-Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
+Compilation::Compilation(DiagnosticEngine &Diags,
+                         const ToolChain &TC, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
@@ -95,7 +96,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
-  : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
+  : Diags(Diags), TheToolChain(TC), Level(Level),
+    RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
@@ -787,40 +789,51 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
 }
 
 static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
-  FilelistInfo filelistInfo = job->getFilelistInfo();
-  if (filelistInfo.path.empty())
-    return true;
+  bool ok = true;
+  for (const FilelistInfo &filelistInfo : job->getFilelistInfos()) {
+    if (filelistInfo.path.empty())
+      return true;
 
-  std::error_code error;
-  llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
-  if (out.has_error()) {
-    out.clear_error();
-    diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
-                   error.message());
-    return false;
-  }
-
-  if (filelistInfo.whichFiles == FilelistInfo::Input) {
-    // FIXME: Duplicated from ToolChains.cpp.
-    for (const Job *input : job->getInputs()) {
-      const CommandOutput &outputInfo = input->getOutput();
-      if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
-        for (auto &output : outputInfo.getPrimaryOutputFilenames())
-          out << output << "\n";
-      } else {
-        auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
-        if (!output.empty())
-          out << output << "\n";
-      }
+    std::error_code error;
+    llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
+    if (out.has_error()) {
+      out.clear_error();
+      diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                     error.message());
+      ok = false;
+      continue;
     }
-  } else {
-    const CommandOutput &outputInfo = job->getOutput();
-    assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
-    for (auto &output : outputInfo.getPrimaryOutputFilenames())
-      out << output << "\n";
-  }
 
-  return true;
+    switch (filelistInfo.whichFiles) {
+    case FilelistInfo::WhichFiles::Input:
+      // FIXME: Duplicated from ToolChains.cpp.
+      for (const Job *input : job->getInputs()) {
+        const CommandOutput &outputInfo = input->getOutput();
+        if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
+          for (auto &output : outputInfo.getPrimaryOutputFilenames())
+            out << output << "\n";
+        } else {
+          auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
+          if (!output.empty())
+            out << output << "\n";
+        }
+      }
+      break;
+    case FilelistInfo::WhichFiles::PrimaryInputs:
+      for (const Action *A : job->getSource().getInputs()) {
+        const auto *IA = cast<InputAction>(A);
+        out << IA->getInputArg().getValue() << "\n";
+      }
+      break;
+    case FilelistInfo::WhichFiles::Output:
+      const CommandOutput &outputInfo = job->getOutput();
+      assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
+      for (auto &output : outputInfo.getPrimaryOutputFilenames())
+        out << output << "\n";
+      break;
+    }
+  }
+  return ok;
 }
 
 int Compilation::performJobsImpl(bool &abnormalExit) {

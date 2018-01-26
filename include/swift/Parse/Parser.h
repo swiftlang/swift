@@ -58,7 +58,7 @@ namespace swift {
   
   namespace syntax {
     class AbsolutePosition;
-    struct RawTokenSyntax;
+    class RawSyntax;
     enum class SyntaxKind;
     class TypeSyntax;
   }// end of syntax namespace
@@ -355,6 +355,13 @@ public:
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
+
+  /// Calling this function to finalize libSyntax tree creation without destroying
+  /// the parser instance.
+  void finalizeSyntaxTree() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    SyntaxContext->finalizeRoot();
+  }
 
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
@@ -1428,7 +1435,7 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+std::vector<std::pair<RC<syntax::RawSyntax>,
                                  syntax::AbsolutePosition>>
 tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,

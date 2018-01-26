@@ -468,21 +468,24 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printType(Type T) {
-    if (Options.TransformContext) {
+  void printTypeWithOptions(Type T, PrintOptions options) {
+    if (options.TransformContext) {
       // FIXME: it's not clear exactly what we want to keep from the existing
       // options, and what we want to discard.
       PrintOptions FreshOptions;
-      FreshOptions.ExcludeAttrList = Options.ExcludeAttrList;
-      FreshOptions.ExclusiveAttrList = Options.ExclusiveAttrList;
+      FreshOptions.ExcludeAttrList = options.ExcludeAttrList;
+      FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
+      FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
       T.print(Printer, FreshOptions);
       return;
     }
 
-    T.print(Printer, Options);
+    T.print(Printer, options);
   }
 
-  void printTransformedType(Type T) {
+  void printType(Type T) { printTypeWithOptions(T, Options); }
+
+  void printTransformedTypeWithOptions(Type T, PrintOptions options) {
     if (CurrentType) {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
@@ -506,12 +509,16 @@ class PrintAST : public ASTVisitor<PrintAST> {
                   SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
     }
 
-    printType(T);
+    printTypeWithOptions(T, options);
+  }
+
+  void printTransformedType(Type T) {
+    printTransformedTypeWithOptions(T, Options);
   }
 
   void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
     if (CurrentType && TL.getType()) {
-      printTransformedType(TL.getType());
+      printTransformedTypeWithOptions(TL.getType(), options);
       return;
     }
 
@@ -3063,6 +3070,35 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
   Printer.printPattern(this);
 }
 
+static bool isSimple(Type type) {
+  switch (type->getKind()) {
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
+
+  case TypeKind::Archetype: {
+    auto arch = type->getAs<ArchetypeType>();
+    return !arch->isOpenedExistential();
+  }
+
+  case TypeKind::ProtocolComposition: {
+    // 'Any', 'AnyObject' and single protocol compositions are simple
+    auto composition = type->getAs<ProtocolCompositionType>();
+    auto memberCount = composition->getMembers().size();
+    if (composition->hasExplicitAnyObject())
+      return memberCount == 0;
+    return memberCount <= 1;
+  }
+
+  default:
+    return true;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -3081,35 +3117,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Printer << "<";
     interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
     Printer << ">";
-  }
-
-  static bool isSimple(Type type) {
-    switch (type->getKind()) {
-    case TypeKind::Function:
-    case TypeKind::GenericFunction:
-      return false;
-
-    case TypeKind::Metatype:
-    case TypeKind::ExistentialMetatype:
-      return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
-
-    case TypeKind::Archetype: {
-      auto arch = type->getAs<ArchetypeType>();
-      return !arch->isOpenedExistential();
-    }
-
-    case TypeKind::ProtocolComposition: {
-      // 'Any', 'AnyObject' and single protocol compositions are simple
-      auto composition = type->getAs<ProtocolCompositionType>();
-      auto memberCount = composition->getMembers().size();
-      if (composition->hasExplicitAnyObject())
-        return memberCount == 0;
-      return memberCount <= 1;
-    }
-
-    default:
-      return true;
-    }
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -4141,6 +4148,36 @@ std::string TypeBase::getString(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   print(OS, PO);
+  return OS.str();
+}
+
+std::string Type::getStringAsComponent(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  if (!isSimple(*this)) {
+    OS << "(";
+    print(OS, PO);
+    OS << ")";
+  } else {
+    print(OS, PO);
+  }
+
+  return OS.str();
+}
+
+std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  if (!isSimple(const_cast<TypeBase *>(this))) {
+    OS << "(";
+    print(OS, PO);
+    OS << ")";
+  } else {
+    print(OS, PO);
+  }
+
   return OS.str();
 }
 

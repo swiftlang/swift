@@ -4007,8 +4007,7 @@ public:
   void visit(Decl *decl) {
     UnifiedStatsReporter::FrontendStatsTracer Tracer;
     if (TC.Context.Stats)
-      Tracer = TC.Context.Stats->getStatsTracer("type-checking",
-                                                decl->getSourceRange());
+      Tracer = TC.Context.Stats->getStatsTracer("typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -4885,8 +4884,15 @@ public:
       llvm::errs() << "Requirement signature: ";
       requirementsSig->print(llvm::errs());
       llvm::errs() << "\n";
+
+      // Note: One cannot canonicalize a requirement signature, because
+      // requirement signatures are necessarily missing requirements.
       llvm::errs() << "Canonical requirement signature: ";
-      requirementsSig->getCanonicalSignature()->print(llvm::errs());
+      auto canRequirementSig =
+        GenericSignature::getCanonical(requirementsSig->getGenericParams(),
+                                       requirementsSig->getRequirements(),
+                                       /*skipValidation=*/true);
+      canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
   }
@@ -6139,7 +6145,7 @@ public:
               TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
-        if (declTy->matches(parentDeclTy, matchMode, &TC)) {
+        if (declTy->matches(parentDeclTy, matchMode)) {
           // If the Objective-C selectors match, always call it exact.
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
@@ -6373,10 +6379,9 @@ public:
       auto propertyTy = property->getInterfaceType();
       auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
           matchDecl, decl, matchDecl->getInterfaceType());
-      
+
       if (!propertyTy->matches(parentPropertyTy,
-                               TypeMatchFlags::AllowOverride,
-                               &TC)) {
+                               TypeMatchFlags::AllowOverride)) {
         TC.diagnose(property, diag::override_property_type_mismatch,
                     property->getName(), propertyTy, parentPropertyTy);
         noteFixableMismatchedTypes(TC, decl, matchDecl);
@@ -6500,6 +6505,7 @@ public:
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
+    UNINTERESTING_ATTR(ClangImporterSynthesizedType)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -9157,7 +9163,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
       if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
-          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)) {
+          || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
+          || isa<ExtensionDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
