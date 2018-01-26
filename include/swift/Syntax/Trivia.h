@@ -80,6 +80,7 @@
 #define SWIFT_SYNTAX_TRIVIA_H
 
 #include "swift/Basic/OwnedString.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
@@ -282,6 +283,29 @@ public:
 
   bool operator!=(const TriviaPiece &Other) const {
     return !(*this == Other);
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddInteger(unsigned(Kind));
+    switch (Kind) {
+      case TriviaKind::LineComment:
+      case TriviaKind::BlockComment:
+      case TriviaKind::DocBlockComment:
+      case TriviaKind::DocLineComment:
+      case TriviaKind::GarbageText:
+        ID.AddString(Text.str());
+        break;
+      case TriviaKind::Newline:
+      case TriviaKind::CarriageReturn:
+      case TriviaKind::Space:
+      case TriviaKind::Backtick:
+      case TriviaKind::Tab:
+      case TriviaKind::VerticalTab:
+      case TriviaKind::Formfeed:
+      case TriviaKind::CarriageReturnLineFeed:
+        ID.AddInteger(Count);
+        break;
+    }
   }
 };
 

@@ -37,6 +37,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -406,6 +407,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   }
   
   llvm::FoldingSet<SILLayout> SILLayouts;
+
+  syntax::SyntaxArena TheSyntaxArena;
 };
 
 ASTContext::Implementation::Implementation()
@@ -503,6 +506,10 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
+}
+
+syntax::SyntaxArena &ASTContext::getSyntaxArena() const {
+  return Impl.TheSyntaxArena;
 }
 
 LazyResolver *ASTContext::getLazyResolver() const {
