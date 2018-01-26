@@ -301,8 +301,8 @@ option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   FALSE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
-  "Enable runtime function counters and expose the API. Defaults to on if assertions are on."
-  ${SWIFT_STDLIB_ASSERTIONS})
+  "Enable runtime function counters and expose the API."
+  FALSE)
 
 #
 # End of user-configurable options.

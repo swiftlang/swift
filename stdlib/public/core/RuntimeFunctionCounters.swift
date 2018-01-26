@@ -18,11 +18,10 @@
 //  number of invocations, or per-object counters, which represent the
 //  number of runtime functions calls for a specific object.
 
-// By default, this feature is enabled only when assertions are enabled. To enable when
-// assertions are off, use this option with build-script:
-// --extra-cmake-options='-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=TRUE'
-// Or to disable in debug builds:
-// --extra-cmake-options='-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=FALSE'
+// By default, this feature is enabled only when assertions are enabled. To control it
+// separately, set the SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS environment variable when
+// invoking build-script:
+// SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS=TRUE ./utils/build-script ...
 #if SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
 
 /// Collect all references inside the object using Mirrors.

@@ -74,6 +74,9 @@ if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
 
+if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
+    config.available_features.add('runtime_function_counters')
+
 if "@CMAKE_GENERATOR@" == "Xcode":
     xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
                                  'bin')
