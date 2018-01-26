@@ -5,7 +5,9 @@ import StdlibUnittest
 
 let RandomTests = TestSuite("Random")
 
-RandomTests.test("random numbers") {
+// Basic random numbers
+
+RandomTests.test("basic random numbers") {
   let randomNumber1 = Int.random(in: .min ... .max)
   let randomNumber2 = Int.random(in: .min ... .max)
   expectTrue(randomNumber1 != randomNumber2)
@@ -17,40 +19,107 @@ RandomTests.test("random numbers") {
   expectTrue(randomDouble1 != randomDouble2)
 }
 
-RandomTests.test("random numbers from range") {
-  let range1 = 0 ..< 20
-  for _ in range1 {
-    let randomNumber = Int.random(in: range1)
-    expectTrue(range1.contains(randomNumber))
-  }
+// Random integers in ranges
 
-  let range2 = 0 ... 20
-  for _ in range1 {
-    let randomNumber = Int.random(in: range2)
-    expectTrue(range2.contains(randomNumber))
+func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) 
+  where T.Stride: SignedInteger, T.Magnitude: UnsignedInteger {
+    
+  let testRange = 0 ..< 1_000
+  var integerSet: Set<T> = []
+  
+  // min open range
+  let minOpenRange = T.min ..< (T.min + 10)
+  for _ in testRange {
+    let random = T.random(in: minOpenRange)
+    expectTrue(minOpenRange.contains(random))
+    integerSet.insert(random)
   }
-
-  let range3 = 3.0 ..< 10.0
-  for _ in range1 {
-    let randomNumber = Double.random(in: range3)
-    expectTrue(range3.contains(randomNumber))
+  expectTrue(integerSet == Set(T.min ..< (T.min + 10)))
+  integerSet.removeAll()
+  
+  // min closed range
+  let minClosedRange = T.min ... (T.min + 10)
+  for _ in testRange {
+    let random = T.random(in: minClosedRange)
+    expectTrue(minClosedRange.contains(random))
+    integerSet.insert(random)
   }
+  expectTrue(integerSet == Set(T.min ... (T.min + 10)))
+  integerSet.removeAll()
+  
+  // max open range
+  let maxOpenRange = (T.max - 10) ..< T.max
+  for _ in testRange {
+    let random = T.random(in: maxOpenRange)
+    expectTrue(maxOpenRange.contains(random))
+    integerSet.insert(random)
+  }
+  expectTrue(integerSet == Set((T.max - 10) ..< T.max))
+  integerSet.removeAll()
+  
+  // max closed range
+  let maxClosedRange = (T.max - 10) ... T.max
+  for _ in testRange {
+    let random = T.random(in: maxClosedRange)
+    expectTrue(maxClosedRange.contains(random))
+    integerSet.insert(random)
+  }
+  expectTrue(integerSet == Set((T.max - 10) ... T.max))
+}
 
-  let range4 = 3.0 ... 10.0
-  for _ in range1 {
-    let randomNumber = Double.random(in: range4)
-    expectTrue(range4.contains(randomNumber))
+RandomTests.test("random integers in ranges") {
+  integerRangeTest(Int8.self)
+  integerRangeTest(Int16.self)
+  integerRangeTest(Int32.self)
+  integerRangeTest(Int64.self)
+  integerRangeTest(UInt8.self)
+  integerRangeTest(UInt16.self)
+  integerRangeTest(UInt32.self)
+  integerRangeTest(UInt64.self)
+}
+
+// Random floating points in ranges
+
+func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type) 
+  where T.RawSignificand: FixedWidthInteger,
+        T.RawSignificand.Stride: SignedInteger & FixedWidthInteger,
+        T.RawSignificand.Magnitude: UnsignedInteger {
+          
+  let testRange = 0 ..< 1_000
+  
+  // open range
+  let openRange: Range<T> = 0.0 ..< 10.0
+  for _ in testRange {
+    let random = T.random(in: openRange)
+    expectTrue(openRange.contains(random))
+  }
+  
+  // closed range
+  let closedRange: ClosedRange<T> = 0.0 ... 10.0
+  for _ in testRange {
+    let random = T.random(in: closedRange)
+    expectTrue(closedRange.contains(random))
   }
 }
 
-RandomTests.test("random elements") {
+RandomTests.test("random floating points in ranges") {
+  floatingPointRangeTest(Float.self)
+  floatingPointRangeTest(Double.self)
+  floatingPointRangeTest(Float80.self)
+}
+
+// Random Elements from collection
+
+RandomTests.test("random elements from collection") {
   let greetings = ["hello", "hi", "hey", "hola", "what's up"]
-  for _ in 0 ..< 20 {
+  for _ in 0 ..< 1_000 {
     let randomGreeting = greetings.random()
     expectNotNil(randomGreeting)
     expectTrue(greetings.contains(randomGreeting!))
   }
 }
+
+// uniform distribution
 
 func chi2Test(_ samples: [Double]) -> Bool {
   let upperBound = 50
