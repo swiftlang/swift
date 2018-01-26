@@ -35,13 +35,17 @@ fileprivate final class TensorBuffer<Unit> {
   private let bufferPointer: UnsafeMutableBufferPointer<Unit>
 
   deinit {
+    debugLog("De-initializing tensor buffer.")
     switch allocation {
     case let .native(pointer):
+      debugLog("Deallocating underlying buffer.")
       pointer.deinitialize(count: count)
       pointer.deallocate()
     case let .tensorFlow(cTensor):
+      debugLog("Deleting underlying tensor.")
       TF_DeleteTensor(cTensor)
     }
+    debugLog("Returning from deinit of TensorBuffer.")
   }
 
   init(allocation: Allocation, count: Int) {
@@ -49,8 +53,10 @@ fileprivate final class TensorBuffer<Unit> {
     // Initialize `bufferPointer`.
     switch allocation {
     case let .native(ptr):
+      debugLog("Initializing TensorBuffer with a native buffer.")
       bufferPointer = UnsafeMutableBufferPointer(start: ptr, count: count)
     case let .tensorFlow(cTensor):
+      debugLog("Initializing TensorBuffer with a cTensor.")
       let startAddress = TF_TensorData(cTensor)
         .assumingMemoryBound(to: Unit.self)
       bufferPointer = UnsafeMutableBufferPointer(
@@ -69,6 +75,7 @@ extension TensorBuffer where Unit : AccelerableTensorUnit {
   /// Initialize a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
   convenience init(owning cTensor: CTensor, count: Int) {
+    debugLog("Initializing TensorBuffer with a cTensor of \(count) elements.")
     let actualCount = (0..<TF_NumDims(cTensor)).reduce(1) { acc, next in
       acc * Int(TF_Dim(cTensor, next))
     }
@@ -196,6 +203,8 @@ public struct ShapedArray<Unit> : ShapedArrayProtocol {
     precondition(buffer.count == shape.reduce(1, *))
     self.buffer = buffer
     self.shape = shape
+    debugLog("Done Init array with buffer: \(self).")
+    // debugLog("Done Init array")
   }
 }
 
@@ -215,8 +224,18 @@ internal extension ShapedArray {
 internal extension ShapedArray where Unit : AccelerableTensorUnit {
   @_versioned
   init(moving cTensor: CTensor) {
+    // Including \(Unit.self) into the message would cause non-deterministic crashes.
+    debugLog("Initializing ShapedArray from CTensor.")
     shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
+    if _RuntimeConfig.printsDebugLog {
+      // Without this local variable, passing the string directly into
+      // debugLog() would not work, because 'self' is captured by the auto
+      // closure param in debugLog().
+      let shapeStr = "The shape is \(shape)."
+      debugLog(shapeStr)
+    }
     buffer = TensorBuffer(owning: cTensor, count: shape.reduce(1, *))
+    debugLog("Done Init array.")
   }
 }
 
@@ -239,6 +258,7 @@ public extension ShapedArray {
   }
 
   init(_ other: ShapedArray) {
+    debugLog("Initializing from another array.")
     self.init(buffer: other.buffer, shape: other.shape)
   }
 
@@ -364,6 +384,7 @@ public struct ContiguousView<Base : ShapedArrayProtocol> {
   fileprivate var base: Base
 
   fileprivate init(base: Base) {
+    debugLog("Initializing ContiguousView.")
     self.base = base
   }
 }
@@ -391,7 +412,10 @@ extension ContiguousView : RandomAccessCollection {
 
   public subscript(index: Int) -> Element {
     get {
-      return base.withUnsafeBufferPointer { $0[index] }
+      debugLog("Getting element \(index).")
+      let ret = base.withUnsafeBufferPointer { $0[index] }
+      debugLog("Elem has value \(ret).")
+      return ret
     }
     set {
       base.withUnsafeMutableBufferPointer { $0[index] = newValue }
