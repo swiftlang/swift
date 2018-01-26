@@ -89,7 +89,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinNonAtomicSlow(
 // Returns null if the object is deiniting.
 // SideTableRefCountBits specialization intentionally does not exist.
 template <>
-HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
+HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool failIfDeiniting)
 {
   auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
   
@@ -98,7 +98,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
     // Already have a side table. Return it.
     return oldbits.getSideTable();
   } 
-  else if (oldbits.getIsDeiniting()) {
+  else if (failIfDeiniting && oldbits.getIsDeiniting()) {
     // Already past the start of deinit. Do nothing.
     return nullptr;
   }
@@ -118,7 +118,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
       delete side;
       return result;
     }
-    else if (oldbits.getIsDeiniting()) {
+    else if (failIfDeiniting && oldbits.getIsDeiniting()) {
       // Already past the start of deinit. Do nothing.
       return nullptr;
     }
@@ -136,7 +136,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
 {
-  auto side = allocateSideTable();
+  auto side = allocateSideTable(true);
   if (side)
     return side->incrementWeak();
   else
@@ -145,7 +145,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
 
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementUnownedSlow(uint32_t n) {
-  auto side = allocateSideTable();
+  auto side = allocateSideTable(false);
   if (side)
     return side->incrementUnowned(n);
   // Overflow but side table allocation failed.
