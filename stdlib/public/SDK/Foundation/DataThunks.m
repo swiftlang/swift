@@ -120,6 +120,8 @@ BOOL __NSDataWriteToURL(NSData *SWIFT_NS_RELEASES_ARGUMENT data, NSURL *SWIFT_NS
 
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
+        [data release];
+        [url release];
         return NO;
     }
 
