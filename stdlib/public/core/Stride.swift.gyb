@@ -307,7 +307,6 @@ extension StrideToIterator: IteratorProtocol {
   }
 }
 
-// FIXME: should really be a Collection, as it is multipass
 /// A sequence of values formed by striding over a half-open interval.
 ///
 /// Use the `stride(from:to:by:)` function to create `StrideTo` instances.
@@ -335,6 +334,8 @@ public struct StrideTo<Element : Strideable> {
 }
 
 extension StrideTo: Sequence {
+  public typealias SubSequence = StrideTo
+  public typealias Iterator = StrideToIterator<Element>
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -371,6 +372,147 @@ extension StrideTo: Sequence {
     }
     return nil
   }
+
+  @_inlineable
+  public func dropFirst(_ n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    var start = _start
+    for _ in 0..<n {
+      start = start.advanced(by: _stride)
+      if start > _end {
+        break
+      }
+    }
+    return StrideTo(_start: start, end: _end, stride: _stride)
+  }
+
+  @_inlineable
+  public func dropLast(_ n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    var end = _end
+    for _ in 0..<n {
+      end = end.advanced(by: -_stride)
+      if end < _start {
+        break
+      }
+    }
+    return StrideTo(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var it = makeIterator()
+    if let first = it.next() {
+      if try !predicate(first) { // predicate is false even on the first element
+        return self
+      }
+    }
+    else { // sequence is empty
+      return self
+    }
+    while let element = it.next() {
+      if try !predicate(element) {
+        return StrideTo(_start: element, end: _end, stride: _stride)
+      }
+    }
+    // predicate returned true for all elements
+    return StrideTo(_start: _end, end: _end, stride: _stride)
+  }
+
+  @_inlineable
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0,
+      "Can't take a prefix of negative length from a sequence")
+    var end = _start
+    for _ in 0..<maxLength {
+      end = end.advanced(by: _stride)
+      if end >= _end {
+        end = _end
+        break
+      }
+    }
+    return StrideTo(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var end = _start.advanced(by: -_stride)
+    for element in self {
+      if try !predicate(element) {
+        break
+      }
+      end = element
+    }
+    end = end.advanced(by: _stride)
+    return StrideTo(_start: _start, end: end, stride: _stride)
+  }
+
+  @_inlineable
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0,
+      "Can't take a suffix of negative length from a sequence")
+    let count = underestimatedCount
+    if maxLength >= count {
+      return self
+    }
+    return dropFirst(count - maxLength)
+  }
+
+  @_inlineable
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    _precondition(maxSplits >= 0, "Must take zero or more splits")
+    var result = [StrideTo]()
+    var subStart = _start
+    var subEnd = _end
+
+    @discardableResult
+    func appendSubsequence(_ knownEmpty: Bool? = nil) -> Bool {
+      let isEmpty = knownEmpty ?? (subEnd - subStart < _stride)
+      if isEmpty && omittingEmptySubsequences {
+        return false
+      }
+      result.append(StrideTo(_start: subStart, end: subEnd, stride: _stride))
+      return true
+    }
+
+    if maxSplits == 0 {
+      appendSubsequence()
+      return result
+    }
+
+    var elementIsSeparator = false
+    var iterator = self.makeIterator()
+    while let element = iterator.next() {
+      if elementIsSeparator { // refers to the previous element
+        subStart = element
+      }
+      subEnd = element
+      elementIsSeparator = try isSeparator(element) // now refers to the current
+      if elementIsSeparator {
+        if !appendSubsequence() {
+          continue
+        }
+        if result.count == maxSplits {
+          break
+        }
+      }
+    }
+
+    if elementIsSeparator {
+      subStart = iterator.next() ?? _end
+    }
+    // processing the rest of the sequence as a single sub-sequence
+    subEnd = _end
+    appendSubsequence(subEnd == subStart)
+    return result
+  }
 }
 
 extension StrideTo: CustomReflectable {
@@ -380,12 +522,9 @@ extension StrideTo: CustomReflectable {
   }
 }
 
-// FIXME(conditional-conformances): This does not yet compile (SR-6474).
-#if false
-extension StrideTo : RandomAccessCollection
-where Element.Stride : BinaryInteger {
+extension StrideTo: Collection
+where Element.Stride: BinaryInteger {
   public typealias Index = Int
-  public typealias SubSequence = Slice<StrideTo<Element>>
   public typealias Indices = Range<Int>
 
   @_inlineable
@@ -416,14 +555,19 @@ where Element.Stride : BinaryInteger {
     _failEarlyRangeCheck(i, bounds: startIndex + 1...endIndex)
     return i - 1
   }
+}
 
+extension StrideTo: BidirectionalCollection
+where Element.Stride: BinaryInteger {
   @_inlineable
   public func index(after i: Index) -> Index {
     _failEarlyRangeCheck(i, bounds: startIndex - 1..<endIndex)
     return i + 1
   }
 }
-#endif
+
+extension StrideTo: RandomAccessCollection
+where Element.Stride: BinaryInteger {}
 
 /// Returns a sequence from a starting value to, but not including, an end
 /// value, stepping by the specified amount.
