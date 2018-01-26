@@ -368,11 +368,12 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(fieldRecordSize);
 
     // Imported classes don't need field descriptors
-    if (NTD->hasClangNode()) {
-      assert(isa<ClassDecl>(NTD));
+    if (NTD->hasClangNode() && isa<ClassDecl>(NTD)) {
       B.addInt32(0);
       return;
     }
+
+    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
 
     auto properties = NTD->getStoredProperties();
     B.addInt32(std::distance(properties.begin(), properties.end()));
@@ -435,6 +436,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     if (NTD->hasClangNode() &&
         !isa<ClassDecl>(NTD) &&
+        !isa<StructDecl>(NTD) &&
         !isa<ProtocolDecl>(NTD))
       return;
 
@@ -940,6 +942,9 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
 
   for (auto PD : ImportedProtocols)
     emitFieldMetadataRecord(PD);
+
+  for (auto SD : ImportedStructs)
+    emitFieldMetadataRecord(SD);
 
   for (auto builtinType : BuiltinTypes)
     emitBuiltinTypeMetadataRecord(builtinType);

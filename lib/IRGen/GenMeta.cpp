@@ -5618,7 +5618,9 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
-    
+
+    ImportedStructs.insert(structDecl);
+
     ForeignStructMetadataBuilder builder(*this, structDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
