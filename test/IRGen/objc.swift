@@ -39,7 +39,7 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$S4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @swift_rt_swift_release
+// CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 }
 
@@ -87,7 +87,7 @@ func test0(_ arg: id) -> id {
 
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden swiftcc void @"$S4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_rt_swift_release
+// CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 
 

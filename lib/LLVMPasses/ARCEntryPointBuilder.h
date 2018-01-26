@@ -69,7 +69,6 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> BridgeObjectPtrTy;
 
   llvm::CallingConv::ID DefaultCC;
-  llvm::CallingConv::ID RegisterPreservingCC;
 
   llvm::CallInst *CreateCall(Constant *Fn, Value *V) {
     CallInst *CI = B.CreateCall(Fn, V);
@@ -88,27 +87,7 @@ class ARCEntryPointBuilder {
 public:
   ARCEntryPointBuilder(Function &F)
       : B(&*F.begin()), Retain(), ObjectPtrTy(),
-        DefaultCC(SWIFT_LLVM_CC(DefaultCC)) {
-    //If the target does not support the new calling convention,
-    //set RegisterPreservingCC to use a default calling convention.
-    RegisterPreservingCC = DefaultCC;
-
-    // Check if the register preserving calling convention
-    // is supported by the backend and should be used
-    // for the deployment target provided for this compilation.
-    if (SWIFT_RT_USE_RegisterPreservingCC) {
-      bool ShouldUseRegisterPreservingCC = false;
-      auto &TargetTriple = F.getParent()->getTargetTriple();
-      llvm::Triple Triple(TargetTriple);
-      auto Arch = Triple.getArch();
-      if (Arch == llvm::Triple::ArchType::aarch64) {
-        ShouldUseRegisterPreservingCC = true;
-      }
-
-      if (ShouldUseRegisterPreservingCC)
-        RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-    }
-  }
+        DefaultCC(SWIFT_DEFAULT_LLVM_CC) { }
 
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
@@ -232,12 +211,10 @@ private:
     auto *ObjectPtrTy = getObjectPtrTy();
 
     llvm::Constant *cache = nullptr;
-    Retain = getWrapperFn(
+    Retain = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
-        isNonAtomic(OrigI) ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_retain)
-                           : SWIFT_RT_ENTRY_REF_AS_STR(swift_retain),
-        RegisterPreservingCC, {ObjectPtrTy}, {ObjectPtrTy},
+        DefaultCC, {ObjectPtrTy}, {ObjectPtrTy},
         {NoUnwind, FirstParamReturned});
 
     return Retain.get();
@@ -251,12 +228,10 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    Release = getWrapperFn(
+    Release = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_release" : "swift_release",
-        isNonAtomic(OrigI) ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_release)
-                           : SWIFT_RT_ENTRY_REF_AS_STR(swift_release),
-        RegisterPreservingCC, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
+        DefaultCC, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
 
     return Release.get();
   }
@@ -288,12 +263,10 @@ private:
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    RetainN = getWrapperFn(
+    RetainN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
-        isNonAtomic(OrigI) ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_retain_n)
-                           : SWIFT_RT_ENTRY_REF_AS_STR(swift_retain_n),
-        RegisterPreservingCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
+        DefaultCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
         {NoUnwind, FirstParamReturned});
 
     return RetainN.get();
@@ -308,13 +281,10 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    ReleaseN = getWrapperFn(
+    ReleaseN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_release_n" : "swift_release_n",
-        isNonAtomic(OrigI)
-            ? SWIFT_RT_ENTRY_REF_AS_STR(swift_nonatomic_release_n)
-            : SWIFT_RT_ENTRY_REF_AS_STR(swift_release_n),
-        RegisterPreservingCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+        DefaultCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
     return ReleaseN.get();
   }

@@ -2759,11 +2759,10 @@ using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 ///                         metadata)
 ///     return metadata
 ///   }
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
-                         const void *arguments)
-    SWIFT_CC(RegisterPreservingCC);
+                         const void *arguments);
 
 // Callback to allocate a generic class metadata object.
 SWIFT_RUNTIME_EXPORT
@@ -2798,12 +2797,11 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 ///   never form part of the uniquing key for the conformance, which
 ///   is ultimately a statement about the user model of overlapping
 ///   conformances.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
-                             void * const *instantiationArgs)
-    SWIFT_CC(RegisterPreservingCC);
+                             void * const *instantiationArgs);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -2843,6 +2841,10 @@ const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
+
+SWIFT_RUNTIME_EXPORT
+Class
+swift_getInitializedObjCClass(Class c);
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 SWIFT_RUNTIME_EXPORT
@@ -2940,13 +2942,12 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
-                                 const ProtocolDescriptor * const *protocols)
-    SWIFT_CC(RegisterPreservingCC);
+                                 const ProtocolDescriptor * const *protocols);
 
 /// \brief Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
