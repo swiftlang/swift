@@ -10,6 +10,7 @@ add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
 
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
   LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}

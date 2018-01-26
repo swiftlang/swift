@@ -146,9 +146,11 @@ public protocol TextOutputStreamable {
 public protocol CustomStringConvertible {
   /// A textual representation of this instance.
   ///
-  /// Instead of accessing this property directly, convert an instance of any
-  /// type to a string by using the `String(describing:)` initializer. For
-  /// example:
+  /// Calling this property directly is discouraged. Instead, convert an
+  /// instance of any type to a string by using the `String(describing:)`
+  /// initializer. This initializer works with any type, and uses the custom
+  /// `description` property for types that conform to
+  /// `CustomStringConvertible`:
   ///
   ///     struct Point: CustomStringConvertible {
   ///         let x: Int, y: Int
@@ -197,6 +199,13 @@ public protocol LosslessStringConvertible : CustomStringConvertible {
 /// `debugDescription` property directly or using
 /// `CustomDebugStringConvertible` as a generic constraint is discouraged.
 ///
+/// - Note: Calling the `dump(_:_:_:_:)` function and printing in the debugger
+///   uses both `String(reflecting:)` and `Mirror(reflecting:)` to collect
+///   information about an instance. If you implement
+///   `CustomDebugStringConvertible` conformance for your custom type, you may
+///   want to consider providing a custom mirror by implementing
+///   `CustomReflectable` conformance, as well.
+///
 /// Conforming to the CustomDebugStringConvertible Protocol
 /// =======================================================
 ///
@@ -231,6 +240,28 @@ public protocol LosslessStringConvertible : CustomStringConvertible {
 ///     // Prints "Point(x: 21, y: 30)"
 public protocol CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
+  ///
+  /// Calling this property directly is discouraged. Instead, convert an
+  /// instance of any type to a string by using the `String(reflecting:)`
+  /// initializer. This initializer works with any type, and uses the custom
+  /// `debugDescription` property for types that conform to
+  /// `CustomDebugStringConvertible`:
+  ///
+  ///     struct Point: CustomDebugStringConvertible {
+  ///         let x: Int, y: Int
+  ///
+  ///         var debugDescription: String {
+  ///             return "(\(x), \(y))"
+  ///         }
+  ///     }
+  ///
+  ///     let p = Point(x: 21, y: 30)
+  ///     let s = String(reflecting: p)
+  ///     print(s)
+  ///     // Prints "(21, 30)"
+  ///
+  /// The conversion of `p` to a string in the assignment to `s` uses the
+  /// `Point` type's `debugDescription` property.
   var debugDescription: String { get }
 }
 
@@ -531,13 +562,10 @@ internal struct _Stdout : TextOutputStream {
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if let asciiBuffer = string._core.asciiBuffer {
+    if _fastPath(string._guts.isASCII) {
       defer { _fixLifetime(string) }
-
-      _stdlib_fwrite_stdout(
-        UnsafePointer(asciiBuffer.baseAddress!),
-        asciiBuffer.count,
-        1)
+      let ascii = string._guts._unmanagedASCIIView
+      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
       return
     }
 
@@ -593,7 +621,7 @@ extension Unicode.Scalar : TextOutputStreamable {
 }
 
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
+public var _playgroundPrintHook : ((String) -> Void)? = nil
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)

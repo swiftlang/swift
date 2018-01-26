@@ -159,7 +159,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
     FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
-#ifndef NDEBUG
+#ifdef NDEBUG
     break;
 #endif
   }
@@ -177,10 +177,10 @@ class AddressUserVisitor {
 public:
   virtual ~AddressUserVisitor() {}
 
-  virtual void visitNormalUse(SILInstruction *user) = 0;
-  virtual void visitTake(CopyAddrInst *copy) = 0;
-  virtual void visitDestroy(DestroyAddrInst *destroy) = 0;
-  virtual void visitDebugValue(DebugValueAddrInst *debugValue) = 0;
+  virtual bool visitNormalUse(SILInstruction *user) = 0;
+  virtual bool visitTake(CopyAddrInst *copy) = 0;
+  virtual bool visitDestroy(DestroyAddrInst *destroy) = 0;
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) = 0;
 };
 } // namespace
 
@@ -219,31 +219,44 @@ static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
                                            - Apply->getArgumentOperandNumber())
                  .isIndirectConvention()
              && "copy_addr location should be passed indirect");
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       continue;
     }
     if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
-      if (CopyInst->getSrc() == use->get() && CopyInst->isTakeOfSrc())
-        visitor.visitTake(CopyInst);
-      else
-        visitor.visitNormalUse(CopyInst);
+      if (CopyInst->getSrc() == use->get() && CopyInst->isTakeOfSrc()) {
+        if (!visitor.visitTake(CopyInst))
+          return false;
+      } else {
+        if (!visitor.visitNormalUse(CopyInst))
+          return false;
+      }
       continue;
     }
     if (auto *Destroy = dyn_cast<DestroyAddrInst>(UserInst)) {
-      visitor.visitDestroy(Destroy);
+      if (!visitor.visitDestroy(Destroy))
+        return false;
+
       continue;
     }
     switch (UserInst->getKind()) {
     case SILInstructionKind::LoadInst:
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       break;
     case SILInstructionKind::ExistentialMetatypeInst:
     case SILInstructionKind::InjectEnumAddrInst:
     case SILInstructionKind::StoreInst:
-      visitor.visitNormalUse(UserInst);
+      if (!visitor.visitNormalUse(UserInst))
+        return false;
+
       break;
     case SILInstructionKind::DebugValueAddrInst:
-      visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst));
+      if (!visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst)))
+        return false;
+
       break;
     case SILInstructionKind::DeallocStackInst:
       break;
@@ -497,20 +510,26 @@ class CopyForwarding {
   public:
     CopySrcUserVisitor(CopyForwarding &CPF) : CPF(CPF) {}
 
-    virtual void visitNormalUse(SILInstruction *user) {
+    virtual bool visitNormalUse(SILInstruction *user) {
       if (isa<LoadInst>(user))
         CPF.IsSrcLoadedFrom = true;
-      
-      CPF.SrcUserInsts.insert(user);
+
+      // Bail on multiple uses in the same instruction to avoid complexity.
+      return CPF.SrcUserInsts.insert(user).second;
     }
-    virtual void visitTake(CopyAddrInst *take) {
+    virtual bool visitTake(CopyAddrInst *take) {
+      if (take->getSrc() == take->getDest())
+        return false;
+
       CPF.TakePoints.push_back(take);
+      return true;
     }
-    virtual void visitDestroy(DestroyAddrInst *destroy) {
+    virtual bool visitDestroy(DestroyAddrInst *destroy) {
       CPF.DestroyPoints.push_back(destroy);
+      return true;
     }
-    virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
-      CPF.SrcDebugValueInsts.insert(debugValue);
+    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+      return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
   };
 
@@ -575,13 +594,18 @@ public:
   CopyDestUserVisitor(SmallPtrSetImpl<SILInstruction *> &DestUsers)
       : DestUsers(DestUsers) {}
 
-  virtual void visitNormalUse(SILInstruction *user) { DestUsers.insert(user); }
-  virtual void visitTake(CopyAddrInst *take) { DestUsers.insert(take); }
-  virtual void visitDestroy(DestroyAddrInst *destroy) {
-    DestUsers.insert(destroy);
+  virtual bool visitNormalUse(SILInstruction *user) {
+    // Bail on multiple uses in the same instruction to avoid complexity.
+    return DestUsers.insert(user).second;
   }
-  virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
-    DestUsers.insert(debugValue);
+  virtual bool visitTake(CopyAddrInst *take) {
+    return DestUsers.insert(take).second;
+  }
+  virtual bool visitDestroy(DestroyAddrInst *destroy) {
+    return DestUsers.insert(destroy).second;
+  }
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+    return DestUsers.insert(debugValue).second;
   }
 };
 } // end anonymous namespace
@@ -842,7 +866,10 @@ bool CopyForwarding::forwardPropagateCopy() {
     if (isa<DeallocStackInst>(UserInst))
       continue;
 
-    DirectDestUsers.insert(UserInst);
+    // Bail on multiple uses in the same instruction so that AnalyzeForwardUse
+    // does not need to deal with it.
+    if (!DirectDestUsers.insert(UserInst))
+      return false;
   }
   // Looking at
   //
@@ -1421,13 +1448,12 @@ class CopyForwardingPass : public SILFunctionTransform
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
-class TempRValueOptPass : public SILFunctionTransform
-{
+class TempRValueOptPass : public SILFunctionTransform {
   AliasAnalysis *AA = nullptr;
 
-  static bool collectLoads(SILInstruction *CurrentInst,
-                           SingleValueInstruction *addr,
-                           llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts);
+  static bool collectLoads(Operand *UserOp, SILInstruction *UserInst,
+                           SingleValueInstruction *Addr,
+                           llvm::SmallPtrSetImpl<SILInstruction *> &LoadInsts);
 
   bool checkNoSourceModification(CopyAddrInst *copyInst,
                        const llvm::SmallPtrSetImpl<SILInstruction *> &useInsts);
@@ -1483,9 +1509,9 @@ void TempRValueOptPass::run() {
 
 /// Transitively explore all data flow uses of the given \p address until
 /// reaching a load or returning false.
-bool TempRValueOptPass::
-collectLoads(SILInstruction *user, SingleValueInstruction *address,
-             llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+bool TempRValueOptPass::collectLoads(
+    Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
+    llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
   if (user->getParent() != address->getParent())
@@ -1496,45 +1522,57 @@ collectLoads(SILInstruction *user, SingleValueInstruction *address,
   // destroy the source. This way, we know that the destroy_addr instructions
   // that we recorded cover all the temporary's lifetime termination points.
   //
-  // Currently this includes address projections and loads.
+  // Currently this includes address projections, loads, and in_guaranteed uses
+  // by an apply.
   //
   // TODO: handle non-destructive projections of enums
   // (unchecked_take_enum_data_addr of Optional is nondestructive.)
   switch (user->getKind()) {
-    default:
-      DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
-      return false;
+  default:
+    DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
+    return false;
 
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst: {
-      // Transitively look through projections on stack addresses.
-      auto proj = cast<SingleValueInstruction>(user);
-      for (auto *useOper : proj->getUses()) {
-        if (!collectLoads(useOper->getUser(), proj, loadInsts))
-          return false;
-      }
+  case SILInstructionKind::ApplyInst: {
+    auto *AI = cast<ApplyInst>(user);
+    auto Convention = AI->getArgumentConvention(userOp->getOperandNumber() - 1);
+    if (Convention.isGuaranteedConvention()) {
+      loadInsts.insert(AI);
       return true;
     }
-
-    case SILInstructionKind::LoadInst:
-    case SILInstructionKind::LoadBorrowInst: {
-      // Loads are the end of the data flow chain. The users of the load can't
-      // access the temporary storage.
-      loadInsts.insert(user);
-      return true;
-    }
-
-    case SILInstructionKind::CopyAddrInst: {
-      // copy_addr which read from the temporary are like loads.
-      // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
-      auto *copyFromTmp = cast<CopyAddrInst>(user);
-      if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
-        DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
+    DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy is source"
+                       << *user);
+    return false;
+  }
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst: {
+    // Transitively look through projections on stack addresses.
+    auto proj = cast<SingleValueInstruction>(user);
+    for (auto *projUseOper : proj->getUses()) {
+      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, loadInsts))
         return false;
-      }
-      loadInsts.insert(copyFromTmp);
-      return true;
     }
+    return true;
+  }
+
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::LoadBorrowInst: {
+    // Loads are the end of the data flow chain. The users of the load can't
+    // access the temporary storage.
+    loadInsts.insert(user);
+    return true;
+  }
+
+  case SILInstructionKind::CopyAddrInst: {
+    // copy_addr which read from the temporary are like loads.
+    // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
+    auto *copyFromTmp = cast<CopyAddrInst>(user);
+    if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
+      DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
+      return false;
+    }
+    loadInsts.insert(copyFromTmp);
+    return true;
+  }
   }
 }
 
@@ -1600,7 +1638,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
       continue;
 
-    if (!collectLoads(user, tempObj, loadInsts))
+    if (!collectLoads(useOper, user, tempObj, loadInsts))
       return false;
   }
 
@@ -1627,6 +1665,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     case SILInstructionKind::TupleElementAddrInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::ApplyInst:
       use->set(copyInst->getSrc());
       break;
 

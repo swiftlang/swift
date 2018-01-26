@@ -30,7 +30,7 @@ void ${node.name}::validate() const {
   if (!Data || !Data->Raw) return;
   auto raw = Data->Raw;
   if (isMissing()) return;
-  assert(raw->Layout.size() == ${len(node.children)});
+  assert(raw->getLayout().size() == ${len(node.children)});
 %     for child in node.children:
 %       if child.token_choices:
 %         choices = ", ".join("tok::" + choice.kind
@@ -41,8 +41,17 @@ void ${node.name}::validate() const {
 %         token_kind = child.main_token().kind
 %         choices = ", ".join("\"%s\"" % choice
 %                             for choice in child.text_choices)
-  syntax_assert_child_token_text(raw, ${child.name}, 
+  syntax_assert_child_token_text(raw, ${child.name},
                                  tok::${token_kind}, ${choices});
+%       end
+%       if child.node_choices:
+#ifndef NDEBUG
+        {
+          auto child = make<Syntax>(raw->getChild(Cursor::${child.name}));
+%         content = check_child_condition(child) + '(child)'
+          assert(${content});
+        }
+#endif
 %       end
 %     end
 }

@@ -123,10 +123,6 @@ SILWitnessTable::~SILWitnessTable() {
   }
 }
 
-IsSerialized_t SILWitnessTable::isSerialized() const {
-  return Serialized ? IsSerialized : IsNotSerialized;
-}
-
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances,
@@ -175,7 +171,7 @@ bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance) 
   auto protocolIsPublic =
       conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
   auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
-  return nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
+  return !nominal->isResilient() && protocolIsPublic && typeIsPublic;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

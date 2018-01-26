@@ -9,16 +9,16 @@ import resilient_enum
 
 // CHECK: %TSi = type <{ [[INT:i32|i64]] }>
 
-// CHECK-LABEL: @_T017struct_resilience26StructWithResilientStorageVMf = internal global
+// CHECK-LABEL: @"$S17struct_resilience26StructWithResilientStorageVMf" = internal global
 
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypes010resilient_A04SizeVAE_A2Ec1ftF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
 
 public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
-// CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
+// CHECK: [[METADATA:%.*]] = call %swift.type* @"$S16resilient_struct4SizeVMa"()
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -46,7 +46,7 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
   return f(s)
 }
 
-// CHECK-LABEL: declare %swift.type* @_T016resilient_struct4SizeVMa()
+// CHECK-LABEL: declare %swift.type* @"$S16resilient_struct4SizeVMa"()
 
 // Rectangle has fixed layout inside its resilience domain, and dynamic
 // layout on the outside.
@@ -54,10 +54,10 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience26functionWithResilientTypesy010resilient_A09RectangleVF(%T16resilient_struct9RectangleV* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypesyy010resilient_A09RectangleVF"(%T16resilient_struct9RectangleV* noalias nocapture)
 public func functionWithResilientTypes(_ r: Rectangle) {
 
-// CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct9RectangleVMa()
+// CHECK: [[METADATA:%.*]] = call %swift.type* @"$S16resilient_struct9RectangleVMa"()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 2
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
@@ -83,7 +83,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience28functionWithMyResilientTypesAA0E4SizeVAD_A2Dc1ftF(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
@@ -113,8 +113,8 @@ public struct StructWithResilientStorage {
 // resilient layout, and go through the field offset vector in the
 // metadata when accessing stored properties.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience26StructWithResilientStorageV1nSivg(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
-// CHECK: [[METADATA:%.*]] = call %swift.type* @_T017struct_resilience26StructWithResilientStorageVMa()
+// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @"$S17struct_resilience26StructWithResilientStorageV1nSivg"(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
+// CHECK: [[METADATA:%.*]] = call %swift.type* @"$S17struct_resilience26StructWithResilientStorageVMa"()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 2
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
@@ -135,7 +135,7 @@ public struct StructWithIndirectResilientEnum {
 }
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience31StructWithIndirectResilientEnumV1nSivg(%T17struct_resilience31StructWithIndirectResilientEnumV* {{.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @"$S17struct_resilience31StructWithIndirectResilientEnumV1nSivg"(%T17struct_resilience31StructWithIndirectResilientEnumV* {{.*}})
 // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T17struct_resilience31StructWithIndirectResilientEnumV, %T17struct_resilience31StructWithIndirectResilientEnumV* %0, i32 0, i32 1
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
@@ -150,27 +150,26 @@ public struct ResilientStructWithMethod {
 
 // Corner case -- type is address-only in SIL, but empty in IRGen
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethodyAA0f10StructWithG0V1r_tF(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF"(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture)
 public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
   _ = r.method
 }
 
 // Type is address-only in SIL, and resilient in IRGen
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T017struct_resilience29partialApplyOfResilientMethody010resilient_A04SizeV1s_tF(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF"(%swift.opaque* noalias nocapture)
 public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }
 
 // Public metadata accessor for our resilient struct
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T017struct_resilience6MySizeVMa()
-// CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @_T017struct_resilience6MySizeVMf, i32 0, i32 1) to %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @"$S17struct_resilience6MySizeVMa"()
+// CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @"$S17struct_resilience6MySizeVMf", i32 0, i32 1) to %swift.type*)
 
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_StructWithResilientStorage(i8*)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
-// CHECK: [[VWT:%.*]] = load i8**, i8*** getelementptr inbounds ({{.*}} @_T017struct_resilience26StructWithResilientStorageVMf{{.*}}, [[INT]] -1)
 
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 
@@ -188,13 +187,13 @@ public func partialApplyOfResilientMethod(s: Size) {
 // public let n: Int
 
 // CHECK: [[FIELD_3:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 2
-// CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0Bi{{32|64}}_WV, i32 {{.*}}), i8*** [[FIELD_3]]
+// CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBi{{32|64}}_WV", i32 {{.*}}), i8*** [[FIELD_3]]
 
 // Resilient aggregate with one field -- make sure we don't look inside it
 // public let i: ResilientInt
 // CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
-// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}}, i8** [[VWT]])
-// CHECK: store atomic %swift.type* {{.*}} @_T017struct_resilience26StructWithResilientStorageVMf{{.*}}, %swift.type** @_T017struct_resilience26StructWithResilientStorageVML release,
+// CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}})
+// CHECK: store atomic %swift.type* {{.*}} @"$S17struct_resilience26StructWithResilientStorageVMf{{.*}}, %swift.type** @"$S17struct_resilience26StructWithResilientStorageVML" release,
 // CHECK: ret void

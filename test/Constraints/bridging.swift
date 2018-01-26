@@ -15,7 +15,7 @@ public class BridgedClassSub : BridgedClass { }
 
 // Attempt to bridge to a type from another module. We only allow this for a
 // few specific types, like String.
-extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
+extension LazyFilterSequence.Iterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'Iterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
   public typealias _ObjectiveCType = BridgedClassSub
 
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
@@ -24,19 +24,19 @@ extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{confor
 
   public static func _forceBridgeFromObjectiveC(
     _ source: _ObjectiveCType,
-    result: inout LazyFilterIterator?
+    result: inout LazyFilterSequence.Iterator?
   ) { }
 
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: _ObjectiveCType,
-    result: inout LazyFilterIterator?
+    result: inout LazyFilterSequence.Iterator?
   ) -> Bool {
     return true
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> LazyFilterIterator {
-    let result: LazyFilterIterator?
+      -> LazyFilterSequence.Iterator {
+    let result: LazyFilterSequence.Iterator?
     return result!
   }
 }
@@ -258,18 +258,18 @@ func rdar19770981(_ s: String, ns: NSString) {
 
 // <rdar://problem/19831919> Fixit offers as! conversions that are known to always fail
 func rdar19831919() {
-  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
-  var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
+  var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Self, Other), (Other, Self)}}
   var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }
 
@@ -296,7 +296,7 @@ func rdar20029786(_ ns: NSString?) {
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
 
-  var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{20-20=(}}{{31-31=) as String}}
+  var s4: String = ns ?? "str" // expected-error{{cannot convert value of type 'NSString' to specified type 'String'}}
   var s5: String = (ns ?? "str") as String // fixed version
 }
 

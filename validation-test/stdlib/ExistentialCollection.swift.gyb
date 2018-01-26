@@ -72,9 +72,9 @@ tests.test("AnyIterator") {
 
     // This is a really complicated type of no interest to our
     // clients.
-    let iterator: LazyMapIterator<
-        IndexingIterator<CountableRange<Int>>, OpaqueValue<Int>
-      > = lazyStrings.makeIterator()
+    let iterator: LazyMapSequence<
+      CountableRange<Int>, OpaqueValue<Int>
+    >.Iterator = lazyStrings.makeIterator()
     return AnyIterator(iterator)
   }
   expectEqual([0, 1, 2, 3, 4], Array(digits()).map { $0.value })
@@ -258,7 +258,7 @@ tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
 %   end
 
   do {
-    var startIndex = c.startIndex
+    let startIndex = c.startIndex
     var badBounds = c.index(c.startIndex, offsetBy: 3)..<c.endIndex
 
     Log.subscriptIndex.expectIncrement(Base.self) {

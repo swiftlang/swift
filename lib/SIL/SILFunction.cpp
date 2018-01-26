@@ -97,7 +97,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false), KeepAsPublic(false),
+      HasCReferences(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
   if (InsertBefore)
@@ -443,6 +443,11 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   // If we can inline it, we can reference it.
   if (hasValidLinkageForFragileInline())
     return true;
+
+  // If the containing module has been serialized
+  if (getModule().isSerialized()) {
+    return true;
+  }
 
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(getLinkage());

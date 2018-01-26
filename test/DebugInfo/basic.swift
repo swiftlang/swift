@@ -51,7 +51,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_T0s5Int64V1moiA2B_ABtFZ{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: @"$Ss5Int64V1moiyA2B_ABtFZ{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
@@ -70,11 +70,11 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 // CHECK-DAG: ![[FILE_CWD:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
 // CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
-// CHECK-DAG: !DISubprogram(name: "main"
+// CHECK-DAG: !DISubprogram(name: "main", {{.*}}file: ![[MAINFILE]],
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])
-// CHECK-DAG: ![[INT64:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64", {{.*}}, identifier: "_T0s5Int64VD")
+// CHECK-DAG: ![[INT64:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64", {{.*}}, identifier: "$Ss5Int64VD")
 // CHECK-DAG: ![[PARAMTYPES]] = !{![[INT64]], ![[INT64]], ![[INT64]]}
 // Import of the main module with the implicit name.
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], file: ![[MAINFILE]])

@@ -618,17 +618,17 @@ void Remangler::mangleClass(Node *node) {
 }
 
 void Remangler::mangleAnyConstructor(Node *node, char kindOp) {
-  mangleChildNode(node, 0);
-  if (node->getNumChildren() > 2) {
-    assert(node->getNumChildren() == 3);
-    mangleChildNode(node, 2);
-  }
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
   Buffer << "f" << kindOp;
 }
 
 void Remangler::mangleConstructor(Node *node) {
   mangleAnyConstructor(node, 'c');
+}
+
+void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TC";
 }
 
 void Remangler::mangleDeallocator(Node *node) {
@@ -860,13 +860,20 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleFunction(Node *node) {
   mangleChildNode(node, 0); // context
   mangleChildNode(node, 1); // name
-  Node *FuncType = getSingleChild(node->getChild(2));
+
+  bool hasLabels = node->getChild(2)->getKind() == Node::Kind::LabelList;
+  Node *FuncType = getSingleChild(node->getChild(hasLabels ? 3 : 2));
+
+  if (hasLabels)
+    mangleChildNode(node, 2); // parameter labels
+
   if (FuncType->getKind() == Node::Kind::DependentGenericType) {
     mangleFunctionSignature(getSingleChild(FuncType->getChild(1)));
     mangleChildNode(FuncType, 0); // generic signature
   } else {
     mangleFunctionSignature(FuncType);
   }
+
   Buffer << "F";
 }
 
@@ -1331,7 +1338,7 @@ void Remangler::mangleModule(Node *node) {
     Buffer << 's';
   } else if (node->getText() == MANGLING_MODULE_OBJC) {
     Buffer << "So";
-  } else if (node->getText() == MANGLING_MODULE_C) {
+  } else if (node->getText() == MANGLING_MODULE_CLANG_IMPORTER) {
     Buffer << "SC";
   } else {
     mangleIdentifier(node);
@@ -1448,6 +1455,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
+void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
+  mangleProtocolConformance(node->getChild(0));
+  Buffer << "Mc";
+}
+
 void Remangler::mangleProtocolList(Node *node, Node *superclass,
                                    bool hasExplicitAnyObject) {
   auto *protocols = getSingleChild(node, Node::Kind::TypeList);
@@ -1549,6 +1561,13 @@ void Remangler::mangleReturnType(Node *node) {
   mangleArgumentTuple(node);
 }
 
+void Remangler::mangleRelatedEntityDeclName(Node *node) {
+  mangleChildNodes(node);
+  if (node->getText().size() != 1)
+    unreachable("cannot handle multi-byte related entities");
+  Buffer << "L" << node->getText();
+}
+
 void Remangler::mangleSILBoxType(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Xb";
@@ -1614,8 +1633,15 @@ void Remangler::mangleTypeList(Node *node) {
   mangleEndOfList(FirstElem);
 }
 
+void Remangler::mangleLabelList(Node *node) {
+  if (node->getNumChildren() == 0)
+    Buffer << 'y';
+  else
+    mangleChildNodes(node);
+}
+
 void Remangler::mangleTypeMangling(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << 'D';
 }
 

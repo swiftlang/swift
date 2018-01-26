@@ -954,6 +954,29 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
+static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
+                                                 DeclContext *DC,
+                                                 ProtocolDecl *protocol) {
+  do {
+    if (DC->isTypeContext()) {
+      auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto type = NTD->getDeclaredType();
+
+      ConformanceCheckOptions options;
+      options |= ConformanceCheckFlags::InExpression;
+      options |= ConformanceCheckFlags::SuppressDependencyTracking;
+      options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+      auto result =
+          TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
+
+      if (result)
+        return NTD;
+    }
+  } while ((DC = DC->getParent()));
+
+  return nullptr;
+}
 /// Bind type variables for archetypes that are determined from
 /// context.
 ///
@@ -1015,8 +1038,18 @@ static void bindArchetypesFromContext(
       // parameters, or because this generic parameter was constrained
       // away into a concrete type.
       if (found != replacements.end()) {
+        Type contextTy;
+
+        if (genericEnv) {
+          contextTy = genericEnv->mapTypeIntoContext(paramTy);
+        } else {
+          auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
+          auto conformingDC = getInnermostConformingDC(cs.TC, cs.DC, protocol);
+          assert(conformingDC);
+          contextTy = conformingDC->getDeclaredTypeInContext();
+        }
+
         auto typeVar = found->second;
-        auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
         cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
                          locatorPtr);
       }
@@ -1404,7 +1437,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &refType,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
-  
+
   switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
@@ -1660,9 +1693,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
-
   // Note that we have resolved this overload.
   resolvedOverloadSets
     = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
@@ -1671,6 +1701,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               openedFullType,
                                               refType};
+
+  if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    // Build the disjunction to attempt binding both T? and T (or
+    // function returning T? and function returning T).
+    buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType, locator);
+  } else {
+    // Add the type binding constraint.
+    addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+  }
+
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
@@ -1840,4 +1880,9 @@ DeclName OverloadChoice::getName() const {
   }
   
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
+  // FIXME: Disable parts of the new IUO implementation for now.
+  return false;
 }

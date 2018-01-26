@@ -119,8 +119,8 @@ func <#test1#> () {
 let myArray = [<#item1#>, <#item2#>]
 
 // CHECK: <ffunc>func <name>test1()</name> {
-// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>, <arg><brace>{}</brace></arg>)</call>
-// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>) <arg><brace>{}</brace></arg></call>
+// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>, <arg><closure><brace>{}</brace></closure></arg>)</call>
+// CHECK:   <call><name>dispatch_async</name>(<arg><call><name>dispatch_get_main_queue</name>()</call></arg>) <arg><closure><brace>{}</brace></closure></arg></call>
 // CHECK: }</ffunc>
 func test1() {
   dispatch_async(dispatch_get_main_queue(), {})
@@ -149,8 +149,8 @@ enum Rawness : Int {
   case Two = 2, Three = 3
 }
 
-// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: <type>() throws -> ()</type></param>)</name> rethrows {}</ffunc>
-func rethrowFunc(_ f: () throws -> ()) rethrows {}
+// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: <type>() throws -> ()</type> = <closure><brace>{}</brace></closure></param>)</name> rethrows {}</ffunc>
+func rethrowFunc(_ f: () throws -> () = {}) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
@@ -179,7 +179,7 @@ class NestedPoundIf{
 class A {
   func foo(_ i : Int, animations: () -> ()) {}
   func perform() {foo(5, animations: {})}
-// CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <brace>{}</brace></arg>)</call>}</ifunc>
+// CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <closure><brace>{}</brace></closure></arg>)</call>}</ifunc>
 }
 
 // CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
@@ -217,7 +217,7 @@ class ReturnType {
   // CHECK: }</ifunc>
   
   func foo2<T>() -> T {}
-  // CHECK:  <ifunc>func <name>foo2<T>()</name> -> <type>T</type> {}</ifunc>
+  // CHECK:  <ifunc>func <name>foo2<<generic-param><name>T</name></generic-param>>()</name> -> <type>T</type> {}</ifunc>
   
   func foo3() -> () -> Int {}
   // CHECK:  <ifunc>func <name>foo3()</name> -> <type>() -> Int</type> {}</ifunc>
@@ -228,6 +228,15 @@ protocol FooProtocol {
   // CHECK:  <associatedtype>associatedtype <name>Bar</name></associatedtype>
   associatedtype Baz: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
+}
+
+// CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {
+// CHECK:   <subscript><name>subscript<<generic-param><name>U</name></generic-param>>(<param>generic: <type>U</type></param>)</name> -> <type>Int</type> { return 0 }</subscript>
+// CHECK:   <typealias>typealias <name>Foo</name><<generic-param><name>Y</name></generic-param>> = Bar<Y></typealias>
+// CHECK: }</struct>
+struct Generic<T: Comparable, X> {
+  subscript<U>(generic: U) -> Int { return 0 }
+  typealias Foo<Y> = Bar<Y>
 }
 
 a.b(c: d?.e?.f, g: h)
@@ -250,3 +259,9 @@ struct Tuples {
   }
 }
 
+completion(a: 1) { (x: Int, y: Int) -> Int in
+  return x + y
+}
+// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Int</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
+// CHECK:    return x + y
+// CHECK: }</closure></arg></call>

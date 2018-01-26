@@ -40,6 +40,10 @@
 #define STMT_RANGE(Id, First, Last)
 #endif
 
+#ifndef LAST_STMT
+#define LAST_STMT(Id)
+#endif
+
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
 STMT(Defer, Stmt)
@@ -62,8 +66,10 @@ STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(Fail, Stmt)
 STMT(Throw, Stmt)
+LAST_STMT(Throw)
 
 #undef STMT_RANGE
 #undef LABELED_STMT
 #undef ABSTRACT_STMT
 #undef STMT
+#undef LAST_STMT

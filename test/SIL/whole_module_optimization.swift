@@ -13,17 +13,17 @@ private func privateFn() -> Int32 {
   return 2
 }
 
-// CHECK-LABEL: sil @_T04main9getAnswers5Int32VyF
-// CHECK-SINGLE-FILE-LABEL: sil @_T04main9getAnswers5Int32VyF
+// CHECK-LABEL: sil @$S4main9getAnswers5Int32VyF
+// CHECK-SINGLE-FILE-LABEL: sil @$S4main9getAnswers5Int32VyF
 public func getAnswer() -> Int32 {
   // CHECK: %0 = integer_literal $Builtin.Int32, 42
   // CHECK-NEXT: %1 = struct $Int32 (%0 : $Builtin.Int32)
   // CHECK-NEXT: return %1 : $Int32
 
-  // CHECK-SINGLE-FILE: %0 = function_ref @_T04main9privateFn33_4704C82F83811927370AA02DFDC75B5ALLs5Int32VyF
+  // CHECK-SINGLE-FILE: %0 = function_ref @$S4main9privateFn33_4704C82F83811927370AA02DFDC75B5ALLs5Int32VyF
   // CHECK-SINGLE-FILE: %1 = thin_to_thick_function %0
   // CHECK-SINGLE-FILE: %2 = convert_function %1
-  // CHECK-SINGLE-FILE: %3 = function_ref @_T04main7computes5Int32VADycF
+  // CHECK-SINGLE-FILE: %3 = function_ref @$S4main7computeys5Int32VADycF
   // CHECK-SINGLE-FILE: %4 = apply %3(%2)
   // CHECK-SINGLE-FILE: return %4 : $Int
 

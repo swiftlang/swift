@@ -722,6 +722,7 @@ extension _JSONEncoder {
         switch self.options.dateEncodingStrategy {
         case .deferredToDate:
             // Must be called with a surrounding with(pushedKey:) call.
+            // Dates encode as single-value objects; this can't both throw and push a container, so no need to catch the error.
             try date.encode(to: self)
             return self.storage.popContainer()
 
@@ -743,7 +744,16 @@ extension _JSONEncoder {
 
         case .custom(let closure):
             let depth = self.storage.count
-            try closure(date, self)
+            do {
+                try closure(date, self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
 
             guard self.storage.count > depth else {
                 // The closure didn't encode anything. Return the default keyed container.
@@ -759,7 +769,19 @@ extension _JSONEncoder {
         switch self.options.dataEncodingStrategy {
         case .deferredToData:
             // Must be called with a surrounding with(pushedKey:) call.
-            try data.encode(to: self)
+            let depth = self.storage.count
+            do {
+                try data.encode(to: self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                // This shouldn't be possible for Data (which encodes as an array of bytes), but it can't hurt to catch a failure.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
+
             return self.storage.popContainer()
 
         case .base64:
@@ -767,7 +789,16 @@ extension _JSONEncoder {
 
         case .custom(let closure):
             let depth = self.storage.count
-            try closure(data, self)
+            do {
+                try closure(data, self)
+            } catch {
+                // If the value pushed a container before throwing, pop it back off to restore state.
+                if self.storage.count > depth {
+                    let _ = self.storage.popContainer()
+                }
+
+                throw error
+            }
 
             guard self.storage.count > depth else {
                 // The closure didn't encode anything. Return the default keyed container.
@@ -801,7 +832,16 @@ extension _JSONEncoder {
 
         // The value should request a container from the _JSONEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            try value.encode(to: self)
+        } catch {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
 
         // The top container should be a new container.
         guard self.storage.count > depth else {
@@ -1212,7 +1252,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     // MARK: - KeyedDecodingContainerProtocol Methods
 
     public var allKeys: [Key] {
-        return self.container.keys.flatMap { Key(stringValue: $0) }
+        return self.container.keys.compactMap { Key(stringValue: $0) }
     }
 
     public func contains(_ key: Key) -> Bool {
@@ -2237,9 +2277,8 @@ extension _JSONDecoder {
         switch self.options.dateDecodingStrategy {
         case .deferredToDate:
             self.storage.push(container: value)
-            let date = try Date(from: self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+            return try Date(from: self)
 
         case .secondsSince1970:
             let double = try self.unbox(value, as: Double.self)!
@@ -2271,9 +2310,8 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let date = try closure(self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+            return try closure(self)
         }
     }
 
@@ -2283,9 +2321,8 @@ extension _JSONDecoder {
         switch self.options.dataDecodingStrategy {
         case .deferredToData:
             self.storage.push(container: value)
-            let data = try Data(from: self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+            return try Data(from: self)
 
         case .base64:
             guard let string = value as? String else {
@@ -2300,9 +2337,8 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let data = try closure(self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+            return try closure(self)
         }
     }
 
@@ -2319,13 +2355,10 @@ extension _JSONDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        let decoded: T
         if type == Date.self || type == NSDate.self {
-            guard let date = try self.unbox(value, as: Date.self) else { return nil }
-            decoded = date as! T
+            return try self.unbox(value, as: Date.self) as? T
         } else if type == Data.self || type == NSData.self {
-            guard let data = try self.unbox(value, as: Data.self) else { return nil }
-            decoded = data as! T
+            return try self.unbox(value, as: Data.self) as? T
         } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
@@ -2336,17 +2369,14 @@ extension _JSONDecoder {
                                                                         debugDescription: "Invalid URL string."))
             }
 
-            decoded = (url as! T)
+            return url as! T
         } else if type == Decimal.self || type == NSDecimalNumber.self {
-            guard let decimal = try self.unbox(value, as: Decimal.self) else { return nil }
-            decoded = decimal as! T
+            return try self.unbox(value, as: Decimal.self) as? T
         } else {
             self.storage.push(container: value)
-            decoded = try type.init(from: self)
-            self.storage.popContainer()
+            defer { self.storage.popContainer() }
+            return try type.init(from: self)
         }
-
-        return decoded
     }
 }
 

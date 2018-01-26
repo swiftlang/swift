@@ -375,10 +375,11 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionDecl {{.*}} _ [146:5 - 148:5] expanded
 // CHECK-EXPANDED: {{^}}        `-BraceStmt {{.*}} [146:9 - 148:5] expanded
 // CHECK-EXPANDED: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
-// CHECK-EXPANDED: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}           |-AbstractFunctionDecl {{.*}} _ [150:25 - 152:3] expanded
-// CHECK-EXPANDED: {{^}}            `-BraceStmt {{.*}} [150:25 - 152:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}              `-BraceStmt {{.*}} [154:6 - 154:8] expanded
+// CHECK-EXPANDED:      {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}           |-Accessors {{.*}} [150:25 - 152:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}             `-AbstractFunctionDecl {{.*}} _ [150:25 - 152:3] expanded
+// CHECK-EXPANDED:      {{^}}                `-BraceStmt {{.*}} [150:25 - 152:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}           `-BraceStmt {{.*}} [154:6 - 154:8] expanded
 
 // CHECK-EXPANDED: |-AbstractFunctionDecl {{.*}} closures() [157:1 - 162:1] expanded
 // CHECK-EXPANDED: {{^}}  `-BraceStmt {{.*}} [157:17 - 162:1] expanded

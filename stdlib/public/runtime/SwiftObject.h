@@ -30,6 +30,10 @@
 
 #if SWIFT_OBJC_INTEROP
 
+// Source code: "SwiftObject"
+// Real class name: mangled "Swift._SwiftObject"
+#define SwiftObject _TtCs12_SwiftObject
+
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))
 #endif
@@ -74,14 +78,7 @@ SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
 
 namespace swift {
 
-struct String { void *x, *y, *z; };
-
-/// Helper from the standard library for stringizing an arbitrary object.
-extern "C" SWIFT_CC(swift)
-void swift_getSummary(String *out, OpaqueValue *value, const Metadata *T);
-
-// Convert a Swift String to an NSString.
-NSString *convertStringToNSString(String *swiftString);
+NSString *getDescription(OpaqueValue *value, const Metadata *type);
 
 }
 

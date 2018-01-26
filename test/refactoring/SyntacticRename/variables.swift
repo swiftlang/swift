@@ -31,6 +31,13 @@ if let i = opt, let /*var-j:def*/j = opt2 {
 var (a, /*pattern-b:def*/b) = (1, 2)
 print(a + /*pattern-b*/b)
 
+struct S {
+	lazy var lazyVal: Int = {
+		let /*lazy:def*/myVal = 0
+		return /*lazy:ref*/myVal
+	}()
+}
+
 // RUN: rm -rf %t.result && mkdir -p %t.result
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="var-y" -old-name "y" -new-name "yack" >> %t.result/variables_var-y.swift
 // RUN: diff -u %S/Outputs/variables/var-y.swift.expected %t.result/variables_var-y.swift
@@ -42,3 +49,5 @@ print(a + /*pattern-b*/b)
 // RUN: diff -u %S/Outputs/variables/var-j.swift.expected %t.result/variables_var-j.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="pattern-b" -old-name "b" -new-name "bee" >> %t.result/variables_pattern-b.swift
 // RUN: diff -u %S/Outputs/variables/pattern-b.swift.expected %t.result/variables_pattern-b.swift
+// RUN: %refactor -syntactic-rename -source-filename %s -pos="lazy" -old-name "myVal" -new-name "myNewVal" >> %t.result/variables_lazy.swift
+// RUN: diff -u %S/Outputs/variables/lazy.swift.expected %t.result/variables_lazy.swift

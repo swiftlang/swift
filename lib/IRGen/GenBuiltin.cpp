@@ -116,13 +116,10 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
-void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
-                            SILType resultType,
+void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
+                            Identifier FnId, SILType resultType,
                             Explosion &args, Explosion &out,
                             SubstitutionList substitutions) {
-  // Decompose the function's name into a builtin name and type list.
-  const BuiltinInfo &Builtin = IGF.getSILModule().getBuiltinInfo(FnId);
-
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -213,13 +210,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
       std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
           PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
       auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
+      if (!FuncNamePtr)
+        FuncNamePtr = llvm::createPGOFuncNameVar(
+            *IGF.IGM.getModule(), llvm::GlobalValue::LinkOnceAnyLinkage,
+            PGOFuncName);
 
-      if (FuncNamePtr) {
-        llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-        NameGEP = llvm::ConstantExpr::getGetElementPtr(
-            ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
-            FuncNamePtr, makeArrayRef(Indices));
-      }
+      llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+      NameGEP = llvm::ConstantExpr::getGetElementPtr(
+          ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+          FuncNamePtr, makeArrayRef(Indices));
     }
 
     // Replace the placeholder value with the new GEP.

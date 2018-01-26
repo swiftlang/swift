@@ -21,6 +21,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Sema.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/APSIntType.h"
 #include "swift/AST/ASTContext.h"
@@ -90,9 +91,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
-    auto literalType = Impl.importType(clangTy, ImportTypeKind::Value,
-                                       isInSystemModule(DC),
-                                       Bridgeability::None);
+    auto literalType = Impl.importTypeIgnoreIUO(
+        clangTy, ImportTypeKind::Value, isInSystemModule(DC),
+        Bridgeability::None);
     if (!literalType)
       return nullptr;
 
@@ -100,9 +101,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     if (castType.isNull()) {
       constantType = literalType;
     } else {
-      constantType = Impl.importType(castType, ImportTypeKind::Value,
-                                     isInSystemModule(DC),
-                                     Bridgeability::None);
+      constantType = Impl.importTypeIgnoreIUO(
+          castType, ImportTypeKind::Value, isInSystemModule(DC),
+          Bridgeability::None);
       if (!constantType)
         return nullptr;
     }
@@ -276,10 +277,9 @@ static Optional<std::pair<llvm::APSInt, Type>>
     if (auto literal = parseNumericLiteral<clang::IntegerLiteral>(impl,token)) {
       auto value = llvm::APSInt { literal->getValue(),
                                   literal->getType()->isUnsignedIntegerType() };
-      auto type  = impl.importType(literal->getType(),
-                                   ImportTypeKind::Value,
-                                   isInSystemModule(DC),
-                                   Bridgeability::None);
+      auto type = impl.importTypeIgnoreIUO(
+          literal->getType(), ImportTypeKind::Value, isInSystemModule(DC),
+          Bridgeability::None);
       return {{ value, type }};
     }
 
@@ -362,10 +362,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       }
       auto identifierName = identifierInfo->getName();
       auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
+
+      clang::sema::DelayedDiagnosticPool diagPool{
+          impl.getClangSema().DelayedDiagnostics.getCurrentPool()};
+      auto diagState = impl.getClangSema().DelayedDiagnostics.push(diagPool);
       auto parsedType = impl.getClangSema().getTypeName(identifier,
                                                         clang::SourceLocation(),
                                                         /*scope*/nullptr);
-      if (parsedType) {
+      impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
+
+      if (parsedType && diagPool.empty()) {
         castType = parsedType.get();
       } else {
         return nullptr;

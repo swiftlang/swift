@@ -70,6 +70,10 @@ private:
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
 
+  /// The ToolChain this Compilation was built with, that it may reuse to build
+  /// subsequent BatchJobs.
+  const ToolChain &TheToolChain;
+
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
 
@@ -172,7 +176,8 @@ private:
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
 
 public:
-  Compilation(DiagnosticEngine &Diags, OutputLevel Level,
+  Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
+              OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,

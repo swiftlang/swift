@@ -32,6 +32,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Projection.h"
@@ -957,9 +958,62 @@ static void checkForViolationWithCall(
   }
 }
 
+/// Given a block used as a noescape function argument, attempt to find
+/// the Swift closure that invoking the block will call.
+static SILValue findClosureStoredIntoBlock(SILValue V) {
+  auto FnType = V->getType().castTo<SILFunctionType>();
+  assert(FnType->getRepresentation() == SILFunctionTypeRepresentation::Block);
+
+  // Given a no escape block argument to a function,
+  // pattern match to find the noescape closure that invoking the block
+  // will call:
+  //     %noescape_closure = ...
+  //     %storage = alloc_stack
+  //     %storage_address = project_block_storage %storage
+  //     store %noescape_closure to [init] %storage_address
+  //     %block = init_block_storage_header %storage invoke %thunk
+  //     %arg = copy_block %block
+
+  InitBlockStorageHeaderInst *IBSHI = nullptr;
+
+  // Look through block copies to find the initialization of block storage.
+  while (true) {
+    if (auto *CBI = dyn_cast<CopyBlockInst>(V)) {
+      V = CBI->getOperand();
+      continue;
+    }
+
+    IBSHI = dyn_cast<InitBlockStorageHeaderInst>(V);
+    break;
+  }
+
+  if (!IBSHI)
+    return nullptr;
+
+  SILValue BlockStorage = IBSHI->getBlockStorage();
+  auto *PBSI = BlockStorage->getSingleUserOfType<ProjectBlockStorageInst>();
+  assert(PBSI && "Couldn't find block storage projection");
+
+  auto *SI = PBSI->getSingleUserOfType<StoreInst>();
+  assert(SI && "Couldn't find single store of function into block storage");
+
+  return SI->getSrc();
+}
+
 /// Look through a value passed as a function argument to determine whether
 /// it is a partial_apply.
 static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
+  auto ArgumentFnType = V->getType().castTo<SILFunctionType>();
+  assert(ArgumentFnType->isNoEscape());
+
+  if (ArgumentFnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Block) {
+    V = findClosureStoredIntoBlock(V);
+
+    if (!V)
+      return nullptr;
+  }
+
   while (true) {
     if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
       V = CFI->getOperand();
@@ -977,11 +1031,6 @@ static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
 /// if any of the @inout_aliasable captures passed to those closures have
 /// in-progress accesses that would conflict with any access the summary
 /// says the closure would perform.
-//
-/// TODO: We currently fail to statically diagnose non-escaping closures pased
-/// via @block_storage convention. To enforce this case, we should statically
-/// recognize when the apply takes a block argument that has been initialized to
-/// a non-escaping closure.
 static void checkForViolationsInNoEscapeClosureArguments(
     const StorageMap &Accesses, ApplySite AS, AccessSummaryAnalysis *ASA,
     llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses,
@@ -1023,12 +1072,20 @@ static void checkForViolationsInNoEscapeClosureArguments(
     if (Callee->empty())
       continue;
 
+
+    // For source compatibility reasons, treat conflicts found by
+    // looking through noescape blocks as warnings. A future compiler
+    // will upgrade these to errors.
+    bool ArgumentIsBlock = (ArgumentFnType->getRepresentation() ==
+                            SILFunctionTypeRepresentation::Block);
+
     // Check the closure's captures, which are a suffix of the closure's
     // parameters.
     unsigned StartIndex =
         Callee->getArguments().size() - PAI->getNumArguments();
     checkForViolationWithCall(Accesses, Callee, StartIndex,
-                              PAI->getArguments(), ASA, DiagnoseAsWarning,
+                              PAI->getArguments(), ASA,
+                              DiagnoseAsWarning || ArgumentIsBlock,
                               ConflictingAccesses);
   }
 }
@@ -1065,6 +1122,54 @@ static void checkForViolationsInNoEscapeClosures(
                                                ConflictingAccesses,
                                                /*DiagnoseAsWarning=*/false);
 }
+
+#ifndef NDEBUG
+// If a partial apply has @inout_aliasable arguments, it may only be used as
+// a @noescape function type in a way that is recognized by
+// DiagnoseStaticExclusivity.
+static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
+  SmallVector<Operand *, 8> uses(PAI->getUses());
+  while (!uses.empty()) {
+    Operand *oper = uses.pop_back_val();
+    SILInstruction *user = oper->getUser();
+
+    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+      continue;
+
+    if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
+      uses.append(copy->getUses().begin(), copy->getUses().end());
+      continue;
+    }
+    if (auto apply = isa<ApplySite>(user)) {
+      SILValue arg = oper->get();
+      auto ArgumentFnType = arg->getType().getAs<SILFunctionType>();
+      if (ArgumentFnType && ArgumentFnType->isNoEscape())
+        continue;
+
+      llvm::dbgs() << "Argument must be @noescape function type: " << *arg;
+      llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                       "used as a @noescape function type argument.");
+    }
+    auto *store = dyn_cast<StoreInst>(user);
+    if (store && oper->getOperandNumber() == StoreInst::Src) {
+      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(store->getDest())) {
+        SILValue storageAddr = PBSI->getOperand();
+        // The closure is stored to block storage. Recursively visit all
+        // uses of any initialized block storage values derived from this
+        // storage address..
+        for (Operand *oper : storageAddr->getUses()) {
+          if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
+            uses.append(IBS->getUses().begin(), IBS->getUses().end());
+        }
+        continue;
+      }
+    }
+    llvm::dbgs() << "Unexpected partial_apply use: " << *user;
+    llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                     "used as a @noescape function type argument.");
+  }
+}
+#endif
 
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                    AccessSummaryAnalysis *ASA) {
@@ -1173,6 +1278,21 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                              ConflictingAccesses);
         continue;
       }
+#ifndef NDEBUG
+      // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
+      // closure types, move this PartialApply verification into the
+      // SILVerifier to better pinpoint the offending pass.
+      if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
+        ApplySite apply(PAI);
+        if (llvm::any_of(range(apply.getNumArguments()),
+                         [apply](unsigned argIdx) {
+                           return apply.getArgumentConvention(argIdx)
+                             == SILArgumentConvention::Indirect_InoutAliasable;
+                         })) {
+          checkNoEscapePartialApply(PAI);
+        }
+      }
+#endif
       // Sanity check to make sure entries are properly removed.
       assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
              "Entries were not properly removed?!");

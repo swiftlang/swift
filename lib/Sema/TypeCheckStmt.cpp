@@ -145,8 +145,8 @@ namespace {
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
     DeclName name = AFD->getFullName();
     if (!name) {
-      if (auto *method = dyn_cast<FuncDecl>(AFD)) {
-        name = method->getAccessorStorageDecl()->getFullName();
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        name = accessor->getStorage()->getFullName();
       }
     }
     return name;
@@ -303,7 +303,9 @@ public:
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
+  CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
+  FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
   SourceLoc EndTypeCheckLoc;
 
@@ -818,9 +820,9 @@ public:
       TC.diagnose(S->getLoc(), diag::fallthrough_from_last_case);
       return nullptr;
     }
-    if (FallthroughDest->hasBoundDecls())
-      TC.diagnose(S->getLoc(), diag::fallthrough_into_case_with_var_binding);
+    S->setFallthroughSource(FallthroughSource);
     S->setFallthroughDest(FallthroughDest);
+    PreviousFallthrough = S;
     return S;
   }
   
@@ -839,10 +841,12 @@ public:
     AddLabeledStmt labelNest(*this, S);
 
     auto cases = S->getCases();
+    CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
       auto *caseBlock = *i;
       // Fallthrough transfers control to the next case block. In the
       // final case block, it is invalid.
+      FallthroughSource = caseBlock;
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
@@ -868,12 +872,12 @@ public:
           // was in the first label item's pattern.
           auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
           if (pattern != firstPattern) {
-            SmallVector<VarDecl *, 4> Vars;
-            firstPattern->collectVariables(Vars);
+            SmallVector<VarDecl *, 4> vars;
+            firstPattern->collectVariables(vars);
             pattern->forEachVariable([&](VarDecl *VD) {
               if (!VD->hasName())
                 return;
-              for (auto expected : Vars) {
+              for (auto *expected : vars) {
                 if (expected->hasName() && expected->getName() == VD->getName()) {
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
@@ -887,18 +891,54 @@ public:
             });
           }
         }
-
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           hadError |= TC.typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
+        
+      // If the previous case fellthrough, similarly check that that case's bindings
+      // includes our first label item's pattern bindings and types.
+      if (PreviousFallthrough) {
+        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+        SmallVector<VarDecl *, 4> Vars;
+        firstPattern->collectVariables(Vars);
+
+        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
+          const Pattern *pattern = labelItem.getPattern();
+          SmallVector<VarDecl *, 4> PreviousVars;
+          pattern->collectVariables(PreviousVars);
+          for (auto expected : Vars) {
+            bool matched = false;
+            if (!expected->hasName())
+              continue;
+            for (auto previous: PreviousVars) {
+              if (previous->hasName() && expected->getName() == previous->getName()) {
+                if (!previous->getType()->isEqual(expected->getType())) {
+                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
+                              previous->getType(), expected->getType());
+                  previous->markInvalid();
+                  expected->markInvalid();
+                }
+                matched = true;
+                break;
+              }
+            }
+            if (!matched) {
+              TC.diagnose(PreviousFallthrough->getLoc(),
+                          diag::fallthrough_into_case_with_var_binding, expected->getName());
+            }
+          }
+        }
+      }
       
       // Type-check the body statements.
+      PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
       hadError |= typeCheckStmt(body);
       caseBlock->setBody(body);
+      previousBlock = caseBlock;
     }
 
     if (!S->isImplicit()) {
@@ -1201,6 +1241,18 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     
     // Otherwise, produce a generic diagnostic.
     if (callee) {
+      auto &ctx = callee->getASTContext();
+      if (callee->isImplicit()) {
+        // Translate calls to implicit functions to their user-facing names
+        if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
+            callee->getBaseName() == ctx.Id_derived_struct_equals) {
+          diagnose(fn->getLoc(), diag::expression_unused_result_operator,
+                   ctx.Id_EqualsOperator)
+            .highlight(SR1).highlight(SR2);
+          return;
+        }
+      }
+
       auto diagID = diag::expression_unused_result_call;
       if (callee->getFullName().isOperator())
         diagID = diag::expression_unused_result_operator;
@@ -1553,8 +1605,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
 
-    // An inlinable constructor in a class must always be delegating.
-    if (!isDelegating && !ClassD->hasFixedLayout() &&
+    // An inlinable constructor in a class must always be delegating,
+    // unless the class is formally '@_fixed_layout'.
+    if (!isDelegating &&
+        ClassD->isFormallyResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

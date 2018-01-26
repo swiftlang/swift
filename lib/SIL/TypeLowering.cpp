@@ -599,14 +599,15 @@ namespace {
       // Trivial
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle loweringStyle) const override {
+    void
+    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                            TypeExpansionKind loweringStyle) const override {
       // Trivial
     }
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       // Trivial
       return value;
     }
@@ -778,7 +779,11 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue aggValue,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
+      if (style == TypeExpansionKind::None) {
+        return emitCopyValue(B, loc, aggValue);
+      }
+
       llvm::SmallVector<SILValue, 8> loweredChildValues;
       for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
@@ -807,17 +812,19 @@ namespace {
       B.emitReleaseValueAndFold(loc, aggValue);
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue aggValue,
-                                 LoweringStyle loweringStyle) const override {
+    void
+    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
+                            TypeExpansionKind loweringStyle) const override {
       SimpleOperationTy Fn;
 
       switch(loweringStyle) {
-      case LoweringStyle::Shallow:
+      case TypeExpansionKind::None:
+        return emitDestroyValue(B, loc, aggValue);
+      case TypeExpansionKind::DirectChildren:
         Fn = &TypeLowering::emitDestroyValue;
         break;
-      case LoweringStyle::Deep:
-        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
+      case TypeExpansionKind::MostDerivedDescendents:
+        Fn = &TypeLowering::emitLoweredDestroyValueMostDerivedDescendents;
         break;
       }
 
@@ -911,7 +918,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, B.getDefaultAtomicity());
@@ -928,19 +935,9 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle style) const override {
-      if (style == LoweringStyle::Shallow) {
-        emitDestroyValue(B, loc, value);
-        return;
-      }
-      assert(style != LoweringStyle::Shallow &&
-             "This method should never be called when performing a shallow "
-             "destroy value.");
-      if (B.getFunction().hasQualifiedOwnership()) {
-        B.createDestroyValue(loc, value);
-        return;
-      }
-      B.emitReleaseValueAndFold(loc, value);
+                                 TypeExpansionKind style) const override {
+      // Enums, we never want to expand.
+      return emitDestroyValue(B, loc, value);
     }
   };
 
@@ -953,12 +950,12 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       return emitCopyValue(B, loc, value);
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle style) const override {
+                                 TypeExpansionKind style) const override {
       emitDestroyValue(B, loc, value);
     }
   };
@@ -1068,7 +1065,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
@@ -1078,7 +1075,7 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle style) const override {
+                                 TypeExpansionKind style) const override {
       llvm_unreachable("type is not loadable!");
     }
   };
@@ -1127,12 +1124,12 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       llvm_unreachable("lowered copy");
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle style) const override {
+                                 TypeExpansionKind style) const override {
       llvm_unreachable("destroy value");
     }
 
@@ -1196,7 +1193,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  LoweringStyle style) const override {
+                                  TypeExpansionKind style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
@@ -1206,7 +1203,7 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 LoweringStyle style) const override {
+                                 TypeExpansionKind style) const override {
       llvm_unreachable("type is not loadable!");
     }
   };
@@ -1283,7 +1280,7 @@ namespace {
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(structType);
 
       // Classify the type according to its stored properties.
@@ -1313,7 +1310,7 @@ namespace {
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
+      if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(enumType);
 
       // If the whole enum is indirect, we lower it as if all payload
@@ -1720,12 +1717,6 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType);
 }
 
-/// Get the type of a global variable getter function.
-static CanAnyFunctionType getGlobalGetterType(CanType varType) {
-  ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get(TupleType::getEmpty(C), varType);
-}
-
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
@@ -1737,6 +1728,14 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
   CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
+
+  // Remove @noescape from function return types. A @noescape
+  // function return type is a contradiction.
+  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    canResultTy =
+        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
+  }
 
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
@@ -1912,12 +1911,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
            "constant ref to computed global var");
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
-  case SILDeclRef::Kind::GlobalGetter: {
-    VarDecl *var = cast<VarDecl>(vd);
-    assert(var->hasStorage() &&
-           "constant ref to computed global var");
-    return getGlobalGetterType(var->getInterfaceType()->getCanonicalType());
-  }
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(*this,
                                                cast<AbstractFunctionDecl>(vd),
@@ -1969,9 +1962,7 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter: {
     return vd->getDeclContext()->getGenericEnvironmentOfContext();
-  }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return cast<ClassDecl>(vd)->getGenericEnvironmentOfContext();
@@ -1996,9 +1987,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
   AbstractionPattern origType = getAbstractionPattern(value);
   CanType substType = lvalueType->getCanonicalType();
 
-  // Remove a layer of l-value type if present.
-  if (auto substLVType = dyn_cast<LValueType>(substType))
-    substType = substLVType.getObjectType();
+  assert(!isa<LValueType>(substType));
 
   // Look through reference storage on the original type.
   auto origRefType = origType.getAs<ReferenceStorageType>();
@@ -2053,7 +2042,7 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
-    if (srcType == mappedType || isa<LValueType>(srcType))
+    if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
 
@@ -2290,10 +2279,8 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2) {
   // Classes, class-constrained archetypes, and pure-ObjC existential types
   // all have single retainable pointer representation; optionality change
   // is allowed.
-  if ((type1.getSwiftRValueType()->mayHaveSuperclass() ||
-       type1.getSwiftRValueType()->isObjCExistentialType()) &&
-      (type2.getSwiftRValueType()->mayHaveSuperclass() ||
-       type2.getSwiftRValueType()->isObjCExistentialType()))
+  if (type1.getSwiftRValueType()->satisfiesClassConstraint() &&
+      type2.getSwiftRValueType()->satisfiesClassConstraint())
     return ABIDifference::Trivial;
 
   // Function parameters are ABI compatible if their differences are
@@ -2520,8 +2507,8 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    assert(structDecl->hasFixedLayout(Module.getSwiftModule(),
-                                      ResilienceExpansion::Minimal) &&
+    assert(!structDecl->isResilient(Module.getSwiftModule(),
+                                    ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
@@ -2547,8 +2534,8 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
-    assert(enumDecl->hasFixedLayout(Module.getSwiftModule(),
-                                    ResilienceExpansion::Minimal) &&
+    assert(!enumDecl->isResilient(Module.getSwiftModule(),
+                                  ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;

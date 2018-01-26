@@ -31,10 +31,12 @@ class FunctionPointer;
 typedef llvm::IRBuilder<> IRBuilderBase;
 
 class IRBuilder : public IRBuilderBase {
+public:
   // Without this, it keeps resolving to llvm::IRBuilderBase because
   // of the injected class name.
   typedef irgen::IRBuilderBase IRBuilderBase;
 
+private:
   /// The block containing the insertion point when the insertion
   /// point was last cleared.  Used only for preserving block
   /// ordering.
@@ -100,6 +102,11 @@ public:
     IRBuilderBase::SetInsertPoint(BB, before);
   }
 
+  void SetInsertPoint(llvm::Instruction *I) {
+    ClearedIP = nullptr;
+    IRBuilderBase::SetInsertPoint(I);
+  }
+
   /// A stable insertion point in the function.  "Stable" means that
   /// it will point to the same location in the function, even if
   /// instructions are subsequently added to the current basic block.
@@ -160,6 +167,19 @@ public:
   StableIP getStableIP() const {
     return StableIP(*this);
   }
+
+  /// Return the LLVM module we're inserting into.
+  llvm::Module *getModule() const {
+    if (auto BB = GetInsertBlock())
+      return BB->getModule();
+    assert(ClearedIP && "IRBuilder has no active or cleared insertion block");
+    return ClearedIP->getModule();
+  }
+
+  /// Don't create allocas this way; you'll get a dynamic alloca.
+  /// Use IGF::createAlloca or IGF::emitDynamicAlloca.
+  llvm::Value *CreateAlloca(llvm::Type *type, llvm::Value *arraySize,
+                            const llvm::Twine &name = "") = delete;
 
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
@@ -252,6 +272,17 @@ public:
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
   }
+
+  using IRBuilderBase::CreateMemSet;
+  llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value, Size size) {
+    return CreateMemSet(dest.getAddress(), value, size.getValue(),
+                        dest.getAlignment().getValue());
+  }
+  llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value,
+                               llvm::Value *size) {
+    return CreateMemSet(dest.getAddress(), value, size,
+                        dest.getAlignment().getValue());
+  }
   
   using IRBuilderBase::CreateLifetimeStart;
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
@@ -300,6 +331,25 @@ public:
   llvm::CallInst *CreateAsmCall(llvm::InlineAsm *asmBlock,
                                 ArrayRef<llvm::Value *> args) {
     return IRBuilderBase::CreateCall(asmBlock, args);
+  }
+
+  /// Call an intrinsic with no type arguments.
+  llvm::CallInst *CreateIntrinsicCall(llvm::Intrinsic::ID intrinsicID,
+                                      ArrayRef<llvm::Value *> args,
+                                      const Twine &name = "") {
+    auto intrinsicFn =
+      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+    return CreateCall(intrinsicFn, args, name);
+  }
+
+  /// Call an intrinsic with type arguments.
+  llvm::CallInst *CreateIntrinsicCall(llvm::Intrinsic::ID intrinsicID,
+                                      ArrayRef<llvm::Type*> typeArgs,
+                                      ArrayRef<llvm::Value *> args,
+                                      const Twine &name = "") {
+    auto intrinsicFn =
+      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    return CreateCall(intrinsicFn, args, name);
   }
 };
 

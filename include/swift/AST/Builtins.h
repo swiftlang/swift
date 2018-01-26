@@ -99,7 +99,8 @@ ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
 StringRef getBuiltinName(BuiltinValueKind ID);
   
 /// \brief The information identifying the builtin - its kind and types.
-struct BuiltinInfo {
+class BuiltinInfo {
+public:
   BuiltinValueKind ID;
   SmallVector<Type, 4> Types;
   bool isReadNone() const;

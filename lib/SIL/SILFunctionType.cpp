@@ -206,6 +206,29 @@ CanSILFunctionType Lowering::adjustFunctionType(
                               witnessMethodConformance);
 }
 
+CanSILFunctionType
+SILFunctionType::getWithRepresentation(Representation repr) {
+  return getWithExtInfo(getExtInfo().withRepresentation(repr));
+}
+
+CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
+  auto oldExt = getExtInfo();
+  if (newExt == oldExt)
+    return CanSILFunctionType(this);
+
+  auto calleeConvention =
+    (newExt.hasContext()
+       ? (oldExt.hasContext()
+            ? getCalleeConvention()
+            : Lowering::DefaultThickCalleeConvention)
+       : ParameterConvention::Direct_Unowned);
+
+  return get(getGenericSignature(), newExt, getCoroutineKind(),
+             calleeConvention, getParameters(), getYields(),
+             getResults(), getOptionalErrorResult(), getASTContext(),
+             getWitnessMethodConformanceOrNone());
+}
+
 namespace {
 
 enum class ConventionsKind : uint8_t {
@@ -761,7 +784,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
     substFormalResultType =
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
-        AbstractionPattern::getOptional(origResultType, OTK_Optional);
+        AbstractionPattern::getOptional(origResultType);
     return {origResultType, substFormalResultType};
 
   // These conventions don't require changes to the formal error type.
@@ -1244,7 +1267,6 @@ static CanSILFunctionType getNativeSILFunctionType(
       LLVM_FALLTHROUGH;
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
-    case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
@@ -1730,14 +1752,16 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
       return SelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
-    switch (FD->getAccessorKind()) {
-    case AccessorKind::NotAccessor:
+    auto accessor = dyn_cast<AccessorDecl>(FD);
+    if (!accessor)
       return getSelectorFamily(FD->getName());
+
+    switch (accessor->getAccessorKind()) {
     case AccessorKind::IsGetter:
       // Getter selectors can belong to families if their name begins with the
       // wrong thing.
-      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign) {
-        auto declName = FD->getAccessorStorageDecl()->getBaseName();
+      if (accessor->getStorage()->isObjC() || c.isForeign) {
+        auto declName = accessor->getStorage()->getBaseName();
         switch (declName.getKind()) {
         case DeclBaseName::Kind::Normal:
           return getSelectorFamily(declName.getIdentifier());
@@ -1771,7 +1795,6 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
@@ -1865,8 +1888,8 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
 static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
                                         SILDeclRef constant) {
   // Must be an accessor.
-  auto func = dyn_cast<FuncDecl>(constant.getDecl());
-  if (!func || !func->isAccessor())
+  auto accessor = dyn_cast<AccessorDecl>(constant.getDecl());
+  if (!accessor)
     return false;
 
   // Must be a type member.
@@ -1928,7 +1951,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
         assert(origLoweredInterfaceType->getNumParams() == 2);
 
         // The 'self' parameter is still the second argument.
-        unsigned selfIndex = cast<FuncDecl>(decl)->isSetter() ? 1 : 0;
+        unsigned selfIndex = cast<AccessorDecl>(decl)->isSetter() ? 1 : 0;
         assert(selfIndex == 1 ||
                origLoweredInterfaceType.getParams()[0].getType()->isVoid());
         foreignInfo.Self.setSelfIndex(selfIndex);
@@ -2006,7 +2029,6 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
 
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
-    case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
       return SILFunctionTypeRepresentation::Thin;
@@ -2115,20 +2137,7 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
 // @guaranteed or whatever.
 static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
-  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
-                         /*resolver*/nullptr);
-}
-
-SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
-  SILDeclRef cur = method, next = method;
-  do {
-    cur = next;
-    if (cur.requiresNewVTableEntry())
-      return cur;
-    next = cur.getNextOverriddenVTableEntry();
-  } while (next);
-
-  return cur;
+  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible);
 }
 
 // FIXME: This makes me very upset. Can we do without this?
@@ -2539,7 +2548,6 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
-  case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::IVarInitializer:

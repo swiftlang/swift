@@ -29,12 +29,15 @@
 using namespace swift;
 
 namespace {
+/// The Mach-O section name for the section containing protocol descriptor
+/// references. This lives within SEG_TEXT.
+constexpr const char ProtocolsSection[] = "__swift5_protos";
 /// The Mach-O section name for the section containing protocol conformances.
 /// This lives within SEG_TEXT.
-constexpr const char ProtocolConformancesSection[] = "__swift2_proto";
+constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeMetadataRecordSection[] = "__swift2_types";
+constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
 
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
@@ -46,7 +49,7 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   using mach_header_platform = mach_header;
 #endif
   
-  // Look for a __swift2_proto section.
+  // Look for a __swift5_proto section.
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
@@ -60,6 +63,12 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 }
 
 } // end anonymous namespace
+
+void swift::initializeProtocolLookup() {
+  _dyld_register_func_for_add_image(
+    addImageCallback<ProtocolsSection,
+                     addImageProtocolsBlockCallback>);
+}
 
 void swift::initializeProtocolConformanceLookup() {
   _dyld_register_func_for_add_image(

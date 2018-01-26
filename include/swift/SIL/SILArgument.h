@@ -43,11 +43,14 @@ class SILArgument : public ValueBase {
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
-  ValueOwnershipKind OwnershipKind;
 
 public:
-  ValueOwnershipKind getOwnershipKind() const { return OwnershipKind; }
-  void setOwnershipKind(ValueOwnershipKind NewKind) { OwnershipKind = NewKind; }
+  ValueOwnershipKind getOwnershipKind() const {
+    return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);
+  }
+  void setOwnershipKind(ValueOwnershipKind NewKind) {
+    Bits.SILArgument.VOKind = static_cast<unsigned>(NewKind);
+  }
 
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
@@ -125,7 +128,9 @@ protected:
                        ValueOwnershipKind OwnershipKind,
                        const ValueDecl *D = nullptr)
       : ValueBase(SubClassKind, Ty, IsRepresentative::Yes), ParentBB(nullptr),
-        Decl(D), OwnershipKind(OwnershipKind) {}
+        Decl(D) {
+    Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
+  }
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 
   friend SILBasicBlock;

@@ -32,6 +32,9 @@ protocol Protocol_Class2 : class {}
 
 @objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
 
+class FáncyName {}
+@objc (FancyName) extension FáncyName {}
+
 @objc  
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 

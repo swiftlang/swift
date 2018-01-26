@@ -1,0 +1,54 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxVisitor.cpp.gyb.
+//// Do Not Edit Directly!
+//===------------- SyntaxVisitor.cpp - Syntax Visitor definitions ---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/SyntaxVisitor.h"
+#include "swift/Basic/Defer.h"
+
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+void swift::syntax::SyntaxVisitor::visit(${node.name} node) {
+  visitChildren(node);
+}
+%   end
+% end
+
+void swift::syntax::SyntaxVisitor::visit(Syntax node) {
+  visitPre(node);
+  SWIFT_DEFER { visitPost(node); };
+  switch (node.getKind()) {
+  case SyntaxKind::Token:
+    visit(node.castTo<TokenSyntax>());
+    return;
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+  case SyntaxKind::${node.syntax_kind}:
+    visit(node.castTo<${node.name}>());
+    return;
+%   end
+% end
+  default:
+    visitChildren(node);
+    return;
+  }
+}
+
+void swift::syntax::Syntax::accept(SyntaxVisitor &visitor) {
+  visitor.visit(*this);
+}

@@ -4,6 +4,13 @@ from Node import Node
 
 
 DECL_NODES = [
+    # initializer -> '=' type
+    Node('TypeInitializerClause', kind='Syntax',
+         children=[
+             Child('Equal', kind='EqualToken'),
+             Child('Value', kind='Type'),
+         ]),
+
     # typealias-declaration -> attributes? access-level-modifier? 'typealias'
     #                            typealias-name generic-parameter-clause?
     #                            typealias-assignment
@@ -13,38 +20,45 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='AccessLevelModifier',
+             Child('AccessLevelModifier', kind='DeclModifier',
                    is_optional=True),
              Child('TypealiasKeyword', kind='TypealiasToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
-             Child('Equals', kind='EqualToken'),
-             Child('Type', kind='Type'),
+             Child('Initializer', kind='TypeInitializerClause',
+                   is_optional=True)
          ]),
 
     Node('FunctionParameterList', kind='SyntaxCollection',
          element='FunctionParameter'),
 
-    # function-signature ->
-    #   '(' parameter-list? ')' (throws | rethrows)? '->'? attributes? type?
-    Node('FunctionSignature', kind='Syntax',
+    Node('ParameterClause', kind='Syntax',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ParameterList', kind='FunctionParameterList'),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # -> Type
+    Node('ReturnClause', kind='Syntax',
+         children=[
+             Child('Arrow', kind='ArrowToken'),
+             Child('ReturnType', kind='Type'),
+         ]),
+
+    # function-signature ->
+    #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
+    Node('FunctionSignature', kind='Syntax',
+         children=[
+             Child('Input', kind='ParameterClause'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('Arrow', kind='ArrowToken',
-                   is_optional=True),
-             Child('ReturnTypeAttributes', kind='AttributeList',
-                   is_optional=True),
-             Child('ReturnType', kind='Type',
-                   is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
     # else-if-directive-clause -> '#elseif' expr stmt-list
@@ -62,7 +76,8 @@ DECL_NODES = [
              Child('PoundIf', kind='PoundIfToken'),
              Child('Condition', kind='Expr'),
              Child('Body', kind='StmtList'),
-             Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList'),
+             Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
+                   is_optional=True),
              Child('ElseClause', kind='ElseDirectiveClause',
                    is_optional=True),
              Child('PoundEndif', kind='PoundEndifToken'),
@@ -78,7 +93,7 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating',
                    ]),
-             Child('Detail', kind='TokenList'),
+             Child('Detail', kind='TokenList', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -97,12 +112,36 @@ DECL_NODES = [
              Child('InheritedTypeCollection', kind='InheritedTypeList'),
          ]),
 
+    # class-declaration -> attributes? access-level-modifier?
+    #                      'class' class-name
+    #                      generic-parameter-clause?
+    #                      type-inheritance-clause?
+    #                      generic-where-clause?
+    #                     '{' class-members '}'
+    # class-name -> identifier
+    Node('ClassDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ClassKeyword', kind='ClassToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
     # struct-declaration -> attributes? access-level-modifier?
     #                         'struct' struct-name
     #                         generic-parameter-clause?
     #                           type-inheritance-clause?
     #                         generic-where-clause?
-    #                         '{' struct-members ''
+    #                         '{' struct-members '}'
     # struct-name -> identifier
     Node('StructDecl', kind='Decl',
          children=[
@@ -136,6 +175,27 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
+    # extension-declaration -> attributes? access-level-modifier?
+    #                            'extension' extended-type
+    #                              type-inheritance-clause?
+    #                            generic-where-clause?
+    #                            '{' extension-members '}'
+    # extension-name -> identifier
+    Node('ExtensionDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ExtensionKeyword', kind='ExtensionToken'),
+             Child('ExtendedType', kind='Type'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
     Node('MemberDeclBlock', kind='Syntax',
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
@@ -158,6 +218,13 @@ DECL_NODES = [
     Node('TopLevelCodeDecl', kind='Decl',
          children=[
              Child('Body', kind='StmtList')
+         ]),
+
+    # initializer -> '=' expr
+    Node('InitializerClause', kind='Syntax',
+         children=[
+             Child('Equal', kind='EqualToken'),
+             Child('Value', kind='Expr'),
          ]),
 
     # parameter ->
@@ -184,9 +251,7 @@ DECL_NODES = [
              Child('TypeAnnotation', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
-             Child('DefaultEquals', kind='EqualToken',
-                   is_optional=True),
-             Child('DefaultValue', kind='Expr',
+             Child('DefaultArgument', kind='InitializerClause',
                    is_optional=True),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
@@ -266,5 +331,82 @@ DECL_NODES = [
                    is_optional=True),
              Child('CloseParen', kind='RightParenToken',
                    is_optional=True),
+         ]),
+
+    Node('AccessPathComponent', kind='Syntax',
+         children=[
+            Child('Name', kind='IdentifierToken'),
+            Child('TrailingDot', kind='PeriodToken', is_optional=True),
+         ]),
+
+    Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
+
+    Node('ImportDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('ImportTok', kind='ImportToken'),
+             Child('ImportKind', kind='Token', is_optional=True,
+                   token_choices=[
+                      'TypealiasToken', 'StructToken', 'ClassToken',
+                      'EnumToken', 'ProtocolToken', 'VarToken', 'LetToken',
+                      'FuncToken',
+                   ]),
+             Child('Path', kind='AccessPath'),
+         ]),
+
+    # (value)
+    Node('AccessorParameter', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Name', kind='IdentifierToken'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    Node('AccessorDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifier', kind='DeclModifier', is_optional=True),
+             Child('AccessorKind', kind='Token',
+                   text_choices=[
+                      'get', 'set', 'didSet', 'willSet',
+                   ]),
+             Child('Parameter', kind='AccessorParameter', is_optional=True),
+             Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
+
+    Node('AccessorBlock', kind="Syntax",
+         children=[
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('AccessorListOrStmtList', kind='Syntax',
+                   node_choices=[
+                      Child('Accessors', kind='AccessorList'),
+                      Child('Statements', kind='StmtList')]),
+             Child('RightBrace', kind='RightBraceToken'),
+         ]),
+
+    # Pattern: Type = Value { get {} },
+    Node('PatternBinding', kind="Syntax",
+         children=[
+             Child('Pattern', kind='Pattern'),
+             Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
+             Child('Initializer', kind='InitializerClause', is_optional=True),
+             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('PatternBindingList', kind="SyntaxCollection",
+         element='PatternBinding'),
+
+    Node('VariableDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
+             Child('LetOrVarKeyword', kind='Token',
+                   token_choices=[
+                       'LetToken', 'VarToken',
+                   ]),
+             Child('Bindings', kind='PatternBindingList'),
          ]),
 ]

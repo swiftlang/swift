@@ -223,8 +223,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
                                                Type valueType) {
   // We can only bridge from class or Objective-C existential types.
-  if (!dynamicType->isObjCExistentialType() &&
-      !dynamicType->mayHaveSuperclass())
+  if (!dynamicType->satisfiesClassConstraint())
     return Type();
 
   // If the value type cannot be bridged, we're done.
@@ -232,14 +231,6 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
     return Type();
 
   return Context.getBridgedToObjC(dc, valueType);
-}
-
-void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
-  // Force any delayed members added to the nominal type declaration.
-  if (nominalDecl->hasDelayedMembers()) {
-    this->handleExternalDecl(nominalDecl);
-    nominalDecl->setHasDelayedMembers(false);
-  }
 }
 
 Type TypeChecker::resolveTypeInContext(
@@ -265,7 +256,6 @@ Type TypeChecker::resolveTypeInContext(
   if (auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
     if (!isa<ProtocolDecl>(nominalType) &&
         (!nominalType->getGenericParams() || !isSpecialized)) {
-      forceExternalDeclMembers(nominalType);
       for (auto parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
@@ -1150,11 +1140,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   for (const auto entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
-
-    // If necessary, add delayed members to the declaration.
-    if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      TC.forceExternalDeclMembers(nomDecl);
-    }
 
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 foundDC, DC,
@@ -3540,61 +3525,59 @@ bool TypeChecker::isRepresentableInObjC(
     return false;
   }
 
-  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    if (FD->isAccessor()) {
-      // Accessors can only be @objc if the storage declaration is.
-      // Global computed properties may however @_cdecl their accessors.
-      auto storage = FD->getAccessorStorageDecl();
-      validateDecl(storage);
-      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
-          Reason != ObjCReason::WitnessToObjC) {
-        if (Diagnose) {
-          auto error = FD->isGetter()
-                    ? (isa<VarDecl>(storage) 
-                         ? diag::objc_getter_for_nonobjc_property
-                         : diag::objc_getter_for_nonobjc_subscript)
-                    : (isa<VarDecl>(storage)
-                         ? diag::objc_setter_for_nonobjc_property
-                         : diag::objc_setter_for_nonobjc_subscript);
+  if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    // Accessors can only be @objc if the storage declaration is.
+    // Global computed properties may however @_cdecl their accessors.
+    auto storage = accessor->getStorage();
+    validateDecl(storage);
+    if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
+        Reason != ObjCReason::WitnessToObjC) {
+      if (Diagnose) {
+        auto error = accessor->isGetter()
+                  ? (isa<VarDecl>(storage) 
+                       ? diag::objc_getter_for_nonobjc_property
+                       : diag::objc_getter_for_nonobjc_subscript)
+                  : (isa<VarDecl>(storage)
+                       ? diag::objc_setter_for_nonobjc_property
+                       : diag::objc_setter_for_nonobjc_subscript);
 
-          diagnose(FD->getLoc(), error);
-          describeObjCReason(*this, AFD, Reason);
-        }
-        return false;
+        diagnose(accessor->getLoc(), error);
+        describeObjCReason(*this, accessor, Reason);
       }
-
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::NotAccessor:
-        llvm_unreachable("already checking for accessor-ness");
-
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsWillSet:
-          // willSet/didSet implementations are never exposed to objc, they are
-          // always directly dispatched from the synthesized setter.
-        if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_observing_accessor);
-          describeObjCReason(*this, AFD, Reason);
-        }
-        return false;
-
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
-        return true;
-
-      case AccessorKind::IsMaterializeForSet:
-        // materializeForSet is synthesized, so never complain about it
-        return false;
-
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
-        if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_addressor);
-          describeObjCReason(*this, AFD, Reason);
-        }
-        return false;
-      }
+      return false;
     }
 
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsWillSet:
+        // willSet/didSet implementations are never exposed to objc, they are
+        // always directly dispatched from the synthesized setter.
+      if (Diagnose) {
+        diagnose(accessor->getLoc(), diag::objc_observing_accessor);
+        describeObjCReason(*this, accessor, Reason);
+      }
+      return false;
+
+    case AccessorKind::IsGetter:
+    case AccessorKind::IsSetter:
+      return true;
+
+    case AccessorKind::IsMaterializeForSet:
+      // materializeForSet is synthesized, so never complain about it
+      return false;
+
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsMutableAddressor:
+      if (Diagnose) {
+        diagnose(accessor->getLoc(), diag::objc_addressor);
+        describeObjCReason(*this, accessor, Reason);
+      }
+      return false;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     unsigned ExpectedParamPatterns = 1;
     if (FD->getImplicitSelfDecl())
       ExpectedParamPatterns++;
@@ -3957,6 +3940,26 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   describeObjCReason(*this, SD, Reason);
 
   return Result;
+}
+
+bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
+  if (!Context.LangOpts.EnableObjCInterop)
+    return false;
+
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    Optional<ForeignErrorConvention> errorConvention;
+    return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
+                                 errorConvention);
+  }
+
+  if (auto var = dyn_cast<VarDecl>(decl))
+    return isRepresentableInObjC(var, ObjCReason::MemberOfObjCMembersClass);
+
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+    return isRepresentableInObjC(subscript,
+                                 ObjCReason::MemberOfObjCMembersClass);
+
+  return false;
 }
 
 void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,

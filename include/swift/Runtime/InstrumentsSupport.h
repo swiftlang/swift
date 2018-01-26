@@ -26,7 +26,7 @@ HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
                                              size_t requiredAlignmentMask);
 
 SWIFT_RUNTIME_EXPORT
-BoxPair (*swift_allocBox)(Metadata const *type);
+BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*_swift_retain)(HeapObject *object);

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -typecheck
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null
 protocol VectorIndex {
     associatedtype Vector8 : Vector where Vector8.Index == Self, Vector8.Element == UInt8
 }

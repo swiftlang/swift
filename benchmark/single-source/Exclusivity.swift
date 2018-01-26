@@ -35,7 +35,7 @@ public let Exclusivity = [
   BenchmarkInfo(
     name: "ExclusivityInMatSet",
     runFunction: run_accessInMatSet,
-    tags: [.runtime, .cpubench]
+    tags: [.runtime, .cpubench, .unstable]
   ),
   // At -Onone
   // 25% swift_release

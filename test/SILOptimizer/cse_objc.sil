@@ -267,7 +267,7 @@ bb0(%0 : $@objc_metatype XXX.Type):
 }
 
 sil_vtable Bar {
-  #Bar.init!initializer.1: _TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
-  #Bar.walk!1: _TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
-  #Bar.deinit!deallocator: _TFC4test3BarD	// test.Bar.__deallocating_deinit
+  #Bar.init!initializer.1: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
+  #Bar.walk!1: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
+  #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }

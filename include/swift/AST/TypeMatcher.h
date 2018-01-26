@@ -279,9 +279,7 @@ class TypeMatcher {
             return false;
         }
 
-        return this->visit(firstFunc.getInput(), secondFunc->getInput(),
-                           sugaredFirstFunc->getInput()) &&
-               this->visit(firstFunc.getResult(), secondFunc->getResult(),
+        return this->visit(firstFunc.getResult(), secondFunc->getResult(),
                            sugaredFirstFunc->getResult());
       }
 

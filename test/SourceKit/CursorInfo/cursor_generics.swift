@@ -10,7 +10,7 @@ func someFunc <A>() -> A {
 }
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:10 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
-// CHECK1: <Declaration>func testGenerics&lt;T&gt;(x: <Type usr="s:15cursor_generics12testGenericsyx1x_tlF1TL_xmfp">T</Type>)</Declaration>
+// CHECK1: <Declaration>func testGenerics&lt;T&gt;(x: <Type usr="s:15cursor_generics12testGenerics1xyx_tlF1TL_xmfp">T</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:10 %s -- %s | %FileCheck -check-prefix=CHECK2 %s
 // CHECK2: <Function

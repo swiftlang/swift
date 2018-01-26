@@ -361,9 +361,9 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassMPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<(ProtocolB & ProtocolA).Protocol>.self))
 
-  expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
+  expectEqual("_TtGC1a12GenericClassaSo10CFArrayRef_",
               NSStringFromClass(GenericClass<CFArray>.self))
-  expectEqual("_TtGC1a12GenericClassVSC7Decimal_",
+  expectEqual("_TtGC1a12GenericClassaSo9NSDecimal_",
               NSStringFromClass(GenericClass<Decimal>.self))
   expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
@@ -499,7 +499,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, true)
+    _stdlib_NSStringHashValue(a, isASCII: true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -509,7 +509,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, false)
+    _stdlib_NSStringHashValue(a, isASCII: false)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -520,7 +520,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, true)
+    _stdlib_NSStringHashValuePointer(ptrA, isASCII: true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -531,7 +531,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak"
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, false)
+    _stdlib_NSStringHashValuePointer(ptrA, isASCII: false)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -761,8 +761,8 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, to: &output)
 
   let expected =
-    "▿ Optional(Swift.Unmanaged<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
-    "  ▿ some: Swift.Unmanaged<__ObjC.CFURL>\n" +
+    "▿ Optional(Swift.Unmanaged<__C.CFURLRef>(_value: http://llvm.org/))\n" +
+    "  ▿ some: Swift.Unmanaged<__C.CFURLRef>\n" +
     "    - _value: http://llvm.org/ #0\n" +
     "      - super: NSObject\n"
 

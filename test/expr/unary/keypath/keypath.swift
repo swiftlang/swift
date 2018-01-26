@@ -485,6 +485,20 @@ func sr6106() {
   }
 }
 
+// SR-6744
+func sr6744() {
+    struct ABC {
+        let value: Int
+        func value(adding i: Int) -> Int { return value + i }
+    }
+
+    let abc = ABC(value: 0)
+    func get<T>(for kp: KeyPath<ABC, T>) -> T {
+        return abc[keyPath: kp]
+    }
+    _ = get(for: \.value)
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

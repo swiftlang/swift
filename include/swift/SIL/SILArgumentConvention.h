@@ -87,6 +87,24 @@ struct SILArgumentConvention {
     return Value <= SILArgumentConvention::Indirect_Out;
   }
 
+  bool isGuaranteedConvention() const {
+    switch (Value) {
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Direct_Guaranteed:
+      return true;
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Deallocating:
+      return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
   /// Returns true if \p Value is a not-aliasing indirect parameter.
   /// The \p isInoutAliasing specifies what to assume about the inout
   /// convention.

@@ -193,7 +193,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // constrained extensions, so use the overload signature's
     // type. This is layering a partial fix upon a total hack.
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-      signature = asd->getOverloadSignature().InterfaceType;
+      signature = asd->getOverloadSignatureType();
 
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
@@ -1033,7 +1033,7 @@ public:
     assert(LastExtensionIncluded == nullptr);
     for (auto const &i : Lookup) {
       for (auto d : i.getSecond()) {
-        d->ValueDeclBits.AlreadyInLookupTable = false;
+        d->setAlreadyInLookupTable(false);
       }
     }
     Lookup.clear();
@@ -1102,10 +1102,10 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // If this declaration is already in the lookup table, don't add it
   // again.
-  if (vd->ValueDeclBits.AlreadyInLookupTable) {
+  if (vd->isAlreadyInLookupTable()) {
     return;
   }
-  vd->ValueDeclBits.AlreadyInLookupTable = true;
+  vd->setAlreadyInLookupTable();
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.
@@ -1249,7 +1249,8 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
+  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
+                                              ci->memberData)) {
     IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
@@ -1832,6 +1833,10 @@ bool DeclContext::lookupQualified(Type type,
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
       if (decl->getOverriddenDecl())
+        continue;
+
+      // If the declaration is not @objc, it cannot be called dynamically.
+      if (!decl->isObjC())
         continue;
 
       auto dc = decl->getDeclContext();

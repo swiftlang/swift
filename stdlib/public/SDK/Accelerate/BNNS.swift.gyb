@@ -23,13 +23,19 @@ bnns2017 = [
   ('OSX','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
 ]
 
-def available(releases):
-  return '@available(' + ', '.join([
+def relString(releases):
+  if not releases:
+    return '*'
+  return ', '.join([
     r[0] + ' ' + r[1] for r in releases
-  ]) + ', *)'
+  ] + ['*'])
 
-def renamed(name):
+def available(releases):
+  return '@available(' + relString(releases) + ')'
+
+def renamed(name, rel=None):
   return '\n'.join([
+    available(rel),
     '@available(*, deprecated, renamed: "' + name + '")'
   ])
 
@@ -38,17 +44,18 @@ def newEnumValue(base, new, old, rel):
   impl = '    return __' + base + old + '\n  }'
   return '  ' + available(rel) + '\n' + decl + impl
 
-def oldEnumValue(base, new, old):
-  return renamed(base + '.' + new) + '\n' + \
+def oldEnumValue(base, new, old, oldRel):
+  return renamed(base + '.' + new, oldRel) + '\n' + \
   'public var ' + base + old + ' = __' + base + old
 
-def renameEnumMembers(base, names):
-  return 'extension ' + base + ' {\n' + \
+def renameEnumMembers(base, baseRel, names):
+  return available(baseRel) + \
+  '\nextension ' + base + ' {\n' + \
   '\n'.join([newEnumValue(base, new, old, rel) for new, old, rel in names]) + '\n}\n' + \
-  '\n'.join([oldEnumValue(base, new, old) for new, old, rel in names if rel != bnns2017])
+  '\n'.join([oldEnumValue(base, new, old, rel) for new, old, rel in names if rel != bnns2017])
 }%
 
-${renameEnumMembers('BNNSDataType', [
+${renameEnumMembers('BNNSDataType', bnns2016, [
   ('float16', 'Float16', bnns2016),
   ('float',   'Float32', bnns2016),
   ('int8',    'Int8',    bnns2016),
@@ -60,12 +67,12 @@ ${renameEnumMembers('BNNSDataType', [
   ('indexed8','Indexed8',bnns2016),
 ])}
 
-${renameEnumMembers('BNNSPoolingFunction', [
+${renameEnumMembers('BNNSPoolingFunction', bnns2016, [
   ('max',     'Max',     bnns2016),
   ('average', 'Average', bnns2016),
 ])}
 
-${renameEnumMembers('BNNSActivationFunction', [
+${renameEnumMembers('BNNSActivationFunction', bnns2016, [
   ('identity', 'Identity', bnns2016),
   ('rectifiedLinear', 'RectifiedLinear', bnns2016),
   ('leakyRectifiedLinear', 'LeakyRectifiedLinear', bnns2016),
@@ -80,8 +87,9 @@ ${renameEnumMembers('BNNSActivationFunction', [
   ('softmax', 'Softmax', bnns2017),
 ])}
 
-${renameEnumMembers('BNNSFlags', [('useClientPointer', 'UseClientPtr', bnns2016)])}
+${renameEnumMembers('BNNSFlags', bnns2016, [('useClientPointer', 'UseClientPtr', bnns2016)])}
 
+${available(bnns2016)}
 extension BNNSImageStackDescriptor {
   ${available(bnns2016)}
   public init(width: Int,
@@ -105,6 +113,7 @@ extension BNNSImageStackDescriptor {
   }
 }
 
+${available(bnns2016)}
 extension BNNSVectorDescriptor {
   ${available(bnns2016)}
   public init(size: Int,
@@ -120,6 +129,7 @@ extension BNNSVectorDescriptor {
   }
 }
 
+${available(bnns2016)}
 extension BNNSLayerData {
   ${available(bnns2016)}
   public init(data: UnsafeRawPointer?,
@@ -155,6 +165,7 @@ extension BNNSLayerData {
   }
 }
 
+${available(bnns2016)}
 extension BNNSActivation {
 
   ${available(bnns2016)}
@@ -226,6 +237,7 @@ extension BNNSActivation {
   }
 }
 
+${available(bnns2016)}
 extension BNNSConvolutionLayerParameters {
   ${available(bnns2016)}
   public init(x_stride: Int,
@@ -251,6 +263,7 @@ extension BNNSConvolutionLayerParameters {
   }
 }
 
+${available(bnns2016)}
 extension BNNSPoolingLayerParameters {
   ${available(bnns2016)}
   public init(x_stride: Int,
@@ -276,6 +289,7 @@ extension BNNSPoolingLayerParameters {
   }
 }
 
+${available(bnns2016)}
 extension BNNSFullyConnectedLayerParameters {
   ${available(bnns2016)}
   public init(in_size: Int,

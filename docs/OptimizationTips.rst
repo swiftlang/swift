@@ -444,7 +444,7 @@ construct such a data structure:
       var value: T {
           get { return ref.val }
           set {
-            if (!isUniquelyReferencedNonObjC(&ref)) {
+            if (!isKnownUniquelyReferenced(&ref)) {
               ref = Ref(newValue)
               return
             }

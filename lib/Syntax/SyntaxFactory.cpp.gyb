@@ -38,17 +38,19 @@
 using namespace swift;
 using namespace swift::syntax;
 
-TokenSyntax
-SyntaxFactory::makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
-                         const Trivia &LeadingTrivia,
-                         const Trivia &TrailingTrivia) {
-  return make<TokenSyntax>(RawTokenSyntax::make(Kind, Text, Presence,
-                                                LeadingTrivia, TrailingTrivia));
+TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
+                                     SourcePresence Presence,
+                                     const Trivia &LeadingTrivia,
+                                     const Trivia &TrailingTrivia) {
+  return make<TokenSyntax>(RawSyntax::make(Kind, Text, Presence,
+                                           LeadingTrivia.Pieces,
+                                           TrailingTrivia.Pieces));
 }
 
 UnknownSyntax
 SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
-  RawSyntax::LayoutList Layout;
+  std::vector<RC<RawSyntax>> Layout;
+  Layout.reserve(Tokens.size());
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
   }
@@ -91,7 +93,15 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
 % for node in SYNTAX_NODES:
 %     if node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}: {
+%       if node.collection_element_choices:
+%         element_checks = []
+%         for choice in node.collection_element_choices:
+%           element_checks.append("Member.getKind() == SyntaxKind::%s" % choice)
+%         all_checks = ' || '.join(element_checks)
+    return ${all_checks};
+%       else:
     return Member.is<${node.collection_element_type}>();
+%       end
   }
 %     end
 % end
@@ -110,34 +120,13 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
     static std::pair<bool, std::function<bool(const Syntax&)>>
       ChildrenConditions[${child_count}] = {
 %    for child in node.children:
+%       check = check_child_condition(child)
 %       if child.is_optional:
 %         option = "true"
 %       else:
 %         option = "false"
-%       if child.token_choices:
-        {   ${option},
-            [](const Syntax &S) {
-              // check ${child.name}.
-              if (auto Tok = S.getAs<TokenSyntax>()) {
-                auto Kind = Tok->getTokenKind();
-%           tok_checks = []
-%           for choice in child.token_choices:
-%             tok_checks.append("Kind == tok::%s" % choice.kind)
-%           end
-%           all_checks = ' || '.join(tok_checks)
-                return ${all_checks};
-              }
-              return false;
-            }
-        },
-%       else:
-        {   ${option},
-            [](const Syntax &S) {
-              // check ${child.name}.
-              return S.getAs<${child.type_name}>().hasValue();
-            }
-        },
 %       end
+        {   ${option}, ${check} },
 %    end
     };
     Optional<Syntax> Parameters[${child_count}];
@@ -186,6 +175,8 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 % elif node.is_syntax_collection():
       std::vector<${node.collection_element_type}> Parts;
       for (auto &E: Elements) {
+        if (!canServeAsCollectionMember(SyntaxKind::${node.syntax_kind}, E))
+          return None;
         if (auto P = E.getAs<${node.collection_element_type}>()) {
           Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
         } else {
@@ -200,28 +191,6 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 % end
   default:
     return None;
-  }
-}
-
-SyntaxKind
-SyntaxFactory::getUnknownKind(SyntaxKind Kind) {
-  switch(Kind) {
-% for node in SYNTAX_NODES:
-%   if node.syntax_kind.endswith('Expr'):
-%     Result = 'SyntaxKind::UnknownExpr'
-%   elif node.syntax_kind.endswith('Stmt'):
-%     Result = 'SyntaxKind::UnknownStmt'
-%   elif node.syntax_kind.endswith('Decl'):
-%     Result = 'SyntaxKind::UnknownDecl'
-%   elif node.syntax_kind.endswith('Token'):
-%     Result = 'SyntaxKind::UnknownToken'
-%   else:
-%     Result = 'SyntaxKind::Unknown'
-%   end
-  case SyntaxKind::${node.syntax_kind}: return ${Result};
-% end
-  default:
-    return SyntaxKind::Unknown;
   }
 }
 
@@ -252,7 +221,8 @@ SyntaxFactory::make${node.syntax_kind}(${child_params}) {
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
   const std::vector<${node.collection_element_type}> &elements) {
-  RawSyntax::LayoutList layout;
+  std::vector<RC<RawSyntax>> layout;
+  layout.reserve(elements.size());
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
@@ -307,17 +277,20 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
                        makeRightParenToken({}, {}));
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(
-    llvm::Optional<TokenSyntax> Label,
-    llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  auto annotation = makeTypeAnnotation(makeBlankAttributeList(), None, Type);
-  return makeTupleTypeElement(Label, Colon, annotation, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
+                                    llvm::Optional<TokenSyntax> Colon,
+                                    TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
+                              TrailingComma);
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeTupleTypeElement(None, None, Type, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, None, None, None, Type, None, None,
+                              TrailingComma);
 }
 
 GenericParameterSyntax

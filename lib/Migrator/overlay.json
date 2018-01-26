@@ -112,22 +112,22 @@
   },
   {
     "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "s:12CoreGraphics7CGFloatV3absA2CFZ",
+    "Usr": "s:12CoreGraphics7CGFloatV3absyA2CFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
   },
   {
     "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "s:Sf3absS2fFZ",
+    "Usr": "s:Sf3absyS2fFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
   },
   {
     "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "s:s7Float80V3absA2BFZ",
+    "Usr": "s:s7Float80V3absyA2BFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
   },
   {
     "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "s:Sd3absS2dFZ",
+    "Usr": "s:Sd3absyS2dFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
   },
   {

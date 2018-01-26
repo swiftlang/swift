@@ -63,6 +63,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/Transforms/Coroutines.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -203,6 +204,9 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
+
+  if (!Opts.DisableLLVMOptzns)
+    addCoroutinePassesToExtensionPoints(PMBuilder);
 
   PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                          addSwiftMergeFunctionsPass);
@@ -758,6 +762,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
+      IGM.emitSwiftProtocols();
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
@@ -939,7 +944,11 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Okay, emit any definitions that we suddenly need.
   irgen.emitLazyDefinitions();
 
+  irgen.emitSwiftProtocols();
+
   irgen.emitProtocolConformances();
+
+  irgen.emitTypeMetadataRecords();
 
   irgen.emitReflectionMetadataVersion();
 
@@ -1066,10 +1075,10 @@ performIRGeneration(IRGenOptions &Opts, swift::ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash) {
-  int numThreads = SILMod->getOptions().NumThreads;
-  if (numThreads != 0) {
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod),
-                                  ModuleName, numThreads);
+  if (SILMod->getOptions().shouldPerformIRGenerationInParallel()) {
+    auto NumThreads = SILMod->getOptions().NumThreads;
+    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
+                                  NumThreads);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;

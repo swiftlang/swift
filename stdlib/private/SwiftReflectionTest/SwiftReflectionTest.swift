@@ -106,12 +106,12 @@ internal func getSectionInfo(_ name: String,
 ///
 /// An image of interest must have the following sections in the __DATA
 /// segment:
-/// - __swift3_fieldmd
-/// - __swift3_assocty
-/// - __swift3_builtin
-/// - __swift3_capture
-/// - __swift3_typeref
-/// - __swift3_reflstr (optional, may have been stripped out)
+/// - __swift5_fieldmd
+/// - __swift5_assocty
+/// - __swift5_builtin
+/// - __swift5_capture
+/// - __swift5_typeref
+/// - __swift5_reflstr (optional, may have been stripped out)
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
 /// - Returns: A `ReflectionInfo` containing the locations of all of the
@@ -122,12 +122,12 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)!
-  let fieldmd = getSectionInfo("__swift3_fieldmd", header)
-  let assocty = getSectionInfo("__swift3_assocty", header)
-  let builtin = getSectionInfo("__swift3_builtin", header)
-  let capture = getSectionInfo("__swift3_capture", header)
-  let typeref = getSectionInfo("__swift3_typeref", header)
-  let reflstr = getSectionInfo("__swift3_reflstr", header)
+  let fieldmd = getSectionInfo("__swift5_fieldmd", header)
+  let assocty = getSectionInfo("__swift5_assocty", header)
+  let builtin = getSectionInfo("__swift5_builtin", header)
+  let capture = getSectionInfo("__swift5_capture", header)
+  let typeref = getSectionInfo("__swift5_typeref", header)
+  let reflstr = getSectionInfo("__swift5_reflstr", header)
   return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
                         fieldmd: fieldmd,
                         assocty: assocty,
@@ -179,7 +179,7 @@ internal func readUInt() -> UInt {
 /// process.
 internal func sendReflectionInfos() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let infos = (0..<_dyld_image_count()).flatMap(getReflectionInfoForImage)
+  let infos = (0..<_dyld_image_count()).compactMap(getReflectionInfoForImage)
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")

@@ -53,7 +53,8 @@ def _apply_default_arguments(args):
 
     # Build LLDB if any LLDB-related options were specified.
     if args.lldb_build_variant is not None or \
-       args.lldb_assertions is not None:
+       args.lldb_assertions is not None or \
+       args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
     # Set the default build variant.
@@ -74,6 +75,9 @@ def _apply_default_arguments(args):
 
     if args.lldb_build_variant is None:
         args.lldb_build_variant = args.build_variant
+
+    if args.lldb_build_with_xcode is None:
+        args.lldb_build_with_xcode = '1'
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
@@ -137,7 +141,6 @@ def _apply_default_arguments(args):
         args.build_foundation = False
         args.build_libdispatch = False
         args.build_libicu = False
-        args.build_playgroundlogger = False
         args.build_playgroundsupport = False
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
@@ -437,6 +440,9 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
+    option('--enable-guaranteed-normal-arguments', store_true,
+           help='Enable guaranteed normal arguments')
+
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
                 'optimization')
@@ -500,9 +506,6 @@ def create_argument_parser():
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
-    option('--playgroundlogger', store_true('build_playgroundlogger'),
-           help='build playgroundlogger')
-
     option('--playgroundsupport', store_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
 
@@ -564,6 +567,14 @@ def create_argument_parser():
     option('--debug-lldb', store('lldb_build_variant'),
            const='Debug',
            help='build the Debug variant of LLDB')
+
+    option('--lldb-build-with-xcode', store('lldb_build_with_xcode'),
+           const='1',
+           help='build LLDB using xcodebuild, if possible')
+
+    option('--lldb-build-with-cmake', store('lldb_build_with_xcode'),
+           const='0',
+           help='build LLDB using CMake')
 
     option('--debug-cmark', store('cmark_build_variant'),
            const='Debug',

@@ -204,8 +204,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
             ->getAsProtocolOrProtocolExtensionContext()) {
       // Fast path: if there are no type parameters in the concrete type, just
       // return it.
-      if (!concrete->getInterfaceType()->hasTypeParameter())
-        return concrete->getInterfaceType();
+      if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
+        return concrete->getDeclaredInterfaceType();
 
       tc.validateDecl(proto);
       auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -366,6 +366,8 @@ TypeChecker::gatherGenericParamBindingsText(
                                 TypeSubstitutionFn substitutions) {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
+    if (type.isNull()) continue;
+
     type.visit([&](Type type) {
       if (auto gp = type->getAs<GenericTypeParamType>()) {
         knownGenericParams.insert(
@@ -541,9 +543,10 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     // If this is a materializeForSet, infer requirements from the
     // storage type instead, since it's not part of the accessor's
     // type signature.
-    if (fn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+    auto accessor = dyn_cast<AccessorDecl>(fn);
+    if (accessor && accessor->isMaterializeForSet()) {
       if (builder) {
-        auto *storage = fn->getAccessorStorageDecl();
+        auto *storage = accessor->getStorage();
         if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(storage)) {
           auto source =
             GenericSignatureBuilder::FloatingRequirementSource::forInferred(
@@ -876,6 +879,13 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
 
+    // Set the IUO attribute on the decl if this was declared with !.
+    if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+      auto *forceAttr =
+          new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
+      ctor->getAttrs().add(forceAttr);
+    }
+
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
@@ -946,9 +956,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
 
   // We get bogus errors here with generic subscript materializeForSet.
-  if (!isa<FuncDecl>(func) ||
-      cast<FuncDecl>(func)->getAccessorKind() !=
-        AccessorKind::IsMaterializeForSet)
+  if (!isa<AccessorDecl>(func) ||
+      !cast<AccessorDecl>(func)->isMaterializeForSet())
     checkReferencedGenericParams(func, sig, *this);
 }
 
@@ -1307,6 +1316,13 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         secondType = req.getSecondType();
       }
 
+      // Don't do further checking on error types.
+      if (firstType->hasError() || (secondType && secondType->hasError())) {
+        // Another requirement will fail later; just continue.
+        valid = false;
+        continue;
+      }
+
       bool requirementFailure = false;
       if (listener && !listener->shouldCheck(kind, firstType, secondType))
         continue;
@@ -1366,12 +1382,16 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         break;
       }
 
-      case RequirementKind::Layout: {
-        // TODO: Statically check if a the first type
-        // conforms to the layout constraint, once we
-        // support such static checks.
-        continue;
-      }
+      case RequirementKind::Layout:
+        // TODO: Statically check other layout constraints, once they can
+        // be spelled in Swift.
+        if (req.getLayoutConstraint()->isClass() &&
+            !firstType->satisfiesClassConstraint()) {
+          diagnostic = diag::type_is_not_a_class;
+          diagnosticNote = diag::anyobject_requirement;
+          requirementFailure = true;
+        }
+        break;
 
       case RequirementKind::Superclass:
         // Superclass requirements.

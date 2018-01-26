@@ -5,7 +5,7 @@
 
 // CHECK-LABEL: sil @{{.*}}testInt
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyxFSi_Tg
+// CHECK:        [[F:%[0-9]+]] = function_ref @$SSa6appendyyxFSi_Tg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NEXT:   tuple
@@ -16,10 +16,10 @@ public func testInt(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testThreeInt
 // CHECK-NOT: apply
-// CHECK:        [[FR:%[0-9]+]] = function_ref @_T0Sa15reserveCapacityySiFSi_Tg5
+// CHECK:        [[FR:%[0-9]+]] = function_ref @$SSa15reserveCapacityyySiFSi_Tg5
 // CHECK-NEXT:   apply [[FR]]
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyxFSi_Tg
+// CHECK:        [[F:%[0-9]+]] = function_ref @$SSa6appendyyxFSi_Tg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NEXT:   apply [[F]]
@@ -32,7 +32,7 @@ public func testThreeInts(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testTooManyInts
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref  @_T0Sa6appendyqd__10contentsOf_t7ElementQyd__Rszs8SequenceRd__lFSi_SaySiGTg5
+// CHECK:        [[F:%[0-9]+]] = function_ref  @$SSa6append10contentsOfyqd___t7ElementQyd__Rszs8SequenceRd__lFSi_SaySiGTg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply
@@ -43,7 +43,7 @@ public func testTooManyInts(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testString
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyxFSS_Tg
+// CHECK:        [[F:%[0-9]+]] = function_ref @$SSa6appendyyxFSS_Tg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply

@@ -7,7 +7,7 @@ func callFoo<T: X>(_ x: T) {
 public func a(y: Sub) {
   callFoo(y)
   // specialization of callFoo for Sub:
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @_T033devirt_witness_method_conformance7callFooyxAA1XRzlFAA3SubC_Tg5Tf4d_n() local_unnamed_addr
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$S33devirt_witness_method_conformance7callFooyyxAA1XRzlFAA3SubC_Tg5Tf4d_n"() local_unnamed_addr
 }
 protocol X {
   func foo()

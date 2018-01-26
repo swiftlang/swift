@@ -386,9 +386,9 @@ SILInstruction *PartialApplyCombiner::combine() {
       // For now, just handle conversion to @noescape, which is irrelevant for
       // direct application of the closure.
       auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
-      auto EscapingCalleeTy = Lowering::adjustFunctionType(
-          ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
-          ConvertCalleeTy->getWitnessMethodConformanceOrNone());
+      auto EscapingCalleeTy =
+          ConvertCalleeTy->getWithExtInfo(
+            ConvertCalleeTy->getExtInfo().withNoEscape(false));
       if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
         Uses.append(CFI->getUses().begin(), CFI->getUses().end());
 

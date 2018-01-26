@@ -16,6 +16,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
@@ -60,6 +61,13 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
 
+  std::string mangleBareProtocol(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("P");
+    return finalize();
+  }
+
   std::string mangleProtocolDescriptor(const ProtocolDecl *Decl) {
     beginMangling();
     appendProtocolName(Decl);
@@ -67,10 +75,18 @@ public:
     return finalize();
   }
 
-  std::string mangleFieldOffsetFull(const ValueDecl *Decl, bool isIndirect) {
+  std::string mangleProtocolConformanceDescriptor(
+                                 const NormalProtocolConformance *Conformance) {
+    beginMangling();
+    appendProtocolConformance(Conformance);
+    appendOperator("Mc");
+    return finalize();
+  }
+
+  std::string mangleFieldOffset(const ValueDecl *Decl) {
     beginMangling();
     appendEntity(Decl);
-    appendOperator("Wv", isIndirect ? "i" : "d");
+    appendOperator("Wvd");
     return finalize();
   }
 
@@ -136,6 +152,10 @@ public:
     }
   }
 
+  std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
+    return mangleTypeSymbol(type, "TC");
+  }
+
   std::string mangleReflectionBuiltinDescriptor(Type type) {
     return mangleTypeSymbol(type, "MB");
   }
@@ -147,10 +167,6 @@ public:
   std::string mangleReflectionAssociatedTypeDescriptor(
                                                  const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "MA");
-  }
-
-  std::string mangleReflectionSuperclassDescriptor(const ClassDecl *Decl) {
-    return mangleNominalTypeSymbol(Decl, "MC");
   }
 
   std::string mangleOutlinedCopyFunction(const GenericTypeDecl *Decl) {
@@ -257,8 +273,8 @@ public:
 
   std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
     beginMangling();
-    appendType(Proto->getCanonicalType());
-    appendOperator("D");
+    appendProtocolName(Proto->getDecl());
+    appendOperator("P");
     return finalize();
   }
 

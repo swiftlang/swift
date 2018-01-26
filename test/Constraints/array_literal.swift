@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances
+// RUN: %target-typecheck-verify-swift
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -105,7 +105,7 @@ func longArray() {
 [1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
 
 
-// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
+// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
   var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
   // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
@@ -338,5 +338,5 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{contextual type 'PArray<String>' cannot be used with array literal}}
+  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
 }

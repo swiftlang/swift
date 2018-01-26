@@ -25,6 +25,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Compiler.h"
 #include <functional>
 #include <string>
 
@@ -339,6 +340,15 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
+  /// Return the name of the type, adding parens in cases where
+  /// appending or prepending text to the result would cause that text
+  /// to be appended to only a portion of the returned type. For
+  /// example for a function type "Int -> Float", adding text after
+  /// the type would make it appear that it's appended to "Float" as
+  /// opposed to the entire type.
+  std::string
+  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+
   /// Computes the join between two types.
   ///
   /// The join of two types is the most specific type that is a supertype of
@@ -536,7 +546,9 @@ template <class X> inline CanTypeWrapper<X> cast_or_null(CanType type) {
   return CanTypeWrapper<X>(cast_or_null<X>(type.getPointer()));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast(CanType type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast_or_null(CanType type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
@@ -554,7 +566,9 @@ inline CanTypeWrapper<X> cast(CanTypeWrapper<P> type) {
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast(CanTypeWrapper<P> type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {

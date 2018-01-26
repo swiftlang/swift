@@ -114,10 +114,6 @@ struct SILDeclRef {
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
 
-    /// GlobalGetter - this constant references the lazy-initializing
-    /// getter for the global VarDecl.
-    GlobalGetter,
-
     /// References the generator for a default argument of a function.
     DefaultArgGenerator,
 
@@ -217,7 +213,6 @@ struct SILDeclRef {
   enum class ManglingKind {
     Default,
     DynamicThunk,
-    SwiftDispatchThunk,
   };
 
   /// Produce a mangled form of this constant.
@@ -245,7 +240,7 @@ struct SILDeclRef {
   }
   /// True if the SILDeclRef references a global variable accessor.
   bool isGlobal() const {
-    return kind == Kind::GlobalAccessor || kind == Kind::GlobalGetter;
+    return kind == Kind::GlobalAccessor;
   }
   /// True if the SILDeclRef references the generator for a default argument of
   /// a function.
@@ -360,6 +355,11 @@ struct SILDeclRef {
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
   SILDeclRef getNextOverriddenVTableEntry() const;
+
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

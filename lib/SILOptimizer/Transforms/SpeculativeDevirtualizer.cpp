@@ -23,6 +23,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -181,7 +182,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   NumTargetsPredicted++;
 
   // Devirtualize the apply instruction on the identical path.
-  auto NewInstPair = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
+  auto NewInstPair =
+      devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr);
   assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
   replaceDeadApply(IdenAI, NewInstPair.first);
 
@@ -322,8 +324,8 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
 /// \brief Try to speculate the call target for the call \p AI. This function
 /// returns true if a change was made.
-static bool tryToSpeculateTarget(FullApplySite AI,
-                                 ClassHierarchyAnalysis *CHA) {
+static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
+                                 OptRemark::Emitter &ORE) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
   // Don't devirtualize withUnsafeGuaranteed 'self' as this would prevent
@@ -364,7 +366,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
+      auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue, &ORE);
       if (NewInstPair.first)
         replaceDeadApply(AI, NewInstPair.first);
       return NewInstPair.second.getInstruction() != nullptr;
@@ -481,6 +483,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Changed = true;
   }
 
+  using namespace OptRemark;
   // Check if there is only a single statically known implementation
   // of the method which can be called by the default case handler.
   if (NotHandledSubsNum || !isDefaultCaseKnown(CHA, AI, CD, Subs)) {
@@ -489,8 +492,27 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     // needs to be handled here. Thus, an indirect call through
     // the class_method cannot be eliminated completely.
     //
+    if (Changed)
+      ORE.emit([&]() {
+        RemarkPassed R("PartialSpecDevirt", *AI.getInstruction());
+        R << "Partially devirtualized call with run-time checks for "
+          << NV("NumSubTypesChecked", Subs.size()) << " subclasses of "
+          << NV("ClassType", &ClassType);
+        if (NotHandledSubsNum)
+          R << ", number of subclasses not devirtualized: "
+            << NV("NotHandledSubsNum", NotHandledSubsNum);
+        if (!isDefaultCaseKnown(CHA, AI, CD, Subs))
+          R << ", not all subclasses are known";
+        return R;
+      });
     return Changed;
   }
+
+  auto RB = [&]() {
+    return RemarkPassed("SpecDevirt", *AI.getInstruction())
+           << "Devirtualized call with run-time checks for the derived classes "
+              "of " << NV("ClassType", &ClassType);
+  };
 
   // At this point it is known that there is only one remaining method
   // implementation which is not covered by checked_cast_br checks yet.
@@ -504,13 +526,18 @@ static bool tryToSpeculateTarget(FullApplySite AI,
                                                 LastCCBI->getCastType());
     B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
     LastCCBI->eraseFromParent();
+    ORE.emit(RB);
     return true;
   }
-  auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
+  auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue, nullptr);
   if (NewInstPair.first) {
+    ORE.emit(RB);
     replaceDeadApply(AI, NewInstPair.first);
     return true;
   }
+
+  if (Changed)
+    ORE.emit(RB);
   return Changed;
 }
 
@@ -546,9 +573,10 @@ namespace {
         }
       }
 
+      OptRemark::Emitter ORE(DEBUG_TYPE, CurFn.getModule());
       // Go over the collected calls and try to insert speculative calls.
       for (auto AI : ToSpecialize)
-        Changed |= tryToSpeculateTarget(AI, CHA);
+        Changed |= tryToSpeculateTarget(AI, CHA, ORE);
 
       if (Changed) {
         invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

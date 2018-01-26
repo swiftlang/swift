@@ -1478,12 +1478,17 @@ ModuleDecl *ClangImporter::loadModule(
     // invalid, it can't be the same thing twice in a row, and it has to come
     // from an actual buffer, so we make a fake buffer and just use a counter.
     if (!Impl.DummyImportBuffer.isValid()) {
+      clang::SourceLocation includeLoc =
+          srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+      // Zero offset is reserved for the bridging header. Increase the offset
+      // so that headers from the bridging header are considered as coming
+      // before headers that are imported from swift code.
+      includeLoc = includeLoc.getLocWithOffset(1);
       Impl.DummyImportBuffer = srcMgr.createFileID(
           llvm::make_unique<ZeroFilledMemoryBuffer>(
               256*1024, StringRef(Implementation::moduleImportBufferName)),
           clang::SrcMgr::C_User,
-          /*LoadedID*/0, /*LoadedOffset*/0,
-          srcMgr.getLocForStartOfFile(srcMgr.getMainFileID()));
+          /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
     }
     clang::SourceLocation clangImportLoc
       = srcMgr.getLocForStartOfFile(Impl.DummyImportBuffer)
@@ -2295,6 +2300,73 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
       Impl.lookupValue(table, name, consumer);
       return false;
     });
+}
+
+void
+ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
+                              llvm::function_ref<void(TypeDecl*)> receiver) {
+  clang::DeclarationName clangName(
+      &Impl.Instance->getASTContext().Idents.get(rawName));
+
+  clang::Sema::LookupNameKind lookupKind;
+  switch (kind) {
+  case ClangTypeKind::Typedef:
+    lookupKind = clang::Sema::LookupOrdinaryName;
+    break;
+  case ClangTypeKind::Tag:
+    lookupKind = clang::Sema::LookupTagName;
+    break;
+  case ClangTypeKind::ObjCProtocol:
+    lookupKind = clang::Sema::LookupObjCProtocolName;
+    break;
+  }
+
+  // Perform name lookup into the global scope.
+  auto &sema = Impl.Instance->getSema();
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   lookupKind);
+  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+    for (auto clangDecl : lookupResult) {
+      if (!isa<clang::TypeDecl>(clangDecl) &&
+          !isa<clang::ObjCContainerDecl>(clangDecl) &&
+          !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+        continue;
+      }
+      auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+      if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported))
+        receiver(importedType);
+    }
+  }
+}
+
+void ClangImporter::lookupRelatedEntity(
+    StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
+    llvm::function_ref<void(TypeDecl*)> receiver) {
+  using CISTAttr = ClangImporterSynthesizedTypeAttr;
+  if (relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapper) ||
+      relatedEntityKind ==
+        CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
+    auto underlyingKind = ClangTypeKind::Tag;
+    if (relatedEntityKind ==
+          CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
+      underlyingKind = ClangTypeKind::Typedef;
+    }
+    lookupTypeDecl(rawName, underlyingKind,
+                   [this, receiver] (const TypeDecl *foundType) {
+      auto *enumDecl =
+          dyn_cast_or_null<clang::EnumDecl>(foundType->getClangDecl());
+      if (!enumDecl)
+        return;
+      if (!Impl.getEnumInfo(enumDecl).isErrorEnum())
+        return;
+      auto *enclosingType =
+          dyn_cast<NominalTypeDecl>(foundType->getDeclContext());
+      if (!enclosingType)
+        return;
+      receiver(enclosingType);
+    });
+  }
 }
 
 void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -3292,7 +3364,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
-    const IterableDeclContext *IDC, DeclName N, uint64_t contextData) {
+    const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
 
   auto *D = IDC->getDecl();
   auto *DC = cast<DeclContext>(D);
@@ -3351,7 +3423,7 @@ ClangImporter::Implementation::loadNamedMembers(
   assert(isa<clang::ObjCContainerDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
-  for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
+  for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
@@ -3365,7 +3437,7 @@ ClangImporter::Implementation::loadNamedMembers(
     for (auto *TD : tmp) {
       if (auto *V = dyn_cast<ValueDecl>(TD)) {
         // Skip ValueDecls if they import under different names.
-        if (V->getFullName().matchesRef(N)) {
+        if (V->getBaseName() == N) {
           Members.push_back(V);
         }
       }

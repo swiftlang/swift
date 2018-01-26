@@ -17,24 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An iterator that never produces an element.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct EmptyIterator<Element> {
-  // no properties
-  
-  /// Creates an instance.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init() {}
-}
-
-extension EmptyIterator: IteratorProtocol, Sequence {
-  /// Returns `nil`, indicating that there are no more elements.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func next() -> Element? {
-    return nil
-  }
-}
-
 /// A collection whose element type is `Element` but that is always empty.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct EmptyCollection<Element> {
@@ -43,6 +25,34 @@ public struct EmptyCollection<Element> {
   /// Creates an instance.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {}
+}
+
+extension EmptyCollection {
+  /// An iterator that never produces an element.
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct Iterator {
+    // no properties
+  
+    /// Creates an instance.
+    @_inlineable // FIXME(sil-serialize-all)
+    public init() {}
+  }  
+}
+
+extension EmptyCollection.Iterator: IteratorProtocol, Sequence {
+  /// Returns `nil`, indicating that there are no more elements.
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func next() -> Element? {
+    return nil
+  }
+}
+
+extension EmptyCollection: Sequence {
+  /// Returns an empty iterator.
+  @_inlineable // FIXME(sil-serialize-all)
+  public func makeIterator() -> Iterator {
+    return Iterator()
+  }
 }
 
 extension EmptyCollection: RandomAccessCollection, MutableCollection {
@@ -84,12 +94,6 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
     _preconditionFailure("EmptyCollection can't advance indices")
   }
 
-  /// Returns an empty iterator.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> EmptyIterator<Element> {
-    return EmptyIterator()
-  }
-
   /// Accesses the element at the given position.
   ///
   /// Must never be called, since this collection is always empty.
@@ -104,7 +108,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
+  public subscript(bounds: Range<Index>) -> SubSequence {
     get {
       _debugPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
         "Index out of range")
@@ -171,3 +175,6 @@ extension EmptyCollection : Equatable {
     return true
   }
 }
+
+// @available(*, deprecated, renamed: "EmptyCollection.Iterator")
+public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator

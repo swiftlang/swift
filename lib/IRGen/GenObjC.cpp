@@ -540,7 +540,6 @@ namespace {
       case SILDeclRef::Kind::StoredPropertyInitializer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
-      case SILDeclRef::Kind::GlobalGetter:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
@@ -1440,7 +1439,7 @@ void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
 
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
-  if (method->isAccessor())
+  if (isa<AccessorDecl>(method))
     return false;
 
   return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();

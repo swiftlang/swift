@@ -41,7 +41,7 @@ bool SyntaxData::isExpr() const {
 }
 
 bool SyntaxData::isPattern() const {
-  return false; // FIXME: Raw->isPattern();
+  return Raw->isPattern();
 }
 
 bool SyntaxData::isUnknown() const {

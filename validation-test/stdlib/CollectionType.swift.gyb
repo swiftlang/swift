@@ -7,7 +7,7 @@
 
 % import os.path
 % import gyb
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal, defaultIndicesForTraversal
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -829,7 +829,6 @@ func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
 % for Traversal in TRAVERSALS:
 %   Collection = collectionForTraversal(Traversal)
 %   Self = 'Fatal' + Collection
-%   Indices = defaultIndicesForTraversal(Traversal)
 
 struct ${Self}<T> : ${Collection} {
   var startIndex: FatalIndex { fatalError() }
@@ -848,9 +847,33 @@ CollectionTypeTests.test("AssociatedTypes/${Collection}") {
     iteratorType: IndexingIterator<C>.self,
     subSequenceType: Slice<C>.self,
     indexType: FatalIndex.self,
-    indicesType: ${Indices}<C>.self)
+    indicesType: DefaultIndices<C>.self)
 }
 % end
+
+
+struct RACollectionWithIntIndex<T> {
+  var contents: [T]
+}
+
+extension RACollectionWithIntIndex: RandomAccessCollection {
+  var startIndex: Int { return contents.startIndex }
+  var endIndex: Int { return contents.endIndex }
+  subscript(index: Int) -> T {
+    get { return contents[index] }
+    set { }
+  }
+}
+
+CollectionTypeTests.test("AssociatedTypes/RACollectionWithIntIndex") {
+  typealias C = RACollectionWithIntIndex<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: Slice<C>.self,
+    indexType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
 
 runAllTests()

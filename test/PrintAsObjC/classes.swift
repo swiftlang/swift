@@ -178,7 +178,7 @@ class DiscardableResult : NSObject {
 // CHECK-LABEL: @interface InheritedInitializersRequired
 // CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE;
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: @end
 @objc class InheritedInitializersRequired : InheritedInitializers {
   @objc required init(evenMoreFun: ()) { super.init() }
@@ -202,6 +202,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
 // CHECK-NEXT: - (nonnull instancetype)getDynamicSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (null_unspecified instancetype)getDynamicSelfIUO SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nonnull)getSelf SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (Methods * _Nullable)maybeGetSelf SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nullable)maybeGetSelf SWIFT_WARN_UNUSED_RESULT;
@@ -247,6 +248,7 @@ class NotObjC {}
   @objc func testSizedFloats(_ a: Float32, b: Float64) {}
 
   @objc func getDynamicSelf() -> Self { return self }
+  @objc func getDynamicSelfIUO() -> Self! { return self }
   @objc class func getSelf() -> Methods.Type { return self }
 
   @objc func maybeGetSelf() -> Methods? { return nil }
@@ -436,7 +438,7 @@ class MyObject : NSObject {}
 // CHECK-LABEL: @interface NewBanned
 // CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE;
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: @end
 @objc class NewBanned : NSObject {
   init(arbitraryArgument: Int) { super.init() }

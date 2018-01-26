@@ -6,7 +6,7 @@ var g: Int64 = 1
 
 class Foo {
   var x: Int64
-  // CHECK: define {{.*}}_T04main3FooCACycfc
+  // CHECK: define {{.*}}$S4main3FooCACycfc
   // CHECK: entry:
   // CHECK: call void @llvm.dbg.value(metadata %T4main3FooC* %0
   // CHECK: ret %T4main3FooC* %0

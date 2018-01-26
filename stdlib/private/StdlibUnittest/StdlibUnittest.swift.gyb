@@ -542,6 +542,13 @@ public func expectCrashLater() {
   _seenExpectCrash = true
 }
 
+public func expectCrash(executing: () -> Void) -> Never {
+  expectCrashLater()
+  executing()
+  expectUnreachable()
+  fatalError()
+}
+
 func _defaultTestSuiteFailedCallback() {
   abort()
 }

@@ -47,6 +47,8 @@ using namespace swift;
 - (id)debugQuickLookObject;
 @end
 
+// mangled Swift._SwiftObject
+#define SwiftObject _TtCs12_SwiftObject
 @class SwiftObject;
 #endif
 
@@ -76,7 +78,11 @@ extern "C" void swift_stringFromUTF8InRawMemory(String *out,
 
 struct String {
   // Keep the details of String's implementation opaque to the runtime.
-  const void *x, *y, *z;
+  const void *x = nullptr;
+  const void *y = nullptr;
+#if __POINTER_WIDTH__ == 32
+  const void *z = nullptr;
+#endif
 
   /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
@@ -332,6 +338,10 @@ static Mirror reflect(HeapObject *owner,
   const OpaqueValue *mirrorValue;
   std::tie(mirrorType, mirrorValue) = unwrapExistential(T, value);
 
+#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  swift_retain(owner);
+#endif
+
   // Use MagicMirror.
   // Consumes 'owner'.
   Mirror result;
@@ -346,7 +356,9 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   return Tuple->NumElements;
 }
 
@@ -391,6 +403,10 @@ void swift_TupleMirror_subscript(String *outString,
   auto &elt = Tuple->getElement(i);
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
+
+#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  swift_retain(owner);
+#endif
 
   // 'owner' is consumed by this call.
   new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
@@ -460,6 +476,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
 
   type->deallocateBufferIn(&temporaryBuffer);
 
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   // swift_StructMirror_subscript and swift_ClassMirror_subscript
   // requires that the owner be consumed. Since we have the new heap box as the
   // owner now, we need to release the old owner to maintain the contract.
@@ -467,6 +484,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
     swift_unknownRelease(owner);
   else
     swift_release(owner);
+#endif
 
   return true;
 }
@@ -478,7 +496,9 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const OpaqueValue *value,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   return Struct->Description->Struct.NumFields;
 }
 
@@ -563,7 +583,9 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
                                       const OpaqueValue *value,
                                       const Metadata *type) {
   if (!isEnumReflectable(type)) {
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
     swift_release(owner);
+#endif
     return nullptr;
   }
 
@@ -573,7 +595,9 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
   unsigned tag;
   getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
 
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
 
   return getFieldName(Description.CaseNames, tag);
 }
@@ -588,12 +612,25 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
   Mirror mirror;
 
-  bool take = mirrorValue == value;
+  bool take =
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+    mirrorValue == value;
+#else
+    false;
+#endif
+
   ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
+
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  // Destroy the whole original value if we couldn't take it.
+  if (!take)
+      type->vw_destroy(value);
+#endif
+
   return result;
 }
 
@@ -602,13 +639,17 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
   if (!isEnumReflectable(type)) {
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
     swift_release(owner);
+#endif
     return 0;
   }
 
   const Metadata *payloadType;
   getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   return (payloadType != nullptr) ? 1 : 0;
 }
 
@@ -633,21 +674,23 @@ void swift_EnumMirror_subscript(String *outString,
   BoxPair pair = swift_allocBox(boxType);
 
   type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
-  boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
+  boxType->vw_initializeWithCopy(pair.second, const_cast<OpaqueValue *>(value));
   type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
                                     (int) (tag - Description.getNumPayloadCases()));
 
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
 
-  owner = pair.object;
-  value = pair.buffer;
+  owner = pair.first;
+  value = pair.second;
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
     owner = *reinterpret_cast<HeapObject * const *>(value);
     value = swift_projectBox(const_cast<HeapObject *>(owner));
     swift_retain(owner);
-    swift_release(pair.object);
+    swift_release(pair.first);
   }
 
   new (outString) String(getFieldName(Description.CaseNames, tag));
@@ -665,7 +708,9 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   auto count = Clas->getDescription()->Class.NumFields;
 
   // If the class has a superclass, the superclass instance is treated as the
@@ -771,7 +816,9 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   if (isa->SuperClass)
     count += 1;
 
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   return count;
 }
 
@@ -810,7 +857,9 @@ id
 swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
   id object = [*reinterpret_cast<const id *>(value) retain];
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   swift_release(owner);
+#endif
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
     id quickLookObject = [object debugQuickLookObject];
     [quickLookObject retain];
@@ -906,6 +955,10 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
 
+#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  swift_retain(owner);
+#endif
+
   result->Self = ClassSuperMirrorMetadata();
   result->MirrorWitness = &ClassSuperMirrorWitnessTable;
   result->Data.Owner = owner;
@@ -924,6 +977,10 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           const Metadata *type) {
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
+
+#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+  swift_retain(owner);
+#endif
 
   result->Self = ObjCSuperMirrorMetadata();
   result->MirrorWitness = &ObjCSuperMirrorWitnessTable;
@@ -1035,12 +1092,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
   BoxPair box = swift_allocBox(T);
 
   if (take)
-    T->vw_initializeWithTake(box.buffer, value);
+    T->vw_initializeWithTake(box.second, value);
   else
-    T->vw_initializeWithCopy(box.buffer, value);
-  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.buffer);
+    T->vw_initializeWithCopy(box.second, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.second);
 
-  Data = {box.object, box.buffer, T};
+  Data = {box.first, box.second, T};
 }
 
 /// MagicMirror ownership-sharing subvalue constructor.
@@ -1073,11 +1130,19 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   Mirror result;
   // Take the value, unless we projected a subvalue from it. We don't want to
   // deal with partial value deinitialization.
-  bool take = mirrorValue == value;
+  bool take =
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+    mirrorValue == value;
+#else
+    false;
+#endif
   ::new (&result) MagicMirror(mirrorValue, mirrorType, take);
+
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   // Destroy the whole original value if we couldn't take it.
   if (!take)
     T->vw_destroy(value);
+#endif
   return MirrorReturn(result);
 }
 

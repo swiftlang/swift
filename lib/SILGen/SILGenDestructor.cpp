@@ -160,6 +160,8 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
   B.createDeallocRef(loc, selfForDealloc, false);
 
+  emitProfilerIncrement(dd->getBody());
+
   // Return.
   B.createReturn(loc, emitEmptyTuple(loc));
 }
@@ -239,7 +241,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)
     .asForeign();
-  auto superclassDtorType = SGM.getConstantType(superclassDtor);
+  auto superclassDtorType = SGM.Types.getConstantType(superclassDtor);
   SILValue superclassDtorValue = B.createObjCSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,
                                    superclassDtorType);

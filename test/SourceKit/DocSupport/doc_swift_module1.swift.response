@@ -413,7 +413,7 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo2(a:b:)",
-        key.usr: "s:5cake12P1P4foo2ySi1a_Si1btF",
+        key.usr: "s:5cake12P1P4foo21a1bySi_SitF",
         key.offset: 92,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -437,7 +437,7 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:5cake12P1PS2icip",
+        key.usr: "s:5cake12P1PyS2icip",
         key.offset: 127,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
@@ -525,8 +525,8 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo2(a:b:)",
-        key.usr: "s:5cake12P2PAAE4foo2ySi1a_Si1btF",
-        key.default_implementation_of: "s:5cake12P1P4foo2ySi1a_Si1btF",
+        key.usr: "s:5cake12P2PAAE4foo21a1bySi_SitF",
+        key.default_implementation_of: "s:5cake12P1P4foo21a1bySi_SitF",
         key.offset: 306,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -550,8 +550,8 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:5cake12P2PAAES2icip",
-        key.default_implementation_of: "s:5cake12P1PS2icip",
+        key.usr: "s:5cake12P2PAAEyS2icip",
+        key.default_implementation_of: "s:5cake12P1PyS2icip",
         key.offset: 341,
         key.length: 26,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",

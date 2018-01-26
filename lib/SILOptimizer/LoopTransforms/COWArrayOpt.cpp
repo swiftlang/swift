@@ -797,7 +797,7 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
 static bool isArrayEltStore(StoreInst *SI) {
   SILValue Dest = stripAddressProjections(SI->getDest());
   if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
-    Dest = MD->getOperand(0);
+    Dest = MD->getValue();
 
   if (auto *PtrToAddr =
           dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
@@ -1095,17 +1095,21 @@ private:
     DepInsts.push_back(StructExtractArrayAddr);
 
     // Check the base the array element address is dependent on.
-    auto *EnumArrayAddr = dyn_cast<EnumInst>(MarkDependence->getBase());
-    if (!EnumArrayAddr)
-      return false;
-    DepInsts.push_back(EnumArrayAddr);
-    auto *UncheckedRefCast =
-        dyn_cast<UncheckedRefCastInst>(EnumArrayAddr->getOperand());
-    if (!UncheckedRefCast)
-      return false;
-    DepInsts.push_back(UncheckedRefCast);
+    SILValue base = MarkDependence->getBase();
 
-    SILValue ArrayBuffer = stripValueProjections(UncheckedRefCast->getOperand(), DepInsts);
+    // We can optionally have an enum instruction here.
+    if (auto *EnumArrayAddr = dyn_cast<EnumInst>(base)) {
+      DepInsts.push_back(EnumArrayAddr);
+      base = EnumArrayAddr->getOperand();
+    }
+
+    // We can optionally have an unchecked cast.
+    if (auto *UncheckedRefCast = dyn_cast<UncheckedRefCastInst>(base)) {
+      DepInsts.push_back(UncheckedRefCast);
+      base = UncheckedRefCast->getOperand();
+    }
+
+    SILValue ArrayBuffer = stripValueProjections(base, DepInsts);
     auto *BaseLoad = dyn_cast<LoadInst>(ArrayBuffer);
     if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBlock()))
       return false;

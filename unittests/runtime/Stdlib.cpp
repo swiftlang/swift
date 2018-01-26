@@ -137,21 +137,21 @@ void _bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
 // ErrorObject
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-int _T0s13_getErrorCodeSiSPyxGs0B0RzlF(void *) {
+int $Ss13_getErrorCodeySiSPyxGs0B0RzlF(void *) {
   abort();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void *_T0s23_getErrorDomainNSStringyXlSPyxGs0B0RzlF(void *) {
+void *$Ss23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF(void *) {
   abort();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void *_T0s29_getErrorUserInfoNSDictionaryyXlSgSPyxGs0B0RzlF(void *) {
+void *$Ss29_getErrorUserInfoNSDictionaryyyXlSgSPyxGs0B0RzlF(void *) {
   abort();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void *_T0s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF(void *) {
+void *$Ss32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF(void *) {
   abort();
 }

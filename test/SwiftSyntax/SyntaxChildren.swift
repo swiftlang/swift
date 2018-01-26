@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: sdk_overlay
+// REQUIRES: objc_interop
 
 import Foundation
 import StdlibUnittest
@@ -28,7 +28,7 @@ var SyntaxChildrenAPI = TestSuite("SyntaxChildrenAPI")
 SyntaxChildrenAPI.test("IterateWithAllPresent") {
   let returnStmt = SyntaxFactory.makeReturnStmt(
     returnKeyword: SyntaxFactory.makeReturnKeyword(),
-    expression: SyntaxFactory.makeBlankExpr(),
+    expression: SyntaxFactory.makeBlankUnknownExpr(),
     semicolon: SyntaxFactory.makeSemicolonToken())
 
   var iterator = returnStmt.children.makeIterator()

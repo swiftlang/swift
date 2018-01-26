@@ -26,7 +26,7 @@ if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
 if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
-var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used with array literal}}
+var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
 
 var f1: Float = 2.0
 var f2: Float = 3.0

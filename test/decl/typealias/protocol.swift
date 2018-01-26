@@ -278,3 +278,15 @@ extension P10 where A == X<Self.U> { }
 
 extension P10 where V == Int { } // expected-warning 3{{'V' is deprecated: just use Int, silly}}
 // expected-warning@-1{{neither type in same-type constraint ('P10.V' (aka 'Int') or 'Int') refers to a generic parameter  or associated type}}
+
+// rdar://problem/36003312
+protocol P11 {
+  typealias A = Y11
+}
+
+struct X11<T: P11> { }
+struct Y11: P11 { }
+
+extension P11 {
+  func foo(_: X11<Self.A>) { }
+}

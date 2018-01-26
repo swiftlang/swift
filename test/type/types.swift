@@ -188,3 +188,7 @@ func sr5505(arg: Int) -> String {
   return "hello"
 }
 var _: sr5505 = sr5505 // expected-error {{use of undeclared type 'sr5505'}}
+
+typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
+                                                          // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}
+                                                          // expected-error@-2 {{default argument not permitted in a tuple type}} {{39-49=}}

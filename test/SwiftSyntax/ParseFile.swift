@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: sdk_overlay
+// REQUIRES: objc_interop
+// REQUIRES: rdar36740859
 
 import Foundation
 import StdlibUnittest
@@ -13,6 +14,18 @@ struct Foo {
   public let x: Int
   private(set) var y: [Bool]
 }
+
+#if os(macOS)
+class Test: NSObject {
+  @objc var bar: Int = 0
+  func test() {
+    print(#selector(function))
+    print(#keyPath(bar))
+  }
+  @objc func function() {
+  }
+}
+#endif
 
 ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)

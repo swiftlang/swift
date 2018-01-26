@@ -29,13 +29,6 @@ using namespace swift;
 /// changes that cause the asserts the fire, please update them. The purpose is
 /// to prevent these predicates from changing values by mistake.
 
-// SILNode uses its padding bits to delegate space to its subclasses. That being
-// said, we do not want to by mistake increase the size as our usage of the
-// padding bits changes over time. So we assert that our value is still exactly
-// 8 bytes in size.
-static_assert((sizeof(SILNode) * 8) == SILNode::NumTotalSILNodeBits,
-              "Expected SILNode to be exactly 8 bytes in size");
-
 //===----------------------------------------------------------------------===//
 //                       Check SILValue Type Properties
 //===----------------------------------------------------------------------===//

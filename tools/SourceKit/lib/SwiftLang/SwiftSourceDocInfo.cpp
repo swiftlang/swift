@@ -694,7 +694,6 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
 static bool passCursorInfoForDecl(SourceFile* SF,
                                   const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
-                                  const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   bool RetrieveRefactoring,
@@ -710,7 +709,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     return true;
 
   SmallString<64> SS;
-  auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
+  auto BaseType = findBaseTypeForReplacingArchetype(VD, ContainerTy);
   bool InSynthesizedExtension = false;
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
@@ -1218,7 +1217,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1281,7 +1280,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
       ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
       if (CursorInfo.isInvalid()) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
       CompilerInvocation CompInvok;
@@ -1293,11 +1292,17 @@ static void resolveCursor(SwiftLangSupport &Lang,
                                 CompInvok, Receiver);
         return;
       case CursorInfoKind::ValueRef: {
-        ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+        ValueDecl *VD = CursorInfo.ValueD;
+        Type ContainerType = CursorInfo.ContainerType;
+        if (CursorInfo.CtorTyRef) {
+          // Treat constructor calls, e.g. MyType(), as the type itself,
+          // rather than its constructor.
+          VD = CursorInfo.CtorTyRef;
+          ContainerType = Type();
+        }
         bool Failed = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
                                             VD, MainModule,
-                                            CursorInfo.ContainerType,
-                                            CursorInfo.ContainerType,
+                                            ContainerType,
                                             CursorInfo.IsRef,
                                             Actionables,
                                             CursorInfo,
@@ -1313,7 +1318,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                           Receiver);
           } else {
-            Receiver({});
+            Receiver(CursorInfoData());
           }
         }
         return;
@@ -1343,7 +1348,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
           }
         }
 
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
       case CursorInfoKind::Invalid: {
@@ -1360,7 +1365,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("cursor info failed: " << Error);
-      Receiver({});
+      Receiver(CursorInfoData());
     }
   };
 
@@ -1589,13 +1594,13 @@ void SwiftLangSupport::getCursorInfo(
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
           passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr, Type(),
+              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr,
               Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
               /*OrigBufferID=*/None, SourceLoc(),
               {}, *this, Invok, {}, Receiver);
         }
       } else {
-        Receiver({});
+        Receiver(CursorInfoData());
       }
     });
     return;
@@ -1606,7 +1611,7 @@ void SwiftLangSupport::getCursorInfo(
   if (!Invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver({});
+    Receiver(CursorInfoData());
     return;
   }
 
@@ -1752,7 +1757,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1761,7 +1766,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       Decl *D = ide::getDeclFromUSR(context, USR, error);
 
       if (!D) {
-        Receiver({});
+        Receiver(CursorInfoData());
         return;
       }
 
@@ -1780,7 +1785,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
-                                  Type(), /*IsRef=*/false, false, ResolvedCursorInfo(),
+                                  /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {
@@ -1790,7 +1795,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                                  /*TryExistingAST=*/false,
                                  CancelOnSubsequentRequest, Receiver);
           } else {
-            Receiver({});
+            Receiver(CursorInfoData());
           }
         }
       }
@@ -1804,7 +1809,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("cursor info failed: " << Error);
-      Receiver({});
+      Receiver(CursorInfoData());
     }
   };
 
@@ -1824,7 +1829,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
     std::function<void(const CursorInfoData &)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
-    receiver({});
+    receiver(CursorInfoData());
     return;
   }
 
@@ -1833,7 +1838,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   if (!invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << error);
-    receiver({});
+    receiver(CursorInfoData());
     return;
   }
 

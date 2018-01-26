@@ -113,8 +113,9 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-TypeNamePair
+TwoWordPair<const char *, uintptr_t>::Return
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
+  using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
   static StaticReadWriteLock TypeNameCacheLock;
@@ -131,7 +132,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return TypeNamePair{result.first, result.second};
+      return Pair{result.first, result.second};
     }
   }
 
@@ -144,7 +145,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return TypeNamePair{result.first, result.second};
+      return Pair{result.first, result.second};
     }
 
     // Build the metadata name.
@@ -156,7 +157,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     result[size] = 0;
 
     cache.insert({key, {result, size}});
-    return TypeNamePair{result, size};
+    return Pair{result, size};
   }
 }
 
@@ -629,7 +630,7 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
 // internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
 //   _ x: UnsafePointer<T>) -> AnyObject?
 #define getErrorEmbeddedNSErrorIndirect \
-  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF)
+  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
                                    const Metadata *T,
@@ -954,7 +955,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       (canConsumeDynamicValue && (flags & DynamicCastFlags::TakeOnSuccess));
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue, isTake);
-    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.object);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.first);
     maybeDeallocateSource(true);
     return true;
   }
@@ -1976,7 +1977,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.object);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
 }
 
 #endif
@@ -2682,6 +2683,12 @@ namespace {
 
 // protocol _ObjectiveCBridgeable {
 struct _ObjectiveCBridgeableWitnessTable {
+  /// The protocol conformance descriptor.
+  const void *protocolConformanceDescriptor;
+
+  static_assert(WitnessTableFirstRequirementOffset == 1,
+                "Witness table layout changed");
+
   // associatedtype _ObjectiveCType : class
   const Metadata * (*ObjectiveCType)(
                      const Metadata *parentMetadata,
@@ -2973,7 +2980,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 /// public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
 /// Called by inlined stdlib code.
 #define _bridgeAnythingNonVerbatimToObjectiveC \
-  MANGLE_SYM(s38_bridgeAnythingNonVerbatimToObjectiveCyXlxlF)
+  MANGLE_SYM(s38_bridgeAnythingNonVerbatimToObjectiveCyyXlxlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                           const Metadata *srcType) {
@@ -3036,7 +3043,7 @@ findBridgeWitness(const Metadata *T) {
 // public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 // Called by inlined stdlib code.
 #define _getBridgedNonVerbatimObjectiveCType \
-  MANGLE_SYM(s36_getBridgedNonVerbatimObjectiveCTypeypXpSgxmlF)
+  MANGLE_SYM(s36_getBridgedNonVerbatimObjectiveCTypeyypXpSgxmlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const Metadata *_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
@@ -3105,14 +3112,14 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
   return false;
 }
 
-// func _bridgeNonVerbatimFromObjectiveC<NativeType>(
-//     x: AnyObject, 
-//     nativeType: NativeType.Type
-//     inout result: T?
+// func _bridgeNonVerbatimFromObjectiveC<T>(
+//     _ x: AnyObject,
+//     _ nativeType: T.Type
+//     _ inout result: T?
 // )
 // Called by inlined stdlib code.
 #define _bridgeNonVerbatimFromObjectiveC \
-  MANGLE_SYM(s32_bridgeNonVerbatimFromObjectiveCyyXl_xmxSgztlF)
+  MANGLE_SYM(s32_bridgeNonVerbatimFromObjectiveCyyyXl_xmxSgztlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void
 _bridgeNonVerbatimFromObjectiveC(
@@ -3150,11 +3157,11 @@ _bridgeNonVerbatimFromObjectiveC(
   swift::crash("value type is not bridged to Objective-C");
 }
 
-/// func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
-///   x: AnyObject, nativeType: T.Type, inout result: T?) -> Bool
+/// func _bridgeNonVerbatimFromObjectiveCConditional<T>(
+///   _ x: AnyObject, _ nativeType: T.Type, _ result: inout T?) -> Bool
 /// Called by inlined stdlib code.
 #define _bridgeNonVerbatimFromObjectiveCConditional \
-  MANGLE_SYM(s43_bridgeNonVerbatimFromObjectiveCConditionalSbyXl_xmxSgztlF)
+  MANGLE_SYM(s43_bridgeNonVerbatimFromObjectiveCConditionalySbyXl_xmxSgztlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool
 _bridgeNonVerbatimFromObjectiveCConditional(
@@ -3198,10 +3205,10 @@ _bridgeNonVerbatimFromObjectiveCConditional(
     destValue, nativeType, nativeType, bridgeWitness);
 }
 
-// func _isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
+// func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 // Called by inlined stdlib code.
 #define _isBridgedNonVerbatimToObjectiveC \
-  MANGLE_SYM(s33_isBridgedNonVerbatimToObjectiveCSbxmlF)
+  MANGLE_SYM(s33_isBridgedNonVerbatimToObjectiveCySbxmlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
                                        const Metadata *T) {

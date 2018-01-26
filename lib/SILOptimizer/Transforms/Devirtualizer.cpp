@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-devirtualizer"
 
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
@@ -53,6 +54,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
+  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
 
   SmallVector<ApplySite, 16> Applies;
   for (auto &BB : F) {
@@ -68,7 +70,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
+    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
     if (!NewInstPair.second)
       continue;
 

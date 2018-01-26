@@ -50,6 +50,7 @@ struct Argument {
   Argument(StringRef Key, unsigned long long N);
 
   Argument(StringRef Key, SILFunction *F);
+  Argument(StringRef Key, SILType *Ty);
 };
 
 /// Shorthand to insert named-value pairs.

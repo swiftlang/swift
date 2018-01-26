@@ -103,6 +103,17 @@ SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
                                    ResultTy, getFunction(), OpenedArchetypes));
 }
 
+ClassifyBridgeObjectInst *
+SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
+  auto &ctx = getASTContext();
+  Type int1Ty = BuiltinIntegerType::get(1, ctx);
+  Type resultTy = TupleType::get({ int1Ty, int1Ty }, ctx);
+  auto ty = SILType::getPrimitiveObjectType(resultTy->getCanonicalType());
+  return insert(new (getModule())
+                ClassifyBridgeObjectInst(getSILDebugLocation(Loc), value, ty));
+}
+
+
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
 SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
@@ -417,8 +428,9 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
 
   while (I && I->getNumOperands() == 1 &&
          I->getNumTypeDependentOperands() == 0) {
-    // All the open instructions are single-value instructions.
-    auto SVI = dyn_cast<SingleValueInstruction>(I->getOperand(0));
+    // All the open instructions are single-value instructions.  Operands may
+    // be null when code is being transformed.
+    auto SVI = dyn_cast_or_null<SingleValueInstruction>(I->getOperand(0));
     // Within SimplifyCFG this function may be called for an instruction
     // within unreachable code. And within an unreachable block it can happen
     // that defs do not dominate uses (because there is no dominance defined).

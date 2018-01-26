@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// How children of this value should be presented in the IDE.
+@_fixed_layout // FIXME(sil-serialize-all)
 public enum _MirrorDisposition {
   /// As a struct.
   case `struct`
@@ -63,16 +64,6 @@ public protocol _Mirror {
 
   /// How `value` should be presented in an IDE.
   var disposition: _MirrorDisposition { get }
-}
-
-/// An entry point that can be called from C++ code to get the summary string
-/// for an arbitrary object. The memory pointed to by "out" is initialized with
-/// the summary string.
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_getSummary")
-public // COMPILER_INTRINSIC
-func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(to: String(reflecting: x))
 }
 
 /// Produce a mirror for any value.  The runtime produces a mirror that
@@ -136,6 +127,7 @@ public struct _MagicMirrorData {
 }
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _OpaqueMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -187,6 +179,7 @@ internal func _getTupleCount(_: _MagicMirrorData) -> Int
 internal func _getTupleChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _TupleMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -232,6 +225,7 @@ internal func _getStructCount(_: _MagicMirrorData) -> Int
 internal func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _StructMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -286,6 +280,7 @@ internal func _swift_EnumMirror_caseName(
     _ data: _MagicMirrorData) -> UnsafePointer<CChar>
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _EnumMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -401,6 +396,7 @@ internal func _getClassPlaygroundQuickLook(
 #endif
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _ClassMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -447,6 +443,7 @@ internal struct _ClassMirror : _Mirror {
 }
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _ClassSuperMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData
@@ -488,6 +485,7 @@ internal struct _ClassSuperMirror : _Mirror {
 }
 
 @_versioned
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _MetatypeMirror : _Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal let data: _MagicMirrorData

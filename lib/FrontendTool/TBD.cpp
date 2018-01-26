@@ -38,9 +38,8 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
   return sorted;
 }
 
-bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
-                     StringRef OutputFilename,
-                     StringRef installName) {
+bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIGMs,
+                     StringRef OutputFilename, StringRef installName) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -49,7 +48,7 @@ bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
     return true;
   }
 
-  writeTBDFile(M, OS, hasMultipleIRGenThreads, installName);
+  writeTBDFile(M, OS, hasMultipleIGMs, installName);
 
   return false;
 }
@@ -118,20 +117,18 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
 }
 
 bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                        bool hasMultipleIRGenThreads,
-                        bool diagnoseExtraSymbolsInTBD) {
+                        bool hasMultipleIGMs, bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
-  enumeratePublicSymbols(M, symbols, hasMultipleIRGenThreads);
+  enumeratePublicSymbols(M, symbols, hasMultipleIGMs);
 
   return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule,
                            diagnoseExtraSymbolsInTBD);
 }
 
 bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
-                        bool hasMultipleIRGenThreads,
-                        bool diagnoseExtraSymbolsInTBD) {
+                        bool hasMultipleIGMs, bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
-  enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads);
+  enumeratePublicSymbols(file, symbols, hasMultipleIGMs);
 
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
                            symbols, IRModule, diagnoseExtraSymbolsInTBD);

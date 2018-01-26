@@ -105,6 +105,21 @@ public:
 
   /// Set the error result slot.
   void setErrorResultSlot(llvm::Value *address);
+
+  /// Are we currently emitting a coroutine?
+  bool isCoroutine() {
+    return CoroutineHandle != nullptr;
+  }
+  llvm::Value *getCoroutineHandle() {
+    assert(isCoroutine());
+    return CoroutineHandle;
+  }
+
+  void setCoroutineHandle(llvm::Value *handle) {
+    assert(CoroutineHandle == nullptr && "already set handle");
+    assert(handle != nullptr && "setting a null handle");
+    CoroutineHandle = handle;
+  }
   
 private:
   void emitPrologue();
@@ -113,6 +128,7 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *ErrorResultSlot = nullptr;
+  llvm::Value *CoroutineHandle = nullptr;
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -127,10 +143,16 @@ public:
   }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
-                       const llvm::Twine &name);
-  Address createAlloca(llvm::Type *ty, llvm::Value *ArraySize, Alignment align,
-                       const llvm::Twine &name);
+                       const llvm::Twine &name = "");
+  Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
+                       const llvm::Twine &name = "");
   Address createFixedSizeBufferAlloca(const llvm::Twine &name);
+
+  StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
+  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
+                                 Alignment align,
+                                 const llvm::Twine &name = "");
+  void emitDeallocateDynamicAlloca(StackAddress address);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -201,6 +223,11 @@ public:
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitAllocEmptyBoxCall();
+
+  // Emit a call to the given generic type metadata access function.
+  llvm::CallInst *emitGenericTypeMetadataAccessFunctionCall(
+                                          llvm::Function *accessFunction,
+                                          ArrayRef<llvm::Value *> args);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with

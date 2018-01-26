@@ -119,7 +119,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitSyntaxSugarType(SyntaxSugarType *ty) {
+  bool visitUnarySyntaxSugarType(UnarySyntaxSugarType *ty) {
     return doIt(ty->getBaseType());
   }
 

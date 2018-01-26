@@ -110,6 +110,7 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(DowngradeExhaustivityCheck)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
+  IGNORED_ATTR(ClangImporterSynthesizedType)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -271,8 +272,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
     // class themself.
-    if (!(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor() &&
-        D->isImplicit()))
+    if (!(isa<AccessorDecl>(D) && D->isImplicit()))
       return diagnoseAndRemoveAttr(attr,
                                    diag::transparent_in_classes_not_supported);
   }
@@ -659,6 +659,7 @@ bool AttributeEarlyChecker::visitAbstractAccessControlAttr(
   // Or within protocols.
   if (isa<ProtocolDecl>(D->getDeclContext())) {
     diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
+    TC.diagnose(attr->getLocation(), diag::access_control_in_protocol_detail);
     return true;
   }
 
@@ -831,6 +832,7 @@ public:
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(DowngradeExhaustivityCheck)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
+    IGNORED_ATTR(ClangImporterSynthesizedType)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -989,10 +991,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
 static Decl *getEnclosingDeclForDecl(Decl *D) {
   // If the declaration is an accessor, treat its storage declaration
   // as the enclosing declaration.
-  if (auto *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isAccessor()) {
-      return FD->getAccessorStorageDecl();
-    }
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+    return accessor->getStorage();
   }
 
   return D->getDeclContext()->getInnermostDeclarationDeclContext();
@@ -1107,10 +1107,10 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     return;
   }
 
-  if (auto *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isAccessor() && !attr->isImplicit()) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+    if (!attr->isImplicit()) {
       unsigned Kind = 2;
-      if (auto *VD = dyn_cast<VarDecl>(FD->getAccessorStorageDecl()))
+      if (auto *VD = dyn_cast<VarDecl>(accessor->getStorage()))
         Kind = VD->isLet() ? 1 : 0;
       TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind)
         .fixItRemove(attr->getRange());

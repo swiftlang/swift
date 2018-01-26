@@ -31,3 +31,10 @@ if let i = opt, let /*var-j:def*/j = opt2 {
 var (a, /*pattern-b:def*/bee) = (1, 2)
 print(a + /*pattern-b*/bee)
 
+struct S {
+	lazy var lazyVal: Int = {
+		let /*lazy:def*/myVal = 0
+		return /*lazy:ref*/myVal
+	}()
+}
+

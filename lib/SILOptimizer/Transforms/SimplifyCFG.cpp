@@ -11,27 +11,29 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 using namespace swift;
 
 STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
@@ -74,13 +76,25 @@ namespace {
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
 
+    ConstantFolder ConstFolder;
+
+    void constFoldingCallback(SILInstruction *I) {
+      // If a terminal instruction gets constant folded (like cond_br), it
+      // enables further simplify-CFG optimizations.
+      if (isa<TermInst>(I))
+        addToWorklist(I->getParent());
+    }
+
     bool ShouldVerify;
     bool EnableJumpThread;
   public:
     SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify,
                 bool EnableJumpThread)
-        : Fn(Fn), PM(PM), ShouldVerify(Verify),
-          EnableJumpThread(EnableJumpThread) {}
+        : Fn(Fn), PM(PM),
+          ConstFolder(PM->getOptions().AssertConfig,
+                      /* EnableDiagnostics */false,
+                      [&](SILInstruction *I) { constFoldingCallback(I); }),
+          ShouldVerify(Verify), EnableJumpThread(EnableJumpThread) {}
 
     bool run();
     
@@ -360,7 +374,8 @@ public:
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
       } else
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {});
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
+                             ArrayRef<SILValue>());
       SEI->eraseFromParent();
 
       // Split the edge from 'Dest' to 'ThreadedSuccessorBlock' it is now
@@ -1090,11 +1105,15 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 /// result in exposing opportunities for CFG simplification.
 bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   bool Simplified = false;
-  for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
+  for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
-    if (auto *I = dyn_cast<SingleValueInstruction>(*O))
-      if (SILValue Result = simplifyInstruction(I)) {
+    if (auto *I = dyn_cast<SingleValueInstruction>(*O)) {
+      SILValue Result = simplifyInstruction(I);
+
+      // The Result can be the same instruction I in case it is in an
+      // unreachable block. In this case it can reference itself as operand.
+      if (Result && Result != I) {
         DEBUG(llvm::dbgs() << "simplify branch operand " << *I);
         I->replaceAllUsesWith(Result);
         if (isInstructionTriviallyDead(I)) {
@@ -1102,6 +1121,8 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
           Simplified = true;
         }
       }
+    }
+  }
   return Simplified;
 }
 
@@ -1226,9 +1247,16 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-      if (DestBB->getArgument(i) != BI->getArg(i))
-        DestBB->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-      else {
+      if (DestBB->getArgument(i) != BI->getArg(i)) {
+        SILValue Val = BI->getArg(i);
+        DestBB->getArgument(i)->replaceAllUsesWith(Val);
+        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+          // Replacing operands may trigger constant folding which then could
+          // trigger other simplify-CFG optimizations.
+          ConstFolder.addToWorklist(I);
+          ConstFolder.processWorkList();
+        }
+      } else {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
         //   br bb2
@@ -2123,7 +2151,8 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
 
   TermInst *Term = BB->getTerminator();
   DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
-  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest, {});
+  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest,
+                                         ArrayRef<SILValue>());
   Term->eraseFromParent();
   addToWorklist(BB);
   addToWorklist(commonDest);

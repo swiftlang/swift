@@ -163,6 +163,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathKind { case readOnly, value, reference }
 
@@ -399,6 +400,7 @@ public class ReferenceWritableKeyPath<
 
 // MARK: Implementation details
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponentKind {
   /// The keypath projects within the storage of the outer value, like a
@@ -459,6 +461,7 @@ internal struct ComputedPropertyID: Hashable {
 }
 
 @_versioned // FIXME(sil-serialize-all)
+@_fixed_layout // FIXME(sil-serialize-all)
 internal struct ComputedArgumentWitnesses {
   internal typealias Destroy = @convention(thin)
     (_ instanceArguments: UnsafeMutableRawPointer, _ size: Int) -> ()
@@ -484,6 +487,7 @@ internal struct ComputedArgumentWitnesses {
   internal let hash: Hash
 }
 
+@_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponent: Hashable {
   @_fixed_layout // FIXME(sil-serialize-all)
@@ -741,6 +745,7 @@ internal struct RawKeyPathComponent {
   @_versioned // FIXME(sil-serialize-all)
   internal var body: UnsafeRawBufferPointer
   
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct Header {
     @_inlineable // FIXME(sil-serialize-all)
@@ -1188,6 +1193,7 @@ internal struct RawKeyPathComponent {
       count: buffer.count - componentSize)
   }
 
+  @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal enum ProjectionResult<NewValue, LeafValue> {
     /// Continue projecting the key path with the given new value.
@@ -1523,7 +1529,7 @@ internal struct KeyPathBuffer {
                      alignment: MemoryLayout<T>.alignment)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
     _memcpy(dest: resultBuf,
-            src: UnsafeMutableRawPointer(mutating: raw.baseAddress.unsafelyUnwrapped),
+            src: raw.baseAddress.unsafelyUnwrapped,
             size: UInt(MemoryLayout<T>.size))
     let result = resultBuf.pointee
     resultBuf.deallocate()
@@ -2029,12 +2035,12 @@ public func _appendingKeyPaths<
         let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
         let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
         _memcpy(dest: kvcStringBuffer,
-                src: UnsafeMutableRawPointer(mutating: rootPtr),
+                src: rootPtr,
                 size: UInt(rootKVCLength))
         kvcStringBuffer.advanced(by: rootKVCLength)
           .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
         _memcpy(dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
-                src: UnsafeMutableRawPointer(mutating: leafPtr),
+                src: leafPtr,
                 size: UInt(leafKVCLength))
         result._kvcKeyPathStringPtr =
           UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))

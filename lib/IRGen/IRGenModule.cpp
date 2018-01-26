@@ -134,6 +134,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       OutputFilename(OutputFilename),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
@@ -146,6 +147,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
+  Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
@@ -197,7 +199,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,                // flags
     Int16Ty,                // mandatory requirement count
     Int16Ty,                // total requirement count
-    Int32Ty                 // requirements array
+    Int32Ty,                // requirements array
+    RelativeAddressTy,      // superclass
+    RelativeAddressTy       // associated type names
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
@@ -280,20 +284,43 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
   OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
 
-  ProtocolConformanceRecordTy
-    = createStructType(*this, "swift.protocol_conformance", {
+  ProtocolRecordTy =
+    createStructType(*this, "swift.protocolref", {
+      RelativeAddressTy
+    });
+  ProtocolRecordPtrTy = ProtocolRecordTy->getPointerTo();
+
+  ProtocolConformanceDescriptorTy
+    = createStructType(*this, "swift.protocol_conformance_descriptor", {
       RelativeAddressTy,
       RelativeAddressTy,
       RelativeAddressTy,
       Int32Ty
     });
-  ProtocolConformanceRecordPtrTy
-    = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
+  ProtocolConformanceDescriptorPtrTy
+    = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
   NominalTypeDescriptorTy
     = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+
+  ClassNominalTypeDescriptorTy =
+        llvm::StructType::get(LLVMContext, {
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int16Ty,
+    Int16Ty,
+    Int32Ty,
+  }, /*packed=*/true);
 
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
@@ -303,8 +330,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
-      RelativeAddressTy,
-      Int32Ty
+      RelativeAddressTy
     });
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);
@@ -397,8 +423,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   else
     RegisterPreservingCC = DefaultCC;
 
-  SwiftCC = SWIFT_LLVM_CC(SwiftCC);
-  UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
+  SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
@@ -607,10 +632,6 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_SwiftCC(ID, NAME, SYMBOL, CC,        \
                                                   RETURNS, ARGS, ATTRS)        \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
@@ -871,6 +892,10 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
 
 llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
+}
+
+llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
+  return llvm::ConstantExpr::getBitCast(ptr, Int8PtrTy);
 }
 
 static void appendEncodedName(raw_ostream &os, StringRef name) {

@@ -57,6 +57,7 @@ Globals
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
+  global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
   global ::= type 'MB'                   // metadata for remote mirrors: builtin type descriptor
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
@@ -117,7 +118,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
-  global ::= type 'D'                    // type mangling for the debugger. TODO: check if we really need this
+  global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
+  global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
@@ -175,9 +177,13 @@ Entities
   static ::= 'Z'
   curry-thunk ::= 'Tc'
 
+  label-list ::= empty-list            // represents complete absence of parameter labels
+  label-list ::= ('_' | identifier)*   // '_' is inserted as placeholder for empty label,
+                                       // since the number of labels should match the number of parameters
+
   // The leading type is the function type
-  entity-spec ::= type file-discriminator? 'fC'      // allocating constructor
-  entity-spec ::= type file-discriminator? 'fc'      // non-allocating constructor
+  entity-spec ::= label-list type file-discriminator? 'fC'      // allocating constructor
+  entity-spec ::= label-list type file-discriminator? 'fc'      // non-allocating constructor
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
@@ -189,11 +195,11 @@ Entities
   entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
-  entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
-  entity-spec ::= type file-discriminator? 'i' ACCESSOR                  // subscript
-  entity-spec ::= decl-name type 'v' ACCESSOR                            // variable
-  entity-spec ::= decl-name type 'fp'                // generic type parameter
-  entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
+  entity-spec ::= decl-name label-list function-signature generic-signature? 'F'    // function
+  entity-spec ::= label-list type file-discriminator? 'i' ACCESSOR                  // subscript
+  entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
+  entity-spec ::= decl-name type 'fp'                                               // generic type parameter
+  entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -211,18 +217,27 @@ Entities
   ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner)
 
   decl-name ::= identifier
-  decl-name ::= identifier 'L' INDEX         // locally-discriminated declaration
-  decl-name ::= identifier identifier 'LL'   // file-discriminated declaration
+  decl-name ::= identifier 'L' INDEX                  // locally-discriminated declaration
+  decl-name ::= identifier identifier 'LL'            // file-discriminated declaration
+  decl-name ::= identifier 'L' RELATED-DISCRIMINATOR  // related declaration
+
+  RELATED-DISCRIMINATOR ::= [a-j]
+  RELATED-DISCRIMINATOR ::= [A-J]
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 
-The identifier in a ``<file-discriminator>`` and the first identifier in a
+The identifier in a ``<file-discriminator>`` and the second identifier in a
 file-discriminated ``<decl-name>`` is a string that represents the file the
 original declaration came from. It should be considered unique within the
-enclosing module. The second identifier is the name of the entity. Not all
+enclosing module. The first identifier is the name of the entity. Not all
 declarations marked ``private`` declarations will use this mangling; if the
 entity's context is enough to uniquely identify the entity, the simple
 ``identifier`` form is preferred.
+
+Twenty operators of the form 'LA', 'LB', etc. are reserved to described
+entities related to the entity whose name is provided. For example, 'LE' and
+'Le' in the "SC" module are used to represent the structs synthesized by the
+Clang importer for various "error code" enums.
 
 Outlined bridged Objective C method call mangling includes which parameters and
 return value are bridged and the type of pattern outlined.
@@ -269,8 +284,8 @@ destructor, the non-allocating or non-deallocating variant is used.
   module ::= known-module                    // abbreviation
 
   known-module ::= 's'                       // Swift
-  known-module ::= 'SC'                      // C
-  known-module ::= 'So'                      // Objective-C
+  known-module ::= 'SC'                      // Clang-importer-synthesized
+  known-module ::= 'So'                      // C and Objective-C
 
 The Objective-C module is used as the context for mangling Objective-C
 classes as ``<type>``\ s.
@@ -351,7 +366,8 @@ Types
   function-signature ::= params-type params-type throws? // results and parameters
 
   params-type := type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
-                                             // with optional inout convention, shared convention
+                                             // with optional inout convention, shared convention. parameters don't have labels,
+                                             // they are mangled separately as part of the entity.
   params-type := empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types

@@ -13,12 +13,12 @@ public func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define {{.*}} @_T04self11stuffStructVACycfC(
+// CHECK: define {{.*}} @"$S4self11stuffStructVACycfC"(
 // CHECK-NEXT: entry:
-// CHECK-NEXT: %[[ALLOCA:.*]] = alloca %T4self11stuffStructV, align {{(4|8)}}
+// CHECK: %[[ALLOCA:.*]] = alloca %T4self11stuffStructV, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %T4self11stuffStructV* %[[ALLOCA]],
 // CHECK-SAME: metadata ![[SELF:.*]], metadata !DIExpression()), !dbg
-// CHECK: ![[STUFFSTRUCT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "stuffStruct",{{.*}}identifier
+// CHECK: ![[STUFFSTRUCT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "stuffStruct", scope:{{.*}}identifier
 // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope
 // CHECK-SAME:                         type: ![[STUFFSTRUCT]]
 

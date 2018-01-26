@@ -490,7 +490,16 @@ extension _PlistEncoder {
 
         // The value should request a container from the _PlistEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            try value.encode(to: self)
+        } catch let error {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
 
         // The top container should be a new container.
         guard self.storage.count > depth else {
@@ -779,7 +788,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     // MARK: - KeyedDecodingContainerProtocol Methods
 
     public var allKeys: [Key] {
-        return self.container.keys.flatMap { Key(stringValue: $0) }
+        return self.container.keys.compactMap { Key(stringValue: $0) }
     }
 
     public func contains(_ key: Key) -> Bool {
@@ -1755,20 +1764,15 @@ extension _PlistDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        let decoded: T
         if type == Date.self || type == NSDate.self {
-            guard let date = try self.unbox(value, as: Date.self) else { return nil }
-            decoded = date as! T
+            return try self.unbox(value, as: Date.self) as? T
         } else if type == Data.self || type == NSData.self {
-            guard let data = try self.unbox(value, as: Data.self) else { return nil }
-            decoded = data as! T
+            return try self.unbox(value, as: Data.self) as? T
         } else {
             self.storage.push(container: value)
-            decoded = try type.init(from: self)
-            self.storage.popContainer()
+            defer { self.storage.popContainer() }
+            return try type.init(from: self)
         }
-
-        return decoded
     }
 }
 

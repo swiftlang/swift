@@ -103,9 +103,9 @@ public:
 } // anonymous namespace
 
 UIdent UIdentVisitor::visitFuncDecl(const FuncDecl *D) {
-  if (D->isAccessor()) {
-    return SwiftLangSupport::getUIDForAccessor(D->getAccessorStorageDecl(),
-                                               D->getAccessorKind(),
+  if (auto AD = dyn_cast<AccessorDecl>(D)) {
+    return SwiftLangSupport::getUIDForAccessor(AD->getStorage(),
+                                               AD->getAccessorKind(),
                                                IsRef);
   }
 
@@ -212,8 +212,6 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::NotAccessor:
-    llvm_unreachable("expected accessor");
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   case AccessorKind::IsGetter:
@@ -395,6 +393,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclSubscript;
     case SyntaxStructureKind::AssociatedType:
       return KindDeclAssociatedType;
+    case SyntaxStructureKind::GenericTypeParam:
+      return KindDeclGenericTypeParam;
     case SyntaxStructureKind::Parameter:
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
@@ -423,6 +423,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprObjectLiteral;
     case SyntaxStructureKind::TupleExpression:
       return KindExprTuple;
+    case SyntaxStructureKind::ClosureExpression:
+      return KindExprClosure;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }

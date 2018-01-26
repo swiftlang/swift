@@ -1,4 +1,4 @@
-//===--- RequirementEnvironment.cpp - ASTContext Implementation -----------===//
+//===--- RequirementEnvironment.cpp - Requirement Environments ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

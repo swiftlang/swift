@@ -68,24 +68,19 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  StackAddress allocateStack(IRGenFunction &IGF,
-                                 SILType T,
-                                 bool isInEntryBlock,
-                                 const llvm::Twine &name) const override {
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                             const llvm::Twine &name) const override {
     // Allocate memory on the stack.
-    auto alloca = emitDynamicAlloca(IGF, T, isInEntryBlock);
-    assert((isInEntryBlock && alloca.SavedSP == nullptr) ||
-           (!isInEntryBlock && alloca.SavedSP != nullptr) &&
-               "stacksave/restore operations can only be skipped in the entry "
-               "block");
-    IGF.Builder.CreateLifetimeStart(alloca.Alloca);
-    return { getAsBitCastAddress(IGF, alloca.Alloca), alloca.SavedSP };
+    auto alloca = IGF.emitDynamicAlloca(T, name);
+    IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
+    return alloca.withAddress(
+             getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    emitDeallocateDynamicAlloca(IGF, stackAddress);
+    IGF.emitDeallocateDynamicAlloca(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,

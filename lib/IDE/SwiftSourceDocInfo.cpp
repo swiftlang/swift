@@ -149,9 +149,17 @@ bool CursorInfoResolver::walkToDeclPost(Decl *D) {
 }
 
 bool CursorInfoResolver::walkToStmtPre(Stmt *S) {
+  // Getting the character range for the statement, to account for interpolation
+  // strings. The token range for the interpolation string is the whole string,
+  // with begin/end locations pointing at the beginning of the string, so if
+  // there is a token location inside the string, it will seem as if it is out
+  // of the source range, unless we convert to character range.
+
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
-  if (!S->isImplicit() && !rangeContainsLoc(S->getSourceRange()))
+  if (!S->isImplicit() &&
+      !rangeContainsLoc(Lexer::getCharSourceRangeFromSourceRange(
+          getSourceMgr(), S->getSourceRange())))
     return false;
   return !tryResolve(S);
 }
@@ -249,6 +257,14 @@ SourceManager &NameMatcher::getSourceMgr() const {
   return SrcFile.getASTContext().SourceMgr;
 }
 
+bool CursorInfoResolver::rangeContainsLoc(SourceRange Range) const {
+  return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
+}
+
+bool CursorInfoResolver::rangeContainsLoc(CharSourceRange Range) const {
+  return Range.contains(LocToResolve);
+}
+
 std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens) {
 
   // Note the original indices and sort them in reverse source order
@@ -318,6 +334,11 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
         tryResolve(ASTWalker::ParentTy(), nextLoc());
     }
   }
+
+  // FIXME: Even implicit Decls should have proper ranges if they include any
+  // non-implicit children (fix implicit Decls created for lazy vars).
+  if (D->isImplicit())
+    return !isDone();
 
   if (shouldSkip(D->getSourceRange()))
     return false;

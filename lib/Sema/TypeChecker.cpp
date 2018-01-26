@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -419,6 +420,9 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       // but that gets tricky with synthesized function bodies.
       if (AFD->isBodyTypeChecked()) continue;
 
+      UnifiedStatsReporter::FrontendStatsTracer Tracer;
+      if (TC.Context.Stats)
+        Tracer = TC.Context.Stats->getStatsTracer("typecheck-fn", AFD);
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
 
@@ -471,6 +475,14 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.finalizeDecl(decl);
     }
 
+    // Ensure that the requirements of the given conformance are
+    // fully checked.
+    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
+      auto conformance = TC.PartiallyCheckedConformances[i];
+      TC.checkConformanceRequirements(conformance);
+    }
+    TC.PartiallyCheckedConformances.clear();
+
     // Complete any conformances that we used.
     for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
       auto conformance = TC.UsedConformances[i];
@@ -483,7 +495,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
-           !TC.UsedConformances.empty());
+           !TC.UsedConformances.empty() ||
+           !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;

@@ -765,6 +765,9 @@ namespace {
     bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
       return true;
     }
+    bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
+      return true;
+    }
     bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
       return true;
     }
@@ -992,6 +995,10 @@ bool SILInstruction::mayRelease() const {
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::UnownedReleaseInst:
@@ -1388,33 +1395,17 @@ MultipleValueInstructionResult::MultipleValueInstructionResult(
 
 void MultipleValueInstructionResult::setOwnershipKind(
     ValueOwnershipKind NewKind) {
-  // Get the original data, merge in our new lower values and then reset the
-  // value in our data.
-  //
-  // *NOTE* This is a two phase set so if this code ever needs to be used in a
-  // concurrent context, a this will need to be updated.
-  uint64_t OriginalData = getSubclassData();
-  uint64_t NewData =
-      (OriginalData & ~ValueOwnershipKind::Mask) | uint64_t(NewKind);
-  setSubclassData(NewData);
+  Bits.MultipleValueInstructionResult.VOKind = unsigned(NewKind);
 }
 
 void MultipleValueInstructionResult::setIndex(unsigned NewIndex) {
-  // We only take the last 3 bytes for simplicity. If more bits are needed at
-  // some point, we can take 5 bits we are burning here and combine them with
-  // 6 bits from SILType, Operand to get more storage. But to do so now would
-  // be premature optimization since we could potentially use those bits for
-  // flags. 500k fields is probably enough.
-  assert(NewIndex < (1 << NumIndexBits) && "Unrepresentable index");
-  uint64_t OriginalData = getSubclassData();
-  uint64_t NewData = (OriginalData & ~(IndexMask << IndexBitOffset)) |
-                     (NewIndex << IndexBitOffset);
-  setSubclassData(NewData);
+  // We currently use 32 bits to store the Index. A previous comment wrote
+  // that "500k fields is probably enough".
+  Bits.MultipleValueInstructionResult.Index = NewIndex;
 }
 
 ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
-  uint64_t Data = getSubclassData() & ValueOwnershipKind::Mask;
-  return ValueOwnershipKind(Data);
+  return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
 MultipleValueInstruction *MultipleValueInstructionResult::getParent() {

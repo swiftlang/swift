@@ -5,7 +5,7 @@
 import gizmo
 
 extension Gizmo {
-  // CHECK-LABEL: sil hidden @_T0So5GizmoC24objc_init_ref_delegationE{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden @$SSo5GizmoC24objc_init_ref_delegationE{{[_0-9a-zA-Z]*}}fc
   convenience init(int i: Int) {
     // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int, [[ORIG_SELF:%[0-9]+]] : @owned $Gizmo):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Gizmo }

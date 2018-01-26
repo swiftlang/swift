@@ -27,6 +27,17 @@
 
 namespace swift {
 
+enum {
+  /// The number of words (pointers) in a value buffer.
+  NumWords_ValueBuffer = 3,
+
+  /// The number of words in a yield-once coroutine buffer.
+  NumWords_YieldOnceBuffer = 4,
+
+  /// The number of words in a yield-many coroutine buffer.
+  NumWords_YieldManyBuffer = 8,
+};
+
 struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -86,12 +97,16 @@ inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
 }
 
 /// Swift class flags.
+/// These flags are valid only when isTypeMetadata().
+/// When !isTypeMetadata() these flags will collide with other Swift ABIs.
 enum class ClassFlags : uint32_t {
-  /// Is this a Swift 1 class?
-  IsSwift1 = 0x1,
+  /// Is this a Swift class from the Darwin pre-stable ABI?
+  /// This bit is clear in stable ABI Swift classes.
+  /// The Objective-C runtime also reads this bit.
+  IsSwiftPreStableABI = 0x1,
 
-  /// Does this class use Swift 1.0 refcounting?
-  UsesSwift1Refcounting = 0x2,
+  /// Does this class use Swift refcounting?
+  UsesSwiftRefcounting = 0x2,
 
   /// Has this class a custom name, specified with the @objc attribute?
   HasCustomObjCName = 0x4
@@ -166,111 +181,28 @@ enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
 };
-  
+
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeMetadataRecordKind : unsigned {
-  /// The conformance is universal and might apply to any type.
-  /// getDirectType() is nil.
-  Universal,
+  /// The conformance is for a nominal type referenced directly;
+  /// getNominalTypeDescriptor() points to the nominal type descriptor.
+  DirectNominalTypeDescriptor = 0x00,
 
-  /// The conformance is for a nongeneric native struct or enum type.
-  /// getDirectType() points to the canonical metadata for the type.
-  UniqueDirectType,
+  /// The conformance is for a nominal type referenced indirectly;
+  /// getNominalTypeDescriptor() points to the nominal type descriptor.
+  IndirectNominalTypeDescriptor = 0x01,
+
+  /// Reserved for future use.
+  Reserved = 0x02,
   
-  /// The conformance is for a nongeneric foreign struct or enum type.
-  /// getDirectType() points to a nonunique metadata record for the type, which
-  /// needs to be uniqued by the runtime.
-  NonuniqueDirectType,
-  
-  /// The conformance is for a nongeneric class type.
-  /// getIndirectClass() points to a variable that contains the pointer to the
-  /// class object, which may be ObjC and thus require a runtime call to get
-  /// metadata.
+  /// The conformance is for an Objective-C class that has no nominal type
+  /// descriptor.
+  /// getIndirectObjCClass() points to a variable that contains the pointer to
+  /// the class object, which then requires a runtime call to get metadata.
   ///
-  /// On platforms without ObjC interop, this indirection isn't necessary,
-  /// and classes could be emitted as UniqueDirectType.
-  UniqueIndirectClass,
-  
-  /// The conformance is for a generic or resilient type.
-  /// getNominalTypeDescriptor() points to the nominal type descriptor shared
-  /// by all metadata instantiations of this type.
-  UniqueNominalTypeDescriptor,
-  
-  /// The conformance is for a nongeneric class type.
-  /// getDirectType() points to the unique class object.
-  ///
-  /// FIXME: This shouldn't exist. On ObjC interop platforms, class references
-  /// must be indirected (using UniqueIndirectClass). On non-ObjC interop
-  /// platforms, the class object always is the type metadata.
-  UniqueDirectClass = 0xF,
-};
-
-/// Kinds of reference to protocol conformance.
-enum class ProtocolConformanceReferenceKind : unsigned {
-  /// A direct reference to a protocol witness table.
-  WitnessTable,
-  /// A function pointer that can be called to access the protocol witness
-  /// table.
-  WitnessTableAccessor,
-  /// A function pointer that can be called to access the protocol witness
-  /// table whose conformance is conditional on additional requirements that
-  /// must first be evaluated and then provided to the accessor function.
-  ConditionalWitnessTableAccessor,
-};
-
-// Type metadata record discriminant
-struct TypeMetadataRecordFlags {
-protected:
-  using int_type = unsigned;
-  int_type Data;
-  
-  enum : int_type {
-    TypeKindMask = 0x0000000FU,
-    TypeKindShift = 0,
-  };
-  
-public:
-  constexpr TypeMetadataRecordFlags() : Data(0) {}
-  constexpr TypeMetadataRecordFlags(int_type Data) : Data(Data) {}
-  
-  constexpr TypeMetadataRecordKind getTypeKind() const {
-    return TypeMetadataRecordKind((Data & TypeKindMask) >> TypeKindShift);
-  }
-  constexpr TypeMetadataRecordFlags withTypeKind(
-                                        TypeMetadataRecordKind ptk) const {
-    return TypeMetadataRecordFlags(
-                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
-  }
-  
-  int_type getValue() const { return Data; }
-};
-
-// Protocol conformance discriminant
-struct ProtocolConformanceFlags : public TypeMetadataRecordFlags {
-private:
-  enum : int_type {
-    ConformanceKindMask = 0x00000030U,
-    ConformanceKindShift = 4,
-  };
-
-public:
-  constexpr ProtocolConformanceFlags() : TypeMetadataRecordFlags(0) {}
-  constexpr ProtocolConformanceFlags(int_type Data) : TypeMetadataRecordFlags(Data) {}
-
-  constexpr ProtocolConformanceFlags withTypeKind(
-                                        TypeMetadataRecordKind ptk) const {
-    return ProtocolConformanceFlags(
-                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
-  }
-  constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
-    return ProtocolConformanceReferenceKind((Data & ConformanceKindMask)
-                                     >> ConformanceKindShift);
-  }
-  constexpr ProtocolConformanceFlags withConformanceKind(
-                                  ProtocolConformanceReferenceKind pck) const {
-    return ProtocolConformanceFlags(
-       (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
-  }
+  /// On platforms without Objective-C interoperability, this case is
+  /// unused.
+  IndirectObjCClass = 0x03,
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.
@@ -311,7 +243,9 @@ enum class ProtocolDispatchStrategy: uint8_t {
 class GenericParameterDescriptorFlags {
   typedef uint16_t int_type;
   enum : int_type {
-    HasVTable        = 0x0004,
+    IsNonUnique            = 0x0002,
+    HasVTable              = 0x0004,
+    HasResilientSuperclass = 0x0008,
   };
   int_type Data;
   
@@ -324,11 +258,39 @@ public:
                                              : (Data & ~HasVTable));
   }
 
+  constexpr GenericParameterDescriptorFlags withIsUnique(bool b) const {
+    return GenericParameterDescriptorFlags(!b ? (Data | IsNonUnique)
+                                           : (Data & ~IsNonUnique));
+  }
+
+  /// Whether this nominal type descriptor is known to be nonunique, requiring
+  /// comparison operations to check string equality of the mangled name.
+  bool isUnique() const {
+    return !(Data & IsNonUnique);
+  }
+
   /// If this type is a class, does it have a vtable?  If so, the number
   /// of vtable entries immediately follows the generic requirement
   /// descriptor.
   bool hasVTable() const {
     return Data & HasVTable;
+  }
+
+  constexpr GenericParameterDescriptorFlags withHasResilientSuperclass(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasResilientSuperclass)
+                                             : (Data & ~HasResilientSuperclass));
+  }
+
+  /// If this type is a class, does it have a resilient superclass?
+  /// If so, the generic parameter offset, field offset vector offset
+  /// and vtable start offsets are relative to the start of the class's
+  /// immediate members in the metadata, and not the start of the
+  /// metadata itself.
+  ///
+  /// Note that the immediate members begin at the same offset where the
+  /// superclass metadata ends.
+  bool hasResilientSuperclass() const {
+    return Data & HasResilientSuperclass;
   }
 
   int_type getIntValue() const {
@@ -480,6 +442,107 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  int_type getIntValue() const { return Value; }
+};
+
+/// Flags that go in a TargetConformanceDescriptor structure.
+class ConformanceFlags {
+public:
+  typedef uint32_t int_type;
+
+  enum class ConformanceKind {
+    /// A direct reference to a protocol witness table.
+    WitnessTable,
+    /// A function pointer that can be called to access the protocol witness
+    /// table.
+    WitnessTableAccessor,
+    /// A function pointer that can be called to access the protocol witness
+    /// table whose conformance is conditional on additional requirements that
+    /// must first be evaluated and then provided to the accessor function.
+    ConditionalWitnessTableAccessor
+  };
+
+private:
+  enum : int_type {
+    ConformanceKindMask = 0x07,      // 8 conformance kinds
+
+    TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
+    TypeMetadataKindShift = 3,
+
+    IsRetroactiveMask = 0x01 << 6,
+    IsSynthesizedNonUniqueMask = 0x01 << 7,
+
+    NumConditionalRequirementsMask = 0xFF << 8,
+    NumConditionalRequirementsShift = 8,
+  };
+
+  int_type Value;
+
+public:
+  ConformanceFlags(int_type value = 0) : Value(value) {}
+
+  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
+    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
+  }
+
+  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+    return ConformanceFlags((Value & ~TypeMetadataKindMask)
+                            | (int_type(kind) << TypeMetadataKindShift));
+  }
+
+  ConformanceFlags withIsRetroactive(bool isRetroactive) const {
+    return ConformanceFlags((Value & ~IsRetroactiveMask)
+                            | (isRetroactive? IsRetroactiveMask : 0));
+  }
+
+  ConformanceFlags withIsSynthesizedNonUnique(
+                                          bool isSynthesizedNonUnique) const {
+    return ConformanceFlags(
+                  (Value & ~IsSynthesizedNonUniqueMask)
+                  | (isSynthesizedNonUnique ? IsSynthesizedNonUniqueMask : 0));
+  }
+
+  ConformanceFlags withNumConditionalRequirements(unsigned n) const {
+    return ConformanceFlags((Value & ~NumConditionalRequirementsMask)
+                            | (n << NumConditionalRequirementsShift));
+  }
+
+  /// Retrieve the conformance kind.
+  ConformanceKind getConformanceKind() const {
+    return ConformanceKind(Value & ConformanceKindMask);
+  }
+
+  /// Retrieve the type reference kind kind.
+  TypeMetadataRecordKind getTypeReferenceKind() const {
+    return TypeMetadataRecordKind(
+                      (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
+  }
+
+  /// Is the conformance "retroactive"?
+  ///
+  /// A conformance is retroactive when it occurs in a module that is
+  /// neither the module in which the protocol is defined nor the module
+  /// in which the conforming type is defined. With retroactive conformance,
+  /// it is possible to detect a conflict at run time.
+  bool isRetroactive() const { return Value & IsRetroactiveMask; }
+
+  /// Is the conformance synthesized in a non-unique manner?
+  ///
+  /// The Swift compiler will synthesize conformances on behalf of some
+  /// imported entities (e.g., C typedefs with the swift_wrapper attribute).
+  /// Such conformances are retroactive by nature, but the presence of multiple
+  /// such conformances is not a conflict because all synthesized conformances
+  /// will be equivalent.
+  bool isSynthesizedNonUnique() const {
+    return Value & IsSynthesizedNonUniqueMask;
+  }
+
+  /// Retrieve the # of conditional requirements.
+  unsigned getNumConditionalRequirements() const {
+    return (Value & NumConditionalRequirementsMask)
+              >> NumConditionalRequirementsShift;
+  }
 
   int_type getIntValue() const { return Value; }
 };
@@ -671,6 +734,49 @@ public:
 };
 using ParameterFlags = TargetParameterTypeFlags<uint32_t>;
 
+template <typename int_type>
+class TargetTupleTypeFlags {
+  enum : int_type {
+    NumElementsMask = 0x0000FFFFU,
+    NonConstantLabelsMask = 0x00010000U,
+  };
+  int_type Data;
+
+public:
+  constexpr TargetTupleTypeFlags() : Data(0) {}
+  constexpr TargetTupleTypeFlags(int_type Data) : Data(Data) {}
+
+  constexpr TargetTupleTypeFlags
+  withNumElements(unsigned numElements) const {
+    return TargetTupleTypeFlags((Data & ~NumElementsMask) | numElements);
+  }
+
+  constexpr TargetTupleTypeFlags<int_type> withNonConstantLabels(
+                                             bool hasNonConstantLabels) const {
+    return TargetTupleTypeFlags<int_type>(
+                        (Data & ~NonConstantLabelsMask) |
+                          (hasNonConstantLabels ? NonConstantLabelsMask : 0));
+  }
+
+  unsigned getNumElements() const { return Data & NumElementsMask; }
+
+  bool hasNonConstantLabels() const { return Data & NonConstantLabelsMask; }
+
+  int_type getIntValue() const { return Data; }
+
+  static TargetTupleTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetTupleTypeFlags(Data);
+  }
+
+  bool operator==(TargetTupleTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetTupleTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
+
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.
 class FieldType {
@@ -746,6 +852,72 @@ static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
 static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
+
+/// Flags for struct layout.
+enum class StructLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline StructLayoutFlags operator|(StructLayoutFlags lhs,
+                                          StructLayoutFlags rhs) {
+  return StructLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline StructLayoutFlags &operator|=(StructLayoutFlags &lhs,
+                                            StructLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline StructLayoutFlags getLayoutAlgorithm(StructLayoutFlags flags) {
+  return StructLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(StructLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
+}
+
+/// Flags for enum layout.
+enum class EnumLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+
+  /// Is the value-witness table mutable in place, or does layout need to
+  /// clone it?
+  IsVWTMutable      = 0x100,
+};
+static inline EnumLayoutFlags operator|(EnumLayoutFlags lhs,
+                                        EnumLayoutFlags rhs) {
+  return EnumLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline EnumLayoutFlags &operator|=(EnumLayoutFlags &lhs,
+                                          EnumLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
+  return EnumLayoutFlags(uintptr_t(flags)
+                           & uintptr_t(EnumLayoutFlags::AlgorithmMask));
+}
+static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
+}
+
+/// The number of arguments that will be passed directly to a generic
+/// nominal type access function. The remaining arguments (if any) will be
+/// passed as an array. That array has enough storage for all of the arguments,
+/// but only fills in the elements not passed directly. The callee may
+/// mutate the array to fill in the direct arguments.
+constexpr unsigned NumDirectGenericTypeMetadataAccessFunctionArgs = 3;
+
+/// The offset (in pointers) to the first requirement in a witness table.
+constexpr unsigned WitnessTableFirstRequirementOffset = 1;
 
 } // end namespace swift
 

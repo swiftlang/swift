@@ -125,7 +125,7 @@
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.name: "init(a:b:)",
-          key.usr: "s:11test_module7TwoIntsCACSi1a_Si1btcfc"
+          key.usr: "s:11test_module7TwoIntsC1a1bACSi_Sitcfc"
         }
       ]
     },

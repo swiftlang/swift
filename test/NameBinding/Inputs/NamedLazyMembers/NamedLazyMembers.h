@@ -97,3 +97,9 @@
 
 @interface DerivedFromMirroringDoer : MirroringDoer
 @end
+
+@interface SimilarlyNamedThings
+- (void)doSomething:(double)x;
+- (void)doSomething:(double)x celsius:(double)y;
+- (void)doSomething:(double)x fahrenheit:(double)y using:(void (^)(void))block;
+@end

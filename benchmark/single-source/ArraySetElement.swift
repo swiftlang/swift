@@ -18,7 +18,7 @@ import TestsUtils
 public var ArraySetElement = BenchmarkInfo(
   name: "ArraySetElement",
   runFunction: run_ArraySetElement,
-  tags: [.runtime, .cpubench]
+  tags: [.runtime, .cpubench, .unstable]
 )
 
 // This is an effort to defeat isUniquelyReferenced optimization. Ideally

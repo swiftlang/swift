@@ -16,8 +16,10 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
@@ -36,7 +38,7 @@ static const char *class_getName(const ClassMetadata* type) {
     reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
 }
 
-template<> void ProtocolConformanceRecord::dump() const {
+template<> void ProtocolConformanceDescriptor::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
     SymbolInfo info;
     int ok = lookupSymbol(addr, &info);
@@ -46,30 +48,17 @@ template<> void ProtocolConformanceRecord::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      printf("universal");
+    case TypeMetadataRecordKind::Reserved:
+      printf("unknown (reserved)");
       break;
-    case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      printf("%s direct type ",
-             kind == TypeMetadataRecordKind::UniqueDirectType
-             ? "unique" : "nonunique");
-      if (const auto *ntd = getDirectType()->getNominalTypeDescriptor()) {
-        printf("%s", ntd->Name.get());
-      } else {
-        printf("<structural type>");
-      }
-      break;
-    case TypeMetadataRecordKind::UniqueDirectClass:
-      printf("unique direct class %s",
-             class_getName(getDirectClass()));
-      break;
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      printf("unique indirect class %s",
-             class_getName(*getIndirectClass()));
+
+    case TypeMetadataRecordKind::IndirectObjCClass:
+      printf("indirect Objective-C class %s",
+             class_getName(*getIndirectObjCClass()));
       break;
       
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
       printf("unique nominal type descriptor %s", symbolName(getNominalTypeDescriptor()));
       break;
   }
@@ -77,14 +66,14 @@ template<> void ProtocolConformanceRecord::dump() const {
   printf(" => ");
   
   switch (getConformanceKind()) {
-    case ProtocolConformanceReferenceKind::WitnessTable:
+    case ConformanceFlags::ConformanceKind::WitnessTable:
       printf("witness table %s\n", symbolName(getStaticWitnessTable()));
       break;
-    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
       printf("witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
-    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
       printf("conditional witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
@@ -96,35 +85,21 @@ template<> void ProtocolConformanceRecord::dump() const {
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
 template <>
-const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
+const Metadata *
+ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::UniqueDirectType:
-    // Already unique.
-    return getDirectType();
-  case TypeMetadataRecordKind::NonuniqueDirectType: {
-    // Ask the runtime for the unique metadata record we've canonized.
-    const ForeignTypeMetadata *FMD =
-        static_cast<const ForeignTypeMetadata *>(getDirectType());
-    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
-  }
-  case TypeMetadataRecordKind::UniqueIndirectClass:
+  case TypeMetadataRecordKind::Reserved:
+    return nullptr;
+  case TypeMetadataRecordKind::IndirectObjCClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
-    if (auto *ClassMetadata = *getIndirectClass())
+    if (auto *ClassMetadata = *getIndirectObjCClass())
       return getMetadataForClass(ClassMetadata);
     return nullptr;
       
-  case TypeMetadataRecordKind::UniqueDirectClass:
-    // The class may be ObjC, in which case we need to instantiate its Swift
-    // metadata.
-    if (auto *ClassMetadata = getDirectClass())
-      return getMetadataForClass(ClassMetadata);
-    return nullptr;
-      
-  case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-  case TypeMetadataRecordKind::Universal:
-    // The record does not apply to a single type.
+  case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
     return nullptr;
   }
 
@@ -133,23 +108,44 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
 
 template<>
 const WitnessTable *
-ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
-const {
+ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
   switch (getConformanceKind()) {
-  case ProtocolConformanceReferenceKind::WitnessTable:
+  case ConformanceFlags::ConformanceKind::WitnessTable:
     return getStaticWitnessTable();
 
-  case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+  case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type, nullptr, 0);
 
-  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+  case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // FIXME: this needs to query the conditional requirements to form the
     // array of witness tables to pass along to the accessor.
+
+    // Pretty-print the type name.
+    auto typeNamePair = TwoWordPair<const char *, uintptr_t>(
+      swift_getTypeName(type, /*qualified=*/true));
+    std::string typeName(typeNamePair.first,
+                         typeNamePair.first + typeNamePair.second);
+
+    // Demangle the protocol name.
+    DemangleOptions options;
+    options.DisplayEntityTypes = false;
+    std::string demangledProtocolName =
+      demangleSymbolAsString(StringRef(getProtocol()->Name), options);
+
+    warning(/*flag=*/0,
+            "warning: Swift runtime does not yet support dynamically "
+            "querying conditional conformance ('%s': '%s')\n",
+            typeName.c_str(), demangledProtocolName.c_str());
     return nullptr;
   }
 
-  swift_runtime_unreachable(
-      "Unhandled ProtocolConformanceReferenceKind in switch.");
+  default:
+    return nullptr;
+  }
+#pragma clang diagnostic pop
+
 }
 
 namespace {
@@ -430,14 +426,18 @@ bool isRelatedType(const Metadata *type, const void *candidate,
                    bool candidateIsMetadata) {
 
   while (true) {
-    if (type == candidate && candidateIsMetadata)
+    // Check whether the types match.
+    if (candidateIsMetadata && type == candidate)
       return true;
 
-    // If the type is resilient or generic, see if there's a witness table
-    // keyed off the nominal type descriptor.
-    const auto *description = type->getNominalTypeDescriptor();
-    if (description == candidate && !candidateIsMetadata)
-      return true;
+    // Check whether the nominal type descriptors match.
+    if (!candidateIsMetadata) {
+      const auto *description = type->getNominalTypeDescriptor();
+      auto candidateDescription =
+      static_cast<const NominalTypeDescriptor *>(candidate);
+      if (description && description->isEqual(candidateDescription))
+        return true;
+    }
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
@@ -522,9 +522,11 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     auto &section = C.SectionsToScan[sectionIdx];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
+      auto &descriptor = *record.get();
+
       // If the record applies to a specific type, cache it.
-      if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto P = record.getProtocol();
+      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -534,7 +536,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
           continue;
 
         // Store the type-protocol pair in the cache.
-        auto witness = record.getWitnessTable(metadata);
+        auto witness = descriptor.getWitnessTable(metadata);
         if (witness) {
           C.cacheSuccess(metadata, P, witness);
         } else {
@@ -544,11 +546,12 @@ swift::swift_conformsToProtocol(const Metadata * const type,
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
       // can be shared.
-      } else if (record.getTypeKind()
-                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor) {
-
-        auto R = record.getNominalTypeDescriptor();
-        auto P = record.getProtocol();
+      } else if (descriptor.getTypeKind()
+                   == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
+                 descriptor.getTypeKind()
+                  == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
+        auto R = descriptor.getNominalTypeDescriptor();
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -557,22 +560,31 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
         // Store the type-protocol pair in the cache.
-        switch (record.getConformanceKind()) {
-        case ProtocolConformanceReferenceKind::WitnessTable:
+        switch (descriptor.getConformanceKind()) {
+        case ConformanceFlags::ConformanceKind::WitnessTable:
           // If the record provides a nondependent witness table for all
           // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(R, P, record.getStaticWitnessTable());
+          C.cacheSuccess(type->getNominalTypeDescriptor(), P,
+                         descriptor.getStaticWitnessTable());
           break;
 
-        case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-        case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+        case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+        case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
           // If the record provides a dependent witness table accessor,
           // cache the result for the instantiated type metadata.
-          C.cacheSuccess(type, P, record.getWitnessTable(type));
+          C.cacheSuccess(type, P, descriptor.getWitnessTable(type));
           break;
 
+        default:
+          // Always fail, because we cannot interpret a future conformance
+          // kind.
+          C.cacheFailure(metadata, P);
+          break;
         }
+#pragma clang diagnostic pop
       }
     }
   }
@@ -589,10 +601,9 @@ swift::swift_conformsToProtocol(const Metadata * const type,
   }
 }
 
-const Metadata *
+const NominalTypeDescriptor *
 swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   auto &C = Conformances.get();
-  const Metadata *foundMetadata = nullptr;
 
   ScopedLock guard(C.SectionsToScanLock);
 
@@ -602,17 +613,26 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
+      auto &descriptor = *record.get();
 
-      if (foundMetadata != nullptr)
+      switch (descriptor.getTypeKind()) {
+      case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+      case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+        if (auto ntd = descriptor.getNominalTypeDescriptor()) {
+          if (ntd->Name.get() == typeName)
+            return ntd;
+        }
         break;
+
+      case TypeMetadataRecordKind::IndirectObjCClass:
+        // Objective-C classes are found by the Objective-C runtime.
+        break;
+
+      case TypeMetadataRecordKind::Reserved:
+        break;
+      }
     }
-    if (foundMetadata != nullptr)
-      break;
   }
 
-  return foundMetadata;
+  return nullptr;
 }

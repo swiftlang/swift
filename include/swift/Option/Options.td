@@ -281,11 +281,6 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
-def enable_experimental_conditional_conformances : Flag<["-"],
-  "enable-experimental-conditional-conformances">,
-  Flags<[FrontendOption]>,
-HelpText<"Enable experimental implementation of SE-0143: Conditional Conformances">;
-
 def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Enable automatic generation of bridging PCH files">;
@@ -623,6 +618,10 @@ def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
+
+def batch_mode : Flag<["-"], "batch-mode">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Combine frontend jobs into batches">;
 
 def wmo : Flag<["-"], "wmo">, Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;

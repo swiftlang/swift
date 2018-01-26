@@ -49,8 +49,12 @@ static bool seemsUseful(SILInstruction *I) {
     return BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath;
   }
 
-  if (isa<ReturnInst>(I) || isa<UnreachableInst>(I) || isa<ThrowInst>(I))
+  if (isa<UnreachableInst>(I))
     return true;
+  if (auto TI = dyn_cast<TermInst>(I)) {
+    if (TI->isFunctionExiting())
+      return true;
+  }
 
   return false;
 }

@@ -25,8 +25,8 @@ sil_global private @globalinit_token0 : $Builtin.Word
 // CHECK-NEXT: }
 sil_global @_Tv2ch1xSi : $Outer
 
-// CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
-sil private @globalinit_func0 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil private @globalinit_func0 : $@convention(c) () -> () {
+sil private @globalinit_func0 : $@convention(c) () -> () {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Outer
   %1 = integer_literal $Builtin.Int32, 2
@@ -42,7 +42,7 @@ bb0:
 // CHECK-NEXT: bb0:
 // CHECK-NOT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
-// CHECK: function_ref @globalinit_func0 : $@convention(thin) () -> ()
+// CHECK: function_ref @globalinit_func0 : $@convention(c) () -> ()
 // CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Outer
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
@@ -50,8 +50,8 @@ sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
+  %3 = function_ref @globalinit_func0 : $@convention(c) () -> ()
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
   %6 = global_addr @_Tv2ch1xSi : $*Outer
   %7 = address_to_pointer %6 : $*Outer to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer

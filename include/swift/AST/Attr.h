@@ -285,6 +285,7 @@ public:
     OnConstructor      = 1 << 24,
     OnDestructor       = 1 << 25,
     OnFunc             = 1 << 26,
+    OnAccessor         = OnFunc,
     OnEnumElement      = 1 << 27,
 
     OnGenericTypeParam = 1 << 28,
@@ -1196,6 +1197,61 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RestatedObjCConformance;
+  }
+};
+
+/// Attached to type declarations synthesized by the Clang importer.
+///
+/// Used to control manglings.
+class ClangImporterSynthesizedTypeAttr : public DeclAttribute {
+public:
+  enum class Kind : char {
+    /// A struct synthesized by the importer to represent an NSError with a
+    /// particular domain, as specified by an enum with the \c ns_error_domain
+    /// Clang attribute.
+    ///
+    /// This one is for enums with names.
+    NSErrorWrapper,
+
+    /// A struct synthesized by the importer to represent an NSError with a
+    /// particular domain, as specified by an enum with the \c ns_error_domain
+    /// Clang attribute.
+    ///
+    /// This one is for anonymous enums that are immediately typedef'd, giving
+    /// them a unique name for linkage purposes according to the C++ standard.
+    NSErrorWrapperAnon,
+  };
+
+  /// The (Clang) name of the declaration that caused this type declaration to
+  /// be synthesized.
+  ///
+  /// Must be a valid Swift identifier as well, for mangling purposes.
+  const StringRef originalTypeName;
+  const Kind kind;
+
+  explicit ClangImporterSynthesizedTypeAttr(StringRef originalTypeName,
+                                            Kind kind)
+    : DeclAttribute(DAK_ClangImporterSynthesizedType, SourceLoc(),
+                    SourceRange(), /*Implicit=*/true),
+      originalTypeName(originalTypeName), kind(kind) {
+    assert(!originalTypeName.empty());
+  }
+
+  StringRef getManglingName() const {
+    return manglingNameForKind(kind);
+  }
+
+  static StringRef manglingNameForKind(Kind kind) {
+    switch (kind) {
+    case Kind::NSErrorWrapper:
+      return "e";
+    case Kind::NSErrorWrapperAnon:
+      return "E";
+    }
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ClangImporterSynthesizedType;
   }
 };
 

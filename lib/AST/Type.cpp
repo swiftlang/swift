@@ -108,17 +108,10 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
-  if (auto nominalTy = dyn_cast<NominalType>(*this))
-    return (GenericTypeDecl*)nominalTy->getDecl();
-  
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return (GenericTypeDecl*)boundTy->getDecl();
-  
-  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
-    return unboundTy->getDecl();
+  if (auto Ty = dyn_cast<AnyGenericType>(*this))
+    return Ty->getDecl();
   return nullptr;
 }
-
 
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
@@ -685,7 +678,7 @@ Type TypeBase::getWithoutParens() {
 Type TypeBase::getWithoutImmediateLabel() {
   Type Ty = this;
   if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       Ty = tupleTy->getElementType(0);
   }
   return Ty;
@@ -870,7 +863,7 @@ Type TypeBase::getRValueInstanceType() {
   
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
+    if (tupleTy->hasParenSema(/*allowName*/true))
       type = tupleTy->getElementType(0);
   }
   
@@ -1028,7 +1021,7 @@ static Type
 getCanonicalInputType(AnyFunctionType *funcType,
                       llvm::function_ref<CanType(Type)> getCanonicalType) {
   auto origInputType = funcType->getInput();
-  bool isParen = isa<ParenType>(origInputType.getPointer());
+  bool isParen = origInputType->hasParenSugar();
   Type inputType = getCanonicalType(origInputType);
 
   if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
@@ -1045,17 +1038,9 @@ getCanonicalInputType(AnyFunctionType *funcType,
   return inputType;
 }
 
-/// getCanonicalType - Return the canonical version of this type, which has
-/// sugar from all levels stripped off.
-CanType TypeBase::getCanonicalType() {
-  // If the type is itself canonical, return it.
-  if (isCanonical())
-    return CanType(this);
-  // If the canonical type was already computed, just return what we have.
-  if (TypeBase *CT = CanonicalType.get<TypeBase*>())
-    return CanType(CT);
+CanType TypeBase::computeCanonicalType() {
+  assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
-  // Otherwise, compute and cache it.
   TypeBase *Result = nullptr;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
@@ -1227,8 +1212,7 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   }
-    
-  
+
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
@@ -1265,57 +1249,17 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Func(this).getPointer();
 }
 
-TypeBase *TypeBase::getDesugaredType() {
-  switch (getKind()) {
-#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
+#define TYPE(Id, Parent)
+#define SUGARED_TYPE(Id, Parent) \
+  static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
-  case TypeKind::Tuple:
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::LValue:
-  case TypeKind::InOut:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Metatype:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::Protocol:
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
-  case TypeKind::DynamicSelf:
-    // None of these types have sugar at the outer level.
-    return this;
-#define SUGARED_TYPE(ID, PARENT) \
-  case TypeKind::ID: \
-    return cast<ID##Type>(this)->getSinglyDesugaredType()->getDesugaredType();
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-  }
-
-  llvm_unreachable("Unknown type kind");
-}
 
 ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
                      ParameterTypeFlags flags)
-  : TypeBase(TypeKind::Paren, nullptr, properties),
-    UnderlyingType(flags.isInOut()
-                     ? InOutType::get(baseType)
-                     : baseType) {
-  ParenTypeBits.Flags = flags.toRaw();
+  : SugarType(TypeKind::Paren,
+              flags.isInOut() ? InOutType::get(baseType) : baseType,
+              properties) {
+  Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
   if (baseType->is<InOutType>())
@@ -1323,60 +1267,55 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
 }
 
 
-TypeBase *ParenType::getSinglyDesugaredType() {
-  return getUnderlyingType().getPointer();
-}
-
-TypeBase *NameAliasType::getSinglyDesugaredType() {
-  return getDecl()->getUnderlyingTypeLoc().getType().getPointer();
-}
-
-TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type SyntaxSugarType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
+Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
   NominalTypeDecl *implDecl;
 
-  if (isa<ArraySliceType>(this)) {
-    implDecl = ctx.getArrayDecl();
-    assert(implDecl && "Array type has not been set yet");
-  } else if (isa<OptionalType>(this)) {
-    implDecl = ctx.getOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
-  } else if (isa<ImplicitlyUnwrappedOptionalType>(this)) {
-    implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
+  // XXX -- If the Decl and Type class hierarchies agreed on spelling, then
+  // we could handle the entire switch statement via macros.
+  switch (getKind()) {
+#define TYPE(Id, Parent) \
+  case TypeKind::Id: llvm_unreachable("non-sugared type?");
+#define SUGARED_TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Paren:
+    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
+  case TypeKind::NameAlias: {
+    auto Ty = cast<NameAliasType>(this);
+    auto UTy = Ty->getDecl()->getUnderlyingTypeLoc().getType().getPointer();
+    if (isa<NominalOrBoundGenericNominalType>(UTy)) {
+      Bits.SugarType.HasCachedType = true;
+      UnderlyingType = UTy;
+    }
+    return UTy;
+  }
+  case TypeKind::ArraySlice:
+    implDecl = Context->getArrayDecl();
+    break;
+  case TypeKind::Optional:
+    implDecl = Context->getOptionalDecl();
+    break;
+  case TypeKind::ImplicitlyUnwrappedOptional:
+    implDecl = Context->getImplicitlyUnwrappedOptionalDecl();
+    break;
+  case TypeKind::Dictionary:
+    implDecl = Context->getDictionaryDecl();
+    break;
+  }
+  assert(implDecl && "Type has not been set yet");
+
+  Bits.SugarType.HasCachedType = true;
+  if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
+    UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
+  } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
+    UnderlyingType = BoundGenericType::get(implDecl, Type(),
+                                      { Ty->getKeyType(), Ty->getValueType() });
   } else {
-    llvm_unreachable("Unhandled syntax sugar type");
+    llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
 
   // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
-  return ImplOrContext.get<Type>();
-}
-
-TypeBase *DictionaryType::getSinglyDesugaredType() {
-  return getImplementationType().getPointer();
-}
-
-Type DictionaryType::getImplementationType() {
-  if (ImplOrContext.is<Type>())
-    return ImplOrContext.get<Type>();
-
-  // Find the generic type that implements this syntactic sugar type.
-  auto &ctx = *ImplOrContext.get<const ASTContext *>();
-  NominalTypeDecl *implDecl = ctx.getDictionaryDecl();
-  assert(implDecl && "Dictionary type has not been set yet");
-
-  // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), { Key, Value });
-  return ImplOrContext.get<Type>();
+  return UnderlyingType;
 }
 
 unsigned GenericTypeParamType::getDepth() const {
@@ -1443,6 +1382,10 @@ bool TypeBase::mayHaveSuperclass() {
     return (bool)archetype->requiresClass();
 
   return is<DynamicSelfType>();
+}
+
+bool TypeBase::satisfiesClassConstraint() {
+  return mayHaveSuperclass() || isObjCExistentialType();
 }
 
 Type TypeBase::getSuperclass() {
@@ -2006,6 +1949,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
              nullptr };
   }
 
+  // Give special dispensation to builtin types for testing purposes.
+  if (type->is<BuiltinType>())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   auto nominal = type->getAnyNominal();
   if (!nominal) return failure();
 
@@ -2235,10 +2182,44 @@ namespace {
   };
 } // end anonymous namespace
 
+static bool matchFunctionTypes(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
+                               TypeMatchOptions matchMode,
+                               OptionalUnwrapping insideOptional,
+                               std::function<bool()> paramsAndResultMatch) {
+  // FIXME: Handle generic functions in non-ABI matches.
+  if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+    if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
+      return false;
+  }
+
+  // When checking overrides, allow the base type to be throwing even if the
+  // overriding type isn't.
+  auto ext1 = fn1->getExtInfo();
+  auto ext2 = fn2->getExtInfo();
+  if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
+    if (ext2.throws()) {
+      ext1 = ext1.withThrows(true);
+    }
+  }
+  // If specified, allow an escaping function parameter to override a
+  // non-escaping function parameter when the parameter is optional.
+  // Note that this is checking 'ext2' rather than 'ext1' because parameters
+  // must be contravariant for the containing function to be covariant.
+  if (matchMode.contains(
+          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
+      insideOptional == OptionalUnwrapping::OptionalToOptional) {
+    if (!ext2.isNoEscape())
+      ext1 = ext1.withNoEscape(false);
+  }
+  if (ext1 != ext2)
+    return false;
+
+  return paramsAndResultMatch();
+}
+
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                     ParameterPosition paramPosition,
-                    OptionalUnwrapping insideOptional,
-                    LazyResolver *resolver) {
+                    OptionalUnwrapping insideOptional) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
@@ -2250,7 +2231,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToOptional, resolver);
+                       OptionalUnwrapping::OptionalToOptional);
       }
 
       // Value-to-optional.
@@ -2261,7 +2242,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::ValueToOptional, resolver);
+                       OptionalUnwrapping::ValueToOptional);
       }
 
     } else if (matchMode.contains(
@@ -2269,7 +2250,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToValue, resolver);
+                       OptionalUnwrapping::OptionalToValue);
       }
     }
   }
@@ -2293,15 +2274,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       OptionalUnwrapping::None, resolver);
+                       OptionalUnwrapping::None);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, OptionalUnwrapping::None,
-                   resolver)){
+                   matchMode, elementPosition, OptionalUnwrapping::None)) {
         return false;
       }
     }
@@ -2314,41 +2294,17 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!fn1)
       return false;
 
-    // FIXME: Handle generic functions in non-ABI matches.
-    if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
-      if (!isa<FunctionType>(t1) || !isa<FunctionType>(t2))
-        return false;
-    }
+    std::function<bool()> paramsAndResultMatch = [=]() {
+      // Inputs are contravariant, results are covariant.
+      return (matches(fn2.getInput(), fn1.getInput(), matchMode,
+                      ParameterPosition::Parameter, OptionalUnwrapping::None) &&
+              matches(fn1.getResult(), fn2.getResult(), matchMode,
+                      ParameterPosition::NotParameter,
+                      OptionalUnwrapping::None));
+    };
 
-    // When checking overrides, allow the base type to be throwing even if the
-    // overriding type isn't.
-    auto ext1 = fn1->getExtInfo();
-    auto ext2 = fn2->getExtInfo();
-    if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-      if (ext2.throws()) {
-        ext1 = ext1.withThrows(true);
-      }
-    }
-    // If specified, allow an escaping function parameter to override a
-    // non-escaping function parameter when the parameter is optional.
-    // Note that this is checking 'ext2' rather than 'ext1' because parameters
-    // must be contravariant for the containing function to be covariant.
-    if (matchMode.contains(
-          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
-        insideOptional == OptionalUnwrapping::OptionalToOptional) {
-      if (!ext2.isNoEscape())
-        ext1 = ext1.withNoEscape(false);
-    }
-    if (ext1 != ext2)
-      return false;
-
-    // Inputs are contravariant, results are covariant.
-    return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, OptionalUnwrapping::None,
-                    resolver) &&
-            matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                    resolver));
+    return matchFunctionTypes(fn1, fn2, matchMode, insideOptional,
+                              paramsAndResultMatch);
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
@@ -2374,17 +2330,15 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   return false;
 }
 
-bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
-                       LazyResolver *resolver) {
+bool TypeBase::matches(Type other, TypeMatchOptions matchMode) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
-                   resolver);
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     if (getTrailingObjects<TupleTypeElt>()[i].getName() == I)
       return i;
   }
@@ -2397,10 +2351,10 @@ int TupleType::getNamedElementId(Identifier I) const {
 /// scalar, return the field number that the scalar is assigned to.  If not,
 /// return -1.
 int TupleType::getElementForScalarInit() const {
-  if (TupleTypeBits.Count == 0) return -1;
+  if (Bits.TupleType.Count == 0) return -1;
   
   int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
@@ -2424,7 +2378,7 @@ int TupleType::getElementForScalarInit() const {
 /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
 /// Otherwise, this returns Type().
 Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
     if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
       return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
   }
@@ -2451,10 +2405,10 @@ ArchetypeType::ArchetypeType(
   }
 
   // Set up the bits we need for trailing objects to work.
-  ArchetypeTypeBits.ExpandedNestedTypes = false;
-  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
-  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
-  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+  Bits.ArchetypeType.ExpandedNestedTypes = false;
+  Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
+  Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
+  Bits.ArchetypeType.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
@@ -2479,10 +2433,10 @@ ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
                         RecursiveTypeProperties::HasOpenedExistential)),
     ParentOrOpenedOrEnvironment(Existential.getPointer()) {
   // Set up the bits we need for trailing objects to work.
-  ArchetypeTypeBits.ExpandedNestedTypes = false;
-  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
-  ArchetypeTypeBits.HasLayoutConstraint = static_cast<bool>(Layout);
-  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+  Bits.ArchetypeType.ExpandedNestedTypes = false;
+  Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
+  Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
+  Bits.ArchetypeType.NumProtocols = ConformsTo.size();
 
   // Record the superclass.
   if (Superclass)
@@ -2546,7 +2500,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (ArchetypeTypeBits.HasSuperclass)
+  if (Bits.ArchetypeType.HasSuperclass)
     return true;
   if (auto layout = getLayoutConstraint())
     if (layout->isClass())
@@ -2582,7 +2536,7 @@ namespace {
 } // end anonymous namespace
 
 void ArchetypeType::populateNestedTypes() const {
-  if (ArchetypeTypeBits.ExpandedNestedTypes) return;
+  if (Bits.ArchetypeType.ExpandedNestedTypes) return;
 
   // Collect the set of nested types of this archetype.
   SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
@@ -2657,10 +2611,10 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 void ArchetypeType::setNestedTypes(
                                  ASTContext &Ctx,
                                  ArrayRef<std::pair<Identifier, Type>> Nested) {
-  assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
+  assert(!Bits.ArchetypeType.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
   std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
-  ArchetypeTypeBits.ExpandedNestedTypes = true;
+  Bits.ArchetypeType.ExpandedNestedTypes = true;
 }
 
 void ArchetypeType::registerNestedType(Identifier name, Type nested) {
@@ -4104,7 +4058,7 @@ SILBoxType::SILBoxType(ASTContext &C,
                        SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
            getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
-  SILBoxTypeBits.NumGenericArgs = Args.size();
+  Bits.SILBoxType.NumGenericArgs = Args.size();
 #ifndef NDEBUG
   // Check that the generic args are reasonable for the box's signature.
   if (Layout->getGenericSignature())

@@ -158,14 +158,28 @@ extension LazySequenceProtocol where Elements == Self {
   public var elements: Self { return self }
 }
 
+extension LazySequenceProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var lazy: LazySequence<Elements> {
+    return elements.lazy
+  }
+}
+
+extension LazySequenceProtocol where Elements: LazySequenceProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var lazy: Elements {
+    return elements
+  }
+}
+
 /// A sequence containing the same elements as a `Base` sequence, but
 /// on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct LazySequence<Base : Sequence>
-  : LazySequenceProtocol, _SequenceWrapper {
+public struct LazySequence<Base : Sequence>: _SequenceWrapper {
+  public var _base: Base
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
@@ -175,12 +189,14 @@ public struct LazySequence<Base : Sequence>
   internal init(_base: Base) {
     self._base = _base
   }
+}
 
-  public var _base: Base
+extension LazySequence: LazySequenceProtocol {
+  public typealias Elements = Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
   @_inlineable // FIXME(sil-serialize-all)
-  public var elements: Base { return _base }
+  public var elements: Elements { return _base }
 }
 
 extension Sequence {
@@ -190,15 +206,5 @@ extension Sequence {
   @_inlineable // FIXME(sil-serialize-all)
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
-  }
-}
-
-/// Avoid creating multiple layers of `LazySequence` wrapper.
-/// Anything conforming to `LazySequenceProtocol` is already lazy.
-extension LazySequenceProtocol {
-  /// Identical to `self`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var lazy: Self {
-    return self
   }
 }

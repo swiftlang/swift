@@ -75,7 +75,7 @@ where SubSequence: MutableCollection
   associatedtype Index
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence = Slice<Self>
+  associatedtype SubSequence
 
   /// Accesses the element at the specified position.
   ///

@@ -37,6 +37,9 @@ class SyntaxASTMap;
 
 namespace syntax {
 
+struct SyntaxVisitor;
+class SourceFileSyntax;
+
 template <typename SyntaxNode>
 SyntaxNode make(RC<RawSyntax> Raw) {
   auto Data = SyntaxData::make(Raw);
@@ -122,6 +125,9 @@ public:
   /// Return the parent of this node, if it has one.
   llvm::Optional<Syntax> getParent() const;
 
+  /// Return the root syntax of this node.
+  Syntax getRoot() const;
+
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
   CursorIndex getIndexInParent() const;
@@ -172,6 +178,14 @@ public:
     // Trivially true.
     return true;
   }
+
+  /// Recursively visit this node.
+  void accept(SyntaxVisitor &Visitor);
+
+  /// Get the absolute position of this raw syntax: its offset, line,
+  /// and column.
+  AbsolutePosition getAbsolutePosition() const;
+
   // TODO: hasSameStructureAs ?
 };
 

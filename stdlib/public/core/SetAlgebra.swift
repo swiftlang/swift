@@ -46,6 +46,8 @@
 /// - `x.union(y).contains(e)` implies `x.contains(e) || y.contains(e)`
 /// - `x.contains(e) && y.contains(e)` if and only if
 ///   `x.intersection(y).contains(e)`
+/// - `x.isSubset(of: y)` implies `x.union(y) == y`
+/// - `x.isSuperset(of: y)` implies `x.union(y) == x`
 /// - `x.isSubset(of: y)` if and only if `y.isSuperset(of: x)`
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
@@ -237,7 +239,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// the `attendees` set:
   ///
   ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     let visitors: Set = ["Marcia", "Nathaniel"]
+  ///     let visitors: Set = ["Diana", "Marcia", "Nathaniel"]
   ///     attendees.formUnion(visitors)
   ///     print(attendees)
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"

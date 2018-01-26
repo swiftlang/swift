@@ -21,6 +21,11 @@ func testDropCode(other: OtherError) -> OtherError.Code {
   return other.code
 }
 
+func testImportsCorrectly() {
+  _ = TypedefOnlyError.badness
+  _ = TypedefOnlyError.Code.badness
+}
+
 func testError() {
   let testErrorNSError = NSError(domain: TestErrorDomain,
                                  code: Int(TestError.TENone.rawValue),

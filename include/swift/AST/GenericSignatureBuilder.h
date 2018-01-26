@@ -936,9 +936,11 @@ private:
   /// Whether there is a trailing written requirement location.
   const bool hasTrailingWrittenRequirementLoc;
 
+public:
   /// Whether a protocol requirement came from the requirement signature.
   const bool usesRequirementSignature;
 
+private:
   /// The actual storage, described by \c storageKind.
   union {
     /// The type to which a requirement applies.

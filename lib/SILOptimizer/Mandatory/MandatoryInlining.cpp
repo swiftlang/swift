@@ -330,9 +330,8 @@ static SILFunction *getCalleeFunction(
     // matters here is @noescape, so just check for that.
     auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
     auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
-    auto EscapingCalleeTy = Lowering::adjustFunctionType(
-        ToCalleeTy, ToCalleeTy->getExtInfo().withNoEscape(false),
-        ToCalleeTy->getWitnessMethodConformanceOrNone());
+    auto EscapingCalleeTy =
+      ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
     if (FromCalleeTy != EscapingCalleeTy)
       return CalleeValue;
 
@@ -390,8 +389,9 @@ static SILFunction *getCalleeFunction(
   if (CalleeFunction->isTransparent() == IsNotTransparent)
     return nullptr;
 
-  if (F->isSerialized() && !CalleeFunction->hasValidLinkageForFragileRef()) {
-    if (!CalleeFunction->hasValidLinkageForFragileInline()) {
+  if (F->isSerialized() &&
+      !CalleeFunction->hasValidLinkageForFragileInline()) {
+    if (!CalleeFunction->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << F->getName() << "\n";
       llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
       llvm_unreachable("Should never be inlining a resilient function into "

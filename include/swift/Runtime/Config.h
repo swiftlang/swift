@@ -33,18 +33,6 @@
 #endif
 #endif
 
-/// Does the current Swift platform use LLVM's intrinsic "swiftcall"
-/// calling convention for Swift functions?
-#ifndef SWIFT_USE_SWIFTCALL
-// Clang doesn't support mangling functions with the swiftcall attribute
-// on Windows and crashes during compilation: http://bugs.llvm.org/show_bug.cgi?id=32000
-#if (__has_attribute(swiftcall) || defined(__linux__)) && !defined(_WIN32)
-#define SWIFT_USE_SWIFTCALL 1
-#else
-#define SWIFT_USE_SWIFTCALL 0
-#endif
-#endif
-
 /// Does the current Swift platform allow information other than the
 /// class pointer to be stored in the isa field?  If so, when deriving
 /// the class pointer of an object, we must apply a
@@ -77,6 +65,16 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
+/// Which bits in the class metadata are used to distinguish Swift classes
+/// from ObjC classes?
+#ifndef SWIFT_CLASS_IS_SWIFT_MASK
+# if __APPLE__ && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+# else
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+# endif
+#endif
+
 // We try to avoid global constructors in the runtime as much as possible.
 // These macros delimit allowed global ctors.
 #if __clang__
@@ -105,7 +103,11 @@
 #define SWIFT_CC_preserve_all  __attribute__((preserve_all))
 #define SWIFT_CC_c
 
-#if SWIFT_USE_SWIFTCALL
+// Define SWIFT_CC_swift in terms of the Swift CC for runtime functions.
+// Functions outside the stdlib or runtime that include this file may be built 
+// with a compiler that doesn't support swiftcall; don't define these macros
+// in that case so any incorrect usage is caught.
+#if __has_attribute(swiftcall)
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
@@ -117,12 +119,14 @@
 #define SWIFT_INDIRECT_RESULT
 #endif
 
+#define SWIFT_CC_SwiftCC SWIFT_CC_swift
+
 // Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
 // convention.
 #define SWIFT_LLVM_CC(CC) SWIFT_LLVM_CC_##CC
 
-// Currently, RuntimeFunctions.def uses the following calling conventions:
-// DefaultCC, RegisterPreservingCC, SwiftCC.
+// Currently, RuntimeFunction.def uses the following calling conventions:
+// DefaultCC, RegisterPreservingCC.
 // If new runtime calling conventions are added later, they need to be mapped
 // here to something appropriate.
 
@@ -131,15 +135,9 @@
 #define SWIFT_CC_DefaultCC_IMPL SWIFT_CC_c
 #define SWIFT_LLVM_CC_DefaultCC llvm::CallingConv::C
 
-#define SWIFT_CC_SwiftCC SWIFT_CC_swift
-
 #define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
-#if SWIFT_USE_SWIFTCALL
 #define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::Swift
-#else
-#define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::C
-#endif
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
@@ -247,6 +245,18 @@
 #define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
+#endif
+
+// These are temporary macros during the +0 cc exploration to cleanly support
+// both +0 and +1 in the runtime.
+#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
+#define SWIFT_NS_RELEASES_ARGUMENT NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...) do { __VA_ARGS__ ; } while (0)
+#define SWIFT_CC_PLUSZERO_GUARD(...)
+#else
+#define SWIFT_NS_RELEASES_ARGUMENT
+#define SWIFT_CC_PLUSONE_GUARD(...)
+#define SWIFT_CC_PLUSZERO_GUARD(...)  do { __VA_ARGS__ ; } while (0)
 #endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H

@@ -7,8 +7,7 @@ import StdlibCollectionUnittest
 // Check that Collection.SubSequence is constrained to Collection.
 //
 
-// expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
-// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Sequence'}}
+// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
 struct CollectionWithBadSubSequence : Collection {
   var startIndex: MinimalIndex {
     fatalError("unreachable")
@@ -22,7 +21,6 @@ struct CollectionWithBadSubSequence : Collection {
     fatalError("unreachable")
   }
 
-  // expected-note@+2 {{possibly intended match}}
   // expected-note@+1 {{possibly intended match}}
   typealias SubSequence = OpaqueValue<Int8>
 }

@@ -167,7 +167,7 @@ var ir2 = ((&i)) // expected-error{{variable has type 'inout Int' which includes
 func takeArrayRef(_ x: inout Array<String>) { }
 
 // rdar://22308291
-takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<String>' cannot be used with array literal}}
+takeArrayRef(["asdf", "1234"]) // expected-error{{cannot pass immutable value of type '[String]' as inout argument}}
 
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {

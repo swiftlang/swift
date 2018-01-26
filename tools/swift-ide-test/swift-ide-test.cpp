@@ -333,6 +333,11 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
+static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
+    "code-complete-call-pattern-heuristics",
+    llvm::cl::desc(
+        "Use heuristics to guess whether we want call pattern completions"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 ObjCForwardDeclarations("enable-objc-forward-declarations",
@@ -390,6 +395,12 @@ CodeCompletionKeywords("code-completion-keywords",
                        llvm::cl::desc("Include keywords in code completion results"),
                        llvm::cl::cat(Category),
                        llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
+CodeCompletionComments("code-completion-comments",
+                       llvm::cl::desc("Include comments in code completion results"),
+                       llvm::cl::cat(Category),
+                       llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -666,7 +677,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SecondSourceFileName,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
-                            bool CodeCompletionKeywords) {
+                            bool CodeCompletionKeywords,
+                            bool CodeCompletionComments) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
     llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -707,7 +719,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
       new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords));
+          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments));
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
@@ -1086,6 +1098,7 @@ private:
       case SyntaxStructureKind::TypeAlias: return "typealias";
       case SyntaxStructureKind::Subscript: return "subscript";
       case SyntaxStructureKind::AssociatedType: return "associatedtype";
+      case SyntaxStructureKind::GenericTypeParam: return "generic-param";
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::ForEachStatement: return "foreach";
       case SyntaxStructureKind::WhileStatement: return "while";
@@ -1101,6 +1114,7 @@ private:
       case SyntaxStructureKind::ObjectLiteralExpression:
         return "object-literal-expression";
       case SyntaxStructureKind::TupleExpression: return "tuple";
+      case SyntaxStructureKind::ClosureExpression: return "closure";
     }
     llvm_unreachable("unhandled tag?");
   }
@@ -2135,37 +2149,34 @@ public:
       OS << Name;
       return;
     }
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      if (auto *ASD = FD->getAccessorStorageDecl()) {
-        switch (FD->getAccessorKind()) {
-        case AccessorKind::NotAccessor:
-          llvm_unreachable("is not an accessor?");
-        case AccessorKind::IsGetter:
-          OS << "<getter for ";
-          break;
-        case AccessorKind::IsSetter:
-          OS << "<setter for ";
-          break;
-        case AccessorKind::IsWillSet:
-          OS << "<willSet for ";
-          break;
-        case AccessorKind::IsDidSet:
-          OS << "<didSet for ";
-          break;
-        case AccessorKind::IsAddressor:
-          OS << "<addressor for ";
-          break;
-        case AccessorKind::IsMutableAddressor:
-          OS << "<mutableAddressor for ";
-          break;
-        case AccessorKind::IsMaterializeForSet:
-          OS << "<materializeForSet for ";
-          break;
-        }
-        printDeclName(ASD);
-        OS << ">";
-        return;
+    if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+      auto *storage = accessor->getStorage();
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+        OS << "<getter for ";
+        break;
+      case AccessorKind::IsSetter:
+        OS << "<setter for ";
+        break;
+      case AccessorKind::IsWillSet:
+        OS << "<willSet for ";
+        break;
+      case AccessorKind::IsDidSet:
+        OS << "<didSet for ";
+        break;
+      case AccessorKind::IsAddressor:
+        OS << "<addressor for ";
+        break;
+      case AccessorKind::IsMutableAddressor:
+        OS << "<mutableAddressor for ";
+        break;
+      case AccessorKind::IsMaterializeForSet:
+        OS << "<materializeForSet for ";
+        break;
       }
+      printDeclName(storage);
+      OS << ">";
+      return;
     }
     OS << "<anonymous>";
   }
@@ -2611,7 +2622,8 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << " "
+           << Error << "\n";
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
@@ -2636,7 +2648,8 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << " " << error
+           << "\n";
   }
 };
 
@@ -2954,7 +2967,8 @@ int main(int argc, char *argv[]) {
     }
 
     ide::PrintingCodeCompletionConsumer Consumer(
-        llvm::outs(), options::CodeCompletionKeywords);
+        llvm::outs(), options::CodeCompletionKeywords,
+        options::CodeCompletionComments);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3001,6 +3015,14 @@ int main(int argc, char *argv[]) {
 
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  if (options::DisableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = false;
+  } else if (options::EnableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = true;
+  } else if (!options::Triple.empty()) {
+    InitInvok.getLangOptions().EnableObjCInterop =
+        llvm::Triple(options::Triple).isOSDarwin();
+  }
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
@@ -3013,14 +3035,6 @@ int main(int argc, char *argv[]) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
-  }
-  if (options::DisableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = false;
-  } else if (options::EnableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = true;
-  } else {
-    InitInvok.getLangOptions().EnableObjCInterop =
-        llvm::Triple(InitInvok.getTargetTriple()).isOSDarwin();
   }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
@@ -3045,6 +3059,8 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
+  InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
+      options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
@@ -3144,7 +3160,8 @@ int main(int argc, char *argv[]) {
                                 options::SecondSourceFilename,
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
-                                options::CodeCompletionKeywords);
+                                options::CodeCompletionKeywords,
+                                options::CodeCompletionComments);
     break;
 
   case ActionType::REPLCodeCompletion:

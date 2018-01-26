@@ -90,7 +90,9 @@ private enum TestEnum {
 private protocol TestProtocol {
   private associatedtype Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
   internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}} {{3-12=}}
+  // expected-note@-1 {{protocol requirements implicitly have the same access as the protocol itself}}
   public func baz() // expected-error {{'public' modifier cannot be used in protocols}} {{3-10=}}
+  // expected-note@-1 {{protocol requirements implicitly have the same access as the protocol itself}}
 }
 
 public(set) func publicSetFunc() {} // expected-error {{'public' modifier cannot be applied to this declaration}} {{1-13=}}

@@ -118,7 +118,7 @@
    `(,(regexp-opt '("retain_value" "release_value_addr" "release_value"
                     "release_value_addr" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
-                    "struct_element_addr" "ref_element_addr"
+                    "struct_element_addr" "ref_element_addr" "ref_tail_addr"
                     "autorelease_value" "copy_value" "destroy_value"
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"

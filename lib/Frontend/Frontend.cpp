@@ -61,14 +61,16 @@ void CompilerInstance::createSILModule() {
       Invocation.getFrontendOptions().Inputs.isWholeModule());
 }
 
-void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
-  assert(SF);
+void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
+  PrimaryBufferIDs.insert(BufID);
+}
+
+void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
-  assert(!PrimarySourceFile && "already has a primary source file");
-  assert(PrimaryBufferID == NO_SUCH_BUFFER || !SF->getBufferID().hasValue() ||
-         SF->getBufferID().getValue() == PrimaryBufferID);
-  PrimarySourceFile = SF;
-  PrimarySourceFile->setReferencedNameTracker(NameTracker);
+  PrimarySourceFiles.push_back(SF);
+  SF->setReferencedNameTracker(NameTracker);
+  if (SF->getBufferID().hasValue())
+    recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -97,12 +99,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
-
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setUpInputs(codeCompletionBufferID);
+  return setUpInputs();
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -176,121 +176,131 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
-bool CompilerInstance::setUpInputs(Optional<unsigned> codeCompletionBufferID) {
+bool CompilerInstance::setUpInputs() {
+  // Adds to InputSourceCodeBufferIDs, so may need to happen before the
+  // per-input setup.
+  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
+
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllFiles())
+       Invocation.getFrontendOptions().Inputs.getAllInputs())
     if (setUpForInput(input))
       return true;
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
-      *codeCompletionBufferID != PrimaryBufferID) {
-    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-    PrimaryBufferID = *codeCompletionBufferID;
+      !isPrimaryInput(*codeCompletionBufferID)) {
+    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
+    recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
   if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1) {
+      InputSourceCodeBufferIDs.size() == 1)
     MainBufferID = InputSourceCodeBufferIDs.front();
-  }
 
   return false;
 }
 
 bool CompilerInstance::setUpForInput(const InputFile &input) {
-  if (llvm::MemoryBuffer *inputBuffer = input.buffer()) {
-    setUpForBuffer(inputBuffer, input.isPrimary());
-    return false;
-  }
-  return setUpForFile(input.file(), input.isPrimary());
-}
-void CompilerInstance::setUpForBuffer(llvm::MemoryBuffer *buffer,
-                                      bool isPrimary) {
-  auto copy = llvm::MemoryBuffer::getMemBufferCopy(
-      buffer->getBuffer(), buffer->getBufferIdentifier());
-  if (serialization::isSerializedAST(copy->getBuffer())) {
-    PartialModules.push_back({std::move(copy), nullptr});
-  } else {
-    unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(copy));
-    InputSourceCodeBufferIDs.push_back(bufferID);
-
-    if (isInSILMode()) {
-      assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
-      MainBufferID = bufferID;
-    }
-
-    if (isPrimary) {
-      assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-      PrimaryBufferID = bufferID;
-    }
-  }
-}
-
-bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
-  if (fileName.empty())
-    return false;
-  // FIXME: Working with filenames is fragile, maybe use the real path
-  // or have some kind of FileManager.
-  using namespace llvm::sys::path;
-  if (Optional<unsigned> existingBufferID =
-          SourceMgr.getIDForBufferIdentifier(fileName)) {
-    if (isInSILMode() ||
-        (isInputSwift() && filename(fileName) == "main.swift")) {
-      assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
-      MainBufferID = existingBufferID.getValue();
-    }
-
-    if (isPrimary) {
-      assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-      PrimaryBufferID = existingBufferID.getValue();
-    }
-
-    return false; // replaced by a memory buffer.
-  }
-
-  // Open the input file.
-  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(fileName);
-  if (!inputFileOrErr) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, fileName,
-                         inputFileOrErr.getError().message());
+  bool failed = false;
+  Optional<unsigned> bufferID = getRecordedBufferID(input, failed);
+  if (failed)
     return true;
+  if (!bufferID)
+    return false;
+
+  if (isInSILMode() ||
+      (input.buffer() == nullptr && isInputSwift() &&
+       llvm::sys::path::filename(input.file()) == "main.swift")) {
+    assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
+    MainBufferID = *bufferID;
   }
 
-  if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
-    llvm::SmallString<128> ModuleDocFilePath(fileName);
-    llvm::sys::path::replace_extension(ModuleDocFilePath,
-                                       SERIALIZED_MODULE_DOC_EXTENSION);
-    FileOrError moduleDocOrErr =
-        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
-    if (!moduleDocOrErr &&
-        moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, fileName,
-                           moduleDocOrErr.getError().message());
-      return true;
-    }
-    PartialModules.push_back(
-        {std::move(inputFileOrErr.get()),
-         moduleDocOrErr ? std::move(moduleDocOrErr.get()) : nullptr});
-    return false;
+  if (input.isPrimary()) {
+    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
+    recordPrimaryInputBuffer(*bufferID);
   }
+  return false;
+}
+
+Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
+                                                         bool &failed) {
+  if (!input.buffer()) {
+    if (Optional<unsigned> existingBufferID =
+            SourceMgr.getIDForBufferIdentifier(input.file())) {
+      return existingBufferID;
+    }
+  }
+  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+            std::unique_ptr<llvm::MemoryBuffer>>
+      buffers = getInputBufferAndModuleDocBufferIfPresent(input);
+
+  if (!buffers.first) {
+    failed = true;
+    return None;
+  }
+
+  // FIXME: The fact that this test happens twice, for some cases,
+  // suggests that setupInputs could use another round of refactoring.
+  if (serialization::isSerializedAST(buffers.first->getBuffer())) {
+    PartialModules.push_back(
+        {std::move(buffers.first), std::move(buffers.second)});
+    return None;
+  }
+  assert(buffers.second.get() == nullptr);
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  unsigned bufferID =
-      SourceMgr.addNewSourceBuffer(std::move(inputFileOrErr.get()));
+  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers.first));
 
   InputSourceCodeBufferIDs.push_back(bufferID);
+  return bufferID;
+}
 
-  if (isInSILMode() || (isInputSwift() && filename(fileName) == "main.swift")) {
-    assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
-    MainBufferID = bufferID;
+std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+          std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
+    const InputFile &input) {
+  if (auto b = input.buffer()) {
+    return std::make_pair(llvm::MemoryBuffer::getMemBufferCopy(
+                              b->getBuffer(), b->getBufferIdentifier()),
+                          nullptr);
   }
-
-  if (isPrimary) {
-    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-    PrimaryBufferID = bufferID;
+  // FIXME: Working with filenames is fragile, maybe use the real path
+  // or have some kind of FileManager.
+  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(input.file());
+  if (!inputFileOrErr) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
+                         inputFileOrErr.getError().message());
+    return std::make_pair(nullptr, nullptr);
   }
+  if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
+    return std::make_pair(std::move(*inputFileOrErr), nullptr);
 
-  return false;
+  if (Optional<std::unique_ptr<llvm::MemoryBuffer>> moduleDocBuffer =
+          openModuleDoc(input)) {
+    return std::make_pair(std::move(*inputFileOrErr),
+                          std::move(*moduleDocBuffer));
+  }
+  return std::make_pair(nullptr, nullptr);
+}
+
+Optional<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInstance::openModuleDoc(const InputFile &input) {
+  llvm::SmallString<128> moduleDocFilePath(input.file());
+  llvm::sys::path::replace_extension(moduleDocFilePath,
+                                     SERIALIZED_MODULE_DOC_EXTENSION);
+  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  FileOrError moduleDocFileOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
+  if (moduleDocFileOrErr)
+    return std::move(*moduleDocFileOrErr);
+
+  if (moduleDocFileOrErr.getError() == std::errc::no_such_file_or_directory)
+    return std::unique_ptr<llvm::MemoryBuffer>();
+
+  Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                       moduleDocFilePath,
+                       moduleDocFileOrErr.getError().message());
+  return None;
 }
 
 ModuleDecl *CompilerInstance::getMainModule() {
@@ -579,7 +589,7 @@ void CompilerInstance::parseLibraryFile(
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
-  if (BufferID == PrimaryBufferID) {
+  if (isPrimaryInput(BufferID)) {
     DelayedCB = PrimaryDelayedCB;
   }
   if (isWholeModuleCompilation())
@@ -587,7 +597,7 @@ void CompilerInstance::parseLibraryFile(
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || BufferID == PrimaryBufferID;
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -653,7 +663,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   SharedTimer timer(
       "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
-      (isWholeModuleCompilation() || MainBufferID == PrimaryBufferID);
+      (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
 
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
@@ -716,7 +726,9 @@ void CompilerInstance::forEachFileToTypeCheck(
   if (isWholeModuleCompilation()) {
     forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
   } else {
-    fn(*PrimarySourceFile);
+    for (auto *SF : PrimarySourceFiles) {
+      fn(*SF);
+    }
   }
 }
 
@@ -738,8 +750,9 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
       SourceFile(*mainModule, fileKind, bufferID, importKind, keepSyntaxInfo);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && *bufferID == PrimaryBufferID)
-    setPrimarySourceFile(inputFile);
+  if (bufferID && isPrimaryInput(*bufferID)) {
+    recordPrimarySourceFile(inputFile);
+  }
 
   return inputFile;
 }
@@ -805,6 +818,7 @@ void CompilerInstance::freeContextAndSIL() {
   TheSILModule.reset();
   MainModule = nullptr;
   SML = nullptr;
-  PrimarySourceFile = nullptr;
+  PrimaryBufferIDs.clear();
+  PrimarySourceFiles.clear();
 }
 

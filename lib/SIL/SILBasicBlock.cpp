@@ -63,7 +63,7 @@ SILBasicBlock::~SILBasicBlock() {
   InstList.clearAndLeakNodesUnsafely();
 }
 
-int SILBasicBlock::getDebugID() {
+int SILBasicBlock::getDebugID() const {
   if (!getParent())
     return -1;
   int idx = 0;

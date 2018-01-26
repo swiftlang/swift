@@ -33,6 +33,9 @@ SILValue swift::getUnderlyingObject(SILValue V) {
   }
 }
 
+/// Strip off casts and address projections into the interior of a value. Unlike
+/// getUnderlyingObject, this does not find the root of a heap object--a class
+/// property is itself an address root.
 SILValue swift::getUnderlyingAddressRoot(SILValue V) {
   while (true) {
     SILValue V2 = stripIndexingInsts(stripCasts(V));
@@ -229,6 +232,53 @@ SILValue swift::stripBorrow(SILValue V) {
   if (auto *BBI = dyn_cast<BeginBorrowInst>(V))
     return BBI->getOperand();
   return V;
+}
+
+SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
+  if (auto *convert = dyn_cast<ConversionInst>(I))
+    return convert;
+
+  switch (I->getKind()) {
+  default:
+    return nullptr;
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginAccessInst:
+    return cast<SingleValueInstruction>(I);
+  }
+}
+
+bool swift::isIncidentalUse(SILInstruction *user) {
+  switch (user->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::EndBorrowInst:
+  case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::FixLifetimeInst:
+    return true;
+  }
+}
+
+bool swift::onlyAffectsRefCount(SILInstruction *user) {
+  switch (user->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::ReleaseValueInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::UnmanagedAutoreleaseValueInst:
+  case SILInstructionKind::UnmanagedReleaseValueInst:
+  case SILInstructionKind::UnmanagedRetainValueInst:
+  case SILInstructionKind::UnownedReleaseInst:
+  case SILInstructionKind::UnownedRetainInst:
+    return true;
+  }
 }
 
 namespace {

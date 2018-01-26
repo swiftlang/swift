@@ -68,7 +68,7 @@ public:
   /// Returns -1 if the block is not contained in a function.
   /// Warning: This function is slow. Therefore it should only be used for
   ///          debug output.
-  int getDebugID();
+  int getDebugID() const;
 
   SILFunction *getParent() { return Parent; }
   const SILFunction *getParent() const { return Parent; }

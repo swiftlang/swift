@@ -64,10 +64,11 @@ def main():
         elif arg == '-o':
             next_arg_is_output = True
 
-    if not write_obj_file or output_file is None:
-        return
-
     new_args = sys.argv[1:]
+
+    if not write_obj_file or output_file is None:
+        subprocess.check_call(new_args)
+        return
 
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
@@ -86,7 +87,8 @@ def main():
         # This is the most important check: is the output file exactly the
         # same.
         if reference_md5 != second_md5:
-            sys.exit("non-determinism when generating: " + output_file)
+            sys.exit("non-determinism when generating: " + output_file +
+                     "\ncommand line:\n" + " ".join(new_args))
 
         # This is the bonus check: does the compiler not re-write the output
         # file. (For compilations < 1sec this check may succeed even if the

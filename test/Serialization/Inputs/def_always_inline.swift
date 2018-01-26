@@ -2,6 +2,7 @@
   return x
 }
 
+@_fixed_layout
 public struct AlwaysInlineInitStruct {
   @_versioned
   var x: Bool
