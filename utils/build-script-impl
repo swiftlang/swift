@@ -2843,7 +2843,6 @@ for host in "${ALL_HOSTS[@]}"; do
                            SWIFTLIBS="${swift_build_dir}/lib/swift" \
                            "${LLDB_SOURCE_DIR}"/test/dotest.py \
                            --executable "${lldb_executable}" \
-                           --rerun-all-issues \
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_DOTEST_CC_OPTS} \
                            ${LLDB_FORMATTER_OPTS}
