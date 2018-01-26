@@ -366,6 +366,8 @@ TypeChecker::gatherGenericParamBindingsText(
                                 TypeSubstitutionFn substitutions) {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
+    if (type.isNull()) continue;
+
     type.visit([&](Type type) {
       if (auto gp = type->getAs<GenericTypeParamType>()) {
         knownGenericParams.insert(
@@ -1380,12 +1382,16 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         break;
       }
 
-      case RequirementKind::Layout: {
-        // TODO: Statically check if a the first type
-        // conforms to the layout constraint, once we
-        // support such static checks.
-        continue;
-      }
+      case RequirementKind::Layout:
+        // TODO: Statically check other layout constraints, once they can
+        // be spelled in Swift.
+        if (req.getLayoutConstraint()->isClass() &&
+            !firstType->satisfiesClassConstraint()) {
+          diagnostic = diag::type_is_not_a_class;
+          diagnosticNote = diag::anyobject_requirement;
+          requirementFailure = true;
+        }
+        break;
 
       case RequirementKind::Superclass:
         // Superclass requirements.
