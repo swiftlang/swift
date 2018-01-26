@@ -272,14 +272,6 @@ public:
                             ///> types.
   };
 
-  /// Given the result of the expansion heuristic,
-  /// return appropriate lowering style.
-  static TypeExpansionKind getLoweringStyle(bool shouldExpand) {
-    if (shouldExpand)
-      return TypeLowering::TypeExpansionKind::MostDerivedDescendents;
-    return TypeLowering::TypeExpansionKind::DirectChildren;
-  }
-
   //===--------------------------------------------------------------------===//
   // DestroyValue
   //===--------------------------------------------------------------------===//
