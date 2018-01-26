@@ -150,8 +150,7 @@ static unsigned getRequirementKindOrder(RequirementKind kind) {
 
 CanGenericSignature GenericSignature::getCanonical(
                                         ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        bool skipValidation) {
+                                        ArrayRef<Requirement> requirements) {
   // Canonicalize the parameters and requirements.
   SmallVector<GenericTypeParamType*, 8> canonicalParams;
   canonicalParams.reserve(params.size());
@@ -173,14 +172,10 @@ CanGenericSignature GenericSignature::getCanonical(
                       reqt.getLayoutConstraint()));
   }
 
-  (void)skipValidation;
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);
 
 #ifndef NDEBUG
-  if (skipValidation)
-    return CanGenericSignature(canSig);
-
   PrettyStackTraceGenericSignature debugStack("canonicalizing", canSig);
 
   // Check that the signature is canonical.

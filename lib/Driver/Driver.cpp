@@ -197,45 +197,41 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
   }
 }
 
-std::unique_ptr<ToolChain>
-Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
-
-  if (const Arg *A = ArgList.getLastArg(options::OPT_target))
-    DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
-
-  const llvm::Triple target(DefaultTargetTriple);
-
+/// Creates an appropriate ToolChain for a given driver and target triple.
+///
+/// This uses a std::unique_ptr instead of returning a toolchain by value
+/// because ToolChain has virtual methods.
+static std::unique_ptr<const ToolChain>
+makeToolChain(Driver &driver, const llvm::Triple &target) {
   switch (target.getOS()) {
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
-    return llvm::make_unique<toolchains::Darwin>(*this, target);
+    return llvm::make_unique<toolchains::Darwin>(driver, target);
     break;
   case llvm::Triple::Linux:
     if (target.isAndroid()) {
-      return llvm::make_unique<toolchains::Android>(*this, target);
+      return llvm::make_unique<toolchains::Android>(driver, target);
     } else {
-      return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+      return llvm::make_unique<toolchains::GenericUnix>(driver, target);
     }
     break;
   case llvm::Triple::FreeBSD:
-    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
     break;
   case llvm::Triple::Win32:
-    return llvm::make_unique<toolchains::Cygwin>(*this, target);
+    return llvm::make_unique<toolchains::Cygwin>(driver, target);
     break;
   case llvm::Triple::Haiku:
-    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
     break;
   default:
-    Diags.diagnose(SourceLoc(), diag::error_unknown_target,
-                   ArgList.getLastArg(options::OPT_target)->getValue());
-    break;
+    return nullptr;
   }
-  return nullptr;
 }
+
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
@@ -505,12 +501,15 @@ static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
   }
 }
 
-std::unique_ptr<Compilation>
-Driver::buildCompilation(const ToolChain &TC,
-                         std::unique_ptr<llvm::opt::InputArgList> ArgList) {
+std::unique_ptr<Compilation> Driver::buildCompilation(
+    ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
+
+  std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
+  if (Diags.hadAnyError())
+    return nullptr;
 
   // Claim --driver-mode here, since it's already been handled.
   (void) ArgList->hasArg(options::OPT_driver_mode);
@@ -553,25 +552,36 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
 
+  if (const Arg *A = ArgList->getLastArg(options::OPT_target))
+    DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
+
   validateArgs(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;
+  
+  std::unique_ptr<const ToolChain> TC =
+      makeToolChain(*this, llvm::Triple(DefaultTargetTriple));
+  if (!TC) {
+    Diags.diagnose(SourceLoc(), diag::error_unknown_target,
+                   ArgList->getLastArg(options::OPT_target)->getValue());
+    return nullptr;
+  }
 
-  if (!handleImmediateArgs(*TranslatedArgList, TC)) {
+  if (!handleImmediateArgs(*TranslatedArgList, *TC)) {
     return nullptr;
   }
 
   // Construct the list of inputs.
   InputFileList Inputs;
-  buildInputs(TC, *TranslatedArgList, Inputs);
+  buildInputs(*TC, *TranslatedArgList, Inputs);
 
   if (Diags.hadAnyError())
     return nullptr;
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(*TC, *TranslatedArgList, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -676,7 +686,7 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, Level,
+  std::unique_ptr<Compilation> C(new Compilation(Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),
@@ -689,7 +699,7 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  std::move(StatsReporter)));
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM.get(),
+  buildActions(TopLevelActions, *TC, OI, OFM.get(),
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -700,7 +710,7 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM.get(), TC, *C);
+  buildJobs(TopLevelActions, OI, OFM.get(), *TC, *C);
 
   // For getting bulk fixits, or for when users explicitly request to continue
   // building despite errors.
@@ -1514,9 +1524,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     AllLinkerInputs.push_back(CA);
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile: {
-    llvm_unreachable("Batch mode should not be used to build actions");
-  }
   case OutputInfo::Mode::Immediate: {
     if (Inputs.empty())
       return;
@@ -1729,50 +1736,6 @@ static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
   return None;
 }
 
-static StringRef assignOutputName(Compilation &C, const JobAction *JA,
-                                  DiagnosticEngine &Diags,
-                                  llvm::SmallString<128> &Buffer,
-                                  StringRef BaseName,
-                                  PreserveOnSignal ShouldPreserveOnSignal) {
-  // We should output to a temporary file, since we're not at the top level
-  // (or are generating a bridging PCH, which is currently always a temp).
-  StringRef Stem = llvm::sys::path::stem(BaseName);
-  StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-  std::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
-  if (EC) {
-    Diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
-                   EC.message());
-    return {};
-  }
-  C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
-
-  return Buffer.str();
-}
-
-static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
-                                  const llvm::Triple &Triple,
-                                  llvm::SmallString<128> &Buffer,
-                                  StringRef BaseInput, StringRef BaseName) {
-  if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
-    return llvm::sys::path::stem(BaseInput);
-  auto link = dyn_cast<LinkJobAction>(JA);
-  if (!link)
-    return BaseName;
-  if (link->getKind() != LinkKind::DynamicLibrary)
-    return BaseName;
-
-  Buffer = Triple.isOSWindows() ? "" : "lib";
-  Buffer.append(BaseName);
-
-  if (Triple.isOSDarwin())
-    Buffer.append(".dylib");
-  else if (Triple.isOSWindows())
-    Buffer.append(".dll");
-  else
-    Buffer.append(".so");
-  return Buffer.str();
-}
-
 static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const OutputInfo &OI,
@@ -1842,12 +1805,47 @@ static StringRef getOutputFilename(Compilation &C,
     BaseName = OI.ModuleName;
 
   // We don't yet have a name, assign one.
-  if (!AtTopLevel)
-    return assignOutputName(C, JA, Diags, Buffer, BaseName,
-                            ShouldPreserveOnSignal);
+  if (!AtTopLevel) {
+    // We should output to a temporary file, since we're not at the top level
+    // (or are generating a bridging PCH, which is currently always a temp).
+    StringRef Stem = llvm::sys::path::stem(BaseName);
+    StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+    std::error_code EC =
+        llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
+    if (EC) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      return {};
+    }
+    C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
 
-  if (JA->getType() == types::TY_Image)
-    return baseNameForImage(JA, OI, Triple, Buffer, BaseInput, BaseName);
+    return Buffer.str();
+  }
+
+
+  if (JA->getType() == types::TY_Image) {
+    if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
+      BaseName = llvm::sys::path::stem(BaseInput);
+    if (auto link = dyn_cast<LinkJobAction>(JA)) {
+      if (link->getKind() == LinkKind::DynamicLibrary) {
+        if (Triple.isOSWindows())
+          Buffer = "";
+        else
+          Buffer = "lib";
+        Buffer.append(BaseName);
+        if (Triple.isOSDarwin())
+          Buffer.append(".dylib");
+        else if (Triple.isOSWindows())
+          Buffer.append(".dll");
+        else
+          Buffer.append(".so");
+        return Buffer.str();
+      }
+    }
+    return BaseName;
+  }
+
 
   StringRef Suffix = types::getTypeTempSuffix(JA->getType());
   assert(Suffix.data() &&
@@ -2044,38 +2042,250 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType()));
   llvm::SmallString<128> Buf;
-  computeMainOutput(C, JA, OI, OFM, TC, AtTopLevel, InputActions, InputJobs,
-                    OutputMap, BaseInput, Buf, Output.get());
+  StringRef OutputFile;
 
-  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA))
-    chooseSwiftModuleOutputPath(C, OI, OFM, OutputMap, Output.get());
+  if (OI.isMultiThreading() && isa<CompileJobAction>(JA) &&
+      types::isAfterLLVM(JA->getType())) {
+    // Multi-threaded compilation: A single frontend command produces multiple
+    // output file: one for each input files.
+    auto OutputFunc = [&](StringRef Input) {
+      const TypeToPathMap *OMForInput = nullptr;
+      if (OFM)
+        OMForInput = OFM->getOutputMapForInput(Input);
 
+      OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
+                                     C.getArgs(), AtTopLevel, Input, InputJobs,
+                                     Diags, Buf);
+      Output->addPrimaryOutput(OutputFile, Input);
+    };
+    // Add an output file for each input action.
+    for (const Action *A : InputActions) {
+      const InputAction *IA = cast<InputAction>(A);
+      OutputFunc(IA->getInputArg().getValue());
+
+    }
+    // Add an output file for each input job.
+    for (const Job *job : InputJobs) {
+      OutputFunc(job->getOutput().getBaseInput(0));
+    }
+  } else {
+    // The common case: there is a single output file.
+    OutputFile = getOutputFilename(C, JA, OI, OutputMap, TC.getTriple(),
+                                   C.getArgs(), AtTopLevel, BaseInput,
+                                   InputJobs, Diags, Buf);
+    Output->addPrimaryOutput(OutputFile, BaseInput);
+  }
+
+  // Choose the swiftmodule output path.
+  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA)) {
+    StringRef OFMModuleOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_SwiftModuleFile);
+      if (iter != OutputMap->end())
+        OFMModuleOutputPath = iter->second;
+    }
+
+    const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
+    if (!OFMModuleOutputPath.empty()) {
+      // Prefer a path from the OutputMap.
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
+                                         OFMModuleOutputPath);
+    } else if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      // We're performing a single compilation (and thus no merge module step),
+      // so prefer to use -emit-module-path, if present.
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
+                                         A->getValue());
+    } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+               OI.ShouldTreatModuleAsTopLevelOutput) {
+      // We're performing a single compile and don't have -emit-module-path,
+      // but have been told to treat the module as a top-level output.
+      // Determine an appropriate path.
+      if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
+        // Put the module next to the top-level output.
+        llvm::SmallString<128> Path(A->getValue());
+        llvm::sys::path::remove_filename(Path);
+        llvm::sys::path::append(Path, OI.ModuleName);
+        llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+        Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      } else {
+        // A top-level output wasn't specified, so just output to
+        // <ModuleName>.swiftmodule.
+        llvm::SmallString<128> Path(OI.ModuleName);
+        llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+        Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      }
+    } else {
+      // We're only generating the module as an intermediate, so put it next
+      // to the primary output of the compile command.
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+      bool isTempFile = C.isTemporaryFile(Path);
+      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+      Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
+    }
+  }
+
+  // Choose the swiftdoc output path.
   if (OI.ShouldGenerateModule &&
-      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
-    chooseSwiftModuleDocOutputPath(C, OutputMap, Output.get());
+      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
+    StringRef OFMModuleDocOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_SwiftModuleDocFile);
+      if (iter != OutputMap->end())
+        OFMModuleDocOutputPath = iter->second;
+    }
+    if (!OFMModuleDocOutputPath.empty()) {
+      // Prefer a path from the OutputMap.
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
+                                         OFMModuleDocOutputPath);
+    } else {
+      // Otherwise, put it next to the swiftmodule file.
+      llvm::SmallString<128> Path(
+          Output->getAnyOutputForType(types::TY_SwiftModuleFile));
+      bool isTempFile = C.isTemporaryFile(Path);
+      llvm::sys::path::replace_extension(Path,
+                                         SERIALIZED_MODULE_DOC_EXTENSION);
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
+    }
+  }
 
-  if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
-    chooseRemappingOutputPath(C, OutputMap, Output.get());
+  if (C.getArgs().hasArg(options::OPT_update_code) &&
+      isa<CompileJobAction>(JA)) {
+    StringRef OFMFixitsOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_Remapping);
+      if (iter != OutputMap->end())
+        OFMFixitsOutputPath = iter->second;
+    }
+    if (!OFMFixitsOutputPath.empty()) {
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping,
+                                         OFMFixitsOutputPath);
+    } else {
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+      bool isTempFile = C.isTemporaryFile(Path);
+      llvm::sys::path::replace_extension(Path, "remap");
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
+    }
+  }
 
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
-    if (C.getArgs().hasArg(options::OPT_serialize_diagnostics))
-      chooseSerializedDiagnosticsPath(C, JA, OI, OutputMap, Output.get());
+    if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
+      auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
+      if (pchJA && pchJA->isPersistentPCH()) {
+        addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OI,
+                                                OutputMap, Diags);
+      } else {
+        addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
+                           OutputMap);
+      }
+
+      // Remove any existing diagnostics files so that clients can detect their
+      // presence to determine if a command was run.
+      StringRef OutputPath =
+        Output->getAnyOutputForType(types::TY_SerializedDiagnostics);
+      if (llvm::sys::fs::is_regular_file(OutputPath))
+        llvm::sys::fs::remove(OutputPath);
+    }
   }
 
-  if (isa<CompileJobAction>(JA))
-    chooseDependenciesOutputPaths(C, OI, OutputMap, Buf, Output.get());
+  if (isa<CompileJobAction>(JA)) {
+    // Choose the dependencies file output path.
+    if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
+      addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
+    }
+    if (C.getIncrementalBuildEnabled()) {
+      addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
+    }
+
+    // The loaded-module-trace is the same for all compile jobs: all `import`
+    // statements are processed, even ones from non-primary files. Thus, only
+    // one of those jobs needs to emit the file, and we can get it to write
+    // straight to the desired final location.
+    auto tracePathEnvVar = getenv("SWIFT_LOADED_MODULE_TRACE_FILE");
+    auto shouldEmitTrace =
+        tracePathEnvVar ||
+        C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
+                           options::OPT_emit_loaded_module_trace_path);
+
+    if (shouldEmitTrace &&
+        C.requestPermissionForFrontendToEmitLoadedModuleTrace()) {
+      StringRef filename;
+      // Prefer the environment variable.
+      if (tracePathEnvVar)
+        filename = StringRef(tracePathEnvVar);
+      else {
+        // By treating this as a top-level output, the return value always
+        // exists.
+        filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+            OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
+            types::TY_ModuleTrace,
+            /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
+      }
+
+      Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
+    }
+
+    if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
+      if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+        llvm::outs() << "TBD emission has been disabled, because it requires a "
+                     << "single compiler invocation: consider enabling the "
+                     << "-whole-module-optimization flag.\n";
+      } else {
+        auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+            OI, C.getArgs(), options::OPT_emit_tbd_path, types::TY_TBD,
+            /*TreatAsTopLevelOutput=*/true, "tbd", Buf);
+
+        Output->setAdditionalOutputForType(types::TY_TBD, filename);
+      }
+    }
+  }
 
   if (C.getArgs().hasArg(options::OPT_save_optimization_record,
-                         options::OPT_save_optimization_record_path))
-    chooseOptimizationRecordPath(C, OI, Buf, Output.get());
+                         options::OPT_save_optimization_record_path)) {
+    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+          OI, C.getArgs(), options::OPT_save_optimization_record_path,
+          types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true, "opt.yaml", Buf);
 
+      Output->setAdditionalOutputForType(types::TY_OptRecord, filename);
+    } else
+      // FIXME: We should use the OutputMap in this case.
+      Diags.diagnose({}, diag::warn_opt_remark_disabled);
+  }
+
+  // Choose the Objective-C header output path.
   if ((isa<MergeModuleJobAction>(JA) ||
        (isa<CompileJobAction>(JA) &&
         OI.CompilerMode == OutputInfo::Mode::SingleCompile)) &&
       C.getArgs().hasArg(options::OPT_emit_objc_header,
-                         options::OPT_emit_objc_header_path))
-    chooseObjectiveCHeaderOutputPath(C, OI, OutputMap, Output.get());
+                         options::OPT_emit_objc_header_path)) {
+    StringRef ObjCHeaderPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_ObjCHeader);
+      if (iter != OutputMap->end())
+        ObjCHeaderPath = iter->second;
+    }
+
+    if (ObjCHeaderPath.empty())
+      if (auto A = C.getArgs().getLastArg(options::OPT_emit_objc_header_path))
+        ObjCHeaderPath = A->getValue();
+
+    if (!ObjCHeaderPath.empty()) {
+      Output->setAdditionalOutputForType(types::TY_ObjCHeader, ObjCHeaderPath);
+    } else {
+      // Put the header next to the primary output file.
+      // FIXME: That's not correct if the user /just/ passed -emit-header
+      // and not -emit-module.
+      addAuxiliaryOutput(C, *Output, types::TY_ObjCHeader, OI,
+                         /*output file map*/nullptr);
+    }
+  }
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
@@ -2159,274 +2369,6 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   return J;
-}
-
-void Driver::computeMainOutput(Compilation &C, const JobAction *JA,
-                               const OutputInfo &OI, const OutputFileMap *OFM,
-                               const ToolChain &TC, bool AtTopLevel,
-                               SmallVectorImpl<const Action *> &InputActions,
-                               SmallVectorImpl<const Job *> &InputJobs,
-                               const TypeToPathMap *OutputMap,
-                               StringRef BaseInput, llvm::SmallString<128> &Buf,
-                               CommandOutput *Output) const {
-  StringRef OutputFile;
-  if (OI.isMultiThreading() && isa<CompileJobAction>(JA) &&
-      types::isAfterLLVM(JA->getType())) {
-    // Multi-threaded compilation: A single frontend command produces multiple
-    // output file: one for each input files.
-    auto OutputFunc = [&](StringRef Input) {
-      const TypeToPathMap *OMForInput = nullptr;
-      if (OFM)
-        OMForInput = OFM->getOutputMapForInput(Input);
-
-      OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
-                                     C.getArgs(), AtTopLevel, Input, InputJobs,
-                                     Diags, Buf);
-      Output->addPrimaryOutput(OutputFile, Input);
-    };
-    // Add an output file for each input action.
-    for (const Action *A : InputActions) {
-      const InputAction *IA = cast<InputAction>(A);
-      OutputFunc(IA->getInputArg().getValue());
-    }
-    // Add an output file for each input job.
-    for (const Job *job : InputJobs) {
-      OutputFunc(job->getOutput().getBaseInput(0));
-    }
-  } else {
-    // The common case: there is a single output file.
-    OutputFile =
-        getOutputFilename(C, JA, OI, OutputMap, TC.getTriple(), C.getArgs(),
-                          AtTopLevel, BaseInput, InputJobs, Diags, Buf);
-    Output->addPrimaryOutput(OutputFile, BaseInput);
-  }
-}
-
-void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
-                                         const OutputFileMap *OFM,
-                                         const TypeToPathMap *OutputMap,
-                                         CommandOutput *Output) const {
-  StringRef OFMModuleOutputPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(types::TY_SwiftModuleFile);
-    if (iter != OutputMap->end())
-      OFMModuleOutputPath = iter->second;
-  }
-
-  const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
-  if (!OFMModuleOutputPath.empty()) {
-    // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
-                                       OFMModuleOutputPath);
-  } else if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
-    // We're performing a single compilation (and thus no merge module step),
-    // so prefer to use -emit-module-path, if present.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
-                                       A->getValue());
-  } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
-             OI.ShouldTreatModuleAsTopLevelOutput) {
-    // We're performing a single compile and don't have -emit-module-path,
-    // but have been told to treat the module as a top-level output.
-    // Determine an appropriate path.
-    if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
-      // Put the module next to the top-level output.
-      llvm::SmallString<128> Path(A->getValue());
-      llvm::sys::path::remove_filename(Path);
-      llvm::sys::path::append(Path, OI.ModuleName);
-      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
-    } else {
-      // A top-level output wasn't specified, so just output to
-      // <ModuleName>.swiftmodule.
-      llvm::SmallString<128> Path(OI.ModuleName);
-      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
-    }
-  } else {
-    // We're only generating the module as an intermediate, so put it next
-    // to the primary output of the compile command.
-    llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
-    bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-    Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
-    if (isTempFile)
-      C.addTemporaryFile(Path);
-  }
-}
-
-void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
-                                            const TypeToPathMap *OutputMap,
-                                            CommandOutput *Output) const {
-  StringRef OFMModuleDocOutputPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(types::TY_SwiftModuleDocFile);
-    if (iter != OutputMap->end())
-      OFMModuleDocOutputPath = iter->second;
-  }
-  if (!OFMModuleDocOutputPath.empty()) {
-    // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
-                                       OFMModuleDocOutputPath);
-  } else {
-    // Otherwise, put it next to the swiftmodule file.
-    llvm::SmallString<128> Path(
-        Output->getAnyOutputForType(types::TY_SwiftModuleFile));
-    bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_DOC_EXTENSION);
-    Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
-    if (isTempFile)
-      C.addTemporaryFile(Path);
-  }
-}
-
-void Driver::chooseRemappingOutputPath(Compilation &C,
-                                       const TypeToPathMap *OutputMap,
-                                       CommandOutput *Output) const {
-  StringRef OFMFixitsOutputPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(types::TY_Remapping);
-    if (iter != OutputMap->end())
-      OFMFixitsOutputPath = iter->second;
-  }
-  if (!OFMFixitsOutputPath.empty()) {
-    Output->setAdditionalOutputForType(types::ID::TY_Remapping,
-                                       OFMFixitsOutputPath);
-  } else {
-    llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
-    bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, "remap");
-    Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
-    if (isTempFile)
-      C.addTemporaryFile(Path);
-  }
-}
-
-void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
-                                             const JobAction *JA,
-                                             const OutputInfo &OI,
-                                             const TypeToPathMap *OutputMap,
-                                             CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
-    auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
-    if (pchJA && pchJA->isPersistentPCH()) {
-      addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OI, OutputMap,
-                                              Diags);
-    } else {
-      addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
-                         OutputMap);
-    }
-
-    // Remove any existing diagnostics files so that clients can detect their
-    // presence to determine if a command was run.
-    StringRef OutputPath =
-        Output->getAnyOutputForType(types::TY_SerializedDiagnostics);
-    if (llvm::sys::fs::is_regular_file(OutputPath))
-      llvm::sys::fs::remove(OutputPath);
-  }
-}
-
-void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
-                                           const TypeToPathMap *OutputMap,
-                                           llvm::SmallString<128> &Buf,
-                                           CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
-    addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
-  }
-  if (C.getIncrementalBuildEnabled()) {
-    addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
-  }
-  chooseLoadedModuleTracePath(C, OI, Buf, Output);
-  chooseTBDPath(C, OI, Buf, Output);
-}
-
-void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
-                                         llvm::SmallString<128> &Buf,
-                                         CommandOutput *Output) const {
-  // The loaded-module-trace is the same for all compile jobs: all `import`
-  // statements are processed, even ones from non-primary files. Thus, only
-  // one of those jobs needs to emit the file, and we can get it to write
-  // straight to the desired final location.
-  auto tracePathEnvVar = getenv("SWIFT_LOADED_MODULE_TRACE_FILE");
-  auto shouldEmitTrace =
-      tracePathEnvVar ||
-      C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
-                         options::OPT_emit_loaded_module_trace_path);
-
-  if (shouldEmitTrace &&
-      C.requestPermissionForFrontendToEmitLoadedModuleTrace()) {
-    StringRef filename;
-    // Prefer the environment variable.
-    if (tracePathEnvVar)
-      filename = StringRef(tracePathEnvVar);
-    else {
-      // By treating this as a top-level output, the return value always
-      // exists.
-      filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
-          types::TY_ModuleTrace,
-          /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
-    }
-
-    Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
-  }
-}
-
-void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
-                           llvm::SmallString<128> &Buf,
-                           CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
-    if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
-      llvm::outs() << "TBD emission has been disabled, because it requires a "
-                   << "single compiler invocation: consider enabling the "
-                   << "-whole-module-optimization flag.\n";
-    } else {
-      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_tbd_path, types::TY_TBD,
-          /*TreatAsTopLevelOutput=*/true, "tbd", Buf);
-
-      Output->setAdditionalOutputForType(types::TY_TBD, filename);
-    }
-  }
-}
-
-void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
-                                          llvm::SmallString<128> &Buf,
-                                          CommandOutput *Output) const {
-  if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
-    auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-        OI, C.getArgs(), options::OPT_save_optimization_record_path,
-        types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true, "opt.yaml", Buf);
-
-    Output->setAdditionalOutputForType(types::TY_OptRecord, filename);
-  } else
-    // FIXME: We should use the OutputMap in this case.
-    Diags.diagnose({}, diag::warn_opt_remark_disabled);
-}
-
-void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
-                                              const OutputInfo &OI,
-                                              const TypeToPathMap *OutputMap,
-                                              CommandOutput *Output) const {
-  StringRef ObjCHeaderPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(types::TY_ObjCHeader);
-    if (iter != OutputMap->end())
-      ObjCHeaderPath = iter->second;
-  }
-
-  if (ObjCHeaderPath.empty())
-    if (auto A = C.getArgs().getLastArg(options::OPT_emit_objc_header_path))
-      ObjCHeaderPath = A->getValue();
-
-  if (!ObjCHeaderPath.empty()) {
-    Output->setAdditionalOutputForType(types::TY_ObjCHeader, ObjCHeaderPath);
-  } else {
-    // Put the header next to the primary output file.
-    // FIXME: That's not correct if the user /just/ passed -emit-header
-    // and not -emit-module.
-    addAuxiliaryOutput(C, *Output, types::TY_ObjCHeader, OI,
-                       /*output file map*/ nullptr);
-  }
 }
 
 static unsigned printActions(const Action *A,

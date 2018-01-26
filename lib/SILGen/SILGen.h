@@ -149,6 +149,14 @@ public:
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
 
+  /// Get the function for a dispatch thunk, creating it if necessary.
+  SILFunction *getDispatchThunk(SILDeclRef constant,
+                                ForDefinition_t forDefinition);
+
+  /// Emit a native Swift class or protocol method dispatch thunk, used for
+  /// resilient method dispatch.
+  SILFunction *emitDispatchThunk(SILDeclRef constant);
+
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);
@@ -321,6 +329,10 @@ public:
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
 
+  void emitGlobalGetter(VarDecl *global,
+                        SILGlobalVariable *onceToken,
+                        SILFunction *onceFunc);
+  
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);

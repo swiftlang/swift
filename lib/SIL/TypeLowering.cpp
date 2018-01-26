@@ -599,15 +599,14 @@ namespace {
       // Trivial
     }
 
-    void
-    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                            TypeExpansionKind loweringStyle) const override {
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 LoweringStyle loweringStyle) const override {
       // Trivial
     }
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       // Trivial
       return value;
     }
@@ -779,7 +778,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue aggValue,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       llvm::SmallVector<SILValue, 8> loweredChildValues;
       for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
@@ -808,19 +807,17 @@ namespace {
       B.emitReleaseValueAndFold(loc, aggValue);
     }
 
-    void
-    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
-                            TypeExpansionKind loweringStyle) const override {
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue aggValue,
+                                 LoweringStyle loweringStyle) const override {
       SimpleOperationTy Fn;
 
       switch(loweringStyle) {
-      case TypeExpansionKind::None:
-        return emitDestroyValue(B, loc, aggValue);
-      case TypeExpansionKind::DirectChildren:
+      case LoweringStyle::Shallow:
         Fn = &TypeLowering::emitDestroyValue;
         break;
-      case TypeExpansionKind::MostDerivedDescendents:
-        Fn = &TypeLowering::emitLoweredDestroyValueMostDerivedDescendents;
+      case LoweringStyle::Deep:
+        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
         break;
       }
 
@@ -914,7 +911,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, B.getDefaultAtomicity());
@@ -931,23 +928,19 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 TypeExpansionKind style) const override {
-      // Enums, we never want to expand.
-      //
-      // TODO: This is a final class. I don't understand why we can't just
-      // delegate to emitDestroyValue in all cases.
-      switch (style) {
-      case TypeExpansionKind::None:
-      case TypeExpansionKind::DirectChildren:
-        return emitDestroyValue(B, loc, value);
-      case TypeExpansionKind::MostDerivedDescendents:
-        if (B.getFunction().hasQualifiedOwnership()) {
-          B.createDestroyValue(loc, value);
-          return;
-        }
-        B.emitReleaseValueAndFold(loc, value);
+                                 LoweringStyle style) const override {
+      if (style == LoweringStyle::Shallow) {
+        emitDestroyValue(B, loc, value);
         return;
       }
+      assert(style != LoweringStyle::Shallow &&
+             "This method should never be called when performing a shallow "
+             "destroy value.");
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.emitReleaseValueAndFold(loc, value);
     }
   };
 
@@ -960,12 +953,12 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       return emitCopyValue(B, loc, value);
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 TypeExpansionKind style) const override {
+                                 LoweringStyle style) const override {
       emitDestroyValue(B, loc, value);
     }
   };
@@ -1075,7 +1068,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
@@ -1085,7 +1078,7 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 TypeExpansionKind style) const override {
+                                 LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
   };
@@ -1134,12 +1127,12 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       llvm_unreachable("lowered copy");
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 TypeExpansionKind style) const override {
+                                 LoweringStyle style) const override {
       llvm_unreachable("destroy value");
     }
 
@@ -1203,7 +1196,7 @@ namespace {
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
-                                  TypeExpansionKind style) const override {
+                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
@@ -1213,7 +1206,7 @@ namespace {
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                                 TypeExpansionKind style) const override {
+                                 LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
   };
@@ -1727,6 +1720,12 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType);
 }
 
+/// Get the type of a global variable getter function.
+static CanAnyFunctionType getGlobalGetterType(CanType varType) {
+  ASTContext &C = varType->getASTContext();
+  return CanFunctionType::get(TupleType::getEmpty(C), varType);
+}
+
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
@@ -1921,6 +1920,12 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
            "constant ref to computed global var");
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
+  case SILDeclRef::Kind::GlobalGetter: {
+    VarDecl *var = cast<VarDecl>(vd);
+    assert(var->hasStorage() &&
+           "constant ref to computed global var");
+    return getGlobalGetterType(var->getInterfaceType()->getCanonicalType());
+  }
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(*this,
                                                cast<AbstractFunctionDecl>(vd),
@@ -1972,7 +1977,9 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::GlobalGetter: {
     return vd->getDeclContext()->getGenericEnvironmentOfContext();
+  }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return cast<ClassDecl>(vd)->getGenericEnvironmentOfContext();

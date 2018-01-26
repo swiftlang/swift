@@ -598,18 +598,9 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  DeclBaseName name = decl->getBaseName();
-  assert(!name.isSpecial() && "Cannot print special names");
-
-  auto *synthesizedTypeAttr =
-      decl->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
-
-  if (synthesizedTypeAttr) {
-    assert(!isDigit(synthesizedTypeAttr->originalTypeName[0]) &&
-           "synthesized type's original name must be a valid Swift identifier");
-    appendIdentifier(synthesizedTypeAttr->originalTypeName);
-  } else if (name.isOperator()) {
-    appendIdentifier(translateOperator(name.getIdentifier().str()));
+  if (decl->isOperator()) {
+    auto name = decl->getBaseName().getIdentifier().str();
+    appendIdentifier(translateOperator(name));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -621,8 +612,9 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         appendOperator("oi");
         break;
     }
-  } else if (!name.empty()) {
-    appendIdentifier(name.getIdentifier().str());
+  } else if (decl->hasName()) {
+    assert(!decl->getBaseName().isSpecial() && "Cannot print special names");
+    appendIdentifier(decl->getBaseName().getIdentifier().str());
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -639,16 +631,6 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     }
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
-  }
-
-  if (synthesizedTypeAttr) {
-    StringRef relatedEntityKind = synthesizedTypeAttr->getManglingName();
-    assert(relatedEntityKind.size() == 1 &&
-           "'L' operator only supports a single letter payload");
-    assert(((relatedEntityKind[0] >= 'a' && relatedEntityKind[0] <= 'j') ||
-            (relatedEntityKind[0] >= 'A' && relatedEntityKind[0] <= 'J')) &&
-           "Only [a-jA-J] are reserved for related entity kinds");
-    return appendOperatorParam("L", synthesizedTypeAttr->getManglingName());
   }
 
   StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);

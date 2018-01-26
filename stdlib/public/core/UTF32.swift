@@ -21,14 +21,8 @@ extension Unicode.UTF32 : Unicode.Encoding {
   public typealias EncodedScalar = CollectionOfOne<UInt32>
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal static var _replacementCodeUnit: CodeUnit {
-    @inline(__always) get { return 0xFFFD }
-  }
-  
-  @_inlineable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
-    return EncodedScalar(_replacementCodeUnit)
+    return EncodedScalar(0xFFFD)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

@@ -25,10 +25,10 @@ using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
 FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
-    if (isa<DefaultArgumentInitializer>(DC))
+    if (auto *DAI = dyn_cast<DefaultArgumentInitializer>(DC))
       return FragileFunctionKind::DefaultArgument;
 
-    if (isa<PatternBindingInitializer>(DC))
+    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
       return FragileFunctionKind::PropertyInitializer;
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {

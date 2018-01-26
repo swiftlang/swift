@@ -177,8 +177,6 @@ class WeakReference;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
-template <typename Runtime> struct TargetProtocolConformanceDescriptor;
-
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
 /// 'object', because it is rooted in memory.
 ///
@@ -984,10 +982,32 @@ using OpaqueMetadata = TargetOpaqueMetadata<InProcess>;
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
 using FullOpaqueMetadata = FullMetadata<OpaqueMetadata>;
-#define BUILTIN_TYPE(Symbol, Name) \
-    SWIFT_RUNTIME_EXPORT \
-    const FullOpaqueMetadata METADATA_SYM(Symbol);
-#include "swift/Runtime/BuiltinTypes.def"
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi8_);      // Builtin.Int8
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi16_);     // Builtin.Int16
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi32_);     // Builtin.Int32
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi64_);     // Builtin.Int64
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi128_);    // Builtin.Int128
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi256_);    // Builtin.Int256
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi512_);    // Builtin.Int512
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bo);        // Builtin.NativeObject
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bb);        // Builtin.BridgeObject
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bp);        // Builtin.RawPointer
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(BB);        // Builtin.UnsafeValueBuffer
+#if SWIFT_OBJC_INTEROP
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(BO);        // Builtin.UnknownObject
+#endif
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {
@@ -2157,10 +2177,6 @@ struct TargetProtocolDescriptor {
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
-  /// The superclass of which all conforming types must be a subclass.
-  RelativeDirectPointer<const TargetClassMetadata<Runtime>, /*Nullable=*/true>
-    Superclass;
-
   /// Associated type names, as a space-separated list in the same order
   /// as the requirements.
   RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
@@ -2183,25 +2199,15 @@ struct TargetProtocolDescriptor {
       NumMandatoryRequirements(0),
       NumRequirements(0),
       Requirements(nullptr),
-      Superclass(nullptr),
       AssociatedTypeNames(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
-/// A witness table for a protocol.
-///
-/// With the exception of the initial protocol conformance descriptor,
+/// A witness table for a protocol. This type is intentionally opaque because
 /// the layout of a witness table is dependent on the protocol being
 /// represented.
-template <typename Runtime>
-struct TargetWitnessTable {
-  /// The protocol conformance descriptor from which this witness table
-  /// was generated.
-  const TargetProtocolConformanceDescriptor<Runtime> *Description;
-};
-
-using WitnessTable = TargetWitnessTable<InProcess>;
+struct WitnessTable;
 
 /// The basic layout of an opaque (non-class-bounded) existential type.
 template <typename Runtime>
@@ -2210,13 +2216,12 @@ struct TargetOpaqueExistentialContainer {
   const TargetMetadata<Runtime> *Type;
   // const void *WitnessTables[];
 
-  const TargetWitnessTable<Runtime> **getWitnessTables() {
-    return reinterpret_cast<const TargetWitnessTable<Runtime> **>(this + 1);
+  const WitnessTable **getWitnessTables() {
+    return reinterpret_cast<const WitnessTable **>(this + 1);
   }
 
-  const TargetWitnessTable<Runtime> * const *getWitnessTables() const {
-    return reinterpret_cast<const TargetWitnessTable<Runtime> * const *>(
-                                                                      this + 1);
+  const WitnessTable * const *getWitnessTables() const {
+    return reinterpret_cast<const WitnessTable * const *>(this + 1);
   }
 
   void copyTypeInto(swift::TargetOpaqueExistentialContainer<Runtime> *dest,
@@ -2300,9 +2305,8 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   
   /// Get a witness table from an existential container of the type described
   /// by this metadata.
-  const TargetWitnessTable<Runtime> * getWitnessTable(
-                                                  const OpaqueValue *container,
-                                                  unsigned i) const;
+  const WitnessTable * getWitnessTable(const OpaqueValue *container,
+                                       unsigned i) const;
 
   /// Return true iff all the protocol constraints are @objc.
   bool isObjC() const {
@@ -2341,11 +2345,11 @@ template <typename Runtime>
 struct TargetExistentialMetatypeContainer {
   const TargetMetadata<Runtime> *Value;
 
-  const TargetWitnessTable<Runtime> **getWitnessTables() {
-    return reinterpret_cast<const TargetWitnessTable<Runtime>**>(this + 1);
+  const WitnessTable **getWitnessTables() {
+    return reinterpret_cast<const WitnessTable**>(this + 1);
   }
-  const TargetWitnessTable<Runtime> * const *getWitnessTables() const {
-    return reinterpret_cast<const TargetWitnessTable<Runtime>* const *>(this + 1);
+  const WitnessTable * const *getWitnessTables() const {
+    return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
   void copyTypeInto(TargetExistentialMetatypeContainer *dest,
@@ -2528,10 +2532,10 @@ struct TargetGenericWitnessTable {
                               /*nullable*/ true> Protocol;
 
   /// The pattern.
-  RelativeDirectPointer<const TargetWitnessTable<Runtime>> Pattern;
+  RelativeDirectPointer<const WitnessTable> Pattern;
 
   /// The instantiation function, which is called after the template is copied.
-  RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
+  RelativeDirectPointer<void(WitnessTable *instantiatedTable,
                              const TargetMetadata<Runtime> *type,
                              void * const *instantiationArgs),
                         /*nullable*/ true> Instantiator;
@@ -2597,63 +2601,74 @@ struct TargetProtocolRecord {
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
-/// The structure of a protocol conformance.
+/// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 template <typename Runtime>
-struct TargetProtocolConformanceDescriptor {
+struct TargetProtocolConformanceRecord {
 public:
   using WitnessTableAccessorFn
-    = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **,
-                                          size_t);
+    = const WitnessTable *(const TargetMetadata<Runtime>*,
+                           const WitnessTable **,
+                           size_t);
 
 private:
   /// The protocol being conformed to.
   ///
   /// The remaining low bit is reserved for future use.
-  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
+  RelativeIndirectablePointerIntPair<ProtocolDescriptor, /*reserved=*/bool>
+    Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
     /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime>>
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetNominalTypeDescriptor<Runtime> * const>
+    RelativeDirectPointerIntPair<TargetNominalTypeDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
       IndirectNominalTypeDescriptor;
 
     /// An indirect reference to the metadata.
-    RelativeDirectPointer<const TargetClassMetadata<Runtime> *>
-      IndirectObjCClass;
+    ///
+    /// Only valid when the \c IndirectClassOrDirectType value is
+    // \c IsIndirectClass.
+    RelativeDirectPointerIntPair<const TargetClassMetadata<Runtime> *,
+                                 TypeMetadataRecordKind> IndirectObjCClass;
   };
-
+  
+  
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<const TargetWitnessTable<Runtime>> WitnessTable;
+    RelativeDirectPointerIntPair<const WitnessTable,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type.
-    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
+    RelativeDirectPointerIntPair<WitnessTableAccessorFn,
+                                 ProtocolConformanceReferenceKind>
+      WitnessTableAccessor;
   };
 
-  /// Various flags, including the kind of conformance.
-  ConformanceFlags Flags;
-
+  /// Reserved word.
+  unsigned Reserved;
+  
 public:
   const ProtocolDescriptor *getProtocol() const {
-    return Protocol;
+    return Protocol.getPointer();
   }
 
   TypeMetadataRecordKind getTypeKind() const {
-    return Flags.getTypeReferenceKind();
+    return DirectNominalTypeDescriptor.getInt();
   }
 
-  typename ConformanceFlags::ConformanceKind getConformanceKind() const {
-    return Flags.getConformanceKind();
+  ProtocolConformanceReferenceKind getConformanceKind() const {
+    return WitnessTable.getInt();
   }
   
   const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
@@ -2669,7 +2684,7 @@ public:
       assert(false && "not indirect class object");
     }
     
-    return IndirectObjCClass.get();
+    return IndirectObjCClass.getPointer();
   }
   
   const TargetNominalTypeDescriptor<Runtime> *
@@ -2679,10 +2694,10 @@ public:
       return nullptr;
 
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor;
+      return DirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor;
+      return *IndirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::IndirectObjCClass:
       assert(false && "not generic metadata pattern");
@@ -2692,28 +2707,32 @@ public:
   }
   
   /// Get the directly-referenced static witness table.
-  const swift::TargetWitnessTable<Runtime> *getStaticWitnessTable() const {
+  const swift::WitnessTable *getStaticWitnessTable() const {
     switch (getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTable:
+    case ProtocolConformanceReferenceKind::WitnessTable:
       break;
         
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
+
+    case ProtocolConformanceReferenceKind::Reserved:
+      break;
     }
-    return WitnessTable;
+    return WitnessTable.getPointer();
   }
   
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
     switch (getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::Reserved:
       break;
         
-    case ConformanceFlags::ConformanceKind::WitnessTable:
+    case ProtocolConformanceReferenceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
-    return WitnessTableAccessor;
+    return WitnessTableAccessor.getPointer();
   }
   
   /// Get the canonical metadata for the type referenced by this record, or
@@ -2723,23 +2742,15 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
-  const swift::TargetWitnessTable<Runtime> *
+  const swift::WitnessTable *
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
   
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
 };
-using ProtocolConformanceDescriptor
-  = TargetProtocolConformanceDescriptor<InProcess>;
-
-template<typename Runtime>
-using TargetProtocolConformanceRecord =
-  RelativeDirectPointer<TargetProtocolConformanceDescriptor<Runtime>,
-                        /*Nullable=*/false>;
-
-using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
-
+using ProtocolConformanceRecord
+  = TargetProtocolConformanceRecord<InProcess>;
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///

@@ -360,8 +360,10 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                                          genericArgs.Types,
                                                          NotForDefinition);
 
-  auto result =
-    IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, genericArgs.Values);
+  auto result = IGF.Builder.CreateCall(accessor, genericArgs.Values);
+  result->setDoesNotThrow();
+  result->addAttribute(llvm::AttributeList::FunctionIndex,
+                       llvm::Attribute::ReadNone);
 
   IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
                              result);
@@ -435,6 +437,26 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     return true;
 
   return false;
+}
+
+static bool hasRequiredTypeMetadataAccessFunction(NominalTypeDecl *typeDecl) {
+  // This needs to be kept in sync with getTypeMetadataStrategy.
+
+  if (isa<ProtocolDecl>(typeDecl))
+    return false;
+
+  switch (getDeclLinkage(typeDecl)) {
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::Private:
+    return true;
+
+  case FormalLinkage::PublicNonUnique:
+  case FormalLinkage::HiddenNonUnique:
+    return false;
+  }
+  llvm_unreachable("bad formal linkage");
+
 }
 
 /// Return the standard access strategy for getting a non-dependent
@@ -1045,14 +1067,12 @@ static bool isLoadFrom(llvm::Value *value, Address address) {
 void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
                                         llvm::Function *accessor,
                                         llvm::GlobalVariable *cacheVariable,
-         const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue,
-         bool isReadNone) {
+         const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue) {
   accessor->setDoesNotThrow();
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
-  if (isReadNone)
-    accessor->setDoesNotAccessMemory();
+  accessor->setDoesNotAccessMemory();
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
@@ -1136,63 +1156,6 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   IGF.Builder.CreateRet(phi);
 }
 
-llvm::CallInst *IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args) {
-
-  ArrayRef<llvm::Value *> callArgs;
-  llvm::Value *callArgsVec[NumDirectGenericTypeMetadataAccessFunctionArgs + 1];
-  Address argsBuffer;
-  bool allocatedArgsBuffer = false;
-  if (args.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
-    // Copy direct arguments.
-    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs)) {
-      callArgsVec[i] = args[i];
-    }
-
-    // Allocate an array to pass the remaining arguments. Note that the
-    // buffer is allocated for the whole length so the callee can fill in
-    // the direct arguments and use the buffer.
-    auto argsBufferTy = llvm::ArrayType::get(IGM.Int8PtrTy, args.size());
-    argsBuffer = createAlloca(argsBufferTy, IGM.getPointerAlignment());
-
-    // Mark the beginning of the array lifetime.
-    Builder.CreateLifetimeStart(argsBuffer,
-                                IGM.getPointerSize() * args.size());
-    allocatedArgsBuffer = true;
-
-    // Fill in the non-direct arguments.
-    for (unsigned i : range(NumDirectGenericTypeMetadataAccessFunctionArgs,
-                            args.size())) {
-      Address elt = Builder.CreateStructGEP(argsBuffer, i,
-                                            IGM.getPointerSize() * i);
-      auto *arg =
-        Builder.CreateBitCast(args[i], elt.getType()->getPointerElementType());
-      Builder.CreateStore(arg, elt);
-    }
-
-    // Fill in the buffer.
-    callArgsVec[NumDirectGenericTypeMetadataAccessFunctionArgs] =
-      Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrPtrTy);
-    callArgs = callArgsVec;
-  } else {
-    callArgs = args;
-  }
-
-  auto call = Builder.CreateCall(accessFunction, callArgs);
-  call->setDoesNotThrow();
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     allocatedArgsBuffer
-                       ? llvm::Attribute::InaccessibleMemOrArgMemOnly
-                       : llvm::Attribute::ReadNone);
-
-  // If we allocated a buffer for the arguments, end it's lifetime.
-  if (allocatedArgsBuffer)
-    Builder.CreateLifetimeEnd(argsBuffer, IGM.getPointerSize() * args.size());
-
-  return call;
-}
-
 static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
                                                       NominalTypeDecl *nominal,
                                                       GenericArguments &genericArgs) {
@@ -1201,57 +1164,28 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
 
   // Collect input arguments to the generic metadata accessor, as laid out
   // by the GenericArguments class.
-  unsigned argIdx = 0;
-  llvm::Argument *callerArgArray = nullptr;
-  for (auto &arg : IGF.CurFn->args()) {
-    // If this an argument passed directly, record it.
-    if (argIdx < NumDirectGenericTypeMetadataAccessFunctionArgs) {
-      genericArgs.Values.push_back(&arg);
-      ++argIdx;
-      continue;
-    }
-
-    assert(!callerArgArray && "Too many arguments");
-    callerArgArray = &arg;
-  }
-
+  for (auto &arg : IGF.CurFn->args())
+    genericArgs.Values.push_back(&arg);
+  assert(genericArgs.Values.size() == genericArgs.Types.size());
   assert((genericArgs.Values.size() > 0 ||
           nominal->getGenericSignature()->areAllParamsConcrete())
          && "no generic args?!");
 
-  Address argsBuffer;
-  if (callerArgArray) {
-    // The caller provided a buffer with enough space for all of the arguments;
-    // use that.
-    argsBuffer = Address(callerArgArray, IGF.IGM.getPointerAlignment());
-  } else {
-    // Allocate a buffer with enough storage for the arguments.
-    auto argsBufferTy =
-      llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
-    argsBuffer = IGF.createAlloca(argsBufferTy,
-                                  IGF.IGM.getPointerAlignment(),
-                                  "generic.arguments");
-    IGF.Builder.CreateLifetimeStart(argsBuffer,
-                            IGF.IGM.getPointerSize() * genericArgs.Values.size());
-  }
-
-  /// Store direct arguments into the buffer.
+  // Slam that information directly into the generic arguments buffer.
+  auto argsBufferTy =
+    llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
+  Address argsBuffer = IGF.createAlloca(argsBufferTy,
+                                        IGF.IGM.getPointerAlignment(),
+                                        "generic.arguments");
+  IGF.Builder.CreateLifetimeStart(argsBuffer,
+                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
   for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
-    Address elt;
-    if (callerArgArray) {
-      elt = IGF.Builder.CreateConstArrayGEP(argsBuffer, i,
-                                            IGF.IGM.getPointerSize());
-    } else {
-      elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
-                                        IGF.IGM.getPointerSize() * i);
-    }
-
-    auto *arg =
-      IGF.Builder.CreateBitCast(genericArgs.Values[i],
-                                elt.getType()->getPointerElementType());
-    IGF.Builder.CreateStore(arg, elt);
+    Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
+                                              IGF.IGM.getPointerSize() * i);
+    IGF.Builder.CreateStore(genericArgs.Values[i], elt);
   }
 
+  // Cast to void*.
   llvm::Value *arguments =
     IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
 
@@ -1262,11 +1196,8 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
   result->addAttribute(llvm::AttributeList::FunctionIndex,
                        llvm::Attribute::ReadOnly);
 
-  // If we allocated the array ourselves, end its lifetime.
-  if (!callerArgArray) {
-    IGF.Builder.CreateLifetimeEnd(argsBuffer,
+  IGF.Builder.CreateLifetimeEnd(argsBuffer,
                           IGF.IGM.getPointerSize() * genericArgs.Values.size());
-  }
 
   return result;
 
@@ -1322,10 +1253,7 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                           CanNominalType type,
                                           llvm::Constant *cacheVariable,
                                     InPlaceMetadataInitializer &&initializer) {
-  llvm::Constant *metadata =
-    IGF.IGM.requiresForeignTypeMetadata(type)
-      ? IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type)
-      : IGF.IGM.getAddrOfTypeMetadata(type, false);
+  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type, false);
 
   // We might not have interesting initialization to do.
   assert((cacheVariable == nullptr) ==
@@ -1511,15 +1439,10 @@ static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   if (IGM.getOptions().optimizeForSize())
     accessor->addFnAttr(llvm::Attribute::NoInline);
 
-  bool isReadNone =
-      (genericArgs.Types.size() <= NumDirectGenericTypeMetadataAccessFunctionArgs);
-
   emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
-                              [&](IRGenFunction &IGF) -> llvm::Value * {
-                                return emitGenericMetadataAccessFunction(
-                                    IGF, nominal, genericArgs);
-                              },
-                              isReadNone);
+                              [&](IRGenFunction &IGF) -> llvm::Value* {
+    return emitGenericMetadataAccessFunction(IGF, nominal, genericArgs);
+  });
 
   return accessor;
 }
@@ -1530,12 +1453,26 @@ static llvm::Constant *
 getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
                                       NominalTypeDecl *theDecl,
                                       ForDefinition_t shouldDefine) {
+  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
+    return nullptr;
+
   if (theDecl->isGenericContext()) {
     return getGenericTypeMetadataAccessFunction(IGM, theDecl, shouldDefine);
   }
 
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
   return getTypeMetadataAccessFunction(IGM, declaredType, shouldDefine);
+}
+
+/// Force a public metadata access function into existence if necessary
+/// for the given type.
+template <class BuilderTy>
+static void maybeEmitNominalTypeMetadataAccessFunction(NominalTypeDecl *theDecl,
+                                                       BuilderTy &builder) {
+  if (!hasRequiredTypeMetadataAccessFunction(theDecl))
+    return;
+
+  builder.createMetadataAccessFunction();
 }
 
 /// Emit a call to the type metadata accessor for the given function.
@@ -1632,7 +1569,12 @@ namespace {
             IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
                 type->getDecl(), types, NotForDefinition);
 
-        return IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, args);
+        auto result = IGF.Builder.CreateCall(accessor, args);
+        result->setDoesNotThrow();
+        result->addAttribute(llvm::AttributeList::FunctionIndex,
+                             llvm::Attribute::ReadNone);
+
+        return result;
       }
 
       // Otherwise, generic arguments are not lowered.
@@ -3398,12 +3340,6 @@ namespace {
     void addClassFlags() {
       auto flags = ClassFlags();
 
-#if !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-      // FIXME: Remove this after enabling stable ABI.
-      // This bit is NOT conditioned on UseDarwinPreStableABIBit.
-      flags |= ClassFlags::IsSwiftPreStableABI;
-#endif
-
       // Set a flag if the class uses Swift refcounting.
       auto type = Target->getDeclaredType()->getCanonicalType();
       if (getReferenceCountingForType(IGM, type)
@@ -3922,12 +3858,7 @@ namespace {
       // The rodata pointer will be instantiated here.
       // Make sure we at least set the 'is Swift class' bit, though.
       ClassRODataPtrOffset = getNextOffsetFromTemplateHeader();
-      if (!IGM.ObjCInterop) {
-        // FIXME: Remove null data altogether rdar://problem/18801263
-        B.addInt(IGM.MetadataKindTy, 1);
-      } else {
-        B.addInt(IGM.MetadataKindTy, IGM.UseDarwinPreStableABIBit ? 1 : 2);
-      }
+      B.addInt(IGM.MetadataKindTy, 1);
     }
     
     void addDependentData() {
@@ -4129,7 +4060,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = true;
     canBeConstant = false;
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
   } else if (doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
                                           layout, fieldLayout);
@@ -4137,7 +4068,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
   } else {
     FixedClassMetadataBuilder builder(IGM, classDecl, init,
                                       layout, fieldLayout);
@@ -4145,7 +4076,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(classDecl, builder);
   }
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -4503,27 +4434,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   return call;
 }
 
-FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                              llvm::Value *metadata,
-                                              SILDeclRef method,
-                                              CanSILFunctionType methodType) {
-  Signature signature = IGF.IGM.getSignature(methodType);
-
-  auto classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-
-  // Find the vtable entry we're interested in.
-  auto methodInfo =
-    IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
-  auto offset = methodInfo.getOffset();
-
-  auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                      signature.getType()->getPointerTo(),
-                                      IGF.IGM.getPointerAlignment());
-  auto fnPtr = IGF.emitInvariantLoad(slot);
-
-  return FunctionPointer(fnPtr, signature);
-}
-
+/// Load the correct virtual function for the given class method.
 FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               llvm::Value *base,
                                               SILType baseType,
@@ -4572,7 +4483,22 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     }
   }
 
-  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
+  // Use the type of the method we were type-checked against, not the
+  // type of the overridden method.
+  auto sig = IGF.IGM.getSignature(methodType);
+
+  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+
+  auto methodInfo =
+    IGF.IGM.getClassMetadataLayout(declaringClass).getMethodInfo(IGF, overridden);
+  auto offset = methodInfo.getOffset();
+
+  auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                      sig.getType()->getPointerTo(),
+                                      IGF.IGM.getPointerAlignment());
+  auto fnPtr = IGF.emitInvariantLoad(slot);
+
+  return FunctionPointer(fnPtr, sig);
 }
 
 //===----------------------------------------------------------------------===//
@@ -4583,9 +4509,8 @@ static llvm::Value *
 emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
                                            CanNominalType type,
                                            llvm::Value *metadata) {
-  // All the value types are basically similar, as are foreign types.
-  assert(isa<StructType>(type) || isa<EnumType>(type) ||
-         IGF.IGM.requiresForeignTypeMetadata(type));
+  // All the value types are basically similar.
+  assert(isa<StructType>(type) || isa<EnumType>(type));
 
   // Set up the value witness table if it's dependent.
   SILType loweredType = IGF.IGM.getLoweredType(AbstractionPattern(type), type);
@@ -4770,14 +4695,14 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
     isPattern = true;
     canBeConstant = false;
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
   } else {
     StructMetadataBuilder builder(IGM, structDecl, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(structDecl, builder);
   }
 
   CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
@@ -4926,14 +4851,14 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
     isPattern = true;
     canBeConstant = false;
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
   } else {
     EnumMetadataBuilder builder(IGM, theEnum, init);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
 
-    builder.createMetadataAccessFunction();
+    maybeEmitNominalTypeMetadataAccessFunction(theEnum, builder);
   }
 
   CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
@@ -5058,22 +4983,6 @@ namespace {
     }
 
     Size getOffsetOfAddressPoint() const { return AddressPoint; }
-
-    void createMetadataAccessFunction() {
-      auto type = cast<NominalType>(asImpl().getTargetType());
-
-      (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
-                                           [&](IRGenFunction &IGF,
-                                               llvm::Constant *cacheVariable) {
-        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type,
-                                                         cacheVariable,
-          [&](IRGenFunction &IGF, llvm::Value *candidate) {
-            auto metadata = uniqueForeignTypeMetadataRef(IGF, candidate);
-            return emitInPlaceValueTypeMetadataInitialization(IGF, type,
-                                                              metadata);
-          });
-      });
-    }
   };
 
   class ForeignClassMetadataBuilder;
@@ -5133,17 +5042,8 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      // FIXME: Go through getAddrOfNominalTypeDescriptor once it's no
-      // longer required to define the nominal type descriptor.
-
-      auto entity = LinkEntity::forNominalTypeDescriptor(Target);
-      auto descriptor =
-        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-                                             entity,
-                                             IGM.getPointerAlignment(),
-                                             IGM.ClassNominalTypeDescriptorTy);
-      assert(!descriptor.isIndirect() && "Should be defined here");
-      B.add(descriptor.getDirectValue());
+      auto descriptor = ClassNominalTypeDescriptorBuilder(this->IGM, Target).emit();
+      B.add(descriptor);
     }
 
     void noteStartOfSuperClass() { }
@@ -5227,18 +5127,6 @@ namespace {
   };
 } // end anonymous namespace
 
-bool IRGenModule::requiresForeignTypeMetadata(CanType type) {
-  if (NominalTypeDecl *nominal = type->getAnyNominal()) {
-    if (auto *clas = dyn_cast<ClassDecl>(nominal)) {
-      return clas->isForeign();
-    }
-
-    return isa<ClangModuleUnit>(nominal->getModuleScopeContext());
-  }
-
-  return false;
-}
-
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // What we save in GlobalVars is actually the offsetted value.
@@ -5250,33 +5138,10 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   ConstantInitBuilder builder(*this);
   auto init = builder.beginStruct();
   init.setPacked(true);
-
-  // Local function to create the global variable for the foreign type
-  // metadata candidate.
-  Size addressPoint;
-  llvm::Constant *result = nullptr;
-  auto createCandidateVariable = [&] {
-    auto definition = init.finishAndCreateFuture();
-
-    // Create the global variable.
-    LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-    auto var =
-        createVariable(*this, link, definition.getType(),
-                       getPointerAlignment());
-    definition.installInGlobal(var);
-
-    // Apply the offset.
-    result = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
-    result = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        Int8Ty, result, getSize(addressPoint));
-    result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
-
-    // Only remember the offset.
-    GlobalVars[entity] = result;
-  };
-
+  
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
+  Size addressPoint;
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
@@ -5285,11 +5150,6 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignClassMetadataBuilder builder(*this, classDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
-
-    ClassNominalTypeDescriptorBuilder(*this, classDecl).emit();
-
-    createCandidateVariable();
-    builder.createMetadataAccessFunction();
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
@@ -5297,9 +5157,6 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignStructMetadataBuilder builder(*this, structDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
-
-    createCandidateVariable();
-    builder.createMetadataAccessFunction();
   } else if (auto enumType = dyn_cast<EnumType>(type)) {
     auto enumDecl = enumType->getDecl();
     assert(enumDecl->hasClangNode());
@@ -5307,15 +5164,31 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     ForeignEnumMetadataBuilder builder(*this, enumDecl, init);
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
-
-    createCandidateVariable();
-    builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
 
-  // Keep type metadata around for all types.
-  addRuntimeResolvableType(type);
+  auto definition = init.finishAndCreateFuture();
+  
+  // Create the global variable.
+  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+  auto var =
+      createVariable(*this, link, definition.getType(), getPointerAlignment());
+  definition.installInGlobal(var);
+  
+  // Apply the offset.
+  llvm::Constant *result = var;
+  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
+  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      Int8Ty, result, getSize(addressPoint));
+  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
+
+  // Only remember the offset.
+  GlobalVars[entity] = result;
+
+  if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
+    addLazyConformances(Nominal);
+  }
 
   return result;
 }
@@ -5401,7 +5274,6 @@ namespace {
       addSize();
       addFlags();
       addRequirements();
-      addSuperclass();
       addAssociatedTypeNames();
 
       B.suggestType(IGM.ProtocolDescriptorStructTy);
@@ -5598,11 +5470,6 @@ namespace {
       }
 
       return nullptr;
-    }
-
-    void addSuperclass() {
-      // FIXME: Implement.
-      B.addRelativeAddressOrNull(nullptr);
     }
 
     void addAssociatedTypeNames() {

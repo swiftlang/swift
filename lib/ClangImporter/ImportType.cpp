@@ -812,7 +812,7 @@ namespace {
         // Map anonymous enums with no fixed underlying type to Int /if/
         // they fit in an Int32. If not, this mapping isn't guaranteed to be
         // consistent for all platforms we care about.
-        if (!clangDecl->isFixed() && clangDecl->isFreeStanding() &&
+        if (!clangDecl->isFixed() &&
             clangDecl->getNumPositiveBits() < 32 &&
             clangDecl->getNumNegativeBits() <= 32)
           return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");

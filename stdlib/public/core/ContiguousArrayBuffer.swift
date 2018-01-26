@@ -19,7 +19,7 @@ import SwiftShims
 /// by the Objective-C runtime.
 @_fixed_layout
 @_versioned
-@_objc_non_lazy_realization
+@objc_non_lazy_realization
 internal final class _EmptyArrayStorage
   : _ContiguousArrayStorageBase {
 

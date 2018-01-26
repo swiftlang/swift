@@ -406,11 +406,31 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   size_t oldSize = results.size();
   bool alreadyInPrivateContext = false;
 
-  auto containerDecl = container->getAsDeclOrDeclExtensionContext();
-  // If FileUnit, then use FileUnit::lookupValue instead.
-  assert(containerDecl != nullptr && "This context does not support lookup.");
+  switch (container->getContextKind()) {
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+    llvm_unreachable("This context does not support lookup.");
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(containerDecl)) {
+  case DeclContextKind::FileUnit:
+    llvm_unreachable("Use FileUnit::lookupValue instead.");
+
+  case DeclContextKind::ExtensionDecl:
+    llvm_unreachable("Use ExtensionDecl::lookupDirect instead.");
+
+  case DeclContextKind::Module: {
+    assert(container == this);
+    this->lookupValue({}, name, NLKind::QualifiedLookup, results);
+    break;
+  }
+
+  case DeclContextKind::GenericTypeDecl: {
+    auto nominal = dyn_cast<NominalTypeDecl>(container);
+    if (!nominal) break;
+
     auto lookupResults = nominal->lookupDirect(name);
 
     // Filter out declarations from other modules.
@@ -423,12 +443,9 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     auto AS = nominal->getFormalAccessScope();
     if (AS.isPrivate() || AS.isFileScope())
       alreadyInPrivateContext = true;
-  } else if (isa<ModuleDecl>(containerDecl)) {
-    assert(container == this);
-    this->lookupValue({}, name, NLKind::QualifiedLookup, results);
-  } else if (!isa<GenericTypeDecl>(containerDecl)) {
-    // If ExtensionDecl, then use ExtensionDecl::lookupDirect instead.
-    llvm_unreachable("This context does not support lookup.");
+
+    break;
+  }
   }
 
   // Filter by private-discriminator, or filter out private decls if there isn't

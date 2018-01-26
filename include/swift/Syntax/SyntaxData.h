@@ -79,9 +79,13 @@ public:
 
   SyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
              CursorIndex IndexInParent = 0)
-      : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {
-    Children.resize(Raw ? Raw->getLayout().size() : 0);
-  }
+    : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {
+      if (Raw) {
+        for (size_t I = 0; I < Raw->Layout.size(); ++I) {
+          Children.push_back(AtomicCache<SyntaxData>());
+        }
+      }
+    }
 
   /// Constructs a SyntaxNode by replacing `self` and recursively building
   /// the parent chain up to the root.
@@ -111,7 +115,7 @@ public:
   /// at the provided index.
   /// DO NOT expose this as public API.
   RC<SyntaxData> realizeSyntaxNode(CursorIndex Index) const {
-    auto &RawChild = Raw->getChild(Index);
+    auto RawChild = Raw->Layout.at(Index);
     return SyntaxData::make(RawChild, this, Index);
   }
 
@@ -153,7 +157,7 @@ public:
 
   /// Returns the kind of syntax node this is.
   SyntaxKind getKind() const {
-    return Raw->getKind();
+    return Raw->Kind;
   }
 
   /// Return the parent syntax if there is one.
@@ -177,7 +181,7 @@ public:
 
   /// Returns the number of children this SyntaxData represents.
   size_t getNumChildren() const {
-    return Raw->getLayout().size();
+    return Raw->Layout.size();
   }
 
   /// Gets the child at the index specified by the provided cursor,
@@ -273,3 +277,4 @@ namespace llvm {
 }
 
 #endif // SWIFT_SYNTAX_SYNTAXDATA_H
+

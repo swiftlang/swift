@@ -26,7 +26,6 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
-#include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/Support/Compiler.h"
@@ -144,7 +143,7 @@ private:
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     bool Parsed = false;
-    if (isa<AccessorDecl>(AFD)) {
+    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
       TheParser.parseAccessorBodyDelayed(AFD);
       Parsed = true;
     }
@@ -296,11 +295,11 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   return Tokens;
 }
 
-std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
+std::vector<std::pair<RC<syntax::RawTokenSyntax>, syntax::AbsolutePosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
                           unsigned BufferID, unsigned Offset,
                           unsigned EndOffset) {
-  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>, syntax::AbsolutePosition>>
       Tokens;
   syntax::AbsolutePosition RunningPos;
 
@@ -311,12 +310,12 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
-        auto ThisToken = RawSyntax::make(
-            Tok.getKind(), Tok.getText(), SourcePresence::Present,
-            LeadingTrivia.Pieces, TrailingTrivia.Pieces);
+        auto ThisToken = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
+                                              SourcePresence::Present,
+                                              LeadingTrivia, TrailingTrivia);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
-        Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
+        Tokens.push_back({ThisToken, ThisTokenPos});
       });
 
   return Tokens;
@@ -468,8 +467,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags, SourceMgr,
-                                           L->getBufferID())) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags)) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());

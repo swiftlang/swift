@@ -770,7 +770,7 @@ CountableClosedRangeTestSuite.test("AssociatedTypes") {
     iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: RandomAccessSlice<Collection>.self,
     indexType: ClosedRangeIndex<MinimalStrideableValue>.self,
-    indicesType: DefaultIndices<Collection>.self)
+    indicesType: DefaultRandomAccessIndices<Collection>.self)
 }
 
 var MiscTestSuite = TestSuite("Misc")

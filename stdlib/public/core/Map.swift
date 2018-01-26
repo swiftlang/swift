@@ -276,28 +276,6 @@ extension LazyMapCollection {
   }
 }
 
-extension LazyMapSequence {
-  @_inlineable
-  public func map<ElementOfResult>(
-    _ transform: @escaping (Element) -> ElementOfResult
-  ) -> LazyMapSequence<Base, ElementOfResult> {
-    return LazyMapSequence<Base, ElementOfResult>(
-      _base: _base,
-      transform: {transform(self._transform($0))})
-  }
-}
-
-extension LazyMapCollection {
-  @_inlineable
-  public func map<ElementOfResult>(
-    _ transform: @escaping (Element) -> ElementOfResult
-  ) -> LazyMapCollection<Base, ElementOfResult> {
-    return LazyMapCollection<Base, ElementOfResult>(
-      _base: _base,
-      transform: {transform(self._transform($0))})
-  }
-}
-
 // @available(*, deprecated, renamed: "LazyMapSequence.Iterator")
 public typealias LazyMapIterator<T, E> = LazyMapSequence<T, E>.Iterator where T: Sequence
 @available(*, deprecated, renamed: "LazyMapCollection")

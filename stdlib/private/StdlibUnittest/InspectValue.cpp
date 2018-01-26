@@ -21,7 +21,7 @@ uint32_t getMetadataKindOf(
     const Metadata *type
 ) {
   auto result = uint32_t(type->getKind());
-  SWIFT_CC_PLUSONE_GUARD(type->vw_destroy(value));
+  type->vw_destroy(value);
   return result;
 }
 

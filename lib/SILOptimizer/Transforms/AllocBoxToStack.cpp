@@ -470,7 +470,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
   // at the beginning of the function.
-  SILBuilderWithScope Builder(ABI);
+  SILBuilder Builder(ABI);
+  Builder.setCurrentDebugScope(ABI->getDebugScope());
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(

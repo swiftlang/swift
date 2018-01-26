@@ -651,6 +651,14 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
   llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
+static EnumElementDecl *findEnumElement(EnumDecl *e, Identifier name) {
+  for (auto elt : e->getAllElements()) {
+    if (elt->getName() == name)
+      return elt;
+  }
+  return nullptr;
+}
+
 EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
   switch (kind) {
   case OTK_Optional:
@@ -677,27 +685,27 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!Impl.OptionalSomeDecl)
-    Impl.OptionalSomeDecl = getOptionalDecl()->getUniqueElement(/*hasVal*/true);
+    Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), Id_some);
   return Impl.OptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
-    Impl.OptionalNoneDecl =getOptionalDecl()->getUniqueElement(/*hasVal*/false);
+    Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), Id_none);
   return Impl.OptionalNoneDecl;
 }
 
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
     Impl.ImplicitlyUnwrappedOptionalSomeDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/true);
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_some);
   return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
     Impl.ImplicitlyUnwrappedOptionalNoneDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/false);
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_none);
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 

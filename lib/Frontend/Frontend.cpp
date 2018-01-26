@@ -61,16 +61,14 @@ void CompilerInstance::createSILModule() {
       Invocation.getFrontendOptions().Inputs.isWholeModule());
 }
 
-void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
-  PrimaryBufferIDs.insert(BufID);
-}
-
-void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
+void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
+  assert(SF);
   assert(MainModule && "main module not created yet");
-  PrimarySourceFiles.push_back(SF);
-  SF->setReferencedNameTracker(NameTracker);
-  if (SF->getBufferID().hasValue())
-    recordPrimaryInputBuffer(SF->getBufferID().getValue());
+  assert(!PrimarySourceFile && "already has a primary source file");
+  assert(PrimaryBufferID == NO_SUCH_BUFFER || !SF->getBufferID().hasValue() ||
+         SF->getBufferID().getValue() == PrimaryBufferID);
+  PrimarySourceFile = SF;
+  PrimarySourceFile->setReferencedNameTracker(NameTracker);
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -182,15 +180,15 @@ bool CompilerInstance::setUpInputs() {
   const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllInputs())
+       Invocation.getFrontendOptions().Inputs.getAllFiles())
     if (setUpForInput(input))
       return true;
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
-      !isPrimaryInput(*codeCompletionBufferID)) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
-    recordPrimaryInputBuffer(*codeCompletionBufferID);
+      *codeCompletionBufferID != PrimaryBufferID) {
+    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
+    PrimaryBufferID = *codeCompletionBufferID;
   }
 
   if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
@@ -216,8 +214,8 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   }
 
   if (input.isPrimary()) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
-    recordPrimaryInputBuffer(*bufferID);
+    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
+    PrimaryBufferID = *bufferID;
   }
   return false;
 }
@@ -589,7 +587,7 @@ void CompilerInstance::parseLibraryFile(
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
-  if (isPrimaryInput(BufferID)) {
+  if (BufferID == PrimaryBufferID) {
     DelayedCB = PrimaryDelayedCB;
   }
   if (isWholeModuleCompilation())
@@ -597,7 +595,7 @@ void CompilerInstance::parseLibraryFile(
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+  auto IsPrimary = isWholeModuleCompilation() || BufferID == PrimaryBufferID;
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -663,7 +661,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   SharedTimer timer(
       "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
-      (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
+      (isWholeModuleCompilation() || MainBufferID == PrimaryBufferID);
 
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
@@ -726,9 +724,7 @@ void CompilerInstance::forEachFileToTypeCheck(
   if (isWholeModuleCompilation()) {
     forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
   } else {
-    for (auto *SF : PrimarySourceFiles) {
-      fn(*SF);
-    }
+    fn(*PrimarySourceFile);
   }
 }
 
@@ -750,9 +746,8 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
       SourceFile(*mainModule, fileKind, bufferID, importKind, keepSyntaxInfo);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && isPrimaryInput(*bufferID)) {
-    recordPrimarySourceFile(inputFile);
-  }
+  if (bufferID && *bufferID == PrimaryBufferID)
+    setPrimarySourceFile(inputFile);
 
   return inputFile;
 }
@@ -818,7 +813,6 @@ void CompilerInstance::freeContextAndSIL() {
   TheSILModule.reset();
   MainModule = nullptr;
   SML = nullptr;
-  PrimaryBufferIDs.clear();
-  PrimarySourceFiles.clear();
+  PrimarySourceFile = nullptr;
 }
 

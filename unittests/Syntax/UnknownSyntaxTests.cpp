@@ -9,7 +9,6 @@ using llvm::SmallString;
 using namespace swift;
 using namespace swift::syntax;
 
-/*
 SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -171,4 +170,3 @@ TEST(UnknownSyntaxTests, EmbedUnknownStmt) {
   // TODO
 }
 
-*/

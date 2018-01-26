@@ -1455,11 +1455,6 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
-void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
-  mangleProtocolConformance(node->getChild(0));
-  Buffer << "Mc";
-}
-
 void Remangler::mangleProtocolList(Node *node, Node *superclass,
                                    bool hasExplicitAnyObject) {
   auto *protocols = getSingleChild(node, Node::Kind::TypeList);
@@ -1559,13 +1554,6 @@ void Remangler::mangleKeyPathHashThunkHelper(Node *node) {
 
 void Remangler::mangleReturnType(Node *node) {
   mangleArgumentTuple(node);
-}
-
-void Remangler::mangleRelatedEntityDeclName(Node *node) {
-  mangleChildNodes(node);
-  if (node->getText().size() != 1)
-    unreachable("cannot handle multi-byte related entities");
-  Buffer << "L" << node->getText();
 }
 
 void Remangler::mangleSILBoxType(Node *node) {

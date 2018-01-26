@@ -1081,7 +1081,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
-    let originalCapacity = d.capacity
+    let originalCapacity = d._variantBuffer.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
@@ -1089,7 +1089,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = d._rawIdentifier()
-    assert(d.capacity < originalCapacity)
+    assert(d._variantBuffer.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
@@ -1102,19 +1102,19 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
     var identity1 = d._rawIdentifier()
-    let originalCapacity = d.capacity
+    let originalCapacity = d._variantBuffer.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d.capacity == originalCapacity)
+    assert(d._variantBuffer.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d.capacity == originalCapacity)
+    assert(d._variantBuffer.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
   }
@@ -1143,7 +1143,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1.capacity
+    let originalCapacity = d1._variantBuffer.asNative.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
@@ -1154,7 +1154,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
-    assert(d2.capacity == originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[10] == nil)
 
@@ -1167,7 +1167,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
-    let originalCapacity = d.capacity
+    let originalCapacity = d._variantBuffer.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
@@ -1175,7 +1175,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = d._rawIdentifier()
-    assert(d.capacity < originalCapacity)
+    assert(d._variantBuffer.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
@@ -1188,19 +1188,19 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = d._rawIdentifier()
-    let originalCapacity = d.capacity
+    let originalCapacity = d._variantBuffer.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d.capacity == originalCapacity)
+    assert(d._variantBuffer.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d.capacity == originalCapacity)
+    assert(d._variantBuffer.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
   }
@@ -1229,7 +1229,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1.capacity
+    let originalCapacity = d1._variantBuffer.asNative.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
@@ -1240,7 +1240,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
-    assert(d2.capacity == originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestKeyTy(10)] == nil)
 
@@ -1721,29 +1721,6 @@ DictionaryTestSuite.test("mapValues(_:)") {
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
     expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
   }
-}
-
-DictionaryTestSuite.test("capacity/init(minimumCapacity:)") {
-  let d0 = Dictionary<String, Int>(minimumCapacity: 0)
-  expectGE(d0.capacity, 0)
-
-  let d1 = Dictionary<String, Int>(minimumCapacity: 1)
-  expectGE(d1.capacity, 1)
-
-  let d3 = Dictionary<String, Int>(minimumCapacity: 3)
-  expectGE(d3.capacity, 3)
-
-  let d4 = Dictionary<String, Int>(minimumCapacity: 4)
-  expectGE(d4.capacity, 4)
-
-  let d10 = Dictionary<String, Int>(minimumCapacity: 10)
-  expectGE(d10.capacity, 10)
-
-  let d100 = Dictionary<String, Int>(minimumCapacity: 100)
-  expectGE(d100.capacity, 100)
-
-  let d1024 = Dictionary<String, Int>(minimumCapacity: 1024)
-  expectGE(d1024.capacity, 1024)
 }
 
 DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
@@ -2335,12 +2312,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
 
   // Insert a new key-value pair.
   d[TestBridgedKeyTy(40)] = TestBridgedValueTy(2040)
-
   var identity2 = d._rawIdentifier()
-  // Storage identity may or may not change depending on allocation behavior.
-  // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
-  //assert(identity1 != identity2)
-
+  assert(identity1 != identity2)
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
@@ -2428,9 +2401,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
     assert(oldValue == nil)
     var identity2 = d._rawIdentifier()
-    // Storage identity may or may not change depending on allocation behavior.
-    // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
-    //assert(identity1 != identity2)
+    assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
 
@@ -2644,7 +2615,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d.capacity < originalCapacity)
+    assert(d._variantBuffer.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2659,7 +2630,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 != d._rawIdentifier())
-    assert(d.capacity >= originalCapacity)
+    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2679,7 +2650,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2.capacity < originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2699,7 +2670,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2.capacity >= originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2727,7 +2698,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d.capacity < originalCapacity)
+    assert(d._variantBuffer.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2742,7 +2713,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d.capacity >= originalCapacity)
+    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2762,7 +2733,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2.capacity < originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2782,7 +2753,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2.capacity >= originalCapacity)
+    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }

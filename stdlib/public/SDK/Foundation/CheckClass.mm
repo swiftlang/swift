@@ -59,9 +59,9 @@ namespace {
     template <size_t N>
     StringRefLite(const char (&staticStr)[N]) : data(staticStr), length(N) {}
 
-    StringRefLite(swift::TwoWordPair<const char *, uintptr_t>::Return rawValue)
-        : data(swift::TwoWordPair<const char *, uintptr_t>(rawValue).first),
-          length(swift::TwoWordPair<const char *, uintptr_t>(rawValue).second){}
+    StringRefLite(swift::TypeNamePair rawValue)
+        : data(rawValue.data),
+          length(rawValue.length){}
 
     NS_RETURNS_RETAINED
     NSString *newNSStringNoCopy() const {

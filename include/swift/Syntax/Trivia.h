@@ -233,12 +233,6 @@ public:
   /// Return kind of the trivia.
   TriviaKind getKind() const { return Kind; }
 
-  /// Return the text of the trivia.
-  StringRef getText() const { return Text.str(); }
-
-  /// Return the text of the trivia.
-  unsigned getCount() const { return Count; }
-
   /// Return textual length of the trivia.
   size_t getTextLength() const {
     switch (Kind) {

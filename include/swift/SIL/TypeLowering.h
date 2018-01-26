@@ -257,27 +257,14 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  /// When using "Lowered" APIs on a type lowering, how far should type lowering
-  /// expand a type into its subtypes when emitting an operation.
-  ///
-  /// If we emit operations on a subtype of the type, we expand the type into
-  /// the subtypes and perform the requested operation at that level of the
-  /// type tree.
-  enum class TypeExpansionKind {
-    None,           ///> Emit operations on the actual value.
-    DirectChildren, ///> Expand the value into its direct children and place
-                    ///> operations on the children.
-    MostDerivedDescendents, ///> Expand the value into its most derived
-                            ///> substypes and perform operations on these
-                            ///> types.
-  };
+  enum class LoweringStyle { Shallow, Deep };
 
   /// Given the result of the expansion heuristic,
   /// return appropriate lowering style.
-  static TypeExpansionKind getLoweringStyle(bool shouldExpand) {
+  static LoweringStyle getLoweringStyle(bool shouldExpand) {
     if (shouldExpand)
-      return TypeLowering::TypeExpansionKind::MostDerivedDescendents;
-    return TypeLowering::TypeExpansionKind::DirectChildren;
+      return TypeLowering::LoweringStyle::Deep;
+    return TypeLowering::LoweringStyle::Shallow;
   }
 
   //===--------------------------------------------------------------------===//
@@ -287,39 +274,32 @@ public:
   /// Emit a lowered destroy value operation.
   ///
   /// This type must be loadable.
-  virtual void
-  emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                          TypeExpansionKind loweringStyle) const = 0;
+  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+                                       SILValue value,
+                                       LoweringStyle loweringStyle) const = 0;
 
   void emitLoweredDestroyChildValue(SILBuilder &B, SILLocation loc,
                                     SILValue value,
-                                    TypeExpansionKind loweringStyle) const {
-    switch (loweringStyle) {
-    case TypeExpansionKind::None:
-      llvm_unreachable("This does not apply to children of aggregate types");
-    case TypeExpansionKind::DirectChildren:
-      return emitDestroyValue(B, loc, value);
-    case TypeExpansionKind::MostDerivedDescendents:
-      return emitLoweredDestroyValueMostDerivedDescendents(B, loc, value);
-    }
+                                    LoweringStyle loweringStyle) const {
+    if (loweringStyle != LoweringStyle::Shallow)
+      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
+    return emitDestroyValue(B, loc, value);
   }
 
   /// Emit a lowered destroy value operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueDirectChildren(SILBuilder &B, SILLocation loc,
-                                             SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, TypeExpansionKind::DirectChildren);
+  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
+                                      SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered destroy_value operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueMostDerivedDescendents(SILBuilder &B,
-                                                     SILLocation loc,
-                                                     SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value,
-                            TypeExpansionKind::MostDerivedDescendents);
+  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
+                                   SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -342,25 +322,22 @@ public:
   /// This type must be loadable.
   virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                         SILValue value,
-                                        TypeExpansionKind style) const = 0;
+                                        LoweringStyle style) const = 0;
 
   /// Emit a lowered copy value operation.
   ///
   /// This type must be loadable.
-  SILValue emitLoweredCopyValueDirectChildren(SILBuilder &B, SILLocation loc,
-                                              SILValue value) const {
-    return emitLoweredCopyValue(B, loc, value,
-                                TypeExpansionKind::DirectChildren);
+  SILValue emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
+                                       SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered copy value operation.
   ///
   /// This type must be loadable.
-  SILValue emitLoweredCopyValueMostDerivedDescendents(SILBuilder &B,
-                                                      SILLocation loc,
-                                                      SILValue value) const {
-    return emitLoweredCopyValue(B, loc, value,
-                                TypeExpansionKind::MostDerivedDescendents);
+  SILValue emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+                                    SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -376,14 +353,11 @@ public:
 
   SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
                                      SILValue value,
-                                     TypeExpansionKind style) const {
-    switch (style) {
-    case TypeExpansionKind::None:
-      llvm_unreachable("This does not apply to children of aggregate");
-    case TypeExpansionKind::DirectChildren:
+                                     LoweringStyle style) const {
+    if (style != LoweringStyle::Shallow) {
+      return emitLoweredCopyValue(B, loc, value, style);
+    } else {
       return emitCopyValue(B, loc, value);
-    case TypeExpansionKind::MostDerivedDescendents:
-      return emitLoweredCopyValueMostDerivedDescendents(B, loc, value);
     }
   }
 

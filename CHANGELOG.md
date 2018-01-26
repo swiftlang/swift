@@ -6,7 +6,6 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
-| [Swift 5.0](#swift-50) |
 | [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
@@ -20,35 +19,8 @@ CHANGELOG
 
 </details>
 
-Swift 5.0
----------
-
-* C macros containing casts are no longer imported to Swift if the type in the
-  cast is unavailable or deprecated, or produces some other diagnostic when
-  referenced. (These macros were already only imported under very limited
-  circumstances with very simple values, so this is unlikely to affect
-  real-world code.)
-
-
 Swift 4.1
 ---------
-
-* [SE-0189][]
-
-  If an initializer is declared in a different module from a struct, it must
-  use `self.init(…)` or `self = …` before returning or accessing `self`.
-  Failure to do so will produce a warning in Swift 4 and an error in Swift 5.
-  This is to keep a client app from accidentally depending on a library's
-  implementation details, and matches an existing restriction for classes,
-  where cross-module initializers must be convenience initializers.
-
-  This will most commonly affect code that extends a struct imported from C.
-  However, most imported C structs are given a zeroing no-argument initializer,
-  which can be called as `self.init()` before modifying specific properties.
-
-  Swift library authors who wish to continue allowing initialization on a
-  per-member basis should explicitly declare a public memberwise initializer
-  for clients in other modules to use.
 
 * [SE-0166][] / [SE-0143][]
 

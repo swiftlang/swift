@@ -43,9 +43,7 @@ enum class ActionType {
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
-  ParseOnly,
   ParserGen,
-  EOFPos,
   None
 };
 
@@ -67,9 +65,6 @@ Action(llvm::cl::desc("Action (required):"),
                    "round-trip-parse",
                    "Parse the source file and print it back out for "
                    "comparing against the input"),
-        clEnumValN(ActionType::ParseOnly,
-                   "parse-only",
-                   "Parse the source file with syntax nodes and exit"),
         clEnumValN(ActionType::ParserGen,
                    "parse-gen",
                    "Parse the source file and print it back out for "
@@ -77,12 +72,7 @@ Action(llvm::cl::desc("Action (required):"),
         clEnumValN(ActionType::SerializeRawTree,
                    "serialize-raw-tree",
                    "Parse the source file and serialize the raw tree"
-                   "to JSON"),
-        clEnumValN(ActionType::EOFPos,
-                   "eof",
-                   "Parse the source file, calculate the absolute position"
-                   "of the EOF token, and dump the buffer from the start of the"
-                   "file to the EOF token")));
+                   "to JSON")));
 
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
@@ -112,7 +102,7 @@ int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
                       DiagnosticEngine &Diags,
-                      std::vector<std::pair<RC<syntax::RawSyntax>,
+                      std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
   Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -124,7 +114,7 @@ getTokensFromFile(const StringRef InputFilename,
                   LangOptions &LangOpts,
                   SourceManager &SourceMgr,
                   DiagnosticEngine &Diags,
-                  std::vector<std::pair<RC<syntax::RawSyntax>,
+                  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                         syntax::AbsolutePosition>> &Tokens) {
   auto Buffer = llvm::MemoryBuffer::getFile(InputFilename);
   if (!Buffer) {
@@ -145,7 +135,6 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
-  Invocation.getLangOptions().VerifySyntaxTree = true;
   Invocation.getFrontendOptions().Inputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
@@ -179,7 +168,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                    syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -187,7 +176,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   }
 
   for (auto TokAndPos : Tokens) {
-    TokAndPos.first->print(llvm::outs(), {});
+    TokAndPos.first->print(llvm::outs());
   }
 
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -200,7 +189,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -238,13 +227,6 @@ int doSerializeRawTree(const char *MainExecutablePath,
   return EXIT_SUCCESS;
 }
 
-int doParseOnly(const char *MainExecutablePath,
-                  const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  return SF ? EXIT_SUCCESS : EXIT_FAILURE;
-}
-
 int dumpParserGen(const char *MainExecutablePath,
                   const StringRef InputFileName) {
   CompilerInstance Instance;
@@ -257,27 +239,6 @@ int dumpParserGen(const char *MainExecutablePath,
   return 0;
 }
 
-int dumpEOFSourceLoc(const char *MainExecutablePath,
-                     const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  auto BufferId = *SF->getBufferID();
-  SyntaxPrintOptions Opts;
-  auto Root = SF->getSyntaxRoot();
-  auto AbPos = Root.getEOFToken().getAbsolutePosition();
-
-  SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
-  auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
-  auto EndLoc = SourceMgr.getLocForOffset(BufferId, AbPos.getOffset());
-
-  // To ensure the correctness of position when translated to line & column pair.
-  if (SourceMgr.getLineAndColumn(EndLoc) != AbPos.getLineAndColumn()) {
-    llvm::outs() << "locations should be identical";
-    return EXIT_FAILURE;
-  }
-  llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
-  return 0;
-}
 }// end of anonymous namespace
 
 int main(int argc, char *argv[]) {
@@ -308,14 +269,8 @@ int main(int argc, char *argv[]) {
   case ActionType::SerializeRawTree:
     ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
     break;
-  case ActionType::ParseOnly:
-    ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
-    break;
   case ActionType::ParserGen:
     ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::EOFPos:
-    ExitCode = dumpEOFSourceLoc(argv[0], options::InputSourceFilename);
     break;
   case ActionType::None:
     llvm::errs() << "an action is required\n";

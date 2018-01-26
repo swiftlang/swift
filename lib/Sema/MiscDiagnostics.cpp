@@ -241,14 +241,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         });
       }
 
-      if (auto *AE = dyn_cast<CollectionExpr>(E)) {
-        visitCollectionElements(AE, [&](unsigned argIndex, Expr *arg) {
-          arg = lookThroughArgument(arg);
-          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-            checkNoEscapeParameterUse(DRE, AE, OperandKind::Argument);
-        });
-      }
-
       // Check decl refs in withoutActuallyEscaping blocks.
       if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
         if (auto DRE =
@@ -423,13 +415,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                llvm::function_ref<void(unsigned, Expr*)> fn) {
       auto *arg = apply->getArg();
       argExprVisitArguments(arg, fn);
-    }
-
-    static void visitCollectionElements(CollectionExpr *collection,
-                               llvm::function_ref<void(unsigned, Expr*)> fn) {
-      auto elts = collection->getElements();
-      for (auto i : indices(elts))
-        fn(i, elts[i]);
     }
 
     static Expr *lookThroughArgument(Expr *arg) {
@@ -2369,29 +2354,6 @@ public:
             StmtConditionForVD[VD] = LCS;
           });
         }
-    }
-    
-    // A fallthrough dest case's bound variable means the source case's
-    // var of the same name is read.
-    if (auto *fallthroughStmt = dyn_cast<FallthroughStmt>(S)) {
-      if (auto *sourceCase = fallthroughStmt->getFallthroughSource()) {
-        SmallVector<VarDecl *, 4> sourceVars;
-        auto sourcePattern = sourceCase->getCaseLabelItems()[0].getPattern();
-        sourcePattern->collectVariables(sourceVars);
-        
-        auto destCase = fallthroughStmt->getFallthroughDest();
-        auto destPattern = destCase->getCaseLabelItems()[0].getPattern();
-        destPattern->forEachVariable([&](VarDecl *V) {
-          if (!V->hasName())
-            return;
-          for (auto *var : sourceVars) {
-            if (var->hasName() && var->getName() == V->getName()) {
-              VarDecls[var] |= RK_Read;
-              break;
-            }
-          }
-        });
-      }
     }
       
     return { true, S };

@@ -12,34 +12,34 @@ public protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
+
+// CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK-SAME:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
+// CHECK:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
 // -- nominal type descriptor
-// CHECK-SAME:           @"$SSo6NSRectVMn"
+// CHECK:           @"$SSo6NSRectVMn"
 // -- witness table
-// CHECK-SAME:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
-// -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
+// -- reserved
+// CHECK:           i32 0
+// CHECK:         },
 extension NSRect: Runcible {
   public func runce() {}
 }
 
-// CHECK-LABEL:         @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
+// CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK-SAME:           [[RUNCIBLE]]
-// -- class object reference
-// CHECK-SAME:           @"got.OBJC_CLASS_$_Gizmo"
+// CHECK:           [[RUNCIBLE]]
+// -- class object reference + 0x03 (class object reference, TODO: indirect me)
+// CHECK:           i32 add
+// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
+// CHECK:           i32 3
 // -- witness table
-// CHECK-SAME:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
-// -- flags
-// CHECK-SAME:           i32 24
-// CHECK-SAME:         }
+// CHECK:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
+// -- reserved
+// CHECK:           i32 0
+// CHECK:         }
 extension Gizmo: Runcible {
   public func runce() {}
 }
-
-// CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
-// CHECK-SAME: @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc"
-// CHECK-SAME: @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc"

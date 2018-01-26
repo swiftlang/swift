@@ -747,7 +747,6 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
 
   // Then use a string switch to try and parse the identifier.
   Result = llvm::StringSwitch<Optional<SILLinkage>>(P.Tok.getText())
-    .Case("non_abi", SILLinkage::PublicNonABI)
     .Case("hidden", SILLinkage::Hidden)
     .Case("shared", SILLinkage::Shared)
     .Case("public_external", SILLinkage::PublicExternal)
@@ -1310,6 +1309,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         ParseState = 1;
       } else if (!ParseState && Id.str() == "globalaccessor") {
         Kind = SILDeclRef::Kind::GlobalAccessor;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "globalgetter") {
+        Kind = SILDeclRef::Kind::GlobalGetter;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "ivardestroyer") {
         Kind = SILDeclRef::Kind::IVarDestroyer;

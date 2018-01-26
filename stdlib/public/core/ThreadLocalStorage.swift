@@ -80,17 +80,30 @@ internal struct _ThreadLocalStorage {
     return _initializeThreadLocalStorage()
   }
 
+  // Retrieve our thread's local uBreakIterator and set it up for the given
+  // StringCore.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   static internal func getUBreakIterator(
-    start: UnsafePointer<UTF16.CodeUnit>,
-    count: Int32
+    for core: _StringCore
+  ) -> OpaquePointer {
+    _sanityCheck(core._owner != nil || core._baseAddress != nil,
+      "invalid StringCore")
+    let corePtr: UnsafeMutablePointer<UTF16.CodeUnit> = core.startUTF16
+    return getUBreakIterator(
+      for: UnsafeBufferPointer(start: corePtr, count: core.count))
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  static internal func getUBreakIterator(
+    for bufPtr: UnsafeBufferPointer<UTF16.CodeUnit>
   ) -> OpaquePointer {
     let tlsPtr = getPointer()
     let brkIter = tlsPtr[0].uBreakIterator
 
     var err = __swift_stdlib_U_ZERO_ERROR
-    __swift_stdlib_ubrk_setText(brkIter, start, count, &err)
+    __swift_stdlib_ubrk_setText(
+      brkIter, bufPtr.baseAddress!, Int32(bufPtr.count), &err)
     _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
 
     return brkIter

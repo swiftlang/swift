@@ -13,10 +13,8 @@
 #ifndef SWIFT_BASIC_STATISTIC_H
 #define SWIFT_BASIC_STATISTIC_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
-#include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Timer.h"
 
@@ -49,16 +47,7 @@
 // Generally we make one of these per-process: either early in the life of the
 // driver, or early in the life of the frontend.
 
-namespace clang {
-  class Decl;
-  class SourceManager;
-}
-
 namespace swift {
-
-class Decl;
-class Expr;
-class SILFunction;
 
 class UnifiedStatsReporter {
 
@@ -86,19 +75,14 @@ public:
     int dummyInstanceVariableToGetConstructorToParse;
   };
 
-  typedef llvm::PointerUnion4<const Decl*,
-                              const clang::Decl*,
-                              const Expr*,
-                              const SILFunction*> TraceEntity;
-
   struct FrontendStatsTracer
   {
     UnifiedStatsReporter *Reporter;
     llvm::TimeRecord SavedTime;
-    StringRef EventName;
-    TraceEntity Entity;
-    FrontendStatsTracer(StringRef EventName,
-                        TraceEntity Entity,
+    StringRef Name;
+    SourceRange Range;
+    FrontendStatsTracer(StringRef Name,
+                        SourceRange const &Range,
                         UnifiedStatsReporter *Reporter);
     FrontendStatsTracer();
     FrontendStatsTracer(FrontendStatsTracer&& other);
@@ -117,7 +101,7 @@ public:
     StringRef CounterName;
     size_t CounterDelta;
     size_t CounterValue;
-    TraceEntity Entity;
+    SourceRange SourceRange;
   };
 
 private:
@@ -128,7 +112,6 @@ private:
   llvm::TimeRecord StartedTime;
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
   SourceManager *SourceMgr;
-  clang::SourceManager *ClangSourceMgr;
   std::unique_ptr<AlwaysOnDriverCounters> DriverCounters;
   std::unique_ptr<AlwaysOnFrontendCounters> FrontendCounters;
   std::unique_ptr<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
@@ -143,7 +126,6 @@ private:
                        StringRef AuxName,
                        StringRef Directory,
                        SourceManager *SM,
-                       clang::SourceManager *CSM,
                        bool TraceEvents);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
@@ -154,7 +136,6 @@ public:
                        StringRef OptType,
                        StringRef Directory,
                        SourceManager *SM=nullptr,
-                       clang::SourceManager *CSM=nullptr,
                        bool TraceEvents=false);
   ~UnifiedStatsReporter();
 
@@ -162,14 +143,10 @@ public:
   AlwaysOnFrontendCounters &getFrontendCounters();
   AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   void noteCurrentProcessExitStatus(int);
-  // We provide 4 explicit overloads here, rather than a single function that
-  // takes a TraceEntity, to save all of our clients from having to include all
-  // 4 headers that define these 4 forward-declared types.
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Decl *D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const clang::Decl*D);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const Expr *E);
-  FrontendStatsTracer getStatsTracer(StringRef EventName, const SILFunction *F);
-  void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
+  FrontendStatsTracer getStatsTracer(StringRef N,
+                                     SourceRange const &R);
+  void saveAnyFrontendStatsEvents(FrontendStatsTracer const& T,
+                                  bool IsEntry);
 };
 
 }

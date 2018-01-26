@@ -10,9 +10,6 @@
 
 public typealias Zahl = Int
 
-// CHECK: typealias List
-// CHECK: typealias Zahl
-
 // CHECK-LABEL: extension Int {
 extension Zahl {
   // CHECK-NEXT: addedMember()
@@ -32,6 +29,9 @@ extension List where Element == Int {
   // CHECK-NEXT: addedMemberInt()
   public func addedMemberInt() {}
 } // CHECK-NEXT: {{^}$}}
+
+// CHECK: typealias List
+// CHECK: typealias Zahl
 
 #else
 

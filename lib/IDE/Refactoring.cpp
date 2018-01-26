@@ -1684,25 +1684,16 @@ bool RefactoringActionCollapseNestedIfExpr::performChange() {
 }
 
 static std::unique_ptr<llvm::SetVector<Expr*>>
-findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
-  Expr *E = nullptr;
-
-  switch (Info.Kind) {
-  case RangeKind::SingleExpression:
-    // FIXME: the range info kind should imply non-empty list.
-    if (!Info.ContainedNodes.empty())
-      E = Info.ContainedNodes[0].get<Expr*>();
-    else
-      return nullptr;
-    break;
-  case RangeKind::PartOfExpression:
-    E = Info.CommonExprParent;
-    break;
-  default:
+  findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
+  if (Info.Kind != RangeKind::SingleExpression
+      && Info.Kind != RangeKind::PartOfExpression)
     return nullptr;
-  }
 
-  assert(E);
+  // FIXME: We should always have a valid node.
+  if (Info.ContainedNodes.empty())
+    return nullptr;
+
+  Expr *E = Info.ContainedNodes[0].get<Expr*>();
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
     std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
@@ -1725,9 +1716,6 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
 
     bool walkToExprPre(Expr *E) {
       if (E->isImplicit())
-        return true;
-      // FIXME: we should have ErrorType instead of null.
-      if (E->getType().isNull())
         return true;
       auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
       //Only binary concatenation operators should exist in expression

@@ -19,7 +19,11 @@
 
 namespace swift {
 enum class tok {
-#define TOKEN(X) X,
+#define LITERAL(X) X,
+#define MISC(X) X,
+#define KEYWORD(X) kw_ ## X,
+#define PUNCTUATOR(X, Y) X,
+#define POUND_KEYWORD(X) pound_ ## X,
 #include "swift/Syntax/TokenKinds.def"
 
   NUM_TOKENS

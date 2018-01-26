@@ -24,6 +24,7 @@ import StdlibUnittest
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
+    defaultIndicesForTraversal,
 )
 
 }%

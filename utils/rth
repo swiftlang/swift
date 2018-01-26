@@ -70,12 +70,9 @@ class ResilienceTest(object):
             for emit_flag in ['-emit-library', '-emit-module']:
                 output_obj = os.path.join(self.config_dir_map[config],
                                           self.lib_obj_name)
-                compiler_flags = [emit_flag,
-                                  '-swift-version', '4',
-                                  '-Xfrontend', '-enable-resilience',
-                                  '-D', config,
-                                  '-c', self.lib_src,
-                                  '-o', output_obj]
+                compiler_flags = [emit_flag, '-Xfrontend',
+                                  '-enable-resilience', '-D', config, '-c',
+                                  self.lib_src, '-o', output_obj]
                 command = self.target_build_swift + \
                     self.additional_compile_flags_library + compiler_flags
                 verbose_print_command(command)

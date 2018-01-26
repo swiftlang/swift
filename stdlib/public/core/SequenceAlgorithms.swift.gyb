@@ -783,8 +783,7 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   @inline(__always)
-  @available(*, deprecated, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
+  @available(*, deprecated, renamed: "compactMap(_:)")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {

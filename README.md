@@ -4,7 +4,7 @@
 
 | | **Swift** | **Package** |
 |---|:---:|:---:|
-|**macOS**        |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
+|**macOS**         |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 |**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
 |**Ubuntu 16.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 |**Ubuntu 16.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10)|
@@ -210,19 +210,17 @@ See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](do
 
 ## Learning More
 
-Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
-directory for more information about the compiler. In particular, the documents
-titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.rst) and
-[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
-helpful to understand before submitting your first PR.
+Be sure to look through the [docs/] docs directory for more information about the
+compiler. In particular, the document on [Debugging The Compiler](docs/DebuggingTheCompiler.rst),
+and [Continuous Integration.md](docs/ContinuousIntegration.md) are very helpful
+to understand before submitting your first PR.
 
 ### Building Documentation
 
 To read the compiler documentation, start by installing the
-[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
-command:
+[Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
 
-    easy_install -U Sphinx
+`easy_install -U Sphinx`
 
 Once complete, you can build the Swift documentation by changing directory into
 [docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This

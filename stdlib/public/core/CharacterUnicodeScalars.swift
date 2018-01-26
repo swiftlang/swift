@@ -110,7 +110,7 @@ extension Character.UnicodeScalarView : Collection {
   @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return Index(
-        _encodedOffset: _base._count,
+        _encodedOffset: _base._smallUTF16?.count ?? _base._largeUTF16!.count,
         _scalar: Unicode.UTF16.EncodedScalar(),
         _stride: 0
       )
@@ -129,9 +129,7 @@ extension Character.UnicodeScalarView : Collection {
       r = parser.parseScalar(from: &i)
     }
     else {
-      let c = _base._largeUTF16!.unmanagedView
-      var i = c[c.index(c.startIndex, offsetBy: startOfNextScalar)...]
-        .makeIterator()
+      var i = _base._largeUTF16![startOfNextScalar...].makeIterator()
       r = parser.parseScalar(from: &i)
     }
     
@@ -170,9 +168,7 @@ extension Character.UnicodeScalarView : BidirectionalCollection {
       r = parser.parseScalar(from: &i)
     }
     else {
-      let c = _base._largeUTF16!.unmanagedView
-      var i = c[..<c.index(c.startIndex, offsetBy: i._encodedOffset)]
-        .reversed().makeIterator()
+      var i = _base._largeUTF16![..<i._encodedOffset].reversed().makeIterator()
       r = parser.parseScalar(from: &i)
     }
     

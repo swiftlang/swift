@@ -46,7 +46,7 @@ import SwiftShims
 //      |
 //      V  _RawNativeDictionaryStorage (a class)  
 //   +-----------------------------------------------------------+
-//   | bucketCount                                               |
+//   | capacity                                                  |
 //   | count                                                     |
 //   | ptrToBits                                                 |
 //   | ptrToKeys                                                 |
@@ -1751,7 +1751,8 @@ public struct Dictionary<Key : Hashable, Value> {
   ///   allocate buffer for in the new dictionary.
   @_inlineable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
-    _variantBuffer = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
+    _variantBuffer =
+      .native(_NativeBuffer(minimumCapacity: minimumCapacity))
   }
 
   /// Creates a new dictionary from the key-value pairs in the given sequence.
@@ -3141,7 +3142,7 @@ collections = [
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@_objc_non_lazy_realization
+@objc_non_lazy_realization
 internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
@@ -3149,7 +3150,7 @@ internal class _RawNative${Self}Storage:
 
   @_versioned // FIXME(sil-serialize-all)
   @nonobjc
-  internal final var bucketCount: Int
+  internal final var capacity: Int
 
   @_versioned // FIXME(sil-serialize-all)
   internal final var count: Int
@@ -3317,7 +3318,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 %end
 
     if !_isPOD(Key.self) {
-      for i in 0 ..< bucketCount {
+      for i in 0 ..< capacity {
         if initializedEntries[i] {
           (keys+i).deinitialize(count: 1)
         }
@@ -3326,7 +3327,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 
 %if Self == 'Dictionary':
     if !_isPOD(Value.self) {
-      for i in 0 ..< bucketCount {
+      for i in 0 ..< capacity {
         if initializedEntries[i] {
           (values+i).deinitialize(count: 1)
         }
@@ -3573,51 +3574,51 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   internal var _storage: RawStorage
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
-  /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
+  /// Hashing. Mostly for bridging; prefer `init(capacity:)`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, unhashable: ()) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
+  internal init(capacity: Int, unhashable: ()) {
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
     let storage = Builtin.allocWithTailElems_3(TypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self,
-        bucketCount._builtinWordValue, Value.self)
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self,
+        capacity._builtinWordValue, Value.self)
 %else:
     let storage = Builtin.allocWithTailElems_2(TypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self)
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self)
 %end
-    self.init(_exactBucketCount: bucketCount, storage: storage)
+    self.init(capacity: capacity, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized RawStorage, completes the
-  /// initialization and returns a Buffer.
+  /// Given a capacity and uninitialized RawStorage, completes the 
+  /// initialization and returns a Buffer.  
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, storage: RawStorage) {
-    storage.bucketCount = bucketCount
+  internal init(capacity: Int, storage: RawStorage) {
+    storage.capacity = capacity
     storage.count = 0
-
+    
     self.init(_storage: storage)
 
     let initializedEntries = _UnsafeBitMap(
         storage: _initializedHashtableEntriesBitMapBuffer,
-        bitCount: bucketCount)
+        bitCount: capacity)
     initializedEntries.initializeToZero()
 
     // Compute all the array offsets now, so we don't have to later
     let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
     let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
-           bitmapWordCount._builtinWordValue, UInt.self, Key.self)
+           numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
 
     // Initialize header
     _storage.initializedEntries = initializedEntries
     _storage.keys = UnsafeMutableRawPointer(keysAddr)
 %if Self == 'Dictionary':
     let valuesAddr = Builtin.getTailAddr_Word(keysAddr,
-        bucketCount._builtinWordValue, Key.self, Value.self)
+        capacity._builtinWordValue, Key.self, Value.self)
     _storage.values = UnsafeMutableRawPointer(valuesAddr)
 %end
   }
@@ -3626,8 +3627,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var bucketCount: Int {
-    return _assumeNonNegative(_storage.bucketCount)
+  internal var capacity: Int {
+    return _assumeNonNegative(_storage.capacity)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -3687,7 +3688,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_versioned
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _sanityCheck(i >= 0 && i < bucketCount)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -3720,7 +3721,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _sanityCheck(i >= 0 && i < bucketCount)
+    _sanityCheck(i >= 0 && i < capacity)
     defer { _fixLifetime(self) }
 
     return _storage.initializedEntries[i]
@@ -3776,7 +3777,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func setKey(_ key: Key, at i: Int) {
-    _sanityCheck(i >= 0 && i < bucketCount)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -3843,7 +3844,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var endIndex: Index {
-    return Index(offset: bucketCount)
+    return Index(offset: capacity)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -3851,7 +3852,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   internal func index(after i: Index) -> Index {
     _precondition(i != endIndex)
     var idx = i.offset + 1
-    while idx < bucketCount && !isInitializedEntry(at: idx) {
+    while idx < capacity && !isInitializedEntry(at: idx) {
       idx += 1
     }
 
@@ -3868,7 +3869,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func assertingGet(_ i: Index) -> SequenceElement {
-    _precondition(i.offset >= 0 && i.offset < bucketCount)
+    _precondition(i.offset >= 0 && i.offset < capacity)
     _precondition(
       isInitializedEntry(at: i.offset),
       "Attempting to access ${Self} elements using an invalid Index")
@@ -3893,43 +3894,32 @@ extension _Native${Self}Buffer
   @_versioned // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(minimumCapacity: Int) {
-    let bucketCount = _Native${Self}Buffer.bucketCount(
-      forCapacity: minimumCapacity,
-      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    self.init(bucketCount: bucketCount)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal init(bucketCount: Int) {
-    // Actual bucket count is the next power of 2 >= bucketCount.
-    // Make sure that is representable.
-    _sanityCheck(bucketCount <= (Int.max >> 1) + 1)
-    var buckets = 2
-    while buckets < bucketCount {
-      buckets <<= 1
+    // Make sure there's a representable power of 2 >= minimumCapacity
+    _sanityCheck(minimumCapacity <= (Int.max >> 1) + 1)
+    var capacity = 2
+    while capacity < minimumCapacity {
+      capacity <<= 1
     }
-    self.init(_exactBucketCount: buckets)
+    self.init(capacity: capacity)
   }
 
-  /// Create a buffer instance with room for at least 'bucketCount' entries,
-  /// marking all entries invalid.
+  /// Create a buffer instance with room for at least 'capacity'
+  /// entries and all entries marked invalid.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
+  internal init(capacity: Int) {
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
     let storage = Builtin.allocWithTailElems_3(HashTypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self,
-        bucketCount._builtinWordValue, Value.self)
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self,
+        capacity._builtinWordValue, Value.self)
 %else:
     let storage = Builtin.allocWithTailElems_2(HashTypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self)
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self)
 %end
-    self.init(_exactBucketCount: bucketCount, storage: storage)
+    self.init(capacity: capacity, storage: storage)
   }
 
 #if _runtime(_ObjC)
@@ -3963,7 +3953,7 @@ extension _Native${Self}Buffer
   internal var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
-    for i in 0..<bucketCount {
+    for i in 0..<capacity {
       if isInitializedEntry(at: i) {
         let key = self.key(at: i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
@@ -3978,22 +3968,21 @@ extension _Native${Self}Buffer
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _bucketMask: Int {
-    // The bucket count is not negative, therefore subtracting 1 will not
-    // overflow.
-    return bucketCount &- 1
+    // The capacity is not negative, therefore subtracting 1 will not overflow.
+    return capacity &- 1
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, bucketCount)
+    return _squeezeHashValue(k.hashValue, capacity)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func _index(after bucket: Int) -> Int {
-    // Bucket is within 0 and bucketCount. Therefore adding 1 does not overflow.
+    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
@@ -4033,13 +4022,13 @@ extension _Native${Self}Buffer
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @_transparent
-  internal static func bucketCount(
-    forCapacity capacity: Int,
+  internal static func minimumCapacity(
+    minimumCount: Int,
     maxLoadFactorInverse: Double
   ) -> Int {
-    // `capacity + 1` below ensures that we don't fill in the last hole
-    return max(Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
-               capacity + 1)
+    // `minimumCount + 1` below ensures that we don't fill in the last hole
+    return max(Int(Double(minimumCount) * maxLoadFactorInverse),
+               minimumCount + 1)
   }
 
   /// Buffer should be uniquely referenced.
@@ -4169,7 +4158,11 @@ extension _Native${Self}Buffer
       return Buffer()
     }
 
-    var nativeBuffer = Buffer(minimumCapacity: elements.count)
+    let requiredCapacity =
+      Buffer.minimumCapacity(
+        minimumCount: elements.count,
+        maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+    var nativeBuffer = Buffer(minimumCapacity: requiredCapacity)
 
 %if Self == 'Set':
 
@@ -4308,8 +4301,8 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @nonobjc
-  internal init(bucketCount: Int = 2) {
-    nativeBuffer = NativeBuffer(bucketCount: bucketCount)
+  internal init(minimumCapacity: Int = 2) {
+    nativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
     super.init()
   }
 
@@ -4421,9 +4414,9 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
      UnsafeMutablePointer<UInt8>) -> Void) {
     bridgeEverything()
-    let bucketCount = nativeBuffer.bucketCount
+    let capacity = nativeBuffer.capacity
     var stop: UInt8 = 0
-    for position in 0..<bucketCount {
+    for position in 0..<capacity {
       if bridgedBuffer.isInitializedEntry(at: position) {
         block(Unmanaged.passUnretained(bridgedBuffer.key(at: position)), 
           Unmanaged.passUnretained(bridgedBuffer.value(at: position)), 
@@ -4488,12 +4481,10 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     // Investigate only allocating the buffer for a Set in this case.
 
     // Create buffer for bridged data.
-    let bridged = BridgedBuffer(
-      _exactBucketCount: nativeBuffer.bucketCount,
-      unhashable: ())
+    let bridged = BridgedBuffer(capacity: nativeBuffer.capacity, unhashable: ())
 
     // Bridge everything.
-    for i in 0..<nativeBuffer.bucketCount {
+    for i in 0..<nativeBuffer.capacity {
       if nativeBuffer.isInitializedEntry(at: i) {
         let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
 %if Self == 'Set':
@@ -4521,12 +4512,12 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     bridgeEverything()
     // The user is expected to provide a storage of the correct size
     var i = 0 // Position in the input storage
-    let bucketCount = nativeBuffer.bucketCount
+    let capacity = nativeBuffer.capacity
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
-        for position in 0..<bucketCount {
+        for position in 0..<capacity {
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
@@ -4535,7 +4526,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
         }
       } else {
         // keys nonnull, objects null
-        for position in 0..<bucketCount {
+        for position in 0..<capacity {
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
@@ -4545,7 +4536,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
-        for position in 0..<bucketCount {
+        for position in 0..<capacity {
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
@@ -4925,20 +4916,19 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @inline(__always)
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNativeBufferNative(
-    withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let oldBucketCount = asNative.bucketCount
-    if oldBucketCount >= desiredBucketCount && isUniquelyReferenced() {
+  internal mutating func ensureUniqueNativeBufferNative(_ minimumCapacity: Int)
+  -> (reallocated: Bool, capacityChanged: Bool) {
+    let oldCapacity = asNative.capacity
+    if oldCapacity >= minimumCapacity && isUniquelyReferenced() {
       return (reallocated: false, capacityChanged: false)
     }
 
     let oldNativeBuffer = asNative
-    var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-    let newBucketCount = newNativeBuffer.bucketCount
-    for i in 0..<oldBucketCount {
+    var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
+    let newCapacity = newNativeBuffer.capacity
+    for i in 0..<oldCapacity {
       if oldNativeBuffer.isInitializedEntry(at: i) {
-        if oldBucketCount == newBucketCount {
+        if oldCapacity == newCapacity {
           let key = oldNativeBuffer.key(at: i)
 %if Self == 'Set':
           newNativeBuffer.initializeKey(key, at: i)
@@ -4962,42 +4952,28 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     self = .native(newNativeBuffer)
     return (reallocated: true,
-      capacityChanged: oldBucketCount != newBucketCount)
-  }
-
-  @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNativeBuffer(
-    withCapacity minimumCapacity: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let bucketCount = NativeBuffer.bucketCount(
-      forCapacity: minimumCapacity,
-      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    return ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+            capacityChanged: oldCapacity != newNativeBuffer.capacity)
   }
 
   /// Ensure this we hold a unique reference to a native buffer
   /// having at least `minimumCapacity` elements.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNativeBuffer(
-    withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
+  internal mutating func ensureUniqueNativeBuffer(_ minimumCapacity: Int)
+  -> (reallocated: Bool, capacityChanged: Bool) {
 #if _runtime(_ObjC)
     // This is a performance optimization that was put in to ensure that we did
     // not make a copy of self to call _isNative over the entire if region
     // causing at -Onone the uniqueness check to fail. This code used to be:
     //
     //  if _isNative {
-    //    return ensureUniqueNativeBufferNative(
-    //      withBucketCount: desiredBucketCount)
+    //    return ensureUniqueNativeBufferNative(minimumCapacity)
     //  }
     //
     // SR-6437
     let n = _isNative
     if n {
-      return ensureUniqueNativeBufferNative(withBucketCount: desiredBucketCount)
+      return ensureUniqueNativeBufferNative(minimumCapacity)
     }
 
     switch self {
@@ -5005,7 +4981,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       fatalError("This should have been handled earlier")
     case .cocoa(let cocoaBuffer):
       let cocoa${Self} = cocoaBuffer.cocoa${Self}
-      var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
+      var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
 %if Self == 'Set':
       while let key = oldCocoaIterator.next() {
@@ -5028,7 +5004,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       return (reallocated: true, capacityChanged: true)
     }
 #else
-    return ensureUniqueNativeBufferNative(withBucketCount: desiredBucketCount)
+    return ensureUniqueNativeBufferNative(minimumCapacity)
 #endif
   }
 
@@ -5039,8 +5015,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _Cocoa${Self}Buffer
   ) {
-    let allocated = ensureUniqueNativeBuffer(
-      withCapacity: cocoaBuffer.count).reallocated
+    let minCapacity = NativeBuffer.minimumCapacity(
+      minimumCount: cocoaBuffer.count,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+    let allocated = ensureUniqueNativeBuffer(minCapacity).reallocated
     _sanityCheck(allocated, "failed to allocate native ${Self} buffer")
   }
 #endif
@@ -5050,7 +5028,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func reserveCapacity(_ capacity: Int) {
-    _ = ensureUniqueNativeBuffer(withCapacity: capacity)
+    let minCapacity = NativeBuffer.minimumCapacity(
+      minimumCount: capacity,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+    _ = ensureUniqueNativeBuffer(minCapacity)
   }
 
   /// The number of elements that can be stored without expanding the current
@@ -5062,10 +5043,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   /// at which adding any more elements will exceed the load factor.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var capacity: Int {
+  internal var effectiveCapacity: Int {
     switch self {
     case .native:
-      return Int(Double(asNative.bucketCount) /
+      return Int(Double(asNative.capacity) /
         _hashContainerDefaultMaxLoadFactorInverse)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
@@ -5253,14 +5234,13 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   ) -> Value? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
-    let minBuckets = found
-      ? asNative.bucketCount
-      : NativeBuffer.bucketCount(
-          forCapacity: asNative.count + 1,
+    let minCapacity = found
+      ? asNative.capacity
+      : NativeBuffer.minimumCapacity(
+          minimumCount: asNative.count + 1,
           maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
 
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withBucketCount: minBuckets)
+    let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
     if capacityChanged {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
@@ -5314,15 +5294,15 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativePointerToValue(at i: Index)
   -> UnsafeMutablePointer<Value> {
     // This is a performance optimization that was put in to ensure that we did
-    // not make a copy of self to call asNative.bucketCount over
+    // not make a copy of self to call asNative.capacity over
     // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
     // fail. This code used to be:
     //
-    // _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+    // _ = ensureUniqueNativeBuffer(capacity)
     //
     // SR-6437
-    let bucketCount = asNative.bucketCount
-    _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+    let capacity = asNative.capacity
+    _ = ensureUniqueNativeBuffer(capacity)
     return asNative.values + i._nativeIndex.offset
   }
 
@@ -5366,9 +5346,11 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       return (inserted: false, pointer: pointer)
     }
 
-    let minCapacity = asNative.count + 1
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withCapacity: minCapacity)
+    let minCapacity = NativeBuffer.minimumCapacity(
+      minimumCount: asNative.count + 1,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+    let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
 
     if capacityChanged {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
@@ -5404,9 +5386,11 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 %end
     }
 
-    let minCapacity = asNative.count + 1
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withCapacity: minCapacity)
+    let minCapacity = NativeBuffer.minimumCapacity(
+      minimumCount: asNative.count + 1,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+    let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
 
     if capacityChanged {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
@@ -5439,8 +5423,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal func nativeMapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> _Variant${Self}Buffer<Key, T> {
-    var buffer = _Native${Self}Buffer<Key, T>(
-      _exactBucketCount: asNative.bucketCount)
+    var buffer = _Native${Self}Buffer<Key, T>(capacity: asNative.capacity)
 
     // Because the keys in the current and new buffer are the same, we can 
     // initialize to the same locations in the new buffer, skipping hash value
@@ -5471,7 +5454,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 #if _runtime(_ObjC)
     case .cocoa(let cocoaStorage):
       var storage: _Variant${Self}Buffer<Key, T> = .native(
-        _Native${Self}Buffer<Key, T>(minimumCapacity: cocoaStorage.count))
+        _Native${Self}Buffer<Key, T>(capacity: cocoaStorage.count))
 
       var i = cocoaStorage.startIndex
       while i != cocoaStorage.endIndex {
@@ -5498,15 +5481,15 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
       if found {
         // This is a performance optimization that was put in to ensure that we
-        // did not make a copy of self to call asNative.bucketCount over
+        // did not make a copy of self to call asNative.capacity over
         // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
         // fail. This code used to be:
         //
-        // _ = ensureUniqueNativeBuffer(withBucketCount: asNative.bucketCount)
+        // _ = ensureUniqueNativeBuffer(asNative.capacity)
         //
         // SR-6437
-        let bucketCount = asNative.bucketCount
-        _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+        let capacity = asNative.capacity
+        _ = ensureUniqueNativeBuffer(capacity)
         do {
           let newValue = try combine(asNative.value(at: i.offset), value)
           asNative.setKey(key, value: newValue, at: i.offset)
@@ -5514,9 +5497,11 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
           fatalError("Duplicate values for key: '\(key)'")
         }
       } else {
-        let minCapacity = asNative.count + 1
-        let (_, capacityChanged) = ensureUniqueNativeBuffer(
-          withCapacity: minCapacity)
+        let minCapacity = NativeBuffer.minimumCapacity(
+          minimumCount: asNative.count + 1,
+          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+        let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
         if capacityChanged {
           i = asNative._find(key, startBucket: asNative._bucket(key)).pos
         }
@@ -5550,9 +5535,11 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       if found {
         asNative.values[i.offset].append(value)
       } else {
-        let minCapacity = asNative.count + 1
-        let (_, capacityChanged) = ensureUniqueNativeBuffer(
-          withCapacity: minCapacity)
+        let minCapacity = NativeBuffer.minimumCapacity(
+          minimumCount: asNative.count + 1,
+          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+        let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
         if capacityChanged {
           i = asNative._find(key, startBucket: asNative._bucket(key)).pos
         }
@@ -5645,16 +5632,16 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
 
     // This is a performance optimization that was put in to ensure that we
-    // did not make a copy of self to call asNative.bucketCount over
+    // did not make a copy of self to call asNative.capacity over
     // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
     // fail. This code used to be:
     //
-    // ... = ensureUniqueNativeBuffer(withBucketCount: asNative.bucketCount)
+    // _ = ensureUniqueNativeBuffer(asNative.capacity)
     //
     // SR-6437
-    let bucketCount = asNative.bucketCount
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withBucketCount: bucketCount)
+    let capacity = asNative.capacity
+    let (_, capacityChanged) =
+      ensureUniqueNativeBuffer(capacity)
     let nativeBuffer = asNative
     if capacityChanged {
       idealBucket = nativeBuffer._bucket(key)
@@ -5677,17 +5664,17 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     at nativeIndex: NativeIndex
   ) -> SequenceElement {
     // This is a performance optimization that was put in to ensure that we did
-    // not make a copy of self to call asNative.bucketCount over
+    // not make a copy of self to call asNative.capacity over
     // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
     // fail. This code used to be:
     //
-    // _ = ensureUniqueNativeBuffer(withBucketCount: asNative.bucketCount)
+    // _ = ensureUniqueNativeBuffer(asNative.capacity)
     //
     // SR-6437
-    let bucketCount = asNative.bucketCount
+    let capacity = asNative.capacity
     // The provided index should be valid, so we will always mutating the
     // set buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+    _ = ensureUniqueNativeBuffer(capacity)
     let nativeBuffer = asNative
 
     let result = nativeBuffer.assertingGet(nativeIndex)
@@ -5763,7 +5750,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func nativeRemoveAll() {
     if !isUniquelyReferenced() {
-        asNative = NativeBuffer(_exactBucketCount: asNative.bucketCount)
+        asNative = NativeBuffer(minimumCapacity: asNative.capacity)
         return
     }
 
@@ -5771,7 +5758,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     // reference, so we will always mutate the dictionary buffer.
     var nativeBuffer = asNative
 
-    for b in 0..<nativeBuffer.bucketCount {
+    for b in 0..<nativeBuffer.capacity {
       if nativeBuffer.isInitializedEntry(at: b) {
         nativeBuffer.destroyEntry(at: b)
       }
@@ -5787,7 +5774,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
 
     if !keepCapacity {
-      self = .native(NativeBuffer(bucketCount: 2))
+      self = .native(NativeBuffer(minimumCapacity: 2))
       return
     }
 
@@ -6417,7 +6404,11 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
   @_inlineable // FIXME(sil-serialize-all)
   public init(count: Int) {
-    _result = ${Self}<${TypeParameters}>(minimumCapacity: count)
+    let requiredCapacity =
+      _Native${Self}Buffer<${TypeParameters}>.minimumCapacity(
+        minimumCount: count,
+        maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+    _result = ${Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
     _nativeBuffer = _result._variantBuffer.asNative
     _requestedCount = count
     _actualCount = 0
@@ -6497,7 +6488,7 @@ extension ${Self} {
   /// allocating new storage.
   @_inlineable // FIXME(sil-serialize-all)
   public var capacity: Int {
-    return _variantBuffer.capacity
+    return _variantBuffer.effectiveCapacity
   }
 
   /// Reserves enough space to store the specified number of ${element}s.
@@ -6516,7 +6507,6 @@ extension ${Self} {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variantBuffer.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
   }
 }
 

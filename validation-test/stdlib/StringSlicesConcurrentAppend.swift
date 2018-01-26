@@ -13,8 +13,8 @@ import Glibc
 var StringTestSuite = TestSuite("String")
 
 extension String {
-  var capacity: Int {
-    return _guts.capacity
+  var capacityInBytes: Int {
+    return _core.nativeBuffer!.capacity
   }
 }
 
@@ -51,7 +51,7 @@ func sliceConcurrentAppendThread(_ tid: ThreadID) {
       sharedString = ""
       sharedString.append("abc")
       sharedString.reserveCapacity(16)
-      expectLE(16, sharedString.capacity)
+      expectLE(16, sharedString.capacityInBytes)
     }
 
     barrier()

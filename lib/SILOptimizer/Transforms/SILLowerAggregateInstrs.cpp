@@ -181,8 +181,8 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
     return false;
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredDestroyValueMostDerivedDescendents(Builder, DV->getLoc(),
-                                                   Value);
+  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
+                             TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
@@ -208,7 +208,8 @@ static bool expandRetainValue(RetainValueInst *CV) {
     return false;
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredCopyValueMostDerivedDescendents(Builder, CV->getLoc(), Value);
+  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
+                          TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 

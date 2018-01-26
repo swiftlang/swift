@@ -4,14 +4,12 @@
 
 import StdlibUnittest
 import Foundation
-import CoreFoundation
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
 @objc class C : NSObject { }
 @objc enum E: Int { case a }
 @objc protocol P1 { }
-protocol P2 { }
 
 DemangleToMetadataTests.test("@objc classes") {
   expectEqual(type(of: C()), _typeByMangledName("4main1CC")!)
@@ -40,26 +38,6 @@ DemangleToMetadataTests.test("Objective-C protocols") {
 
 DemangleToMetadataTests.test("Classes that don't exist") {
   expectNil(_typeByMangledName("4main4BoomC"))
-}
-
-DemangleToMetadataTests.test("CoreFoundation classes") {
-  expectEqual(CFArray.self, _typeByMangledName("So10CFArrayRefa")!)
-}
-
-DemangleToMetadataTests.test("Imported error types") {
-  expectEqual(URLError.self, _typeByMangledName("10Foundation8URLErrorV")!)
-  expectEqual(URLError.Code.self,
-    _typeByMangledName("10Foundation8URLErrorV4CodeV")!)
-}
-
-DemangleToMetadataTests.test("Imported swift_wrapper types") {
-  expectEqual(URLFileResourceType.self,
-    _typeByMangledName("So21NSURLFileResourceTypea")!)
-}
-
-DemangleToMetadataTests.test("Imported enum types") {
-  expectEqual(NSURLSessionTask.State.self,
-    _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
 runAllTests()

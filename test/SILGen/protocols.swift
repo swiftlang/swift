@@ -416,27 +416,6 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:      apply [[CALLBACK]]<T>
 
-public struct Val {
-  public var x: Int = 0
-}
-
-public protocol Proto {
-  var val: Val { get nonmutating set}
-}
-
-public func test(_ p: Proto) {
-  p.val.x += 1
-}
-
-// CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in Proto) -> ()
-// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!materializeForSet
-// CHECK: [[BUF:%.*]] = apply [[MAT]]
-// CHECK: [[WB:%.*]] = pointer_to_thin_function
-// This use looks like it is mutating but really is not. We use to assert in the SIL verifier.
-// CHECK: apply [[WB]]{{.*}}({{.*}}[[OPEN]]
-// CHECK: return
-
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$S9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW
 // CHECK-NEXT: }

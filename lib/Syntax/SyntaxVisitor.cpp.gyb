@@ -19,7 +19,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/SyntaxVisitor.h"
-#include "swift/Basic/Defer.h"
 
 % for node in SYNTAX_NODES:
 %   if is_visitable(node):
@@ -30,22 +29,14 @@ void swift::syntax::SyntaxVisitor::visit(${node.name} node) {
 % end
 
 void swift::syntax::SyntaxVisitor::visit(Syntax node) {
-  visitPre(node);
-  SWIFT_DEFER { visitPost(node); };
   switch (node.getKind()) {
-  case SyntaxKind::Token:
-    visit(node.castTo<TokenSyntax>());
-    return;
+  case SyntaxKind::Token: visit(make<TokenSyntax>(node.getRaw())); return;
 % for node in SYNTAX_NODES:
 %   if is_visitable(node):
-  case SyntaxKind::${node.syntax_kind}:
-    visit(node.castTo<${node.name}>());
-    return;
+  case SyntaxKind::${node.syntax_kind}: visit(make<${node.name}>(node.getRaw())); return;
 %   end
 % end
-  default:
-    visitChildren(node);
-    return;
+  default: visitChildren(node); return;
   }
 }
 

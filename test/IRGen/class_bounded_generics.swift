@@ -85,16 +85,14 @@ func superclass_bounded_archetype_call(_ x: SomeClass, y: SomeSubclass) -> (Some
 // CHECK-LABEL: define hidden swiftcc void @"$S22class_bounded_generics0a1_B17_archetype_method{{[_0-9a-zA-Z]*}}F"(%objc_object*, %objc_object*, %swift.type* %T, i8** %T.ClassBoundBinary)
 func class_bounded_archetype_method<T : ClassBoundBinary>(_ x: T, y: T) {
   x.classBoundMethod()
-  // CHECK: [[INHERITED_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 1
-  // CHECK: [[INHERITED:%.*]] = load i8*, i8** [[INHERITED_GEP]]
+  // CHECK: [[INHERITED:%.*]] = load i8*, i8** %T.ClassBoundBinary, align 8
   // CHECK: [[INHERITED_WTBL:%.*]] = bitcast i8* [[INHERITED]] to i8**
-  // CHECK: [[WITNESS_GEP:%.*]] = getelementptr inbounds i8*, i8** [[INHERITED_WTBL]], i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_GEP]], align 8
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[INHERITED_WTBL]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* swiftself %0, %swift.type* {{.*}}, i8** [[INHERITED_WTBL]])
   x.classBoundBinaryMethod(y)
   // CHECK: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
-  // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 2
+  // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
@@ -148,7 +146,7 @@ func class_bounded_erasure(_ x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %T22class_bounded_generics13ConcreteClassC* [[INSTANCE:%.*]] to %objc_object*
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* [[INSTANCE_OPAQUE]], 0
-  // CHECK: [[T1:%.*]] = insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$S22class_bounded_generics13ConcreteClassCAA0E5BoundAAWP", i32 0, i32 0), 1
+  // CHECK: [[T1:%.*]] = insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S22class_bounded_generics13ConcreteClassCAA0E5BoundAAWP", i32 0, i32 0), 1
   // CHECK: ret { %objc_object*, i8** } [[T1]]
 }
 
@@ -156,8 +154,7 @@ func class_bounded_erasure(_ x: ConcreteClass) -> ClassBound {
 func class_bounded_protocol_method(_ x: ClassBound) {
   x.classBoundMethod()
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* %0)
-  // CHECK: [[WITNESS_GEP:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_TABLE:%.*]], i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_GEP]], align 8
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_TABLE:%.*]], align 8
   // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FN]](%objc_object* swiftself %0, %swift.type* [[METADATA]], i8** [[WITNESS_TABLE]])
 }

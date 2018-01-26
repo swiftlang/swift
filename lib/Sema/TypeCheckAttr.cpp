@@ -110,7 +110,6 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(DowngradeExhaustivityCheck)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
-  IGNORED_ATTR(ClangImporterSynthesizedType)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -832,7 +831,6 @@ public:
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(DowngradeExhaustivityCheck)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
-    IGNORED_ATTR(ClangImporterSynthesizedType)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

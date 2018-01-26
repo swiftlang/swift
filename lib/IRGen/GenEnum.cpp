@@ -3903,12 +3903,6 @@ namespace {
       } else if (CommonSpareBits.size() > 0) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
-#if defined(__BIG_ENDIAN__) && defined(__LP64__)
-        // Code produced above are of type IGM.Int32Ty
-        // However, payload is IGM.SizeTy in 64bit
-        if (numCaseBits >= 64)
-          tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
-#endif
         // We know we won't use more than numCaseBits from tagIndex's value:
         // We made sure of this in the logic above.
         payload.insertValue(IGF, tagIndex, 0,
@@ -4399,7 +4393,7 @@ namespace {
         payloadTI.collectArchetypeMetadata(IGF, typeToMetadataVec, PayloadT);
       }
       if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-          ((typeToMetadataVec.size() != SZ) || (TIK < Fixed))) {
+          typeToMetadataVec.size() != SZ) {
         auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
         assert(metadata && "Expected Type Metadata Ref");
         typeToMetadataVec.insert(std::make_pair(canType, metadata));
@@ -5857,8 +5851,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
   ExtraTagBitCount = numTagBits <= commonSpareBitCount
     ? 0 : numTagBits - commonSpareBitCount;
-  NumExtraTagValues =
-      (commonSpareBitCount < 32) ? numTags >> commonSpareBitCount : 0;
+  NumExtraTagValues = numTags >> commonSpareBitCount;
 
   // Create the type. We need enough bits to store the largest payload plus
   // extra tag bits we need.

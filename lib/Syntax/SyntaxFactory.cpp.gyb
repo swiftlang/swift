@@ -38,19 +38,17 @@
 using namespace swift;
 using namespace swift::syntax;
 
-TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
-                                     SourcePresence Presence,
-                                     const Trivia &LeadingTrivia,
-                                     const Trivia &TrailingTrivia) {
-  return make<TokenSyntax>(RawSyntax::make(Kind, Text, Presence,
-                                           LeadingTrivia.Pieces,
-                                           TrailingTrivia.Pieces));
+TokenSyntax
+SyntaxFactory::makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
+                         const Trivia &LeadingTrivia,
+                         const Trivia &TrailingTrivia) {
+  return make<TokenSyntax>(RawTokenSyntax::make(Kind, Text, Presence,
+                                                LeadingTrivia, TrailingTrivia));
 }
 
 UnknownSyntax
 SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
-  std::vector<RC<RawSyntax>> Layout;
-  Layout.reserve(Tokens.size());
+  RawSyntax::LayoutList Layout;
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
   }
@@ -221,8 +219,7 @@ SyntaxFactory::make${node.syntax_kind}(${child_params}) {
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
   const std::vector<${node.collection_element_type}> &elements) {
-  std::vector<RC<RawSyntax>> layout;
-  layout.reserve(elements.size());
+  RawSyntax::LayoutList layout;
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }

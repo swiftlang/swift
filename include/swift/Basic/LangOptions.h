@@ -256,9 +256,6 @@ namespace swift {
     /// this source file.
     bool KeepSyntaxInfoInSourceFile = false;
 
-    /// Whether to verify the parsed syntax tree and emit related diagnostics.
-    bool VerifySyntaxTree = false;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

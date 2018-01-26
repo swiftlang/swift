@@ -97,66 +97,10 @@ HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
 SWIFT_RUNTIME_EXPORT
 void swift_verifyEndOfLifetime(HeapObject *object);
 
-/// A structure that's two pointers in size.
-///
-/// C functions can use the TwoWordPair::Return type to return a value in
-/// two registers, compatible with Swift's calling convention for tuples
-/// and structs of two word-sized elements.
-template<typename A, typename B>
-struct TwoWordPair {
-  A first;
-  B second;
-  
-  TwoWordPair() = default;
-  TwoWordPair(A first, B second);
-
-  // FIXME: rdar://36755525 clang miscompiles swiftcall functions
-  // Structs are returned indirectly on these platforms, but we want to return
-  // in registers, so cram the result into an unsigned long long.
-  // Use an enum class with implicit conversions so we don't dirty C callers
-  // too much.
-#if __arm__ || __i386__ || defined(__CYGWIN__) || defined(_MSC_VER)
-#if defined(__CYGWIN__)
-  enum class Return : unsigned __int128 {};
-#else
-  enum class Return : unsigned long long {};
-#endif
-
-  operator Return() const {
-    union {
-      TwoWordPair value;
-      Return mangled;
-    } reinterpret = {*this};
-    
-    return reinterpret.mangled;
-  }
-  
-  /*implicit*/ TwoWordPair(Return r) {
-    union {
-      Return mangled;
-      TwoWordPair value;
-    } reinterpret = {r};
-    
-    *this = reinterpret.value;
-  }
-#else
-  using Return = TwoWordPair;
-#endif
+struct BoxPair {
+  HeapObject *object;
+  OpaqueValue *buffer;
 };
-  
-template<typename A, typename B>
-inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
-  : first(first), second(second)
-{
-  static_assert(sizeof(A) == sizeof(void*),
-                "first type must be word-sized");
-  static_assert(sizeof(B) == sizeof(void*),
-                "second type must be word-sized");
-  static_assert(alignof(TwoWordPair) == alignof(void*),
-                "pair must be word-aligned");
-}
-  
-using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 
 /// Allocates a heap object that can contain a value of the given type.
 /// Returns a Box structure containing a HeapObject* pointer to the
@@ -165,19 +109,19 @@ using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 /// appropriate to store a value of the given type.
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
-SWIFT_RUNTIME_EXPORT
-BoxPair::Return swift_allocBox(Metadata const *type);
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+BoxPair swift_allocBox(Metadata const *type);
 
-SWIFT_RUNTIME_EXPORT
-BoxPair::Return (*_swift_allocBox)(Metadata const *type);
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+BoxPair (*_swift_allocBox)(Metadata const *type);
 
 /// Performs a uniqueness check on the pointer to a box structure. If the check
 /// fails allocates a new box and stores the pointer in the buffer.
 ///
 ///  if (!isUnique(buffer[0]))
 ///    buffer[0] = swift_allocBox(type)
-SWIFT_RUNTIME_EXPORT
-BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
@@ -1242,11 +1186,16 @@ static inline bool swift_unknownUnownedIsEqual(UnownedReference *ref,
 
 #endif /* SWIFT_OBJC_INTEROP */
 
+struct TypeNamePair {
+  const char *data;
+  uintptr_t length;
+};
+
 /// Return the name of a Swift type represented by a metadata object.
 /// func _getTypeName(_ type: Any.Type, qualified: Bool)
 ///   -> (UnsafePointer<UInt8>, Int)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-TwoWordPair<const char *, uintptr_t>::Return
+TypeNamePair
 swift_getTypeName(const Metadata *type, bool qualified);  
 
 } // end namespace swift

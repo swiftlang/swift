@@ -37,7 +37,6 @@ enum SILStringEncoding : uint8_t {
 
 enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PUBLIC,
-  SIL_LINKAGE_PUBLIC_NON_ABI,
   SIL_LINKAGE_HIDDEN,
   SIL_LINKAGE_SHARED,
   SIL_LINKAGE_PRIVATE,
@@ -46,7 +45,7 @@ enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_SHARED_EXTERNAL,
   SIL_LINKAGE_PRIVATE_EXTERNAL,
 };
-using SILLinkageField = BCFixed<4>;
+using SILLinkageField = BCFixed<3>;
 
 enum SILVTableEntryKindEncoding : uint8_t {
   SIL_VTABLE_ENTRY_NORMAL,

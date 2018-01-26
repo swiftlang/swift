@@ -298,9 +298,9 @@ func internalMedian(_ inputs: [UInt64]) -> UInt64 {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 @_silgen_name("_swift_leaks_startTrackingObjects")
-func startTrackingObjects(_: UnsafePointer<CChar>) -> ()
+func startTrackingObjects(_: UnsafeMutableRawPointer) -> ()
 @_silgen_name("_swift_leaks_stopTrackingObjects")
-func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
+func stopTrackingObjects(_: UnsafeMutableRawPointer) -> Int
 
 #endif
 
@@ -346,14 +346,15 @@ class SampleRunner {
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    name.withCString { p in startTrackingObjects(p) }
+    var str = name
+    startTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
     let start_ticks = timer.getTime()
     fn(Int(num_iters))
     // Stop the timer.
     let end_ticks = timer.getTime()
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    name.withCString { p in stopTrackingObjects(p) }
+    stopTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
 
     // Compute the spent time and the scaling factor.

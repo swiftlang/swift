@@ -121,7 +121,7 @@ sil @take_t : $@convention(thin) <T> (@in T) -> ()
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
   // CHECK: [[METADATA:%.*]] = call %swift.type* @"$S11typed_boxes3DynVMa"(%swift.type* %T)
-  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
+  // CHECK: [[ALLOC:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   %a = alloc_box $<τ_0_0> { var τ_0_0 } <Dyn<T>>
@@ -138,7 +138,7 @@ entry:
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @dyn_box_b
 sil @dyn_box_b : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
+  // CHECK: [[ALLOC:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   %a = alloc_box $<τ_0_0> { var τ_0_0 } <T>

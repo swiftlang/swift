@@ -499,7 +499,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: true)
+    _stdlib_NSStringHashValue(a, true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -509,7 +509,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: false)
+    _stdlib_NSStringHashValue(a, false)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -520,7 +520,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: true)
+    _stdlib_NSStringHashValuePointer(ptrA, true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -531,7 +531,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak"
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: false)
+    _stdlib_NSStringHashValuePointer(ptrA, false)
   }
   expectEqual(0, nsStringCanaryCount)
 }

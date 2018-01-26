@@ -309,6 +309,13 @@ DeclContext *Decl::getInnermostDeclContext() const {
   return getDeclContext();
 }
 
+DeclContext *Decl::getDeclContextForModule() const {
+  if (auto module = dyn_cast<ModuleDecl>(this))
+    return const_cast<ModuleDecl *>(module);
+
+  return nullptr;
+}
+
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }
@@ -1472,10 +1479,16 @@ bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::isFormallyResilient() const {
-  // Check for an explicit @_fixed_layout attribute.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return false;
+bool AbstractStorageDecl::isResilient() const {
+  // If we're in a nominal type, just query the type.
+  auto *dc = getDeclContext();
+
+  if (dc->isTypeContext()) {
+    auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (nominalDecl == nullptr)
+      return false;
+    return nominalDecl->isResilient();
+  }
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
@@ -1483,19 +1496,12 @@ bool AbstractStorageDecl::isFormallyResilient() const {
                             /*respectVersionedAttr=*/true).isPublic())
     return false;
 
-  // If we're an instance property of a nominal type, query the type.
-  auto *dc = getDeclContext();
-  if (!isStatic())
-    if (auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext())
-      return nominalDecl->isResilient();
-
-  return true;
-}
-
-bool AbstractStorageDecl::isResilient() const {
-  if (!isFormallyResilient())
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
+  // Must use resilient access patterns.
+  assert(getDeclContext()->isModuleScopeContext());
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Resilient:
     return true;
@@ -4937,7 +4943,8 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
       base, decl, baseInterfaceTy);
 
   return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible);
+                                      TypeMatchFlags::AllowABICompatible,
+                                      /*resolver*/nullptr);
 }
 
 void AbstractFunctionDecl::computeNeedsNewVTableEntry() {

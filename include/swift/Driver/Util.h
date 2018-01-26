@@ -43,9 +43,8 @@ namespace driver {
   /// The Compilation is responsible for generating this file before running
   /// the Job this info is attached to.
   struct FilelistInfo {
-    enum class WhichFiles : unsigned {
+    enum WhichFiles : bool {
       Input,
-      PrimaryInputs,
       Output
     };
 

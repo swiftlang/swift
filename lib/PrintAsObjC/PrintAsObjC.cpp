@@ -2062,7 +2062,7 @@ using SmallSetVector =
 template <typename T>
 struct PointerLikeComparator {
   using Traits = llvm::PointerLikeTypeTraits<T>;
-  bool operator()(T lhs, T rhs) const {
+  bool operator()(T lhs, T rhs) {
     return std::less<void*>()(Traits::getAsVoidPointer(lhs),
                               Traits::getAsVoidPointer(rhs));
   }

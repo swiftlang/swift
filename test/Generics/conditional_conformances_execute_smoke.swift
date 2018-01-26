@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
-// REQUIRES: executable_test
-
 // Smoke test to see that various conditional conformances correctly execute
 
 protocol P1 {

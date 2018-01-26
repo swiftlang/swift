@@ -118,17 +118,17 @@ findReflectionSection(const ObjectFile *objectFile,
 
 static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
   auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift5_fieldmd", ".swift5_fieldmd", "swift5_fieldmd"});
+      objectFile, {"__swift3_fieldmd", ".swift3_fieldmd", "swift3_fieldmd"});
   auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift5_assocty", ".swift5_assocty", "swift5_assocty"});
+      objectFile, {"__swift3_assocty", ".swift3_assocty", "swift3_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift5_builtin", ".swift5_builtin", "swift5_builtin"});
+      objectFile, {"__swift3_builtin", ".swift3_builtin", "swift3_builtin"});
   auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift5_capture", ".swift5_capture", "swift5_capture"});
+      objectFile, {"__swift3_capture", ".swift3_capture", "swift3_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_typeref", ".swift5_typeref", "swift5_typeref"});
+      objectFile, {"__swift3_typeref", ".swift3_typeref", "swift3_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_reflstr", ".swift5_reflstr", "swift5_reflstr"});
+      objectFile, {"__swift3_reflstr", ".swift3_reflstr", "swift3_reflstr"});
 
   return {
       {fieldSection.first, fieldSection.second},

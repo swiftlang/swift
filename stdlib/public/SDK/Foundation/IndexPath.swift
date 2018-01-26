@@ -22,7 +22,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     public typealias ReferenceType = NSIndexPath
     public typealias Element = Int
     public typealias Index = Array<Int>.Index
-    public typealias Indices = DefaultIndices<IndexPath>
+    public typealias Indices = DefaultRandomAccessIndices<IndexPath>
     
     fileprivate enum Storage : ExpressibleByArrayLiteral {
         typealias Element = Int

@@ -1,6 +1,5 @@
 set(UTILS_SOURCES
   Utils/CFG.cpp
-  Utils/CastOptimizer.cpp
   Utils/CheckedCastBrJumpThreading.cpp
   Utils/ConstantFolding.cpp
   Utils/Devirtualize.cpp

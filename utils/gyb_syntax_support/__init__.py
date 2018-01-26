@@ -24,7 +24,7 @@ def make_missing_child(child):
         token = child.main_token()
         tok_kind = "tok::" + token.kind if token else "tok::unknown"
         tok_text = token.text if token else ""
-        return 'RawSyntax::missing(%s, "%s")' % (tok_kind, tok_text)
+        return 'RawTokenSyntax::missingToken(%s, "%s")' % (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind

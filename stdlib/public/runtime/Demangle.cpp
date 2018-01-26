@@ -126,15 +126,6 @@ _applyGenericArguments(const Metadata * const *genericArgs,
   return genericNode;
 }
 
-static Demangle::NodePointer
-_buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
-#define BUILTIN_TYPE(Symbol, Name) \
-  if (type == &METADATA_SYM(Symbol).base) \
-    return Dem.createNode(Node::Kind::BuiltinTypeName, Name);
-#include "swift/Runtime/BuiltinTypes.def"
-  return nullptr;
-}
-
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
 _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
@@ -460,14 +451,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     return tupleNode;
   }
-  case MetadataKind::Opaque: {
-    if (auto builtinType = _buildDemanglerForBuiltinType(type, Dem))
-      return builtinType;
-
+  case MetadataKind::Opaque:
     // FIXME: Some opaque types do have manglings, but we don't have enough info
     // to figure them out.
-    break;
-  }
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:

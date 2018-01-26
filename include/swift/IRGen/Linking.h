@@ -187,10 +187,6 @@ class LinkEntity {
     /// nominal type in a protocol conformance.
     ReflectionAssociatedTypeDescriptor,
 
-    /// The protocol conformance descriptor for a conformance.
-    /// The pointer is a NormalProtocolConformance*.
-    ProtocolConformanceDescriptor,
-
     // These are both type kinds and protocol-conformance kinds.
 
     /// A lazy protocol witness accessor function. The pointer is a
@@ -592,14 +588,6 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformance(
         Kind::ReflectionAssociatedTypeDescriptor, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forProtocolConformanceDescriptor(const NormalProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(
-        Kind::ProtocolConformanceDescriptor, C);
     return entity;
   }
 

@@ -40,8 +40,13 @@ struct ScalarEnumerationTraits<syntax::SourcePresence> {
 template <>
 struct ScalarEnumerationTraits<tok> {
   static void enumeration(Output &out, tok &value) {
-#define TOKEN(name) \
-    out.enumCase(value, #name, tok::name);
+#define EXPAND(Str, Case) \
+    out.enumCase(value, Str, Case);
+#define LITERAL(X) EXPAND(#X, tok::X)
+#define MISC(X) EXPAND(#X, tok::X)
+#define KEYWORD(X) EXPAND("kw_" #X, tok::kw_##X)
+#define PUNCTUATOR(X, Y) EXPAND(#X, tok::X)
+#define POUND_KEYWORD(X) EXPAND("pound_" #X, tok::pound_##X)
 #include "swift/Syntax/TokenKinds.def"
   }
 };
@@ -56,9 +61,8 @@ struct ScalarEnumerationTraits<tok> {
 template<>
 struct ObjectTraits<syntax::TriviaPiece> {
   static void mapping(Output &out, syntax::TriviaPiece &value) {
-    auto kind = value.getKind();
-    out.mapRequired("kind", kind);
-    switch (kind) {
+    out.mapRequired("kind", value.Kind);
+    switch (value.Kind) {
       case syntax::TriviaKind::Space:
       case syntax::TriviaKind::Tab:
       case syntax::TriviaKind::VerticalTab:
@@ -66,17 +70,15 @@ struct ObjectTraits<syntax::TriviaPiece> {
       case syntax::TriviaKind::Newline:
       case syntax::TriviaKind::CarriageReturn:
       case syntax::TriviaKind::CarriageReturnLineFeed:
-      case syntax::TriviaKind::Backtick: {
-        auto count = value.getCount();
-        out.mapRequired("value", count);
+      case syntax::TriviaKind::Backtick:
+        out.mapRequired("value", value.Count);
         break;
-      }
       case syntax::TriviaKind::LineComment:
       case syntax::TriviaKind::BlockComment:
       case syntax::TriviaKind::DocLineComment:
       case syntax::TriviaKind::DocBlockComment:
       case syntax::TriviaKind::GarbageText: {
-        auto text = value.getText();
+        auto text = value.Text.str();
         out.mapRequired("value", text);
         break;
       }
@@ -107,25 +109,13 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
 /// Serialization traits for Trivia.
 /// Trivia will serialize as an array of the underlying TriviaPieces.
 template<>
-struct ArrayTraits<ArrayRef<syntax::TriviaPiece>> {
-  static size_t size(Output &out, ArrayRef<syntax::TriviaPiece> &seq) {
-    return seq.size();
+struct ArrayTraits<syntax::Trivia> {
+  static size_t size(Output &out, syntax::Trivia &seq) {
+    return seq.Pieces.size();
   }
-  static syntax::TriviaPiece &
-  element(Output &out, ArrayRef<syntax::TriviaPiece> &seq, size_t index) {
-    return const_cast<syntax::TriviaPiece &>(seq[index]);
-  }
-};
-
-/// Serialization traits for RawSyntax list.
-template<>
-struct ArrayTraits<ArrayRef<RC<syntax::RawSyntax>>> {
-  static size_t size(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq) {
-    return seq.size();
-  }
-  static RC<syntax::RawSyntax> &
-  element(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq, size_t index) {
-    return const_cast<RC<syntax::RawSyntax> &>(seq[index]);
+  static syntax::TriviaPiece& element(Output &out, syntax::Trivia &seq,
+                                      size_t index) {
+    return seq.Pieces[index];
   }
 };
 
@@ -196,25 +186,32 @@ struct ObjectTraits<TokenDescription> {
 template<>
 struct ObjectTraits<RC<syntax::RawSyntax>> {
   static void mapping(Output &out, RC<syntax::RawSyntax> &value) {
-    if (value->isToken()) {
-      auto tokenKind = value->getTokenKind();
-      auto text = value->getTokenText();
+    auto kind = value->Kind;
+    switch (kind) {
+    case syntax::SyntaxKind::Token: {
+      auto Tok = cast<syntax::RawTokenSyntax>(value);
+      auto tokenKind = Tok->getTokenKind();
+      auto text = Tok->getText();
       auto description = TokenDescription { tokenKind, text };
       out.mapRequired("tokenKind", description);
 
-      auto leadingTrivia = value->getLeadingTrivia();
+      auto leadingTrivia = Tok->LeadingTrivia;
       out.mapRequired("leadingTrivia", leadingTrivia);
 
-      auto trailingTrivia = value->getTrailingTrivia();
+      auto trailingTrivia = Tok->TrailingTrivia;
       out.mapRequired("trailingTrivia", trailingTrivia);
-    } else {
-      auto kind = value->getKind();
+      break;
+    }
+    default: {
       out.mapRequired("kind", kind);
 
-      auto layout = value->getLayout();
+      auto layout = value->Layout;
       out.mapRequired("layout", layout);
+
+      break;
     }
-    auto presence = value->getPresence();
+    }
+    auto presence = value->Presence;
     out.mapRequired("presence", presence);
   }
 };

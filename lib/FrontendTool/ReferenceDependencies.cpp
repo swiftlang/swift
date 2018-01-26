@@ -126,7 +126,11 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
                                       DependencyTracker &depTracker,
                                       const FrontendOptions &opts) {
-  assert(SF && "Cannot emit reference dependencies without a SourceFile");
+  if (!SF) {
+    diags.diagnose(SourceLoc(),
+                   diag::emit_reference_dependencies_without_primary_file);
+    return true;
+  }
 
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it

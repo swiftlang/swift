@@ -15,7 +15,7 @@
 
 SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY
 extern "C" void
-NSArray_getObjects(NSArray SWIFT_NS_RELEASES_ARGUMENT *_Nonnull nsArray,
+NSArray_getObjects(NSArray NS_RELEASES_ARGUMENT *_Nonnull nsArray,
                    id *objects, NSUInteger rangeLocation,
                    NSUInteger rangeLength) {
   [nsArray getObjects:objects range:NSMakeRange(rangeLocation, rangeLength)];

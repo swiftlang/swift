@@ -77,31 +77,6 @@ SILValue stripExpectIntrinsic(SILValue V);
 /// ust return V.
 SILValue stripBorrow(SILValue V);
 
-/// Return a non-null SingleValueInstruction if the given instruction merely
-/// copies a value, possibly changing its type or ownership state, but otherwise
-/// having no effect.
-///
-/// This is useful for checking all users of a value to verify that the value is
-/// only used in recognizable patterns without otherwise "escaping". These are
-/// instructions that the use-visitor can recurse into. Note that the value's
-/// type may be changed by a cast.
-SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
-
-/// Return true if the given instruction has no effect on it's operand values
-/// and produces no result. These are typically end-of scope markers.
-///
-/// This is useful for checking all users of a value to verify that the value is
-/// only used in recognizable patterns without otherwise "escaping".
-bool isIncidentalUse(SILInstruction *user);
-
-/// Return true if the given `user` instruction modifies the value's refcount
-/// without propagating the value or having any other effect aside from
-/// potentially destroying the value itself (and executing associated cleanups).
-///
-/// This is useful for checking all users of a value to verify that the value is
-/// only used in recognizable patterns without otherwise "escaping".
-bool onlyAffectsRefCount(SILInstruction *user);
-
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.
 ///

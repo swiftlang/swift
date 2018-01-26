@@ -24,15 +24,7 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      F.setSerialized(IsNotSerialized);
-    }
-
-    for (auto &WT : M.getWitnessTables()) {
-      WT.setSerialized(IsNotSerialized);
-    }
-
-    for (auto &VT : M.getVTables()) {
-      VT.setSerialized(IsNotSerialized);
+      F.setSerialized(IsSerialized_t::IsNotSerialized);
     }
   }
 

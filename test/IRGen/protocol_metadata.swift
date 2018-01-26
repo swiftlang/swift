@@ -90,7 +90,6 @@ protocol Comprehensive {
   var instance: Assoc { get set }
   static var global: Assoc { get set }
 }
-
 // CHECK: [[COMPREHENSIVE_REQTS:@.*]] = internal unnamed_addr constant [11 x %swift.protocol_requirement]
 // CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
@@ -103,15 +102,6 @@ protocol Comprehensive {
 // CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 5, i32 0 }]
-
-// CHECK: [[COMPREHENSIVE_ASSOC_NAME:@.*]] = private constant [6 x i8] c"Assoc\00"
-
-// CHECK: @"$S17protocol_metadata13ComprehensiveMp" = hidden constant %swift.protocol
-// CHECK-SAME: i32 72, i32 7, i16 11, i16 11,
-// CHECK-SAME: [11 x %swift.protocol_requirement]* [[COMPREHENSIVE_REQTS]]
-// CHECK-SAME: i32 0
-// CHECK-SAME: i32 trunc
-// CHECK-SAME: [6 x i8]* [[COMPREHENSIVE_ASSOC_NAME]]
 
 func reify_metadata<T>(_ x: T) {}
 

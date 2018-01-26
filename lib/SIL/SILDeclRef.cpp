@@ -271,13 +271,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
-  // Default argument generators of Public functions have PublicNonABI linkage
-  // if the function was type-checked in Swift 4 mode.
-  if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-  }
-
   bool neverPublic = false;
 
   // ivar initializers and destroyers are completely contained within the class
@@ -288,13 +281,15 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
-    // If the type is public, the property initializer is referenced from
-    // inlinable initializers, and has PublicNonABI linkage.
+    // If the property is public, the initializer needs to be public, because
+    // it might be referenced from an inlineable initializer.
     //
     // Note that we don't serialize the presence of an initializer, so there's
     // no way to reference one from another module except for this case.
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
+    //
+    // This is silly, and we need a proper resilience story here.
+    if (d->getEffectiveAccess() == AccessLevel::Public)
+      return maybeAddExternal(SILLinkage::Public);
 
     // Otherwise, use the visibility of the type itself, because even if the
     // property is private, we might reference the initializer from another
@@ -583,6 +578,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
+    case SILDeclRef::ManglingKind::SwiftDispatchThunk:
+      assert(!isForeign && !isDirectReference && !isCurried);
+      SKind = ASTMangler::SymbolKind::SwiftDispatchThunk;
+      break;
   }
 
   switch (kind) {
@@ -650,6 +649,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
+
+  case SILDeclRef::Kind::GlobalGetter:
+    assert(!isCurried);
+    return mangler.mangleGlobalGetterEntity(getDecl(), SKind);
 
   case SILDeclRef::Kind::DefaultArgGenerator:
     assert(!isCurried);

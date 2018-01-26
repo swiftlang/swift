@@ -219,11 +219,11 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-BoxPair::Return swift::swift_allocBox(const Metadata *type) {
+BoxPair swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
-BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
+BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
   auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
   HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
@@ -235,8 +235,8 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
     // Copy the data.
-    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
-    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    type->vw_initializeWithCopy(refAndObjectAddr.buffer, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.object;
     // Release ownership of the old box.
     swift_release(box);
     return refAndObjectAddr;
@@ -250,7 +250,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
-BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
+BoxPair SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 

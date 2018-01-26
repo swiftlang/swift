@@ -383,7 +383,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
       continue;
 
     if (currentAssocTypeIdx == matchingAssocTypeIdx)
-      return reqIdx + WitnessTableFirstRequirementOffset;
+      return reqIdx;
 
     ++currentAssocTypeIdx;
   }
@@ -508,8 +508,7 @@ public:
     // FIXME: Need to also gather generic requirements.
     std::vector<BuiltType> allGenericArgsVec;
     ArrayRef<BuiltType> allGenericArgs;
-    if (typeDecl->GenericParams.NestingDepth > 1 &&
-        typeDecl->GenericParams.isGeneric()) {
+    if (typeDecl->GenericParams.NestingDepth > 1) {
       if (!parent) return BuiltType();
 
       // Dig out the parent nominal descriptor.
@@ -546,8 +545,6 @@ public:
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
-                  "Need to account for change in number of direct arguments");
     switch (allGenericArgs.size()) {
     case 0:
       return accessFunction();
@@ -571,23 +568,15 @@ public:
                                                           allGenericArgs[0],
                                                           allGenericArgs[1],
                                                           allGenericArgs[2]);
+
     default:
-      using GenericMetadataAccessFunction4 =
-        const Metadata *(const void *, const void *, const void *,
-                         const void *);
-      return ((GenericMetadataAccessFunction4 *)accessFunction)(
-                                                      allGenericArgs[0],
-                                                      allGenericArgs[1],
-                                                      allGenericArgs[2],
-                                                      allGenericArgs.data());
+      // FIXME: Implement.
+      return BuiltType();
     }
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
-#define BUILTIN_TYPE(Symbol, _) \
-    if (mangledName.equals(#Symbol)) \
-      return &METADATA_SYM(Symbol).base;
-#include "swift/Runtime/BuiltinTypes.def"
+    // FIXME: Implement.
     return BuiltType();
   }
 

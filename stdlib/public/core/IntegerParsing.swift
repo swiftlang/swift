@@ -143,22 +143,26 @@ extension FixedWidthInteger {
   public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     let r = Self(radix)
-    let range = text._encodedOffsetRange
-    let guts = text._wholeString._guts
-    defer { _fixLifetime(guts) }
+    let s = text._ephemeralString
+    defer { _fixLifetime(s) }
+    
+    let c = s._core
     let result: Self?
-    if _slowPath(guts._isOpaque) {
-      var i = guts._asOpaque()[range].makeIterator()
+    if _slowPath(c._baseAddress == nil) {
+      var i = s.utf16.makeIterator()
       result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
-    } else if guts.isASCII {
-      var i = guts._unmanagedASCIIView[range].makeIterator()
+    }
+    else if _fastPath(c.elementWidth == 1), let a = c.asciiBuffer {
+      var i = a.makeIterator()
       result = _parseASCII(codeUnits: &i, radix: r)
-    } else {
-      var i = guts._unmanagedUTF16View[range].makeIterator()
+    }
+    else {
+      let b = UnsafeBufferPointer(start: c.startUTF16, count: c.count)
+      var i = b.makeIterator()
       result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
     }
     guard _fastPath(result != nil) else { return nil }
-    self = result._unsafelyUnwrappedUnchecked
+    self = result!
   }
 
   /// Creates a new integer value from the given string.

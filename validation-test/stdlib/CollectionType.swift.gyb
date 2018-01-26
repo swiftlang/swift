@@ -7,7 +7,7 @@
 
 % import os.path
 % import gyb
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal, defaultIndicesForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -829,6 +829,7 @@ func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
 % for Traversal in TRAVERSALS:
 %   Collection = collectionForTraversal(Traversal)
 %   Self = 'Fatal' + Collection
+%   Indices = defaultIndicesForTraversal(Traversal)
 
 struct ${Self}<T> : ${Collection} {
   var startIndex: FatalIndex { fatalError() }
@@ -847,7 +848,7 @@ CollectionTypeTests.test("AssociatedTypes/${Collection}") {
     iteratorType: IndexingIterator<C>.self,
     subSequenceType: Slice<C>.self,
     indexType: FatalIndex.self,
-    indicesType: DefaultIndices<C>.self)
+    indicesType: ${Indices}<C>.self)
 }
 % end
 

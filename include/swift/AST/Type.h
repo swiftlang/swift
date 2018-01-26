@@ -340,15 +340,6 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
-  /// Return the name of the type, adding parens in cases where
-  /// appending or prepending text to the result would cause that text
-  /// to be appended to only a portion of the returned type. For
-  /// example for a function type "Int -> Float", adding text after
-  /// the type would make it appear that it's appended to "Float" as
-  /// opposed to the entire type.
-  std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
-
   /// Computes the join between two types.
   ///
   /// The join of two types is the most specific type that is a supertype of

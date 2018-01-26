@@ -431,12 +431,10 @@ Objective-C ``Protocol`` objects. The layout is as follows:
   the flags. It specifies the number of requirements that do not have default
   implementations.
 - **Number of requirements** is stored as a 16-bit integer after the flags. It
-  specifies the total number of requirements for the protocol.
+  specifies the total number of requirements for the protocl.
 - **Requirements pointer** stored as a 32-bit relative pointer to an array
   of protocol requirements. The number of elements in the array is specified
   by the preceding 16-bit integer.
-- **Superclass pointer** stored as a 32-bit relative pointer to class metadata,
-  describing the superclass bound of the protocol.
 - **Associated type names** stored as a 32-bit relative pointer to a
   null-terminated string. The string contains the names of the associated
   types, in the order they apparent in the requirements list, separated by

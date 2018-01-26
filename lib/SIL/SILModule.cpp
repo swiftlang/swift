@@ -60,12 +60,6 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
     case SILLinkage::Public:
       decl->setLinkage(SILLinkage::PublicExternal);
       return;
-    case SILLinkage::PublicNonABI:
-      // PublicNonABI functions receive SharedExternal linkage, so that
-      // they have "link once" semantics when deserialized by multiple
-      // translation units in the same Swift module.
-      decl->setLinkage(SILLinkage::SharedExternal);
-      return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
@@ -73,8 +67,8 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
       decl->setLinkage(SILLinkage::SharedExternal);
       return;
     case SILLinkage::Private:
-      decl->setLinkage(SILLinkage::PrivateExternal);
-      return;
+        decl->setLinkage(SILLinkage::PrivateExternal);
+        return;
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::SharedExternal:

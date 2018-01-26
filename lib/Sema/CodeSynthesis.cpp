@@ -276,8 +276,9 @@ static void maybeMarkTransparent(FuncDecl *accessor,
   if (!nominalDecl)
     return;
 
-  // Accessors for resilient properties are not @_transparent.
-  if (storage->isResilient())
+  // Accessors for stored properties of resilient types are not
+  // @_transparent.
+  if (nominalDecl->isResilient())
     return;
 
   // Accessors for protocol storage requirements are never @_transparent

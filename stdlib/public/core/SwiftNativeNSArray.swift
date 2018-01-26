@@ -267,10 +267,6 @@ internal class _SwiftNativeNSArrayWithContiguousStorage {
   @_inlineable
   @_versioned
   internal init() {}
-
-  @_inlineable
-  @_versioned
-  deinit {}
 }
 #endif
 

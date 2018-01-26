@@ -18,7 +18,7 @@
 #ifndef SWIFT_SYNTAX_TOKENSYNTAX_H
 #define SWIFT_SYNTAX_TOKENSYNTAX_H
 
-#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/TokenKinds.h"
@@ -36,48 +36,58 @@ public:
   TokenSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
     : Syntax(Root, Data) {}
 
+  RC<RawTokenSyntax> getRawToken() const {
+    return cast<RawTokenSyntax>(getRaw());
+  }
+
   static TokenSyntax missingToken(const tok Kind, OwnedString Text) {
-    return make<TokenSyntax>(RawSyntax::missing(Kind, Text));
+    return make<TokenSyntax>(RawTokenSyntax::missingToken(Kind, Text));
   }
 
-  Trivia getLeadingTrivia() const {
-    return Trivia { getRaw()->getLeadingTrivia().vec() };
+  const Trivia &getLeadingTrivia() const {
+    return getRawToken()->LeadingTrivia;
   }
 
-  Trivia getTrailingTrivia() const {
-    return Trivia { getRaw()->getTrailingTrivia().vec() };
+  const Trivia &getTrailingTrivia() const {
+    return getRawToken()->TrailingTrivia;
   }
 
   TokenSyntax withLeadingTrivia(const Trivia &Trivia) const {
-    auto NewRaw = getRaw()->withLeadingTrivia(Trivia.Pieces);
+    auto NewRaw = getRawToken()->withLeadingTrivia(Trivia);
     return Data->replaceSelf<TokenSyntax>(NewRaw);
   }
 
   TokenSyntax withTrailingTrivia(const Trivia &Trivia) const {
-    auto NewRaw = getRaw()->withTrailingTrivia(Trivia.Pieces);
+    auto NewRaw = getRawToken()->withTrailingTrivia(Trivia);
     return Data->replaceSelf<TokenSyntax>(NewRaw);
   }
 
-  /* TODO: If we really need them.
-  bool isKeyword() const;
-
-  bool isPunctuation() const;
-
-  bool isOperator() const;
-
-  bool isLiteral() const;
-  */
+  bool isKeyword() const {
+    return getRawToken()->isKeyword();
+  }
 
   bool isMissing() const {
-    return getRaw()->isMissing();
+    return getRawToken()->isMissing();
+  }
+
+  bool isPunctuation() const {
+    return getRawToken()->isPunctuation();
+  }
+
+  bool isOperator() const {
+    return getRawToken()->isOperator();
+  }
+
+  bool isLiteral() const {
+    return getRawToken()->isLiteral();
   }
 
   tok getTokenKind() const {
-    return getRaw()->getTokenKind();
+    return getRawToken()->getTokenKind();
   }
 
   StringRef getText() const {
-    return getRaw()->getTokenText();
+    return getRawToken()->getText();
   }
 
   static bool classof(const Syntax *S) {

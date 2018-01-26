@@ -84,7 +84,13 @@ public:
       addSymbol("main");
   }
 
+  void visitPatternBindingDecl(PatternBindingDecl *PBD);
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
+
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    // any information here is encoded elsewhere
+  }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 

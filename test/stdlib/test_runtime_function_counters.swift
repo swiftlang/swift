@@ -44,30 +44,15 @@ public func length<T>(_ l: List<T>) -> Int {
 }
 
 /// CHECK-LABEL: TEST: Collect references inside objects
-
-// Constant strings don't really have a reference, but BridgeObject
-// still counts as one.
-//
-// FIXME(TODO: JIRA): On 32-bit, we use AnyObject? instead of BridgeObject. If
-// we get back onto a real reference (or if 64-bit gets off of a real
-// reference), then drop adjust the optionality of the following check.
-//
-/// CHECK: Constant string: [{{([0-9a-fA-Fx]+)?}}]
-
+/// Constant strings do not have an owner, thus no references.
+/// CHECK: Constant string: []
 /// An array has one reference
 /// CHECK: Array<Int>: [{{[0-9a-fA-Fx]+}}]
-
-/// MyStruct has two references plus a String with a third
-//
-// FIXME(TODO: JIRA): On 32-bit, we use AnyObject? instead of BridgeObject. If
-// we get back onto a real reference (or if 64-bit gets off of a real
-// reference), then drop adjust the optionality of the following check.
-//
-/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}{{(, [0-9a-fA-Fx]+)?}}]
-
-/// Dictionary has one reference
+/// MyStruct has two references
+/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}]
+/// Dictionary has once reference
 /// CHECK: Dictionary<Int, Int>: [{{[0-9a-fA-Fx]+}}]
-/// Set has one reference
+/// Set has once reference
 /// CHECK: Set<Int>: [{{[0-9a-fA-Fx]+}}]
 /// Test collection of references inside different types of objects.
 @inline(never)

@@ -15,10 +15,10 @@ import default_arguments_other
 public func defaultString() -> String { return "hi" }
 
 // SWIFT3-LABEL: sil @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
-// SWIFT4-LABEL: sil non_abi [serialized] @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
+// SWIFT4-LABEL: sil [serialized] @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
 
 // SWIFT3-LABEL: sil @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
-// SWIFT4-LABEL: sil non_abi [serialized] @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
+// SWIFT4-LABEL: sil [serialized] @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
 
 public func hasDefaultArguments(x: Int = 0, y: String = defaultString()) {}
 
@@ -55,7 +55,7 @@ public func callsOtherDefaultArguments() {
   otherDefaultArguments()
 }
 
-// CHECK-LABEL: sil hidden_external [serialized] @$S23default_arguments_other0C16DefaultArguments1xySi_tFfA_ : $@convention(thin) () -> Int
+// CHECK-LABEL: sil [serialized] @$S23default_arguments_other0C16DefaultArguments1xySi_tFfA_ : $@convention(thin) () -> Int
 
 // CHECK-LABEL: sil @$S23default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 

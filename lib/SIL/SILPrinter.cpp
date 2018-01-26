@@ -344,6 +344,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::GlobalAccessor:
     OS << "!globalaccessor";
     break;
+  case SILDeclRef::Kind::GlobalGetter:
+    OS << "!globalgetter";
+    break;
   case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "!defaultarg" << "." << defaultArgIndex;
     break;
@@ -2192,7 +2195,6 @@ void SILFunction::dump(const char *FileName) const {
 static StringRef getLinkageString(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return "public ";
-  case SILLinkage::PublicNonABI: return "non_abi ";
   case SILLinkage::Hidden: return "hidden ";
   case SILLinkage::Shared: return "shared ";
   case SILLinkage::Private: return "private ";

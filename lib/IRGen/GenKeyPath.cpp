@@ -258,8 +258,6 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     
   {
     IRGenFunction IGF(IGM, layoutFn);
-    if (IGM.DebugInfo)
-      IGM.DebugInfo->emitArtificialFunction(IGF, layoutFn);
     // Unmarshal the generic environment from the argument buffer.
     auto parameters = IGF.collectParameters();
     auto args = parameters.claimNext();
@@ -511,9 +509,6 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     
   {
     IRGenFunction IGF(IGM, initFn);
-    if (IGM.DebugInfo)
-      IGM.DebugInfo->emitArtificialFunction(IGF, initFn);
-
     auto params = IGF.collectParameters();
     // Pointer to the argument packet passed into swift_getKeyPath
     auto src = params.claimNext();

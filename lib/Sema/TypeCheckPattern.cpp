@@ -1231,11 +1231,10 @@ recur:
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
       for (int i = 0; i < numExtraOptionals; ++i) {
-        auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
         sub = new (Context) EnumElementPattern(TypeLoc(),
                                                IP->getStartLoc(),
                                                IP->getEndLoc(),
-                                               some->getName(),
+                                               Context.Id_some,
                                                nullptr, sub,
                                                /*Implicit=*/true);
       }

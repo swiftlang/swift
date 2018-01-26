@@ -3,13 +3,6 @@
 
 import StdlibUnittest
 
-extension String {
-  var bufferID: Int {
-    guard let id = _guts._objectIdentifier else { return 0 }
-    return id.hashValue
-  }
-}
-
 // CHECK-NOT: Reallocations exceeded 30
 func testReallocation() {
   var x = "The quick brown fox jumped over the lazy dog\n"._split(separator: " ")
@@ -20,10 +13,10 @@ func testReallocation() {
   var reallocations = 0
   for i in 0..<laps {
     for s in x {
-      var lastBase = story.bufferID
+      var lastBase = story._core._baseAddress
       story += " "
       story += s
-      if lastBase != story.bufferID {
+      if lastBase != story._core._baseAddress {
         reallocations += 1
         
         // To avoid dumping a vast string here, just write the first

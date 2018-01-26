@@ -16,10 +16,10 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/Trivia.h"
@@ -31,7 +31,8 @@ namespace {
 static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
                                        ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  return RawSyntax::make(Kind, Parts, SourcePresence::Present);
+  RawSyntax::LayoutList Layout(Parts);
+  return RawSyntax::make(Kind, Layout, SourcePresence::Present);
 }
 
 RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
@@ -51,18 +52,16 @@ RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF,
-                                           DiagnosticEngine &Diags,
-                                           SourceManager &SourceMgr,
-                                           unsigned BufferID)
-    : RootDataOrParent(new RootContextData(SF, Diags, SourceMgr, BufferID)),
-      CtxtHolder(CtxtHolder), Storage(getRootData().Storage), Offset(0),
-      Mode(AccumulationMode::Root), Enabled(SF.shouldKeepSyntaxInfo()) {
+                                           DiagnosticEngine &Diags)
+    : RootDataOrParent(new RootContextData(SF, Diags)),
+      CtxtHolder(CtxtHolder), Mode(AccumulationMode::Root),
+      Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
 }
 
 /// Add RawSyntax to the parts.
 void SyntaxParsingContext::addRawSyntax(RC<RawSyntax> Raw) {
-  Storage.emplace_back(Raw);
+  Parts.emplace_back(Raw);
 }
 
 SyntaxParsingContext *SyntaxParsingContext::getRoot() {
@@ -78,9 +77,9 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  addRawSyntax(RawSyntax::make(Tok.getKind(), Tok.getText(),
-                               SourcePresence::Present, LeadingTrivia.Pieces,
-                               TrailingTrivia.Pieces));
+  addRawSyntax(RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
+                                    SourcePresence::Present, LeadingTrivia,
+                                    TrailingTrivia));
 }
 
 /// Add Syntax to the parts.
@@ -91,17 +90,14 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
-  if (N == 0) {
-    Storage.push_back(createSyntaxAs(Kind, {}));
-    return;
-  }
+  assert(N >= 1);
 
-  auto I = Storage.end() - N;
-  *I = createSyntaxAs(Kind, getParts().take_back(N));
+  auto I = Parts.end() - N;
+  *I = createSyntaxAs(Kind, llvm::makeArrayRef(Parts).take_back(N));
 
-  // Remove consumed parts.
+  // Remove used parts.
   if (N != 1)
-    Storage.erase(I + 1, Storage.end());
+    Parts.erase(I + 1, Parts.end());
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
@@ -121,14 +117,13 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     break;
   }
   case SyntaxKind::MemberAccessExpr:
-  case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:
   case SyntaxKind::SubscriptExpr:
   case SyntaxKind::ExprList: {
-    createNodeInPlace(Kind, getParts().size());
+    createNodeInPlace(Kind, Parts.size());
     break;
   }
   default:
@@ -141,16 +136,14 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind) {
   assert(isTopOfContextStack());
   if (!Enabled)
     return;
-  auto Parts = getParts();
-  auto Count = 0;
-  for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
-    if (!SyntaxFactory::canServeAsCollectionMember(ColletionKind,
-                                                   make<Syntax>(*I)))
-      break;
-    ++Count;
-  }
-  if (Count)
+  auto Count = std::count_if(Parts.rbegin(), Parts.rend(),
+                             [&](const RC<RawSyntax> &Raw) {
+    return SyntaxFactory::canServeAsCollectionMember(ColletionKind,
+                                                     make<Syntax>(Raw));
+  });
+  if (Count) {
     createNodeInPlace(ColletionKind, Count);
+  }
 }
 
 namespace {
@@ -216,35 +209,7 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
   }
 }
 
-/// This verifier traverses a syntax node to emit proper diagnostics.
-class SyntaxVerifier: public SyntaxVisitor {
-  RootContextData &RootData;
-  template<class T>
-  SourceLoc getSourceLoc(T Node) {
-    return RootData.SourceMgr.getLocForOffset(RootData.BufferID,
-      Node.getAbsolutePosition().getOffset());
-  }
-public:
-  SyntaxVerifier(RootContextData &RootData) : RootData(RootData) {}
-  void visit(UnknownDeclSyntax Node) override {
-    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
-                            "declaration");
-    visitChildren(Node);
-  }
-  void visit(UnknownExprSyntax Node) override {
-    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
-                            "expression");
-    visitChildren(Node);
-  }
-
-  void verify(Syntax Node) {
-    Node.accept(*this);
-  }
-};
-
-void finalizeSourceFile(RootContextData &RootData,
-                        ArrayRef<RC<RawSyntax>> Parts) {
-  SourceFile &SF = RootData.SF;
+void finalizeSourceFile(SourceFile &SF, ArrayRef<RC<RawSyntax>> Parts) {
   std::vector<DeclSyntax> AllTopLevel;
   llvm::Optional<TokenSyntax> EOFToken;
 
@@ -255,13 +220,14 @@ void finalizeSourceFile(RootContextData &RootData,
     }
   }
 
-  if (!Parts.empty() && Parts.back()->isToken(tok::eof)) {
+  if (Parts.back()->isToken() &&
+      cast<RawTokenSyntax>(Parts.back())->is(tok::eof)) {
     EOFToken.emplace(make<TokenSyntax>(Parts.back()));
     Parts = Parts.drop_back();
   }
 
   for (auto RawNode : Parts) {
-    if (RawNode->getKind() != SyntaxKind::StmtList)
+    if (RawNode->Kind != SyntaxKind::StmtList)
       // FIXME: Skip for now.
       continue;
     AllTopLevel.push_back(
@@ -271,27 +237,8 @@ void finalizeSourceFile(RootContextData &RootData,
       SyntaxFactory::makeDeclList(AllTopLevel),
       EOFToken.hasValue() ? *EOFToken
                           : TokenSyntax::missingToken(tok::eof, "")));
-
-  if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
-    // Verify the added nodes if specified.
-    SyntaxVerifier Verifier(RootData);
-    Verifier.verify(SF.getSyntaxRoot());
-  }
 }
 } // End of anonymous namespace
-
-void SyntaxParsingContext::finalizeRoot() {
-  if (!Enabled)
-    return;
-  assert(isTopOfContextStack() && "some sub-contexts are not destructed");
-  assert(isRoot() && "only root context can finalize the tree");
-  assert(Mode == AccumulationMode::Root);
-  finalizeSourceFile(getRootData(), getParts());
-
-  // Clear the parts because we will call this function again when destroying
-  // the root context.
-  getRootData().Storage.clear();
-}
 
 SyntaxParsingContext::~SyntaxParsingContext() {
   assert(isTopOfContextStack() && "destructed in wrong order");
@@ -310,38 +257,28 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   switch (Mode) {
   // Create specified Syntax node from the parts and add it to the parent.
   case AccumulationMode::CreateSyntax:
-    assert(!isRoot());
-    createNodeInPlace(SynKind, Storage.size() - Offset);
+    getParent()->addRawSyntax(createSyntaxAs(SynKind, Parts));
     break;
 
   // Ensure the result is specified Syntax category and add it to the parent.
-  case AccumulationMode::CoerceKind: {
-    assert(!isRoot());
-    if (Storage.size() == Offset) {
-      Storage.push_back(bridgeAs(CtxtKind, {}));
-    } else {
-      auto I = Storage.begin() + Offset;
-      *I = bridgeAs(CtxtKind, getParts());
-      // Remove used parts.
-      if (Storage.size() > Offset + 1)
-        Storage.erase(Storage.begin() + (Offset + 1), Storage.end());
-    }
+  case AccumulationMode::CoerceKind:
+    getParent()->addRawSyntax(bridgeAs(CtxtKind, Parts));
     break;
-  }
 
-  // Do nothing.
+  // Just move the parts to the tail of the parent.
   case AccumulationMode::Transparent:
-    assert(!isRoot());
+    std::move(Parts.begin(), Parts.end(), std::back_inserter(getParent()->Parts));
     break;
 
-  // Remove all parts in this context.
+  // Do nothing. Just let it discarded.
   case AccumulationMode::Discard:
-    Storage.resize(Offset);
+    assert(!isRoot());
     break;
 
   // Accumulate parsed toplevel syntax onto the SourceFile.
   case AccumulationMode::Root:
-    finalizeRoot();
+    assert(isRoot() && "AccumulationMode::Root is only for root context");
+    finalizeSourceFile(getRootData().SF, Parts);
     break;
 
   // Never.

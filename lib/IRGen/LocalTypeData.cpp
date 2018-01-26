@@ -264,8 +264,7 @@ void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
                               /*prefix*/ false);
 
           auto table =
-              emitInvariantLoadOfOpaqueWitness(*this, selfTable,
-                                        wIndex.forProtocolWitnessTable());
+              emitInvariantLoadOfOpaqueWitness(*this, selfTable, wIndex);
           table = Builder.CreateBitCast(table, IGM.WitnessTablePtrTy);
           setProtocolWitnessTableName(IGM, table, archetype, proto);
 

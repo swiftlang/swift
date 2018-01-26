@@ -91,6 +91,29 @@ import Typedefs
 
 prefix operator ***
 
+// CHECK-LABEL: extension WrappedInt : WrappedProto {
+// CHECK-NEXT: func wrappedMethod()
+// CHECK-NEXT: prefix static func *** (x: WrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
+extension WrappedInt: WrappedProto {
+  public func wrappedMethod() {}
+  public static prefix func ***(x: WrappedInt) {}
+}
+// CHECK-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-NEXT: func unwrappedMethod()
+// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-RECOVERY-NEXT: func unwrappedMethod()
+// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
+// CHECK-RECOVERY-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
+extension UnwrappedInt: UnwrappedProto {
+  public func unwrappedMethod() {}
+  public static prefix func ***(x: UnwrappedInt) {}
+}
+
 // CHECK-LABEL: class User {
 // CHECK-RECOVERY-LABEL: class User {
 open class User {
@@ -373,29 +396,5 @@ public typealias UnwrappedAlias = UnwrappedInt
 
 public typealias ConstrainedWrapped<T: HasAssoc> = T where T.Assoc == WrappedInt
 public typealias ConstrainedUnwrapped<T: HasAssoc> = T where T.Assoc == UnwrappedInt
-
-// CHECK-LABEL: extension Int32 : UnwrappedProto {
-// CHECK-NEXT: func unwrappedMethod()
-// CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
-// CHECK-NEXT: }
-// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
-// CHECK-RECOVERY-NEXT: func unwrappedMethod()
-// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
-// CHECK-RECOVERY-NEXT: }
-// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
-extension UnwrappedInt: UnwrappedProto {
-  public func unwrappedMethod() {}
-  public static prefix func ***(x: UnwrappedInt) {}
-}
-
-// CHECK-LABEL: extension WrappedInt : WrappedProto {
-// CHECK-NEXT: func wrappedMethod()
-// CHECK-NEXT: prefix static func *** (x: WrappedInt)
-// CHECK-NEXT: }
-// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
-extension WrappedInt: WrappedProto {
-  public func wrappedMethod() {}
-  public static prefix func ***(x: WrappedInt) {}
-}
 
 #endif // TEST

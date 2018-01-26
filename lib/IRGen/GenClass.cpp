@@ -31,7 +31,6 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILVTableVisitor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1020,36 +1019,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
-
-  // If the class is resilient, emit dispatch thunks.
-  if (isResilient(D, ResilienceExpansion::Minimal)) {
-    struct ThunkEmitter : public SILVTableVisitor<ThunkEmitter> {
-      IRGenModule &IGM;
-      ClassDecl *D;
-
-      ThunkEmitter(IRGenModule &IGM, ClassDecl *D)
-        : IGM(IGM), D(D) {
-        addVTableEntries(D);
-      }
-
-      void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
-
-      void addMethod(SILDeclRef member) {
-        auto *func = cast<AbstractFunctionDecl>(member.getDecl());
-        if (func->getDeclContext() == D &&
-            func->getEffectiveAccess() >= AccessLevel::Public) {
-          IGM.emitDispatchThunk(member);
-        }
-      }
-
-      void addPlaceholder(MissingMemberDecl *m) {
-        assert(m->getNumberOfVTableEntries() == 0
-               && "Should not be emitting class with missing members");
-      }
-    };
-
-    ThunkEmitter emitter(*this, D);
-  }
 }
 
 namespace {

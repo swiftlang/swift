@@ -191,7 +191,7 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal func _internalIndex(at i: Int) -> Int {
-      return _guts.startIndex + i
+      return _core.startIndex + i
     }
 
     /// Accesses the code unit at the given position.
@@ -212,29 +212,30 @@ extension String {
           "out-of-range access on a UTF16View")
 
       let index = _internalIndex(at: i.encodedOffset)
-      let u = _guts[index]
-      if _fastPath(UTF16._isScalar(u)) {
+      let u = _core[index]
+      if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit.
         return u
       }
 
-      if UTF16.isLeadSurrogate(u) {
-        // Sequence is well-formed if `u` is followed by a low-surrogate.
+      if (u &>> 10) == 0b1101_10 {
+        // `u` is a high-surrogate.  Sequence is well-formed if it
+        // is followed by a low-surrogate.
         if _fastPath(
-          index + 1 < _guts.count &&
-          UTF16.isTrailSurrogate(_guts[index + 1])) {
+               index + 1 < _core.count &&
+               (_core[index + 1] &>> 10) == 0b1101_11) {
           return u
         }
-        return UTF16._replacementCodeUnit
+        return 0xfffd
       }
 
       // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
-      if _fastPath(index != 0 && UTF16.isLeadSurrogate(_guts[index - 1])) {
+      if _fastPath(index != 0 && (_core[index - 1] &>> 10) == 0b1101_10) {
         return u
       }
-      return UTF16._replacementCodeUnit
+      return 0xfffd
     }
 
 #if _runtime(_ObjC)
@@ -257,21 +258,23 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _guts: _StringGuts) {
-      self.init(_guts, offset: 0, length: _guts.count)
+    internal init(_ _core: _StringCore) {
+      self.init(_core, offset: 0, length: _core.count)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
+    internal init(_ _core: _StringCore, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
-      self._guts = _guts
+      self._core = _core
     }
 
     @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
-      return String(_guts._extractSlice(_encodedOffsetRange))
+      let start = _internalIndex(at: _offset)
+      let end = _internalIndex(at: _offset + _length)
+      return String(_core[start..<end])
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -283,16 +286,15 @@ extension String {
     internal var _offset: Int
     @_versioned // FIXME(sil-serialize-all)
     internal var _length: Int
-
-    @_versioned
-    internal var _guts: _StringGuts
+    @_versioned // FIXME(sil-serialize-all)
+    internal let _core: _StringCore
   }
 
   /// A UTF-16 encoding of `self`.
   @_inlineable // FIXME(sil-serialize-all)
   public var utf16: UTF16View {
     get {
-      return UTF16View(_guts)
+      return UTF16View(_core)
     }
     set {
       self = String(describing: newValue)
@@ -325,7 +327,9 @@ extension String {
     // semantics may be impossible to preserve in the case of string literals,
     // since we no longer have access to the length of the original string when
     // there is no owner and elements are dropped from the end.
-    let wholeString = String(utf16._guts)
+    let wholeString = utf16._core.nativeBuffer.map { String(_StringCore($0)) }
+       ?? String(utf16._core)
+
     guard
       let start = UTF16Index(_offset: utf16._offset)
         .samePosition(in: wholeString),
@@ -336,13 +340,14 @@ extension String {
         return nil
     }
     self = wholeString[start..<end]
+
   }
 
   /// Creates a string corresponding to the given sequence of UTF-16 code units.
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4.0)
   public init(_ utf16: UTF16View) {
-    self = String(utf16._guts)
+    self = String(utf16._core)
   }
 
   /// The index type for subscripting a string.
@@ -355,19 +360,7 @@ extension String.UTF16View : _SwiftStringView {
   internal var _ephemeralContent : String { return _persistentContent }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String { return String(self._guts) }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  var _wholeString : String {
-    return String(_guts)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  var _encodedOffsetRange : Range<Int> {
-    return _offset..<_offset+_length
-  }
+  internal var _persistentContent : String { return String(self._core) }
 }
 
 // Index conversions
@@ -599,7 +592,7 @@ extension String.UTF16View {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String.UTF16View {
     return String.UTF16View(
-      _guts,
+      _core,
       offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
       length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
   }

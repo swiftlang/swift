@@ -78,11 +78,7 @@ extern "C" void swift_stringFromUTF8InRawMemory(String *out,
 
 struct String {
   // Keep the details of String's implementation opaque to the runtime.
-  const void *x = nullptr;
-  const void *y = nullptr;
-#if __POINTER_WIDTH__ == 32
-  const void *z = nullptr;
-#endif
+  const void *x, *y, *z;
 
   /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
@@ -674,7 +670,7 @@ void swift_EnumMirror_subscript(String *outString,
   BoxPair pair = swift_allocBox(boxType);
 
   type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
-  boxType->vw_initializeWithCopy(pair.second, const_cast<OpaqueValue *>(value));
+  boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
   type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
                                     (int) (tag - Description.getNumPayloadCases()));
 
@@ -682,15 +678,15 @@ void swift_EnumMirror_subscript(String *outString,
   swift_release(owner);
 #endif
 
-  owner = pair.first;
-  value = pair.second;
+  owner = pair.object;
+  value = pair.buffer;
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
     owner = *reinterpret_cast<HeapObject * const *>(value);
     value = swift_projectBox(const_cast<HeapObject *>(owner));
     swift_retain(owner);
-    swift_release(pair.first);
+    swift_release(pair.object);
   }
 
   new (outString) String(getFieldName(Description.CaseNames, tag));
@@ -1092,12 +1088,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
   BoxPair box = swift_allocBox(T);
 
   if (take)
-    T->vw_initializeWithTake(box.second, value);
+    T->vw_initializeWithTake(box.buffer, value);
   else
-    T->vw_initializeWithCopy(box.second, value);
-  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.second);
+    T->vw_initializeWithCopy(box.buffer, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.buffer);
 
-  Data = {box.first, box.second, T};
+  Data = {box.object, box.buffer, T};
 }
 
 /// MagicMirror ownership-sharing subvalue constructor.

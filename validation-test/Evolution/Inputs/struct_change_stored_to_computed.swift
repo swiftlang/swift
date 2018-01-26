@@ -34,7 +34,7 @@ public struct ChangeStoredToComputed {
     }
   }
 
-  public var fahrenheit: Int
+  public var fahrenheit: Int = 32
 }
 
 #endif

@@ -147,26 +147,29 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
-  typedef SWIFT_CC(swift) NSString *GetDescriptionFn(OpaqueValue*, const Metadata*);
-  auto getDescription = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<GetDescriptionFn*>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation15_getDescriptionySo8NSStringCxlF)))));
-  
+NSString *swift::convertStringToNSString(String *swiftString) {
+  // public func _convertStringToNSString(_ string: String) -> NSString
+  typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
+  auto convertStringToNSString = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<ConversionFn*>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringySo0E0CSSF)))));
+
   // If Foundation hasn't loaded yet, fall back to returning the static string
   // "Swift._SwiftObject". The likelihood of someone invoking -description without
   // ObjC interop is low.
-  if (!getDescription) {
+  if (!convertStringToNSString)
     return @"Swift._SwiftObject";
-  }
 
-  return [getDescription(value, type) autorelease];
+  return convertStringToNSString(swiftString->x,
+                                 swiftString->y,
+                                 swiftString->z);
 }
 
-static NSString *_getObjectDescription(SwiftObject *obj) {
+static NSString *_getDescription(SwiftObject *obj) {
+  String tmp;
   swift_retain((HeapObject*)obj);
-  return getDescription((OpaqueValue*)&obj,
-                        _swift_getClassOfAllocated(obj));
+  swift_getSummary(&tmp, (OpaqueValue*)&obj, _swift_getClassOfAllocated(obj));
+  return [convertStringToNSString(&tmp) autorelease];
 }
 
 static NSString *_getClassDescription(Class cls) {
@@ -385,10 +388,10 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (NSString *)description {
-  return _getObjectDescription(self);
+  return _getDescription(self);
 }
 - (NSString *)debugDescription {
-  return _getObjectDescription(self);
+  return _getDescription(self);
 }
 
 + (NSString *)description {
@@ -1420,10 +1423,13 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
   return object->refCounts.isUniquelyReferencedOrPinned();
 }
 
-using ClassExtents = TwoWordPair<size_t, size_t>;
+struct ClassExtents {
+  size_t negative;
+  size_t positive; 
+};
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-ClassExtents::Return
+ClassExtents
 _getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
@@ -1436,7 +1442,7 @@ _getSwiftClassInstanceExtents(const Metadata *c) {
 #if SWIFT_OBJC_INTEROP
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-ClassExtents::Return
+ClassExtents
 _getObjCClassInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())

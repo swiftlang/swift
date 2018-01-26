@@ -2,8 +2,6 @@
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
-// RUN: %swift-syntax-test -input-source-filename %s -eof > %t
-// RUN: diff -u %s %t
 
 import ABC
 import A.B.C
@@ -66,8 +64,6 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
-    _ = self
-    _ = Self
   }
 
   func superExpr() {
@@ -222,8 +218,7 @@ func postfix() {
   foo[] {}
   foo[1] {}
   foo[1][2,x:3]
-  foo?++.bar!(baz).self
-  foo().0
+  foo?++.bar!(baz)
 
   foo(x:y:)()
   _ = .foo(x:y:)
