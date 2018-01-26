@@ -1,6 +1,7 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_WARNINGS
+// REQUIRES: executable_test
 protocol P {
   func foo()
 }
