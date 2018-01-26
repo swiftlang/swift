@@ -38,12 +38,40 @@ public enum _RuntimeConfig {
 
   /// When true, prints various debug messages on the runtime state.
   static public var printsDebugLog = false
+
+  /// When true, forces the model code to be run on a GPU.  If there is no usable
+  /// GPU, your program will crash.
+  /// This option requires that the Swift compiler and model code are built with
+  /// `--config=cuda`.
+  /// If there are multiple GPUs, an arbitrary one is chosen.
+  ///
+  /// TODO: replace with an enum such as:
+  /// enum_ComputeDeviceKind {
+  ///   case cpu, gpu, tpu
+  /// }
+  static public var runsOnGPU = false {
+    willSet {
+      debugLog("About to set runsOnGPU to \(newValue)")
+      guard newValue else { return }
+      guard _ExecutionContext.global.gpuDeviceName != nil else {
+        fatalError("""
+          GPU must be available when _RuntimeConfig.runsOnGPU is set to true \
+          -- did you compile with --config=cuda and have a TF-qualified GPU?
+          """)
+      }
+    }
+  }
 }
 
 /// The host of any tensor computation.
 public final class _ExecutionContext {
   /// Global context storing all available devices, loaded functions, etc.
   public static let global: _ExecutionContext = _ExecutionContext()
+
+  public let cpuDeviceName: String
+
+  /// Only set when there is a usable GPU.
+  public let gpuDeviceName: String?
 
   /// The TFE_Context object.
   private var cContext: CTFEContext
@@ -63,10 +91,46 @@ public final class _ExecutionContext {
   private init() {
     debugLog("Initializing global context.")
 
+    // Initialize the TF runtime exactly one.
+    InitTensorFlowRuntime()
+
     let opts = TFE_NewContextOptions()
+    // This only affects GPU based tensor computation, where any input tensors
+    // living in CPU will be transparently copied onto GPU.
+    TFE_ContextOptionsSetDevicePlacementPolicy(opts, TFE_DEVICE_PLACEMENT_SILENT)
     cContext = TFE_NewContext(opts, status)
     TFE_DeleteContextOptions(opts)
     checkOk(status)
+
+    // Initialize GPU device.
+    // While the code here is only needed when _RuntimeConfig.runsOnGPU is true,
+    // running it in all code paths helps keep things simple (e.g. so that the
+    // cpuDeviceName property is always set.)
+    let devices = TFE_ContextListDevices(cContext, status)
+    checkOk(status)
+    defer { TF_DeleteDeviceList(devices!) }
+
+    let deviceCount = TF_DeviceListCount(devices!)
+    debugLog("There are \(deviceCount) devices.")
+    var deviceNames: [String : String] = [:]
+    for deviceId in 0..<deviceCount {
+      let cDeviceName = TF_DeviceListName(devices, deviceId, status)
+      checkOk(status)
+      let deviceName = String(cString: cDeviceName!)
+      let cDeviceType = TF_DeviceListType(devices, deviceId, status)
+      checkOk(status)
+      let deviceType = String(cString: cDeviceType!)
+      debugLog("Device \(deviceId) has type \(deviceType) and name \(deviceName).")
+      deviceNames[deviceType] = deviceName
+    }
+    guard let cpuDeviceName = deviceNames["CPU"] else {
+      fatalError("CPU should always be an available device.")
+    }
+    self.cpuDeviceName = cpuDeviceName
+    // This must be non-nil when _RuntimeConfig.runsOnGPU is set to true, as
+    // being enforced in the willSet check for that property.
+    self.gpuDeviceName = deviceNames["GPU"]
+
     // Initialize the mutex.
 #if os(Linux) || os(FreeBSD)
     pthread_mutex_init(&mutex, nil)
@@ -261,6 +325,18 @@ public final class _TensorComputation {
     }
     debugLog("Done creating a new op.")
 
+    if _RuntimeConfig.runsOnGPU {
+      guard let gpuDeviceName = context.gpuDeviceName else {
+        fatalError("""
+          The availability of a GPU device should have been confirmed \
+          at this point.
+          """)
+      }
+      debugLog("Setting op device to \(gpuDeviceName).")
+      TFE_OpSetDevice(op, gpuDeviceName, status)
+      checkOk(status)
+    }
+
     debugLog("Populating the op's input list.")
     for inputTensor in inputTensors {
       TFE_OpAddInput(op, inputTensor, status)
@@ -340,7 +416,7 @@ public extension _TensorComputation {
   }
 
   /// Wait for completion the computation as given by 'program', and returns
-  /// output handles.
+  /// output handles, whose underlying tensors may live on CPU or GPU.
   func finish() -> [CTensorHandle] {
     debugLog("Calling _TensorComputation.finish().")
 #if os(Linux) || os(FreeBSD)
@@ -411,7 +487,7 @@ public func _TFCStartTensorComputation(
 /// - Parameters:
 ///   - computation: The tensor computation to finish.
 ///   - tensorResultAddress: The address to an uninitialized buffer to accept
-///     results of the computation.
+///     results of the computation, where the output tensors may live on CPU or GPU.
 ///   - tensorResultCount: The number of results to accept from the computation.
 /// - Note: The result address as passed in is pointing to uninitialized memory,
 ///   this must initialize the memory, transfering ownership of the tensor handles

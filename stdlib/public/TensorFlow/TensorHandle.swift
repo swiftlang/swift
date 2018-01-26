@@ -56,7 +56,8 @@ extension TensorHandle {
     let context = _ExecutionContext.global
     let hostHandle: CTensorHandle = context.withMutableCContext { ctx in
       debugLog("Calling TFE_TensorHandleCopyToDevice().")
-      let ret = TFE_TensorHandleCopyToDevice(cTensorHandle, ctx, "CPU:0", status)
+      let ret = TFE_TensorHandleCopyToDevice(
+        cTensorHandle, ctx, context.cpuDeviceName, status)
       checkOk(status)
       return ret!
     }

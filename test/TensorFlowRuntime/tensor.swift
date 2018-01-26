@@ -6,6 +6,21 @@
 import TensorFlow
 import StdlibUnittest
 
+extension TestSuite {
+  func testCPUAndGPU(_ name: String, _ body: @escaping () -> Void) {
+    test(name + "_CPU") {
+      _RuntimeConfig.runsOnGPU = false
+      body()
+    }
+#if CUDA
+    test(name + "_GPU") {
+      _RuntimeConfig.runsOnGPU = true
+      body()
+    }
+#endif
+  }
+}
+
 var TensorTests = TestSuite("Tensor")
 
 /// Determines if two floating point numbers are very nearly equal.
@@ -21,7 +36,7 @@ func testInitializers() {
   expectEqual(Array(x.array.units),
     [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
 }
-TensorTests.test("Initializers", testInitializers)
+TensorTests.testCPUAndGPU("Initializers", testInitializers)
 
 @inline(never)
 func testFactoryInitializers() {
@@ -29,7 +44,7 @@ func testFactoryInitializers() {
   expectEqual(Array(x.array.units),
     Array(repeating: 1, count: 10))
 }
-TensorTests.test("FactoryInitializers", testFactoryInitializers)
+TensorTests.testCPUAndGPU("FactoryInitializers", testFactoryInitializers)
 
 @inline(never)
 func testSimpleMath() {
@@ -39,7 +54,7 @@ func testSimpleMath() {
   expectNearlyEqual(array.units[0], 0.833655, byError: 0.0001)
   expectNearlyEqual(array.units[1], 0.833655, byError: 0.0001)
 }
-TensorTests.test("SimpleMath", testSimpleMath)
+TensorTests.testCPUAndGPU("SimpleMath", testSimpleMath)
 
 @inline(never)
 func testMultiOpMath() {
@@ -51,7 +66,7 @@ func testMultiOpMath() {
   _ = expsqr
   // TODO: Check result
 }
-TensorTests.test("testMultiOpMath", testMultiOpMath)
+TensorTests.testCPUAndGPU("testMultiOpMath", testMultiOpMath)
 
 @inline(never)
 func testXWPlusB() {
@@ -65,7 +80,7 @@ func testXWPlusB() {
   _ = x ⊗ w + b
   // TODO: Check result
 }
-TensorTests.test("testXWPlusB", testXWPlusB)
+TensorTests.testCPUAndGPU("testXWPlusB", testXWPlusB)
 
 @inline(never)
 func testXORInference() {
@@ -91,9 +106,9 @@ func testXORInference() {
   expectLT(abs(xor(1.0, 0.0) - 1.0), 0.1)
   expectLT(abs(xor(1.0, 1.0) - 0.0), 0.1)
 }
-TensorTests.test("XORInference", testXORInference)
+TensorTests.testCPUAndGPU("XORInference", testXORInference)
 
-TensorTests.test("MLPClassifierStruct") {
+TensorTests.testCPUAndGPU("MLPClassifierStruct") {
   struct MLPClassifier {
     // 2 x 4
     var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
@@ -122,7 +137,7 @@ func testRankGetter() {
   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
   expectEqual(x.rank, 2)
 }
-TensorTests.test("RankGetter", testRankGetter)
+TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 
 // TODO: Merge into the previous example when we support code motion to avoid
 // sends.
@@ -131,20 +146,20 @@ func testRankGetter2() {
   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
   expectEqual(y.rank, 7)
 }
-TensorTests.test("RankGetter2", testRankGetter2)
+TensorTests.testCPUAndGPU("RankGetter2", testRankGetter2)
 
 @inline(never)
 func testShapeGetter() {
   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
   expectEqual(x.shape, [2, 3])
 }
-TensorTests.test("ShapeGetter", testShapeGetter)
+TensorTests.testCPUAndGPU("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
   expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
 }
-TensorTests.test("ShapeGetter2", testShapeGetter2)
+TensorTests.testCPUAndGPU("ShapeGetter2", testShapeGetter2)
 
 runAllTests()
