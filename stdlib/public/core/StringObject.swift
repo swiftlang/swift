@@ -421,9 +421,11 @@ extension _StringObject {
   var asUnmanagedRawStart: UnsafeRawPointer {
     @inline(__always)
     get {
-      _sanityCheck(isUnmanaged)
+      _sanityCheck(isUnmanagedOrNative)
 #if arch(i386) || arch(arm)
-      return UnsafeRawPointer(bitPattern: _bits)._unsafelyUnwrappedUnchecked
+      return UnsafeRawPointer(
+        bitPattern: isUnmanaged ? _bits : referenceBits
+      )._unsafelyUnwrappedUnchecked
 #else
       return UnsafeRawPointer(
         bitPattern: payloadBits
@@ -510,7 +512,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .unmanagedSingleByte, .unmanagedDoubleByte, .strong():
+      case .unmanagedSingleByte, .unmanagedDoubleByte, .strong:
         return true
       default:
         return false
