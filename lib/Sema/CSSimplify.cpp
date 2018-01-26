@@ -1329,14 +1329,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (auto layoutConstraint = layout.getLayoutConstraint()) {
     if (layoutConstraint->isClass()) {
       if (kind == ConstraintKind::ConformsTo) {
-        // Conformance to AnyObject is defined by having a single
-        // retainable pointer representation:
-        //
-        // - @objc existentials
-        // - class constrained archetypes
-        // - classes
-        if (!type1->isObjCExistentialType() &&
-            !type1->mayHaveSuperclass())
+        if (!type1->satisfiesClassConstraint())
           return SolutionKind::Error;
       } else {
         // Subtype relation to AnyObject also allows class-bound

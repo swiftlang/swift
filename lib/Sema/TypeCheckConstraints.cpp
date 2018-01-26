@@ -2827,9 +2827,7 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
-  if (archetype->requiresClass() &&
-      !type->mayHaveSuperclass() &&
-      !type->isObjCExistentialType())
+  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
