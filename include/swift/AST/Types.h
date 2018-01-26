@@ -696,6 +696,16 @@ public:
   /// with a class type.
   bool mayHaveSuperclass();
 
+  /// Determine whether this type satisfies a class layout constraint, written
+  /// `T: AnyObject` in the source.
+  ///
+  /// A class layout constraint is satisfied when we have a single retainable
+  /// pointer as the representation, which includes:
+  /// - @objc existentials
+  /// - class constrained archetypes
+  /// - classes
+  bool satisfiesClassConstraint();
+
   /// \brief Determine whether this type can be used as a base type for AST
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
