@@ -190,3 +190,14 @@ enum Foo { case A(P, String) }
 func Foo_cases() {
   _ = Foo.A
 }
+
+enum Indirect<T> {
+  indirect case payload((T, other: T))
+  case none
+}
+// CHECK-LABEL: sil{{.*}} @{{.*}}makeIndirectEnum{{.*}} : $@convention(thin) <T> (@in T) -> @owned Indirect<T>
+// CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
+// CHECK: enum $Indirect<T>, #Indirect.payload!enumelt.1, [[BOX]] : $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
+func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {
+  return Indirect.payload((payload, other: payload))
+}

@@ -3541,7 +3541,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // throws, we know to deallocate the uninitialized box.
   if (element->isIndirect() ||
       element->getParentEnum()->isIndirect()) {
-    auto boxTy = SILBoxType::get(payloadTL.getLoweredType().getSwiftRValueType());
+    auto boxTy = SGM.M.Types.getBoxTypeForEnumElement(enumTy, element);
     auto *box = B.createAllocBox(loc, boxTy);
     auto *addr = B.createProjectBox(loc, box, 0);
 
