@@ -1069,8 +1069,17 @@ public:
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
                                 "result of InOutExpr");
       auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
-      
-      checkSameType(DestTy, srcObj, "object types for InOutExpr");
+
+      // HACK: Allow differences in optionality of the source and
+      // result types. When IUO is gone from the type system we'll no
+      // longer need this.
+      auto srcOptObjTy = srcObj->getAnyOptionalObjectType();
+      auto dstOptObjTy = DestTy->getAnyOptionalObjectType();
+      if (srcOptObjTy && dstOptObjTy) {
+        checkSameType(srcOptObjTy, dstOptObjTy, "object types for InOutExpr");
+      } else {
+        checkSameType(DestTy, srcObj, "object types for InOutExpr");
+      }
       verifyCheckedBase(E);
     }
 

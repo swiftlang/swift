@@ -5517,6 +5517,38 @@ static unsigned computeCallLevel(ConstraintSystem &cs, ConcreteDeclRef callee,
   return 0;
 }
 
+// HACK: Support calling functions with inouts of differing kinds of
+// optionality so that we can warn about overloading by IUO vs. plain
+// Optional and allow users to correct the issue by removing an
+// overload and passing the differently-optional value to the
+// remaining overload.
+bool inOutOptionalityDifferenceHack(Expr *arg, Type paramType,
+                                    ConstraintSystem &cs) {
+  auto *inOutArgTy = cs.getType(arg)->getAs<InOutType>();
+  if (!inOutArgTy)
+    return false;
+
+  auto *inOutParamTy = paramType->getAs<InOutType>();
+  if (!inOutParamTy)
+    return false;
+
+  OptionalTypeKind argOTK;
+  OptionalTypeKind paramOTK;
+  auto argObjTy = inOutArgTy->getObjectType()->getAnyOptionalObjectType(argOTK);
+  auto paramObjTy =
+      inOutParamTy->getObjectType()->getAnyOptionalObjectType(paramOTK);
+
+  if (argOTK == paramOTK || argOTK == OTK_None || paramOTK == OTK_None)
+    return false;
+
+  if (!argObjTy->isEqual(paramObjTy))
+    return false;
+
+  // Hammer over the argument type with the expected parameter type.
+  cs.setType(arg, paramType);
+  return true;
+}
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, AnyFunctionType *funcType,
     ApplyExpr *apply,
@@ -5747,11 +5779,16 @@ Expr *ExprRewriter::coerceCallArguments(
       continue;
     }
 
-    // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType,
-                                     getArgLocator(argIdx, paramIdx));
-    if (!convertedArg)
-      return nullptr;
+    Expr *convertedArg;
+    if (inOutOptionalityDifferenceHack(arg, paramType, cs)) {
+      convertedArg = arg;
+    } else {
+      // Convert the argument.
+      convertedArg =
+          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+      if (!convertedArg)
+        return nullptr;
+    }
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
