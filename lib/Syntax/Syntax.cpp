@@ -75,8 +75,8 @@ bool Syntax::isMissing() const {
 }
 
 llvm::Optional<Syntax> Syntax::getParent() const {
-  auto ParentData = getData().Parent;
-  if (ParentData == nullptr) return llvm::None;
+  auto ParentData = getData().getParent();
+  if (!ParentData) return llvm::None;
   return llvm::Optional<Syntax> {
     Syntax { Root, ParentData }
   };
