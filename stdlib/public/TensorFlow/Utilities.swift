@@ -88,9 +88,15 @@ func logToStderr(_ message: String) {
   _ = fputs(message, stderr)
 }
 
-func debugLog(_ message: @autoclosure () -> String) {
+@_versioned
+func debugLog(_ message: @autoclosure () -> String,
+              file: StaticString = #file,
+              line: UInt = #line
+) {
   if _RuntimeConfig.printsDebugLog {
-    print(message())
+    print("[\(file):\(line)] \(message())")
+    // This helps dump more log before a crash.
+    fflush(stdout)
   }
 }
 
