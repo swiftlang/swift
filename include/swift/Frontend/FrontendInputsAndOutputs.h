@@ -38,8 +38,6 @@ class FrontendInputsAndOutputs {
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
-  /// Only one set of outputs (one OutputFilename, one SupplementaryOutputPaths)
-  /// is produced.
   bool IsSingleThreadedWMO = false;
 
   /// Punt where needed to enable batch mode experiments.
