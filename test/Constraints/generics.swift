@@ -265,7 +265,9 @@ protocol SubProto: BaseProto {}
 struct FullyGeneric<Foo> {} // expected-note 11 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
 
 struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
+// expected-note@-1{{requirement specified as 'Foo' : 'AnyObject'}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
+// expected-note@-1{{requirement specified as 'Foo' : 'AnyObject' [with Foo = Any]}}
 
 struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic type 'ProtoBound' declared here}}
 struct ProtoBound2<Foo> where Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound2'}}
@@ -301,11 +303,11 @@ func testFixIts() {
   _ = FullyGeneric<Any>()
 
   _ = AnyClassBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<AnyObject>}}
-  _ = AnyClassBound<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
+  _ = AnyClassBound<Any>() // expected-error {{'AnyClassBound' requires that 'Any' be a class type}}
   _ = AnyClassBound<AnyObject>()
 
   _ = AnyClassBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{21-21=<AnyObject>}}
-  _ = AnyClassBound2<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
+  _ = AnyClassBound2<Any>() // expected-error {{'AnyClassBound2' requires that 'Any' be a class type}}
   _ = AnyClassBound2<AnyObject>()
 
   _ = ProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#Foo: SubProto#>>}}
