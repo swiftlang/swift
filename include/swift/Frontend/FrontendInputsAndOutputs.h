@@ -36,10 +36,39 @@ class FrontendInputsAndOutputs {
 
   llvm::StringMap<unsigned> PrimaryInputs;
 
+  /// In Single-threaded WMO mode, all inputs are used
+  /// both for importing and compiling.
+  /// Only one set of outputs (one OutputFilename, one SupplementaryOutputPaths)
+  /// is produced.
+  bool IsSingleThreadedWMO = false;
+
+  /// Punt where needed to enable batch mode experiments.
+  bool AreBatchModeChecksBypassed = false;
+
 public:
+  bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
+  void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
+
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
+
+  // Single-threaded WMO routines:
+
+  //  SingleThreadedWMO mode needs only one of each output file for the entire
+  //  invocation. WMO can get away with that because it doesn't even attempt to
+  //  be incremental, and so it doesn't need per-file intermediates that
+  //  wouldn't be generated otherwise.
+  //
+  //    (A few of the outputs might make more sense to be generated for every
+  //    input—.d files in particular—but it wasn't natural when passing them on
+  //    the command line, and it hasn't been critical. So right now there's only
+  //    one of everything in WMO, always, except for the actual object files in
+  //    threaded mode.)
+  bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
+  void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
+
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
 
   // Readers:
 
@@ -82,10 +111,9 @@ public:
 
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
-
   // FIXME: dmu fix uses / remove these when batch mode works
   void assertMustNotBeMoreThanOnePrimaryInput() const;
+  void assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled() const;
 
   // Count-dependend readers:
 
@@ -97,6 +125,9 @@ public:
   /// \return the name of the unique primary input, or an empty StrinRef if
   /// there isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const;
+
+  /// Combines all primaries for stats reporter
+  std::string getStatsFileMangledInputName() const;
 
   bool isInputPrimary(StringRef file) const;
 
@@ -123,6 +154,40 @@ public:
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr);
+
+  // Outputs
+
+private:
+  friend class ArgsToFrontendOptionsConverter;
+
+  void setMainOutputs(ArrayRef<std::string> outputFiles);
+
+public:
+  unsigned countOfInputsProducingOutput() const;
+
+  const InputFile &firstInputProducingOutput() const;
+  const InputFile &lastInputProducingOutput() const;
+
+  void forEachInputProducingOutput(
+      llvm::function_ref<void(const InputFile &)> fn) const;
+
+  std::vector<std::string> copyOutputFilenames() const;
+
+  void
+  forEachOutputFilename(llvm::function_ref<void(const std::string)> fn) const;
+
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const;
+
+  bool isOutputFilenameStdout() const;
+  bool isOutputFileDirectory() const;
+  bool hasNamedOutputFile() const;
+
+  // Supplementary outputs
+
+  void forEachInputProducingSupplementaryOutput(
+      llvm::function_ref<void(const InputFile &)> fn) const;
 };
 
 } // namespace swift

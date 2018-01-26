@@ -34,6 +34,7 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
     const FrontendInputsAndOutputs &other) {
   for (InputFile input : other.AllInputs)
     addInput(input);
+  IsSingleThreadedWMO = other.IsSingleThreadedWMO;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -41,6 +42,7 @@ operator=(const FrontendInputsAndOutputs &other) {
   clearInputs();
   for (InputFile input : other.AllInputs)
     addInput(input);
+  IsSingleThreadedWMO = other.IsSingleThreadedWMO;
   return *this;
 }
 
@@ -102,6 +104,12 @@ void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
          "have not implemented >1 primary input yet");
 }
 
+void FrontendInputsAndOutputs::
+    assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled() const {
+  if (!areBatchModeChecksBypassed())
+    assertMustNotBeMoreThanOnePrimaryInput();
+}
+
 const InputFile *FrontendInputsAndOutputs::getUniquePrimaryInput() const {
   assertMustNotBeMoreThanOnePrimaryInput();
   const auto b = PrimaryInputs.begin();
@@ -118,6 +126,12 @@ FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
 StringRef FrontendInputsAndOutputs::getNameOfUniquePrimaryInputFile() const {
   const auto *input = getUniquePrimaryInput();
   return input == nullptr ? StringRef() : input->file();
+}
+
+std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
+  return isWholeModule()
+             ? "all"
+             : primaryInputCount() == 1 ? firstPrimaryInput().file() : "batch";
 }
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
@@ -237,4 +251,91 @@ void FrontendInputsAndOutputs::addInputFile(StringRef file,
 void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
                                                    llvm::MemoryBuffer *buffer) {
   addInput(InputFile(file, true, buffer));
+}
+
+// Outputs
+
+unsigned FrontendInputsAndOutputs::countOfInputsProducingOutput() const {
+  return isSingleThreadedWMO()
+             ? 1
+             : hasPrimaryInputs() ? primaryInputCount() : inputCount();
+}
+
+const InputFile &FrontendInputsAndOutputs::firstInputProducingOutput() const {
+  return isSingleThreadedWMO()
+             ? firstInput()
+             : hasPrimaryInputs() ? firstPrimaryInput() : firstInput();
+}
+
+const InputFile &FrontendInputsAndOutputs::lastInputProducingOutput() const {
+  return isSingleThreadedWMO()
+             ? firstInput()
+             : hasPrimaryInputs() ? lastPrimaryInput() : lastInput();
+}
+
+void FrontendInputsAndOutputs::forEachInputProducingOutput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  isSingleThreadedWMO()
+      ? fn(firstInput())
+      : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
+}
+
+void FrontendInputsAndOutputs::setMainOutputs(
+    ArrayRef<std::string> outputFiles) {
+  assert(countOfInputsProducingOutput() == outputFiles.size());
+  if (hasPrimaryInputs()) {
+    unsigned i = 0;
+    for (auto index : indices(AllInputs)) {
+      InputFile &f = AllInputs[index];
+      if (f.isPrimary())
+        f.setOutputFilename(outputFiles[i]);
+    }
+  } else if (isSingleThreadedWMO()) {
+    AllInputs[0].setOutputFilename(outputFiles[0]);
+  } else {
+    for (auto i : indices(AllInputs))
+      AllInputs[i].setOutputFilename(outputFiles[i]);
+  }
+}
+
+std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
+  std::vector<std::string> outputs;
+  forEachInputProducingOutput([&](const InputFile &input) -> void {
+    outputs.push_back(input.outputFilename());
+  });
+  return outputs;
+}
+
+void FrontendInputsAndOutputs::forEachOutputFilename(
+    llvm::function_ref<void(const std::string)> fn) const {
+  forEachInputProducingOutput(
+      [&](const InputFile &input) -> void { fn(input.outputFilename()); });
+}
+
+StringRef FrontendInputsAndOutputs::getSingleOutputFilename() const {
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeEnabled();
+  return hasInputs() ? StringRef(lastInputProducingOutput().outputFilename())
+                     : StringRef();
+}
+
+bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
+  return getSingleOutputFilename() == "-";
+}
+
+bool FrontendInputsAndOutputs::isOutputFileDirectory() const {
+  return hasNamedOutputFile() &&
+         llvm::sys::fs::is_directory(getSingleOutputFilename());
+}
+
+bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
+  return hasInputs() && !isOutputFilenameStdout();
+}
+
+// Supplementary outputs
+
+void FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
+    llvm::function_ref<void(const InputFile &)> fn) const {
+  isWholeModule()
+      ? fn(firstInput())
+      : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
 }
