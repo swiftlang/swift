@@ -1481,6 +1481,7 @@ namespace {
       }
       
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
+      cs.TC.requestMemberLayout(subscript);
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
