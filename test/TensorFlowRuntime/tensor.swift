@@ -8,6 +8,13 @@ import StdlibUnittest
 
 var TensorTests = TestSuite("Tensor")
 
+/// Determines if two floating point numbers are very nearly equal.
+func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
+  _ lhs: T, _ rhs: T, byError error: T = 0.000001
+) {
+  expectLT(abs(lhs - rhs), error)
+}
+
 @inline(never)
 func testInitializers() {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
@@ -28,9 +35,9 @@ TensorTests.test("FactoryInitializers", testFactoryInitializers)
 func testSimpleMath() {
   let x = Tensor<Float>([1.2, 1.2]).toDevice()
   let y = tanh(x)
-  _ = y
-  // TODO: Check result. Currently crashing because of rank/shape getters
-  // expectTrue(y.array - 0.833655 < 0.000001)
+  let array = y.array
+  expectNearlyEqual(array.units[0], 0.833655, byError: 0.0001)
+  expectNearlyEqual(array.units[1], 0.833655, byError: 0.0001)
 }
 TensorTests.test("SimpleMath", testSimpleMath)
 

@@ -53,9 +53,11 @@ extension TensorHandle {
     // NOTE: This will not perform a copy if the handle is already on the host.
     let context = _ExecutionContext.global
     let hostHandle: CTensorHandle = context.withMutableCContext { ctx in
-      defer { checkOk(status) }
-      return TFE_TensorHandleCopyToDevice(cTensorHandle, ctx, "CPU:0", status)
+      let ret = TFE_TensorHandleCopyToDevice(cTensorHandle, ctx, "CPU:0", status)
+      checkOk(status)
+      return ret!
     }
+    defer { TFE_DeleteTensorHandle(hostHandle) }
     // Materialize the tensor on the host.
     let cTensor = TFE_TensorHandleResolve(hostHandle, status)
     checkOk(status)
