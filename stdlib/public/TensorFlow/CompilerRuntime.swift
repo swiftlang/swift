@@ -61,6 +61,8 @@ public final class _ExecutionContext {
 
   /// Initializes a new execution context by initializing available devices.
   private init() {
+    debugLog("Initializing global context.")
+
     let opts = TFE_NewContextOptions()
     cContext = TFE_NewContext(opts, status)
     TFE_DeleteContextOptions(opts)
@@ -72,6 +74,7 @@ public final class _ExecutionContext {
   }
 
   deinit {
+    debugLog("De-initializing global context.")
     TFE_DeleteContext(cContext, status)
     checkOk(status)
     TF_DeleteStatus(status)
@@ -138,13 +141,19 @@ fileprivate extension _ExecutionContext {
   ///   - count: The size of the program in bytes.
   func loadProgramInBytes(_ address: UnsafeRawPointer, count: Int) {
     sync { [unowned self] in
+      debugLog("Loading a program.")
+
       // If the program is already loaded, do nothing.
-      if self.loadedPrograms.contains(address) { return }
+      if self.loadedPrograms.contains(address) {
+        debugLog("Already loaded before.")
+        return
+      }
 
       // Here we have to do a fairly awkward dance to load the graph functions
       // and populate them into the TFE_Context.  We load the program as a
       // TF_Graph, then copy the functions out of it, then copy them into the
       // TFE_Context.
+      debugLog("Loading graph functions.")
       let graph = TF_NewGraph()
       // TensorFlow loads things through TF_Buffer.  Create one that avoids
       // redundantly copying the program bytes.
@@ -166,6 +175,7 @@ fileprivate extension _ExecutionContext {
       TF_DeleteGraph(graph)
 
       // Add functions to the context.
+      debugLog("Adding functions to context.")
       for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
         TFE_ContextAddFunction(self.cContext, function, self.status)
         checkOk(self.status)
@@ -176,6 +186,7 @@ fileprivate extension _ExecutionContext {
       funcs.deallocate()
       // Memorize the loaded program by address.
       loadedPrograms.insert(address)
+      debugLog("Done loading a new program.")
     }
   }
 }
@@ -243,17 +254,20 @@ public final class _TensorComputation {
 
     // Now that we have them in our context, we can get ready to get the top
     // level function and create an op.
+    debugLog("Creating a new op.")
     self.op = context.withMutableCContext { [status] ctx in
       defer { checkOk(status) }
       return TFE_NewOp(ctx, entryFunctionNameAddress, status)
     }
+    debugLog("Done creating a new op.")
 
-    // Populate the op's input list.
+    debugLog("Populating the op's input list.")
     for inputTensor in inputTensors {
       TFE_OpAddInput(op, inputTensor, status)
       checkOk(status)
     }
 
+    debugLog("Created returning info.")
     self.returnValues = [CTensorHandle?](repeating: nil, count: resultCount)
     self.returnValueCount = CInt(resultCount)
 
@@ -296,6 +310,7 @@ public final class _TensorComputation {
   }
 
   deinit {
+    debugLog("De-initializing _TensorComputation.")
     TFE_DeleteOp(op)
     TF_DeleteStatus(status)
   }
@@ -330,6 +345,7 @@ public extension _TensorComputation {
     debugLog("Calling _TensorComputation.finish().")
 #if os(Linux) || os(FreeBSD)
     if let pthread = pthread {
+      debugLog("Waiting for thread to join.")
       let joinStatus = pthread_join(pthread, nil)
       internalConsistencyCheck(joinStatus == 0)
       self.pthread = nil
@@ -374,6 +390,13 @@ public func _TFCStartTensorComputation(
   // with an async design.
   _ resultCount: Int
 ) -> _TensorComputation {
+
+  debugLog("""
+    _TFCStartTensorComputation() is called with \(programByteCount) \
+    program bytes, \(tensorArgumentCount) input tensors and \
+    \(String(cString:entryFunctionNameAddress)) as the func name.
+    """)
+
   return _TensorComputation(programByteAddress: programByteAddress,
                             programByteCount: programByteCount,
                             entryFunctionNameAddress: entryFunctionNameAddress,
