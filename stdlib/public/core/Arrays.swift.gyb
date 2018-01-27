@@ -1543,7 +1543,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_inlineable
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
-    return _customRemoveLast()!
+    return _customRemoveLast().unsafelyUnwrapped
   }
 
   @_inlineable
