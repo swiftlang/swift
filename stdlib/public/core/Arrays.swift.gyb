@@ -1493,17 +1493,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
 %if Self == 'ArraySlice':
-  /// Removes and returns the last element of the array.
-  ///
-  /// The array must not be empty. This example removes the last number from an
-  /// array of `Double` values.
-  ///
-  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
-  ///     let removed = measurements.removeLast()
-  ///     print(measurements)
-  ///     // Prints "[1.1, 1.5, 2.9, 1.2, 1.5, 1.3]"
-  ///
-  /// - Returns: The element that was removed.
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
     _precondition(count > 0, "Can't removeLast from an empty ${Self}")
@@ -1517,6 +1506,82 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     // positive.
     let result = self[i &- 1]
     self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
+    return result
+  }
+  
+  /// Removes and returns the element at the specified position.
+  ///
+  /// All the elements following the specified position are moved up to
+  /// close the gap.
+  ///
+  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
+  ///     let removed = measurements.remove(at: 2)
+  ///     print(measurements)
+  ///     // Prints "[1.1, 1.5, 1.2, 1.5, 1.3, 1.2]"
+  ///
+  /// - Parameter index: The position of the element to remove. `index` must
+  ///   be a valid index of the array.
+  /// - Returns: The element at the specified index.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the array.
+  @_inlineable
+  @discardableResult
+  public mutating func remove(at index: Int) -> Element {
+    _checkIndex(index)
+    let result = self[index]
+    self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
+    return result
+  }
+
+%else:
+  /// Removes and returns the last element of the array.
+  ///
+  /// - Returns: The last element of the array if the array is not empty;
+  ///   otherwise, `nil`.
+  ///
+  /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
+  ///   of the array; otherwise, O(1).
+  @_inlineable
+  public mutating func popLast() -> Element? {
+    guard !isEmpty else { return nil }
+    return _customRemoveLast()!
+  }
+
+  @_inlineable
+  public mutating func _customRemoveLast() -> Element? {
+    _precondition(!isEmpty, "Can't removeLast from an empty ${Self}")
+    _makeUniqueAndReserveCapacityIfNotUnique()
+    let newCount = _getCount() - 1
+    let pointer = (_buffer.firstElementAddress + newCount)
+    let element = pointer.move()
+    _buffer.count = newCount
+    return element
+  }
+  /// Removes and returns the element at the specified position.
+  ///
+  /// All the elements following the specified position are moved up to
+  /// close the gap.
+  ///
+  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
+  ///     let removed = measurements.remove(at: 2)
+  ///     print(measurements)
+  ///     // Prints "[1.1, 1.5, 1.2, 1.5, 1.3, 1.2]"
+  ///
+  /// - Parameter index: The position of the element to remove. `index` must
+  ///   be a valid index of the array.
+  /// - Returns: The element at the specified index.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the array.
+  @_inlineable
+  @discardableResult
+  public mutating func remove(at index: Int) -> Element {
+    _checkIndex(index)
+    _makeUniqueAndReserveCapacityIfNotUnique()
+    let newCount = _getCount() - 1
+    let pointer = (_buffer.firstElementAddress + index)
+    let result = pointer.move()
+    pointer.moveInitialize(from: pointer + 1, count: newCount - index)
+    _buffer.count = newCount
     return result
   }
 %end
@@ -1544,29 +1609,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)
     self.replaceSubrange(i..<i, with: CollectionOfOne(newElement))
-  }
-
-  /// Removes and returns the element at the specified position.
-  ///
-  /// All the elements following the specified position are moved up to
-  /// close the gap.
-  ///
-  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
-  ///     let removed = measurements.remove(at: 2)
-  ///     print(measurements)
-  ///     // Prints "[1.1, 1.5, 1.2, 1.5, 1.3, 1.2]"
-  ///
-  /// - Parameter index: The position of the element to remove. `index` must
-  ///   be a valid index of the array.
-  /// - Returns: The element at the specified index.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
-  @_inlineable
-  @discardableResult
-  public mutating func remove(at index: Int) -> Element {
-    let result = self[index]
-    self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
-    return result
   }
 
   /// Removes all elements from the array.
@@ -2357,35 +2399,6 @@ extension Array {
   }
 }
 #endif
-
-extension Array {
-  /// Removes and returns the last element of the array.
-  ///
-  /// - Returns: The last element of the array if the array is not empty;
-  ///   otherwise, `nil`.
-  ///
-  /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
-  ///   of the array; otherwise, O(1).
-  @_inlineable
-  public mutating func popLast() -> Element? {
-    guard !isEmpty else { return nil }
-    return removeLast()
-  }
-}
-
-extension ContiguousArray {
-  /// Removes and returns the last element of the array.
-  ///
-  /// - Returns: The last element of the array if the array is not empty;
-  ///   otherwise, `nil`.
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public mutating func popLast() -> Element? {
-    guard !isEmpty else { return nil }
-    return removeLast()
-  }
-}
 
 extension ArraySlice {
   @_inlineable
