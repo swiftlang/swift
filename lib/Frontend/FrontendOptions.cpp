@@ -104,10 +104,9 @@ void FrontendOptions::forAllOutputPaths(
       fn(input.outputFilename());
   }
   const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
+      &InputsAndOutputs.supplementaryOutputs().ModuleOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -182,11 +181,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
-         !canActionEmitDependencies(RequestedAction);
-}
-
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -218,11 +212,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
-}
-
-bool FrontendOptions::canActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -251,11 +241,6 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
-         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -287,14 +272,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
-}
-
-bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {

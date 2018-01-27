@@ -104,12 +104,15 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  const FrontendOptions &opts,
                                  const InputFile &input) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath, EC,
+      llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.DependenciesFilePath, EC.message());
+    diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -188,12 +191,15 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   DependencyTracker &depTracker,
                                   const FrontendOptions &opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
-                           llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath, EC,
+      llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        opts.LoadedModuleTracePath, EC.message());
+    ctxt.Diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -618,7 +624,8 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
+  bool shouldTrackReferences = !opts.InputsAndOutputs.supplementaryOutputs()
+                                    .ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -749,7 +756,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.DependenciesFilePath.empty())
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
@@ -763,7 +771,8 @@ static bool performCompile(CompilerInstance &Instance,
     }
   }
 
-  if (!opts.LoadedModuleTracePath.empty())
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .LoadedModuleTracePath.empty())
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
                                 opts);
 
@@ -788,9 +797,12 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    if (!opts.ObjCHeaderOutputPath.empty())
-      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                         opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    if (!opts.InputsAndOutputs.supplementaryOutputs()
+             .ObjCHeaderOutputPath.empty())
+      return printAsObjC(
+          opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+          Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+          moduleIsPublic);
     if (shouldIndex) {
       if (emitIndexData(Instance.getPrimarySourceFile(),
                         Invocation, Instance))
@@ -800,13 +812,14 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   auto &SILOpts = Invocation.getSILOptions();
-  if (!opts.TBDPath.empty()) {
+  if (!opts.InputsAndOutputs.supplementaryOutputs().TBDPath.empty()) {
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
                            : opts.TBDInstallName;
 
     if (writeTBD(Instance.getMainModule(), SILOpts.hasMultipleIGMs(),
-                 opts.TBDPath, installName))
+                 opts.InputsAndOutputs.supplementaryOutputs().TBDPath,
+                 installName))
       return true;
   }
 
@@ -1043,9 +1056,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
 
-  if (!opts.ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                      opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .ObjCHeaderOutputPath.empty()) {
+    (void)printAsObjC(
+        opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
@@ -1474,7 +1489,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
-      Invocation.getFrontendOptions().SerializedDiagnosticsPath;
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.supplementaryOutputs()
+            .SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1509,10 +1526,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+  if (!Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .ReferenceDependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 

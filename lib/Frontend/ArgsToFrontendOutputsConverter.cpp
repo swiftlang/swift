@@ -28,15 +28,27 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
-Optional<std::vector<std::string>> ArgsToFrontendOutputsConverter::convert() {
+Optional<std::pair<std::vector<std::string>, SupplementaryOutputPaths>>
+ArgsToFrontendOutputsConverter::convert() {
   const auto requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
 
   if (!FrontendOptions::doesActionProduceOutput(requestedAction))
-    return std::vector<std::string>();
+    return std::make_pair(std::vector<std::string>(),
+                          SupplementaryOutputPaths());
 
-  return OutputFilesComputer(Args, Diags, InputsAndOutputs)
-      .computeOutputFiles();
+  Optional<std::vector<std::string>> outputFiles =
+      OutputFilesComputer(Args, Diags, InputsAndOutputs).computeOutputFiles();
+  if (!outputFiles)
+    return None;
+  Optional<SupplementaryOutputPaths> outputPaths =
+      SupplementaryOutputPathsComputer(Args, Diags, InputsAndOutputs,
+                                       *outputFiles, ModuleName)
+          .computeOutputPaths();
+  if (!outputPaths)
+    return None;
+
+  return std::make_pair(*outputFiles, *outputPaths);
 }
 
 /// Try to read an output file list file.
@@ -179,4 +191,210 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   llvm::sys::path::append(path, base);
   llvm::sys::path::replace_extension(path, Suffix);
   return path.str();
+}
+
+SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
+    const ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    ArrayRef<std::string> outputFiles, StringRef moduleName)
+    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+      OutputFiles(outputFiles), ModuleName(moduleName),
+      RequestedAction(
+          ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
+
+Optional<SupplementaryOutputPaths>
+SupplementaryOutputPathsComputer::computeOutputPaths() const {
+  Optional<std::vector<SupplementaryOutputPaths>> pathsFromUser =
+      getSupplementaryFilenamesFromArguments();
+  if (!pathsFromUser)
+    return None;
+
+  return computeOutputPathsForOneInput(
+      OutputFiles[0], (*pathsFromUser)[0],
+      InputsAndOutputs.firstInputProducingOutput());
+}
+
+Optional<std::vector<SupplementaryOutputPaths>>
+SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments()
+    const {
+
+  auto objCHeaderOutput =
+      readSupplementaryOutputArguments(options::OPT_emit_objc_header_path);
+  auto moduleOutput =
+      readSupplementaryOutputArguments(options::OPT_emit_module_path);
+  auto moduleDocOutput =
+      readSupplementaryOutputArguments(options::OPT_emit_module_doc_path);
+  auto dependenciesFile =
+      readSupplementaryOutputArguments(options::OPT_emit_dependencies_path);
+  auto referenceDependenciesFile = readSupplementaryOutputArguments(
+      options::OPT_emit_reference_dependencies_path);
+  auto serializedDiagnostics =
+      readSupplementaryOutputArguments(options::OPT_serialize_diagnostics_path);
+  auto loadedModuleTrace = readSupplementaryOutputArguments(
+      options::OPT_emit_loaded_module_trace_path);
+  auto TBD = readSupplementaryOutputArguments(options::OPT_emit_tbd_path);
+
+  if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
+      !dependenciesFile || !referenceDependenciesFile ||
+      !serializedDiagnostics || !loadedModuleTrace || !TBD) {
+    return None;
+  }
+  std::vector<SupplementaryOutputPaths> result;
+
+  const unsigned N =
+      InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+  for (unsigned i = 0; i < N; ++i) {
+    result.push_back(SupplementaryOutputPaths(
+        (*objCHeaderOutput)[i], (*moduleOutput)[i], (*moduleDocOutput)[i],
+        (*dependenciesFile)[i], (*referenceDependenciesFile)[i],
+        (*serializedDiagnostics)[i], (*loadedModuleTrace)[i], (*TBD)[i]));
+  }
+  return result;
+}
+
+// Extend this routine for filelists if/when we have them.
+
+Optional<std::vector<std::string>>
+SupplementaryOutputPathsComputer::readSupplementaryOutputArguments(
+    swift::options::ID path_id) const {
+  std::vector<std::string> paths = Args.getAllArgValues(path_id);
+
+  const unsigned N =
+      InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+  if (paths.size() > N) {
+    std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+    Diags.diagnose(SourceLoc(), diag::error_too_many_supplementary_outputs,
+                   Table->getOptionName(path_id));
+    return None;
+  }
+  while (paths.size() < N)
+    paths.push_back(std::string());
+  return paths;
+}
+
+Optional<SupplementaryOutputPaths>
+SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
+    StringRef outputFile, const SupplementaryOutputPaths &pathsFromArguments,
+    const InputFile &input) const {
+  StringRef implicitBasis = deriveImplicitBasis(outputFile, input);
+
+  using namespace options;
+
+  auto dependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_dependencies, pathsFromArguments.DependenciesFilePath, "d", "",
+      implicitBasis);
+  if (!dependenciesFilePath)
+    return None;
+
+  auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_reference_dependencies,
+      pathsFromArguments.ReferenceDependenciesFilePath, "swiftdeps", "",
+      implicitBasis);
+  if (!referenceDependenciesFilePath)
+    return None;
+
+  auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
+      OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
+      "dia", "", implicitBasis);
+
+  if (!serializedDiagnosticsPath)
+    return None;
+
+  auto objCHeaderOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath, "h", "",
+      implicitBasis);
+  if (!objCHeaderOutputPath)
+    return None;
+
+  auto loadedModuleTracePath = determineSupplementaryOutputFilename(
+      OPT_emit_loaded_module_trace, pathsFromArguments.LoadedModuleTracePath,
+      "trace.json", "", implicitBasis);
+  if (!loadedModuleTracePath)
+    return None;
+
+  auto tbdPath = determineSupplementaryOutputFilename(
+      OPT_emit_tbd, pathsFromArguments.TBDPath, "tbd", "", implicitBasis);
+  if (!tbdPath)
+    return None;
+
+  auto moduleDocOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_doc, pathsFromArguments.ModuleDocOutputPath,
+      SERIALIZED_MODULE_DOC_EXTENSION, "", implicitBasis);
+  if (!moduleDocOutputPath)
+    return None;
+
+  ID emitModuleOption;
+  std::string moduleExtension;
+  std::string mainOutputIfUsableForModule;
+  deriveModulePathParameters(emitModuleOption, moduleExtension,
+                             mainOutputIfUsableForModule);
+
+  auto moduleOutputPath = determineSupplementaryOutputFilename(
+      emitModuleOption, pathsFromArguments.ModuleOutputPath, moduleExtension,
+      mainOutputIfUsableForModule, implicitBasis);
+  if (!moduleOutputPath)
+    return None;
+
+  return SupplementaryOutputPaths(
+      *objCHeaderOutputPath, *moduleOutputPath, *moduleDocOutputPath,
+      *dependenciesFilePath, *referenceDependenciesFilePath,
+      *serializedDiagnosticsPath, *loadedModuleTracePath, *tbdPath);
+}
+
+StringRef SupplementaryOutputPathsComputer::deriveImplicitBasis(
+    StringRef outputFilename, const InputFile &input) const {
+  if (!outputFilename.empty() && outputFilename != "-")
+    // Put the serialized diagnostics file next to the output file.
+    return outputFilename;
+
+  // If we have a primary input, so use that as the basis for the name of the
+  // serialized diagnostics file, otherwise fall back on the
+  // module name.
+  if (input.isPrimary() && input.file() != "-")
+    return llvm::sys::path::filename(input.file());
+
+  return ModuleName;
+}
+
+Optional<std::string>
+SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
+    options::ID emitOpt, std::string pathFromArguments, StringRef extension,
+    StringRef mainOutputIfUsable, StringRef implicitBasis) const {
+  using namespace options;
+
+  if (!pathFromArguments.empty())
+    return pathFromArguments;
+
+  if (!Args.hasArg(emitOpt))
+    return std::string();
+
+  if (!mainOutputIfUsable.empty()) {
+    return mainOutputIfUsable.str();
+  }
+
+  llvm::SmallString<128> path(implicitBasis);
+  llvm::sys::path::replace_extension(path, extension);
+  return path.str().str();
+};
+
+void SupplementaryOutputPathsComputer::deriveModulePathParameters(
+    options::ID &emitOption, std::string &extension,
+    std::string &mainOutputIfUsable) const {
+
+  bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
+               RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
+
+  emitOption = !isSIB ? options::OPT_emit_module
+                      : RequestedAction == FrontendOptions::ActionType::EmitSIB
+                            ? options::OPT_emit_sib
+                            : options::OPT_emit_sibgen;
+
+  bool canUseMainOutputForModule =
+      RequestedAction == FrontendOptions::ActionType::MergeModules ||
+      RequestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
+
+  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+
+  mainOutputIfUsable =
+      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
 }
