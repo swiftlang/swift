@@ -1527,7 +1527,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_inlineable
   @discardableResult
   public mutating func remove(at index: Int) -> Element {
-    _checkIndex(index)
     let result = self[index]
     self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
     return result
@@ -1575,7 +1574,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_inlineable
   @discardableResult
   public mutating func remove(at index: Int) -> Element {
-    _checkIndex(index)
+    _precondition(index < endIndex, "Index out of range")
+    _precondition(index >= startIndex, "Index out of range")
     _makeUniqueAndReserveCapacityIfNotUnique()
     let newCount = _getCount() - 1
     let pointer = (_buffer.firstElementAddress + index)
