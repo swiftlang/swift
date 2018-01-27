@@ -1697,12 +1697,14 @@ function(add_swift_library name)
           set(codesign_arg CODESIGN)
         endif()
         precondition(THIN_INPUT_TARGETS)
-        _add_swift_lipo_target(
-            SDK ${sdk}
-            TARGET ${lipo_target}
-            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
-            ${codesign_arg}
-            ${THIN_INPUT_TARGETS})
+        _add_swift_lipo_target(SDK
+                                 ${sdk}
+                               TARGET
+                                 ${lipo_target}
+                               OUTPUT
+                                 ${UNIVERSAL_LIBRARY_NAME}
+                               ${codesign_arg}
+                               ${THIN_INPUT_TARGETS})
 
         # Cache universal libraries for dependency purposes
         set(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}
@@ -1748,11 +1750,13 @@ function(add_swift_library name)
               "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
           set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-          _add_swift_lipo_target(
-              SDK ${sdk}
-              TARGET ${lipo_target_static}
-              OUTPUT "${UNIVERSAL_LIBRARY_NAME}"
-              ${THIN_INPUT_TARGETS_STATIC})
+          _add_swift_lipo_target(SDK
+                                   ${sdk}
+                                 TARGET
+                                   ${lipo_target_static}
+                                 OUTPUT
+                                   "${UNIVERSAL_LIBRARY_NAME}"
+                                 ${THIN_INPUT_TARGETS_STATIC})
           swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
               FILES "${UNIVERSAL_LIBRARY_NAME}"
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}"
@@ -1765,14 +1769,18 @@ function(add_swift_library name)
         # Add Swift standard library targets as dependencies to the top-level
         # convenience target.
         if(SWIFTLIB_TARGET_LIBRARY)
+          set(FILTERED_UNITTESTS
+                swiftStdlibCollectionUnittest
+                swiftStdlibUnicodeUnittest)
+
           foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
             set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
+               TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                   ${lipo_target}
                   ${lipo_target_static})
-              if((NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest") AND
-                 (NOT "${name}" STREQUAL "swiftStdlibUnicodeUnittest"))
+              if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
                 add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
                     ${lipo_target}
                     ${lipo_target_static})
