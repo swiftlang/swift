@@ -44,9 +44,10 @@
 /// integer type. Nesting `DoubleWidth` instances, in particular, can result in
 /// undesirable performance.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct DoubleWidth<Base : FixedWidthInteger>
-  : _ExpressibleByBuiltinIntegerLiteral
-  where Base.Words : Collection, Base.Magnitude.Words : Collection {    
+public struct DoubleWidth<Base : FixedWidthInteger> :
+  _ExpressibleByBuiltinIntegerLiteral
+  where Base.Magnitude : UnsignedInteger,
+  Base.Words : Collection, Base.Magnitude.Words : Collection {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
@@ -329,134 +330,6 @@ extension DoubleWidth : FixedWidthInteger {
     return High.bitWidth + Low.bitWidth
   }
 
-  /// Returns the quotient and remainder after dividing a triple-width magnitude
-  /// `lhs` by a double-width magnitude `rhs`.
-  ///
-  /// This operation is conceptually that described by Burnikel and Ziegler
-  /// (1998).
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal static func _divide(
-    _ lhs: (high: Low, mid: Low, low: Low), by rhs: Magnitude
-  ) -> (quotient: Low, remainder: Magnitude) {
-    // The following invariants are guaranteed to hold by dividingFullWidth or
-    // quotientAndRemainder before this method is invoked:
-    _sanityCheck(lhs.high != (0 as Low))
-    _sanityCheck(rhs.leadingZeroBitCount == 0)
-    _sanityCheck(Magnitude(lhs.high, lhs.mid) < rhs)
-
-    // Estimate the quotient.
-    var quotient = lhs.high == rhs.high
-      ? Low.max
-      : rhs.high.dividingFullWidth((lhs.high, lhs.mid)).quotient
-    // Compute the product q * rhs.
-    // TODO: This could be performed more efficiently.
-    var product =
-      DoubleWidth<Magnitude>(
-        0, Magnitude(quotient.multipliedFullWidth(by: rhs.low)))
-    let (x, y) = quotient.multipliedFullWidth(by: rhs.high)
-    product += DoubleWidth<Magnitude>(Magnitude(0, x), Magnitude(y, 0))
-    // Compute the remainder after decrementing q as necessary.
-    var remainder =
-      DoubleWidth<Magnitude>(
-        Magnitude(0, lhs.high), Magnitude(lhs.mid, lhs.low))
-    while remainder < product {
-      quotient = quotient &- 1
-      remainder += DoubleWidth<Magnitude>(0, rhs)
-    }
-    remainder -= product
-
-    return (quotient, remainder.low)
-  }
-
-  /// Returns the quotient and remainder after dividing a quadruple-width
-  /// magnitude `lhs` by a double-width magnitude `rhs`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal static func _divide(
-    _ lhs: DoubleWidth<Magnitude>, by rhs: Magnitude
-  ) -> (quotient: Magnitude, remainder: Magnitude) {
-    guard _fastPath(rhs > (0 as Magnitude)) else {
-      fatalError("Division by zero")
-    }
-    guard _fastPath(rhs >= lhs.high) else {
-      fatalError("Division results in an overflow")
-    }
-
-    if lhs.high == (0 as Magnitude) {
-      return lhs.low.quotientAndRemainder(dividingBy: rhs)
-    }
-
-    if rhs.high == (0 as Low) {
-      let a = lhs.high.high % rhs.low
-      let b = a == (0 as Low)
-        ? lhs.high.low % rhs.low
-        : rhs.low.dividingFullWidth((a, lhs.high.low)).remainder
-      let (x, c) = b == (0 as Low)
-        ? lhs.low.high.quotientAndRemainder(dividingBy: rhs.low)
-        : rhs.low.dividingFullWidth((b, lhs.low.high))
-      let (y, d) = c == (0 as Low)
-        ? lhs.low.low.quotientAndRemainder(dividingBy: rhs.low)
-        : rhs.low.dividingFullWidth((c, lhs.low.low))
-      return (Magnitude(x, y), Magnitude(0, d))
-    }
-
-    // Left shift both rhs and lhs, then divide and right shift the remainder.
-    let shift = rhs.leadingZeroBitCount
-    let rhs = rhs &<< shift
-    let lhs = lhs &<< shift
-    if lhs.high.high == (0 as Low)
-      && Magnitude(lhs.high.low, lhs.low.high) < rhs {
-      let (quotient, remainder) =
-        DoubleWidth._divide((lhs.high.low, lhs.low.high, lhs.low.low), by: rhs)
-      return (Magnitude(0, quotient), remainder &>> shift)
-    }
-    let (x, a) =
-      DoubleWidth._divide((lhs.high.high, lhs.high.low, lhs.low.high), by: rhs)
-    let (y, b) =
-      DoubleWidth._divide((a.high, a.low, lhs.low.low), by: rhs)
-    return (Magnitude(x, y), b &>> shift)
-  }
-
-  /// Returns the quotient and remainder after dividing a double-width
-  /// magnitude `lhs` by a double-width magnitude `rhs`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal static func _divide(
-    _ lhs: Magnitude, by rhs: Magnitude
-  ) -> (quotient: Magnitude, remainder: Magnitude) {
-    guard _fastPath(rhs > (0 as Magnitude)) else {
-      fatalError("Division by zero")
-    }
-    guard rhs < lhs else {
-      if _fastPath(rhs > lhs) { return (0, lhs) }
-      return (1, 0)
-    }
-
-    if lhs.high == (0 as Low) {
-      let (quotient, remainder) =
-        lhs.low.quotientAndRemainder(dividingBy: rhs.low)
-      return (Magnitude(quotient), Magnitude(remainder))
-    }
-
-    if rhs.high == (0 as Low) {
-      let (x, a) = lhs.high.quotientAndRemainder(dividingBy: rhs.low)
-      let (y, b) = a == (0 as Low)
-        ? lhs.low.quotientAndRemainder(dividingBy: rhs.low)
-        : rhs.low.dividingFullWidth((a, lhs.low))
-      return (Magnitude(x, y), Magnitude(0, b))
-    }
-
-    // Left shift both rhs and lhs, then divide and right shift the remainder.
-    let shift = rhs.leadingZeroBitCount
-    let rhs = rhs &<< shift
-    let high = (lhs &>> (Magnitude.bitWidth &- shift)).low
-    let lhs = lhs &<< shift
-    let (quotient, remainder) =
-      DoubleWidth._divide((high, lhs.high, lhs.low), by: rhs)
-    return (Magnitude(0, quotient), remainder &>> shift)
-  }
-
   @_inlineable // FIXME(sil-serialize-all)
   public func addingReportingOverflow(
     _ rhs: DoubleWidth
@@ -506,7 +379,7 @@ extension DoubleWidth : FixedWidthInteger {
     dividingBy other: DoubleWidth
   ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
     let (quotient, remainder) =
-      DoubleWidth._divide(self.magnitude, by: other.magnitude)
+      Magnitude._divide(self.magnitude, by: other.magnitude)
     guard DoubleWidth.isSigned else {
       return (DoubleWidth(quotient), DoubleWidth(remainder))
     }
@@ -589,7 +462,7 @@ extension DoubleWidth : FixedWidthInteger {
   ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
     let other = DoubleWidth<DoubleWidth>(dividend)
     let (quotient, remainder) =
-      DoubleWidth._divide(other.magnitude, by: self.magnitude)
+      Magnitude._divide(other.magnitude, by: self.magnitude)
     guard DoubleWidth.isSigned else {
       return (DoubleWidth(quotient), DoubleWidth(remainder))
     }
@@ -851,7 +724,135 @@ extension DoubleWidth : FixedWidthInteger {
   }
 }
 
-extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {}
+extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
+  /// Returns the quotient and remainder after dividing a triple-width magnitude
+  /// `lhs` by a double-width magnitude `rhs`.
+  ///
+  /// This operation is conceptually that described by Burnikel and Ziegler
+  /// (1998).
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _divide(
+    _ lhs: (high: Low, mid: Low, low: Low), by rhs: Magnitude
+  ) -> (quotient: Low, remainder: Magnitude) {
+    // The following invariants are guaranteed to hold by dividingFullWidth or
+    // quotientAndRemainder before this method is invoked:
+    _sanityCheck(lhs.high != (0 as Low))
+    _sanityCheck(rhs.leadingZeroBitCount == 0)
+    _sanityCheck(Magnitude(lhs.high, lhs.mid) < rhs)
+
+    // Estimate the quotient.
+    var quotient = lhs.high == rhs.high
+      ? Low.max
+      : rhs.high.dividingFullWidth((lhs.high, lhs.mid)).quotient
+    // Compute the product q * rhs.
+    // TODO: This could be performed more efficiently.
+    var product =
+      DoubleWidth<Magnitude>(
+        0, Magnitude(quotient.multipliedFullWidth(by: rhs.low)))
+    let (x, y) = quotient.multipliedFullWidth(by: rhs.high)
+    product += DoubleWidth<Magnitude>(Magnitude(0, x), Magnitude(y, 0))
+    // Compute the remainder after decrementing q as necessary.
+    var remainder =
+      DoubleWidth<Magnitude>(
+        Magnitude(0, lhs.high), Magnitude(lhs.mid, lhs.low))
+    while remainder < product {
+      quotient = quotient &- 1
+      remainder += DoubleWidth<Magnitude>(0, rhs)
+    }
+    remainder -= product
+
+    return (quotient, remainder.low)
+  }
+
+  /// Returns the quotient and remainder after dividing a quadruple-width
+  /// magnitude `lhs` by a double-width magnitude `rhs`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _divide(
+    _ lhs: DoubleWidth<Magnitude>, by rhs: Magnitude
+  ) -> (quotient: Magnitude, remainder: Magnitude) {
+    guard _fastPath(rhs > (0 as Magnitude)) else {
+      fatalError("Division by zero")
+    }
+    guard _fastPath(rhs >= lhs.high) else {
+      fatalError("Division results in an overflow")
+    }
+
+    if lhs.high == (0 as Magnitude) {
+      return lhs.low.quotientAndRemainder(dividingBy: rhs)
+    }
+
+    if rhs.high == (0 as Low) {
+      let a = lhs.high.high % rhs.low
+      let b = a == (0 as Low)
+        ? lhs.high.low % rhs.low
+        : rhs.low.dividingFullWidth((a, lhs.high.low)).remainder
+      let (x, c) = b == (0 as Low)
+        ? lhs.low.high.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((b, lhs.low.high))
+      let (y, d) = c == (0 as Low)
+        ? lhs.low.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((c, lhs.low.low))
+      return (Magnitude(x, y), Magnitude(0, d))
+    }
+
+    // Left shift both rhs and lhs, then divide and right shift the remainder.
+    let shift = rhs.leadingZeroBitCount
+    let rhs = rhs &<< shift
+    let lhs = lhs &<< shift
+    if lhs.high.high == (0 as Low)
+      && Magnitude(lhs.high.low, lhs.low.high) < rhs {
+      let (quotient, remainder) =
+        Magnitude._divide((lhs.high.low, lhs.low.high, lhs.low.low), by: rhs)
+      return (Magnitude(0, quotient), remainder &>> shift)
+    }
+    let (x, a) =
+      Magnitude._divide((lhs.high.high, lhs.high.low, lhs.low.high), by: rhs)
+    let (y, b) =
+      Magnitude._divide((a.high, a.low, lhs.low.low), by: rhs)
+    return (Magnitude(x, y), b &>> shift)
+  }
+
+  /// Returns the quotient and remainder after dividing a double-width
+  /// magnitude `lhs` by a double-width magnitude `rhs`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal static func _divide(
+    _ lhs: Magnitude, by rhs: Magnitude
+  ) -> (quotient: Magnitude, remainder: Magnitude) {
+    guard _fastPath(rhs > (0 as Magnitude)) else {
+      fatalError("Division by zero")
+    }
+    guard rhs < lhs else {
+      if _fastPath(rhs > lhs) { return (0, lhs) }
+      return (1, 0)
+    }
+
+    if lhs.high == (0 as Low) {
+      let (quotient, remainder) =
+        lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+      return (Magnitude(quotient), Magnitude(remainder))
+    }
+
+    if rhs.high == (0 as Low) {
+      let (x, a) = lhs.high.quotientAndRemainder(dividingBy: rhs.low)
+      let (y, b) = a == (0 as Low)
+        ? lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((a, lhs.low))
+      return (Magnitude(x, y), Magnitude(0, b))
+    }
+
+    // Left shift both rhs and lhs, then divide and right shift the remainder.
+    let shift = rhs.leadingZeroBitCount
+    let rhs = rhs &<< shift
+    let high = (lhs &>> (Magnitude.bitWidth &- shift)).low
+    let lhs = lhs &<< shift
+    let (quotient, remainder) =
+      Magnitude._divide((high, lhs.high, lhs.low), by: rhs)
+    return (Magnitude(0, quotient), remainder &>> shift)
+  }
+}
 
 extension DoubleWidth : SignedNumeric, SignedInteger
   where Base : SignedInteger {}
