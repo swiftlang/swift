@@ -3463,10 +3463,15 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       return srcType->getOptionalObjectType() && destType->isAny();
     }
 
-    void emitSilenceOptionalAnyWarningWithCoercion(Expr *E) {
-      TC.diagnose(E->getLoc(), diag::silence_optional_to_any)
+    void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      SmallString<16> coercionString;
+      coercionString += " as ";
+      coercionString += destType->getWithoutParens()->getString();
+
+      TC.diagnose(E->getLoc(), diag::silence_optional_to_any,
+                  destType, coercionString.substr(1))
         .highlight(E->getSourceRange())
-        .fixItInsertAfter(E->getEndLoc(), " as Any");
+        .fixItInsertAfter(E->getEndLoc(), coercionString);
     }
 
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
@@ -3480,7 +3485,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       if (isOptionalToAnyCoercion(srcType, destType)) {
         TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                    /* from */ srcType)
+                    /* from */ srcType, /* to */ destType)
           .highlight(subExpr->getSourceRange());
 
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
@@ -3491,7 +3496,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           .highlight(subExpr->getSourceRange())
           .fixItInsertAfter(subExpr->getEndLoc(), "!");
 
-        emitSilenceOptionalAnyWarningWithCoercion(subExpr);
+        emitSilenceOptionalAnyWarningWithCoercion(subExpr, destType);
       }
     }
 
