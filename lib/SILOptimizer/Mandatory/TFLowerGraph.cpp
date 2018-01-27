@@ -447,7 +447,10 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       // This command adds the dtype of the result tensor as a dtype attribute.
       auto type = isTensorHandle(inst->getType().getSwiftRValueType());
       assert(type && "Not a valid builtin");
-      TF_SetAttrType(op, "dtype", (TF_DataType)convertSwiftTypeToTF(type));
+      const char *attrName = "dtype";
+      if (tfopInfo.opName == "Cast")
+        attrName = "DstT";
+      TF_SetAttrType(op, attrName, (TF_DataType)convertSwiftTypeToTF(type));
       break;
     }
     }
