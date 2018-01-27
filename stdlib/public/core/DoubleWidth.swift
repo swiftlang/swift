@@ -1,4 +1,4 @@
-//===--- DoubleWidth.swift.gyb --------------------------------*- swift -*-===//
+//===--- DoubleWidth.swift ------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -457,21 +457,31 @@ extension DoubleWidth : FixedWidthInteger {
     return (Magnitude(0, quotient), remainder &>> shift)
   }
 
-% for (operator, name) in [('+', 'adding'), ('-', 'subtracting')]:
-%   highAffectedByLowOverflow = 'Base.max' if operator == '+' else 'Base.min'
   @_inlineable // FIXME(sil-serialize-all)
-  public func ${name}ReportingOverflow(_ rhs: DoubleWidth)
-    -> (partialValue: DoubleWidth, overflow: Bool) {
+  public func addingReportingOverflow(
+    _ rhs: DoubleWidth
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
     let (low, lowOverflow) =
-      _storage.low.${name}ReportingOverflow(rhs._storage.low)
+      _storage.low.addingReportingOverflow(rhs._storage.low)
     let (high, highOverflow) =
-      _storage.high.${name}ReportingOverflow(rhs._storage.high)
-    let result = (high &${operator} (lowOverflow ? 1 : 0), low)
-    let overflow = highOverflow ||
-      high == ${highAffectedByLowOverflow} && lowOverflow
-    return (partialValue: DoubleWidth(result), overflow: overflow)
+      _storage.high.addingReportingOverflow(rhs._storage.high)
+    let result = (high &+ (lowOverflow ? 1 : 0), low)
+    let overflow = highOverflow || high == Base.max && lowOverflow
+    return (DoubleWidth(result), overflow)
   }
-% end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func subtractingReportingOverflow(
+    _ rhs: DoubleWidth
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
+    let (low, lowOverflow) =
+      _storage.low.subtractingReportingOverflow(rhs._storage.low)
+    let (high, highOverflow) =
+      _storage.high.subtractingReportingOverflow(rhs._storage.high)
+    let result = (high &- (lowOverflow ? 1 : 0), low)
+    let overflow = highOverflow || high == Base.min && lowOverflow
+    return (DoubleWidth(result), overflow)
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func multipliedReportingOverflow(
@@ -480,12 +490,13 @@ extension DoubleWidth : FixedWidthInteger {
     let (carry, product) = multipliedFullWidth(by: rhs)
     let result = DoubleWidth(truncatingIfNeeded: product)
     
-    let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
+    let isNegative = DoubleWidth.isSigned &&
+      (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
     let didCarry = isNegative
       ? carry != ~(0 as DoubleWidth)
       : carry != (0 as DoubleWidth)
-    let hadPositiveOverflow = !isNegative &&
-      DoubleWidth.isSigned && product.leadingZeroBitCount == 0
+    let hadPositiveOverflow =
+      DoubleWidth.isSigned && !isNegative && product.leadingZeroBitCount == 0
 
     return (result, didCarry || hadPositiveOverflow)
   }
@@ -593,15 +604,23 @@ extension DoubleWidth : FixedWidthInteger {
     return (quotient_, remainder_)
   }
 
-% for operator in ['&', '|', '^']:
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ${operator}=(
-    lhs: inout DoubleWidth, rhs: DoubleWidth
-  ) {
-    lhs._storage.low ${operator}= rhs._storage.low
-    lhs._storage.high ${operator}= rhs._storage.high
+  public static func &=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    lhs._storage.low &= rhs._storage.low
+    lhs._storage.high &= rhs._storage.high
   }
-% end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func |=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    lhs._storage.low |= rhs._storage.low
+    lhs._storage.high |= rhs._storage.high
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ^=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    lhs._storage.low ^= rhs._storage.low
+    lhs._storage.high ^= rhs._storage.high
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   public static func <<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
@@ -686,38 +705,78 @@ extension DoubleWidth : FixedWidthInteger {
         High(Low(Base.bitWidth) &- rhs._storage.low))
     lhs._storage.high &>>= High(rhs._storage.low)
   }
-  
-%{
-binaryOperators = [
-  ('+', 'adding', '_', '+'),
-  ('-', 'subtracting', '_', '-'),
-  ('*', 'multiplied', 'by', '*'),
-  ('/', 'divided', 'by', '/'),
-  ('%', 'remainder', 'dividingBy', '/'),
-]
-}%
-% for (operator, name, firstArg, kind) in binaryOperators:
 
-  // FIXME(integers): remove this once the operators are back to Numeric
+  // FIXME(integers): remove these once the operators are back to Numeric
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ${operator} (
-    lhs: DoubleWidth, rhs: DoubleWidth
-  ) -> DoubleWidth {
+  public static func +(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
     var lhs = lhs
-    lhs ${operator}= rhs
+    lhs += rhs
     return lhs
   }
 
-%   argumentLabel = (firstArg + ':') if firstArg != '_' else ''
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ${operator}=(
-    lhs: inout DoubleWidth, rhs: DoubleWidth
-  ) {
-    let (result, overflow) = lhs.${name}ReportingOverflow(${argumentLabel}rhs)
-    _precondition(!overflow, "Overflow in ${operator}=")
+  public static func +=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let (result, overflow) = lhs.addingReportingOverflow(rhs)
+    _precondition(!overflow, "Addition results in an overflow")
     lhs = result
   }
-% end
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func -(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func -=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
+    _precondition(!overflow, "Subtraction results in an overflow")
+    lhs = result
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func *(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func *=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+    _precondition(!overflow, "Multiplication results in an overflow")
+    lhs = result
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func /(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func /=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let (result, overflow) = lhs.dividedReportingOverflow(by: rhs)
+    _precondition(!overflow, "Division results in an overflow")
+    lhs = result
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func %(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
+    var lhs = lhs
+    lhs %= rhs
+    return lhs
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func %=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let (result, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
+    // It's *division* that can result in an overflow.
+    _precondition(!overflow, "Division results in an overflow")
+    lhs = result
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   public init(_truncatingBits bits: UInt) {
