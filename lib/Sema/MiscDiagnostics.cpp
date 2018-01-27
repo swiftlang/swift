@@ -3493,6 +3493,18 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       }
     }
 
+    /// Returns true iff the collection upcast coercion is an Optional-to-Any
+    /// coercion.
+    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
+                                   conversion) {
+      if (!conversion.OrigValue || !conversion.Conversion)
+        return false;
+
+      auto srcType = conversion.OrigValue->getType();
+      auto destType = conversion.Conversion->getType();
+      return isOptionalToAnyCoercion(srcType, destType);
+    }
+
     /// Looks through OptionalEvaluationExprs and InjectIntoOptionalExprs to
     /// find a child ErasureExpr, returning nullptr if no such child is found.
     /// Any intermediate OptionalEvaluationExprs will be marked as ignored.
@@ -3577,9 +3589,38 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       emitSilenceOptionalAnyWarningWithCoercion(subExpr, destType);
     }
 
+    void visitCollectionUpcastExpr(CollectionUpcastConversionExpr *E,
+                                   OptionalToAnyCoercion coercion) {
+      // We only need to consider the valueConversion, as the Key type of a
+      // Dictionary cannot be implicitly coerced to Any.
+      auto valueConversion = E->getValueConversion();
+
+      // We're handling the coercion of the entire collection, so we don't need
+      // to re-visit a nested ErasureExpr for the value.
+      if (auto conversionExpr = valueConversion.Conversion)
+        if (auto *erasureExpr =
+              findErasureExprThroughOptionalInjections(conversionExpr))
+          IgnoredExprs.insert(erasureExpr);
+
+      if (coercion.shouldSuppressDiagnostic() ||
+          !isOptionalToAnyCoercion(valueConversion))
+        return;
+
+      auto subExpr = E->getSubExpr();
+
+      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                  /* from */ subExpr->getType(), /* to */ E->getType())
+        .highlight(subExpr->getSourceRange());
+
+      emitSilenceOptionalAnyWarningWithCoercion(subExpr, E->getType());
+    }
+
     void visitPossibleOptionalToAnyExpr(Expr *E,
                                         OptionalToAnyCoercion coercion) {
-      if (auto *erasureExpr = dyn_cast<ErasureExpr>(E)) {
+      if (auto *upcastExpr =
+          dyn_cast<CollectionUpcastConversionExpr>(E)) {
+        visitCollectionUpcastExpr(upcastExpr, coercion);
+      } else if (auto *erasureExpr = dyn_cast<ErasureExpr>(E)) {
         visitErasureExpr(erasureExpr, coercion);
       } else if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(E)) {
         // The ErasureExpr could be nested within optional injections and
