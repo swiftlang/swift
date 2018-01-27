@@ -3455,15 +3455,68 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     public:
       Type DestType;
       CoerceExpr *ParentCoercion;
+
+      bool shouldSuppressDiagnostic() {
+        // If we have a parent CoerceExpr that has the same type as our
+        // Optional-to-Any coercion, don't emit a diagnostic.
+        return ParentCoercion && ParentCoercion->getType()->isEqual(DestType);
+      }
     };
 
     /// Returns true iff a coercion from srcType to destType is an
     /// Optional-to-Any coercion.
     bool isOptionalToAnyCoercion(Type srcType, Type destType) {
-      return srcType->getOptionalObjectType() && destType->isAny();
+      size_t difference = 0;
+      return isOptionalToAnyCoercion(srcType, destType, difference);
+    }
+
+    /// Returns true iff a coercion from srcType to destType is an
+    /// Optional-to-Any coercion. On returning true, the value of 'difference'
+    /// will be the difference in the levels of optionality.
+    bool isOptionalToAnyCoercion(Type srcType, Type destType,
+                                 size_t &difference) {
+      SmallVector<Type, 4> destOptionals;
+      auto destValueType =
+        destType->lookThroughAllAnyOptionalTypes(destOptionals);
+
+      if (!destValueType->isAny())
+        return false;
+
+      SmallVector<Type, 4> srcOptionals;
+      srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
+
+      if (srcOptionals.size() > destOptionals.size()) {
+        difference = srcOptionals.size() - destOptionals.size();
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    /// Looks through OptionalEvaluationExprs and InjectIntoOptionalExprs to
+    /// find a child ErasureExpr, returning nullptr if no such child is found.
+    /// Any intermediate OptionalEvaluationExprs will be marked as ignored.
+    ErasureExpr *findErasureExprThroughOptionalInjections(Expr *E) {
+      while (true) {
+        if (auto *next = dyn_cast<OptionalEvaluationExpr>(E)) {
+          // We don't want to re-visit any intermediate optional evaluations.
+          IgnoredExprs.insert(next);
+          E = next->getSubExpr();
+        } else if (auto *next = dyn_cast<InjectIntoOptionalExpr>(E)) {
+          E = next->getSubExpr();
+        } else {
+          break;
+        }
+      }
+      return dyn_cast<ErasureExpr>(E);
     }
 
     void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      // Treat an IUO destination type as a regular Optional type, as we cannot
+      // suggest a fix-it of e.g 'as Any!'.
+      if (auto baseType = destType->getImplicitlyUnwrappedOptionalObjectType())
+        destType = OptionalType::get(baseType);
+
       SmallString<16> coercionString;
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();
@@ -3475,35 +3528,69 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
-      if (coercion.ParentCoercion)
+      if (coercion.shouldSuppressDiagnostic())
         return;
 
       auto subExpr = E->getSubExpr();
 
+      // Currently we don't produce Optional-as-Any warnings for implicit IUO
+      // to Any coercions (this doesn't take into consideration implicit
+      // coercions such as Any?! to Any?, however; we warn on those).
+      if (subExpr->getType()->getImplicitlyUnwrappedOptionalObjectType())
+        return;
+
+      // Look through any BindOptionalExprs, as the coercion may have started
+      // from a higher level of optionality.
+      while (auto *bindExpr = dyn_cast<BindOptionalExpr>(subExpr))
+        subExpr = bindExpr->getSubExpr();
+
+      // We're taking the source type from the child of any BindOptionalExprs,
+      // and the destination from the parent of any
+      // (InjectIntoOptional/OptionalEvaluation)Exprs in order to take into
+      // account any bindings that need to be done for nested Optional-to-Any
+      // coercions, e.g Int??? to Any?.
       auto srcType = subExpr->getType();
       auto destType = coercion.DestType;
 
-      if (isOptionalToAnyCoercion(srcType, destType)) {
-        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                    /* from */ srcType, /* to */ destType)
-          .highlight(subExpr->getSourceRange());
+      size_t optionalityDifference = 0;
+      if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
+        return;
 
+      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                  /* from */ srcType, /* to */ destType)
+        .highlight(subExpr->getSourceRange());
+
+      if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
           .highlight(subExpr->getSourceRange())
           .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
-
-        TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
-          .highlight(subExpr->getSourceRange())
-          .fixItInsertAfter(subExpr->getEndLoc(), "!");
-
-        emitSilenceOptionalAnyWarningWithCoercion(subExpr, destType);
       }
+
+      SmallString<4> forceUnwrapString;
+      for (size_t i = 0; i < optionalityDifference; i++)
+        forceUnwrapString += "!";
+
+      TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
+        .highlight(subExpr->getSourceRange())
+        .fixItInsertAfter(subExpr->getEndLoc(), forceUnwrapString);
+
+      emitSilenceOptionalAnyWarningWithCoercion(subExpr, destType);
     }
 
     void visitPossibleOptionalToAnyExpr(Expr *E,
                                         OptionalToAnyCoercion coercion) {
       if (auto *erasureExpr = dyn_cast<ErasureExpr>(E)) {
         visitErasureExpr(erasureExpr, coercion);
+      } else if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(E)) {
+        // The ErasureExpr could be nested within optional injections and
+        // bindings, such as is the case for e.g Int??? to Any?. Try and find
+        // and visit it directly, making sure we don't re-visit it later.
+        auto subExpr = optionalEvalExpr->getSubExpr();
+        if (auto *erasureExpr =
+              findErasureExprThroughOptionalInjections(subExpr)) {
+          visitErasureExpr(erasureExpr, coercion);
+          IgnoredExprs.insert(erasureExpr);
+        }
       }
     }
 

@@ -59,8 +59,79 @@ func warnOptionalToAnyCoercion(value x: Int?) -> Any {
   // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }
 
-func takesCollectionOfAny(_ a: [Any], _ d: [String : Any]) {
+func takesOptionalAny(_: Any?, _: Any?) {}
+
+func warnNestedOptionalToOptionalAnyCoercion(_ a: Int?, _ b: Any??, _ c: Int???, _ d: Any????) {
+  takesOptionalAny(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any?'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{24-24= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{24-24=!}}
+  // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+
+  takesOptionalAny(a, b ?? "")
+  takesOptionalAny(a, b!)
+  takesOptionalAny(a, b as Any?)
+
+  takesOptionalAny(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any?'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{21-21=!!}}
+  // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{21-21= as Any?}}
+  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any?'}}
+  // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{24-24=!!!}}
+  // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+
+  takesOptionalAny(c!!, d!!!)
+  takesOptionalAny(c as Any?, d as Any?)
 }
+
+func dontWarnIUOToAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
+  _ = takeAny(a, b)
+  _ = takeAny(c, d)
+}
+
+func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
+  takesOptionalAny(a, b) // expected-warning {{expression implicitly coerced from 'Any?!' to 'Any?'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{24-24= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{24-24=!}}
+  // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+
+  takesOptionalAny(a, b ?? "")
+  takesOptionalAny(a, b!)
+  takesOptionalAny(a, b as Any?)
+
+  takesOptionalAny(c, d) // expected-warning {{expression implicitly coerced from 'Int??!' to 'Any?'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{21-21=!!}}
+  // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{21-21= as Any?}}
+  // expected-warning@-3 {{expression implicitly coerced from 'Any???!' to 'Any?'}}
+  // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{24-24=!!!}}
+  // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+
+  takesOptionalAny(c!!, d!!!)
+  takesOptionalAny(c as Any?, d as Any?)
+}
+
+func takesIUO(_: Any!, _: Any!) {}
+
+func warnOptionalToIUOAny(_ a: Int?, _ b: Any??, _ c: Int???, _ d: Any????) {
+  takesIUO(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any!'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
+  // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{16-16= as Any?}}
+
+  takesIUO(a, b ?? "")
+  takesIUO(a, b!)
+  takesIUO(a, b as Any?)
+
+  takesIUO(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any!'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{13-13=!!}}
+  // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{13-13= as Any?}}
+  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any!'}}
+  // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{16-16=!!!}}
+  // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{16-16= as Any?}}
+
+  takesIUO(c!!, d!!!)
+  takesIUO(c as Any?, d as Any?)
+}
+
+func takesCollectionOfAny(_ a: [Any], _ d: [String : Any]) {}
 
 func warnCollectionOfAny(_ a: [Int?], _ d: [String : Int?]) {
   // https://bugs.swift.org/browse/SR-2928 - Collection casts from collections of optionals to collections of Any need custom handling
