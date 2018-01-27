@@ -1180,7 +1180,26 @@ public:
   
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
-  
+  NominalTypeKind Kind;
+
+  using NonGenericMetadataAccessFunction = const Metadata *();
+
+  /// A pointer to the metadata access function for this type.
+  ///
+  /// The type of the returned function is speculative; in reality, it
+  /// takes one argument for each of the generic requirements, in the order
+  /// they are listed.  Therefore, the function type is correct only if
+  /// this type is non-generic.
+  ///
+  /// Not all type metadata have access functions.
+  TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
+                              /*Nullable*/ true> AccessFunction;
+
+  /// The generic parameter descriptor header. This describes how to find and
+  /// parse the generic parameter vector in metadata records for this nominal
+  /// type.
+  GenericParameterDescriptorHeader GenericParams;
+
   /// The following fields are kind-dependent.
   union {
     /// Information about class types.
@@ -1286,21 +1305,6 @@ public:
       }
     } Enum;
   };
-  
-  NominalTypeKind Kind;
-
-  using NonGenericMetadataAccessFunction = const Metadata *();
-
-  /// A pointer to the metadata access function for this type.
-  ///
-  /// The type of the returned function is speculative; in reality, it
-  /// takes one argument for each of the generic requirements, in the order
-  /// they are listed.  Therefore, the function type is correct only if
-  /// this type is non-generic.
-  ///
-  /// Not all type metadata have access functions.
-  TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
-                              /*Nullable*/ true> AccessFunction;
 
   NonGenericMetadataAccessFunction *getAccessFunction() const {
     return AccessFunction.get();
@@ -1313,11 +1317,6 @@ public:
   int32_t offsetToNameOffset() const {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
   }
-
-  /// The generic parameter descriptor header. This describes how to find and
-  /// parse the generic parameter vector in metadata records for this nominal
-  /// type.
-  GenericParameterDescriptorHeader GenericParams;
 
   const GenericContextDescriptor *getGenericContexts() const {
     return this->template getTrailingObjects<GenericContextDescriptor>();

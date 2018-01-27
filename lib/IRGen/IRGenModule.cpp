@@ -313,13 +313,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,
     Int32Ty,
     Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
-    Int32Ty,
     Int16Ty,
     Int16Ty,
     Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty,
+    Int32Ty
   }, /*packed=*/true);
 
   MethodDescriptorStructTy
