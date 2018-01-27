@@ -619,9 +619,13 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
-def batch_mode : Flag<["-"], "batch-mode">,
+def enable_batch_mode : Flag<["-"], "enable-batch-mode">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Combine frontend jobs into batches">;
+  HelpText<"Enable combining frontend jobs into batches">;
+
+def disable_batch_mode : Flag<["-"], "disable-batch-mode">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Disable combining frontend jobs into batches">;
 
 def wmo : Flag<["-"], "wmo">, Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
