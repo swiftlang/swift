@@ -275,7 +275,6 @@ public final class _TensorComputation {
   /// The number of return values of the tensor program.
   var returnValueCount: CInt
 
-#if os(Linux) || os(FreeBSD)
   /// The thread to run tensor computation in. The global config flag
   /// '_RuntimeConfig.usesSynchronousExecution' decides whether tensor
   /// computation should be synchronous: if true, this property will be nil.
@@ -284,8 +283,12 @@ public final class _TensorComputation {
   ///   swift/stdlib/private/SwiftPrivatePthreadExtras/SwiftPrivatePthreadExtras.swift
   ///   https://github.com/ketzusaka/Strand/blob/master/Sources/Strand.swift
   ///   Also assess Windows portability (where pthread_create does not exist).
+#if os(Linux) || os(FreeBSD)
   private var pthread: pthread_t? =
     _RuntimeConfig.usesSynchronousExecution ? nil : pthread_t()
+#else
+  private var pthread: Int? =
+    _RuntimeConfig.usesSynchronousExecution ? nil : 1
 #endif
 
   /// Load the TF program from a binary TF FunctionDef proto given by

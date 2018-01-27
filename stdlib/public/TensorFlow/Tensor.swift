@@ -90,13 +90,16 @@ public extension Tensor {
 // Initialization
 //===----------------------------------------------------------------------===//
 
-public extension Tensor {
+extension Tensor where Unit : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
-  @inline(never) // make @_inlineable when implemented.
-  init?<FromType>(_ other: Tensor<FromType>) {
-    fatalError("FIXME: Implement element conversion")
+  @_inlineable // make @_inlineable when implemented.
+  public init<FromType : Numeric>(_ other: Tensor<FromType>) {
+    self.init(#tfop("Cast", "td:t", other.handle))
+    //self = Tensor<Unit>(#tfop("Cast", "td:t", other.handle))
   }
+}
 
+public extension Tensor {
   // Scalar (0-D) initializer, takes exactly one value.
   @_inlineable
   init(_ value: Unit) {
@@ -214,9 +217,8 @@ public extension Tensor {
     // big to want to do so for performance reasons.
     @inline(__always)
     get {
-      // TODO: When we get type conversion ops, it would be better to run the
-      // UInt->Int cast in-graph than using map.
-      return shapeTensor.array.units.map(Int.init)
+      // TODO: Need an efficient way to turn a ShapedArray into an Array.
+      return Array(Tensor<Int>(shapeTensor).array.units)
     }
   }
 

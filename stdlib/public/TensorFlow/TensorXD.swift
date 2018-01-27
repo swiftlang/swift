@@ -59,17 +59,16 @@ extension Tensor1D : ExpressibleByArrayLiteral {
   }
 }
 
+/// Perform an element-wise type conversion from `Tensor1D<T>`.
+extension Tensor1D where Unit : Numeric {
+  @_inlineable
+  public init<T : Numeric>(_ other: Tensor1D<T>) {
+    self.init(underlying: Tensor<Unit>(other.underlyingTensor))
+  }
+}
+
 // Initializers
 public extension Tensor1D {
-  /// Perform an element-wise type conversion from `Tensor1D<T>`.
-  @_inlineable
-  public init?<T>(_ other: Tensor1D<T>) {
-    guard let tensor = Tensor<Unit>(other.underlyingTensor) else {
-      return nil
-    }
-    self.init(underlying: tensor)
-  }
-
   /// values initializer, takes an array of values.
   @_inlineable
   init(_ units: [Unit]) {
@@ -170,17 +169,16 @@ extension Tensor2D : ExpressibleByArrayLiteral {
   }
 }
 
+/// Perform an element-wise type conversion from `Tensor2D<T>`.
+extension Tensor2D where Unit : Numeric {
+  @_inlineable
+  public init<T : Numeric>(_ other: Tensor2D<T>) {
+    self.init(underlying: Tensor<Unit>(other.underlyingTensor))
+  }
+}
+
 // Initializers.
 public extension Tensor2D {
-  /// Perform an element-wise type conversion from `Tensor2D<T>`.
-  @_inlineable
-  public init?<T>(_ other: Tensor1D<T>) {
-    guard let tensor = Tensor<Unit>(other.underlyingTensor) else {
-      return nil
-    }
-    self.init(underlying: tensor)
-  }
-
   /// values initializer, takes an array of values.
   @_inlineable
   init(_ elements: [[Unit]]) {
