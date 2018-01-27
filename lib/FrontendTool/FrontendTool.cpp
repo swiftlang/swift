@@ -104,12 +104,15 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  const FrontendOptions &opts,
                                  const InputFile &input) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath, EC,
+      llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.DependenciesFilePath, EC.message());
+    diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().DependenciesFilePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -187,15 +190,19 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   DependencyTracker &depTracker,
                                   const FrontendOptions &opts) {
-  if (opts.LoadedModuleTracePath.empty())
+  if (opts.InputsAndOutputs.supplementaryOutputs()
+          .LoadedModuleTracePath.empty())
     return false;
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
-                           llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(
+      opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath, EC,
+      llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        opts.LoadedModuleTracePath, EC.message());
+    ctxt.Diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.InputsAndOutputs.supplementaryOutputs().LoadedModuleTracePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -751,9 +758,11 @@ static void emitReferenceDependencies(CompilerInvocation &Invocation,
 static bool finishTypecheck(CompilerInvocation &Invocation,
                             CompilerInstance &Instance, bool moduleIsPublic) {
   FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (!opts.ObjCHeaderOutputPath.empty())
-    return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                       opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .ObjCHeaderOutputPath.empty())
+    return printAsObjC(
+        opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   if (!opts.IndexStorePath.empty()) {
     if (emitIndexData(Instance.getPrimarySourceFile(), Invocation, Instance))
       return true;
@@ -763,7 +772,9 @@ static bool finishTypecheck(CompilerInvocation &Invocation,
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  StringRef TBDPath = Invocation.getFrontendOptions().TBDPath;
+  StringRef TBDPath = Invocation.getFrontendOptions()
+                          .InputsAndOutputs.supplementaryOutputs()
+                          .TBDPath;
   if (TBDPath.empty())
     return false;
   auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
@@ -868,8 +879,8 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ReferencedNameTracker nameTracker;
-  const bool shouldTrackReferences =
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty();
+  const bool shouldTrackReferences = !opts.InputsAndOutputs.supplementaryOutputs()
+                                    .ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -907,7 +918,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.DependenciesFilePath.empty())
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
@@ -978,7 +990,8 @@ static Optional<bool> emitSILAfterSILGen(CompilerInvocation &Invocation,
 
 static bool serializeMSF(FrontendOptions &opts, SILModule *SM,
                          ASTContext &Context, ModuleOrSourceFile MSF) {
-  const std::string &moduleOutputPath = opts.ModuleOutputPath;
+  const std::string &moduleOutputPath =
+      opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath;
   if (moduleOutputPath.empty())
     return Context.hadError();
   SerializationOptions serializationOpts;
@@ -1083,7 +1096,8 @@ static Optional<bool> emitModuleIfNeeded(SILModule *SM,
                                          CompilerInstance &Instance,
                                          ModuleOrSourceFile MSF) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (opts.ModuleOutputPath.empty() && opts.ModuleDocOutputPath.empty())
+  if (opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty() &&
+      opts.InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath.empty())
     return None;
 
   // Serialize the SILModule if it was not serialized yet.
@@ -1189,8 +1203,10 @@ computeSerializationOptions(const CompilerInvocation &Invocation,
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+  serializationOpts.OutputPath =
+      opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath =
+      opts.InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader)
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -1262,7 +1278,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (opts.ModuleOutputPath.empty())
+    if (opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty())
       return;
 
     SerializationOptions serializationOpts =
@@ -1295,9 +1311,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   setMSFPrivateDiscriminator(IRGenOpts, MSF);
 
-  if (!opts.ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                      opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  if (!opts.InputsAndOutputs.supplementaryOutputs()
+           .ObjCHeaderOutputPath.empty()) {
+    (void)printAsObjC(
+        opts.InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath,
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
   if (auto r = emitSIBIFNeededAfterOptimizations(Invocation, SM.get(),
@@ -1421,7 +1439,8 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       return true;
     }
   } else {
-    StringRef moduleToken = opts.ModuleOutputPath;
+    StringRef moduleToken =
+        opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath;
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
@@ -1666,7 +1685,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
-      Invocation.getFrontendOptions().SerializedDiagnosticsPath;
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.supplementaryOutputs()
+            .SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1701,10 +1722,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+  if (!Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .DependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .ReferenceDependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
+      !Invocation.getFrontendOptions()
+           .InputsAndOutputs.supplementaryOutputs()
+           .LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 

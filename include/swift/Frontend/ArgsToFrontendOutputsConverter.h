@@ -43,7 +43,8 @@ public:
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
 
-  Optional<std::vector<std::string>> convert();
+  Optional<std::pair<std::vector<std::string>, SupplementaryOutputPaths>>
+  convert();
 
   /// None -> could not open
   static Optional<std::vector<std::string>>
@@ -102,6 +103,50 @@ private:
   std::string determineBaseNameOfOutput(const InputFile &input) const;
 
   std::string deriveOutputFileFromParts(StringRef dir, StringRef base) const;
+};
+
+class SupplementaryOutputPathsComputer {
+  const ArgList &Args;
+  DiagnosticEngine &Diags;
+  const FrontendInputsAndOutputs &InputsAndOutputs;
+  ArrayRef<std::string> OutputFiles;
+  StringRef ModuleName;
+
+  const FrontendOptions::ActionType RequestedAction;
+
+public:
+  SupplementaryOutputPathsComputer(
+      const ArgList &args, DiagnosticEngine &diags,
+      const FrontendInputsAndOutputs &inputsAndOutputs,
+      ArrayRef<std::string> outputFiles, StringRef moduleName);
+  Optional<SupplementaryOutputPaths> computeOutputPaths() const;
+
+private:
+  /// \return None if error
+  Optional<std::vector<SupplementaryOutputPaths>>
+  getSupplementaryFilenamesFromArguments() const;
+
+  /// \return None if error
+  /// Otherwise return a vector with one entry per file producing supplementary
+  /// outputs.
+  Optional<std::vector<std::string>>
+  readSupplementaryOutputArguments(swift::options::ID path_id) const;
+
+  Optional<SupplementaryOutputPaths> computeOutputPathsForOneInput(
+      StringRef outputFilename,
+      const SupplementaryOutputPaths &pathsFromFilelists,
+      const InputFile &) const;
+
+  StringRef deriveImplicitBasis(StringRef outputFilename,
+                                const InputFile &) const;
+  Optional<std::string> determineSupplementaryOutputFilename(
+      options::ID emitOpt, std::string pathFromArgumentsOrFilelists,
+      StringRef extension, StringRef mainOutputIfUsable,
+      StringRef implicitBasis) const;
+
+  void deriveModulePathParameters(options::ID &emitOption,
+                                  std::string &extension,
+                                  std::string &mainOutputIfUsable) const;
 };
 
 } // namespace swift
