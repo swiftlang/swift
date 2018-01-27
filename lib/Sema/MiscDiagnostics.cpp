@@ -3449,7 +3449,89 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
   class UnintendedOptionalBehaviorWalker : public ASTWalker {
     TypeChecker &TC;
-    SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
+    SmallPtrSet<Expr *, 16> IgnoredExprs;
+
+    class OptionalToAnyCoercion {
+    public:
+      Type DestType;
+      CoerceExpr *ParentCoercion;
+    };
+
+    /// Returns true iff a coercion from srcType to destType is an
+    /// Optional-to-Any coercion.
+    bool isOptionalToAnyCoercion(Type srcType, Type destType) {
+      return srcType->getOptionalObjectType() && destType->isAny();
+    }
+
+    void emitSilenceOptionalAnyWarningWithCoercion(Expr *E) {
+      TC.diagnose(E->getLoc(), diag::silence_optional_to_any)
+        .highlight(E->getSourceRange())
+        .fixItInsertAfter(E->getEndLoc(), " as Any");
+    }
+
+    void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
+      if (coercion.ParentCoercion)
+        return;
+
+      auto subExpr = E->getSubExpr();
+
+      auto srcType = subExpr->getType();
+      auto destType = coercion.DestType;
+
+      if (isOptionalToAnyCoercion(srcType, destType)) {
+        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                    /* from */ srcType)
+          .highlight(subExpr->getSourceRange());
+
+        TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
+          .highlight(subExpr->getSourceRange())
+          .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+
+        TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
+          .highlight(subExpr->getSourceRange())
+          .fixItInsertAfter(subExpr->getEndLoc(), "!");
+
+        emitSilenceOptionalAnyWarningWithCoercion(subExpr);
+      }
+    }
+
+    void visitPossibleOptionalToAnyExpr(Expr *E,
+                                        OptionalToAnyCoercion coercion) {
+      if (auto *erasureExpr = dyn_cast<ErasureExpr>(E)) {
+        visitErasureExpr(erasureExpr, coercion);
+      }
+    }
+
+    void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+      // Warn about interpolated segments that contain optionals.
+      for (auto &segment : E->getSegments()) {
+        // Allow explicit casts.
+        if (auto paren = dyn_cast<ParenExpr>(segment))
+          if (isa<ExplicitCastExpr>(paren->getSubExpr()))
+            continue;
+
+        // Bail out if we don't have an optional.
+        if (!segment->getType()->getRValueType()->getOptionalObjectType())
+          continue;
+
+        TC.diagnose(segment->getStartLoc(),
+                    diag::optional_in_string_interpolation_segment)
+          .highlight(segment->getSourceRange());
+
+        // Suggest 'String(describing: <expr>)'.
+        auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
+        TC.diagnose(segment->getLoc(),
+                    diag::silence_optional_in_interpolation_segment_call)
+          .highlight(segment->getSourceRange())
+          .fixItInsert(segmentStart, "String(describing: ")
+          .fixItInsert(segment->getEndLoc(), ")");
+
+        // Suggest inserting a default value.
+        TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+          .highlight(segment->getSourceRange())
+          .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+      }
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -3459,60 +3541,20 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
         if (!CE->hasSingleExpressionBody())
           return { false, E };
 
-      if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
-        if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
-          ErasureCoercedToAny.insert(coercion->getSubExpr());
-      } else if (isa<ErasureExpr>(E) && !ErasureCoercedToAny.count(E) &&
-                 E->getType()->isAny()) {
-        auto subExpr = cast<ErasureExpr>(E)->getSubExpr();
-        auto erasedTy = subExpr->getType();
-        if (erasedTy->getOptionalObjectType()) {
-          TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                      erasedTy)
-              .highlight(subExpr->getSourceRange());
+      if (IgnoredExprs.count(E))
+        return { true, E };
 
-          TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
-          TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), "!");
-          TC.diagnose(subExpr->getLoc(), diag::silence_optional_to_any)
-              .highlight(subExpr->getSourceRange())
-              .fixItInsertAfter(subExpr->getEndLoc(), " as Any");
-        }
-      } else if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-        // Warn about interpolated segments that contain optionals.
-        for (auto &segment : literal->getSegments()) {
-          // Allow explicit casts.
-          if (auto paren = dyn_cast<ParenExpr>(segment)) {
-            if (isa<ExplicitCastExpr>(paren->getSubExpr())) {
-              continue;
-            }
-          }
-
-          // Bail out if we don't have an optional.
-          if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
-            continue;
-          }
-
-          TC.diagnose(segment->getStartLoc(),
-                      diag::optional_in_string_interpolation_segment)
-              .highlight(segment->getSourceRange());
-
-          // Suggest 'String(describing: <expr>)'.
-          auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
-          TC.diagnose(segment->getLoc(),
-                      diag::silence_optional_in_interpolation_segment_call)
-            .highlight(segment->getSourceRange())
-            .fixItInsert(segmentStart, "String(describing: ")
-            .fixItInsert(segment->getEndLoc(), ")");
-
-          // Suggest inserting a default value. 
-          TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-            .highlight(segment->getSourceRange())
-            .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
-        }
+      if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        visitInterpolatedStringLiteralExpr(literal);
+      } else if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
+        // If we come across a CoerceExpr, visit its subExpr with the coercion
+        // as the parent, making sure we don't re-visit the subExpr later.
+        auto subExpr = coercion->getSubExpr();
+        visitPossibleOptionalToAnyExpr(subExpr,
+                                       { subExpr->getType(), coercion });
+        IgnoredExprs.insert(subExpr);
+      } else {
+        visitPossibleOptionalToAnyExpr(E, { E->getType(), nullptr });
       }
       return { true, E };
     }
