@@ -424,8 +424,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         diag::rethrowing_function_type : diag::throw_in_function_type;
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
-      if (Tok.is(tok::kw_throw))
-        Tok.setKind(tok::kw_throws);
     }
     throwsLoc = consumeToken();
   }
