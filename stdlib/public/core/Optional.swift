@@ -409,6 +409,24 @@ extension Optional : Equatable where Wrapped : Equatable {
   }
 }
 
+extension Optional : Hashable where Wrapped : Hashable {
+    /// The hash value for the optional.
+    ///
+    /// Two optionals that are equal will always have equal hash values.
+    ///
+    /// Hash values are not guaranteed to be equal across different executions of
+    /// your program. Do not save hash values to use during a future execution.
+    @_inlineable
+    public var hashValue: Int {
+        switch self {
+        case .some(let wrapped):
+            return wrapped.hashValue
+        case .none:
+            return _mixInt(0)
+        }
+    }
+}
+
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
 @_fixed_layout

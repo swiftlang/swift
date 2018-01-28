@@ -69,6 +69,11 @@ OptionalTests.test("Equatable") {
   expectEqual([false, true, true, true, true, false], testRelation(!=))
 }
 
+OptionalTests.test("Hashable") {
+    expectEqual([true, false, false, false, false, true], testRelation { $0.hashValue == $1.hashValue })
+    expectEqual([false, true, true, true, true, false], testRelation { $0.hashValue != $1.hashValue })
+}
+
 OptionalTests.test("CustomReflectable") {
   // Test with a non-refcountable type.
   do {

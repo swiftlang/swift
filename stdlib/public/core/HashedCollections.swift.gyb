@@ -2786,6 +2786,24 @@ extension Dictionary : Equatable where Value : Equatable {
   }
 }
 
+extension Dictionary : Hashable where Value : Hashable {
+  /// The hash value for the dictionary.
+  ///
+  /// Two dictionaries that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable
+  public var hashValue: Int {
+    var result: Int = _mixInt(0)
+    for (k, v) in self {
+      result ^= _mixInt(k.hashValue)
+      result ^= _mixInt(v.hashValue)
+    }
+    return result
+  }
+}
+
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
