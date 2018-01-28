@@ -813,12 +813,12 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
          "Loaded a module during parse-only");
 }
 
-void CompilerInstance::freeContextAndSIL() {
+void CompilerInstance::freeContext() {
   Context.reset();
-  TheSILModule.reset();
   MainModule = nullptr;
   SML = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }
 
+void CompilerInstance::freeSIL() { TheSILModule.reset(); }
