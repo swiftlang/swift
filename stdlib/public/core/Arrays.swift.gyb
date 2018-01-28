@@ -855,7 +855,7 @@ extension ${Self} {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
@@ -864,7 +864,7 @@ extension ${Self} {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
@@ -1543,8 +1543,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_inlineable
   public mutating func popLast() -> Element? {
     let newCount = _getCount() - 1
-    guard newCount >= 0 else { return nil }
-    _makeUniqueAndReserveCapacityIfNotUnique()
+    guard !isEmpty else { return nil }
+    return _customRemoveLast().unsafelyUnwrapped
     let pointer = (_buffer.firstElementAddress + newCount)
     let element = pointer.move()
     _buffer.count = newCount
