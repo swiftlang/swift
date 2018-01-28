@@ -95,18 +95,18 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 }
 
 void FrontendOptions::forAllOutputPaths(
-    std::function<void(const std::string &)> fn) const {
+    const InputFile &input, std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const std::string &OutputFileName : OutputFilenames) {
-      fn(OutputFileName);
-    }
+    if (InputsAndOutputs.isWholeModule())
+      InputsAndOutputs.forEachOutputFilename(fn);
+    else
+      fn(input.outputFilename());
   }
   const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
+      &InputsAndOutputs.supplementaryOutputs().ModuleOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ModuleDocOutputPath,
+      &InputsAndOutputs.supplementaryOutputs().ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -115,21 +115,16 @@ void FrontendOptions::forAllOutputPaths(
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (hasNamedOutputFile())
+  if (InputsAndOutputs.hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
-    return getSingleOutputFilename();
+    return InputsAndOutputs.getSingleOutputFilename();
 
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  const auto input = Inputs.getUniquePrimaryInput();
+  const auto input = InputsAndOutputs.getUniquePrimaryInput();
   return input ? llvm::sys::path::filename(input->file())
                : StringRef(ModuleName);
-}
-
-bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() &&
-         llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
 const char *
@@ -186,11 +181,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
-         !canActionEmitDependencies(RequestedAction);
-}
-
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -222,11 +212,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
-}
-
-bool FrontendOptions::canActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -255,11 +241,6 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
-         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -291,14 +272,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
-}
-
-bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {

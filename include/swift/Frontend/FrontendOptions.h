@@ -14,7 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 
@@ -33,37 +33,15 @@ class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
 public:
-  FrontendInputs Inputs;
+  FrontendInputsAndOutputs InputsAndOutputs;
 
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  /// The specified output files. If only a single outputfile is generated,
-  /// the name of the last specified file is taken.
-  std::vector<std::string> OutputFilenames;
+  void forAllOutputPaths(const InputFile &input,
+                         std::function<void(const std::string &)> fn) const;
 
-  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
-
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
-  /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
-  }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
-  }
   bool isOutputFileDirectory() const;
-  bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
-  }
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -83,27 +61,8 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The path to which we should emit an Objective-C header for the module.
-  std::string ObjCHeaderOutputPath;
-
-  /// Path to a file which should contain serialized diagnostics for this
-  /// frontend invocation.
-  std::string SerializedDiagnosticsPath;
-
-  /// The path to which we should output a Make-style dependencies file.
-  std::string DependenciesFilePath;
-
-  /// The path to which we should output a Swift reference dependencies file.
-  std::string ReferenceDependenciesFilePath;
-
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
-
-  /// The path to which we should output a loaded module trace file.
-  std::string LoadedModuleTracePath;
-
-  /// The path to which we should output a TBD file.
-  std::string TBDPath;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -315,19 +274,15 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasSingleInput();
+    return InputKind == InputFileKind::IFK_Swift &&
+           InputsAndOutputs.hasSingleInput();
   }
 
 private:
-  bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath() const;
-  static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath() const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
 public:

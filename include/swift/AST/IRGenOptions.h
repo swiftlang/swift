@@ -190,6 +190,9 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
+  /// Used by (at least) lldb/source/Symbol/SwiftASTContext.cpp:4603
+  /// FIXME: dmu Should go away in favor of
+  /// Instance.getFrontendOptions().InputsAndOutputs.getSingleOutputFilename.
   StringRef getSingleOutputFilename() const {
     if (OutputFilenames.size() >= 1)
       return OutputFilenames.back();
