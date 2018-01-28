@@ -16,13 +16,34 @@ struct S {
   var j: Int!
   let k: Int
   var m: Int
+  var n: Int! {
+    get {
+      return m
+    }
+    set {
+      m = newValue
+    }
+  }
+  var o: Int! {
+    willSet {
+      m = newValue
+    }
+    didSet {
+      m = oldValue
+    }
+  }
 
   func fn() -> Int! { return i }
 
   static func static_fn() -> Int! { return 0 }
 
   subscript(i: Int) -> Int! {
-    return i
+    set {
+      m = newValue
+    }
+    get {
+      return i
+    }
   }
 
   init(i: Int!, j: Int!, k: Int, m: Int) {
