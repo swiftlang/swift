@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // REQUIRES: objc_interop
+// UNSUPPORTED: CPU=i386
 
 import Foundation
 
