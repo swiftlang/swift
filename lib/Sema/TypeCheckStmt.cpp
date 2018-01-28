@@ -1090,7 +1090,20 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->hasLValueType()) {
-    diagnose(E->getLoc(), diag::expression_unused_lvalue)
+    // This must stay in sync with diag::expression_unused_lvalue.
+    enum {
+        SK_Variable = 0,
+        SK_Property,
+        SK_Subscript
+    } storageKind = SK_Variable;
+    if (auto declRef = E->getReferencedDecl()) {
+      auto decl = declRef.getDecl();
+      if (isa<SubscriptDecl>(decl))
+        storageKind = SK_Subscript;
+      else if (decl->getDeclContext()->isTypeContext())
+        storageKind = SK_Property;
+    }
+    diagnose(E->getLoc(), diag::expression_unused_lvalue, storageKind)
       .highlight(E->getSourceRange());
     return;
   }
