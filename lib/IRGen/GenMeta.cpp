@@ -2210,10 +2210,10 @@ namespace {
   public:    
     void layout() {
       asImpl().addName();
-      asImpl().addKindDependentFields();
       asImpl().addKind();
       asImpl().addAccessFunction();
       asImpl().addGenericParams();
+      asImpl().addKindDependentFields();
     }
 
     CanType getAbstractType() {
@@ -2522,12 +2522,12 @@ namespace {
       VTableSize = layout.getVTableSize();
 
       if (layout.hasResilientSuperclass()) {
-        FieldVectorOffset = layout.getRelativeFieldOffsetVectorOffset();
         GenericParamsOffset = layout.getRelativeGenericRequirementsOffset();
+        FieldVectorOffset = layout.getRelativeFieldOffsetVectorOffset();
         VTableOffset = layout.getRelativeVTableOffset();
       } else {
-        FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
         GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+        FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
         VTableOffset = layout.getStaticVTableOffset();
       }
     }
@@ -2541,7 +2541,7 @@ namespace {
     Size getGenericParamsOffset() {
       return GenericParamsOffset;
     }
-    
+
     void addKindDependentFields() {
       // Build the field name list.
       llvm::SmallString<64> fieldNames;
