@@ -2527,6 +2527,45 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
   return boxType;
 }
 
+CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
+                                                      EnumElementDecl *elt) {
+
+  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+
+  assert(elt->getDeclContext() == enumDecl);
+  assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
+
+  auto &C = M.getASTContext();
+
+  auto boxSignature = getEffectiveGenericSignature(enumDecl);
+
+  if (boxSignature == CanGenericSignature()) {
+    auto eltIntfTy = elt->getArgumentInterfaceType();
+    auto boxVarTy = getLoweredType(eltIntfTy).getSwiftRValueType();
+    auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true));
+    return SILBoxType::get(C, layout, {});
+  }
+
+  // Use the enum's signature for the box type.
+  auto boundEnum = enumType.getSwiftRValueType();
+
+  // Lower the enum element's argument in the box's context.
+  auto eltIntfTy = elt->getArgumentInterfaceType();
+  GenericContextScope scope(*this, boxSignature);
+  auto boxVarTy = getLoweredType(getAbstractionPattern(elt), eltIntfTy)
+                      .getSwiftRValueType();
+  auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true));
+
+  // Instantiate the layout with enum's substitution list.
+  auto subMap = boundEnum->getContextSubstitutionMap(
+      M.getSwiftModule(), enumDecl, enumDecl->getGenericEnvironment());
+  SmallVector<Substitution, 4> genericArgs;
+  boxSignature->getSubstitutions(subMap, genericArgs);
+
+  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+  return boxTy;
+}
+
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
