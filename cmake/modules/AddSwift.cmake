@@ -257,6 +257,10 @@ function(_add_variant_c_compile_flags)
   else()
     list(APPEND result "-DNDEBUG")
   endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
@@ -320,6 +324,10 @@ function(_add_variant_swift_compile_flags
 
   if (SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
     list(APPEND result "-Xfrontend" "-enable-guaranteed-normal-arguments")
+  endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
