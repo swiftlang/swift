@@ -377,7 +377,7 @@ static void setModuleName(CompilerInvocation &Invocation) {
   StringRef Filename = Invocation.getOutputFilename();
   if (Filename.empty()) {
     if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-      Invocation.setModuleName("__main__");
+      Invocation.setModuleName("main");
       return;
     }
     Filename = Invocation.getFrontendOptions()
@@ -386,7 +386,7 @@ static void setModuleName(CompilerInvocation &Invocation) {
   Filename = llvm::sys::path::filename(Filename);
   StringRef ModuleName = llvm::sys::path::stem(Filename);
   if (ModuleName.empty() || !Lexer::isIdentifier(ModuleName)) {
-    Invocation.setModuleName("__main__");
+    Invocation.setModuleName("main");
     return;
   }
   Invocation.setModuleName(ModuleName);
