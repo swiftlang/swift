@@ -651,3 +651,19 @@ func run() {
 }
 
 run()
+
+public enum Indirect<T> {
+  indirect case payload((T, other: T))
+  case none
+}
+
+public func testIndirectEnum<T>(_ payload: T) -> Indirect<T> {
+  return Indirect.payload((payload, other: payload))
+}
+
+public func testCase(_ closure: @escaping (Int) -> ()) -> Indirect<(Int) -> ()> {
+  return testIndirectEnum(closure)
+}
+
+// CHECK: payload((Function), other: (Function))
+print(testCase({ _ in }))
