@@ -22,7 +22,18 @@
 import CTensorFlow
 
 //===----------------------------------------------------------------------===//
-// - MARK: Runtime checkers
+// Standard library extensions
+//===----------------------------------------------------------------------===//
+
+public extension Sequence {
+  /// Returns true if all elements satisfy the predicate
+  func forAll(_ predicate: (Element) throws -> Bool) rethrows -> Bool {
+    return try first(where: { try !predicate($0) }) == nil
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Runtime checkers
 //===----------------------------------------------------------------------===//
 
 /// These checks run in both debug and release modes (while assert() only runs
@@ -49,7 +60,7 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 }
 
 //===----------------------------------------------------------------------===//
-// - MARK: Type aliases
+// Type aliases
 //===----------------------------------------------------------------------===//
 
 /// TF_Status* type.
@@ -68,7 +79,7 @@ typealias CTFEContext = OpaquePointer
 typealias CTFEOp = OpaquePointer
 
 //===----------------------------------------------------------------------===//
-// - MARK: Logging
+// Logging
 //===----------------------------------------------------------------------===//
 
 #if os(macOS)
