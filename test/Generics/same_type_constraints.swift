@@ -376,5 +376,5 @@ func resultTypeSuppress<T: P1>() -> StructTakingP1<T> {
 typealias NotAnInt = Double
 
 extension X11 where NotAnInt == Int { }
-// expected-warning@-1{{neither type in same-type constraint ('NotAnInt' (aka 'Double') or 'Int') refers to a generic parameter  or associated type}}
+// expected-warning@-1{{neither type in same-type constraint ('NotAnInt' (aka 'Double') or 'Int') refers to a generic parameter or associated type}}
 // expected-error@-2{{generic signature requires types 'NotAnInt' (aka 'Double') and 'Int' to be the same}}
