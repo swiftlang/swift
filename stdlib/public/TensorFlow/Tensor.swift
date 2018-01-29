@@ -161,7 +161,7 @@ public extension Tensor {
     let contiguousSize = shape.reduce(1, *)
     let byteSize = contiguousSize * MemoryLayout<Unit>.stride
     precondition(units.count == contiguousSize, """
-      The number of units don't match the shape
+      The number of units doesn't match the shape.
       """)
     let cTensor = TF_AllocateTensor(Unit.cDataType,
                                     shape.map(Int64.init),
@@ -288,7 +288,7 @@ public extension Tensor where Unit : FloatingPoint {
 }
 
 //===----------------------------------------------------------------------===//
-// Broadcasting and rank lifting
+// Shape transformations
 //===----------------------------------------------------------------------===//
 
 public extension AccelerableTensorUnit {
@@ -297,6 +297,14 @@ public extension AccelerableTensorUnit {
   @inline(never) // make @_inlineable when implemented.
   func broadcast(toRank rank: Int) -> Tensor<Self> {
     fatalError("FIXME: implement scalar broadcast")
+  }
+}
+
+internal extension Tensor {
+  /// Empty tensor, used privately for passing the correct arguments to ops.
+  @_versioned
+  static var empty: Tensor<Unit> {
+    return self.init(.empty)
   }
 }
 
@@ -317,6 +325,28 @@ public extension Tensor {
   @inline(never) // make @_inlineable when implemented.
   func broadcast(to other: Tensor) -> Tensor {
     fatalError("FIXME: implement broadcast")
+  }
+
+  /// Reshape to the specified shape.
+  /// - Precondition: The number of units matches the new shape.
+  @_inlineable
+  func reshaped(_ newShape: [Int]) -> Tensor {
+    return reshaped(newShape.isEmpty ? .empty : Tensor<Int>(newShape))
+  }
+
+  /// Reshape to scalar.
+  /// - Precondition: The tensor has exactly one unit.
+  @_inlineable
+  func scalarized() -> Unit {
+    return reshaped(.empty).scalar!
+  }
+
+  /// Reshape by removing 1-dimensions. If axes are specified, remove the
+  /// specified dimensions, assuming they are 1.
+  @_inlineable
+  func squeezed(alongAxes axes: Int...) -> Tensor {
+    let axesTensor = Tensor<Int>(axes)
+    return squeezed(alongAxes: axesTensor)
   }
 }
 

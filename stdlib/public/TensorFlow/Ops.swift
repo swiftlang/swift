@@ -66,7 +66,10 @@ infix operator ⊗ : MultiplicationPrecedence
 //   scalarization and rank getter are implemented.
 //
 
-/// Arithmetic Operators.
+//===----------------------------------------------------------------------===//
+// Elementwise binary arithmetics
+//===----------------------------------------------------------------------===//
+
 extension Tensor /*: Numeric*/ where Unit : Numeric {
   @_inlineable
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
@@ -165,36 +168,17 @@ public extension Tensor where Unit : Numeric {
   static func /=(lhs: inout Tensor, rhs: Unit) {
     lhs = lhs / rhs
   }
+}
 
-  /// Matrix multiplication
-  @_inlineable
-  func dot(_ other: Tensor) -> Tensor {
-    return Tensor(#tfop("MatMul", "tt:t", self.handle, other.handle))
-  }
-
-  @_inlineable
-  static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return lhs.dot(rhs)
-  }
-
-  @_inlineable
-  static func ⊗ (lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) ⊗ rhs
-  }
-
-  @_inlineable
-  static func ⊗ (lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs ⊗ Tensor(rhs)
-  }
-
+public extension Tensor {
   @inline(never) // make @_inlinable when implemented.
   func mean() -> Unit {
-    // FIXME: Implement!
-    fatalError("FIXME: implement reduceMean")
+    let result = Tensor(#tfop("Mean", "tt:t", handle, TensorHandle<Int>.empty))
+    return result.scalar!
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func reduceMean(
+  func mean(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
@@ -207,7 +191,7 @@ public extension Tensor where Unit : Numeric {
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func reduceMin(
+  func min(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
@@ -220,7 +204,7 @@ public extension Tensor where Unit : Numeric {
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func reduceMax(
+  func max(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
@@ -234,7 +218,7 @@ public extension Tensor where Unit : Numeric {
   }
 
   @inline(never) // make @_inlinable when implemented.
-  func reduceSum(
+  func sum(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
@@ -256,6 +240,52 @@ public extension Tensor where Unit : Numeric {
     return Tensor(#tfop("Square", "t:t", handle))
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Linear algebra
+//===----------------------------------------------------------------------===//
+
+public extension Tensor where Unit : Numeric {
+  @_inlineable
+  func dot(_ other: Tensor) -> Tensor {
+    return Tensor(#tfop("MatMul", "tt:t", self.handle, other.handle))
+  }
+
+  @_inlineable
+  static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return lhs.dot(rhs)
+  }
+
+  @_inlineable
+  static func ⊗ (lhs: Unit, rhs: Tensor) -> Tensor {
+    return Tensor(lhs) ⊗ rhs
+  }
+
+  @_inlineable
+  static func ⊗ (lhs: Tensor, rhs: Unit) -> Tensor {
+    return lhs ⊗ Tensor(rhs)
+  }
+}
+
+public extension Tensor1D where Unit : Numeric {
+  @_inlineable
+  func dot(_ other: Tensor2D<Unit>) -> Tensor1D<Unit> {
+    return Tensor1D(underlying: underlyingTensor.dot(other.underlyingTensor))
+  }
+}
+
+public extension Tensor2D where Unit : Numeric {
+  @_inlineable
+  static func ⊗ (
+    lhs: Tensor1D<Unit>, rhs: Tensor2D<Unit>
+  ) -> Tensor1D<Unit> {
+    return lhs.dot(rhs)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Elementwise binary comparison
+//===----------------------------------------------------------------------===//
 
 public extension Tensor where Unit : Comparable {
   @_inlineable
@@ -338,7 +368,10 @@ public extension Tensor where Unit : Equatable {
   }
 }
 
-/// Transposition and concatenation
+//===----------------------------------------------------------------------===//
+// Transposition and concatenation
+//===----------------------------------------------------------------------===//
+
 public extension Tensor {
   @_inlineable
   var transpose: Tensor {
@@ -350,6 +383,10 @@ public extension Tensor {
     fatalError("FIXME: implement concatenated(with:)")
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Elementwise basic math functions
+//===----------------------------------------------------------------------===//
 
 @_inlineable
 public func abs<Unit: Numeric>(
@@ -487,6 +524,10 @@ public func max<Unit : Numeric & Comparable>(
   return max(lhs, Tensor(rhs))
 }
 
+//===----------------------------------------------------------------------===//
+// Selection
+//===----------------------------------------------------------------------===//
+
 public extension Tensor where Unit == Bool {
   @_inlineable
   public func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
@@ -504,41 +545,40 @@ public extension Tensor where Unit == Bool {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Reduction
+//===----------------------------------------------------------------------===//
+
 public extension Tensor2D where Unit : Numeric {
   // Sum tensor along one axis, producing a Tensor1D.
   @_inlineable
-  func reduceSum(alongAxis axis: Int) -> Tensor1D<Unit> {
+  func sum(alongAxis axis: Int) -> Tensor1D<Unit> {
     return Tensor1D<Unit>(underlying:
-      underlyingTensor.reduceSum(alongAxes: axis))
+      underlyingTensor.sum(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMax(alongAxis axis: Int) -> Tensor1D<Unit> {
+  func max(alongAxis axis: Int) -> Tensor1D<Unit> {
     return Tensor1D<Unit>(underlying:
-      underlyingTensor.reduceMax(alongAxes: axis))
+      underlyingTensor.max(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMin(alongAxis axis: Int) -> Tensor1D<Unit> {
+  func min(alongAxis axis: Int) -> Tensor1D<Unit> {
     return Tensor1D<Unit>(underlying:
-      underlyingTensor.reduceMin(alongAxes: axis))
+      underlyingTensor.min(alongAxes: axis))
   }
 
   @_inlineable
-  func reduceMean(alongAxis axis: Int) -> Tensor1D<Unit> {
+  func mean(alongAxis axis: Int) -> Tensor1D<Unit> {
     return Tensor1D<Unit>(underlying:
-      underlyingTensor.reduceMean(alongAxes: axis))
+      underlyingTensor.mean(alongAxes: axis))
   }
 }
 
-public extension Tensor2D where Unit : Numeric {
-  @_inlineable
-  static func ⊗ (
-    lhs: Tensor1D<Unit>, rhs: Tensor2D<Unit>
-  ) -> Tensor1D<Unit> {
-    return Tensor1D(underlying: lhs.underlyingTensor.dot(rhs.underlyingTensor))
-  }
-}
+//===----------------------------------------------------------------------===//
+// Tensor properties
+//===----------------------------------------------------------------------===//
 
 public extension Tensor {
   @_inlineable
@@ -557,7 +597,10 @@ public extension Tensor {
   }
 }
 
-/// Slicing
+//===----------------------------------------------------------------------===//
+// Slicing and shape transformations
+//===----------------------------------------------------------------------===//
+
 public extension Tensor {
   /// Returns a subdimensional tensor at the specified list of indices.
   /// - Todo: If possible, this should be defined as an op, to be run on the
@@ -571,5 +614,82 @@ public extension Tensor {
   // tfop_slice(tensor, begin, end) -> tensor
   subscript(bounds: Range<Int>) -> Tensor {
     fatalError("FIXME: implement subscript to tensor")
+  }
+
+  @_inlineable
+  func reshaped(_ newShape: Tensor<Int>) -> Tensor {
+    return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
+  }
+
+  @_inlineable
+  func squeezed(alongAxes axes: Tensor<Int>? = nil) -> Tensor {
+    // FIXME: handle attributes (squeeze_dims)
+    return Tensor(#tfop("Squeeze", "t:t", handle))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Convolution and pooling
+//===----------------------------------------------------------------------===//
+
+public enum Padding {
+  case same, valid
+}
+
+public extension Tensor where Unit : FloatingPoint {
+  @_inlineable
+  // @differentiable(
+  //   withRespectTo: (self, .0),
+  //   gradient: _adjointConvolve2D(input:filter:primal:seed:)
+  // )
+  func convolved2D(
+    withFilter filter: Tensor,
+    strides: [Int],
+    padding: Padding
+  ) -> Tensor {
+    // FIXME: handle attributes (strides and padding)
+    return Tensor(#tfop("Conv2D", "tt:t", handle, filter.handle))
+  }
+
+  @_inlineable
+  // @differentiable(
+  //   withRespectTo: (self),
+  //   gradient:
+  //     _adjointMaxPooled2D(input:kernelSize:strides:padding:primal:seed:)
+  // )
+  func maxPooled(
+    kernelSize: Tensor<Int32>,
+    strides: Tensor<Int32>,
+    padding: Padding
+  ) -> Tensor {
+    return Tensor(#tfop("MaxPoolV2", "ttt:t",
+                        handle, kernelSize.handle, strides.handle))
+  }
+
+  @_inlineable
+  func maxPooled(
+    kernelSize: [Int],
+    strides: [Int],
+    padding: Padding
+  ) -> Tensor {
+    // FIXME: handle attributes (padding)
+    return maxPooled(kernelSize: Tensor<Int32>(Tensor<Int>(kernelSize)),
+                     strides: Tensor<Int32>(Tensor<Int>(strides)),
+                     padding: padding)
+  }
+
+  @_inlineable
+  // @differentiable(
+  //   withRespectTo: (self),
+  //   gradient:
+  //     _adjointAveragePooled2D(input:kernelSize:strides:padding:primal:seed:)
+  // )
+  func averagePooled(
+    kernelSize: [Int],
+    strides: [Int],
+    padding: Padding
+  ) -> Tensor {
+    // FIXME: handle attributes (ksize, strides, padding)
+    return Tensor(#tfop("AvgPool", "t:t", handle))
   }
 }
