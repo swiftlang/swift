@@ -180,8 +180,8 @@ public func concrete_concrete() {
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S34conditional_conformance_with_assoc09concrete_E0yyF"() #0 {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %0 = call %swift.type* @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"() #10
-// CHECK-NEXT:    %1 = call i8** @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"() #10
+// CHECK-NEXT:    %0 = call %swift.type* @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"()
+// CHECK-NEXT:    %1 = call i8** @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"()
 // CHECK-NEXT:    call swiftcc void @"$S34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* %0, %swift.type* %0, i8** %1)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT: }
@@ -196,7 +196,7 @@ public func concrete_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[Double_TYPE:%.*]] = call %swift.type* @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"() #10
+// CHECK-NEXT:    [[Double_TYPE:%.*]] = call %swift.type* @"$S34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"()
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$S34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
