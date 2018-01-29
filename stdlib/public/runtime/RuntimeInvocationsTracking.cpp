@@ -21,10 +21,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 
-// This file is compiled always, even if assertions are disabled and no runtime
-// functions are being tracked. This is done to avoid recompiling Swift clients
-// using these APIs. They should be able to link against the standard library
-// independent of the fact whether assertions are enabled or not.
+#if defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 
 #define SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)                 \
   invocationCounter_##RT_FUNCTION
@@ -238,3 +235,5 @@ _swift_setGlobalRuntimeFunctionCountersUpdateHandler(
 /// TODO: Provide an API to remove any counters releated to a specific object
 /// or all objects.
 /// This is useful if you want to reset the stats for some/all objects.
+
+#endif
