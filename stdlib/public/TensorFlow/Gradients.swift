@@ -38,7 +38,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// - MARK: Elementwise binary ops
+//===----------------------------------------------------------------------===//
+// Elementwise binary
+//===----------------------------------------------------------------------===//
 
 @_inlineable
 @_versioned
@@ -166,7 +168,9 @@ func _adjointPow<T : FloatingPoint>(
   return (seed * y * pow(x, y-1), seed * log(x) * primal)
 }
 
-// - MARK: Elementwise unary ops
+//===----------------------------------------------------------------------===//
+// Elementwise unary
+//===----------------------------------------------------------------------===//
 
 @_inlineable
 @_versioned
@@ -232,18 +236,17 @@ func _adjointTanh<T : FloatingPoint>(
   return seed * (1 - primal.squared())
 }
 
-// - MARK: Linear algebra ops
+//===----------------------------------------------------------------------===//
+// Linear algebra
+//===----------------------------------------------------------------------===//
 
-// FIXME: Restore when Sema bug is fixed.
-// Sema cannot infer Unit : Numeric in '_adjointDot'.
-//
-// @_inlineable
-// @_versioned
-// func _adjointDot<T : Numeric>(
-//   _ x: Tensor<T>, _ y: Tensor<T>, primal: Tensor<T>, seed: Tensor<T>
-// ) -> (Tensor<T>, Tensor<T>) {
-//   return (seed.dot(y.transpose), x.tranpose.dot(y))
-// }
+@_inlineable
+@_versioned
+func _adjointDot<T : Numeric>(
+  _ x: Tensor<T>, _ y: Tensor<T>, primal: Tensor<T>, seed: Tensor<T>
+) -> (Tensor<T>, Tensor<T>) {
+  return (seed.dot(y.transpose), x.transpose.dot(y))
+}
 
 @_inlineable
 @_versioned
@@ -253,4 +256,147 @@ func _adjointTranspose<T : Numeric>(
   return seed.transpose
 }
 
-// - MARK: Reduction ops
+//===----------------------------------------------------------------------===//
+// Reduction
+//===----------------------------------------------------------------------===//
+
+
+//===----------------------------------------------------------------------===//
+// Convolution and pooling
+//===----------------------------------------------------------------------===//
+
+/// TensorFlow builtin conv2d gradient helper for the input.
+@_inlineable
+@_versioned
+// @differentiable(
+//   withRespectTo: (.1, .2),
+//   gradient: _adjointTFConv2DBackpropInput(_:_:_:_:_:_:_:)
+// )
+func _TFConv2DBackpropInput<T : FloatingPoint>(
+  shape: Tensor<Int32>,
+  filter: Tensor<T>,
+  backpropOutput: Tensor<T>,
+  strides: [Int],
+  padding: Padding
+) -> Tensor<T> {
+  // FIXME: handle attributes (strides and padding)
+  return Tensor(#tfop("Conv2DBackpropInput", "ttt:t",
+                      shape.handle, filter.handle, backpropOutput.handle))
+}
+
+/// TensorFlow builtin conv2d gradient helper for the filter.
+@_inlineable
+@_versioned
+// @differentiable(
+//   withRespectTo: (.0, .2),
+//   gradient: _adjointTFConv2DBackpropFilter(_:_:_:_:_:_:_:)
+// )
+func _TFConv2DBackpropFilter<T : FloatingPoint>(
+  input: Tensor<T>,
+  filterSizes: Tensor<Int32>,
+  backpropOutput: Tensor<T>,
+  strides: [Int],
+  padding: Padding
+) -> Tensor<T> {
+  // FIXME: handle attributes (strides and padding)
+  return Tensor(#tfop("Conv2DBackpropFilter", "ttt:t",
+                      input.handle, filterSizes.handle, backpropOutput.handle))
+}
+
+@_inlineable
+@_versioned
+func _adjointTFConv2DBackpropInput<T : FloatingPoint>(
+  _ shape: Tensor<Int32>,
+  _ filter: Tensor<T>,
+  _ backpropOutput: Tensor<T>,
+  _ strides: [Int],
+  _ padding: Padding,
+  _ primal: Tensor<T>,
+  _ seed: Tensor<T>
+) -> (Tensor<T>, Tensor<T>) {
+  return (
+    _TFConv2DBackpropFilter(input: seed, filterSizes: shape,
+                            backpropOutput: backpropOutput, strides: strides,
+                            padding: padding),
+    seed.convolved2D(withFilter: filter, strides: strides, padding: padding)
+  )
+}
+
+@_inlineable
+@_versioned
+func _adjointTFConv2DBackpropFilter<T : FloatingPoint>(
+  _ input: Tensor<T>,
+  _ filterSizes: Tensor<Int32>,
+  _ backpropOutput: Tensor<T>,
+  _ strides: [Int],
+  _ padding: Padding,
+  _ primal: Tensor<T>,
+  _ seed: Tensor<T>
+) -> (Tensor<T>, Tensor<T>) {
+  return (
+    _TFConv2DBackpropInput(shape: filterSizes, filter: seed,
+                           backpropOutput: backpropOutput, strides: strides,
+                           padding: padding),
+    input.convolved2D(withFilter: seed, strides: strides, padding: padding)
+  )
+}
+
+@_inlineable
+@_versioned
+func _adjointConvolved2D<T : FloatingPoint>(
+  input: Tensor<T>,
+  filter: Tensor<T>,
+  strides: [Int],
+  padding: Padding,
+  primal: Tensor<T>,
+  seed: Tensor<T>
+) -> (Tensor<T>, Tensor<T>) {
+  return (
+    _TFConv2DBackpropInput(shape: input.shapeTensor, filter: filter,
+                           backpropOutput: seed, strides: strides,
+                           padding: padding),
+    _TFConv2DBackpropFilter(input: input, filterSizes: filter.shapeTensor,
+                            backpropOutput: seed, strides: strides,
+                            padding: padding
+    )
+  )
+}
+
+@_inlineable
+@_versioned
+func _adjointMaxPooled<T>(
+  input: Tensor<T>,
+  kernelSize: Tensor<Int32>,
+  strides: Tensor<Int32>,
+  padding: Padding,
+  primal: Tensor<T>,
+  seed: Tensor<T>
+) -> Tensor<T> {
+  // TODO: Currently this is not higher order differentiable. Redefine in closed
+  // form.
+  // FIXME: handle attributes (padding)
+  return Tensor(#tfop("MaxPoolGradV2", "ttttt:t",
+                      input.shapeTensor.handle,
+                      primal.handle,
+                      seed.handle,
+                      kernelSize.handle,
+                      strides.handle))
+}
+
+@_inlineable
+@_versioned
+func _adjointAveragePooled<T>(
+  input: Tensor<T>,
+  kernelSize: [Int],
+  strides: [Int],
+  padding: Padding,
+  primal: Tensor<T>,
+  seed: Tensor<T>
+) -> Tensor<T> {
+  // TODO: Currently this is not higher order differentiable. Redefine in closed
+  // form.
+  // FIXME: handle attributes (ksize, strides, padding)
+  return Tensor(#tfop("AvgPoolGrad", "tt:t",
+                      input.shapeTensor.handle,
+                      seed.handle))
+}

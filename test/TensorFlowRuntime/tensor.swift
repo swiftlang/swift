@@ -101,10 +101,10 @@ func testXORInference() {
     let y = tanh(o1 ⊗ w2 + b2)
     return y.array.units[0] // TODO: use better scalar getter
   }
-  expectLT(abs(xor(0.0, 0.0) - 0.0), 0.1)
-  expectLT(abs(xor(0.0, 1.0) - 1.0), 0.1)
-  expectLT(abs(xor(1.0, 0.0) - 1.0), 0.1)
-  expectLT(abs(xor(1.0, 1.0) - 0.0), 0.1)
+  expectNearlyEqual(xor(0.0, 0.0), 0.0, byError: 0.1)
+  expectNearlyEqual(xor(0.0, 1.0), 1.0, byError: 0.1)
+  expectNearlyEqual(xor(1.0, 0.0), 1.0, byError: 0.1)
+  expectNearlyEqual(xor(1.0, 1.0), 0.0, byError: 0.1)
 }
 TensorTests.testCPUAndGPU("XORInference", testXORInference)
 
@@ -112,12 +112,12 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
   struct MLPClassifier {
     // 2 x 4
     var w1 = Tensor<Float>([[1.0, 0.8, 0.4, 0.4],
-        [0.4, 0.3, 0.2, 0.1]]).toDevice()
+                            [0.4, 0.3, 0.2, 0.1]]).toDevice()
     // 4 x 1
     var w2 = Tensor<Float>([[0.4],
-        [0.4],
-        [0.3],
-        [0.9]]).toDevice()
+                            [0.4],
+                            [0.3],
+                            [0.9]]).toDevice()
     var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
     var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
 
@@ -128,9 +128,174 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
       return tanh(o1 ⊗ w2 + b2)
     }
   }
-  // TODO: Check results
-  _ = MLPClassifier().prediction(for: Tensor([[1, 0.5]]).toDevice())
+  let classifier = MLPClassifier()
+  let _ = classifier.prediction(for: Tensor([[1, 0.5]]).toDevice())
+  // TODO: Check result.
 }
+
+TensorTests.testCPUAndGPU("Reshape") {
+  let x = Tensor([[1], [2], [3]]).toDevice() // Shape 3 x 1
+  let y = x.reshaped([1, 3, 1, 1, 1])
+  expectEqual(y.shape, [1, 3, 1, 1, 1])
+}
+
+// FIXME: Partitioner gives unpredictable errors regarding send/receive.
+#if false
+@inline(never)
+func testStraightLineXORTraining() {
+  // Hyper-parameters
+  let iterationCount = 1000
+  let learningRate: Float = 0.2
+
+  // Parameters
+  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5).toDevice()
+  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5).toDevice()
+  var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
+  var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
+
+  // Training data
+  let inputBatch = Tensor<Float>(
+    [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+  ).toDevice()
+  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
+
+  // Training loop
+  // FIXME: Partitioner assertion "Marking instructions out of the tensor region?"
+  // for i in 0..<iterationCount {
+    let mmul1 = inputBatch ⊗ w1
+    let l1 = mmul1 + b1
+    // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
+    // `sigmoid` is @_inlineable, and it should not need send/receive.
+    let o1 = sigmoid(l1)
+    let mmul2 = o1 ⊗ w2
+    let l2 = mmul2 + b2
+    // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
+    // `sigmoid` is @_inlineable, and it should not need send/receive.
+    let pred = sigmoid(l2)
+
+    // Loss
+    let sub = outputBatch - pred
+    let sqr = sub * sub
+    let mean = sqr.mean()
+
+    // Gradient
+    let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
+    let dSub = 2 * sub * dSqr
+    let dPred = -dSub
+    let dL2 = dPred * pred * (1 - pred)
+    let dMmul2 = dL2
+    let dB2 = dL2
+    let dO1 = dMmul2 ⊗ w2.transpose
+    let dW2 = o1.transpose ⊗ dMmul2
+    let dL1 = dO1 * l1 * (1 - l1)
+    let dMmul1 = dL1
+    let dB1 = dL1
+    let dW1 = inputBatch ⊗ dMmul1
+
+    // Descent
+    w1 -= (dW1 * learningRate)
+    b1 -= (dB1 * learningRate)
+    w2 -= (dW2 * learningRate)
+    b2 -= (dB2 * learningRate)
+  // }
+}
+TensorTests.testCPUAndGPU("StraightLineXORTraining", testStraightLineXORTraining)
+#endif
+
+// FIXME: Partitioner assertion "Marking instructions out of the tensor region?"
+#if false
+@inline(never)
+func testXORClassifierTraining() {
+  struct MLPClassifier {
+    // TODO: randomize weights once we have Tensor.random() implemented.
+    var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5).toDevice()
+    var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5).toDevice()
+    var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
+    var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
+
+    @_versioned
+    @inline(__always)
+    func prediction(for x: Tensor<Float>) -> Tensor<Float> {
+      let o1 = tanh(x ⊗ w1 + b1)
+      return tanh(o1 ⊗ w2 + b2)
+    }
+
+    @_versioned
+    @inline(__always)
+    func prediction(for a: Bool, _ b: Bool) -> Bool {
+      let x: Float = a ? 1 : 0
+      let y: Float = b ? 1 : 0
+      let input = Tensor([[x, y]])
+      let floatPred = prediction(for: input).scalarized()
+      return abs(floatPred - 1) < 0.001
+    }
+
+    @_versioned
+    @inline(__always)
+    func loss(of prediction: Tensor<Float>,
+              from exampleOutput: Tensor<Float>) -> Float {
+      return (prediction - exampleOutput).squared().mean()
+    }
+
+    @_versioned
+    @inline(__always)
+    mutating func train(inputBatch x: Tensor<Float>,
+                        outputBatch expected: Tensor<Float>,
+                        iterationCount: Int, learningRate: Float) {
+      for i in 0..<iterationCount {
+        let
+          mmul1 = x ⊗ w1,
+          l1 = mmul1 + b1,
+          o1 = sigmoid(l1),
+          mmul2 = o1 ⊗ w2,
+          l2 = mmul2 + b2,
+          pred = sigmoid(l2)
+
+        // Loss
+        let
+          sub = expected - pred,
+          sqr = pow(sub, 2),
+          mean = sqr.mean()
+
+        // Gradient
+        let
+          dSqr = 1 / Tensor<Float>(pred.unitCountTensor),
+          dSub = 2 * sub * dSqr,
+          dPred = -dSub,
+          dL2 = dPred * pred * (1 - pred),
+          dMmul2 = dL2,
+          dB2 = dL2,
+          dO1 = dMmul2 ⊗ w2.transpose,
+          dW2 = o1.transpose ⊗ dMmul2,
+          dL1 = dO1 * l1 * (1 - l1),
+          dMmul1 = dL1,
+          dB1 = dL1,
+          dW1 = x ⊗ dMmul1
+
+        // Descent
+        w1 -= (dW1 * learningRate)
+        b1 -= (dB1 * learningRate)
+        w2 -= (dW2 * learningRate)
+        b2 -= (dB2 * learningRate)
+      }
+    }
+  }
+
+  var classifier = MLPClassifier()
+  classifier.train(
+    inputBatch: Tensor<Float>([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]),
+    outputBatch: Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]),
+    iterationCount: 1000,
+    learningRate: 0.2
+  )
+  // TODO: Uncomment once send/receive is fixed.
+  // expectEqual(classifier.prediction(for: false, false), false)
+  // expectEqual(classifier.prediction(for: false, true), true)
+  // expectEqual(classifier.prediction(for: true, false), true)
+  // expectEqual(classifier.prediction(for: true, true), false)
+}
+TensorTests.testCPUAndGPU("XORClassifierTraining", testXORClassifierTraining)
+#endif
 
 @inline(never)
 func testRankGetter() {

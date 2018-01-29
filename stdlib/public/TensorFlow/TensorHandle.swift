@@ -23,7 +23,7 @@ public typealias CTensorHandle = OpaquePointer
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
 /// into a tensor program.
-public final class TensorHandle<Unit: AccelerableTensorUnit> {
+public final class TensorHandle<Unit : AccelerableTensorUnit> {
   /// This is the underlying "TF_TensorHandle*" which this TensorHandle
   /// represents.
   ///
@@ -43,7 +43,21 @@ public final class TensorHandle<Unit: AccelerableTensorUnit> {
   }
 }
 
-extension TensorHandle {
+internal extension TensorHandle {
+  /// An empty tensor of shape [0] with no elements. This is some total
+  /// madness to be passed to #tfop as 'None'.
+  @_versioned
+  static var empty: TensorHandle {
+    @inline(never)
+    get {
+      let tensor = TF_AllocateTensor(Unit.cDataType, nil, 0, 0)
+      let status = TF_NewStatus()
+      let cHandle = TFE_NewTensorHandle(tensor, status)
+      checkOk(status)
+      return self.init(cTensorHandle: cHandle!)
+    }
+  }
+
   /// Create a shaped array with contents of the underlying tensor. If the
   /// tensor is on the accelerator, it will be copied to the host.
   /// - Returns: A shaped array.
