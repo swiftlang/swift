@@ -647,7 +647,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
-          if (auto *decl = astNode.get<ValueDecl *>())
+          if (auto *decl = astNode.dyn_cast<ValueDecl *>())
             decl->dump(llvm::dbgs());
           else
             astNode.get<Expr *>()->dump(llvm::dbgs());
