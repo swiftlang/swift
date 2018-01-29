@@ -857,9 +857,7 @@ id
 swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
   id object = [*reinterpret_cast<const id *>(value) retain];
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
     id quickLookObject = [object debugQuickLookObject];
     [quickLookObject retain];
@@ -1130,19 +1128,14 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   Mirror result;
   // Take the value, unless we projected a subvalue from it. We don't want to
   // deal with partial value deinitialization.
-  bool take =
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-    mirrorValue == value;
-#else
-    false;
-#endif
+  bool take = false;
+  SWIFT_CC_PLUSONE_GUARD(take = (mirrorValue == value));
   ::new (&result) MagicMirror(mirrorValue, mirrorType, take);
 
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   // Destroy the whole original value if we couldn't take it.
-  if (!take)
+  if (!take) {
     T->vw_destroy(value);
-#endif
+  }
   return MirrorReturn(result);
 }
 
