@@ -69,7 +69,7 @@ public func subclassgeneric_generic<T: P2>(_: T.Type) {
 // CHECK-NEXT:    [[COUNT_PTR:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
 // CHECK-NEXT:    store i64 %2, i64* [[COUNT_PTR]], align 8
 // CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 

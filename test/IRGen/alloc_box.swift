@@ -11,5 +11,5 @@ func f() -> Bool? { return nil }
 // CHECK-LABEL: @"$S9alloc_boxyycfU_"
 // CHECK: <label>:8:
 // CHECK-NOT: call void @swift_setDeallocating
-// CHECK: call void @swift_rt_swift_deallocUninitializedObject
+// CHECK: call void @swift_deallocUninitializedObject
 

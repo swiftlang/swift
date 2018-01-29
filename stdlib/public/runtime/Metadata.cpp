@@ -225,8 +225,7 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 
 /// The primary entrypoint.
 const Metadata *swift::swift_getGenericMetadata(GenericMetadata *pattern,
-                                                const void *arguments)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                                                const void *arguments) {
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
 
@@ -2373,8 +2372,7 @@ swift::swift_getExistentialTypeMetadata(
                                   ProtocolClassConstraint classConstraint,
                                   const Metadata *superclassConstraint,
                                   size_t numProtocols,
-                                  const ProtocolDescriptor * const *protocols)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                                  const ProtocolDescriptor * const *protocols) {
 
   // We entrust that the compiler emitting the call to
   // swift_getExistentialTypeMetadata always sorts the `protocols` array using
@@ -2823,7 +2821,7 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
 const WitnessTable *swift::swift_getGenericWitnessTable(
     GenericWitnessTable *genericTable, const Metadata *type,
-    void *const *instantiationArgs) SWIFT_CC(RegisterPreservingCC_IMPL) {
+    void *const *instantiationArgs) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }
