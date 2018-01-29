@@ -2795,11 +2795,12 @@ extension Dictionary : Hashable where Value : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable
   public var hashValue: Int {
-    var result: Int = _mixInt(0)
+    var result: Int = 0
     for (k, v) in self {
-      result ^= _mixInt(k.hashValue)
-      result ^= _mixInt(v.hashValue)
+      result = _combineHashValues(result, k.hashValue)
+      result = _combineHashValues(result, v.hashValue)
     }
+    result = _mixInt(result)
     return result
   }
 }

@@ -418,12 +418,16 @@ extension Optional : Hashable where Wrapped : Hashable {
     /// your program. Do not save hash values to use during a future execution.
     @_inlineable
     public var hashValue: Int {
+        var result: Int
         switch self {
-        case .some(let wrapped):
-            return wrapped.hashValue
         case .none:
-            return _mixInt(0)
+            result = 0
+        case .some(let wrapped):
+            result = 1
+            result = _combineHashValues(result, wrapped.hashValue)
         }
+        result = _mixInt(result)
+        return result
     }
 }
 
