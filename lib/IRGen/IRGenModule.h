@@ -522,8 +522,7 @@ public:
   
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
-  llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
-  llvm::CallingConv::ID SwiftCC;     /// swift calling convention
+  llvm::CallingConv::ID SwiftCC;       /// swift calling convention
 
   Signature getAssociatedTypeMetadataAccessFunctionSignature();
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();

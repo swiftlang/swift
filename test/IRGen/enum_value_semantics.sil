@@ -282,7 +282,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ; <label>:[[RELEASE_PAYLOAD]]
 // CHECK-NEXT: [[DATA_ADDR:%.*]] = bitcast %T20enum_value_semantics23SinglePayloadNontrivialO* [[ADDR]] to %swift.refcounted**
 // CHECK-NEXT: [[DATA:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DATA_ADDR]], align 8
-// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[DATA]])
+// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[DATA]])
 // CHECK-NEXT: br label %[[DONE]]
 
 // CHECK:      ; <label>:[[DONE]]

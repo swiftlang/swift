@@ -266,8 +266,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 
 /// Dynamically cast a class instance to a Swift class type.
 const void *swift::swift_dynamicCastClass(const void *object,
-                                          const ClassMetadata *targetType)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                                          const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
 
@@ -567,7 +566,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT
 id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -595,7 +594,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   }
 }
 
-SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT
 id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -2403,8 +2402,7 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                               const Metadata *srcType,
                               const Metadata *targetType,
-                              DynamicCastFlags flags)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                              DynamicCastFlags flags) {
   auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
                                                    targetType, flags);
   srcType = unwrapResult.payloadType;
@@ -3235,13 +3233,13 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
 }
 
 // Called by compiler-generated cast code.
-SWIFT_CC(c) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API
 bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
 // Called by compiler-generated code.
-SWIFT_CC(c) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API
 bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
