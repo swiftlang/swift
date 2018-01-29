@@ -110,6 +110,8 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
 
+  ASTContext &C;
+
   std::vector<RC<RawSyntax>> &Storage;
 
   // Offet for 'Storage' this context owns from.
@@ -137,14 +139,20 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
     return makeArrayRef(Storage).drop_front(Offset);
   }
 
+  RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
+                                  ArrayRef<RC<RawSyntax>> Parts);
+  RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts);
+  RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts);
+
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
-    DiagnosticEngine &Diags, SourceManager &SourceMgr, unsigned BufferID);
+                       unsigned BufferID);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
+        C(CtxtHolder->C),
         Storage(CtxtHolder->Storage), Offset(Storage.size()),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&

@@ -67,11 +67,12 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
 } // end of anonymous namespace
 
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence) {
+                     SourcePresence Presence, bool ManualMemory) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
   Bits.Kind = unsigned(Kind);
   Bits.Presence = unsigned(Presence);
+  Bits.ManualMemory = unsigned(ManualMemory);
   Bits.NumChildren = Layout.size();
 
   // Initialize layout data.
@@ -79,11 +80,12 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                           getTrailingObjects<RC<RawSyntax>>());
 }
 
-RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
+RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence, bool ManualMemory,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia) {
   Bits.Kind = unsigned(SyntaxKind::Token);
   Bits.Presence = unsigned(Presence);
+  Bits.ManualMemory = unsigned(ManualMemory);
   Bits.TokenKind = unsigned(TokKind);
   Bits.NumLeadingTrivia = LeadingTrivia.size();
   Bits.NumTrailingTrivia = TrailingTrivia.size();
@@ -113,24 +115,30 @@ RawSyntax::~RawSyntax() {
   }
 }
 
-RC<RawSyntax> RawSyntax::make(SyntaxKind Kind,
-                                ArrayRef<RC<RawSyntax>> Layout,
-                                SourcePresence Presence) {
+RC<RawSyntax>
+RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                SourcePresence Presence,
+                llvm::function_ref<void *(size_t, size_t)> Allocate) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
-  void *data = ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(Kind, Layout, Presence));
+  void *data =
+      Allocate ? Allocate(size, alignof(RawSyntax)) : ::operator new(size);
+  return RC<RawSyntax>(new (data)
+                           RawSyntax(Kind, Layout, Presence, bool(Allocate)));
 }
 
-RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
-                              SourcePresence Presence,
-                              ArrayRef<TriviaPiece> LeadingTrivia,
-                              ArrayRef<TriviaPiece> TrailingTrivia) {
+RC<RawSyntax>
+RawSyntax::make(tok TokKind, OwnedString Text, SourcePresence Presence,
+                ArrayRef<TriviaPiece> LeadingTrivia,
+                ArrayRef<TriviaPiece> TrailingTrivia,
+                llvm::function_ref<void *(size_t, size_t)> Allocate) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
-  void *data = ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(TokKind, Text, Presence,
-                                            LeadingTrivia, TrailingTrivia));
+  void *data =
+      Allocate ? Allocate(size, alignof(RawSyntax)) : ::operator new(size);
+
+  return RC<RawSyntax>(new (data) RawSyntax(
+      TokKind, Text, Presence, bool(Allocate), LeadingTrivia, TrailingTrivia));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {

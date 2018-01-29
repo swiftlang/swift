@@ -114,8 +114,9 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
   return canServeAsCollectionMemberRaw(CollectionKind, Member.getRaw());
 }
 
-RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
-                                       llvm::ArrayRef<RC<RawSyntax>> Elements) {
+RC<RawSyntax> SyntaxFactory::createRaw(
+    SyntaxKind Kind, llvm::ArrayRef<RC<RawSyntax>> Elements,
+    llvm::function_ref<void *(size_t, size_t)> Allocate) {
   switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
@@ -139,13 +140,13 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 %   end
     if (I != Elements.size())
       return nullptr;
-    return RawSyntax::make(Kind, Layout, SourcePresence::Present);
+    return RawSyntax::make(Kind, Layout, SourcePresence::Present, Allocate);
 % elif node.is_syntax_collection():
     for (auto &E : Elements) {
       if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
         return nullptr;
     }
-    return RawSyntax::make(Kind, Elements, SourcePresence::Present);
+    return RawSyntax::make(Kind, Elements, SourcePresence::Present, Allocate);
 % else:
     return nullptr;
 % end

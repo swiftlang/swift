@@ -228,6 +228,9 @@ class RawSyntax final
       unsigned Kind : bitmax(NumSyntaxKindBits, 8);
       /// Whether this piece of syntax was actually present in the source.
       unsigned Presence : 1;
+      /// Whether this piece of syntax was constructed with manually managed
+      /// memory.
+      unsigned ManualMemory : 1;
     };
     enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
 
@@ -261,26 +264,42 @@ class RawSyntax final
   }
 
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-            SourcePresence Presence);
-  RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
+            SourcePresence Presence, bool ManualMemory);
+  RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence, bool ManualMemory,
             ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia);
 
 public:
   ~RawSyntax();
 
+  void Release() const {
+    //llvm::errs() << "Release: " << Bits.ManualMemory << "\n";
+    if (Bits.ManualMemory)
+      return;
+    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
+  }
+  void Retain() const {
+    //llvm::errs() << "Retain: " << Bits.ManualMemory << "\n";
+    if (Bits.ManualMemory) {
+      return;
+    }
+    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
+  }
+
   /// \name Factory methods.
   /// @{
   
   /// Make a raw "layout" syntax node.
-  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                            SourcePresence Presence);
+  static RC<RawSyntax>
+  make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout, SourcePresence Presence,
+       llvm::function_ref<void *(size_t, size_t)> Allocate = {});
 
   /// Make a raw "token" syntax node.
-  static RC<RawSyntax> make(tok TokKind, OwnedString Text,
-                            SourcePresence Presence,
-                            ArrayRef<TriviaPiece> LeadingTrivia,
-                            ArrayRef<TriviaPiece> TrailingTrivia);
+  static RC<RawSyntax>
+  make(tok TokKind, OwnedString Text, SourcePresence Presence,
+       ArrayRef<TriviaPiece> LeadingTrivia,
+       ArrayRef<TriviaPiece> TrailingTrivia,
+       llvm::function_ref<void *(size_t, size_t)> Allocate = {});
 
   /// Make a missing raw "layout" syntax node.
   static RC<RawSyntax> missing(SyntaxKind Kind) {

@@ -55,7 +55,8 @@ struct SyntaxFactory {
                                        llvm::ArrayRef<Syntax> Elements);
 
   static RC<RawSyntax> createRaw(SyntaxKind Kind,
-                                 llvm::ArrayRef<RC<RawSyntax>> Elements);
+                                 llvm::ArrayRef<RC<RawSyntax>> Elements,
+    llvm::function_ref<void *(size_t, size_t)> Allocate = {});
 
   /// Count the number of children for a given syntax node kind,
   /// returning a pair of mininum and maximum count of children. The gap

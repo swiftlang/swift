@@ -96,14 +96,14 @@ namespace {
 
 namespace {
 class RCRSCacheNode : public llvm::FastFoldingSetNode {
-  const RC<syntax::RawSyntax> Raw;
+  syntax::RawSyntax *Raw;
 
 public:
-  RCRSCacheNode(const RC<syntax::RawSyntax> Raw,
+  RCRSCacheNode(syntax::RawSyntax *Raw,
                 const llvm::FoldingSetNodeID &ID)
       : FastFoldingSetNode(ID), Raw(Raw) {}
 
-  RC<syntax::RawSyntax> get() { return Raw; }
+  syntax::RawSyntax *get() { return Raw; }
 };
 } // end anonymous namespace
 
@@ -4906,9 +4906,11 @@ RC<syntax::RawSyntax> ASTContext::getRawTokenSyntax(
       // Tokens contains comment triiva et al.
       any_of(TrailingTrivia,
              [](const syntax::TriviaPiece &T) { return T.getText().size(); })) {
-    return syntax::RawSyntax::make(TokKind, Text,
-                                   syntax::SourcePresence::Present,
-                                   LeadingTrivia, TrailingTrivia);
+    return syntax::RawSyntax::make(
+        TokKind, Text, syntax::SourcePresence::Present, LeadingTrivia,
+        TrailingTrivia, [&](size_t size, size_t alignment) {
+          return Allocate(size, alignment);
+        });
   }
 
   llvm::FoldingSetNodeID ID;
@@ -4920,9 +4922,10 @@ RC<syntax::RawSyntax> ASTContext::getRawTokenSyntax(
   if (auto existing = CachedTokens.FindNodeOrInsertPos(ID, insertPos))
     return existing->get();
 
-  auto Raw =
-      syntax::RawSyntax::make(TokKind, Text, syntax::SourcePresence::Present,
-                              LeadingTrivia, TrailingTrivia);
-  CachedTokens.InsertNode(new RCRSCacheNode(Raw, ID), insertPos);
+  auto Raw = syntax::RawSyntax::make(
+      TokKind, Text, syntax::SourcePresence::Present, LeadingTrivia,
+      TrailingTrivia,
+      [&](size_t size, size_t alignment) { return Allocate(size, alignment); });
+  CachedTokens.InsertNode(new RCRSCacheNode(Raw.get(), ID), insertPos);
   return Raw;
 }
