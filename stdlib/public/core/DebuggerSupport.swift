@@ -170,6 +170,11 @@ public enum _DebuggerSupport {
     if isRoot || collectionStatus.isCollection { return true }
     let count = Int(mirror.children.count)
     if count > 0 { return true }
+    if let ds = mirror.displayStyle {
+      if ds == .`class` {
+        return true
+      }
+    }
     if let sc = mirror.superclassMirror {
       return ivarCount(mirror: sc) > 0
     } else {
