@@ -3545,12 +3545,6 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       auto subExpr = E->getSubExpr();
 
-      // Currently we don't produce Optional-as-Any warnings for implicit IUO
-      // to Any coercions (this doesn't take into consideration implicit
-      // coercions such as Any?! to Any?, however; we warn on those).
-      if (subExpr->getType()->getImplicitlyUnwrappedOptionalObjectType())
-        return;
-
       // Look through any BindOptionalExprs, as the coercion may have started
       // from a higher level of optionality.
       while (auto *bindExpr = dyn_cast<BindOptionalExpr>(subExpr))

@@ -82,9 +82,16 @@ func warnNestedOptionalToOptionalAnyCoercion(_ a: Int?, _ b: Any??, _ c: Int???,
   takesOptionalAny(c as Any?, d as Any?)
 }
 
-func dontWarnIUOToAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
-  _ = takeAny(a, b)
-  _ = takeAny(c, d)
+func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
+  _ = takeAny(a, b) // expected-warning {{expression implicitly coerced from 'Int!' to 'Any'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{16-16= as Any}}
+  // expected-warning@-4 {{expression implicitly coerced from 'Any?!' to 'Any'}}
+  // expected-note@-5 {{force-unwrap the value to avoid this warning}}{{19-19=!!}}
+  // expected-note@-6 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{19-19= as Any}}
+
+  _ = takeAny(a as Any, b as Any)
 }
 
 func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
