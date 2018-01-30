@@ -857,6 +857,9 @@ public:
                               GenericEnvironment *env,
                               bool isMutable);
 
+  CanSILBoxType getBoxTypeForEnumElement(SILType enumType,
+                                         EnumElementDecl *elt);
+
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 
