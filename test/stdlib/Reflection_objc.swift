@@ -14,6 +14,7 @@
 
 import Swift
 import Foundation
+import CoreGraphics
 
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
