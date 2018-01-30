@@ -406,7 +406,9 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
 static bool isInSwiftModule(Node *node) {
   Node *context = node->getFirstChild();
   return (context->getKind() == Node::Kind::Module &&
-          context->getText() == STDLIB_NAME);
+          context->getText() == STDLIB_NAME &&
+          // Check for private declarations in Swift
+          node->getChild(1)->getKind() == Node::Kind::Identifier);
 };
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
