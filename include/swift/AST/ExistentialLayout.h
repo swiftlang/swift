@@ -17,6 +17,7 @@
 #ifndef SWIFT_EXISTENTIAL_LAYOUT_H
 #define SWIFT_EXISTENTIAL_LAYOUT_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/SmallVector.h"
@@ -66,10 +67,13 @@ struct ExistentialLayout {
   // constraints?
   bool isErrorExistential() const;
 
-  ArrayRef<ProtocolType *> getProtocols() const {
-    if (singleProtocol)
-      return ArrayRef<ProtocolType *>{&singleProtocol, 1};
-    return multipleProtocols;
+  static inline ProtocolType *getProtocolType(const Type &Ty) {
+    return cast<ProtocolType>(Ty.getPointer());
+  }
+  typedef ArrayRefView<Type,ProtocolType*,getProtocolType> ProtocolTypeArrayRef;
+
+  ProtocolTypeArrayRef getProtocols() const {
+    return protocols;
   }
 
   LayoutConstraint getLayoutConstraint() const;
@@ -77,10 +81,10 @@ struct ExistentialLayout {
 private:
   // Inline storage for 'protocols' member above when computing
   // layout of a single ProtocolType
-  ProtocolType *singleProtocol;
+  Type singleProtocol;
 
   /// Zero or more protocol constraints.
-  ArrayRef<ProtocolType *> multipleProtocols;
+  ArrayRef<Type> protocols;
 };
 
 }
