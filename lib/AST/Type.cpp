@@ -1385,6 +1385,10 @@ bool TypeBase::mayHaveSuperclass() {
   return is<DynamicSelfType>();
 }
 
+bool TypeBase::satisfiesClassConstraint() {
+  return mayHaveSuperclass() || isObjCExistentialType();
+}
+
 Type TypeBase::getSuperclass() {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);

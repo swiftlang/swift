@@ -2315,7 +2315,13 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
 
   // Implicitly break out of the pattern match statement.
   if (SGF.B.hasValidInsertionPoint()) {
-    SGF.emitBreakOutOf(CleanupLocation(caseBlock), PatternMatchStmt);
+    // Case blocks without trailing braces have ambiguous cleanup locations.
+    SILLocation cleanupLoc = getCompilerGeneratedLocation();
+    if (auto *braces = dyn_cast<BraceStmt>(caseBlock->getBody()))
+      if (braces->getNumElements() == 1 &&
+          dyn_cast_or_null<DoStmt>(braces->getElement(0).dyn_cast<Stmt *>()))
+        cleanupLoc = CleanupLocation(caseBlock);
+    SGF.emitBreakOutOf(cleanupLoc, PatternMatchStmt);
   }
 }
 

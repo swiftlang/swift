@@ -1796,8 +1796,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType, nullptr)
-             ->isEqual(type) && "Conflicting type witness deductions");
+    assert(Conformance->getTypeWitness(assocType, nullptr)->isEqual(type) &&
+           "Conflicting type witness deductions");
     return;
   }
 
@@ -2656,8 +2656,12 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
+  if (type->hasError())
+    return ErrorType::get(tc.Context);
+
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
+
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
@@ -2688,11 +2692,9 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     }
   }
 
-  if (genericSig->requiresClass(depTy)) {
-    if (!contextType->isObjCExistentialType() &&
-        !contextType->mayHaveSuperclass())
-      return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
-  }
+  if (genericSig->requiresClass(depTy) &&
+      !contextType->satisfiesClassConstraint())
+    return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
 
   // Success!
   return CheckTypeWitnessResult();
@@ -2747,6 +2749,16 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     }
   }
 
+  // If there are no viable witnesses, and all nonviable candidates came from
+  // protocol extensions, treat this as "missing".
+  if (viable.empty() &&
+      std::find_if(nonViable.begin(), nonViable.end(),
+                   [](const std::pair<TypeDecl *, CheckTypeWitnessResult> &x) {
+                     return x.first->getDeclContext()
+                        ->getAsProtocolOrProtocolExtensionContext() == nullptr;
+                   }) == nonViable.end())
+    return ResolveWitnessResult::Missing;
+
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     auto interfaceType = viable.front().second;
@@ -2781,7 +2793,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     [nonViable](NormalProtocolConformance *conformance) {
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredInterfaceType()->hasError())
+        if (candidate.first->getDeclaredInterfaceType()->hasError() ||
+            candidate.second.isError())
           continue;
 
         diags.diagnose(

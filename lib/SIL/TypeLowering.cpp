@@ -2298,10 +2298,8 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2) {
   // Classes, class-constrained archetypes, and pure-ObjC existential types
   // all have single retainable pointer representation; optionality change
   // is allowed.
-  if ((type1.getSwiftRValueType()->mayHaveSuperclass() ||
-       type1.getSwiftRValueType()->isObjCExistentialType()) &&
-      (type2.getSwiftRValueType()->mayHaveSuperclass() ||
-       type2.getSwiftRValueType()->isObjCExistentialType()))
+  if (type1.getSwiftRValueType()->satisfiesClassConstraint() &&
+      type2.getSwiftRValueType()->satisfiesClassConstraint())
     return ABIDifference::Trivial;
 
   // Function parameters are ABI compatible if their differences are

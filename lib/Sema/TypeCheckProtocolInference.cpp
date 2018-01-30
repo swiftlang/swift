@@ -818,7 +818,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
 
   if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
     // Record the failure, if we haven't seen one already.
-    if (!failedDefaultedAssocType) {
+    if (!failedDefaultedAssocType && !failed.isError()) {
       failedDefaultedAssocType = defaultedAssocType;
       failedDefaultedWitness = defaultType;
       failedDefaultedResult = failed;
@@ -1680,6 +1680,9 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         diags.diagnose(assocType, diag::bad_associated_type_deduction,
                        assocType->getFullName(), proto->getFullName());
         for (const auto &failed : failedSet) {
+          if (failed.Result.isError())
+            continue;
+
           diags.diagnose(failed.Witness,
                          diag::associated_type_deduction_witness_failed,
                          failed.Requirement->getFullName(),
