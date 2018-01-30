@@ -217,20 +217,9 @@ namespace {
 
     class EntityContext {
       bool AsContext = false;
-      std::string AnonymousContextDiscriminator;
     public:
       bool isAsContext() const {
         return AsContext;
-      }
-      
-      void setAnonymousContextDiscriminator(StringRef discriminator) {
-        AnonymousContextDiscriminator = discriminator;
-      }
-      
-      std::string takeAnonymousContextDiscriminator() {
-        auto r = std::move(AnonymousContextDiscriminator);
-        AnonymousContextDiscriminator.clear();
-        return r;
       }
 
       class ManglingContextRAII {
@@ -289,15 +278,13 @@ namespace {
     void mangleSimpleEntity(Node *node, char basicKind, StringRef entityKind,
                             EntityContext &ctx);
     void mangleNamedEntity(Node *node, char basicKind, StringRef entityKind,
-                          EntityContext &ctx,
-                          StringRef ArtificialPrivateDiscriminator = {});
+                           EntityContext &ctx);
     void mangleTypedEntity(Node *node, char basicKind, StringRef entityKind,
                            EntityContext &ctx);
     void mangleNamedAndTypedEntity(Node *node, char basicKind,
                                    StringRef entityKind,
                                    EntityContext &ctx);
-    void mangleNominalType(Node *node, char basicKind, EntityContext &ctx,
-                          StringRef ArtificialPrivateDiscriminator = {});
+    void mangleNominalType(Node *node, char basicKind, EntityContext &ctx);
 
     void mangleProtocolWithoutPrefix(Node *node);
     void mangleProtocolListWithoutPrefix(Node *node,
@@ -1015,30 +1002,12 @@ void Remangler::mangleSimpleEntity(Node *node, char basicKind,
 
 void Remangler::mangleNamedEntity(Node *node, char basicKind,
                                   StringRef entityKind,
-                                  EntityContext &ctx,
-                                  StringRef artificialPrivateDiscriminator) {
+                                  EntityContext &ctx) {
   assert(node->getNumChildren() == 2);
   if (basicKind != '\0') Out << basicKind;
   mangleEntityContext(node->begin()[0], ctx);
   Out << entityKind;
-  
-  auto privateDiscriminator = ctx.takeAnonymousContextDiscriminator();
-  if (!privateDiscriminator.empty() && isdigit(privateDiscriminator[0]))
-    privateDiscriminator = "_" + privateDiscriminator;
-  if (!artificialPrivateDiscriminator.empty())
-    privateDiscriminator.append(artificialPrivateDiscriminator.data(),
-                                artificialPrivateDiscriminator.size());
-  
-  // Include the artificial private discriminator if one was given.
-  auto name = node->getChild(1);
-  if (!privateDiscriminator.empty()
-      && name->getKind() == Node::Kind::Identifier) {
-    Out << 'P';
-    ::mangleIdentifier(privateDiscriminator,
-                       OperatorKind::NotOperator,
-                       /*punycode*/ false, Out);
-  }
-  mangle(name);
+  mangleChildNode(node, 1); // decl name / index
 }
 
 void Remangler::mangleTypedEntity(Node *node, char basicKind,
@@ -1588,14 +1557,6 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   mangleEntityContext(node->begin()[1], ctx); // context
 }
 
-void Remangler::mangleAnonymousContext(Node *node, EntityContext &ctx) {
-  mangleEntityContext(node->getChild(1), ctx);
-
-  // Since we can't change the old mangling, mangle an anonymous context by
-  // introducing a private discriminator onto its child contexts.
-  ctx.setAnonymousContextDiscriminator(node->getChild(0)->getText());
-}
-
 void Remangler::mangleModule(Node *node, EntityContext &ctx) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
@@ -1747,13 +1708,6 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx) {
   }
 
   switch (node->getKind()) {
-  case Node::Kind::OtherNominalType:
-    // Mangle unknown type kinds as structures since we can't change the old
-    // mangling. Give the mangling an artificial "private discriminator" so that
-    // clients who understand the old mangling know this is an unstable
-    // mangled name.
-    mangleNominalType(node, 'V', ctx, "_UnknownTypeKind");
-    break;
   case Node::Kind::Structure:
     mangleNominalType(node, 'V', ctx);
     break;
@@ -1780,15 +1734,10 @@ void Remangler::mangleClass(Node *node, EntityContext &ctx) {
   mangleAnyNominalType(node, ctx);
 }
 
-void Remangler::mangleOtherNominalType(Node *node, EntityContext &ctx) {
-  mangleAnyNominalType(node, ctx);
-}
-
-void Remangler::mangleNominalType(Node *node, char kind, EntityContext &ctx,
-                                  StringRef artificialPrivateDiscriminator) {
+void Remangler::mangleNominalType(Node *node, char kind, EntityContext &ctx) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
-  mangleNamedEntity(node, kind, "", ctx, artificialPrivateDiscriminator);
+  mangleNamedEntity(node, kind, "", ctx);
   addSubstitution(entry);
 }
 
@@ -1803,11 +1752,6 @@ void Remangler::mangleBoundGenericStructure(Node *node) {
 }
 
 void Remangler::mangleBoundGenericEnum(Node *node) {
-  EntityContext ctx;
-  mangleAnyNominalType(node, ctx);
-}
-
-void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
 }
@@ -2016,22 +1960,6 @@ void Remangler::mangleSILBoxImmutableField(Node *node) {
 }
 
 void Remangler::mangleAssocTypePath(Node *node) {
-  unreachable("unsupported");
-}
-
-void Remangler::mangleModuleDescriptor(Node *node) {
-  unreachable("unsupported");
-}
-
-void Remangler::mangleExtensionDescriptor(Node *node) {
-  unreachable("unsupported");
-}
-
-void Remangler::mangleAnonymousDescriptor(Node *node) {
-  unreachable("unsupported");
-}
-
-void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   unreachable("unsupported");
 }
 

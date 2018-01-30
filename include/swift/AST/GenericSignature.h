@@ -323,13 +323,6 @@ public:
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol);
 
-  /// Get the ordinal of a generic parameter in this generic signature.
-  ///
-  /// For example, if you have a generic signature for a nested context like:
-  ///   <t_0_0, t_0_1, t_1_0>
-  /// then this will return 0 for t_0_0, 1 for t_0_1, and 2 for t_1_0.
-  unsigned getGenericParamOrdinal(GenericTypeParamType *param);
-
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

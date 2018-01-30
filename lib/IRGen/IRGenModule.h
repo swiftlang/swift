@@ -76,7 +76,6 @@ namespace clang {
 }
 
 namespace swift {
-  class GenericSignature;
   class GenericSignatureBuilder;
   class AssociatedConformance;
   class AssociatedType;
@@ -404,8 +403,6 @@ public:
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
   SILModuleConventions silConv;
-  ModuleDecl *ObjCModule = nullptr;
-  ModuleDecl *ClangImporterModule = nullptr;
 
   llvm::SmallString<128> OutputFilename;
   
@@ -721,9 +718,6 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
-  llvm::Constant *getAddrOfAssociatedTypeGenericParamRef(GenericSignature *sig,
-                                                    CanDependentMemberType dmt);
-  ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
@@ -850,7 +844,7 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
-  
+
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
   struct ObjCProtocolPair {
@@ -1092,19 +1086,11 @@ public:
 
   llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
                                                  ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
-                                      ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                      ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
-                                      ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfModuleContextDescriptor(ModuleDecl *D,
-                                      ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfObjCModuleContextDescriptor();
-  llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
-  ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
+                                                 ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
-                                      ConstantInit definition = ConstantInit());
+                                              ConstantInit definition =
+                                                ConstantInit());
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
                                   const NormalProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
@@ -1154,8 +1140,7 @@ public:
 
   ConstantReference
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-       llvm::Type *defaultType,
-       ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+                                       llvm::Type *defaultType);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,
@@ -1177,14 +1162,7 @@ public:
   /// Add the swifterror attribute.
   void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
-  void emitSharedContextDescriptor(DeclContext *dc);
-
 private:
-  llvm::Constant *
-  getAddrOfSharedContextDescriptor(LinkEntity entity,
-                                   ConstantInit definition,
-                                   llvm::function_ref<void()> emit);
-  
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
                                         ConstantInit definition,

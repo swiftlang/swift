@@ -203,9 +203,9 @@ extension SomeOuterGenericClass where T == Int {
 }
 
 TypeNameTests.test("NestedInConstrainedExtension") {
-  expectEqual("(extension in main):main.SomeOuterGenericClass.AnotherInnerStruct",
+  expectEqual("main.SomeOuterGenericClass.AnotherInnerStruct",
               _typeName(SomeOuterGenericClass<Int>.AnotherInnerStruct.self));
-  expectEqual("(extension in main):main.SomeOuterGenericClass.AnotherInnerGenericStruct<Swift.String>",
+  expectEqual("main.SomeOuterGenericClass.AnotherInnerGenericStruct<Swift.String>",
               _typeName(SomeOuterGenericClass<Int>.AnotherInnerGenericStruct<String>.self));
 }
 

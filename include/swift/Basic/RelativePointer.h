@@ -490,10 +490,6 @@ public:
   IntTy getInt() const & {
     return IntTy(RelativeOffsetPlusInt & getMask());
   }
-  
-  Offset getOpaqueValue() const & {
-    return RelativeOffsetPlusInt;
-  }
 };
 
 // Type aliases for "far" relative pointers, which need to be able to reach

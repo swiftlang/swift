@@ -1144,9 +1144,3 @@ unsigned GenericParamKey::findIndexIn(
   // We didn't find the parameter we were looking for.
   return genericParams.size();
 }
-
-unsigned GenericSignature::getGenericParamOrdinal(GenericTypeParamType *param) {
-  return GenericParamKey(param->getDepth(), param->getIndex())
-    .findIndexIn(getGenericParams());
-}
-

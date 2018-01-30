@@ -1,6 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %utils/chex.py < %s > %t/generic_structs.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -19,25 +17,29 @@ import Builtin
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S15generic_structs13SingleDynamicVwxg" to i8*)]
 
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [14 x i8] c"SingleDynamic\00"
+// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"15generic_structs13SingleDynamicV\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
-// CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant 
-// --       flags: struct, unique, generic
-// CHECK-SAME:   <i32 0x0000_00D1>
+// CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK-SAME:   [14 x i8]* [[SINGLEDYNAMIC_NAME]]
+// CHECK-SAME:   [34 x i8]* [[SINGLEDYNAMIC_NAME]]
 // --       field count
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
 // --       field names
 // CHECK-SAME:   [3 x i8]* [[SINGLEDYNAMIC_FIELDS]]
+// --       kind 1 (struct)
+// CHECK-SAME:   i32 1
 // --       generic parameter vector offset
 // CHECK-SAME:   i32 2,
-// --       generic params, requirements, key args, extra args
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
-// --       generic parameters
-// CHECK-SAME:   <i8 0x80>
+// --       generic parameter count, primary count
+// CHECK-SAME:   i32 1, i32 1
+// --       nesting depth
+// CHECK-SAME: i16 1,
+// --       flags
+// CHECK-SAME: i16 0,
+// --       generic parameters at depth 0
+// CHECK-SAME: i32 1
 // CHECK-SAME: }>
 // CHECK: @"$S15generic_structs13SingleDynamicVMP" = internal global <{ {{.*}} }> <{
 // -- template header
@@ -52,39 +54,29 @@ import Builtin
 
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [24 x i8] c"DynamicWithRequirements\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"15generic_structs23DynamicWithRequirementsV\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMn" = hidden constant <{ {{.*}} i32 }> <{
-// --       flags: struct, unique, generic
-// CHECK-SAME:   <i32 0x0000_00D1>
 // --       name
-// CHECK-SAME: [24 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
+// CHECK-SAME: [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count
 // CHECK-SAME: i32 2,
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
 // --       field names
 // CHECK-SAME: [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
+// --       kind 1 (struct)
+// CHECK-SAME: i32 1,
 // --       generic parameter vector offset
 // CHECK-SAME: i32 2,
-// --       generic params, requirements, key args, extra args
-// CHECK-SAME: i32 2, i32 2, i32 2, i32 2,
-// --       generic parameters
-// CHECK-SAME: <i8 0x80>, <i8 0x80>,
-// --       generic requirement
-//   --       protocol requirement with extra arg
-// CHECK-SAME: i32 64
-//   --       param 0
-// CHECK-SAME: i32 0
-//   --       protocol Req1
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req1Mp"
-
-//   --       protocol requirement with extra arg
-// CHECK-SAME: i32 64
-//   --       param 1
+// --       generic requirements count; generic arguments count
+// CHECK-SAME: i32 4, i32 2
+// --       nesting depth
+// CHECK-SAME: i16 1,
+// --       flags
+// CHECK-SAME: i16 0,
+// --       generic parameters at depth 0
 // CHECK-SAME: i32 2
-//   --       protocol Req2
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req2Mp"
 // CHECK-SAME: }>
 
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMP" = internal global <{ {{.*}} }> <{

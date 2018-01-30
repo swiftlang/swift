@@ -210,7 +210,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself)
 // CHECK: [[CALL1:%.*]] = call %swift.type* @"$SSayy22big_types_corner_cases9BigStructVcSgGMa"
 // CHECK: [[CALL2:%.*]] = call i8** @"$SSayy22big_types_corner_cases9BigStructVcSgGSayxGs10CollectionsWl
-// CHECK: call swiftcc void @"$Ss10CollectionPsE5index5where5IndexQzSgSb7ElementQzKc_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegir_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIgxdzo_ACytIegir_SgSbsAE_pIgidzo_TRTA" to i8*), %swift.refcounted* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
+// CHECK: call swiftcc void @"$Ss10CollectionPsE5index5where5IndexQzSgSb7ElementQzKc_tKF"(%TSq.0* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegir_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIgxdzo_ACytIegir_SgSbsAE_pIgidzo_TRTA" to i8*), %swift.refcounted* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
 // CHECK: ret void
 class TestBig {
     typealias Handler = (BigStruct) -> Void

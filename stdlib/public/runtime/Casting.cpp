@@ -642,7 +642,7 @@ id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.AnyHashable.
-extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
 
 static bool isAnyHashableType(const StructMetadata *type) {
   return type->getDescription() == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
@@ -2121,13 +2121,13 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.Array.
-extern "C" const TypeContextDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
+extern "C" const NominalTypeDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,

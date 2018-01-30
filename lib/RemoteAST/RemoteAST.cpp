@@ -138,7 +138,7 @@ public:
 
     return createNominalTypeDecl(node);
   }
-  
+
   NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
 
   ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
@@ -1107,8 +1107,8 @@ public:
   Result<MetadataKind>
   getKindForRemoteTypeMetadata(RemoteAddress metadata) override {
     auto result = Reader.readKindFromMetadata(metadata.getAddressData());
-    if (result)
-      return *result;
+    if (result.first)
+      return result.second;
     return getFailure<MetadataKind>();
   }
 
@@ -1145,7 +1145,7 @@ public:
   Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) override {
     auto result = Reader.readMetadataFromInstance(object.getAddressData());
-    if (result) return RemoteAddress(*result);
+    if (result.first) return RemoteAddress(result.second);
     return getFailure<RemoteAddress>();
   }
 };

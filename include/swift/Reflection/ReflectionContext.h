@@ -91,17 +91,19 @@ public:
 
     auto TR = readTypeFromMetadata(MetadataAddress);
     auto kind = this->readKindFromMetadata(MetadataAddress);
-    if (TR != nullptr && kind) {
-      switch (*kind) {
+    if (TR != nullptr && kind.first) {
+      switch (kind.second) {
       case MetadataKind::Class: {
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
-        auto start =
+        bool valid;
+        unsigned start;
+        std::tie(valid, start) =
             this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
 
         // Perform layout
-        if (start)
-          TI = TC.getClassInstanceTypeInfo(TR, *start);
+        if (valid)
+          TI = TC.getClassInstanceTypeInfo(TR, start);
 
         break;
       }
@@ -119,20 +121,20 @@ public:
   /// metadata as its isa pointer.
   const TypeInfo *getInstanceTypeInfo(StoredPointer ObjectAddress) {
     auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
-    if (!MetadataAddress)
+    if (!MetadataAddress.first)
       return nullptr;
 
-    auto kind = this->readKindFromMetadata(*MetadataAddress);
-    if (!kind)
+    auto kind = this->readKindFromMetadata(MetadataAddress.second);
+    if (!kind.first)
       return nullptr;
 
-    switch (*kind) {
+    switch (kind.second) {
     case MetadataKind::Class:
-      return getMetadataTypeInfo(*MetadataAddress);
+      return getMetadataTypeInfo(MetadataAddress.second);
 
     case MetadataKind::HeapLocalVariable: {
-      auto CDAddr = this->readCaptureDescriptorFromMetadata(*MetadataAddress);
-      if (!CDAddr)
+      auto CDAddr = this->readCaptureDescriptorFromMetadata(MetadataAddress.second);
+      if (!CDAddr.first)
         return nullptr;
 
       // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata
@@ -141,7 +143,7 @@ public:
       //
       // Non-generic SIL boxes share metadata among types with compatible
       // layout, but we need some way to get an outgoing pointer map for them.
-      auto *CD = getBuilder().getCaptureDescriptor(*CDAddr);
+      auto *CD = getBuilder().getCaptureDescriptor(CDAddr.second);
       if (CD == nullptr)
         return nullptr;
 
@@ -153,7 +155,7 @@ public:
     case MetadataKind::HeapGenericLocalVariable: {
       // Generic SIL @box type - there is always an instantiated metadata
       // pointer for the boxed type.
-      if (auto Meta = readMetadata(*MetadataAddress)) {
+      if (auto Meta = readMetadata(MetadataAddress.second)) {
         auto GenericHeapMeta =
           cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
         return getMetadataTypeInfo(GenericHeapMeta->BoxedType);
@@ -253,10 +255,12 @@ public:
     case RecordKind::ErrorExistential: {
       // We have a pointer to an error existential, which is always heap object.
 
-      auto MetadataAddress
+      bool successfullyGotIsa = false;
+      StoredPointer MetadataAddress = 0;
+      std::tie(successfullyGotIsa, MetadataAddress)
         = readMetadataFromInstance(ExistentialAddress.getAddressData());
 
-      if (!MetadataAddress)
+      if (!successfullyGotIsa)
         return false;
 
       bool isObjC = false;
@@ -264,14 +268,14 @@ public:
       // If we can determine the Objective-C class name, this is probably an
       // error existential with NSError-compatible layout.
       std::string ObjCClassName;
-      if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
+      if (readObjCClassName(MetadataAddress, ObjCClassName)) {
         if (ObjCClassName == "_SwiftNativeNSError")
           isObjC = true;
       } else {
         // Otherwise, we can check to see if this is a class metadata with the
         // kind value's least significant bit set, which indicates a pure
         // Swift class.
-        auto Meta = readMetadata(*MetadataAddress);
+        auto Meta = readMetadata(MetadataAddress);
         auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
         if (!ClassMeta)
           return false;
@@ -289,12 +293,13 @@ public:
 
       // We need to get the instance's alignment info so we can get the exact
       // offset of the start of its data in the class.
-      auto InstanceMetadataAddress =
+      StoredPointer InstanceMetadataAddress = 0;
+      std::tie(successfullyGotIsa, InstanceMetadataAddress) =
         readMetadataFromInstance(InstanceMetadataAddressAddress);
-      if (!InstanceMetadataAddress)
+      if (!successfullyGotIsa)
         return false;
 
-      auto InstanceTR = readTypeFromMetadata(*InstanceMetadataAddress);
+      auto InstanceTR = readTypeFromMetadata(InstanceMetadataAddress);
       if (!InstanceTR)
         return false;
 
@@ -334,18 +339,18 @@ private:
                                   RecordKind::ClosureContext);
 
     auto Metadata = readMetadataFromInstance(Context);
-    if (!Metadata)
+    if (!Metadata.first)
       return nullptr;
 
     // Calculate the offset of the first capture.
     // See GenHeap.cpp, buildPrivateMetadata().
     auto OffsetToFirstCapture =
-        this->readOffsetToFirstCaptureFromMetadata(*Metadata);
-    if (!OffsetToFirstCapture)
+        this->readOffsetToFirstCaptureFromMetadata(Metadata.second);
+    if (!OffsetToFirstCapture.first)
       return nullptr;
 
     // Initialize the builder.
-    Builder.addField(*OffsetToFirstCapture, sizeof(StoredPointer),
+    Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0);
 
     // Skip the closure's necessary bindings struct, if it's present.
@@ -409,10 +414,10 @@ private:
           continue;
 
         auto Metadata = readMetadataSource(Context, Source.second, Builder);
-        if (!Metadata)
+        if (!Metadata.first)
           return nullptr;
 
-        auto *SubstTR = readTypeFromMetadata(*Metadata);
+        auto *SubstTR = readTypeFromMetadata(Metadata.second);
         if (SubstTR == nullptr)
           return nullptr;
 
@@ -470,7 +475,7 @@ private:
   /// above.
   ///
   /// \param Builder Used to obtain offsets of elements known so far.
-  llvm::Optional<StoredPointer>
+  std::pair<bool, StoredPointer>
   readMetadataSource(StoredPointer Context,
                      const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
@@ -493,7 +498,7 @@ private:
                                    &MetadataAddress))
         break;
 
-      return MetadataAddress;
+      return std::make_pair(true, MetadataAddress);
     }
     case MetadataSourceKind::ReferenceCapture: {
       unsigned Index = cast<ReferenceCaptureMetadataSource>(MS)->getIndex();
@@ -522,27 +527,27 @@ private:
                                    &CaptureAddress))
         break;
 
-      return CaptureAddress;
+      return std::make_pair(true, CaptureAddress);
     }
     case MetadataSourceKind::GenericArgument: {
       auto *GAMS = cast<GenericArgumentMetadataSource>(MS);
       auto Base = readMetadataSource(Context, GAMS->getSource(), Builder);
-      if (!Base)
+      if (!Base.first)
         break;
 
       unsigned Index = GAMS->getIndex();
-      auto Arg = readGenericArgFromMetadata(*Base, Index);
-      if (!Arg)
+      auto Arg = readGenericArgFromMetadata(Base.second, Index);
+      if (!Arg.first)
         break;
 
-      return *Arg;
+      return Arg;
     }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       break;
     }
 
-    return llvm::None;
+    return std::make_pair(false, StoredPointer(0));
   }
 };
 
