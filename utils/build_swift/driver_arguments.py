@@ -314,7 +314,6 @@ def create_argument_parser():
            help='the number of parallel build jobs to use')
 
     option('--darwin-xcrun-toolchain', store,
-           default=defaults.DARWIN_XCRUN_TOOLCHAIN,
            help='the name of the toolchain to use on Darwin')
     option('--cmake', store_path(executable=True),
            help='the path to a CMake executable that will be used to build '
