@@ -723,7 +723,7 @@ mirrors.test("PlaygroundQuickLook") {
   case .text(let text):
 #if _runtime(_ObjC)
 // FIXME: Enable if non-objc hasSuffix is implemented.
-    expectTrue(text.contains("X #1 in"), text)
+    expectTrue(text.contains(").X"), text)
 #endif
   default:
     expectTrue(false)

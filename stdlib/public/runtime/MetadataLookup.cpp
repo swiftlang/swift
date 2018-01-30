@@ -60,14 +60,14 @@ namespace {
   struct NominalTypeDescriptorCacheEntry {
   private:
     std::string Name;
-    const NominalTypeDescriptor *Description;
+    const TypeContextDescriptor *Description;
 
   public:
     NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
-                           const NominalTypeDescriptor *description)
+                                    const TypeContextDescriptor *description)
       : Name(name.str()), Description(description) {}
 
-    const NominalTypeDescriptor *getDescription() {
+    const TypeContextDescriptor *getDescription() {
       return Description;
     }
 
@@ -131,27 +131,95 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
+bool
+swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
+                                         Demangle::NodePointer node) {
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+  
+  while (context) {
+    switch (context->getKind()) {
+    case ContextDescriptorKind::Module: {
+      auto module = cast<ModuleContextDescriptor>(context);
+      // Match to a mangled module name.
+      if (node->getKind() != Demangle::Node::Kind::Module)
+        return false;
+      if (!node->getText().equals(module->Name.get()))
+        return false;
+      
+      node = nullptr;
+      break;
+    }
+    
+    case ContextDescriptorKind::Extension: {
+      // TODO: Check whether the extension context constraints match.
+      return false;
+    }
+    
+    default:
+      if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
+        auto flags = type->Flags.getKindSpecificFlags();
+        switch (node->getKind()) {
+        // If the mangled name doesn't indicate a type kind, accept anything.
+        // Otherwise, try to match them up.
+        case Demangle::Node::Kind::OtherNominalType:
+          break;
+        case Demangle::Node::Kind::Structure:
+          if (type->getKind() != ContextDescriptorKind::Struct
+              && !(flags & (uint16_t)TypeContextDescriptorFlags::IsCTag))
+            return false;
+          break;
+        case Demangle::Node::Kind::Class:
+          if (type->getKind() != ContextDescriptorKind::Class)
+            return false;
+          break;
+        case Demangle::Node::Kind::Enum:
+          if (type->getKind() != ContextDescriptorKind::Enum)
+            return false;
+          break;
+        case Demangle::Node::Kind::TypeAlias:
+          if (!(flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef))
+            return false;
+          break;
+        default:
+          return false;
+        }
+        if (!node->getChild(1)->getText().equals(type->Name.get()))
+          return false;
+        
+        node = node->getChild(0);
+        break;
+      }
+      
+      // We don't know about this kind of context, or it doesn't have a stable
+      // name we can match to.
+      return false;
+    }
+    
+    context = context->Parent;
+  }
+  
+  // We should have reached the top of the node tree at the same time we reached
+  // the top of the context tree.
+  if (node)
+    return false;
+  
+  return true;
+}
+
 // returns the nominal type descriptor for the type named by typeName
-static const NominalTypeDescriptor *
+static const TypeContextDescriptor *
 _searchTypeMetadataRecords(const TypeMetadataState &T,
-                           const llvm::StringRef typeName) {
+                           Demangle::NodePointer node) {
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      switch (record.getTypeKind()) {
-      case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-        if (auto ntd = record.getNominalTypeDescriptor()) {
-          if (ntd->Name.get() == typeName)
-            return ntd;
+      if (auto ntd = record.getNominalTypeDescriptor()) {
+        if (_contextDescriptorMatchesMangling(ntd, node)) {
+          return ntd;
         }
-        break;
-
-      case TypeMetadataRecordKind::IndirectObjCClass:
-      case TypeMetadataRecordKind::Reserved:
-        break;
       }
     }
   }
@@ -159,10 +227,12 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
   return nullptr;
 }
 
-static const NominalTypeDescriptor *
-_findNominalTypeDescriptor(llvm::StringRef mangledName) {
-  const NominalTypeDescriptor *foundNominal = nullptr;
+static const TypeContextDescriptor *
+_findNominalTypeDescriptor(Demangle::NodePointer node) {
+  const TypeContextDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
+
+  auto mangledName = Demangle::mangleNode(node);
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -171,13 +241,13 @@ _findNominalTypeDescriptor(llvm::StringRef mangledName) {
 
   // Check type metadata records
   T.SectionsToScanLock.withLock([&] {
-    foundNominal = _searchTypeMetadataRecords(T, mangledName);
+    foundNominal = _searchTypeMetadataRecords(T, node);
   });
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
   if (!foundNominal)
-    foundNominal = _searchConformancesByMangledTypeName(mangledName);
+    foundNominal = _searchConformancesByMangledTypeName(node);
 
   if (foundNominal) {
     T.NominalCache.getOrInsert(mangledName, foundNominal);
@@ -428,7 +498,7 @@ public:
   using BuiltType = const Metadata *;
 
   struct BuiltNominalTypeDecl :
-    llvm::PointerUnion<const NominalTypeDescriptor *, const Metadata *>
+    llvm::PointerUnion<const TypeContextDescriptor *, const Metadata *>
   {
     using PointerUnion::PointerUnion;
 
@@ -451,8 +521,7 @@ public:
 #endif
 
     // Look for a nominal type descriptor based on its mangled name.
-    auto mangledName = Demangle::mangleNode(node);
-    return _findNominalTypeDescriptor(mangledName);
+    return _findNominalTypeDescriptor(node);
   }
 
   BuiltProtocolDecl createProtocolDecl(
@@ -502,30 +571,33 @@ public:
     if (metadataOrTypeDecl.is<const Metadata *>())
       return BuiltType();
 
-    auto typeDecl = metadataOrTypeDecl.get<const NominalTypeDescriptor *>();
+    auto typeDecl = metadataOrTypeDecl.get<const TypeContextDescriptor *>();
 
     // Gather all of the generic arguments.
     // FIXME: Need to also gather generic requirements.
     std::vector<BuiltType> allGenericArgsVec;
     ArrayRef<BuiltType> allGenericArgs;
-    if (typeDecl->GenericParams.NestingDepth > 1 &&
-        typeDecl->GenericParams.isGeneric()) {
-      if (!parent) return BuiltType();
-
-      // Dig out the parent nominal descriptor.
-      auto parentNominal = parent->getNominalTypeDescriptor();
+    if (typeDecl->Parent->isGeneric()) {
+      // TODO: The parent's generic arguments may not be a prefix of ours
+      // if there are same type or protocol requirements.
+      
+      auto parentNominal = parent->getTypeContextDescriptor();
       if (!parentNominal) return BuiltType();
 
-      // Copy over the generic arguments from the parent.
-      unsigned numParentGenericArgs =
-        parentNominal->GenericParams.NumPrimaryParams;
+      auto parentGenericArgs = parent->getGenericArgs();
 
-      if (numParentGenericArgs > 0) {
-        auto parentGenericArgs = parent->getGenericArgs();
+      // TODO: Handle generic arguments with protocol requirements or
+      // same type constraints.
+      if (parentGenericArgs
+          && parentNominal->getGenericContextHeader().getNumArguments() !=
+               parentNominal->getGenericContextHeader().NumParams)
+        return nullptr;
+      
+      if (parentGenericArgs) {
         allGenericArgsVec.insert(
-                               allGenericArgsVec.end(),
-                               parentGenericArgs,
-                               parentGenericArgs + numParentGenericArgs);
+         allGenericArgsVec.end(),
+         parentGenericArgs,
+         parentGenericArgs + parentNominal->getGenericContextHeader().NumParams);
       }
 
       // Add the generic arguments for this type.
@@ -538,12 +610,14 @@ public:
     }
 
     // FIXME: We don't want the number of "primary" parameters, we want the
-    // number of parameters as written.
-    if (typeDecl->GenericParams.NumPrimaryParams != allGenericArgs.size())
+    // total number of parameters.
+    if (typeDecl->isGeneric()
+        && typeDecl->getGenericContextHeader().NumParams
+             != typeDecl->getGenericContextHeader().getNumArguments())
       return BuiltType();
 
     // Call the access function.
-    auto accessFunction = typeDecl->getAccessFunction();
+    auto accessFunction = typeDecl->AccessFunction.get();
     if (!accessFunction) return BuiltType();
 
     static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,

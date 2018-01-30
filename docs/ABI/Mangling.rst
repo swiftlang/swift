@@ -55,6 +55,11 @@ Globals
   global ::= type 'ML'                   // type metadata lazy cache variable
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= module 'MXM'                // module descriptor
+  global ::= context 'MXE'               // extension descriptor
+  global ::= context 'MXX'               // anonymous context descriptor
+  global ::= context identifier 'MXY'    // anonymous context descriptor
+  global ::= type assoc_type_path 'MXA'  // generic parameter ref
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
@@ -283,6 +288,15 @@ destructor, the non-allocating or non-deallocating variant is used.
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
 
+  context ::= entity identifier type-list 'XZ' // unknown runtime context
+
+The runtime produces manglings of unknown runtime contexts when a declaration
+context has no preserved runtime information, or when a declaration is encoded
+in runtime in a way that the current runtime does not understand. These
+manglings are unstable and may change between runs of the process.
+
+::
+
   known-module ::= 's'                       // Swift
   known-module ::= 'SC'                      // Clang-importer-synthesized
   known-module ::= 'So'                      // C and Objective-C
@@ -300,6 +314,7 @@ Types
   any-generic-type ::= context decl-name 'C'     // nominal class type
   any-generic-type ::= context decl-name 'O'     // nominal enum type
   any-generic-type ::= context decl-name 'V'     // nominal struct type
+  any-generic-type ::= context decl-name 'XY'    // unknown nominal type
   any-generic-type ::= protocol 'P'              // nominal protocol type
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
