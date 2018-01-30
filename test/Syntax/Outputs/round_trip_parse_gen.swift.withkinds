@@ -86,7 +86,19 @@ class C <MemberDeclBlock>{<FunctionDecl>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ImplicitMemberExpr>.foo </ImplicitMemberExpr><ClosureExpr>{ <IntegerLiteralExpr>12 </IntegerLiteralExpr>}</ClosureExpr></FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><SubscriptExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>[<FunctionCallArgument><IntegerLiteralExpr>12</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>.bar</MemberAccessExpr></SequenceExpr>
-  }</CodeBlock></FunctionDecl>
+  }</CodeBlock></FunctionDecl><InitializerDecl>
+
+  init<ParameterClause>() </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl><Attribute>
+  @objc </Attribute><DeclModifier>private </DeclModifier>init<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>)</ParameterClause></InitializerDecl><InitializerDecl>
+  init!<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl>
+  init?<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><CodeBlock>{}</CodeBlock></InitializerDecl><InitializerDecl><DeclModifier>
+  public </DeclModifier>init<ParameterClause>(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause>throws <CodeBlock>{}</CodeBlock></InitializerDecl><DeinitializerDecl><Attribute>
+
+  @objc </Attribute>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl><DeinitializerDecl><DeclModifier>
+  private </DeclModifier>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl><SubscriptDecl><DeclModifier>
+
+  internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl><SubscriptDecl>
+  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl>
 }</MemberDeclBlock></ClassDecl>
 
 #endif</IfConfigDecl><IfConfigDecl>

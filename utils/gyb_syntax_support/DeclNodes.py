@@ -321,6 +321,62 @@ DECL_NODES = [
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
+    Node('InitializerDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('InitKeyword', kind='InitToken'),
+             Child('OptionalMark', kind='Token',
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'InfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ],
+                   is_optional=True),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('Parameters', kind='ParameterClause'),
+             Child('ThrowsOrRethrowsKeyword', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'ThrowsToken',
+                       'RethrowsToken',
+                   ]),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             # the body is not necessary inside a protocol definition
+             Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('DeinitializerDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('DeinitKeyword', kind='DeinitToken'),
+             Child('Body', kind='CodeBlock'),
+         ]),
+
+    Node('SubscriptDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('SubscriptKeyword', kind='SubscriptToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('Indices', kind='ParameterClause'),
+             Child('Result', kind='ReturnClause'),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             # the body is not necessary inside a protocol definition
+             Child('Accessor', kind='AccessorBlock', is_optional=True),
+         ]),
+
     # else-if-directive-clause-list -> else-if-directive-clause
     #   else-if-directive-clause-list?
     Node('ElseifDirectiveClauseList', kind='SyntaxCollection',
