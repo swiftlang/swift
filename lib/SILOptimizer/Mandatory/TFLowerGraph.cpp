@@ -51,6 +51,13 @@ namespace {
   /// multi-output op.
   typedef std::pair<SILValue, unsigned> SILOpResult;
 
+  /// Get the SILType for the specified SILOpResult.
+  SILType getOpResultType(SILOpResult r) {
+    if (auto *inst = dyn_cast<SILInstruction>((SILNode*)r.first))
+      return inst->getResults()[r.second]->getType();
+    return r.first->getType();
+  }
+
   /// As we lower SIL instructions to tensorflow graph nodes, we traverse the
   /// SESE region tree.  Nodes that produce while loops and conditions turn into
   /// scopes.
@@ -69,8 +76,8 @@ namespace {
     /// this is the top level graph function, then the passed values are null.
     TF_Output passedValue;
 
-    /// This is the type of the parameter.
-    SILType type;
+    /// This is the SILValue that the parameter corresponds to.
+    SILOpResult value;
   };
 
   /// This represents a TensorFlow TF_Function that is being constructed,
@@ -87,10 +94,20 @@ namespace {
     /// These are inputs to the graph function.
     SmallVector<GraphFunctionInput, 4> inputs;
 
-    /// These are outputs from the function.  If this is the top level of the
-    /// function, then this is filled in by a return instruction and the
-    /// SILArgument*'s are null.  Otherwise, this is filled in by a BranchInst
-    /// and the SILArgument's indicate which BB arguments are provided by this.
+    /// These are outputs from the function, and the SILArgument* (if non-null)
+    /// specifies which SILArgument the output corresponds to.  This gets filled
+    /// in in a few different ways:
+    ///  1) If this is the top level of the function, then this is filled in by
+    ///     a return instruction and the SILArgument*'s are null.
+    ///  2) In a conditional region, this is filled in by a BranchInst to a
+    ///     merge point and the SILArgument's indicate which BB arguments are
+    ///     provided by the branch.
+    ///  3) The condition function for a While region has one output (with a
+    ///     null SILArgument) corresponding to the boolean result of the
+    ///     function.
+    ///  4) The body function for a While region has an output for each
+    ///     SILArgument in the loop header block, and also has outputs for the
+    ///     live-in values used within the loop (with no SILArgument specified).
     SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
 
     /// This is a list of all of the operations that make up this function.
@@ -175,14 +192,13 @@ public:
 private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
   llvm::StringSet<> usedOpNames;
+public:  // Lowering functionality.
   std::string getUniqueName(SILDebugLocation loc, const char *baseName);
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
 
-  TF_Output createParameter(SILType ty, SILLocation loc,
-                            TF_Output passedValue,
+  TF_Output createParameter(SILOpResult value, TF_Output passedValue,
                             GraphFunctionBody &fn);
-public:  // Lowering functionality.
 
   /// Add an available value for the specified SILOpResult (a SILValue+result#)
   /// to the value mapping.  This defaults to setting its scope to the current
@@ -192,15 +208,24 @@ public:  // Lowering functionality.
                        unsigned depth = ~0U) {
     // If an explicit depth isn't specified, then this is added to the current
     // function.
-    if (depth == ~0U)
+    ValueMappingScopedHashTable::ScopeTy *scope = valueMapping.getCurScope();
+    if (depth == ~0U) {
       depth = functionStack.size()-1;
+    } else {
+      // This isn't particularly efficient, but this happens infrequently and
+      // the scope stack should be shallow.
+      SmallVector<ValueMappingScopedHashTable::ScopeTy *, 4> scopes;
+      for (auto tmp = scope; tmp != nullptr; tmp = tmp->getParentScope())
+        scopes.push_back(tmp);
+      scope = scopes[scopes.size()-1-depth];
+    }
 
 #ifndef NDEBUG
     auto it = valueMapping.begin(value);
     assert((it == valueMapping.end() || it->second < depth) &&
            "value introduced multiple times in the same scope");
 #endif
-    valueMapping.insert(value, {result, depth});
+    valueMapping.insertIntoScope(scope, value, {result, depth});
   }
 
   /// Return the TensorFlow operand for the specified value.  Note that this can
@@ -217,8 +242,14 @@ public:  // Lowering functionality.
       assert(!v->getType().is<TupleType>() &&
              "Directly referring to multiple result value!");
     }
+    return getOperandValue({v, idx});
+  }
 
-    std::pair<TF_Output, unsigned> valueInfo = valueMapping.lookup({v, idx});
+  /// Return the TensorFlow operand for the specified SILOpResult (a
+  /// SILValue+result #).  Note that this can return a null value if an error
+  /// occurred lowering the operand in question.
+  TF_Output getOperandValue(SILOpResult v) {
+    std::pair<TF_Output, unsigned> valueInfo = valueMapping.lookup(v);
     assert(valueInfo.first.oper != nullptr && "didn't find live-in value?");
 
     auto value = valueInfo.first;
@@ -238,10 +269,11 @@ public:  // Lowering functionality.
     for (unsigned depth = valueInfo.second+1; depth != functionStack.size();
          ++depth) {
       // Create placeholder, add it as input to each function.
-      value = createParameter(v->getType(), v.getLoc(), value,
-                              functionStack[depth]);
+      value = createParameter(v, value, functionStack[depth]);
+      if (errorOccurred) return {};
+
       // Remember that it is the available version of this value at that depth.
-      addValueMapping({v, idx}, value, depth);
+      addValueMapping(v, value, depth);
     }
 
     return value;
@@ -268,10 +300,6 @@ public:  // Lowering functionality.
   void visitReturnInst(ReturnInst *inst);
   void visitBranchInst(BranchInst *inst);
 
-  void visitCondBranchInst(CondBranchInst *inst) {
-    // Handled by region lowering.
-  }
-
   // visitSILInstruction is the bottom level of the instruction visitor, where
   // unhandled instructions bottom out in.
   void visitSILInstruction(SILInstruction *inst) {
@@ -280,10 +308,13 @@ public:  // Lowering functionality.
     inst->dump();
   }
 
-  GraphFunctionBody lowerToFunction(SESERegionTree *r, bool isTopLevel = false);
+  GraphFunctionBody lowerToFunction(const std::function<void()> &body);
 
-  void lowerArguments();
-  void lowerBasicBlock(SILBasicBlock *bb);
+  void lowerArgumentsToParams(ArrayRef<SILArgument *> args,
+                              ArrayRef<TF_Output> passedValues,
+                              SILLocation loc);
+
+  void lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator = false);
   void lowerRegion(SESERegionTree *region);
   void lowerSequenceRegion(SequenceSESERegion *r);
   void lowerWhileLoopRegion(WhileLoopSESERegion *r);
@@ -545,10 +576,19 @@ void TFGraphLowering::visitBranchInst(BranchInst *inst) {
 }
 
 
+/// Lower all of the instructions in the specified basic block.  If
+/// skipTerminator is set to true, then the terminator instruction isn't
+/// lowered.
+void TFGraphLowering::lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator) {
+  // Visit all of the instructions other than the terminator.
+  auto I = bb->begin(), E = bb->end();
 
-void TFGraphLowering::lowerBasicBlock(SILBasicBlock *bb) {
-  for (auto &inst : *bb) {
-    visit(&inst);
+  // Ignore the terminator instruction if requested.
+  if (skipTerminator)
+    E = std::prev(E);
+
+  for (; I != E; ++I) {
+    visit(&*I);
 
     // If we produced an error lowering an instruction, give up hope and return.
     if (errorOccurred)
@@ -561,21 +601,189 @@ void TFGraphLowering::lowerSequenceRegion(SequenceSESERegion *r) {
     lowerRegion(child.get());
 }
 
+
+/// Given a conditional branch, produce the TF_Output for its branch condition.
+static TF_Output getCondition(CondBranchInst *condBr,
+                              TFGraphLowering &lowering) {
+  auto cond = condBr->getCondition();
+  auto tensorToI1 = cast<BuiltinInst>(cond);
+  assert(tensorToI1->getName().str() == "tf_tensor_to_i1" &&
+         tensorToI1->getNumOperands() == 1 &&
+         "unexpected branch condition in graph lowering");
+  cond = tensorToI1->getOperand(0);
+
+  // Get the graph node that corresponds to the condition.
+  return lowering.getOperandValue(cond);
+}
+
+// Given a boolean value, create a 'not' operation to invert it, returning the
+// inverted result.
+static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
+                             TFGraphLowering &lowering) {
+  auto opLocString = lowering.getUniqueName(loc, "not");
+  auto &graphFn = lowering.getCurrentGraphFunction();
+  auto *op = TF_NewOperation(graphFn.getGraph(), "LogicalNot",
+                             opLocString.c_str());
+  TF_AddInput(op, input);
+
+  auto *result = graphFn.finishOp(op, lowering.status);
+  if (lowering.checkStatus(loc.getLocation()))
+    return { nullptr, 0 };
+  return { result, 0 };
+}
+
+// Our WhileLoopSESERegion has been structurized into a canonical form that
+// matches up pretty closely to the XLA while loop: we know we have a
+// preheader, a header block, that the header block has one exit edge, and
+// that there are no other exits out of the loop.
+//
+// This means that we can turn the computation that produces the bool for the
+// termination condition into the loop exit check.
 void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
-  // Our WhileLoopSESERegion has been structurized into a canonical form that
-  // matches up pretty closely to the XLA while loop: we know we have a
-  // preheader, a header block, that the header block has one exit edge, and
-  // that there are no other exits out of the loop.
-  //
-  // This means that we can turn the computation that produces the bool for the
-  // termination condition into the loop exit check, and turn the loop body
-  // overall - possibly duplicating computation in the exit computation :-( -
-  // into the XLA While Loop body.
+  // Emit the preheader block.  The preheader ends with a branch that sets BB
+  // arguments, which we will handle specially later.  They provide the passed
+  // values to the loop function that we will create.
+  lowerBasicBlock(r->getPreheader(), /*skipTerminator:*/ true);
+  auto phBranch = cast<BranchInst>(r->getPreheader()->getTerminator());
+
+  // Get all the values that the preheader passes in for the SILArguments in
+  // the loop body.
+  SmallVector<TF_Output, 4> preheaderInputs;
+  for (auto argValue : phBranch->getArgs()) {
+    auto result = getOperandValue(argValue);
+    if (!result.oper) return; // Error occurred.
+    preheaderInputs.push_back(result);
+  }
+
+  // We know that the header block of the loop ends with a conditional branch,
+  // which is the sole exit from the loop.
+  auto headerBr = cast<CondBranchInst>(r->getHeader()->getTerminator());
+  SILBasicBlock *headerBB = r->getHeader();
+
+  // Start by lowering the loop header and body of the loop to a function that
+  // is the body of the while loop.  We do this before lowering the condition,
+  // because the body is a superset of the code in the condition, and thus will
+  // have all of the live inputs present.
+  auto loopBodyFn = lowerToFunction([&]() {
+    // Process each of the SILArguments in the header block.  These are the
+    // values that are live across loop iterations and are the outputs of the
+    // body.
+    auto brLoc = r->getPreheader()->getTerminator()->getLoc();
+    lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs, brLoc);
+    if (errorOccurred) return;
+
+    // The loop body consists of two logical regions: the code in the header
+    // itself (which controls the exit condition) and the code in the body
+    // region.
+    //
+    // Of course, the header block dominates the loop body, and it is possible
+    // that some computation in the header block is used by *both* the exit
+    // condition and the loop body.  Unfortunately, due to the way that XLA
+    // structures its While loop into a separate function for the condition and
+    // body, we are required to emit the computation into both functions, and
+    // rely on XLA to CSE it where possible (which I suspect it doesn't do).
+    //
+    // This will also be problematic when the condition is allowed to have
+    // side effects (e.g. because of send and recv) because they cannot be
+    // reissued in general.
+    //
+    // A better model for while loop is to change the condition to be a function
+    // "T -> (U, bool)" and have the loop body be "U -> T".  This structure
+    // would also allow the result of the loop to be U, which is necessary to
+    // support live outputs (e.g. in repeat/while loops).  This will take
+    // significant TensorFlow and XLA changes though so we can survive without
+    // it for quite some time.
+
+    // Lower any code in the header block, which may be used by the body of the
+    // loop.  It ends with a conditional branch (which conditionally exits the
+    // loop) that we don't want to lower.
+    lowerBasicBlock(headerBB, /*skipTerminator:*/ true);
+    if (errorOccurred) return;
+
+    // Lower all the code in the body of the loop.  This region ends with a
+    // branch back to the loop header that passes arguments, and these arguments
+    // will be installed as "exit values" on the loop by the normal BranchInst
+    // lowering code.
+    lowerRegion(r->getBody());
+  });
+
+  // Okay, at this point, the loop body should have all of the SILArguments
+  // installed as inputs and outputs (in guaranteed matching order) and will
+  // have all of the live inputs added as inputs to the function.  XLA While
+  // loops require a T->T function, so we need to add the live inputs as outputs
+  // as well.
+  assert(loopBodyFn.outputs.size() == headerBB->getArguments().size() &&
+         "loop body result values didn't get lowered properly");
+
+  for (unsigned i = loopBodyFn.outputs.size(), e = loopBodyFn.inputs.size();
+       i != e; ++i) {
+    loopBodyFn.outputs.push_back({
+      /*SILArgument*/nullptr, loopBodyFn.inputs[i].parameter
+    });
+  }
+
+  // Next, lower the condition function into a 'stop predicate' for the loop.
+  auto condFn = lowerToFunction([&]() {
+    // The condition function takes the same set of inputs as the loop body.
+    auto brLoc = r->getPreheader()->getTerminator()->getLoc();
+    lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs, brLoc);
+    if (errorOccurred) return;
+
+    // Copy the live-in set over to the condition by requesting the values be
+    // live.  This ensures that the condition and body functions agree on their
+    // inputs.
+    auto &graphFn = getCurrentGraphFunction();
+    for (unsigned i = graphFn.inputs.size(), e = loopBodyFn.inputs.size();
+         i != e; ++i) {
+      (void)getOperandValue(loopBodyFn.inputs[i].value);
+    }
+
+    // Lower any code in the header block, which may be used by the termination
+    // condition.  It ends with a conditional branch which we handle manually.
+    lowerBasicBlock(r->getHeader(), /*skipTerminator:*/ true);
+    if (errorOccurred) return;
+
+    // Lower the condition, which always produces a boolean value.
+    auto condValue = getCondition(headerBr, *this);
+    if (!condValue.oper) return;  // Error occurred.
+
+    // If the condition is true when the loop should continue, invert the
+    // condition.
+    if (headerBr->getTrueBB() != r->getExit()) {
+      condValue = createNotOp(condValue, headerBr->getDebugLocation(), *this);
+      if (!condValue.oper) return;   // Error occurred.
+    }
+
+    // The result of the function is our condition value.
+    graphFn.outputs.push_back({ /*SILArgument*/nullptr, condValue });
+
+  });
+
+  if (errorOccurred) return;
 
 
-  // TODO: ...
+  // We are going to need the input values and types for the op creation: build
+  // these lists now.
+  SmallVector<TF_Output, 4> inputs;
+  SmallVector<TF_DataType, 4> inputTypes;
+  for (auto &input : loopBodyFn.inputs) {
+    inputs.push_back(input.passedValue);
+    auto ty = getOpResultType(input.value);
+    inputTypes.push_back(getTensorFlowDataType(ty, input.value.first.getLoc()));
+  }
 
-  // Finally, we can create the actual operation itself.  This is the Tensorflow
+  // Create TF_Function's for our condition and body.
+  auto loc = headerBr->getDebugLocation();
+  auto loopBodyFnName = getUniqueName(loc, "whilebody");
+  if (buildGraphFunction(loopBodyFn, loopBodyFnName))
+    return;
+  auto condFnName = getUniqueName(loc, "whilecond");
+  if (buildGraphFunction(condFn, condFnName))
+    return;
+
+  auto &graphFn = getCurrentGraphFunction();
+
+  // Now we can create the actual operation itself.  This is the Tensorflow
   // op description that we are generating:
   // REGISTER_OP("While")
   //   .Input("input: T")
@@ -583,9 +791,34 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   //   .Attr("T: list(type) >= 0")
   //   .Attr("cond: func")
   //   .Attr("body: func")
+  auto opLocString = getUniqueName(loc, "op");
+  auto *op = TF_NewOperation(graphFn.getGraph(), "While", opLocString.c_str());
+  TF_AddInputList(op, inputs.data(), inputs.size());
+  TF_SetAttrTypeList(op, "T", inputTypes.data(), inputTypes.size());
+  TF_SetAttrFuncName(op, "cond", condFnName.c_str(), condFnName.size());
+  TF_SetAttrFuncName(op, "body",  loopBodyFnName.c_str(),
+                     loopBodyFnName.size());
 
-  internalError(SILFn->getLocation(),
-                "TFLowerGraph cannot handle loops yet");
+  auto *result = graphFn.finishOp(op, status);
+  if (checkStatus(loc.getLocation()))
+    return;
+
+  // The live-out value from the while loop was the state of the SILArgument's
+  // at the time that the termination program stopped.  Those SILArgument values
+  // dominate the exit branch, so they may be used by code after the while.
+  // Install them in our name lookup table.
+  for (unsigned i = 0, e = headerBB->getArguments().size(); i != e; ++i) {
+    addValueMapping(SILOpResult(headerBB->getArgument(i), 0),
+                    { result, (int)i });
+  }
+
+  // In addition to the SIL arguments themselves, all of the code in the header
+  // block dominates the exit as well and may well be used by code outside the
+  // loop.  We've already emit it into the condition function and the while loop
+  // body, so emit it one more time outside the loop for good measure.  We
+  // should be able to remove this when/if we get a proper model for loops as
+  // described above.
+  lowerBasicBlock(r->getHeader(), /*skipTerminator:*/ true);
 }
 
 void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
@@ -595,7 +828,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
   // Start by lowering any code that exists in the block that leads up to the
   // conditional branch.  This ensures that the condition bool is available.
-  lowerBasicBlock(r->getBranchBB());
+  lowerBasicBlock(r->getBranchBB(), /*skipTerminator:*/ true);
   if (errorOccurred)
     return;
 
@@ -604,22 +837,22 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   auto condBr = cast<CondBranchInst>(r->getBranchBB()->getTerminator());
   auto loc = condBr->getDebugLocation();
 
-  auto cond = condBr->getCondition();
-  auto tensorToI1 = cast<BuiltinInst>(cond);
-  assert(tensorToI1->getName().str() == "tf_tensor_to_i1" &&
-         tensorToI1->getNumOperands() == 1 &&
-         "unexpected branch condition in graph lowering");
-  cond = tensorToI1->getOperand(0);
-
-  // Get the graph node that corresponds to the condition.
-  auto condValue = getOperandValue(cond);
+  auto condValue = getCondition(condBr, *this);
   if (!condValue.oper) return;  // Error occurred.
 
   // Lower the true and false bodies to graph functions.
-  auto trueCodeFn = lowerToFunction(r->getTrue());
+  auto trueCodeFn = lowerToFunction([&]() {
+    // Lower all of the code inside the region (which can of course recursively
+    // create functions and call them as ops.
+    lowerRegion(r->getTrue());
+  });
   if (errorOccurred)
     return;
-  auto falseCodeFn = lowerToFunction(r->getFalse());
+  auto falseCodeFn = lowerToFunction([&]() {
+    // Lower all of the code inside the region (which can of course recursively
+    // create functions and call them as ops.
+    lowerRegion(r->getFalse());
+  });
   if (errorOccurred)
     return;
 
@@ -636,35 +869,30 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // Our approach on this is to build a set of the true inputs, then add any
   // unique-to-the-false-function entries, then rearrange the false list to
   // match the true list.
-  llvm::SmallSet<std::pair<void*, int>, 4> trueInputs;
+  llvm::SmallSet<SILOpResult, 4> trueInputs;
   for (auto &input : trueCodeFn.inputs) {
-    bool inserted = trueInputs.insert({input.passedValue.oper,
-                                       input.passedValue.index}).second;
+    bool inserted = trueInputs.insert(input.value).second; (void)inserted;
     assert(inserted && "A passed value shouldn't be added multiple times");
-    (void)inserted;
   }
 
   // Scan the false function, adding entries to the true fn input list if it
   // lacks them, and build the false function index.
-  llvm::SmallDenseMap<std::pair<void*, int>, unsigned> falseInputIndex;
+  llvm::SmallDenseMap<SILOpResult, unsigned> falseInputIndex;
   for (unsigned i = 0, e = falseCodeFn.inputs.size(); i != e; ++i) {
     auto &input = falseCodeFn.inputs[i];
 
     // Keep track of the all the false function entries (and their index) in the
     // falseInputIndex.
-    auto &entry = falseInputIndex[{input.passedValue.oper,
-                                   input.passedValue.index}];
+    auto &entry = falseInputIndex[input.value];
     assert(entry == 0 && "A passed value shouldn't be added multiple times");
     entry = i+1;  // Entry in the map is 1-biased.
 
     // Check to see if the true function already has this passed value.
-    if (!trueInputs.insert({input.passedValue.oper,
-                            input.passedValue.index}).second)
+    if (!trueInputs.insert(input.value).second)
       continue;  // Ignore common entries.
 
     // If not, add the parameter to the true list.
-    createParameter(input.type, loc.getLocation(), input.passedValue,
-                    trueCodeFn);
+    createParameter(input.value, input.passedValue, trueCodeFn);
   }
 
   // Okay, we now know that the true function has all of the input parameters,
@@ -683,11 +911,11 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   for (auto &input : trueCodeFn.inputs) {
     // Build info we need to create the op node later.
     inputs.push_back(input.passedValue);
-    inputTypes.push_back(getTensorFlowDataType(input.type, loc.getLocation()));
+    auto ty = getOpResultType(input.value);
+    inputTypes.push_back(getTensorFlowDataType(ty, loc.getLocation()));
 
     // Figure out where the false node parameter should come from.
-    auto entry = falseInputIndex[{input.passedValue.oper,
-                                  input.passedValue.index}];
+    auto entry = falseInputIndex[input.value];
 
     // If the false function already had this parameter set up, use it.
     if (entry != 0) {
@@ -695,8 +923,7 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     } else {
       // Otherwise, we need to create a new parameter and add it.  Fortunately
       // this automatically adds it to the false function's input list for us.
-      createParameter(input.type, loc.getLocation(), input.passedValue,
-                      falseCodeFn);
+      createParameter(input.value, input.passedValue, falseCodeFn);
     }
   }
 
@@ -755,7 +982,6 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   auto opLocString = getUniqueName(loc, "op");
   auto *op = TF_NewOperation(graphFn.getGraph(), "If", opLocString.c_str());
   TF_AddInput(op, condValue);
-
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "Tin", inputTypes.data(), inputTypes.size());
   TF_SetAttrTypeList(op, "Tout", outputTypes.data(), outputTypes.size());
@@ -771,35 +997,6 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // that got defined end up referring to this node.
   for (int i = 0, e = trueCodeFn.outputs.size(); i != e; ++i)
     addValueMapping({trueCodeFn.outputs[i].first, 0}, {result, i});
-
-#if 0  // TODO: Remove when we get If working.
-
-  // XLA does not have a usable if condition yet, so we may have to lower:
-  //   if cond { trueCode } else { falseCode }
-  // into:
-  //   tmp = cond
-  //   while tmp {
-  //      trueCode
-  //      tmp = 0
-  //   }
-  //   tmp = !cond
-  //   while tmp {
-  //      falseCode
-  //      tmp = 0
-  //   }
-  //
-  // The real problem with doing this though is that XlaWhile loops are overly
-  // limited on the result types of the loop: they can only produce an output
-  // value if it is an input.  In real code, you can have something like this:
-  //    if cond {
-  //      a = foo()
-  //    } else {
-  //      a = bar()
-  //    }
-  // The problem with this is that since "a" is created on both branches to the
-  // if statement we have no idea what shape it is.  Promoting it to being an
-  // input of the XlaWhile doesn't work because XLA requires static shapes.
-#endif
 }
 
 void TFGraphLowering::lowerRegion(SESERegionTree *region) {
@@ -826,16 +1023,18 @@ void TFGraphLowering::lowerRegion(SESERegionTree *region) {
 // Top Level driver
 //===----------------------------------------------------------------------===//
 
-/// Create a "Placeholder" op parameter input on the specified function with the
-/// specified type.  When this is created on inner functions, passedValue
+/// Create a "Placeholder" op parameter input on the specified function for the
+/// specified SIL Value.  When this is created on inner functions, passedValue
 /// indicates the value that is passed in to fulfill this parameter from the
-/// next outer scope.
+/// next outer scope.  For the top-level parameters to the SIL function, the
+/// passedValue can be null.
 TF_Output TFGraphLowering::
-createParameter(SILType ty, SILLocation loc, TF_Output passedValue,
+createParameter(SILOpResult value, TF_Output passedValue,
                 GraphFunctionBody &fn) {
   auto opName = "arg_" + llvm::utostr(OpID++);
   auto *desc = TF_NewOperation(fn.getGraph(), "Placeholder", opName.c_str());
-  auto type = getTensorFlowDataType(ty, loc);
+  auto loc = value.first.getLoc();
+  auto type = getTensorFlowDataType(getOpResultType(value), loc);
   if (!type) {
     internalError(loc, "use of unknown dtype!");
     return { nullptr, 0 };
@@ -846,17 +1045,33 @@ createParameter(SILType ty, SILLocation loc, TF_Output passedValue,
   if (checkStatus(loc))
     return { nullptr, 0 };
 
+#ifndef NDEBUG
+  // Verify we haven't seen this value yet.
+  if (value.first) {
+    for (auto i : fn.inputs)
+      assert(i.value != value && "adding redundant value");
+  }
+#endif
+
   // Success!  Remember this parameter, and the value that is passed in.
-  fn.inputs.push_back({{ result, 0 }, passedValue, ty });
+  fn.inputs.push_back({{ result, 0 }, passedValue, value });
   return { result, 0 };
 }
 
-
-void TFGraphLowering::lowerArguments() {
+/// Lower the specified list of SIL arguments to a bunch of parameters, filling
+/// the inputs list for the current function.  If the passedValues array is
+/// non-empty, it specifies the passed values to add to the input.
+void TFGraphLowering::lowerArgumentsToParams(ArrayRef<SILArgument *> args,
+                                             ArrayRef<TF_Output> passedValues,
+                                             SILLocation loc) {
   auto &graphFn = getCurrentGraphFunction();
-  auto loc = SILFn->getLocation();
-  for (auto arg : SILFn->getArguments()) {
-    auto result = createParameter(arg->getType(), loc, TF_Output(), graphFn);
+  unsigned idx = 0;
+  for (auto arg : args) {
+    auto passedValue = TF_Output();
+    if (!passedValues.empty())
+      passedValue = passedValues[idx++];
+
+    auto result = createParameter({arg, 0}, passedValue, graphFn);
     if (result.oper == nullptr)
       return;
 
@@ -865,9 +1080,9 @@ void TFGraphLowering::lowerArguments() {
 }
 
 
-/// Lower the specified SESE region to a GraphFunctionBody.
+/// Build a function around the code produced by the specified std::function.
 GraphFunctionBody TFGraphLowering::
-lowerToFunction(SESERegionTree *r, bool isTopLevel) {
+lowerToFunction(const std::function<void()> &body) {
   // Push a scope, allowing us to keep track of any live-in values in the
   // true code.  These will need to become tuple elements live across the
   // loop.
@@ -876,13 +1091,8 @@ lowerToFunction(SESERegionTree *r, bool isTopLevel) {
   /// Start a new graph function.
   functionStack.push_back(GraphFunctionBody());
 
-  // If this is the top level of the function, add its formal arguments.
-  if (isTopLevel)
-    lowerArguments();
-
-  // Lower all of the code inside the region (which can of course recursively
-  // create functions and call them as ops.
-  lowerRegion(r);
+  // Lower the code in the body however the caller wants to do it.
+  body();
 
   auto result = std::move(functionStack.back());
   functionStack.pop_back();
@@ -982,8 +1192,17 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
   TFGraphLowering graphGen(fn);
-  auto graphFnBody = graphGen.lowerToFunction(structure.get(),
-                                              /*isTopLevel*/true);
+  auto graphFnBody = graphGen.lowerToFunction([&]() {
+    // This is the top level of the function, add its formal arguments.
+    graphGen.lowerArgumentsToParams(fn->getArguments(), {}, fn->getLocation());
+    if (graphGen.errorOccurred)
+      return;
+
+    // Lower all of the code inside the function body (which can of course
+    // recursively creates functions and call them as ops.
+    graphGen.lowerRegion(structure.get());
+  });
+
   // Create the graph function for the top level code.
   auto fnName = graphGen.SILFn->getName();
   if (graphGen.buildGraphFunction(graphFnBody, fnName))

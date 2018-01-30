@@ -19,8 +19,7 @@ struct TensorCore<Element> {}
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: testLoop
 // CHECK-NEXT: [sequence
-// CHECK-NEXT:   block bb0
-// CHECK-NEXT:   <while Header: bb2   exit: bb1
+// CHECK-NEXT:   <while Preheader: bb0, Header: bb2, exit: bb1
 // CHECK-NEXT:     block bb3>
 // CHECK-NEXT:   block bb1]
 // CHECK-NEXT: --- XLA CFG Canonicalize end
