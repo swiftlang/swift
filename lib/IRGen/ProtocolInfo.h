@@ -227,12 +227,7 @@ public:
       if (witness.matchesFunction(function))
         return getNonBaseWitnessIndex(&witness);
     }
-
-    // FIXME: This should be an "unreachable", but Swift < 4.1 had an
-    // existing bug here that depends on (effectively) getting this
-    // result in non-Asserts builds. Emulate that behavior for now,
-    // but only on the Swift 4.1 branch.
-    return WitnessIndex(0, false);
+    llvm_unreachable("didn't find entry for function");
   }
 
   /// Return the witness index for the type metadata access function
