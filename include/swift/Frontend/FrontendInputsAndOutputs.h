@@ -36,10 +36,32 @@ class FrontendInputsAndOutputs {
 
   llvm::StringMap<unsigned> PrimaryInputs;
 
+  /// In Single-threaded WMO mode, all inputs are used
+  /// both for importing and compiling.
+  bool IsSingleThreadedWMO = false;
+
+  /// Punt where needed to enable batch mode experiments.
+  bool AreBatchModeChecksBypassed = false;
+
 public:
+  bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
+  void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
+
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
+
+  // Whole-module-optimization (WMO) routines:
+
+  // SingleThreadedWMO produces only main output file. In contrast,
+  // multi-threaded WMO produces one main output per input, as single-file and
+  // batch-mode do for each primary. Both WMO modes produce only one set of
+  // supplementary outputs.
+
+  bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
+  void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
+
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
 
   // Readers:
 
@@ -82,12 +104,18 @@ public:
 
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
-
   /// Fails an assertion if there is more than one primary input.
   /// Used in situations where only one primary input can be handled
   /// and where batch mode has not been implemented yet.
   void assertMustNotBeMoreThanOnePrimaryInput() const;
+
+  /// Fails an assertion when there is more than one primary input unless
+  /// the experimental -bypass-batch-mode-checks argument was passed to
+  /// the front end.
+  /// FIXME: When batch mode is complete, this function should be obsolete.
+  void
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed()
+      const;
 
   // Count-dependend readers:
 
@@ -99,6 +127,9 @@ public:
   /// \return the name of the unique primary input, or an empty StrinRef if
   /// there isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const;
+
+  /// Combines all primaries for stats reporter
+  std::string getStatsFileMangledInputName() const;
 
   bool isInputPrimary(StringRef file) const;
 
@@ -125,6 +156,43 @@ public:
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr);
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr);
+
+  // Outputs
+
+private:
+  friend class ArgsToFrontendOptionsConverter;
+
+  void setMainOutputs(ArrayRef<std::string> outputFiles);
+
+public:
+  unsigned countOfInputsProducingMainOutputs() const;
+
+  const InputFile &firstInputProducingOutput() const;
+  const InputFile &lastInputProducingOutput() const;
+
+  /// Under single-threaded WMO, we pretend that the first input
+  /// generates the main output, even though it will include code
+  /// generated from all of them.
+  void forEachInputProducingAMainOutputFile(
+      llvm::function_ref<void(const InputFile &)> fn) const;
+
+  std::vector<std::string> copyOutputFilenames() const;
+
+  void
+  forEachOutputFilename(llvm::function_ref<void(const std::string &)> fn) const;
+
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  StringRef getSingleOutputFilename() const;
+
+  bool isOutputFilenameStdout() const;
+  bool isOutputFileDirectory() const;
+  bool hasNamedOutputFile() const;
+
+  // Supplementary outputs
+
+  void forEachInputProducingSupplementaryOutput(
+      llvm::function_ref<void(const InputFile &)> fn) const;
 };
 
 } // namespace swift

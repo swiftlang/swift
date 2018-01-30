@@ -33,17 +33,24 @@ enum class InputFileKind {
 class InputFile {
   std::string Filename;
   bool IsPrimary;
-  /// Null if the contents are not overridden.
+  /// Points to a buffer overriding the file's contents, or nullptr if there is
+  /// none.
   llvm::MemoryBuffer *Buffer;
+
+  /// Contains the name of the main output file, that is, the .o file for this
+  /// input. If there is no such file, contains an empty string. If the output
+  /// is to be written to stdout, contains "-".
+  std::string OutputFilename;
 
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
+            llvm::MemoryBuffer *buffer = nullptr,
+            StringRef outputFilename = StringRef())
       : Filename(
             convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
-        IsPrimary(isPrimary), Buffer(buffer) {
+        IsPrimary(isPrimary), Buffer(buffer), OutputFilename(outputFilename) {
     assert(!name.empty());
   }
 
@@ -59,6 +66,12 @@ public:
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
+  }
+
+  const std::string &outputFilename() const { return OutputFilename; }
+
+  void setOutputFilename(StringRef outputFilename) {
+    OutputFilename = outputFilename;
   }
 };
 
