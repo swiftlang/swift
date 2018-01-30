@@ -2302,7 +2302,7 @@ class VarDeclUsageChecker : public ASTWalker {
   const VarDecl *AssociatedGetter = nullptr;
 
   /// The first reference to the associated getter.
-  const DeclRefExpr *AssociatedGetterDeclRef = nullptr;
+  const Expr *AssociatedGetterRefExpr = nullptr;
 
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
@@ -2569,7 +2569,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (FD && FD->getAccessorKind() == AccessorKind::Set) {
         auto getter = dyn_cast<VarDecl>(FD->getStorage());
         if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
-          if (auto DRE = AssociatedGetterDeclRef) {
+          if (auto DRE = AssociatedGetterRefExpr) {
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
             Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
@@ -2864,10 +2864,18 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     addMark(DRE->getDecl(), RK_Read);
 
-    // If the Decl is a read of a getter, track the first DRE for diagnostics
+    // If the Expression is a read of a getter, track for diagnostics
     if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      if (AssociatedGetter == VD && AssociatedGetterDeclRef == nullptr)
-        AssociatedGetterDeclRef = DRE;
+      if (AssociatedGetter == VD && AssociatedGetterRefExpr == nullptr)
+        AssociatedGetterRefExpr = DRE;
+    }
+  }
+  // If the Expression is a member reference, see if it is a read of the getter
+  // to track for diagnostics.
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
+      if (AssociatedGetter == VD && AssociatedGetterRefExpr == nullptr)
+        AssociatedGetterRefExpr = MRE;
     }
   }
   // If this is an AssignExpr, see if we're mutating something that we know
