@@ -3266,18 +3266,18 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
   BoundGenericType *newType;
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericClassType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz = BoundGenericClassType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericClassType), arena);
     newType = new (mem) BoundGenericClassType(
         theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericStructType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz =BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericStructType), arena);
     newType = new (mem) BoundGenericStructType(
         theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericEnumType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz = BoundGenericEnumType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericEnumType), arena);
     newType = new (mem) BoundGenericEnumType(
         theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else {
@@ -3418,8 +3418,8 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
     return compTy;
 
   // Use trailing objects for member type storage
-  auto mem = C.Allocate(sizeof(ProtocolCompositionType) + sizeof(Type) *
-                        Members.size(), alignof(Type), arena);
+  auto size = totalSizeToAlloc<Type>(Members.size());
+  auto mem = C.Allocate(size, alignof(ProtocolCompositionType), arena);
   auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
                                                   Members,
                                                   HasExplicitAnyObject,
