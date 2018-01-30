@@ -923,6 +923,12 @@ bool ExtensionDecl::isConstrainedExtension() const {
     != nominal->getGenericSignature()->getCanonicalSignature();
 }
 
+bool ExtensionDecl::isEquivalentToExtendedContext() const {
+  auto decl = getExtendedType()->getAnyNominal();
+  return getParentModule() == decl->getParentModule()
+    && !isConstrainedExtension()
+    && !getDeclaredInterfaceType()->isExistentialType();
+}
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
