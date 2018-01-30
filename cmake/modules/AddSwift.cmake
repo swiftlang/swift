@@ -409,14 +409,14 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(SWIFT_ENABLE_GOLD_LINKER AND
-       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      list(APPEND result "-fuse-ld=gold")
-    endif()
-    if(SWIFT_ENABLE_LLD_LINKER OR
+    find_program(LDLLD_PATH "ld.lld")
+    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
+    elseif(SWIFT_ENABLE_GOLD_LINKER AND
+       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      list(APPEND result "-fuse-ld=gold")
     endif()
   endif()
 
