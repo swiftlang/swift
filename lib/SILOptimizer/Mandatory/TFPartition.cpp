@@ -1914,8 +1914,10 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// value using the TensorFlow runtime utilities.
 static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
                                                 SILLocation loc) {
-  assert(convertSwiftTypeToTF(value->getType().getSwiftRValueType()) != 0 &&
-         "Can only convert TF compatible types to Tensors");
+  // We need to create a dtype value.  It is an imported C enum value, so it is
+  // modeled as a struct that wraps an integer value (itself a struct).
+  auto dtypeVal = convertSwiftTypeToTF(value->getType().getSwiftRValueType());
+  assert(dtypeVal && "Can only convert TF compatible types to Tensors");
 
   // Get a reference to the CreateCTensorHandle function, which is defined like
   // this:
@@ -1925,10 +1927,6 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
   auto createFn = B.getModule().findFunction("_swift_tfc_CreateCTensorHandle",
                                              SILLinkage::PublicExternal);
   auto *fnRef = B.createFunctionRef(loc, createFn);
-
-  // We need to create a dtype value.  It is an imported C enum value, so it is
-  // modeled as a struct that wraps an integer value (itself a struct).
-  auto dtypeVal = convertSwiftTypeToTF(value->getType().getSwiftRValueType());
 
   auto dtypeType = fnRef->getFunctionType()->getParameters()[1].getType();
   auto dtypeDecl = dtypeType->getAnyNominal();
@@ -2159,10 +2157,12 @@ insertTensorComputationStartEndTerminate() -> PartitionedTensorProgram {
   // dealloc_stack %0 : $*(CTensorHandle, CTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
 
+  // TODO: Handle release instructions.
+#if 0
   // Finally, release all of the TensorHandle's, releasing their memory.
   for (auto arg : tensorFnArguments)
     B.createReleaseValue(loc, arg, Atomicity::Atomic);
-
+#endif
 
   // Create the runtime call in the host program that rendezvous with the tensor
   // program and returns the results.
@@ -2257,7 +2257,7 @@ insertTensorComputationStartEndTerminate() -> PartitionedTensorProgram {
   // Now that we are done with the buffer of results, get rid of it.  It is
   // uninitialized at this point, so it should not be destroyed.
 
-  // dealloc_stack %0 : $*(AnyTensorHandle, AnyTensorHandle)
+  // dealloc_stack %0 : $*(CTensorHandle, CTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
 
 
