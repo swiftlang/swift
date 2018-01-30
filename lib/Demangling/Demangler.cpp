@@ -120,16 +120,13 @@ static bool isFunctionAttr(Node::Kind kind) {
 int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   if (mangledName.empty()) return 0;
 
-  // Check for the swift-4 prefix
-  if (mangledName.size() >= 3 && mangledName[0] == '_' &&
-      mangledName[1] == 'T' && mangledName[2] == '0')
-    return 3;
+  llvm::StringRef prefixes[] = {/*Swift 4*/ "_T0", /*Swift > 4*/ "$S", "_$S"};
 
-  // Check for the swift > 4 prefix
-  unsigned Offset = (mangledName[0] == '_' ? 1 : 0);
-  if (mangledName.size() >= Offset + 1 &&
-      mangledName[Offset] == '$' && mangledName[Offset + 1] == 'S')
-    return Offset + 2;
+  // Look for any of the known prefixes
+  for (auto prefix : prefixes) {
+    if (mangledName.startswith(prefix))
+      return prefix.size();
+  }
 
   return 0;
 }
@@ -142,13 +139,12 @@ bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
 }
 
 bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
-  StringRef mangledNameRef(mangledName, 4);
+  StringRef mangledNameRef(mangledName);
   return isSwiftSymbol(mangledNameRef);
 }
 
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
-  return mangledName.size() >= 2 && mangledName[0] == '_' &&
-      mangledName[1] == 'T';
+  return mangledName.startswith("_T");
 }
 
 llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){

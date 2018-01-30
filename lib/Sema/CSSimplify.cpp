@@ -1863,16 +1863,32 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         locator.withPathElement(
                           ConstraintLocator::ArrayElementType));
     
-    case TypeKind::InOut:
+    case TypeKind::InOut: {
       // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind == ConstraintKind::BindParam ||
           kind >= ConstraintKind::OperatorArgumentConversion)
         return getTypeMatchFailure(locator);
-      
-      return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
-                        cast<InOutType>(desugar2)->getObjectType(),
-                        ConstraintKind::Equal, subflags,
-                  locator.withPathElement(ConstraintLocator::ArrayElementType));
+
+      auto inoutObjTy1 = cast<InOutType>(desugar1)->getObjectType();
+      auto inoutObjTy2 = cast<InOutType>(desugar2)->getObjectType();
+
+      OptionalTypeKind OTK1;
+      OptionalTypeKind OTK2;
+      auto optionalObjTy1 = inoutObjTy1->getAnyOptionalObjectType(OTK1);
+      auto optionalObjTy2 = inoutObjTy2->getAnyOptionalObjectType(OTK2);
+      if (OTK1 != OTK2 && optionalObjTy1 && optionalObjTy2) {
+        increaseScore(ScoreKind::SK_InOutOptionalityConversion);
+        return matchTypes(inoutObjTy1,
+                          inoutObjTy2,
+                          ConstraintKind::ArgumentConversion, subflags,
+                          locator.withPathElement(ConstraintLocator::ArrayElementType));
+      } else {
+        return matchTypes(inoutObjTy1,
+                          inoutObjTy2,
+                          ConstraintKind::Equal, subflags,
+                          locator.withPathElement(ConstraintLocator::ArrayElementType));
+      }
+    }
 
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
