@@ -13,7 +13,6 @@
 #ifndef SWIFT_BASIC_STATISTIC_H
 #define SWIFT_BASIC_STATISTIC_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "swift/AST/Identifier.h"
@@ -86,19 +85,29 @@ public:
     int dummyInstanceVariableToGetConstructorToParse;
   };
 
-  typedef llvm::PointerUnion4<const Decl*,
-                              const clang::Decl*,
-                              const Expr*,
-                              const SILFunction*> TraceEntity;
+  // To trace an entity, you have to provide a TraceFormatter for it. This is a
+  // separate type since we do not have retroactive conformances in C++, and it
+  // is a type that takes void* arguments since we do not have existentials
+  // separate from objects in C++. Pity us.
+  struct TraceFormatter {
+    virtual void traceName(const void *Entity, raw_ostream &OS) const = 0;
+    virtual void traceLoc(const void *Entity,
+                          SourceManager *SourceMgr,
+                          clang::SourceManager *ClangSourceMgr,
+                          raw_ostream &OS) const = 0;
+    virtual ~TraceFormatter();
+  };
 
   struct FrontendStatsTracer
   {
     UnifiedStatsReporter *Reporter;
     llvm::TimeRecord SavedTime;
     StringRef EventName;
-    TraceEntity Entity;
+    const void *Entity;
+    const TraceFormatter *Formatter;
     FrontendStatsTracer(StringRef EventName,
-                        TraceEntity Entity,
+                        const void *Entity,
+                        const TraceFormatter *Formatter,
                         UnifiedStatsReporter *Reporter);
     FrontendStatsTracer();
     FrontendStatsTracer(FrontendStatsTracer&& other);
@@ -117,7 +126,8 @@ public:
     StringRef CounterName;
     size_t CounterDelta;
     size_t CounterValue;
-    TraceEntity Entity;
+    const void *Entity;
+    const TraceFormatter *Formatter;
   };
 
 private:
@@ -162,9 +172,10 @@ public:
   AlwaysOnFrontendCounters &getFrontendCounters();
   AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
   void noteCurrentProcessExitStatus(int);
-  // We provide 4 explicit overloads here, rather than a single function that
-  // takes a TraceEntity, to save all of our clients from having to include all
-  // 4 headers that define these 4 forward-declared types.
+  // We declare 4 explicit overloads here, but the _definitions_ live in the
+  // upper-level files (in libswiftAST or libswiftSIL) that provide the types
+  // being traced. If you want to trace those types, it's assumed you're linking
+  // with the object files that define the tracer.
   FrontendStatsTracer getStatsTracer(StringRef EventName, const Decl *D);
   FrontendStatsTracer getStatsTracer(StringRef EventName, const clang::Decl*D);
   FrontendStatsTracer getStatsTracer(StringRef EventName, const Expr *E);
