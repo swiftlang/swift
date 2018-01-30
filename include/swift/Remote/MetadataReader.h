@@ -1028,7 +1028,7 @@ private:
   buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangle::NodeFactory nodeFactory;
-    SmallVector<std::pair<Demangle::Node::Kind, std::string>, 4>
+    std::vector<std::pair<Demangle::Node::Kind, std::string>>
       nameComponents;
     ContextDescriptorRef parent = descriptor;
     
@@ -1103,7 +1103,8 @@ private:
       return BuiltNominalTypeDecl();
     if (nameComponents.back().first != Node::Kind::Module)
       return BuiltNominalTypeDecl();
-    auto moduleInfo = nameComponents.pop_back_val();
+    auto moduleInfo = std::move(nameComponents.back());
+    nameComponents.pop_back();
     auto demangling =
       nodeFactory.createNode(Node::Kind::Module, moduleInfo.second);
     for (auto &component : reversed(nameComponents)) {
