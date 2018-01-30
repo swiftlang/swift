@@ -1026,16 +1026,53 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 /***************************************************************************/
 /*** Nominal type descriptors **********************************************/
 /***************************************************************************/
-template<>
-bool NominalTypeDescriptor::isEqual(const NominalTypeDescriptor *other) const {
+bool swift::equalContexts(const ContextDescriptor *a,
+                          const ContextDescriptor *b)
+{
   // Fast path: pointer equality.
-  if (this == other) return true;
+  if (a == b) return true;
 
-  // If both nominal type descriptors are known to be unique, we're done.
-  if (this->isUnique() && other->isUnique()) return false;
+  // If either context is null, we're done.
+  if (a == nullptr || b == nullptr)
+    return false;
 
-  // Compare the mangled names.
-  return strcmp(this->Name.get(), other->Name.get()) == 0;
+  // If either descriptor is known to be unique, we're done.
+  if (a->isUnique() || b->isUnique()) return false;
+  
+  // Do the kinds match?
+  if (a->getKind() != b->getKind()) return false;
+  
+  // Do the parents match?
+  if (!equalContexts(a->Parent.get(), b->Parent.get()))
+    return false;
+  
+  // Compare kind-specific details.
+  switch (auto kind = a->getKind()) {
+  case ContextDescriptorKind::Module: {
+    // Modules with the same name are equivalent.
+    auto moduleA = cast<ModuleContextDescriptor>(a);
+    auto moduleB = cast<ModuleContextDescriptor>(b);
+    return strcmp(moduleA->Name.get(), moduleB->Name.get()) == 0;
+  }
+  
+  case ContextDescriptorKind::Extension:
+  case ContextDescriptorKind::Anonymous:
+    // These context kinds are always unique.
+    return false;
+  
+  default:
+    // Types in the same context with the same name are equivalent.
+    if (kind >= ContextDescriptorKind::Type_First
+        && kind <= ContextDescriptorKind::Type_Last) {
+      auto typeA = cast<TypeContextDescriptor>(a);
+      auto typeB = cast<TypeContextDescriptor>(b);
+      return strcmp(typeA->Name.get(), typeB->Name.get()) == 0;
+    }
+    
+    // Otherwise, this runtime doesn't know anything about this context kind.
+    // Conservatively return false.
+    return false;
+  }
 }
 
 /***************************************************************************/
@@ -1418,7 +1455,7 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 static void _swift_initializeSuperclass(ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
-  if (theClass->getDescription()->GenericParams.isGeneric())
+  if (theClass->getDescription()->isGeneric())
     _swift_initGenericClassObjCName(theClass);
 #endif
 
@@ -1428,11 +1465,9 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
   // to the class metadata.
   {
     const auto *description = theClass->getDescription();
-    auto &genericParams = description->GenericParams;
-
     auto *classWords = reinterpret_cast<void **>(theClass);
 
-    if (genericParams.Flags.hasVTable()) {
+    if (description->hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
         classWords[vtable->getVTableOffset(theClass) + i]
@@ -1454,17 +1489,18 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
     const auto *description = ancestor->getDescription();
-    auto &genericParams = description->GenericParams;
 
     // Copy the generic requirements.
-    if (genericParams.hasGenericRequirements()) {
-      memcpy(classWords + genericParams.getOffset(ancestor),
-             superWords + genericParams.getOffset(ancestor),
-             genericParams.NumGenericRequirements * sizeof(uintptr_t));
+    if (description->isGeneric()
+        && description->getGenericContextHeader().hasArguments()) {
+      memcpy(classWords + description->getGenericArgumentOffset(ancestor),
+             superWords + description->getGenericArgumentOffset(ancestor),
+             description->getGenericContextHeader().getNumArguments() *
+               sizeof(uintptr_t));
     }
 
     // Copy the vtable entries.
-    if (genericParams.Flags.hasVTable()) {
+    if (description->hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       memcpy(classWords + vtable->getVTableOffset(ancestor),
              superWords + vtable->getVTableOffset(ancestor),
@@ -2851,8 +2887,6 @@ const WitnessTable *swift::swift_getGenericWitnessTable(
 
   return entry->get(genericTable);
 }
-
-uint64_t swift::RelativeDirectPointerNullPtr = 0;
 
 /***************************************************************************/
 /*** Allocator implementation **********************************************/

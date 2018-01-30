@@ -239,77 +239,6 @@ enum class ProtocolDispatchStrategy: uint8_t {
   Swift = 1,
 };
 
-/// Flags in a generic nominal type descriptor.
-class GenericParameterDescriptorFlags {
-  typedef uint16_t int_type;
-  enum : int_type {
-    IsNonUnique            = 0x0002,
-    HasVTable              = 0x0004,
-    HasResilientSuperclass = 0x0008,
-  };
-  int_type Data;
-  
-  constexpr GenericParameterDescriptorFlags(int_type data) : Data(data) {}
-public:
-  constexpr GenericParameterDescriptorFlags() : Data(0) {}
-
-  constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
-                                             : (Data & ~HasVTable));
-  }
-
-  constexpr GenericParameterDescriptorFlags withIsUnique(bool b) const {
-    return GenericParameterDescriptorFlags(!b ? (Data | IsNonUnique)
-                                           : (Data & ~IsNonUnique));
-  }
-
-  /// Whether this nominal type descriptor is known to be nonunique, requiring
-  /// comparison operations to check string equality of the mangled name.
-  bool isUnique() const {
-    return !(Data & IsNonUnique);
-  }
-
-  /// If this type is a class, does it have a vtable?  If so, the number
-  /// of vtable entries immediately follows the generic requirement
-  /// descriptor.
-  bool hasVTable() const {
-    return Data & HasVTable;
-  }
-
-  constexpr GenericParameterDescriptorFlags withHasResilientSuperclass(bool b) const {
-    return GenericParameterDescriptorFlags(b ? (Data | HasResilientSuperclass)
-                                             : (Data & ~HasResilientSuperclass));
-  }
-
-  /// If this type is a class, does it have a resilient superclass?
-  /// If so, the generic parameter offset, field offset vector offset
-  /// and vtable start offsets are relative to the start of the class's
-  /// immediate members in the metadata, and not the start of the
-  /// metadata itself.
-  ///
-  /// Note that the immediate members begin at the same offset where the
-  /// superclass metadata ends.
-  bool hasResilientSuperclass() const {
-    return Data & HasResilientSuperclass;
-  }
-
-  int_type getIntValue() const {
-    return Data;
-  }
-  
-  static GenericParameterDescriptorFlags fromIntValue(int_type Data) {
-    return GenericParameterDescriptorFlags(Data);
-  }
-  
-  bool operator==(GenericParameterDescriptorFlags other) const {
-    return Data == other.Data;
-  }
-  bool operator!=(GenericParameterDescriptorFlags other) const {
-    return Data != other.Data;
-  }
-};
-
-
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
@@ -918,6 +847,254 @@ constexpr unsigned NumDirectGenericTypeMetadataAccessFunctionArgs = 3;
 
 /// The offset (in pointers) to the first requirement in a witness table.
 constexpr unsigned WitnessTableFirstRequirementOffset = 1;
+
+/// Kinds of context descriptor.
+enum class ContextDescriptorKind : uint8_t {
+  /// This context descriptor represents a module.
+  Module = 0,
+  
+  /// This context descriptor represents an extension.
+  Extension = 1,
+  
+  /// This context descriptor represents an anonymous possibly-generic context
+  /// such as a function body.
+  Anonymous = 2,
+  
+  /// First kind that represents a type of any sort.
+  Type_First = 16,
+  
+  /// This context descriptor represents a class.
+  Class = Type_First,
+  
+  /// This context descriptor represents a struct.
+  Struct = Type_First + 1,
+  
+  /// This context descriptor represents an enum.
+  Enum = Type_First + 2,
+  
+  /// Last kind that represents a type of any sort.
+  Type_Last = 31,
+};
+
+/// Common flags stored in the first 32-bit word of any context descriptor.
+struct ContextDescriptorFlags {
+private:
+  uint32_t Value;
+
+  explicit constexpr ContextDescriptorFlags(uint32_t Value)
+    : Value(Value) {}
+public:
+  constexpr ContextDescriptorFlags() : Value(0) {}
+  constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
+                                   bool isGeneric,
+                                   bool isUnique,
+                                   uint8_t version,
+                                   uint16_t kindSpecificFlags)
+    : ContextDescriptorFlags(ContextDescriptorFlags()
+                               .withKind(kind)
+                               .withGeneric(isGeneric)
+                               .withUnique(isUnique)
+                               .withVersion(version)
+                               .withKindSpecificFlags(kindSpecificFlags))
+  {}
+
+  /// The kind of context this descriptor describes.
+  constexpr ContextDescriptorKind getKind() const {
+    return ContextDescriptorKind(Value & 0x1Fu);
+  }
+  
+  /// Whether the context being described is generic.
+  constexpr bool isGeneric() const {
+    return (Value & 0x80u) != 0;
+  }
+  
+  /// Whether this is a unique record describing the referenced context.
+  constexpr bool isUnique() const {
+    return (Value & 0x40u) != 0;
+  }
+  
+  /// The format version of the descriptor. Higher version numbers may have
+  /// additional fields that aren't present in older versions.
+  constexpr uint8_t getVersion() const {
+    return (Value >> 8u) & 0xFFu;
+  }
+  
+  /// The most significant two bytes of the flags word, which can have
+  /// kind-specific meaning.
+  constexpr uint16_t getKindSpecificFlags() const {
+    return (Value >> 16u) & 0xFFFFu;
+  }
+  
+  constexpr ContextDescriptorFlags withKind(ContextDescriptorKind kind) const {
+    return assert((uint8_t(kind) & 0x1F) == uint8_t(kind)),
+      ContextDescriptorFlags((Value & 0xFFFFFFE0u) | uint8_t(kind));
+  }
+  
+  constexpr ContextDescriptorFlags withGeneric(bool isGeneric) const {
+    return ContextDescriptorFlags((Value & 0xFFFFFF7Fu)
+                                  | (isGeneric ? 0x80u : 0));
+  }
+
+  constexpr ContextDescriptorFlags withUnique(bool isUnique) const {
+    return ContextDescriptorFlags((Value & 0xFFFFFFBFu)
+                                  | (isUnique ? 0x40u : 0));
+  }
+
+  constexpr ContextDescriptorFlags withVersion(uint8_t version) const {
+    return ContextDescriptorFlags((Value & 0xFFFF00FFu) | (version << 8u));
+  }
+
+  constexpr ContextDescriptorFlags
+  withKindSpecificFlags(uint16_t flags) const {
+    return ContextDescriptorFlags((Value & 0xFFFFu) | (flags << 16u));
+  }
+  
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
+};
+
+/// Flags for nominal type context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the type.
+enum class TypeContextDescriptorFlags: uint16_t {
+  /// Set if the context descriptor is includes metadata for dynamically
+  /// constructing a class's vtables at metadata instantiation time.
+  HasVTable = 0x8000u,
+  
+  /// Set if the context descriptor is for a class with resilient ancestry.
+  HasResilientSuperclass = 0x4000u,
+  
+  /// Set if the type represents an imported C tag type.
+  IsCTag = 0x2000u,
+  
+  /// Set if the type represents an imported C typedef type.
+  IsCTypedef = 0x1000u,
+};
+
+enum class GenericParamKind : uint8_t {
+  /// A type parameter.
+  Type = 0,
+  
+  Max = 0x3F,
+};
+
+class GenericParamDescriptor {
+  uint8_t Value;
+  
+  explicit constexpr GenericParamDescriptor(uint8_t Value)
+    : Value(Value) {}
+public:
+  constexpr GenericParamDescriptor(GenericParamKind kind,
+                                   bool hasKeyArgument,
+                                   bool hasExtraArgument)
+    : GenericParamDescriptor(GenericParamDescriptor(0)
+                         .withKind(kind)
+                         .withKeyArgument(hasKeyArgument)
+                         .withExtraArgument(hasExtraArgument))
+  {}
+  
+  constexpr bool hasKeyArgument() const {
+    return (Value & 0x80u) != 0;
+  }
+
+  constexpr bool hasExtraArgument() const {
+    return (Value & 0x40u) != 0;
+  }
+
+  constexpr GenericParamKind getKind() const {
+    return GenericParamKind(Value & 0x3Fu);
+  }
+  
+  constexpr GenericParamDescriptor
+  withKeyArgument(bool hasKeyArgument) const {
+    return GenericParamDescriptor((Value & 0x7Fu)
+      | (hasKeyArgument ? 0x80u : 0));
+  }
+  
+  constexpr GenericParamDescriptor
+  withExtraArgument(bool hasExtraArgument) const {
+    return GenericParamDescriptor((Value & 0xBFu)
+      | (hasExtraArgument ? 0x40u : 0));
+  }
+  
+  constexpr GenericParamDescriptor withKind(GenericParamKind kind) const {
+    return assert((uint8_t(kind) & 0x3Fu) == uint8_t(kind)),
+      GenericParamDescriptor((Value & 0xC0u) | uint8_t(kind));
+  }
+  
+  constexpr uint8_t getIntValue() const {
+    return Value;
+  }
+};
+
+enum class GenericRequirementKind : uint8_t {
+  /// A protocol requirement.
+  Protocol = 0,
+  /// A same-type requirement.
+  SameType = 1,
+  /// A base class requirement.
+  BaseClass = 2,
+  /// A "same-conformance" requirement, implied by a same-type or base-class
+  /// constraint that binds a parameter with protocol requirements.
+  SameConformance = 3,
+  /// A layout constraint.
+  Layout = 0x1F,
+};
+
+class GenericRequirementFlags {
+  uint32_t Value;
+  
+  explicit constexpr GenericRequirementFlags(uint32_t Value)
+    : Value(Value) {}
+public:
+  constexpr GenericRequirementFlags(GenericRequirementKind kind,
+                                    bool hasKeyArgument,
+                                    bool hasExtraArgument)
+    : GenericRequirementFlags(GenericRequirementFlags(0)
+                         .withKind(kind)
+                         .withKeyArgument(hasKeyArgument)
+                         .withExtraArgument(hasExtraArgument))
+  {}
+  
+  constexpr bool hasKeyArgument() const {
+    return (Value & 0x80u) != 0;
+  }
+
+  constexpr bool hasExtraArgument() const {
+    return (Value & 0x40u) != 0;
+  }
+
+  constexpr GenericRequirementKind getKind() const {
+    return GenericRequirementKind(Value & 0x1Fu);
+  }
+  
+  constexpr GenericRequirementFlags
+  withKeyArgument(bool hasKeyArgument) const {
+    return GenericRequirementFlags((Value & 0x7Fu)
+      | (hasKeyArgument ? 0x80u : 0));
+  }
+  
+  constexpr GenericRequirementFlags
+  withExtraArgument(bool hasExtraArgument) const {
+    return GenericRequirementFlags((Value & 0xBFu)
+      | (hasExtraArgument ? 0x40u : 0));
+  }
+  
+  constexpr GenericRequirementFlags
+  withKind(GenericRequirementKind kind) const {
+    return assert((uint8_t(kind) & 0x1Fu) == uint8_t(kind)),
+      GenericRequirementFlags((Value & 0xE0u) | uint8_t(kind));
+  }
+  
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
+};
+
+enum class GenericRequirementLayoutKind : uint32_t {
+  // A class constraint.
+  Class = 0,
+};
 
 } // end namespace swift
 

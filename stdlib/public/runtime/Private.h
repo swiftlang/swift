@@ -157,8 +157,17 @@ namespace swift {
   /// Returns true if common value witnesses were used, false otherwise.
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
-  const NominalTypeDescriptor *
-  _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
+  const Metadata *
+  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
+                                  const Metadata *metadata,
+                                  const TypeContextDescriptor *ntd);
+
+  bool
+  _contextDescriptorMatchesMangling(const ContextDescriptor *context,
+                                    Demangle::NodePointer node);
+  
+  const TypeContextDescriptor *
+  _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
