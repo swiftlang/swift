@@ -249,6 +249,7 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
   containsNonObjCProtocol = !protoDecl->isObjC();
 
   singleProtocol = type;
+  protocols = { &singleProtocol, 1 };
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
@@ -270,10 +271,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   }
 
   singleProtocol = nullptr;
-  multipleProtocols = {
-    reinterpret_cast<ProtocolType * const *>(members.data()),
-    members.size()
-  };
+  protocols = { members.data(), members.size() };
 }
 
 
