@@ -7,7 +7,7 @@ import c_layout
 // CHECK-DAG: @"$S28reflection_metadata_imported15HasImportedTypeVMF" = internal constant {{.*}}swift5_fieldmd
 // CHECK-DAG: @"$SSo1AVMB" = linkonce_odr hidden constant {{.*}}swift5_builtin
 // CHECK-DAG: @"$SSo11CrappyColorVMB" = linkonce_odr hidden constant {{.*}}swift5_builtin
-// CHECK-DAG: @"$SSo11CrappyColorVs16RawRepresentableSCMA" = linkonce_odr hidden constant {{.*}}swift5_assocty
+// CHECK-DAG: @"$SSo11CrappyColorVs16RawRepresentableSCHMA" = linkonce_odr hidden constant {{.*}}swift5_assocty
 
 struct HasImportedType {
   let a: A

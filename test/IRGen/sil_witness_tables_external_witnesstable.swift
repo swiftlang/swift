@@ -5,7 +5,7 @@
 import Swift
 
 // CHECK: @"$Ss1XVN" = external global %swift.type
-// CHECK: @"$Ss1XVs1PsWP" = external global i8*
+// CHECK: @"$Ss1XVs1PsHWP" = external global i8*
 
 func doSomething<T : P>(_ t : T) -> Y {
   return t.doSomething()

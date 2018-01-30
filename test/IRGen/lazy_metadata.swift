@@ -35,11 +35,11 @@
 // CHECK-DAG: @"$S4test7StructEVMf" =
 
 // protocol witness tables
-// CHECK-DAG: @"$S4test7StructAVAA5ProtoAAWP" =
-// CHECK-DAG: @"$S4test7StructBVAA5ProtoAAWP" =
-// CHECK-DAG: @"$S4test7StructCVAA5ProtoAAWP" =
-// CHECK-DEAD-NOT: @"$S4test7StructDVAA5ProtoAAWP" =
-// CHECK-DAG: @"$S4test7StructEVAA12PrivateProto{{[_A-Z0-9]*}}AAWP" =
+// CHECK-DAG: @"$S4test7StructAVAA5ProtoAAHWP" =
+// CHECK-DAG: @"$S4test7StructBVAA5ProtoAAHWP" =
+// CHECK-DAG: @"$S4test7StructCVAA5ProtoAAHWP" =
+// CHECK-DEAD-NOT: @"$S4test7StructDVAA5ProtoAAHWP" =
+// CHECK-DAG: @"$S4test7StructEVAA12PrivateProto{{[_A-Z0-9]*}}AAHWP" =
 
 public protocol Proto {
   func abc()

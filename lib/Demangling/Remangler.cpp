@@ -1456,12 +1456,17 @@ void Remangler::mangleProtocol(Node *node) {
 }
 
 void Remangler::mangleRetroactiveConformance(Node *node) {
+  SubstitutionEntry entry;
   mangleProtocolConformance(node->getChild(1));
   Buffer << 'g';
   mangleIndex(node->getChild(0)->getIndex());
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
+  SubstitutionEntry entry;
+  if (trySubstitution(node, entry))
+    return;
+
   Node *Ty = getChildOfType(node->getChild(0));
   Node *GenSig = nullptr;
   if (Ty->getKind() == Node::Kind::DependentGenericType) {
@@ -1475,6 +1480,9 @@ void Remangler::mangleProtocolConformance(Node *node) {
   mangleChildNode(node, 2);
   if (GenSig)
     mangle(GenSig);
+
+  Buffer << 'H';
+  addSubstitution(entry);
 }
 
 void Remangler::mangleProtocolDescriptor(Node *node) {

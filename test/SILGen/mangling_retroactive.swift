@@ -21,3 +21,8 @@ struct Z2<T: P> {
 
 // CHECK: sil hidden @$S20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAg_AkL1QAAg0_GF
 func test1(_: Z2<X>.Inner<Y>) { }
+
+struct Z3<T: P, U: P> { }
+
+// CHECK: sil hidden @$S20mangling_retroactive5test2yyAA2Z3Vy12RetroactiveB1XVA2G0E1A1PAAg_AJg0_GF
+func test2(_: Z3<X, X>) { }

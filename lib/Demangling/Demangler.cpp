@@ -439,6 +439,7 @@ NodePointer Demangler::demangleOperator() {
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
     case 'I': return demangleImplFunctionType();
+    case 'H': return demangleProtocolConformance();
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
     case 'M': return demangleMetatype();
@@ -1063,7 +1064,7 @@ NodePointer Demangler::popProtocol() {
 
 NodePointer Demangler::demangleRetroactiveConformance() {
   NodePointer Index = demangleIndexAsNode();
-  NodePointer Conformance = popProtocolConformance();
+  NodePointer Conformance = popNode(Node::Kind::ProtocolConformance);
   if (!Index || !Conformance)
     return nullptr;
 
@@ -1272,7 +1273,7 @@ NodePointer Demangler::demangleMetatype() {
   switch (nextChar()) {
     case 'c':
       return createWithChild(Node::Kind::ProtocolConformanceDescriptor,
-                             popProtocolConformance());
+                             popNode(Node::Kind::ProtocolConformance));
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
     case 'P':
@@ -1297,7 +1298,7 @@ NodePointer Demangler::demangleMetatype() {
                              popNode(Node::Kind::Type));
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
-                             popProtocolConformance());
+                             popNode(Node::Kind::ProtocolConformance));
     case 'C': {
       NodePointer Ty = popNode(Node::Kind::Type);
       if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
@@ -1488,7 +1489,7 @@ NodePointer Demangler::demangleGenericParamIndex() {
   return getDependentGenericParamType(0, demangleIndex() + 1);
 }
 
-NodePointer Demangler::popProtocolConformance() {
+NodePointer Demangler::demangleProtocolConformance() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Module = popModule();
   NodePointer Proto = popProtocol();
@@ -1506,6 +1507,7 @@ NodePointer Demangler::popProtocolConformance() {
   NodePointer Conf = createWithChildren(Node::Kind::ProtocolConformance,
                                         Type, Proto, Module);
   addChild(Conf, Ident);
+  addSubstitution(Conf);
   return Conf;
 }
 
@@ -1531,7 +1533,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case 'W': {
       NodePointer Entity = popNode(isEntity);
-      NodePointer Conf = popProtocolConformance();
+      NodePointer Conf = popNode(Node::Kind::ProtocolConformance);
       return createWithChildren(Node::Kind::ProtocolWitness, Conf, Entity);
     }
     case 'R':
@@ -1895,32 +1897,32 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'P':
       return createWithChild(Node::Kind::ProtocolWitnessTable,
-                             popProtocolConformance());
+                             popNode(Node::Kind::ProtocolConformance));
     case 'G':
       return createWithChild(Node::Kind::GenericProtocolWitnessTable,
-                             popProtocolConformance());
+                             popNode(Node::Kind::ProtocolConformance));
     case 'I':
       return createWithChild(
                   Node::Kind::GenericProtocolWitnessTableInstantiationFunction,
-                  popProtocolConformance());
+                  popNode(Node::Kind::ProtocolConformance));
     case 'l': {
-      NodePointer Conf = popProtocolConformance();
+      NodePointer Conf = popNode(Node::Kind::ProtocolConformance);
       NodePointer Type = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::LazyProtocolWitnessTableAccessor,
                                 Type, Conf);
     }
     case 'L': {
-      NodePointer Conf = popProtocolConformance();
+      NodePointer Conf = popNode(Node::Kind::ProtocolConformance);
       NodePointer Type = popNode(Node::Kind::Type);
       return createWithChildren(
                Node::Kind::LazyProtocolWitnessTableCacheVariable, Type, Conf);
     }
     case 'a':
       return createWithChild(Node::Kind::ProtocolWitnessTableAccessor,
-                             popProtocolConformance());
+                             popNode(Node::Kind::ProtocolConformance));
     case 't': {
       NodePointer Name = popNode(isDeclName);
-      NodePointer Conf = popProtocolConformance();
+      NodePointer Conf = popNode(Node::Kind::ProtocolConformance);
       return createWithChildren(Node::Kind::AssociatedTypeMetadataAccessor,
                                 Conf, Name);
     }
@@ -1928,7 +1930,7 @@ NodePointer Demangler::demangleWitness() {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
       auto AssocTypePath = popAssocTypePath();
 
-      NodePointer Conf = popProtocolConformance();
+      NodePointer Conf = popNode(Node::Kind::ProtocolConformance);
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, AssocTypePath, ProtoTy);
     }

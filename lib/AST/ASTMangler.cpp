@@ -2125,7 +2125,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
     appendOperator("Z");
 }
 
-void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
+void ASTMangler::appendProtocolConformance(
+                                    const ProtocolConformance *conformance) {
+  if (tryMangleSubstitution(conformance))
+    return;
+
   GenericSignature *contextSig = nullptr;
   auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
@@ -2162,6 +2166,9 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig, contextSig);
   }
+
+  appendOperator("H");
+  addSubstitution(conformance);
 }
 
 void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {

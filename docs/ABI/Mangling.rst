@@ -491,7 +491,8 @@ Generics
 
 ::
 
-  protocol-conformance ::= type protocol module generic-signature?
+  protocol-conformance ::= type protocol module generic-signature? 'H'
+  protocol-conformance ::= substitution
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The
 named module is the one containing the extension or type declaration that

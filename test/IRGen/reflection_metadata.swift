@@ -41,7 +41,7 @@
 
 // CHECK-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift5_fieldmd
 // CHECK-DAG: @"$S19reflection_metadata7MyClassCMF" = internal constant {{.*}}swift5_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}}swift5_assocty
+// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAHMA" = internal constant {{.*}}swift5_assocty
 // CHECK-DAG: @"$S19reflection_metadata8MyStructVMF" = internal constant {{.*}}swift5_fieldmd
 // CHECK-DAG: @"$S19reflection_metadata6MyEnumOMF" = internal constant {{.*}}swift5_fieldmd
 // CHECK-DAG: @"$S19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}}swift5_fieldmd

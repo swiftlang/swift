@@ -2992,7 +2992,7 @@ id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 //===----------------------------------------------------------------------===//
 
 #define BRIDGING_CONFORMANCE_SYM \
-  MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+  MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesHWP)
 
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 
