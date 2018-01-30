@@ -83,7 +83,7 @@
 // PRINT-NEXT:  let Notification: String
 // PRINT-NEXT:  let swiftNamedNotification: String
 //
-// PRINT-LABEL: struct CFNewType : _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct CFNewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
@@ -97,7 +97,7 @@
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
 //
-// PRINT-LABEL: struct MyABINewType : _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct MyABINewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
