@@ -222,6 +222,10 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
     Stream << S;
 }
 
+void Output::null() {
+  Stream << "null";
+}
+
 void Output::indent() {
   Stream.indent(StateStack.size() * 2);
 }
