@@ -287,6 +287,14 @@ func sr964() {
       print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
     }
   }
+  struct MemberGetter {
+    var suspiciousSetter: String {
+      get { return "" }
+      set {
+        print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-31=newValue}}
+      }
+    }
+  }
   var namedSuspiciousSetter: String {
     get { return "" }
     set(parameter) {
