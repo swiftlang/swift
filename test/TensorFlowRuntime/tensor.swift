@@ -57,6 +57,17 @@ func testSimpleMath() {
 TensorTests.testCPUAndGPU("SimpleMath", testSimpleMath)
 
 @inline(never)
+func test3Adds() {
+  let a = Tensor([1]).toDevice()
+  let b = Tensor([2]).toDevice()
+  let c = Tensor([3]).toDevice()
+
+  let o = a + b + c
+  expectEqual(o.array.units[0], 6)
+}
+TensorTests.testCPUAndGPU("test3Adds", test3Adds)
+
+@inline(never)
 func testMultiOpMath() {
   let x = Tensor<Float>([1.2, 1.2]).toDevice()
   let y = Tensor<Float>([4.3, 4.3]).toDevice()
