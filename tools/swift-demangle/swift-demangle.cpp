@@ -49,6 +49,10 @@ RemangleMode("test-remangle",
            llvm::cl::desc("Remangle test mode (show the remangled string)"));
 
 static llvm::cl::opt<bool>
+RemangleRtMode("remangle-objc-rt",
+           llvm::cl::desc("Remangle to the ObjC runtime name mangling scheme"));
+
+static llvm::cl::opt<bool>
 RemangleNew("remangle-new",
            llvm::cl::desc("Remangle the symbol with new mangling scheme"));
 
@@ -121,6 +125,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     if (hadLeadingUnderscore) llvm::outs() << '_';
     llvm::outs() << remangled;
     return;
+  } else if (RemangleRtMode) {
+    std::string remangled = name;
+    if (pointer) {
+      remangled = swift::Demangle::mangleNodeOld(pointer);
+    }
+    llvm::outs() << remangled;
   }
   if (!TreeOnly) {
     if (RemangleNew) {
