@@ -4,12 +4,8 @@
 #if !defined(__FOO_H__)
 #define __FOO_H__ 1
 
-#import <Foundation.h>
 #import <FooSub/FooSub.h>
 #import <FooHelper/FooHelper.h>
-
-#define _CF_TYPED_ENUM __attribute__((swift_wrapper(enum)))
-#define NS_STRING_ENUM _CF_TYPED_ENUM
 
 // Types.
 
@@ -283,7 +279,5 @@ typedef CF_ENUM(long, ABAuthorizationStatus) {
     kABAuthorizationStatusNotDetermined = 0,    // deprecated, use CNAuthorizationStatusNotDetermined
     kABAuthorizationStatusRestricted,           // deprecated, use CNAuthorizationStatusRestricted
 } AB_DEPRECATED("use CNAuthorizationStatus");
-
-typedef NSString *MyNSStringEnum NS_STRING_ENUM;
 
 #endif /* ! __FOO_H__ */
