@@ -8585,3 +8585,53 @@ ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
       .getBaseIdentifier();
 }
 
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// clang::Decls, is defined here to avoid too much layering violation / circular
+// linkage dependency.
+
+struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
+      ND->printName(OS);
+    }
+  }
+
+  static inline void printClangShortLoc(raw_ostream &OS,
+                                        clang::SourceManager *CSM,
+                                        clang::SourceLocation L) {
+    if (!L.isValid() || !L.isFileID())
+      return;
+    auto PLoc = CSM->getPresumedLoc(L);
+    OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
+       << ':' << PLoc.getColumn();
+  }
+
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    if (CSM) {
+      const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+      auto Range = CD->getSourceRange();
+      printClangShortLoc(OS, CSM, Range.getBegin());
+      OS << '-';
+      printClangShortLoc(OS, CSM, Range.getEnd());
+    }
+  }
+};
+
+static ClangDeclTraceFormatter TF;
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef EventName,
+                                     const clang::Decl *D) {
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(EventName, D, &TF, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
+}
