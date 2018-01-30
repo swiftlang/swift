@@ -453,8 +453,12 @@ enum ScoreKind {
   SK_KeyPathSubscript,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
+  /// A conversion from 'inout Optional<T>' to 'inout
+  /// ImplicitlyUnwrappedOptional<T>' or vice-versa.
+  /// FIXME: This goes away when IUO-as-a-type goes away.
+  SK_InOutOptionalityConversion,
 
-  SK_LastScoreKind = SK_ValueToPointerConversion,
+  SK_LastScoreKind = SK_InOutOptionalityConversion,
 };
 
 /// The number of score kinds.
