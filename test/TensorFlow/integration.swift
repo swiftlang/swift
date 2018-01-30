@@ -188,7 +188,6 @@ public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitl
 // CHECK: cond_br [[BOOLVAL]],
 
 
-// expected-error@+1 {{TFLowerGraph cannot handle loops yet}}
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor1D<Float>, arg2: Tensor1D<Float>) {
   var a = arg1.toDevice()
@@ -230,8 +229,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK-NEXT: [sequence
 // CHECK-NEXT:   {condition Header: bb0
 // CHECK-NEXT:     [sequence
-// CHECK-NEXT:       block bb2
-// CHECK-NEXT:       <while Header: bb3   exit: bb4
+// CHECK-NEXT:       <while Preheader: bb2, Header: bb3, exit: bb4
 // CHECK-NEXT:         block bb5>
 // CHECK-NEXT:       block bb4]
 // CHECK-NEXT:     block bb1}

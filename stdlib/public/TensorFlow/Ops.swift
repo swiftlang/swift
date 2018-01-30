@@ -109,6 +109,11 @@ public extension Tensor where Unit : Numeric {
   }
 
   @_inlineable
+  static func +=(lhs: inout Tensor, rhs: Unit) {
+    lhs = lhs + Tensor(rhs)
+  }
+
+  @_inlineable
   // @differentiable(gradient: _adjointNegate(_:primal:seed:))
   static prefix func -(rhs: Tensor) -> Tensor {
     return Tensor(#tfop("Neg", "t:t", rhs.handle))
@@ -167,6 +172,31 @@ public extension Tensor where Unit : Numeric {
   @_inlineable
   static func /=(lhs: inout Tensor, rhs: Unit) {
     lhs = lhs / rhs
+  }
+
+   @_inlineable
+  static func %(lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Tensor(#tfop("Mod", "tt:t", lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  static func %(lhs: Tensor, rhs: Unit) -> Tensor {
+    return lhs % Tensor(rhs)
+  }
+
+  @_inlineable
+  static func %(lhs: Unit, rhs: Tensor) -> Tensor {
+    return Tensor(lhs) % rhs
+  }
+
+  @_inlineable
+  static func %=(lhs: inout Tensor, rhs: Tensor) {
+    lhs = lhs % rhs
+  }
+
+  @_inlineable
+  static func %=(lhs: inout Tensor, rhs: Unit) {
+    lhs = lhs % rhs
   }
 }
 
@@ -365,6 +395,21 @@ public extension Tensor where Unit : Equatable {
   @_inlineable
   static func == (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
     return Tensor(lhs) == rhs
+  }
+
+  @_inlineable
+  static func != (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor<Bool>(#tfop("NotEqual", "tt:t", lhs.handle, rhs.handle))
+  }
+
+  @_inlineable
+  static func != (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
+    return lhs != Tensor(rhs)
+  }
+
+  @_inlineable
+  static func != (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) != rhs
   }
 }
 

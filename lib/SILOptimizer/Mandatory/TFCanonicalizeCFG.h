@@ -123,8 +123,8 @@ namespace tf {
   };
 
   /// This represents a conditional SESE region.  Conditional regions start with
-  /// a basic block that contains a conditional brach, and may optionally have a
-  /// true or false region.  The end block (which is the merge) is not
+  /// a basic block that contains a conditional branch, and may optionally have
+  /// a true or false region.  The end block (which is the merge) is not
   /// considered part of this region.
   class ConditionalSESERegion : public SESERegionTree {
     SILBasicBlock *branchBB;

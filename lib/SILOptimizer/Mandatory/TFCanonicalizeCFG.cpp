@@ -63,9 +63,11 @@ void SequenceSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
 }
 
 void WhileLoopSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "<while Header: ";
+  OS.indent(indent) << "<while Preheader: ";
+  preheader->printAsOperand(OS);
+  OS << ", Header: ";
   header->printAsOperand(OS);
-  OS << "   exit: ";
+  OS << ", exit: ";
   exit->printAsOperand(OS);
   OS << "\n";
   body->print(OS, indent+2);
@@ -100,9 +102,9 @@ namespace {
     PostDominanceInfo PDI;
     SILLoopInfo LI;
 
-    /// processLoops fills in this mapping: it is keyed by the header block of
-    /// each loop, and points to the region produced for it.
-    llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopHeaders;
+    /// processLoops fills in this mapping: it is keyed by the preheader block
+    /// of each loop, and points to the region produced for it.
+    llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
   public:
     SESERegionBuilder(SILFunction *F) : DI(F), PDI(F), LI(F, &DI) {}
 
@@ -179,10 +181,10 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
   while (startBB != endBB) {
     // If this ends with a loop, it will already have been processed and
     // collapsed into a single node.  Just use it.
-    auto loopIt = loopHeaders.find(startBB);
-    if (loopIt != loopHeaders.end()) {
+    auto loopIt = loopPreheaders.find(startBB);
+    if (loopIt != loopPreheaders.end()) {
       auto whileNode = loopIt->second;
-      loopHeaders.erase(loopIt);
+      loopPreheaders.erase(loopIt);
 
       results.push_back(std::unique_ptr<SESERegionTree>(whileNode));
       startBB = whileNode->getExit();
@@ -232,7 +234,7 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
 }
 
 /// Process the specified loop, collapsing it into a SESE region node.  This
-/// forms a WhileLoopSESERegion node and puts it into the loopHeader data
+/// forms a WhileLoopSESERegion node and puts it into the loopPreheaders data
 /// structure, allowing the outer level's acyclic region handling to pick it up.
 void SESERegionBuilder::processLoop(SILLoop *loop) {
   // If there are any nested loops within this one, transform them inside out.
@@ -256,8 +258,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
   loop->getExitingBlocks(exitingBlocks);
 
   // Loop canonicalization also gives us the property that exits out of the loop
-  // have critical edges split, and that any exit block jumps to a block (outside
-  // the loop) that is *only* targeted by blocks inside the loop.
+  // have critical edges split, and that any exit block jumps to a block
+  // (outside the loop) that is *only* targeted by blocks inside the loop.
 
   // In many cases, we'll end up with the loop body in proper while form ready
   // for XLA: this is the case when there is exactly one loop exit, and it is
@@ -281,11 +283,11 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
 
     auto result = new WhileLoopSESERegion(preheader, header, exit,
                                           std::move(bodyRegion));
-    loopHeaders.insert({header, result});
+    loopPreheaders.insert({preheader, result});
     return;
   }
 
-  assert(0 && "SESE FIXME: Imperfect loop exits not handled yet!");
+  llvm_unreachable("SESE FIXME: Imperfect loop exits not handled yet!");
   // splitCriticalEdge
 
   // FIXME: Need to handle "break" edges that exit the loop, preventing the body
