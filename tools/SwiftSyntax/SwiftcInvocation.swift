@@ -73,17 +73,21 @@ func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
     
     let process = Process()
     
-    process.terminationHandler = { process in
-      stdoutPipe.fileHandleForReading.readabilityHandler = nil
-      stderrPipe.fileHandleForReading.readabilityHandler = nil
-    }
-    
     process.launchPath = executable.path
     process.arguments = arguments
     process.standardOutput = stdoutPipe
     process.standardError = stderrPipe
     process.launch()
     process.waitUntilExit()
+
+    // Read to EOF.
+    stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+    stderrData.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
+
+    // Clean up.
+    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+    stderrPipe.fileHandleForReading.readabilityHandler = nil
+
     return ProcessResult(exitCode: Int(process.terminationStatus),
                          stdoutData: stdoutData,
                          stderrData: stderrData)
