@@ -87,8 +87,6 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 10 };
-
   /// A single property.
   ///
   /// Note that the property polarities should be chosen so that 0 is
@@ -124,7 +122,10 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+
+    Last_Property = HasDependentMember
   };
+  enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
 private:
   unsigned Bits;
