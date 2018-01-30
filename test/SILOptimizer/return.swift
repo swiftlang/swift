@@ -97,7 +97,7 @@ func whileLoop(flag: Bool) -> Int {
 struct S {}
 extension S:ExpressibleByStringLiteral {
   init!(stringLiteral:String) {
-  } // expected-error {{missing return in a function expected to return 'S!'}}
+  } // no error
 }
 
 func whileTrueLoop() -> Int {
@@ -150,3 +150,12 @@ func testCleanupCodeEmptyTuple(fn: @autoclosure () -> Bool = false,
     exit()
   }
 } // no warning
+
+protocol InitProtocol {
+  init(_ x: Int)
+}
+
+struct StructWithIUOinit : InitProtocol {
+  init!(_ x: Int) {  } // no missing-return error
+}
+
