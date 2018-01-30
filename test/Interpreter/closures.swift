@@ -82,3 +82,12 @@ func f() -> Bool? { return nil }
   let c = { b = true }
   _ = (b, c)
 })()
+
+// Don't crash in optimized mode.
+func crash() {
+    let f: (Int, Int, Int, Int) -> Int = { _, _, _, _ in 21 }
+    let fs = [f, f]
+    // CHECK: fs: [(Function), (Function)]
+    print("fs: \(fs)")
+}
+crash()
