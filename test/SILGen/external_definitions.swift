@@ -19,7 +19,7 @@ hasNoPrototype()
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
 // CHECK:   destroy_value [[ANSIBLE]] : $Optional<Ansible>
 // -- Referencing unapplied C function goes through a thunk
-// CHECK:   [[NSANSE:%.*]] = function_ref @$SSo6NSAnseySQySo7AnsibleCGADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible>
+// CHECK:   [[NSANSE:%.*]] = function_ref @$SSo6NSAnseySo7AnsibleCSgADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible>
 // -- Referencing unprototyped C function passes no parameters
 // CHECK:   [[NOPROTO:%.*]] = function_ref @hasNoPrototype : $@convention(c) () -> ()
 // CHECK:   apply [[NOPROTO]]()
@@ -31,7 +31,7 @@ hasNoPrototype()
 // CHECK-LABEL: sil shared [serializable] @$SSo7AnsibleC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Optional<Any>, @thick Ansible.Type) -> @owned Optional<Ansible>
 
 // -- Native Swift thunk for NSAnse
-// CHECK: sil shared [serialized] [thunk] @$SSo6NSAnseySQySo7AnsibleCGADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible> {
+// CHECK: sil shared [serialized] [thunk] @$SSo6NSAnseySo7AnsibleCSgADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible> {
 // CHECK: bb0(%0 : @owned $Optional<Ansible>):
 // CHECK:   %1 = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
 // CHECK:   %2 = apply %1(%0) : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>

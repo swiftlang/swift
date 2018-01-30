@@ -4936,6 +4936,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
       base, decl, baseInterfaceTy);
 
+  // FIXME: IUO
   return !derivedInterfaceTy->matches(overrideInterfaceTy,
                                       TypeMatchFlags::AllowABICompatible);
 }

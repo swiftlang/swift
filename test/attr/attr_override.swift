@@ -314,13 +314,13 @@ protocol P2 {}
 
 class MismatchOptional : MismatchOptionalBase {
   override func param(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{29-29=?}}
-  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{32-32=?}}
+  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{32-32=?}}
   override func result() -> Int? { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
 
   override func fixSeveralTypes(a: Int, b: Int) -> Int! { return nil }
   // expected-error@-1 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{39-39=?}}
-  // expected-error@-2 {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{47-47=?}}
-  // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{55-56=}}
+  // expected-error@-2 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{47-47=?}}
+  // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{55-56=}}
 
   override func functionParam(x: @escaping (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{56-56=)?}}
   override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
@@ -372,7 +372,7 @@ class MismatchOptional : MismatchOptionalBase {
 }
 
 class MismatchOptional2 : MismatchOptionalBase {
-  override func result() -> Int! { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{32-33=}}
+  override func result() -> Int! { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
 
   // None of these are overrides because we didn't say 'override'. Since they're
   // not exact matches, they shouldn't result in errors.

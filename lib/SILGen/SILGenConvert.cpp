@@ -1153,8 +1153,7 @@ Optional<Conversion> Conversion::adjustForInitialForceValue() const {
 
   case BridgeToObjC: {
     auto sourceOptType =
-      ImplicitlyUnwrappedOptionalType::get(getBridgingSourceType())
-        ->getCanonicalType();
+      OptionalType::get(getBridgingSourceType())->getCanonicalType();
     return Conversion::getBridging(ForceAndBridgeToObjC,
                                    sourceOptType,
                                    getBridgingResultType(),
