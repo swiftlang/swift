@@ -98,6 +98,11 @@ DictionaryTestSuite.test("Hashable") {
     let dd6: Dictionary<Int, Dictionary<Int, String>> = [2: [:]]
     let dd7: Dictionary<Int, Dictionary<Int, String>> = [:]
     checkHashable([dd1, dd2, dd3, dd4, dd5, dd6, dd7], equalityOracle: { $0 == $1 })
+
+    // d5 is equal to d4, but will probably be iterated differently
+    let d5: Dictionary<Int, String> = [1: "meow", 4: "mooo", 2: "meow"]
+    expectEqual(d4, d5)
+    expectEqual(d4.hashValue, d5.hashValue)
 }
 
 DictionaryTestSuite.test("valueDestruction") {
