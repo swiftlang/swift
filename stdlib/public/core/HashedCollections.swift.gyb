@@ -2796,12 +2796,11 @@ extension Dictionary : Hashable where Value : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to Dictionary too
-    var result: Int = 0
+    var result: Int = _mixInt(0)
     for (k, v) in self {
-      result = _combineHashValues(result, k.hashValue)
-      result = _combineHashValues(result, v.hashValue)
+      let combined = _combineHashValues(k.hashValue, v.hashValue)
+      result ^= _mixInt(combined)
     }
-    result = _mixInt(result)
     return result
   }
 }
