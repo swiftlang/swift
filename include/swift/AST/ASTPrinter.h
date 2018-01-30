@@ -324,6 +324,11 @@ StringRef getCodePlaceholder();
 void printEnumElementsAsCases(
     llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
     llvm::raw_ostream &OS);
+
+void getInheritedForPrinting(const Decl *decl,
+                             llvm::function_ref<bool(const Decl*)> shouldPrint,
+                             llvm::SmallVectorImpl<TypeLoc> &Results);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H
