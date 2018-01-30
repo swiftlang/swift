@@ -23,6 +23,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
@@ -856,6 +858,7 @@ void ASTMangler::appendType(Type type) {
           appendAnyGenericType(NDecl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
+          appendRetroactiveConformances(type);
           appendOperator("G");
         }
         addSubstitution(type.getPointer());
@@ -1085,6 +1088,44 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
     for (Type arg : boundType->getGenericArgs()) {
       appendType(arg);
     }
+  }
+}
+
+void ASTMangler::appendRetroactiveConformances(Type type) {
+  auto nominal = type->getAnyNominal();
+  if (!nominal) return;
+
+  auto genericSig = nominal->getGenericSignatureOfContext();
+  if (!genericSig) return;
+
+  auto module = Mod ? Mod : nominal->getModuleContext();
+  auto subMap = type->getContextSubstitutionMap(module, nominal);
+  if (subMap.empty()) return;
+
+  unsigned numProtocolRequirements = 0;
+  for (const auto &req: genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    SWIFT_DEFER {
+      ++numProtocolRequirements;
+    };
+
+    // Fast path: we're in the module of the protocol.
+    auto proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    if (proto->getModuleContext() == module)
+      continue;
+
+    auto conformance =
+      subMap.lookupConformance(req.getFirstType()->getCanonicalType(), proto);
+    if (!conformance || !conformance->isConcrete()) continue;
+
+    auto normal = conformance->getConcrete()->getRootNormalConformance();
+    if (!normal->isRetroactive() || normal->isSynthesizedNonUnique())
+      continue;
+
+    appendProtocolConformance(normal);
+    appendOperator("g", Index(numProtocolRequirements));
   }
 }
 
