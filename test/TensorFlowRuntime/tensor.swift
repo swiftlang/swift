@@ -12,6 +12,9 @@ extension TestSuite {
       _RuntimeConfig.runsOnGPU = false
       body()
     }
+    testGPU(name, body)
+  }
+  func testGPU(_ name: String, _ body: @escaping () -> Void) {
 #if CUDA
     test(name + "_GPU") {
       _RuntimeConfig.runsOnGPU = true
@@ -92,6 +95,48 @@ func testXWPlusB() {
   // TODO: Check result
 }
 TensorTests.testCPUAndGPU("testXWPlusB", testXWPlusB)
+
+
+@inline(never)
+func simpleCounterLoop() {
+  let maxCount = 100
+  var a = Tensor<Int>(0)
+  let b = Tensor<Int>(1)
+
+  a -= b
+
+  var count = 0
+  while count < maxCount {
+    a += b
+    count += 1
+  }
+  a -= b
+  expectEqual(a.scalar, 8)
+}
+
+// FIXME: The While op doesn't work on the CPU.
+TensorTests.testGPU("simpleCounterLoop", simpleCounterLoop)
+
+
+
+#if false // FIXME: Exposing partitioning bugs.
+@inline(never)
+func testLoopsAndConditions() {
+  var a = Tensor<Int>(6)
+  var count = Tensor<Int>(0)
+  while (a != 1).scalar! {
+    if (a % 2 == 0).scalar! {
+      a = a / 2
+    } else {
+      a = 3 * a + 1
+    }
+    count += 1
+  }
+
+  expectEqual(count.scalar, 8)
+}
+TensorTests.testCPUAndGPU("testLoopsAndConditions", testLoopsAndConditions)
+#endif
 
 @inline(never)
 func testXORInference() {
