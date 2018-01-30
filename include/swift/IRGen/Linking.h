@@ -144,10 +144,6 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
 
-    /// The module descriptor for a module.
-    /// The pointer is a ModuleDecl*.
-    ModuleDescriptor,
-    
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
@@ -155,15 +151,6 @@ class LinkEntity {
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
-    /// The descriptor for an extension.
-    /// The pointer is an ExtensionDecl*.
-    ExtensionDescriptor,
-    
-    /// The descriptor for a runtime-anonymous context.
-    /// The pointer is the DeclContext* of a child of the context that should
-    /// be considered private.
-    AnonymousDescriptor,
-    
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -481,30 +468,6 @@ public:
     return entity;
   }
 
-  static LinkEntity forModuleDescriptor(ModuleDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::ModuleDescriptor, decl);
-    return entity;
-  }
-
-  static LinkEntity forExtensionDescriptor(ExtensionDecl *decl) {
-    LinkEntity entity;
-    entity.Pointer = const_cast<void*>(static_cast<const void*>(decl));
-    entity.SecondaryPointer = nullptr;
-    entity.Data =
-      LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtensionDescriptor));
-    return entity;
-  }
-
-  static LinkEntity forAnonymousDescriptor(DeclContext *dc) {
-    LinkEntity entity;
-    entity.Pointer = const_cast<void*>(static_cast<const void*>(dc));
-    entity.SecondaryPointer = nullptr;
-    entity.Data =
-      LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AnonymousDescriptor));
-    return entity;
-  }
-
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
@@ -661,16 +624,6 @@ public:
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
   
-  const ExtensionDecl *getExtension() const {
-    assert(getKind() == Kind::ExtensionDescriptor);
-    return reinterpret_cast<ExtensionDecl*>(Pointer);
-  }
-
-  const DeclContext *getDeclContext() const {
-    assert(getKind() == Kind::AnonymousDescriptor);
-    return reinterpret_cast<DeclContext*>(Pointer);
-  }
-
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);

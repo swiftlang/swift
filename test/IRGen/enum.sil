@@ -110,9 +110,9 @@ import Swift
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum16DynamicSingletonOwxs" to i8*)
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum16DynamicSingletonOwxg" to i8*)
 
-// CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [17 x i8] c"DynamicSingleton\00"
-// CHECK: @"$S4enum16DynamicSingletonOMn" = hidden constant <{
-// CHECK-SAME:   [17 x i8]* [[DYNAMICSINGLETON_NAME]]
+// CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [25 x i8] c"4enum16DynamicSingletonO\00"
+// CHECK: @"$S4enum16DynamicSingletonOMn" = hidden constant <{ {{.*}} i32 }> <{
+// CHECK-SAME:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       One payload
 // CHECK-SAME:   i32 1,
 // --       No empty cases
@@ -121,12 +121,16 @@ import Swift
 // CHECK-SAME:   [[DYNAMICSINGLETON_FIELD_NAMES]]
 // --       Case type accessor
 // CHECK-SAME:   @get_field_types_DynamicSingleton
-// --       generic argument offset
+// --       generic parameter vector offset
 // CHECK-SAME:   i32 2,
-// --       generic parameters, requirements, key, extra
-// CHECK-SAME:   i32 1, i32 0, i32 1, i32 0
-// --       generic param
-// CHECK-SAME:   i8 -128,
+// --       generic parameter vector length; witness table counts
+// CHECK-SAME:   i32 1, i32 1
+// --       nesting depth
+// CHECK-SAME:   i16 1
+// --       flags
+// CHECK-SAME:   i16 0
+// --       generic parameters at depth 0
+// CHECK-SAME:   i32 1
 // CHECK-SAME: }>
 
 // CHECK: @"$S4enum16DynamicSingletonOMP" = internal global <{ {{.*}}, %swift.type* }> <{

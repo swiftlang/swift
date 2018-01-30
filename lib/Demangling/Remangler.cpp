@@ -271,7 +271,7 @@ class Remangler {
   }
 
   void mangleAnyNominalType(Node *node);
-  void mangleAnyGenericType(Node *node, StringRef TypeOp);
+  void mangleAnyGenericType(Node *node, char TypeOp);
   void mangleGenericArgs(Node *node, char &Separator);
   void mangleAnyConstructor(Node *node, char kindOp);
   void mangleAbstractStorage(Node *node, StringRef accessorCode);
@@ -419,7 +419,7 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
   return {(int)Chain.size(), node};
 }
 
-void Remangler::mangleAnyGenericType(Node *node, StringRef TypeOp) {
+void Remangler::mangleAnyGenericType(Node *node, char TypeOp) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
   mangleChildNodes(node);
@@ -442,10 +442,9 @@ void Remangler::mangleAnyNominalType(Node *node) {
     return;
   }
   switch (node->getKind()) {
-    case Node::Kind::Structure: return mangleAnyGenericType(node, "V");
-    case Node::Kind::Enum: return mangleAnyGenericType(node, "O");
-    case Node::Kind::Class: return mangleAnyGenericType(node, "C");
-    case Node::Kind::OtherNominalType: return mangleAnyGenericType(node, "XY");
+    case Node::Kind::Structure: return mangleAnyGenericType(node, 'V');
+    case Node::Kind::Enum: return mangleAnyGenericType(node, 'O');
+    case Node::Kind::Class: return mangleAnyGenericType(node, 'C');
     default:
       unreachable("bad nominal type kind");
   }
@@ -558,10 +557,6 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 }
 
 void Remangler::mangleBoundGenericStructure(Node *node) {
-  mangleAnyNominalType(node);
-}
-
-void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
   mangleAnyNominalType(node);
 }
 
@@ -849,13 +844,6 @@ void Remangler::mangleExtension(Node *node) {
   if (node->getNumChildren() == 3)
     mangleChildNode(node, 2); // generic signature
   Buffer << 'E';
-}
-
-void Remangler::mangleAnonymousContext(Node *node) {
-  mangleChildNode(node, 1);
-  mangleChildNode(node, 0);
-  mangleTypeList(node->getChild(2));
-  Buffer << "XZ";
 }
 
 void Remangler::mangleFieldOffset(Node *node) {
@@ -1443,7 +1431,7 @@ void Remangler::manglePrivateDeclName(Node *node) {
 }
 
 void Remangler::mangleProtocol(Node *node) {
-  mangleAnyGenericType(node, "P");
+  mangleAnyGenericType(node, 'P');
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
@@ -1602,10 +1590,6 @@ void Remangler::mangleStatic(Node *node) {
   Buffer << 'Z';
 }
 
-void Remangler::mangleOtherNominalType(Node *node) {
-  mangleAnyNominalType(node);
-}
-
 void Remangler::mangleStructure(Node *node) {
   mangleAnyNominalType(node);
 }
@@ -1637,7 +1621,7 @@ void Remangler::mangleType(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node) {
-  mangleAnyGenericType(node, "a");
+  mangleAnyGenericType(node, 'a');
 }
 
 void Remangler::mangleTypeList(Node *node) {
@@ -1900,32 +1884,6 @@ void Remangler::mangleAssocTypePath(Node *node) {
     mangle(Child);
     mangleListSeparator(FirstElem);
   }
-}
-  
-void Remangler::mangleModuleDescriptor(Node *node) {
-  mangle(node->getChild(0));
-  Buffer << "MXM";
-}
-
-void Remangler::mangleExtensionDescriptor(Node *node) {
-  mangle(node->getChild(0));
-  Buffer << "MXE";
-}
-
-void Remangler::mangleAnonymousDescriptor(Node *node) {
-  mangle(node->getChild(0));
-  if (node->getNumChildren() == 1) {
-    Buffer << "MXX";
-  } else {
-    mangleIdentifier(node->getChild(1));
-    Buffer << "MXY";
-  }
-}
-  
-void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
-  mangleType(node->getChild(0));
-  mangleAssocTypePath(node->getChild(1));
-  Buffer << "MXA";
 }
 
 } // anonymous namespace

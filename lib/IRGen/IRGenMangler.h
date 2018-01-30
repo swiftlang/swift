@@ -60,28 +60,7 @@ public:
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
-  
-  std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
-    beginMangling();
-    appendContext(Decl);
-    appendOperator("MXM");
-    return finalize();
-  }
-  
-  std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
-    beginMangling();
-    appendContext(Decl);
-    appendOperator("MXE");
-    return finalize();
-  }
-  
-  std::string mangleAnonymousDescriptor(const DeclContext *DC) {
-    beginMangling();
-    appendContext(DC);
-    appendOperator("MXX");
-    return finalize();
-  }
-  
+
   std::string mangleBareProtocol(const ProtocolDecl *Decl) {
     beginMangling();
     appendProtocolName(Decl);
@@ -160,17 +139,6 @@ public:
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
     appendOperator("WT");
-    return finalize();
-  }
-
-  std::string mangleAssociatedTypeGenericParamRef(unsigned baseOrdinal,
-                                                  CanType member) {
-    beginMangling();
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendType(GenericTypeParamType::get(0, baseOrdinal,
-                                         member->getASTContext()));
-    appendAssociatedTypePath(member, isFirstAssociatedTypeIdentifier);
-    appendOperator("MXA");
     return finalize();
   }
 

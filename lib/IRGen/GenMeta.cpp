@@ -16,7 +16,6 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Decl.h"
@@ -30,14 +29,11 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
 
 #include "Address.h"
 #include "Callee.h"
@@ -2195,9 +2191,9 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
   return Flags(kind).withIsInstance(!fn->isStatic());
 }
 
-namespace {
+namespace {  
   template<class Impl>
-  class ContextDescriptorBuilderBase {
+  class NominalTypeDescriptorBuilderBase {
   protected:
     Impl &asImpl() { return *static_cast<Impl*>(this); }
     IRGenModule &IGM;
@@ -2205,493 +2201,150 @@ namespace {
     ConstantInitBuilder InitBuilder;
   protected:
     ConstantStructBuilder B;
-    Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
-      GenericParamCount,
-      GenericRequirementCount,
-      GenericKeyArgumentCount,
-      GenericExtraArgumentCount;
-    unsigned NumGenericKeyArguments = 0;
-    unsigned NumGenericExtraArguments = 0;
 
-    ContextDescriptorBuilderBase(IRGenModule &IGM)
+    NominalTypeDescriptorBuilderBase(IRGenModule &IGM)
       : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {
       B.setPacked(true);
     }
-  
-  public:
+
+  public:    
     void layout() {
-      asImpl().addFlags();
-      asImpl().addParent();
-    }
-    
-    void addFlags() {
-      B.addInt32(
-        ContextDescriptorFlags(asImpl().getContextKind(),
-                               asImpl().getGenericSignature() != nullptr,
-                               asImpl().isUniqueDescriptor(),
-                               asImpl().getVersion(),
-                               asImpl().getKindSpecificFlags())
-          .getIntValue());
-    }
-    
-    void addParent() {
-      ConstantReference parent = asImpl().getParent();
-      if (parent.getValue()) {
-        B.addRelativeAddress(parent);
-      } else {
-        B.addInt32(0); // null offset
-      }
-    }
-    
-    void addGenericSignature() {
-      if (!asImpl().getGenericSignature())
-        return;
-      
-      asImpl().addGenericParametersHeader();
-      asImpl().addGenericParameters();
-      asImpl().addGenericRequirements();
-      asImpl().finishGenericParameters();
-    }
-    
-    void addGenericParametersHeader() {
-      // Drop placeholders for the counts. We'll fill these in when we emit
-      // the related sections.
-      GenericParamCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericRequirementCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericKeyArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-      GenericExtraArgumentCount = B.addPlaceholderWithSize(IGM.Int32Ty);
-    }
-    
-    void addGenericParameters() {
-      GenericSignature *sig = asImpl().getGenericSignature();
-      assert(sig);
-      auto canSig = sig->getCanonicalSignature();
-      
-      for (auto param : canSig->getGenericParams()) {
-        // Currently, there are only type parameters. The parameter is a key
-        // argument if it hasn't been grounded by a same-type constraint.
-        asImpl().addGenericParameter(GenericParamKind::Type,
-                               /*key argument*/ !canSig->isConcreteType(param),
-                               /*extra argument*/ false);
-      }
-      
-      // Pad the structure up to four bytes for the following requirements.
-      unsigned padding = (unsigned) -canSig->getGenericParams().size() & 3;
-      for (unsigned i = 0; i < padding; ++i)
-        B.addInt(IGM.Int8Ty, 0);
-      
-      // Fill in the parameter count.
-      B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int32Ty,
-                               canSig->getGenericParams().size());
-    }
-    
-    void addGenericParameter(GenericParamKind kind,
-                             bool isKeyArgument, bool isExtraArgument) {
-      if (isKeyArgument)
-        ++NumGenericKeyArguments;
-      if (isExtraArgument)
-        ++NumGenericExtraArguments;
-      
-      B.addInt(IGM.Int8Ty,
-               GenericParamDescriptor(kind, isKeyArgument, isExtraArgument)
-                 .getIntValue());
-    }
-    
-    void addGenericRequirements() {
-      assert(asImpl().getGenericSignature());
-      GenericSignature *sig = asImpl().getGenericSignature();
-      assert(sig);
-      auto canSig = sig->getCanonicalSignature();
-      
-      unsigned numRequirements = 0;
-      for (auto &requirement : canSig->getRequirements()) {
-        ++numRequirements;
-        
-        switch (auto kind = requirement.getKind()) {
-        case RequirementKind::Layout:
-          switch (auto layoutKind =
-                    requirement.getLayoutConstraint()->getKind()) {
-          case LayoutConstraintKind::Class: {
-            // Encode the class constraint.
-            auto flags = GenericRequirementFlags(GenericRequirementKind::Layout,
-                                                 /*key argument*/ false,
-                                                 /*extra argument*/ false);
-            asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-             [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
-            break;
-          }
-          default:
-            // No other layout constraints are supported in source-level Swift
-            // today.
-            llvm_unreachable("shouldn't show up in ABI");
-          }
-          break;
-
-        case RequirementKind::Conformance: {
-          // ABI TODO: We also need a *key* argument that uniquely identifies
-          // the conformance for conformance requirements as well.
-          auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
-                                               /*TODO key argument*/ false,
-                                               /*extra argument*/ true);
-          auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
-            ->getDecl();
-          auto descriptorRef =
-            IGM.getConstantReferenceForProtocolDescriptor(protocol);
-          asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-            [&]{ B.addRelativeAddress(descriptorRef); });
-          break;
-        }
-          
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass: {
-          auto abiKind = kind == RequirementKind::SameType
-            ? GenericRequirementKind::SameType
-            : GenericRequirementKind::BaseClass;
-          
-          auto flags = GenericRequirementFlags(abiKind, false, false);
-          auto typeName =
-            getMangledTypeName(IGM,
-                               requirement.getSecondType()->getCanonicalType(),
-                               /*willBeRelativelyAddressed*/ true);
-          
-          asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-            [&]{ B.addRelativeAddress(typeName); });
-
-          // ABI TODO: Same type and superclass constraints also imply
-          // "same conformance" constraints on any protocol requirements of
-          // the constrained type, which we should emit.
-          break;
-        }
-        }
-      }
-      
-      // Fill in the final requirement count.
-      B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int32Ty,
-                               numRequirements);
-    }
-
-    void addGenericRequirement(GenericRequirementFlags flags,
-                               Type paramType,
-                               llvm::function_ref<void ()> addReference) {
-      if (flags.hasKeyArgument())
-        ++NumGenericKeyArguments;
-      if (flags.hasExtraArgument())
-        ++NumGenericExtraArguments;
-      
-      B.addInt(IGM.Int32Ty, flags.getIntValue());
-      asImpl().addGenericParamRef(paramType->getCanonicalType());
-      addReference();
-    }
-    
-    void addGenericParamRef(CanType type) {
-      // type should be either a generic parameter or dependent member type
-      // thereof.
-      
-      if (auto genericParam = dyn_cast<GenericTypeParamType>(type)) {
-        // We can encode the ordinal of a direct type parameter reference
-        // inline.
-        auto ordinal = asImpl().getGenericSignature()
-          ->getGenericParamOrdinal(genericParam);
-        B.addInt32(ordinal << 1);
-        return;
-      }
-      
-      if (auto dmt = dyn_cast<DependentMemberType>(type)) {
-        // We have to encode the associated type path out-of-line.
-        auto assocTypeRecord = IGM.getAddrOfAssociatedTypeGenericParamRef(
-          asImpl().getGenericSignature(),
-          dmt);
-
-        B.addTaggedRelativeOffset(IGM.Int32Ty, assocTypeRecord, 1);
-        return;
-      }
-      
-      llvm_unreachable("not a generic parameter");
-    }
-    
-    void finishGenericParameters() {
-      B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int32Ty,
-                               NumGenericKeyArguments);
-      B.fillPlaceholderWithInt(*GenericExtraArgumentCount, IGM.Int32Ty,
-                               NumGenericExtraArguments);
-    }
-
-    uint8_t getVersion() {
-      return 0;
-    }
-    
-    uint16_t getKindSpecificFlags() {
-      return 0;
-    }
-    
-    // Subclasses should provide:
-    //
-    // bool isUniqueDescriptor();
-    // llvm::Constant *getParent();
-    // ContextDescriptorKind getContextKind();
-    // GenericSignature *getGenericSignature();
-    // void emit();
-  };
-  
-  class ModuleContextDescriptorBuilder
-      : public ContextDescriptorBuilderBase<ModuleContextDescriptorBuilder> {
-    using super = ContextDescriptorBuilderBase;
-    
-    ModuleDecl *M;
-    
-  public:
-    ModuleContextDescriptorBuilder(IRGenModule &IGM, ModuleDecl *M)
-      : super(IGM), M(M)
-    {}
-  
-    void layout() {
-      super::layout();
-      addName();
-    }
-    
-    void addName() {
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getName().str(),
-                                           /*willBeRelativelyAddressed*/ true));
-    }
-    
-    bool isUniqueDescriptor() {
-      return false;
-    }
-  
-    ConstantReference getParent() {
-      return {nullptr, ConstantReference::Direct};
-    }
-    
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Module;
-    }
-    
-    GenericSignature *getGenericSignature() {
-      return nullptr;
-    }
-        
-    void emit() {
-      asImpl().layout();
-      
-      auto addr = IGM.getAddrOfModuleContextDescriptor(M,
-                                                     B.finishAndCreateFuture());
-      auto var = cast<llvm::GlobalVariable>(addr);
-      
-      var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
-    }
-  };
-
-  class ExtensionContextDescriptorBuilder
-    : public ContextDescriptorBuilderBase<ExtensionContextDescriptorBuilder> {
-    
-    using super = ContextDescriptorBuilderBase;
-    
-    ExtensionDecl *E;
-  
-  public:
-    ExtensionContextDescriptorBuilder(IRGenModule &IGM, ExtensionDecl *E)
-      : super(IGM), E(E)
-    {}
-    
-    void layout() {
-      super::layout();
-      addExtendedContext();
-      addGenericSignature();
-    }
-    
-    void addExtendedContext() {
-      auto string = getMangledTypeName(IGM,
-                                 E->getSelfInterfaceType()->getCanonicalType(),
-                                 /*relatively addressed*/ true);
-      B.addRelativeAddress(string);
-    }
-    
-    ConstantReference getParent() {
-      return {IGM.getAddrOfModuleContextDescriptor(E->getParentModule()),
-              ConstantReference::Direct};
-    }
-    
-    bool isUniqueDescriptor() {
-      // Extensions generated by the Clang importer will be emitted into any
-      // binary that uses the Clang module. Otherwise, we can guarantee that
-      // an extension (and any of its possible sub-contexts) belong to one
-      // translation unit.
-      return !isa<ClangModuleUnit>(E->getModuleScopeContext());
-    }
-    
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Extension;
-    }
-    
-    GenericSignature *getGenericSignature() {
-      return E->getGenericSignature();
-    }
-      
-    void emit() {
-      asImpl().layout();
-      
-      auto addr = IGM.getAddrOfExtensionContextDescriptor(E,
-                                                     B.finishAndCreateFuture());
-      auto var = cast<llvm::GlobalVariable>(addr);
-      
-      var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
-    }
-  };
-  
-  class AnonymousContextDescriptorBuilder
-    : public ContextDescriptorBuilderBase<AnonymousContextDescriptorBuilder> {
-    
-    using super = ContextDescriptorBuilderBase;
-    
-    DeclContext *DC;
-  
-  public:
-    AnonymousContextDescriptorBuilder(IRGenModule &IGM, DeclContext *DC)
-      : super(IGM), DC(DC)
-    {
-    }
-    
-    void layout() {
-      super::layout();
-    }
-  
-    ConstantReference getParent() {
-      return {IGM.getAddrOfModuleContextDescriptor(DC->getParentModule()),
-              ConstantReference::Direct};
-    }
-    
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Anonymous;
-    }
-    
-    GenericSignature *getGenericSignature() {
-      return nullptr;
-    }
-    
-    bool isUniqueDescriptor() {
-      return true;
-    }
-
-    void emit() {
-      asImpl().layout();
-      auto addr = IGM.getAddrOfAnonymousContextDescriptor(DC,
-                                                     B.finishAndCreateFuture());
-      auto var = cast<llvm::GlobalVariable>(addr);
-      
-      var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
-    }
-  };
-  
-  template<class Impl>
-  class TypeContextDescriptorBuilderBase
-    : public ContextDescriptorBuilderBase<Impl> {
-  
-    using super = ContextDescriptorBuilderBase<Impl>;
-  
-  protected:
-    NominalTypeDecl *Type;
-    using super::IGM;
-    using super::B;
-    using super::asImpl;
-
-  public:
-    using super::addGenericSignature;
-  
-    TypeContextDescriptorBuilderBase(IRGenModule &IGM, NominalTypeDecl *Type)
-      : super(IGM), Type(Type)
-    {}
-    
-    void layout() {
-      super::layout();
       asImpl().addName();
+      asImpl().addKindDependentFields();
+      asImpl().addKind();
       asImpl().addAccessFunction();
-      // ABI TODO: layout info should be superseded by remote mirror metadata
-      asImpl().addLayoutInfo();
-      asImpl().addGenericSignature();
+      asImpl().addGenericParams();
+    }
+
+    CanType getAbstractType() {
+      return asImpl().getTarget()->getDeclaredType()->getCanonicalType();
+    }
+
+    void addName() {
+      B.addRelativeAddress(getMangledTypeName(IGM, getAbstractType(),
+                                 /*willBeRelativelyAddressed*/ true));
     }
     
-    void addName() {
-      StringRef name;
-      
-      // Try to use the Clang name if there is one.
-      if (auto namedClangDecl =
-                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        name = namedClangDecl->getName();
-      } else {
-        name = Type->getName().str();
-      }
-      
-      auto nameStr = IGM.getAddrOfGlobalString(name,
-                                           /*willBeRelativelyAddressed*/ true);
-      B.addRelativeAddress(nameStr);
+    void addKind() {
+      auto kind = asImpl().getKind();
+      B.addInt32(kind);
     }
-      
+
     void addAccessFunction() {
+      NominalTypeDecl *typeDecl = asImpl().getTarget();
       llvm::Constant *accessFn =
-        getRequiredTypeMetadataAccessFunction(IGM, Type, NotForDefinition);
+        getRequiredTypeMetadataAccessFunction(IGM, typeDecl, NotForDefinition);
       B.addRelativeAddressOrNull(accessFn);
     }
     
-    ConstantReference getParent() {
-      return IGM.getAddrOfParentContextDescriptor(Type);
-    }
-    
-    GenericSignature *getGenericSignature() {
-      return Type->getGenericSignature();
-    }
-    
-    void addGenericParametersHeader() {
-      // Include the offset to the generic argument vector inside a metadata
-      // record for this type.
+    void addGenericParams() {
+      NominalTypeDecl *ntd = asImpl().getTarget();
+
+      // uint32_t GenericParameterVectorOffset;
       B.addInt32(asImpl().getGenericParamsOffset() / IGM.getPointerSize());
-      super::addGenericParametersHeader();
-    }
+
+      // The archetype order here needs to be consistent with
+      // MetadataVisitor::addGenericFields.
       
-    bool isUniqueDescriptor() {
-      return !isa<ClangModuleUnit>(Type->getModuleScopeContext());
+      GenericTypeRequirements requirements(IGM, ntd);
+      
+      // uint32_t NumGenericRequirements;
+      B.addInt32(requirements.getStorageSizeInWords());
+
+      // uint32_t NumPrimaryGenericParameters;
+      B.addInt32(requirements.getNumTypeRequirements());
+
+      // GenericParameterDescriptorFlags Flags;
+      GenericParameterDescriptorFlags flags;
+      if (auto *cd = dyn_cast<ClassDecl>(ntd)) {
+        if (!cd->isForeign()) {
+          auto &layout = IGM.getClassMetadataLayout(cd);
+          if (layout.getVTableSize() > 0)
+            flags = flags.withHasVTable(true);
+          if (layout.hasResilientSuperclass())
+            flags = flags.withHasResilientSuperclass(true);
+        }
+      }
+
+      // Whether the nominal type descriptor is known to be unique.
+      flags = flags.withIsUnique(asImpl().isUniqueDescriptor());
+
+      // Calculate the number of generic parameters at each nesting depth.
+      unsigned totalGenericParams = 0;
+      SmallVector<unsigned, 2> numPrimaryParams;
+      for (auto *outer = ntd; outer != nullptr;
+           outer = outer->getDeclContext()
+               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        unsigned genericParamsAtDepth = 0;
+        if (auto *genericParams = outer->getGenericParams()) {
+          for (auto *paramDecl : *genericParams) {
+            auto contextTy = ntd->mapTypeIntoContext(
+                paramDecl->getDeclaredInterfaceType());
+            // Skip parameters which have been made concrete, because they do
+            // not appear in type metadata.
+            //
+            // FIXME: We should emit information about same-type constraints
+            // as well as conformance constraints, so that clients can
+            // reconstruct the full generic signature of the type, including
+            // fully-concrete parameters.
+            if (contextTy->is<ArchetypeType>()) {
+              totalGenericParams++;
+              genericParamsAtDepth++;
+            }
+          }
+        }
+        numPrimaryParams.push_back(genericParamsAtDepth);
+      }
+
+      // This assertion will fail once we have generic types nested
+      // inside generic functions or other local generic contexts.
+      assert(totalGenericParams == requirements.getNumTypeRequirements());
+
+      // Emit the nesting depth.
+      B.addInt16(numPrimaryParams.size());
+
+      // Emit the flags.
+      B.addInt16(flags.getIntValue());
+
+      // Emit the number of generic parameters at each nesting depth.
+      std::reverse(numPrimaryParams.begin(), numPrimaryParams.end());
+      for (auto count : numPrimaryParams)
+        B.addInt32(count);
+
+      // TODO: provide reflective descriptions of the type and
+      // conformance requirements stored here.
     }
-    
+
     llvm::Constant *emit() {
       asImpl().layout();
-      auto addr = IGM.getAddrOfTypeContextDescriptor(Type,
+
+      auto addr = IGM.getAddrOfNominalTypeDescriptor(asImpl().getTarget(),
                                                      B.finishAndCreateFuture());
       auto var = cast<llvm::GlobalVariable>(addr);
-      
+
       var->setConstant(true);
       IGM.setTrueConstGlobal(var);
+
       return var;
     }
-    
-    /// Flags to indicate Clang-imported declarations so we mangle them
-    /// consistently at runtime.
-    uint16_t getClangImportedFlags() const {
-      auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type);
-      if (!clangDecl)
-        return 0;
-      
-      if (isa<clang::TagDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTag;
-      
-      if (isa<clang::TypedefNameDecl>(clangDecl)
-          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl))
-        return (uint16_t)TypeContextDescriptorFlags::IsCTypedef;
-      
-      return 0;
+
+    // Imported declarations have nonunique nominal type descriptors.
+    bool isUniqueDescriptor() {
+      return !isa<ClangModuleUnit>(
+                                asImpl().getTarget()->getModuleScopeContext());
     }
 
-    // Subclasses should provide:
-    // Size getGenericParamsOffset();
-    // ContextDescriptorKind getContextKind();
-    // void addLayoutInfo(); // ABI TODO: should be superseded
+    // Derived class must provide:
+    //   NominalTypeDecl *getTarget();
+    //   unsigned getKind();
+    //   unsigned getGenericParamsOffset();
+    //   void addKindDependentFields();
+    //
+    // Derived class can override:
+    //   bool isUniqueDescriptor();
   };
-
+  
   /// Build a doubly-null-terminated list of field names.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
   template<typename ValueDeclRange>
   unsigned getFieldNameString(const ValueDeclRange &fields,
                               llvm::SmallVectorImpl<char> &out) {
@@ -2712,9 +2365,6 @@ namespace {
   /// Build the field type vector accessor for a nominal type. This is a
   /// function that lazily instantiates the type metadata for all of the
   /// types of the stored properties of an instance of a nominal type.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
@@ -2741,9 +2391,6 @@ namespace {
   }
   
   /// Build a field type accessor for stored properties.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
@@ -2760,9 +2407,6 @@ namespace {
   }
   
   /// Build a case type accessor for enum payloads.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
@@ -2792,40 +2436,42 @@ namespace {
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
-
-
-  class StructContextDescriptorBuilder
-    : public TypeContextDescriptorBuilderBase<StructContextDescriptorBuilder>
-  {
-    using super = TypeContextDescriptorBuilderBase;
   
-    StructDecl *getType() {
-      return cast<StructDecl>(Type);
-    }
-
+  class StructNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>
+  {
+    using super
+      = NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>;
+    
+    // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
-
+    
+    StructDecl *Target;
+    
   public:
-    StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type)
-      : super(IGM, Type)
+    StructNominalTypeDescriptorBuilder(IRGenModule &IGM,
+                                       StructDecl *s)
+      : super(IGM), Target(s)
     {
-      auto &layout = IGM.getMetadataLayout(getType());
-      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+      auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
+      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
     }
-
+    
+    StructDecl *getTarget() { return Target; }
+    
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Struct);
+    }
+    
     Size getGenericParamsOffset() {
       return GenericParamsOffset;
     }
-
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Struct;
-    }
     
-    void addLayoutInfo() {
+    void addKindDependentFields() {
       // Build the field name list.
       llvm::SmallString<64> fieldNames;
-      unsigned numFields = getFieldNameString(getType()->getStoredProperties(),
+      unsigned numFields = getFieldNameString(Target->getStoredProperties(),
                                               fieldNames);
       
       B.addInt32(numFields);
@@ -2835,90 +2481,20 @@ namespace {
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 getType()->getStoredProperties());
+        = getFieldTypeAccessorFn(IGM, Target,
+                                   Target->getStoredProperties());
       
       B.addRelativeAddress(fieldTypeVectorAccessor);
     }
-    
-    uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
-    }
   };
   
-  class EnumContextDescriptorBuilder
-    : public TypeContextDescriptorBuilderBase<EnumContextDescriptorBuilder>
+  class ClassNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<ClassNominalTypeDescriptorBuilder>,
+      public SILVTableVisitor<ClassNominalTypeDescriptorBuilder>
   {
-    using super = TypeContextDescriptorBuilderBase;
-  
-    EnumDecl *getType() {
-      return cast<EnumDecl>(Type);
-    }
+    using super
+      = NominalTypeDescriptorBuilderBase<ClassNominalTypeDescriptorBuilder>;
     
-    Size GenericParamsOffset;
-    Size PayloadSizeOffset;
-    
-  public:
-    EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type)
-      : super(IGM, Type)
-    {
-      auto &layout = IGM.getMetadataLayout(getType());
-      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
-      if (layout.hasPayloadSizeOffset())
-        PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
-    }
-    
-    Size getGenericParamsOffset() {
-      return GenericParamsOffset;
-    }
-
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Enum;
-    }
-    
-    void addLayoutInfo() {
-      auto &strategy = getEnumImplStrategy(IGM,
-                     getType()->getDeclaredTypeInContext()->getCanonicalType());
-      
-      
-      // # payload cases in the low 24 bits, payload size offset in the high 8.
-      unsigned numPayloads = strategy.getElementsWithPayload().size();
-      assert(numPayloads < (1<<24) && "too many payload elements for runtime");
-      assert(PayloadSizeOffset % IGM.getPointerAlignment() == Size(0)
-             && "payload size not word-aligned");
-      unsigned PayloadSizeOffsetInWords
-        = PayloadSizeOffset / IGM.getPointerSize();
-      assert(PayloadSizeOffsetInWords < 0x100 &&
-             "payload size offset too far from address point for runtime");
-      B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
-      // # empty cases
-      B.addInt32(strategy.getElementsWithNoPayload().size());
-
-      B.addRelativeAddressOrNull(strategy.emitCaseNames());
-
-      // Build the case type accessor.
-      llvm::Function *caseTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 strategy.getElementsWithPayload());
-      
-      B.addRelativeAddress(caseTypeVectorAccessor);
-    }
-    
-    uint16_t getKindSpecificFlags() {
-      return getClangImportedFlags();
-    }
-  };
-  
-  class ClassContextDescriptorBuilder
-    : public TypeContextDescriptorBuilderBase<ClassContextDescriptorBuilder>,
-      public SILVTableVisitor<ClassContextDescriptorBuilder>
-  {
-    using super = TypeContextDescriptorBuilderBase;
-  
-    ClassDecl *getType() {
-      return cast<ClassDecl>(Type);
-    }
-
     // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
 
@@ -2927,19 +2503,22 @@ namespace {
     Size VTableOffset;
     unsigned VTableSize;
 
+    ClassDecl *Target;
+    
   public:
-    ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type)
-      : super(IGM, Type)
+    ClassNominalTypeDescriptorBuilder(IRGenModule &IGM,
+                                       ClassDecl *c)
+      : super(IGM), Target(c)
     {
-      if (getType()->isForeign()) {
+      if (Target->isForeign()) {
         VTable = nullptr;
         VTableSize = 0;
         return;
       }
 
-      auto &layout = IGM.getClassMetadataLayout(getType());
+      auto &layout = IGM.getClassMetadataLayout(Target);
 
-      VTable = IGM.getSILModule().lookUpVTable(getType());
+      VTable = IGM.getSILModule().lookUpVTable(Target);
       VTableSize = layout.getVTableSize();
 
       if (layout.hasResilientSuperclass()) {
@@ -2953,45 +2532,45 @@ namespace {
       }
     }
     
-    void layout() {
-      super::layout();
-      addVTable();
-    }
-
-    ContextDescriptorKind getContextKind() {
-      return ContextDescriptorKind::Class;
-    }
+    ClassDecl *getTarget() { return Target; }
     
-    uint16_t getKindSpecificFlags() {
-      uint16_t flags = 0;
-      if (!getType()->isForeign()) {
-        if (VTableSize != 0)
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasVTable;
-
-        auto &layout = IGM.getClassMetadataLayout(getType());
-        if (layout.hasResilientSuperclass())
-          flags |= (uint16_t)TypeContextDescriptorFlags::HasResilientSuperclass;
-      }
-      
-      flags |= getClangImportedFlags();
-      
-      return flags;
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Class);
     }
     
     Size getGenericParamsOffset() {
       return GenericParamsOffset;
     }
     
-    void addVTable() {
-      if (VTableSize == 0)
-        return;
+    void addKindDependentFields() {
+      // Build the field name list.
+      llvm::SmallString<64> fieldNames;
+      unsigned numFields = getFieldNameString(Target->getStoredProperties(),
+                                              fieldNames);
       
+      B.addInt32(numFields);
+      B.addInt32(FieldVectorOffset / IGM.getPointerSize());
+      B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
+                                           /*willBeRelativelyAddressed*/ true));
+      
+      // Build the field type accessor function.
+      llvm::Function *fieldTypeVectorAccessor
+        = getFieldTypeAccessorFn(IGM, Target,
+                                 Target->getStoredProperties());
+      
+      B.addRelativeAddress(fieldTypeVectorAccessor);
+    }
+
+    void addVTableDescriptor() {
+      assert(VTableSize != 0);
       B.addInt32(VTableOffset / IGM.getPointerSize());
       B.addInt32(VTableSize);
-      
-      addVTableEntries(getType());
+
+      addVTableEntries(Target);
+
+      // TODO: Emit reflection metadata for virtual methods
     }
-    
+
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
@@ -3010,7 +2589,7 @@ namespace {
       auto *dc = fn.getDecl()->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
-      if (fn.getDecl()->getDeclContext() == getType()) {
+      if (fn.getDecl()->getDeclContext() == Target) {
         if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
           assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
           auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
@@ -3033,101 +2612,76 @@ namespace {
     void addPlaceholder(MissingMemberDecl *MMD) {
       llvm_unreachable("cannot generate metadata with placeholders in it");
     }
-    
-    void addLayoutInfo() {
-      // Build the field name list.
-      llvm::SmallString<64> fieldNames;
-      unsigned numFields = getFieldNameString(getType()->getStoredProperties(),
-                                              fieldNames);
-      
-      B.addInt32(numFields);
-      B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
-      
-      // Build the field type accessor function.
-      llvm::Function *fieldTypeVectorAccessor
-        = getFieldTypeAccessorFn(IGM, getType(),
-                                 getType()->getStoredProperties());
-      
-      B.addRelativeAddress(fieldTypeVectorAccessor);
+
+    void layout() {
+      super::layout();
+      if (VTableSize != 0)
+        addVTableDescriptor();
     }
   };
-} // end anonymous namespace
-
-llvm::Constant *
-IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
-                                              ConstantInit definition,
-                                              llvm::function_ref<void()> emit) {
-  if (!definition) {
-    // Generate the definition if it hasn't been generated yet.
-    auto existing = GlobalVars.find(entity);
-    if (existing == GlobalVars.end() ||
-        !existing->second
-        || cast<llvm::GlobalValue>(existing->second)->isDeclaration()) {
-      
-      // In some cases we have multiple declarations in the AST that end up
-      // with the same context mangling (a clang module and its overlay,
-      // equivalent extensions, etc.). These can share a context descriptor
-      // at runtime.
-      auto mangledName = entity.mangleAsString();
-      if (auto otherDefinition = Module.getGlobalVariable(mangledName)) {
-        GlobalVars.insert({entity, otherDefinition});
-        return otherDefinition;
-      }
-      
-      // Otherwise, emit the descriptor.
-      emit();
-    }
-  }
   
-  return getAddrOfLLVMVariable(entity, Alignment(4),
-                               definition,
-                               NominalTypeDescriptorTy,
-                               DebugTypeInfo());
-}
+  class EnumNominalTypeDescriptorBuilder
+    : public NominalTypeDescriptorBuilderBase<EnumNominalTypeDescriptorBuilder>
+  {
+    using super
+      = NominalTypeDescriptorBuilderBase<EnumNominalTypeDescriptorBuilder>;
+    
+    // Offsets of key fields in the metadata records.
+    Size GenericParamsOffset;
+    Size PayloadSizeOffset;
+    
+    EnumDecl *Target;
+    
+  public:
+    EnumNominalTypeDescriptorBuilder(IRGenModule &IGM, EnumDecl *c)
+      : super(IGM), Target(c)
+    {
+      auto &layout = IGM.getMetadataLayout(Target);
+      GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+      if (layout.hasPayloadSizeOffset())
+        PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
+    }
+    
+    EnumDecl *getTarget() { return Target; }
+    
+    unsigned getKind() {
+      return unsigned(NominalTypeKind::Enum);
+    }
+    
+    Size getGenericParamsOffset() {
+      return GenericParamsOffset;
+    }
+    
+    void addKindDependentFields() {
+      auto &strategy = getEnumImplStrategy(IGM,
+                        Target->getDeclaredTypeInContext()->getCanonicalType());
+      
+      
+      // # payload cases in the low 24 bits, payload size offset in the high 8.
+      unsigned numPayloads = strategy.getElementsWithPayload().size();
+      assert(numPayloads < (1<<24) && "too many payload elements for runtime");
+      assert(PayloadSizeOffset % IGM.getPointerAlignment() == Size(0)
+             && "payload size not word-aligned");
+      unsigned PayloadSizeOffsetInWords
+        = PayloadSizeOffset / IGM.getPointerSize();
+      assert(PayloadSizeOffsetInWords < 0x100 &&
+             "payload size offset too far from address point for runtime");
+      B.addInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
+      // # empty cases
+      B.addInt32(strategy.getElementsWithNoPayload().size());
 
-llvm::Constant *
-IRGenModule::getAddrOfModuleContextDescriptor(ModuleDecl *D,
-                                              ConstantInit definition) {
-  auto entity = LinkEntity::forModuleDescriptor(D);
-  return getAddrOfSharedContextDescriptor(entity, definition,
-    [&]{ ModuleContextDescriptorBuilder(*this, D).emit(); });
-}
+      B.addRelativeAddressOrNull(strategy.emitCaseNames());
 
-llvm::Constant *
-IRGenModule::getAddrOfObjCModuleContextDescriptor() {
-  if (!ObjCModule)
-    ObjCModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_OBJC),
-      Context);
-  return getAddrOfModuleContextDescriptor(ObjCModule);
-}
+      // Build the case type accessor.
+      llvm::Function *caseTypeVectorAccessor
+        = getFieldTypeAccessorFn(IGM, Target,
+                                 strategy.getElementsWithPayload());
+      
+      B.addRelativeAddress(caseTypeVectorAccessor);
+    }
+  };
 
-llvm::Constant *
-IRGenModule::getAddrOfClangImporterModuleContextDescriptor() {
-  if (!ClangImporterModule)
-    ClangImporterModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER),
-      Context);
-  return getAddrOfModuleContextDescriptor(ClangImporterModule);
-}
-
-llvm::Constant *
-IRGenModule::getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
-                                                 ConstantInit definition) {
-  auto entity = LinkEntity::forExtensionDescriptor(ED);
-  return getAddrOfSharedContextDescriptor(entity, definition,
-    [&]{ ExtensionContextDescriptorBuilder(*this, ED).emit(); });
-}
-
-llvm::Constant *
-IRGenModule::getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                                 ConstantInit definition) {
-  auto entity = LinkEntity::forAnonymousDescriptor(DC);
-  return getAddrOfSharedContextDescriptor(entity, definition,
-    [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
-}
+} // end anonymous namespace
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
@@ -3813,7 +3367,7 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = ClassContextDescriptorBuilder(IGM, Target).emit();
+      auto descriptor = ClassNominalTypeDescriptorBuilder(IGM, Target).emit();
       B.add(descriptor);
     }
 
@@ -5089,7 +4643,7 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto *descriptor = StructContextDescriptorBuilder(IGM, Target).emit();
+      auto *descriptor = StructNominalTypeDescriptorBuilder(IGM, Target).emit();
       B.add(descriptor);
     }
 
@@ -5262,7 +4816,7 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      auto descriptor = EnumContextDescriptorBuilder(IGM, Target).emit();
+      auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
       B.add(descriptor);
     }
 
@@ -5579,9 +5133,17 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
+      // FIXME: Go through getAddrOfNominalTypeDescriptor once it's no
+      // longer required to define the nominal type descriptor.
+
+      auto entity = LinkEntity::forNominalTypeDescriptor(Target);
       auto descriptor =
-        ClassContextDescriptorBuilder(this->IGM, Target).emit();
-      B.add(descriptor);
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                                             entity,
+                                             IGM.getPointerAlignment(),
+                                             IGM.ClassNominalTypeDescriptorTy);
+      assert(!descriptor.isIndirect() && "Should be defined here");
+      B.add(descriptor.getDirectValue());
     }
 
     void noteStartOfSuperClass() { }
@@ -5724,6 +5286,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     builder.layout();
     addressPoint = builder.getOffsetOfAddressPoint();
 
+    ClassNominalTypeDescriptorBuilder(*this, classDecl).emit();
+
     createCandidateVariable();
     builder.createMetadataAccessFunction();
   } else if (auto structType = dyn_cast<StructType>(type)) {
@@ -5752,14 +5316,6 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
 
   // Keep type metadata around for all types.
   addRuntimeResolvableType(type);
-  
-  // If the enclosing type is also an imported type, force its metadata too.
-  if (auto enclosing = type->getNominalParent()) {
-    auto canonicalEnclosing = enclosing->getCanonicalType();
-    if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      getAddrOfForeignTypeMetadataCandidate(canonicalEnclosing);
-    }
-  }
 
   return result;
 }

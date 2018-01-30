@@ -266,7 +266,6 @@ private:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
-    case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -286,7 +285,6 @@ private:
     case Node::Kind::SILBoxType:
     case Node::Kind::SILBoxTypeWithLayout:
     case Node::Kind::Structure:
-    case Node::Kind::OtherNominalType:
     case Node::Kind::TupleElementName:
     case Node::Kind::Type:
     case Node::Kind::TypeAlias:
@@ -447,11 +445,6 @@ private:
     case Node::Kind::OutlinedDestroy:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::AssocTypePath:
-    case Node::Kind::ModuleDescriptor:
-    case Node::Kind::AnonymousDescriptor:
-    case Node::Kind::AssociatedTypeGenericParamRef:
-    case Node::Kind::ExtensionDescriptor:
-    case Node::Kind::AnonymousContext:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -920,17 +913,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";
     return nullptr;
-  case Node::Kind::AnonymousContext:
-    if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
-      print(Node->getChild(1));
-      Printer << ".(unknown context at " << Node->getChild(0)->getText() << ")";
-      if (Node->getChild(2)->getNumChildren() > 0) {
-        Printer << '<';
-        print(Node->getChild(2));
-        Printer << '>';
-      }
-    }
-    return nullptr;
   case Node::Kind::Extension:
     assert((Node->getNumChildren() == 2 || Node->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
@@ -1002,7 +984,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Enum:
   case Node::Kind::Protocol:
   case Node::Kind::TypeAlias:
-  case Node::Kind::OtherNominalType:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true);
   case Node::Kind::LocalDeclName:
@@ -1461,7 +1442,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericClass:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
-  case Node::Kind::BoundGenericOtherNominalType:
     printBoundGeneric(Node);
     return nullptr;
   case Node::Kind::DynamicSelf:
@@ -1893,22 +1873,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AssocTypePath:
     printChildren(Node->begin(), Node->end(), ".");
       return nullptr;
-  case Node::Kind::ModuleDescriptor:
-    Printer << "module descriptor ";
-    print(Node->getChild(0));
-    return nullptr;
-  case Node::Kind::AnonymousDescriptor:
-    Printer << "anonymous descriptor ";
-    print(Node->getChild(0));
-    return nullptr;
-  case Node::Kind::ExtensionDescriptor:
-    Printer << "extension descriptor ";
-    print(Node->getChild(0));
-    return nullptr;
-  case Node::Kind::AssociatedTypeGenericParamRef:
-    Printer << "generic parameter reference for associated type ";
-    printChildren(Node);
-    return nullptr;
   }
   printer_unreachable("bad node kind!");
 }

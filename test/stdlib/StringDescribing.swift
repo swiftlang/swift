@@ -15,11 +15,7 @@ StringDescribingTestSuite.test("String(describing:) shouldn't include extra stuf
 
 StringDescribingTestSuite.test("String(reflecting:) should include extra stuff if the class is private") {
   expectEqual(String(reflecting: Bar.self), "main.Bar")
-
-  let privateName = String(reflecting: Foo.self)
-
-  expectEqual(privateName.prefix(6), "main.(")
-  expectEqual(privateName.suffix(5), ").Foo")
+  expectEqual(String(reflecting: Foo.self), "main.(Foo in _AE29BC3E71CF180B9604AA0071CCE6E8)")
 }
 
 runAllTests()
