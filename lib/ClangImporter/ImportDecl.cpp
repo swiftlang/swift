@@ -5201,7 +5201,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 
   for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
     if (auto *otherProto = ctx.getProtocol(attr->getProtocolKind()))
-      if (otherProto == proto)
+      if (otherProto == proto || otherProto->inheritsFrom(proto))
         return true;
 
   // Only consider extensions from the original module...or from an overlay
