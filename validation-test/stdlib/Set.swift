@@ -2152,6 +2152,28 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   }
 }
 
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
+  // NSString's isEqual(_:) implementation is stricter than Swift's String, so
+  // Set values bridged over from Objective-C may have duplicate keys.
+  // rdar://problem/35995647
+  let cafe1 = "Cafe\u{301}" as NSString
+  let cafe2 = "Café" as NSString
+
+  let nsset = NSMutableSet()
+  nsset.add(cafe1)
+  expectTrue(nsset.contains(cafe1))
+  expectFalse(nsset.contains(cafe2))
+  nsset.add(cafe2)
+  expectEqual(2, nsset.count)
+  expectTrue(nsset.contains(cafe1))
+  expectTrue(nsset.contains(cafe2))
+  
+  let s: Set<String> = convertNSSetToSet(nsset)
+  expectEqual(1, s.count)
+  expectTrue(s.contains("Cafe\u{301}"))
+  expectTrue(s.contains("Café"))
+  expectTrue(Array(s) == ["Café"])
+}
 
 //===---
 // Dictionary -> NSDictionary bridging tests.

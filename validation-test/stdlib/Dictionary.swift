@@ -3152,6 +3152,26 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   }
 }
 
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
+  // NSString's isEqual(_:) implementation is stricter than Swift's String, so
+  // Dictionary values bridged over from Objective-C may have duplicate keys.
+  // rdar://problem/35995647
+  let cafe1 = "Cafe\u{301}" as NSString
+  let cafe2 = "Café" as NSString
+
+  let nsd = NSMutableDictionary()
+  nsd.setObject(42, forKey: cafe1)
+  nsd.setObject(23, forKey: cafe2)
+  expectEqual(2, nsd.count)
+  expectTrue((42 as NSNumber).isEqual(nsd.object(forKey: cafe1)))
+  expectTrue((23 as NSNumber).isEqual(nsd.object(forKey: cafe2)))
+
+  let d = convertNSDictionaryToDictionary(nsd) as [String: Int]
+  expectEqual(1, d.count)
+  expectEqual(d["Cafe\u{301}"], d["Café"])
+  let v = d["Café"]
+  expectTrue(v == 42 || v == 23)
+}
 
 //===---
 // Dictionary -> NSDictionary bridging tests.
