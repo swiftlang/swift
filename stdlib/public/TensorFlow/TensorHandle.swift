@@ -44,20 +44,6 @@ public final class TensorHandle<Unit : AccelerableTensorUnit> {
 }
 
 internal extension TensorHandle {
-  /// An empty tensor of shape [0] with no elements. This is some total
-  /// madness to be passed to #tfop as 'None'.
-  @_versioned
-  static var empty: TensorHandle {
-    @inline(never)
-    get {
-      let tensor = TF_AllocateTensor(Unit.cDataType, nil, 0, 0)
-      let status = TF_NewStatus()
-      let cHandle = TFE_NewTensorHandle(tensor, status)
-      checkOk(status)
-      return self.init(cTensorHandle: cHandle!)
-    }
-  }
-
   /// Create a shaped array with contents of the underlying tensor. If the
   /// tensor is on the accelerator, it will be copied to the host.
   /// - Returns: A shaped array.
