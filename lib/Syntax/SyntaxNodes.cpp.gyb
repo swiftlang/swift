@@ -46,11 +46,8 @@ void ${node.name}::validate() const {
 %       end
 %       if child.node_choices:
 #ifndef NDEBUG
-        {
-          auto child = make<Syntax>(raw->getChild(Cursor::${child.name}));
-%         content = check_child_condition(child) + '(child)'
-          assert(${content});
-        }
+  assert(${check_child_condition_raw(child)}(
+             raw->getChild(Cursor::${child.name})));
 #endif
 %       end
 %     end

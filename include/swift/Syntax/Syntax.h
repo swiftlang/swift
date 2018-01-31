@@ -174,6 +174,10 @@ public:
     return Root == Other.Root && Data == Other.Data;
   }
 
+  static bool kindof(SyntaxKind Kind) {
+    return true;
+  }
+
   static bool classof(const Syntax *S) {
     // Trivially true.
     return true;
