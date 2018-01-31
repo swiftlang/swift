@@ -717,7 +717,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
     return;
 
   // Walk predecessors until we find marked blocks or other blocks we are
-  // control dependent on.  We only scan the region post dominated by BB.
+  // control-dependent on.  We only scan the region post dominated by BB.
   //
   // Note that though this is bounded, that it isn't a very efficient algorithm
   // since each block marking can walk the entire function's CFG, but it is good
@@ -731,7 +731,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   SmallPtrSet<SILBasicBlock*, 32> visited;
   visited.insert(BB);
 
-  // Walk up the CFG looking for terminators we are control dependent on.
+  // Walk up the CFG looking for terminators we are control-dependent on.
   while (!worklist.empty()) {
     auto thisBB = worklist.pop_back_val();
     assert(tensorCodeBlocks.postDominates(BB, thisBB) &&
@@ -742,7 +742,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       continue;
 
     // Check the predecessors of this block.  If any of them have multiple
-    // successors, then we may be control dependent on that conditional.
+    // successors, then we may be control-dependent on that conditional.
     for (auto pred : thisBB->getPredecessorBlocks()) {
       // Count the number of successors of this block which are tensor related.
       // If we see successors that are not tensor related, we'll remember that
@@ -758,16 +758,19 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         }
       }
 
-      // If the predecessor has a single tensor-related successor (us) then we
-      // aren't control dependent on it.
-      if (numTensorSuccs == 1)
-        continue;
-
       // Check to see if pred is already visited or if its terminator is already
       // marked then we don't need to reprocess it.
       if (visited.count(pred) ||
           markedInstructions.count(pred->getTerminator()))
         continue;
+
+      // If the predecessor has a single tensor-related successor (us) then we
+      // aren't control-dependent on it.  It may be control-dependent on
+      // something though.
+      if (numTensorSuccs == 1) {
+        worklist.push_back(pred);
+        continue;
+      }
 
       // Otherwise, check to see if BB is post-dominated by thisBB, but not by
       // pred - in other words that it is the post dominance frontier for BB.
