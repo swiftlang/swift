@@ -5937,6 +5937,60 @@ public:
     }
   }
 
+  static bool parameterTypesMatch(const ValueDecl *derivedDecl,
+                                  const ValueDecl *baseDecl,
+                                  TypeMatchOptions matchMode) {
+    const ParameterList *derivedParams;
+    const ParameterList *baseParams;
+    if (auto *derived = dyn_cast<AbstractFunctionDecl>(derivedDecl)) {
+      auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getParameterList(1);
+      derivedParams = derived->getParameterList(1);
+    } else {
+      auto *base = dyn_cast<SubscriptDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getIndices();
+      derivedParams = cast<SubscriptDecl>(derivedDecl)->getIndices();
+    }
+
+    if (baseParams->size() != derivedParams->size())
+      return false;
+
+    auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
+                                                          /*derivedSubs=*/None);
+
+    for (auto i : indices(baseParams->getArray())) {
+      auto baseItfTy = baseParams->get(i)->getInterfaceType();
+      auto baseParamTy =
+          baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+      baseParamTy = baseParamTy.subst(subs);
+      auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParams->get(i)
+              ->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getAnyOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
+
+      // If there is no match, then we're done.
+      return false;
+    }
+
+    return true;
+  }
+
   /// Determine which method or subscript this method or subscript overrides
   /// (if any).
   ///
@@ -6155,8 +6209,22 @@ public:
               TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
-        if (declTy->matches(parentDeclTy, matchMode)) {
-          // If the Objective-C selectors match, always call it exact.
+        auto declFnTy = declTy->getAs<AnyFunctionType>();
+        auto parentDeclFnTy = parentDeclTy->getAs<AnyFunctionType>();
+        if (declFnTy && parentDeclFnTy) {
+          auto paramsAndResultMatch = [=]() -> bool {
+            return parameterTypesMatch(decl, parentDecl, matchMode) &&
+                   declFnTy->getResult()->matches(parentDeclFnTy->getResult(),
+                                                  matchMode);
+          };
+
+          if (declFnTy->matchesFunctionType(parentDeclFnTy, matchMode,
+                                            paramsAndResultMatch)) {
+            matches.push_back({parentDecl, objCMatch, parentDeclTy});
+            hadExactMatch |= objCMatch;
+            continue;
+          }
+        } else if (declTy->matches(parentDeclTy, matchMode)) {
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
           continue;
