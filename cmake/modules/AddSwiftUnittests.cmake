@@ -48,7 +48,8 @@ function(add_swift_unittest test_dirname)
   endif()
 
   find_program(LDLLD_PATH "ld.lld")
-  if(SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH)
+  # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+  if(SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=lld")
   elseif(SWIFT_ENABLE_GOLD_LINKER AND

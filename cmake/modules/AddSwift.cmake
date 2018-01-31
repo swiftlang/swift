@@ -410,7 +410,8 @@ function(_add_variant_link_flags)
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     find_program(LDLLD_PATH "ld.lld")
-    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH) OR
+    # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
