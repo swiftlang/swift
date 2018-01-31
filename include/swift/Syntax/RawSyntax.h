@@ -47,7 +47,10 @@ using llvm::StringRef;
 
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
-  (assert(Raw->getChild(Cursor)->Kind == ExpectedKind));
+  ({                                                                           \
+    if (auto &__Child = Raw->getChild(Cursor::CursorName))                     \
+      assert(__Child->getKind() == ExpectedKind);                              \
+  })
 #else
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind) ({});
 #endif
@@ -56,17 +59,18 @@ using llvm::StringRef;
 #define syntax_assert_child_token(Raw, CursorName, ...)                        \
   ({                                                                           \
     bool __Found = false;                                                      \
-    auto __Token = Raw->getChild(Cursor::CursorName);                          \
-    assert(__Token->isToken());                                                \
-    if (__Token->isPresent()) {                                                \
-      for (auto Token : {__VA_ARGS__}) {                                       \
-        if (__Token->getTokenKind() == Token) {                                \
-          __Found = true;                                                      \
-          break;                                                               \
+    if (auto &__Token = Raw->getChild(Cursor::CursorName)) {                   \
+      assert(__Token->isToken());                                              \
+      if (__Token->isPresent()) {                                              \
+        for (auto Token : {__VA_ARGS__}) {                                     \
+          if (__Token->getTokenKind() == Token) {                              \
+            __Found = true;                                                    \
+            break;                                                             \
+          }                                                                    \
         }                                                                      \
+        assert(__Found && "invalid token supplied for " #CursorName            \
+                          ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
-      assert(__Found && "invalid token supplied for " #CursorName              \
-                        ", expected one of {" #__VA_ARGS__ "}");               \
     }                                                                          \
   })
 #else
@@ -77,18 +81,19 @@ using llvm::StringRef;
 #define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)        \
   ({                                                                           \
     bool __Found = false;                                                      \
-    auto __Child = Raw->getChild(Cursor::CursorName);                          \
-    assert(__Child->isToken());                                                \
-    if (__Child->isPresent()) {                                                \
-      assert(__Child->getTokenKind() == TokenKind);                            \
-      for (auto __Text : {__VA_ARGS__}) {                                      \
-        if (__Child->getTokenText() == __Text) {                               \
-          __Found = true;                                                      \
-          break;                                                               \
+    if (auto &__Child = Raw->getChild(Cursor::CursorName)) {                   \
+      assert(__Child->isToken());                                              \
+      if (__Child->isPresent()) {                                              \
+        assert(__Child->getTokenKind() == TokenKind);                          \
+        for (auto __Text : {__VA_ARGS__}) {                                    \
+          if (__Child->getTokenText() == __Text) {                             \
+            __Found = true;                                                    \
+            break;                                                             \
+          }                                                                    \
         }                                                                      \
+        assert(__Found && "invalid text supplied for " #CursorName             \
+                          ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
-      assert(__Found && "invalid text supplied for " #CursorName               \
-                        ", expected one of {" #__VA_ARGS__ "}");               \
     }                                                                          \
   })
 #else

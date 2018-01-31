@@ -201,7 +201,8 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
       printSyntaxKind(Kind, OS, Opts, true);
 
     for (const auto &LE : getLayout())
-      LE->print(OS, Opts);
+      if (LE)
+        LE->print(OS, Opts);
 
     if (PrintKind)
       printSyntaxKind(Kind, OS, Opts, false);
