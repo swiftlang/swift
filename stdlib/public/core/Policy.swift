@@ -25,7 +25,7 @@
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
-@_fixed_layout
+@_exhaustive
 public enum Never {}
 
 //===----------------------------------------------------------------------===//
