@@ -549,7 +549,9 @@ static void reportRelated(ASTContext &Ctx,
     // Otherwise, report the inheritance of the type alias itself.
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
-    passInherits(TD->getInherited(), Consumer);
+    llvm::SmallVector<TypeLoc, 4> AllInherits;
+    getInheritedForPrinting(TD, [](const Decl* d) { return true; }, AllInherits);
+    passInherits(AllInherits, Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
   } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
