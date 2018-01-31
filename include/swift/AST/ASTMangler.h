@@ -190,6 +190,9 @@ protected:
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
+  /// Append any retroactive conformances.
+  void appendRetroactiveConformances(Type type);
+
   void appendImplFunctionType(SILFunctionType *fn);
 
   void appendContextOf(const ValueDecl *decl);

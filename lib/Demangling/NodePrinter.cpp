@@ -398,6 +398,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::RelatedEntityDeclName:
+    case Node::Kind::RetroactiveConformance:
     case Node::Kind::Setter:
     case Node::Kind::Shared:
     case Node::Kind::SILBoxLayout:
@@ -1082,6 +1083,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << " -> ";
       printChildren(Node);
     }
+    return nullptr;
+  case Node::Kind::RetroactiveConformance:
+    if (Node->getNumChildren() != 2)
+      return nullptr;
+
+    Printer << "retroactive @ ";
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::Weak:
     Printer << "weak ";

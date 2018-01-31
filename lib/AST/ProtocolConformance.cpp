@@ -24,6 +24,7 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -351,6 +352,10 @@ bool NormalProtocolConformance::isRetroactive() const {
 
   // Everything else is retroactive.
   return true;
+}
+
+bool NormalProtocolConformance::isSynthesizedNonUnique() const {
+  return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
 }
 
 ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {

@@ -369,7 +369,7 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
  
-  bound-generic-type ::= type 'y' (type* '_')* type* 'G'   // one type-list per nesting level of type
+  bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
@@ -558,6 +558,17 @@ values indicates a single generic parameter at the outermost depth::
 
 A generic signature must only precede an operator character which is different
 from any character in a ``<GENERIC-PARAM-COUNT>``.
+
+::
+
+  retroactive-conformance ::= protocol-conformance 'g' INDEX
+
+When a protocol conformance used to satisfy one of a bound generic type's
+generic requirements is retroactive (i.e., it is specified in a module other
+than the module of the conforming type or the conformed-to protocol), it is
+mangled with its offset into the set of conformance requirements, the
+root protocol conformance, and the suffix 'g'.
+
 
 Identifiers
 ~~~~~~~~~~~
