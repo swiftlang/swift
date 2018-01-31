@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_fixed_layout
+  @_exhaustive
   public enum ASCII {}
 }
 

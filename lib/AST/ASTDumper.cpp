@@ -757,9 +757,9 @@ namespace {
 
       if (NTD->hasInterfaceType()) {
         if (NTD->isResilient())
-          OS << " @_resilient_layout";
+          OS << " resilient";
         else
-          OS << " @_fixed_layout";
+          OS << " non-resilient";
       }
     }
 
