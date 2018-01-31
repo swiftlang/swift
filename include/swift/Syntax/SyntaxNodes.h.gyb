@@ -53,6 +53,11 @@ class ${node.name} ${qualifier} : public ${node.base_type} {
 %     if node.is_buildable():
       friend class ${node.name}Builder;
 %     end
+%     if node.requires_validation():
+  void validate() const;
+%     end
+
+public:
 %     if node.children:
   enum Cursor : uint32_t {
 %       for child in node.children:
@@ -60,10 +65,7 @@ class ${node.name} ${qualifier} : public ${node.base_type} {
 %       end
   };
 %     end
-%     if node.requires_validation():
-  void validate() const;
-%     end
-public:
+
   ${node.name}(const RC<SyntaxData> Root, const SyntaxData *Data)
     : ${node.base_type}(Root, Data) {
 %     if node.requires_validation():
@@ -88,12 +90,17 @@ public:
   with${child.name}(llvm::Optional<${child.type_name}> New${child.type_name});
 
 %     end
-  static bool classof(const Syntax *S) {
+
+  static bool kindof(SyntaxKind Kind) {
 %   if node.is_base():
-    return S->is${node.syntax_kind}();
+    return is${node.syntax_kind}Kind(Kind);
 %   else:
-    return S->getKind() == SyntaxKind::${node.syntax_kind};
+    return Kind == SyntaxKind::${node.syntax_kind};
 %   end
+  }
+
+  static bool classof(const Syntax *S) {
+    return kindof(S->getKind());
   }
 };
 
