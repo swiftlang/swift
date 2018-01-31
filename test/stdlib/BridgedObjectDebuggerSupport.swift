@@ -28,6 +28,11 @@ func debugVal<T>(_ x: inout T) -> String {
   }
 }
 
+// Check if @x uses the small-string or Cocoa representations.
+func hasSmallStringOrCocoaVariant(_ x: String) -> Bool {
+  return x._guts._isCocoa || x._guts._isSmall
+}
+
 StringForPrintObjectTests.test("Basic") {
   var a = "Hello World" as NSString
   let a_printed = printObj(a)
@@ -57,6 +62,19 @@ StringForPrintObjectTests.test("NSStringFromUnsafeBuffer") {
   expectEqual("A\n", a_printed)
   expectEqual(a_printed, a_debug)
   buf.deallocate()
+}
+
+StringForPrintObjectTests.test("NSStringUTF8") {
+  let nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
+  expectTrue(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)
+  var newNSUTF16 = nsUTF16 as String
+  expectTrue(hasSmallStringOrCocoaVariant(newNSUTF16))
+  let printed = printObj(newNSUTF16)
+  let debug = debugVal(&newNSUTF16)
+  expectEqual("🏂☃❅❆❄︎⛄️❄️", String(reflecting: nsUTF16))
+  expectEqual("\"🏂☃❅❆❄︎⛄️❄️\"", String(reflecting: newNSUTF16))
+  expectEqual("\"🏂☃❅❆❄︎⛄️❄️\"\n", printed)
+  expectEqual(printed, debug)
 }
 
 StringForPrintObjectTests.test("ArrayOfStrings") {
