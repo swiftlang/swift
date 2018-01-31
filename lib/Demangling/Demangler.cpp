@@ -458,6 +458,7 @@ NodePointer Demangler::demangleOperator() {
     case 'c': return popFunctionType(Node::Kind::FunctionType);
     case 'd': return createNode(Node::Kind::VariadicMarker);
     case 'f': return demangleFunctionEntity();
+    case 'g': return demangleRetroactiveConformance();
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
@@ -1060,7 +1061,27 @@ NodePointer Demangler::popProtocol() {
   return createType(Proto);
 }
 
+NodePointer Demangler::demangleRetroactiveConformance() {
+  NodePointer Index = demangleIndexAsNode();
+  NodePointer Conformance = popProtocolConformance();
+  if (!Index || !Conformance)
+    return nullptr;
+
+  return createWithChildren(Node::Kind::RetroactiveConformance,
+                            Index, Conformance);
+}
+
 NodePointer Demangler::demangleBoundGenericType() {
+  NodePointer RetroactiveConformances = nullptr;
+  while (auto RetroactiveConformance =
+         popNode(Node::Kind::RetroactiveConformance)) {
+    if (!RetroactiveConformances)
+      RetroactiveConformances = createNode(Node::Kind::TypeList);
+    RetroactiveConformances->addChild(RetroactiveConformance, *this);
+  }
+  if (RetroactiveConformances)
+    RetroactiveConformances->reverseChildren();
+
   Vector<NodePointer> TypeListList(*this, 4);
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
@@ -1076,7 +1097,10 @@ NodePointer Demangler::demangleBoundGenericType() {
       return nullptr;
   }
   NodePointer Nominal = popTypeAndGetAnyGeneric();
-  NodePointer NTy = createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
+  NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
+  if (RetroactiveConformances)
+    BoundNode->addChild(RetroactiveConformances, *this);
+  NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
   return NTy;
 }
