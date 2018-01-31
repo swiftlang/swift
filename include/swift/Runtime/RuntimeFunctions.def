@@ -746,7 +746,7 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, C_CC,
               TypeMetadataPtrTy->getPointerTo(0),
               Int32Ty->getPointerTo(0),
               TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
 //                                          const Metadata *resultMetadata);
@@ -796,7 +796,7 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 //                                              const void * const *arguments,
@@ -823,7 +823,7 @@ FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
          ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
               TypeMetadataPtrTy,
               Int8PtrPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC,
@@ -858,7 +858,7 @@ FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
               Int8PtrTy, WitnessTablePtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
 //                                       const char *labels,
@@ -867,7 +867,7 @@ FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_getTupleTypeMetadata3(Metadata *elt0, Metadata *elt1,
 //                                       Metadata *elt2, const char *labels,
@@ -876,7 +876,7 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_getExistentialTypeMetadata(
 //                              ProtocolClassConstraint classConstraint,
@@ -890,7 +890,7 @@ FUNCTION(GetExistentialMetadata,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int1Ty, TypeMetadataPtrTy, SizeTy,
               ProtocolDescriptorPtrTy->getPointerTo()),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // Metadata *swift_relocateClassMetadata(Metadata *self,
 //                                       size_t templateSize,
