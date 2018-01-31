@@ -594,12 +594,7 @@ private:
                     bool openBracket = true, bool closeBracket = true);
   void printNominalDeclGenericParams(NominalTypeDecl *decl);
   void printNominalDeclGenericRequirements(NominalTypeDecl *decl);
-  void printInherited(const Decl *decl, ArrayRef<TypeLoc> inherited);
-
-  void printInherited(const NominalTypeDecl *D);
-  void printInherited(const ExtensionDecl *D);
-  void printInherited(const GenericTypeParamDecl *D);
-  void printInherited(const AssociatedTypeDecl *D);
+  void printInherited(const Decl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
 
@@ -1656,29 +1651,10 @@ void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
       printGenericSignature(GenericSig, PrintRequirements | InnermostOnly);
 }
 
-void PrintAST::printInherited(const Decl *decl, ArrayRef<TypeLoc> inherited) {
+void PrintAST::printInherited(const Decl *decl) {
   SmallVector<TypeLoc, 6> TypesToPrint;
-  for (auto TL : inherited) {
-    if (auto Ty = TL.getType()) {
-      if (auto NTD = Ty->getAnyNominal())
-        if (!shouldPrint(NTD))
-          continue;
-    }
-    TypesToPrint.push_back(TL);
-  }
-
-  auto &ctx = decl->getASTContext();
-  for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-    if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
-      if (!shouldPrint(proto))
-        continue;
-      if (attr->getProtocolKind() == KnownProtocolKind::RawRepresentable &&
-          isa<EnumDecl>(decl) &&
-          cast<EnumDecl>(decl)->hasRawType())
-        continue;
-      TypesToPrint.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
-    }
-  }
+  getInheritedForPrinting(decl, [this](const Decl* D) { return shouldPrint(D); },
+                          TypesToPrint);
   if (TypesToPrint.empty())
     return;
 
@@ -1689,22 +1665,6 @@ void PrintAST::printInherited(const Decl *decl, ArrayRef<TypeLoc> inherited) {
   }, [&]() {
     Printer << ", ";
   });
-}
-
-void PrintAST::printInherited(const NominalTypeDecl *D) {
-  printInherited(D, D->getInherited());
-}
-
-void PrintAST::printInherited(const ExtensionDecl *D) {
-  printInherited(D, D->getInherited());
-}
-
-void PrintAST::printInherited(const GenericTypeParamDecl *D) {
-  printInherited(D, D->getInherited());
-}
-
-void PrintAST::printInherited(const AssociatedTypeDecl *D) {
-  printInherited(D, D->getInherited());
 }
 
 static void getModuleEntities(const clang::Module *ClangMod,
@@ -4237,4 +4197,40 @@ void swift::printEnumElementsAsCases(
                   printPayloads(EE, OS);
                   OS << ": " << getCodePlaceholder() << "\n";
                 });
+}
+
+void
+swift::getInheritedForPrinting(const Decl *decl,
+                               llvm::function_ref<bool(const Decl*)> shouldPrint,
+                               llvm::SmallVectorImpl<TypeLoc> &Results) {
+  ArrayRef<TypeLoc> inherited;
+  if (auto td = dyn_cast<TypeDecl>(decl)) {
+    inherited = td->getInherited();
+  } else if (auto ed = dyn_cast<ExtensionDecl>(decl)) {
+    inherited = ed->getInherited();
+  }
+
+  // Collect explicit inheritted types.
+  for (auto TL: inherited) {
+    if (auto Ty = TL.getType()) {
+      if (auto NTD = Ty->getAnyNominal())
+        if (!shouldPrint(NTD))
+          continue;
+    }
+    Results.push_back(TL);
+  }
+
+  // Collect synthesized conformances.
+  auto &ctx = decl->getASTContext();
+  for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
+      if (!shouldPrint(proto))
+        continue;
+      if (attr->getProtocolKind() == KnownProtocolKind::RawRepresentable &&
+          isa<EnumDecl>(decl) &&
+          cast<EnumDecl>(decl)->hasRawType())
+        continue;
+      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+    }
+  }
 }

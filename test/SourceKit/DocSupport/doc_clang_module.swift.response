@@ -4550,6 +4550,18 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 36,
     key.length: 205,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum1</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:s9EquatableP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "RawRepresentable",
+        key.usr: "s:s16RawRepresentableP"
+      }
+    ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -4651,6 +4663,18 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 274,
     key.length: 205,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum2</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:s9EquatableP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "RawRepresentable",
+        key.usr: "s:s16RawRepresentableP"
+      }
+    ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -4759,6 +4783,18 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 544,
     key.length: 205,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum3</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:s9EquatableP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "RawRepresentable",
+        key.usr: "s:s16RawRepresentableP"
+      }
+    ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -4936,6 +4972,13 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 1011,
     key.length: 337,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions</decl.name> : <ref.protocol usr=\"s:s9OptionSetP\">OptionSet</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "OptionSet",
+        key.usr: "s:s9OptionSetP"
+      }
+    ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -7059,6 +7102,18 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 7408,
     key.length: 214,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:s9EquatableP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "RawRepresentable",
+        key.usr: "s:s16RawRepresentableP"
+      }
+    ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
