@@ -87,111 +87,86 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
   }
 }
 
-bool SyntaxFactory::
-canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
+                                                  const RC<RawSyntax> &Member) {
   switch (CollectionKind) {
 % for node in SYNTAX_NODES:
-%     if node.is_syntax_collection():
-  case SyntaxKind::${node.syntax_kind}: {
-%       if node.collection_element_choices:
-%         element_checks = []
-%         for choice in node.collection_element_choices:
-%           element_checks.append("Member.getKind() == SyntaxKind::%s" % choice)
-%         all_checks = ' || '.join(element_checks)
-    return ${all_checks};
-%       else:
-    return Member.is<${node.collection_element_type}>();
+%   if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}:
+%     if node.collection_element_choices:
+%       element_checks = []
+%       for choice in node.collection_element_choices:
+%         element_checks.append("" + choice + "Syntax::kindof(Member->getKind())")
 %       end
-  }
+    return ${' || '.join(element_checks)};
+%     else:
+    return ${node.collection_element_type}::kindof(Member->getKind());
 %     end
+%   end
 % end
   default:
     llvm_unreachable("Not collection kind.");
   }
 }
 
-Optional<Syntax>
-SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
-  switch(Kind) {
+bool SyntaxFactory::
+canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+  return canServeAsCollectionMemberRaw(CollectionKind, Member.getRaw());
+}
+
+RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
+                                       llvm::ArrayRef<RC<RawSyntax>> Elements) {
+  switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
-%    child_count = len(node.children)
-    static std::pair<bool, std::function<bool(const Syntax&)>>
-      ChildrenConditions[${child_count}] = {
-%    for child in node.children:
-%       check = check_child_condition(child)
-%       if child.is_optional:
-%         option = "true"
-%       else:
-%         option = "false"
-%       end
-        {   ${option}, ${check} },
-%    end
-    };
-    Optional<Syntax> Parameters[${child_count}];
-    unsigned CurCond = 0;
-    for (unsigned I = 0, N = Elements.size(); I < N; ) {
-      // We should use all elements.
-      if (CurCond == ${child_count}) {
-        return None;
-      }
-      if (ChildrenConditions[CurCond].second(Elements[I])) {
-        // we find a node that satisfies the condition.
-        Parameters[CurCond].emplace(Elements[I]);
-        CurCond ++;
-        I ++;
-      } else if (ChildrenConditions[CurCond].first) {
-        // If the unsatisfied condition is optional, move on to the next condition.
-        CurCond ++;
-      } else {
-        // Mandatory condition is not satisfied.
-        return None;
-      }
+%   child_count = len(node.children)
+    RC<RawSyntax> Layout[${child_count}];
+    unsigned I = 0;
+%   for (child_idx, child) in enumerate(node.children):
+    // child[${child_idx}] ${child.name}
+    if (I == Elements.size() ||
+        !${check_child_condition_raw(child)}(Elements[I])) {
+%     if child.is_optional:
+      Layout[${child_idx}] = ${make_missing_child(child)};
+%     else:
+      return nullptr;
+%     end
+    } else {
+      Layout[${child_idx}] = Elements[I];
+      ++I;
     }
-    for (; CurCond < ${child_count}; CurCond ++) {
-      if (!ChildrenConditions[CurCond].first) {
-        // if the remaining condition is mandatory, we cannot create.
-        return None;
-      }
-    }
-    assert(CurCond == ${child_count});
-    return make${node.syntax_kind}(
-% params = []
-% for i, child in enumerate(node.children):
-%   child = node.children[i]
-%   if child.is_optional:
-%      params.append("/*Optional %s*/ Parameters[%s].hasValue() ?" \
-%       "(*Parameters[%s]).getAs<%s>().getValue() : (Optional<%s>) None" %
-%         (child.name, i, i, child.type_name, child.type_name))
-%   else:
-%      params.append("/*%s*/ (*Parameters[%s]).getAs<%s>().getValue()" %
-%        (child.name, i, child.type_name))
 %   end
-% end
-% child_parms = '\n, '.join(params)
-      ${child_parms}
-    );
+    if (I != Elements.size())
+      return nullptr;
+    return RawSyntax::make(Kind, Layout, SourcePresence::Present);
 % elif node.is_syntax_collection():
-      std::vector<${node.collection_element_type}> Parts;
-      for (auto &E: Elements) {
-        if (!canServeAsCollectionMember(SyntaxKind::${node.syntax_kind}, E))
-          return None;
-        if (auto P = E.getAs<${node.collection_element_type}>()) {
-          Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
-        } else {
-          return None;
-        }
-      }
-      return make${node.syntax_kind}(Parts);
+    for (auto &E : Elements) {
+      if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
+        return nullptr;
+    }
+    return RawSyntax::make(Kind, Elements, SourcePresence::Present);
 % else:
-    return None;
+    return nullptr;
 % end
-   }
+  }
 % end
   default:
-    return None;
+    return nullptr;
   }
+}
+
+Optional<Syntax>
+SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
+  std::vector<RC<RawSyntax>> Layout;
+  Layout.reserve(Elements.size());
+  for (auto &E : Elements)
+    Layout.emplace_back(E.getRaw());
+
+  if (auto Raw = createRaw(Kind, Layout))
+    return make<Syntax>(Raw);
+  else
+    return None;
 }
 
 % for node in SYNTAX_NODES:

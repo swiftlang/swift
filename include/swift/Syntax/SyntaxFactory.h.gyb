@@ -51,8 +51,11 @@ struct SyntaxFactory {
   static UnknownSyntax
   makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens);
 
-  static Optional<Syntax>
-  createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements);
+  static Optional<Syntax> createSyntax(SyntaxKind Kind,
+                                       llvm::ArrayRef<Syntax> Elements);
+
+  static RC<RawSyntax> createRaw(SyntaxKind Kind,
+                                 llvm::ArrayRef<RC<RawSyntax>> Elements);
 
   /// Count the number of children for a given syntax node kind,
   /// returning a pair of mininum and maximum count of children. The gap
@@ -141,6 +144,11 @@ struct SyntaxFactory {
   /// Creates an `==` operator token.
   static TokenSyntax makeEqualityOperator(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Whether a raw node `Member` can serve as a member in a syntax collection
+  /// of the given syntax collection kind.
+  static bool canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
+                                            const RC<RawSyntax> &Member);
 
   /// Whether a node `Member` can serve as a member in a syntax collection of
   /// the given syntax collection kind.
