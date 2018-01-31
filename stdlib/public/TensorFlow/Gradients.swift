@@ -352,10 +352,10 @@ func _adjointConvolved2D<T : FloatingPoint>(
   seed: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   return (
-    _TFConv2DBackpropInput(shape: input.shapeTensor, filter: filter,
+    _TFConv2DBackpropInput(shape: input.shapeTensorOriginal, filter: filter,
                            backpropOutput: seed, strides: strides,
                            padding: padding),
-    _TFConv2DBackpropFilter(input: input, filterSizes: filter.shapeTensor,
+    _TFConv2DBackpropFilter(input: input, filterSizes: filter.shapeTensorOriginal,
                             backpropOutput: seed, strides: strides,
                             padding: padding
     )
@@ -376,7 +376,7 @@ func _adjointMaxPooled<T>(
   // form.
   // FIXME: handle attributes (padding)
   return Tensor(#tfop("MaxPoolGradV2", "ttttt:t",
-                      input.shapeTensor.handle,
+                      input.shapeTensorOriginal.handle,
                       primal.handle,
                       seed.handle,
                       kernelSize.handle,
@@ -397,6 +397,6 @@ func _adjointAveragePooled<T>(
   // form.
   // FIXME: handle attributes (ksize, strides, padding)
   return Tensor(#tfop("AvgPoolGrad", "tt:t",
-                      input.shapeTensor.handle,
+                      input.shapeTensorOriginal.handle,
                       seed.handle))
 }

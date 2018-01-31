@@ -195,6 +195,11 @@ TensorTests.testCPUAndGPU("Reshape") {
   expectEqual(y.shape, [1, 3, 1, 1, 1])
 }
 
+TensorTests.testCPUAndGPU("ReshapeScalar") {
+  let z = Tensor([[10]]).toDevice().reshaped([])
+  expectEqual(z.shape, [])
+}
+
 // FIXME: Partitioner gives unpredictable errors regarding send/receive.
 #if false
 @inline(never)
