@@ -23,6 +23,7 @@ from __future__ import print_function
 import os
 import subprocess
 import sys
+import time
 
 
 VERBOSE = False
@@ -37,11 +38,11 @@ def compile_and_stat(compile_args, output_file):
     subprocess.check_call(compile_args)
 
     md5 = subprocess.check_output(["md5", "-q", output_file])
-    mtime = os.path.getmtime(output_file)
+    mtime = time.ctime(os.path.getmtime(output_file))
 
     if VERBOSE:
-        print("  time = {}".format(md5))
-        print("  md5 = " + mtime)
+        print(" time = " + str(mtime))
+        print("  md5 = " + md5)
 
     return (md5, mtime)
 
