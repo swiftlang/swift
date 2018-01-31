@@ -228,7 +228,7 @@ protected:
 
   void appendRequirement(const Requirement &reqt);
 
-  void appendGenericSignatureParts(ArrayRef<GenericTypeParamType*> params,
+  void appendGenericSignatureParts(TypeArrayView<GenericTypeParamType> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 

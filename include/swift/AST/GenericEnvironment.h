@@ -89,7 +89,7 @@ public:
     return Signature;
   }
 
-  ArrayRef<GenericTypeParamType *> getGenericParams() const;
+  TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().

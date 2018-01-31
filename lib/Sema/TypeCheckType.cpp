@@ -2352,9 +2352,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   SmallVector<Substitution, 4> genericArgs;
   if (genericSig) {
     TypeSubstitutionMap genericArgMap;
-    ArrayRef<GenericTypeParamType *> params;
 
-    params = genericSig->getGenericParams();
+    auto params = genericSig->getGenericParams();
     if (repr->getGenericArguments().size()
           != genericSig->getSubstitutionListSize()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);

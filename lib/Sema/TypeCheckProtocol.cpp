@@ -2960,7 +2960,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
-      { proto->getProtocolSelfType() },
+      { Type(proto->getProtocolSelfType()) },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(TC, DC),
@@ -3426,8 +3426,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
     auto conditionalCheckResult =
       checkGenericArguments(DC, ComplainLoc, noteLoc, T,
-                            { lookupResult->getRequirement()
-                                ->getProtocolSelfType() },
+                            { Type(lookupResult->getRequirement()
+                                ->getProtocolSelfType()) },
                             lookupResult->getConditionalRequirements(),
                             [](SubstitutableType *dependentType) {
                               return Type(dependentType);
