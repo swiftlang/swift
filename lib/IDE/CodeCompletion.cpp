@@ -2644,9 +2644,15 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
-      addTypeAnnotation(Builder,
-                        Result.hasValue() ? Result.getValue() :
-                                            ConstructorType->getResult());
+      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        addTypeAnnotationForImplicitlyUnwrappedOptional(
+            Builder, Result.hasValue() ? Result.getValue()
+                                       : ConstructorType->getResult());
+      } else {
+        addTypeAnnotation(Builder, Result.hasValue()
+                                       ? Result.getValue()
+                                       : ConstructorType->getResult());
+      }
     };
 
     if (ConstructorType && hasInterestingDefaultValues(CD))
