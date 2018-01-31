@@ -3095,16 +3095,18 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
 %   if x.kind == '/':
-    // No LLVM primitives for checking overflow of division
-    // operations, so we check manually.
+    // No LLVM primitives for checking overflow of division operations, so we
+    // check manually.
     if _slowPath(rhs == (0 as ${Self})) {
-      _preconditionFailure("Remainder of or division by zero")
+      _preconditionFailure(
+        "Division by zero${' in remainder operation' if x.operator == '%' else ''}")
     }
 %     if signed:
     if _slowPath(
       ${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}
     ) {
-      _preconditionFailure("Overflow in remainder of or division")
+      _preconditionFailure(
+        "Division results in an overflow${' in remainder operation' if x.operator == '%' else ''}")
     }
 %     end
     let (result, overflow) =
@@ -3129,16 +3131,18 @@ ${overflowOperationComment(x.operator)}
   public func ${x.name}ReportingOverflow(
     ${x.firstArg} other: ${Self}
   ) -> (partialValue: ${Self}, overflow: Bool) {
-
 %         if x.kind == '/':
-    // No LLVM primitives for checking overflow of division
-    // operations, so we check manually.
-    if _slowPath(
-      other == (0 as ${Self})
-      ${'|| self == %s.min && other == (-1 as %s)' % (Self, Self) if signed else ''}
-    ) {
+    // No LLVM primitives for checking overflow of division operations, so we
+    // check manually.
+    if _slowPath(other == (0 as ${Self})) {
       return (partialValue: self, overflow: true)
     }
+%           if signed:
+    if _slowPath(self == ${Self}.min && other == (-1 as ${Self})) {
+%             partialValue = 'self' if x.operator == '/' else '0'
+      return (partialValue: ${partialValue}, overflow: true)
+    }
+%           end
 
     let (newStorage, overflow) = (
       Builtin.${u}${x.llvmName}_Int${bits}(self._value, other._value),
@@ -3146,9 +3150,9 @@ ${overflowOperationComment(x.operator)}
 
 %         else:
 
-    let (newStorage, overflow)
-    = Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
-      self._value, other._value, false._value)
+    let (newStorage, overflow) =
+      Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
+        self._value, other._value, false._value)
 %         end
 
     return (
@@ -3161,16 +3165,16 @@ ${assignmentOperatorComment('%', True)}
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
-    // No LLVM primitives for checking overflow of division
-    // operations, so we check manually.
+    // No LLVM primitives for checking overflow of division operations, so we
+    // check manually.
     if _slowPath(rhs == (0 as ${Self})) {
-      _preconditionFailure("Remainder of division by zero")
+      _preconditionFailure(
+        "Division by zero in remainder operation")
     }
 %     if signed:
-    if _slowPath(
-      ${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}
-    ) {
-      _preconditionFailure("Overflow in remainder of division")
+    if _slowPath(${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}) {
+      _preconditionFailure(
+        "Division results in an overflow in remainder operation")
     }
 %     end
 
@@ -3455,15 +3459,24 @@ ${assignmentOperatorComment(x.operator, True)}
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
     // FIXME(integers): tests
-%   # 128 bit types are not provided by the 32-bit LLVM
+%   # 128-bit types are not provided by the 32-bit LLVM
 %   #if word_bits == 32 and bits == 64:
+%   # FIXME(integers): uncomment the above after using the right conditional
+%   # compilation block to exclude 64-bit Windows, which does not support
+%   # 128-bit operations
 %   if bits == 64:
-    let lhs = DoubleWidth<${Self}>(dividend)
-    let rhs = DoubleWidth<${Self}>(self)
+%     HalfWidth = 'Int32' if signed else 'UInt32'
+    let lhsHigh =
+      unsafeBitCast(dividend.high, to: DoubleWidth<${HalfWidth}>.self)
+    let lhsLow = unsafeBitCast(dividend.low, to: DoubleWidth<UInt32>.self)
+    let rhs_ = unsafeBitCast(self, to: DoubleWidth<${HalfWidth}>.self)
 
-    let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
-    // FIXME(integers): check for high words in quotient and remainder
-    return (${Self}(quotient.low), ${Self}(remainder.low))
+    let (quotient_, remainder_) = rhs_.dividingFullWidth((lhsHigh, lhsLow))
+
+    let quotient = unsafeBitCast(quotient_, to: ${Self}.self)
+    let remainder = unsafeBitCast(remainder_, to: ${Self}.self)
+
+    return (quotient: quotient, remainder: remainder)
 %   else:
     // FIXME(integers): handle division by zero and overflows
     _precondition(self != 0, "Division by zero")
