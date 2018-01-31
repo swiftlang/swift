@@ -1252,10 +1252,17 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 }
 
 // Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   const bool Escape = std::strpbrk(Arg, "\"\\$ ");
 
-  if (!Quote && !Escape) {
+  if (StringRef(Arg).startswith(TempDir)) {
+    // Don't write temporary file names in the debug info. This would prevent
+    // incremental llvm compilation because we would generate different IR on
+    // every compiler invocation.
+    Arg = "<temporary-file>";
+  }
+
+  if (!Escape) {
     OS << Arg;
     return;
   }
@@ -1479,9 +1486,14 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
                                               const ArrayRef<const char*> &Args,
                                               StringRef SDKPath,
                                               StringRef ResourceDir) {
+  // This isn't guaranteed to be the same temp directory as what the driver
+  // uses, but it's highly likely.
+  llvm::SmallString<128> TDir;
+  llvm::sys::path::system_temp_directory(true, TDir);
+
   llvm::raw_string_ostream OS(Output);
   interleave(Args,
-             [&](const char *Argument) { PrintArg(OS, Argument, false); },
+             [&](const char *Argument) { PrintArg(OS, Argument, TDir.str()); },
              [&] { OS << " "; });
 
   // Inject the SDK path and resource dir if they are nonempty and missing.
@@ -1497,11 +1509,11 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
   }
   if (!haveSDKPath) {
     OS << " -sdk ";
-    PrintArg(OS, SDKPath.data(), false);
+    PrintArg(OS, SDKPath.data(), TDir.str());
   }
   if (!haveResourceDir) {
     OS << " -resource-dir ";
-    PrintArg(OS, ResourceDir.data(), false);
+    PrintArg(OS, ResourceDir.data(), TDir.str());
   }
 }
 
