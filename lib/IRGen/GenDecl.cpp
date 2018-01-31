@@ -2644,9 +2644,8 @@ namespace {
     void addFlags() {
       // Miscellaneous flags.
       Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
-      Flags = Flags.withIsSynthesizedNonUnique(
-                isa<ClangModuleUnit>(
-                      Conformance->getDeclContext()->getModuleScopeContext()));
+      Flags =
+        Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
 
       // Add the flags.
       B.addInt32(Flags.getIntValue());

@@ -659,6 +659,10 @@ void Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node) {
   unreachable("This should never be called");
 }
 
+void Remangler::mangleRetroactiveConformance(Node *node) {
+  unreachable("Retroactive conformances aren't in the old mangling");
+}
+
 void Remangler::mangleProtocolConformance(Node *node) {
   // type, protocol name, context
   assert(node->getNumChildren() == 3);

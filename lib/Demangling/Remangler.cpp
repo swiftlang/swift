@@ -437,6 +437,15 @@ void Remangler::mangleAnyNominalType(Node *node) {
     mangleAnyNominalType(unboundType);
     char Separator = 'y';
     mangleGenericArgs(node, Separator);
+
+    if (node->getNumChildren() == 3) {
+      // Retroactive conformances.
+      auto listNode = node->getChild(2);
+      for (size_t Idx = 0, Num = listNode->getNumChildren(); Idx < Num; ++Idx) {
+        mangle(listNode->getChild(Idx));
+      }
+    }
+
     Buffer << 'G';
     addSubstitution(entry);
     return;
@@ -1444,6 +1453,12 @@ void Remangler::manglePrivateDeclName(Node *node) {
 
 void Remangler::mangleProtocol(Node *node) {
   mangleAnyGenericType(node, "P");
+}
+
+void Remangler::mangleRetroactiveConformance(Node *node) {
+  mangleProtocolConformance(node->getChild(1));
+  Buffer << 'g';
+  mangleIndex(node->getChild(0)->getIndex());
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
