@@ -21,3 +21,8 @@
 // CHECK-LLDB-NOT: debug_pubnames
 // CHECK-LLDB:     apple_names
 // CHECK-LLDB-NOT: debug_pubnames
+
+// Check that we don't write temporary file names in the debug info
+// RUN: TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I <temporary-file>
+
