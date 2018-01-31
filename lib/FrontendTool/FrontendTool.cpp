@@ -263,7 +263,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
 
   json::Output jsonOut(*os);
   auto Root = SF->getSyntaxRoot().getRaw();
-  jsonOut << Root;
+  jsonOut << *Root;
   *os << "\n";
   return false;
 }

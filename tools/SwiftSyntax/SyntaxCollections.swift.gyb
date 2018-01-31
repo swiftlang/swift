@@ -46,7 +46,7 @@ public struct ${node.name}: _SyntaxBase {
   ///                     collection.
   /// - Returns: A new `${node.name}` with the new layout underlying it.
   internal func replacingLayout(
-    _ layout: [RawSyntax]) -> ${node.name} {
+    _ layout: [RawSyntax?]) -> ${node.name} {
     let newRaw = data.raw.replacingLayout(layout)
     let (newRoot, newData) = data.replacingSelf(newRaw)
     return ${node.name}(root: newRoot, data: newData)

@@ -19,6 +19,8 @@ using namespace swift::syntax;
 RC<SyntaxData> SyntaxData::make(RC<RawSyntax> Raw,
                                 const SyntaxData *Parent,
                                 CursorIndex IndexInParent) {
+  if (!Raw)
+    return nullptr;
   return RC<SyntaxData> {
     new SyntaxData(Raw, Parent, IndexInParent)
   };
