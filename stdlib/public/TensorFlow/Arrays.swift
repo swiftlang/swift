@@ -144,13 +144,6 @@ public protocol ShapedArrayProtocol {
   /// all dimensions of the shape.
   init<S : Sequence>(shape: Shape, units: S) where S.Element == Unit
 
-  /// Initialize an array using specific shape and the contiguous view of
-  /// another collection that conforms to ShapedArrayProtocol.
-  /// - Precondition: The number of `units` must be equal to the product of
-  /// all dimensions of the shape.
-  init<Other>(shape: [Int], units: ContiguousView<Other>)
-    where Unit == Other.Unit
-
   /// Calls a closure with a pointer to the array’s contiguous storage.
   /// - Parameter body: A closure with an UnsafeBufferPointer parameter that
   /// points to the contiguous storage for the array. If no such storage exists,
@@ -174,9 +167,9 @@ public protocol ShapedArrayProtocol {
 }
 
 public extension ShapedArrayProtocol {
-  /// A collection view of contiguous units in row-major order.
-  var units: ContiguousView<Self> {
-    return ContiguousView(base: self)
+  /// The units of the shaped array in row-major order.
+  var units: [Unit] {
+    return withUnsafeBufferPointer(Array.init)
   }
 }
 
@@ -268,11 +261,6 @@ public extension ShapedArray {
     self.init(buffer: other.buffer, shape: other.shape)
   }
 
-  init(shape: [Int], units: ContiguousView<ShapedArray>) {
-    precondition(units.count == shape.reduce(1, *))
-    self.init(buffer: units.base.buffer, shape: shape)
-  }
-
   init(shape: [Int], units: [Unit]) {
     let unitCount = shape.reduce(1, *)
     precondition(unitCount == units.count)
@@ -301,19 +289,6 @@ public extension ShapedArray {
       // precondition failure.
       precondition(i == unitCount,
                    "The sequence has fewer elements than needed by the shape.")
-    }
-  }
-
-  init<Other>(shape: [Int], units: ContiguousView<Other>)
-    where Unit == Other.Unit {
-    let count = shape.reduce(1, *)
-    precondition(count == units.count)
-    let buffer = TensorBuffer<Unit>.createUninitialized(count: count)
-    self.init(buffer: buffer, shape: shape)
-    buffer.withUnsafeMutablePointerToUnits { ptr in
-      units.base.withUnsafeBufferPointer { arrayBuf in
-        ptr.initialize(from: arrayBuf.baseAddress!, count: count)
-      }
     }
   }
 
@@ -420,20 +395,11 @@ public struct ShapedArraySlice<Unit> /*: ShapedArrayProtocol */ {
 }
 
 public extension ShapedArraySlice {
-  init(shape: [Int], units: ContiguousView<ShapedArray<Unit>>) {
-    self.init(base: ShapedArray(buffer: units.base.buffer, shape: shape))
-  }
-
   init(shape: [Int], units: [Unit]) {
     self.init(base: ShapedArray(shape: shape, units: units))
   }
 
   init<S : Sequence>(shape: [Int], units: S) where S.Element == Unit {
-    self.init(base: ShapedArray(shape: shape, units: units))
-  }
-
-  init<Other>(shape: [Int], units: ContiguousView<Other>)
-    where Unit == Other.Unit {
     self.init(base: ShapedArray(shape: shape, units: units))
   }
 
@@ -453,70 +419,6 @@ public extension ShapedArraySlice {
 public extension ShapedArraySlice where Unit : AccelerableTensorUnit {
   init(_ other: Tensor<Unit>) {
     self.init(base: other.array)
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// ContiguousView
-//===----------------------------------------------------------------------===//
-
-/// A view of a shaped array's contents as a collection of units. It can be
-/// created using the `.units` getter on a value that conforms to
-/// `ShapedArrayProtocol`.
-///
-/// For example, one can mutate the units of a shaped array using linear
-/// indices:
-///
-///   let tensor = Tensor([[1, 2], [3, 4]]) // Shape 2 x 2
-///   tensor.units[3] = 100
-///
-public struct ContiguousView<Base : ShapedArrayProtocol> {
-  public typealias Element = Base.Unit
-  fileprivate var base: Base
-
-  fileprivate init(base: Base) {
-    debugLog("Initializing ContiguousView.")
-    self.base = base
-  }
-}
-
-extension ContiguousView : RandomAccessCollection {
-  public var count: Int {
-    return base.unitCount
-  }
-
-  public var startIndex: Int {
-    return 0
-  }
-
-  public var endIndex: Int {
-    return count
-  }
-
-  public func index(after i: Int) -> Int {
-    return i + 1
-  }
-
-  public func index(before i: Int) -> Int {
-    return i - 1
-  }
-
-  public subscript(index: Int) -> Element {
-    get {
-      debugLog("Getting element \(index).")
-      let ret = base.withUnsafeBufferPointer { $0[index] }
-      debugLog("Elem has value \(ret).")
-      return ret
-    }
-    set {
-      base.withUnsafeMutableBufferPointer { $0[index] = newValue }
-    }
-  }
-}
-
-extension ContiguousView : Equatable where Element : Equatable {
-  public static func == (lhs: ContiguousView, rhs: ContiguousView) -> Bool {
-    return lhs.elementsEqual(rhs)
   }
 }
 

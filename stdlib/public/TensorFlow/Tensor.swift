@@ -100,27 +100,28 @@ extension Tensor where Unit : Numeric {
 }
 
 public extension Tensor {
-  // Scalar (0-D) initializer, takes exactly one value.
+  /// Initialize a tensor with a unit representing a scalar value.
   @_inlineable
   init(_ value: Unit) {
     self.init(#tfop("tfc.scalarToTensor", "s:t", value))
   }
 
-  /// Vector (1-D) initializer, takes an array of values.
+  /// Initialize a tensor with an array representing a vector.
   @_inlineable
   init(_ vector: [Unit]) {
     self.init(shape: [vector.count], units: vector)
   }
 
-  /// Matrix (2-D) initializer, takes an array of array of values.
+  /// Initialize a tensor with an array of arrays representing a matrix.
+  ///
+  /// - Precondition: The number of elements in each sub-dimensional array in
+  ///   the array must be equal.
   @_inlineable
   init(_ matrix: [[Unit]]) {
     /// Sanity check
     guard let firstRow = matrix.first else {
       preconditionFailure("The first dimension is empty. Cannot infer shape.")
     }
-    precondition(firstRow.count >= 1,
-                 "The second dimension is empty. Dimension cannot be zero.")
     /// Now we make assumption about the shape.
     let rowCount = matrix.count, columnCount = firstRow.count
     let contiguousSize = rowCount * columnCount
@@ -153,7 +154,7 @@ public extension Tensor {
     self.init(TensorHandle(cTensorHandle: cHandle!))
   }
 
-  /// Arbitrary shape initializer.
+  /// Initialize a tensor with arbitrary shape.
   /// - Precondition: The number of units should be the same as the
   /// product of all of shape's dimensions.
   @_inlineable
@@ -203,6 +204,14 @@ public extension Tensor {
     TF_DeleteTensor(cTensor)
     self.init(TensorHandle(cTensorHandle: cHandle!))
   }
+
+  /// Initialize a degenerate tensor with no elements with the specified rank.
+  ///
+  /// - Precondition: Rank must be greater than 0.
+  @_inlineable
+  init(emptyWithRank rank: Int) {
+    self.init(shape: Array(repeating: 0, count: rank), units: [])
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -217,21 +226,24 @@ public extension Tensor {
     // big to want to do so for performance reasons.
     @inline(__always)
     get {
-      // TODO: Need an efficient way to turn a ShapedArray into an Array.
-      return Array(Tensor<Int>(shapeTensor).array.units)
+      return shapeTensor.units
     }
   }
 
   @_inlineable
   var rank: Int {
-    // TODO: Optimize when we have rank-collapsing scalar getters
-    return Int(rankTensor.array.scalar!)
+    @inline(__always)
+    get {
+      return rankTensor.scalar!
+    }
   }
 
   @_inlineable
   var unitCount: Int {
-    // TODO: Optimize when we have rank-collapsing scalar getters
-    return Int(unitCountTensor.array.scalar!)
+    @inline(__always)
+    get {
+      return unitCountTensor.scalar!
+    }
   }
 }
 
@@ -300,14 +312,6 @@ public extension AccelerableTensorUnit {
   }
 }
 
-internal extension Tensor {
-  /// Empty tensor, used privately for passing the correct arguments to ops.
-  @_versioned
-  static var empty: Tensor<Unit> {
-    return self.init(.empty)
-  }
-}
-
 public extension Tensor {
   @inline(never) // make @_inlineable when implemented.
   func rankLifted(by dimensionCount: Int) -> Tensor {
@@ -330,15 +334,30 @@ public extension Tensor {
   /// Reshape to the specified shape.
   /// - Precondition: The number of units matches the new shape.
   @_inlineable
+  @inline(__always)
   func reshaped(_ newShape: [Int]) -> Tensor {
-    return reshaped(newShape.isEmpty ? .empty : Tensor<Int>(newShape))
+    return reshaped(Tensor<Int>(newShape))
   }
 
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one unit.
   @_inlineable
+  @inline(__always)
   func scalarized() -> Unit {
-    return reshaped(.empty).scalar!
+#if false // FIXME: The partitioner needs to promote array literals.
+    guard let scalar = reshaped([]).scalar else {
+      preconditionFailure(
+        "Only tensors with exactly one unit can be scalarized.")
+    }
+#else
+    // FIXME: This is the inefficient implementation. When the partitioner
+    // can promote array literals, replace this with the implementation above.
+    guard let scalar = array.scalar else {
+      preconditionFailure(
+        "Only tensors with exactly one unit can be scalarized.")
+    }
+#endif
+    return scalar
   }
 
   /// Reshape by removing 1-dimensions. If axes are specified, remove the
@@ -418,5 +437,10 @@ public extension Tensor {
     // This is considered to be a well known way to produce a copy to the host,
     // so we never way to produce an "implicit copy to host" warning.
     return toHost().handle.makeHostCopy()
+  }
+
+  @_inlineable
+  var units: [Unit] {
+    return array.units
   }
 }

@@ -201,66 +201,76 @@ public extension Tensor where Unit : Numeric {
 }
 
 public extension Tensor {
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func mean() -> Unit {
-    let result = Tensor(#tfop("Mean", "tt:t", handle, TensorHandle<Int>.empty))
+    let result = Tensor<Unit>(#tfop("Mean", "tt:t", handle,
+                                    Tensor<Int>(emptyWithRank: 1).handle))
     return result.scalar!
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func mean(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    fatalError("FIXME: implement max axis")
+    // FIXME: handle attribute (keep_dims)
+    return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle))
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func min() -> Unit {
-    fatalError("FIXME: implement min")
+    let result = Tensor<Unit>(#tfop("Min", "tt:t", handle,
+                                    Tensor<Int>(emptyWithRank: 1).handle))
+    return result.scalar!
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func min(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    fatalError("FIXME: implement max axis")
+    // FIXME: handle attribute (keep_dims)
+    return Tensor<Unit>(#tfop("Min", "tt:t", handle, Tensor<Int>(axes).handle))
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func max() -> Unit {
-    fatalError("FIXME: implement max")
+    let result = Tensor<Unit>(#tfop("Max", "tt:t", handle,
+                                    Tensor<Int>(emptyWithRank: 1).handle))
+    return result.scalar!
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func max(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    fatalError("FIXME: implement max axis")
+    // FIXME: handle attribute (keep_dims)
+    return Tensor<Unit>(#tfop("Max", "tt:t", handle, Tensor<Int>(axes).handle))
   }
 
-  // Sum entire tensor to produce a scalar value.
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func sum() -> Unit {
-    fatalError("FIXME: implement sum")
+    let result = Tensor<Unit>(#tfop("Sum", "tt:t", handle,
+                                    Tensor<Int>(emptyWithRank: 1).handle))
+    return result.scalar!
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @_inlineable
   func sum(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    fatalError("FIXME: implement max axis")
+    // FIXME: handle attribute (keep_dims)
+    return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle))
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @inline(never) // make @_inlineable when implemented.
   func argmax() -> Int {
     fatalError("FIXME: implement argmax")
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @inline(never) // make @_inlineable when implemented.
   func argmin() -> Int {
     fatalError("FIXME: implement argmin")
   }
@@ -423,7 +433,7 @@ public extension Tensor {
     return Tensor(#tfop("Transpose", "t:t", handle))
   }
 
-  @inline(never) // make @_inlinable when implemented.
+  @inline(never) // make @_inlineable when implemented.
   func concatenated(with other: Tensor) -> Tensor {
     fatalError("FIXME: implement concatenated(with:)")
   }
@@ -625,20 +635,59 @@ public extension Tensor2D where Unit : Numeric {
 // Tensor properties
 //===----------------------------------------------------------------------===//
 
+/// Internal getters that return Int32 tensors.
+internal extension Tensor {
+  @_versioned
+  @_inlineable
+  var shapeTensorOriginal: Tensor<Int32> {
+    @inline(__always)
+    get {
+      return Tensor<Int32>(#tfop("Shape", "t:t", handle))
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  var rankTensorOriginal: Tensor<Int32> {
+    @inline(__always)
+    get {
+      return Tensor<Int32>(#tfop("Rank", "t:t", handle))
+    }
+  }
+
+  @_versioned
+  @_inlineable
+  var unitCountTensorOriginal: Tensor<Int32> {
+    @inline(__always)
+    get {
+      return Tensor<Int32>(#tfop("Size", "t:t", handle))
+    }
+  }
+}
+
 public extension Tensor {
   @_inlineable
-  var shapeTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Shape", "t:t", handle))
+  var shapeTensor: Tensor<Int> {
+    @inline(__always)
+    get {
+      return Tensor<Int>(shapeTensorOriginal)
+    }
   }
 
   @_inlineable
-  var rankTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Rank", "t:t", handle))
+  var rankTensor: Tensor<Int> {
+    @inline(__always)
+    get {
+      return Tensor<Int>(rankTensorOriginal)
+    }
   }
 
   @_inlineable
-  var unitCountTensor: Tensor<Int32> {
-    return Tensor<Int32>(#tfop("Size", "t:t", handle))
+  var unitCountTensor: Tensor<Int> {
+    @inline(__always)
+    get {
+      return Tensor<Int>(unitCountTensorOriginal)
+    }
   }
 }
 
@@ -662,6 +711,7 @@ public extension Tensor {
   }
 
   @_inlineable
+  @inline(__always)
   func reshaped(_ newShape: Tensor<Int>) -> Tensor {
     return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
   }
@@ -703,12 +753,13 @@ public extension Tensor where Unit : FloatingPoint {
   //     _adjointMaxPooled2D(input:kernelSize:strides:padding:primal:seed:)
   // )
   func maxPooled(
-    kernelSize: Tensor<Int32>,
-    strides: Tensor<Int32>,
+    kernelSize: Tensor<Int>,
+    strides: Tensor<Int>,
     padding: Padding
   ) -> Tensor {
-    return Tensor(#tfop("MaxPoolV2", "ttt:t",
-                        handle, kernelSize.handle, strides.handle))
+    return Tensor(#tfop("MaxPoolV2", "ttt:t", handle,
+                  Tensor<Int32>(kernelSize).handle,
+                  Tensor<Int32>(strides).handle))
   }
 
   @_inlineable
@@ -718,8 +769,8 @@ public extension Tensor where Unit : FloatingPoint {
     padding: Padding
   ) -> Tensor {
     // FIXME: handle attributes (padding)
-    return maxPooled(kernelSize: Tensor<Int32>(Tensor<Int>(kernelSize)),
-                     strides: Tensor<Int32>(Tensor<Int>(strides)),
+    return maxPooled(kernelSize: Tensor<Int>(kernelSize),
+                     strides: Tensor<Int>(strides),
                      padding: padding)
   }
 
