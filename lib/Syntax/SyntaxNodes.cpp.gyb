@@ -28,7 +28,7 @@ using namespace swift::syntax;
 %   if node.requires_validation():
 void ${node.name}::validate() const {
 #ifndef NDEBUG
-  auto raw = Data->Raw;
+  auto raw = Data->getRaw();
   if (isMissing()) return;
   assert(raw->getLayout().size() == ${len(node.children)});
 %     for child in node.children:
