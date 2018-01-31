@@ -68,7 +68,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 5. When this is done, add the `<icu-source>/bin` folder to your `Path` environment variable.
 
 ### 4. Get ready
-- From within a **developer** command prompt, execute the following command if you have an x64 PC.
+- From within a **developer** command prompt (not PowerShell nor cmd, but [the Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
 ```
 VsDevCmd -arch=amd64
 ```
