@@ -138,6 +138,12 @@ public protocol ShapedArrayProtocol {
   /// all dimensions of the shape.
   init(shape: Shape, units: [Unit])
 
+  /// Initialize an array using specific shape and a sequence of units in
+  /// row-major order.
+  /// - Precondition: The number of `units` must be equal to the product of
+  /// all dimensions of the shape.
+  init<S : Sequence>(shape: Shape, units: S) where S.Element == Unit
+
   /// Initialize an array using specific shape and the contiguous view of
   /// another collection that conforms to ShapedArrayProtocol.
   /// - Precondition: The number of `units` must be equal to the product of
@@ -177,7 +183,7 @@ public extension ShapedArrayProtocol {
 public extension ShapedArrayProtocol where Unit : Equatable, Shape : Equatable {
   static func == <Other>(lhs: Self, rhs: Other) -> Bool
     where Shape == Other.Shape,
-          Other: ShapedArrayProtocol,
+          Other : ShapedArrayProtocol,
           Unit == Other.Unit {
     return lhs.shape == rhs.shape &&
       lhs.units.elementsEqual(rhs.units)
@@ -268,13 +274,33 @@ public extension ShapedArray {
   }
 
   init(shape: [Int], units: [Unit]) {
-    let count = shape.reduce(1, *)
-    precondition(count == units.count)
-    self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
+    let unitCount = shape.reduce(1, *)
+    precondition(unitCount == units.count)
+    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+    self.init(buffer: buffer, shape: shape)
     buffer.withUnsafeMutablePointerToUnits { ptr in
       units.withUnsafeBufferPointer { arrayBuf in
-        ptr.initialize(from: arrayBuf.baseAddress!, count: count)
+        ptr.initialize(from: arrayBuf.baseAddress!, count: unitCount)
       }
+    }
+  }
+
+  init<S : Sequence>(shape: [Int], units: S) where S.Element == Unit {
+    let unitCount = shape.reduce(1, *)
+    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+    self.init(buffer: buffer, shape: shape)
+    buffer.withUnsafeMutablePointerToUnits { ptr in
+      // TODO: Refactor with better pointer initializers in Swift 4.1.
+      var i = 0
+      for unit in units {
+        guard i < unitCount else { break }
+        ptr.advanced(by: i).initialize(to: unit)
+        i += 1
+      }
+      // If the sequence has fewer elements than the shape needs, this is a
+      // precondition failure.
+      precondition(i == unitCount,
+                   "The sequence has fewer elements than needed by the shape.")
     }
   }
 
@@ -282,7 +308,8 @@ public extension ShapedArray {
     where Unit == Other.Unit {
     let count = shape.reduce(1, *)
     precondition(count == units.count)
-    self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
+    let buffer = TensorBuffer<Unit>.createUninitialized(count: count)
+    self.init(buffer: buffer, shape: shape)
     buffer.withUnsafeMutablePointerToUnits { ptr in
       units.base.withUnsafeBufferPointer { arrayBuf in
         ptr.initialize(from: arrayBuf.baseAddress!, count: count)
@@ -292,8 +319,8 @@ public extension ShapedArray {
 
   /// Initialize a scalar tensor.
   init(_ scalar: Unit) {
-    self.init(buffer: TensorBuffer.createUninitialized(count: 1),
-              shape: [])
+    let buffer = TensorBuffer<Unit>.createUninitialized(count: 1)
+    self.init(buffer: buffer, shape: [])
     buffer.withUnsafeMutablePointerToUnits { ptr in
       ptr.initialize(to: scalar)
     }
@@ -303,10 +330,11 @@ public extension ShapedArray {
   /// - parameter shape: tensor shape
   /// - parameter repeating: repeated value
   init(shape: Shape, repeating repeatedValue: Unit) {
-    let count = shape.reduce(1, *)
-    self.init(buffer: TensorBuffer.createUninitialized(count: count), shape: shape)
+    let unitCount = shape.reduce(1, *)
+    let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
+    self.init(buffer: buffer, shape: shape)
     buffer.withUnsafeMutablePointerToUnits { ptr in
-      ptr.initialize(repeating: repeatedValue, count: count)
+      ptr.initialize(repeating: repeatedValue, count: unitCount)
     }
   }
 }
@@ -329,7 +357,6 @@ public extension ShapedArray {
     }
   }
 }
-
 
 /// Tensor conversion
 extension ShapedArray where Unit : AccelerableTensorUnit {
@@ -362,6 +389,70 @@ extension ShapedArray where Unit : AccelerableTensorUnit {
 public extension Tensor where Unit : AccelerableTensorUnit {
   init(_ other: ShapedArray<Unit>) {
     self.init(other.makeTensorHandle())
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ShapedArraySlice
+//===----------------------------------------------------------------------===//
+
+/// ShapedArraySlice
+public struct ShapedArraySlice<Unit> /*: ShapedArrayProtocol */ {
+  public typealias Shape = [Int]
+
+  private var base: ShapedArray<Unit>
+  private var baseIndices: [Int]
+  private var bounds: CountableRange<Int>?
+
+  /// Initialize a shaped array slice from a shaped array as base, with
+  /// specified subdimensional inwards indices and subtensor bounds.
+  fileprivate init(
+    base: ShapedArray<Unit>,
+    baseIndices indices: [Int] = [],
+    bounds: CountableRange<Int>? = nil
+  ) {
+    precondition(indices.count <= base.rank, "Element indices are out of bounds.")
+    precondition(zip(base.shape, indices).forAll { $1 >= 0 && $1 < $0 })
+    self.base = base
+    self.baseIndices = indices
+    self.bounds = bounds
+  }
+}
+
+public extension ShapedArraySlice {
+  init(shape: [Int], units: ContiguousView<ShapedArray<Unit>>) {
+    self.init(base: ShapedArray(buffer: units.base.buffer, shape: shape))
+  }
+
+  init(shape: [Int], units: [Unit]) {
+    self.init(base: ShapedArray(shape: shape, units: units))
+  }
+
+  init<S : Sequence>(shape: [Int], units: S) where S.Element == Unit {
+    self.init(base: ShapedArray(shape: shape, units: units))
+  }
+
+  init<Other>(shape: [Int], units: ContiguousView<Other>)
+    where Unit == Other.Unit {
+    self.init(base: ShapedArray(shape: shape, units: units))
+  }
+
+  /// Initialize a scalar tensor.
+  init(_ scalar: Unit) {
+    self.init(base: ShapedArray(scalar))
+  }
+
+  /// Allocate and initialize a tensor to a repeated value.
+  /// - parameter shape: tensor shape
+  /// - parameter repeating: repeated value
+  init(shape: Shape, repeating repeatedValue: Unit) {
+    self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
+  }
+}
+
+public extension ShapedArraySlice where Unit : AccelerableTensorUnit {
+  init(_ other: Tensor<Unit>) {
+    self.init(base: other.array)
   }
 }
 
