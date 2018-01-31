@@ -4400,19 +4400,27 @@ public:
                           FloatingRequirementSource source)
     : module(module), Builder(builder), source(source) { }
 
-  Action walkToTypePost(Type ty) override {
-    auto boundGeneric = ty->getAs<BoundGenericType>();
-    if (!boundGeneric)
-      return Action::Continue;
-
-    auto *decl = boundGeneric->getDecl();
-    auto genericSig = decl->getGenericSignature();
-    if (!genericSig)
+  Action walkToTypePre(Type ty) override {
+    // Unbound generic types are the result of recovered-but-invalid code, and
+    // don't have enough info to do any useful substitutions.
+    if (ty->is<UnboundGenericType>())
       return Action::Stop;
 
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    auto decl = ty->getAnyNominal();
+    if (!decl)
+      return Action::Continue;
+
+    auto genericSig = decl->getGenericSignature();
+    if (!genericSig)
+      return Action::Continue;
+
     /// Retrieve the substitution.
-    auto subMap = boundGeneric->getContextSubstitutionMap(
-      &module, decl, decl->getGenericEnvironment());
+    auto subMap = ty->getContextSubstitutionMap(&module, decl,
+                                                decl->getGenericEnvironment());
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
