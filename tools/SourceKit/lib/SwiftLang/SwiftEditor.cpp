@@ -1766,7 +1766,8 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Impl.SemanticInfo->getInvocation()->applyTo(CompInv);
     Impl.SemanticInfo->getInvocation()->raw(Args, PrimaryFile);
   } else {
-    ArrayRef<const char *> Args;
+    SmallVector<const char *, 1> Args;
+    Args.push_back(Impl.FilePath.c_str()); // Input
     std::string Error;
     // Ignore possible error(s)
     Lang.getASTManager().
