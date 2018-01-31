@@ -106,9 +106,7 @@ public:
   Element operator[](const size_t Index) const {
     assert(Index < size());
     assert(!empty());
-
-    auto ChildData = Data->getChild(Index);
-    return Element { Root, ChildData.get() };
+    return { Root, Data->getChild(Index).get() };
   }
 
   /// Return a new collection with the given element added to the end.

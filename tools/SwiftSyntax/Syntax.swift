@@ -124,7 +124,9 @@ extension Syntax {
   ///
   /// This property is an implementation detail of `SyntaxChildren`.
   internal var presentChildIndices: _SyntaxBase.PresentChildIndicesSequence {
-    return raw.layout.indices.lazy.filter { self.raw.layout[$0].isPresent }
+    return raw.layout.indices.lazy.filter {
+      self.raw.layout[$0]?.isPresent == true
+    }
   }
 
   /// Gets the child at the provided index in this node's children.
@@ -133,8 +135,8 @@ extension Syntax {
   ///            is not a child at that index in the node.
   public func child(at index: Int) -> Syntax? {
     guard raw.layout.indices.contains(index) else { return nil }
-    if raw.layout[index].isMissing { return nil }
-    return makeSyntax(root: _root, data: data.cachedChild(at: index))
+    guard let childData = data.cachedChild(at: index) else { return nil }
+    return makeSyntax(root: _root, data: childData)
   }
 
   /// A source-accurate description of this node.

@@ -128,7 +128,7 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
     if (I == Elements.size() ||
         !${check_child_condition_raw(child)}(Elements[I])) {
 %     if child.is_optional:
-      Layout[${child_idx}] = ${make_missing_child(child)};
+      Layout[${child_idx}] = nullptr;
 %     else:
       return nullptr;
 %     end
@@ -183,8 +183,7 @@ SyntaxFactory::make${node.syntax_kind}(${child_params}) {
   auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
-    ${child.name}.hasValue() ? ${child.name}->getRaw() :
-        cast<RawSyntax>(${make_missing_child(child)}),
+    ${child.name}.hasValue() ? ${child.name}->getRaw() : nullptr,
 %       else:
     ${child.name}.getRaw(),
 %       end
@@ -211,7 +210,11 @@ ${node.name}
 SyntaxFactory::makeBlank${node.syntax_kind}() {
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %   for child in node.children:
+%       if child.is_optional:
+    nullptr,
+%       else:
     ${make_missing_child(child)},
+%       end
 %   end
   }, SourcePresence::Present);
   return make<${node.name}>(raw);

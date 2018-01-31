@@ -111,8 +111,9 @@ public:
   /// at the provided index.
   /// DO NOT expose this as public API.
   RC<SyntaxData> realizeSyntaxNode(CursorIndex Index) const {
-    auto &RawChild = Raw->getChild(Index);
-    return SyntaxData::make(RawChild, this, Index);
+    if (auto &RawChild = Raw->getChild(Index))
+      return SyntaxData::make(RawChild, this, Index);
+    return nullptr;
   }
 
   /// Replace a child in the raw syntax and recursively rebuild the
@@ -215,6 +216,8 @@ public:
   /// cache it. This is safe because AtomicCache only ever mutates its cache
   /// one time -- the first initialization that wins a compare_exchange_strong.
   RC<SyntaxData> getChild(size_t Index) const {
+    if (!getRaw()->getChild(Index))
+      return nullptr;
     return Children[Index].getOrCreate([&]() {
       return realizeSyntaxNode(Index);
     });

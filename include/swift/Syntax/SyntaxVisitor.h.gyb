@@ -46,7 +46,8 @@ struct SyntaxVisitor {
 
   void visitChildren(Syntax node) {
     for (unsigned i = 0, e = node.getNumChildren(); i != e; ++i) {
-      visit(node.getChild(i));
+      if (auto Child = node.getChild(i))
+        visit(*Child);
     }
   }
 };
