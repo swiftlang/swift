@@ -368,7 +368,8 @@ extension DoubleWidth : FixedWidthInteger {
     guard DoubleWidth.isSigned else {
       return (DoubleWidth(quotient), DoubleWidth(remainder))
     }
-    let quotient_ = (self.high < (0 as High)) != (other.high < (0 as High))
+    let isNegative = (self.high < (0 as High)) != (other.high < (0 as High))
+    let quotient_ = isNegative
       ? quotient == DoubleWidth.min.magnitude
         ? DoubleWidth.min
         : 0 - DoubleWidth(quotient)
@@ -452,7 +453,9 @@ extension DoubleWidth : FixedWidthInteger {
     guard DoubleWidth.isSigned else {
       return (DoubleWidth(quotient), DoubleWidth(remainder))
     }
-    let quotient_ = (self.high < (0 as High)) != (other.high.high < (0 as High))
+    let isNegative =
+      (self.high < (0 as High)) != (other.high.high < (0 as High))
+    let quotient_ = isNegative
       ? quotient == DoubleWidth.min.magnitude
         ? DoubleWidth.min
         : 0 - DoubleWidth(quotient)
@@ -508,15 +511,29 @@ extension DoubleWidth : FixedWidthInteger {
 
     lhs &>>= rhs
   }
-  
+
+  /// Returns this value "masked" by its bit width.
+  ///
+  /// "Masking" notionally involves repeatedly incrementing or decrementing this
+  /// value by `self.bitWidth` until the result is contained in the range
+  /// `0..<self.bitWidth`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  @_transparent
+  internal func _masked() -> DoubleWidth {
+    // FIXME(integers): test types with bit widths that aren't powers of 2
+    if DoubleWidth.bitWidth.nonzeroBitCount == 1 {
+      return self & DoubleWidth(DoubleWidth.bitWidth &- 1)
+    }
+    if DoubleWidth.isSigned && self._storage.high < (0 as High) {
+      return self % DoubleWidth(DoubleWidth.bitWidth) + self
+    }
+    return self % DoubleWidth(DoubleWidth.bitWidth)
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    // FIXME(integers): test types with bit widths that aren't powers of 2
-    let rhs = DoubleWidth.bitWidth.nonzeroBitCount == 1
-      ? rhs & DoubleWidth(DoubleWidth.bitWidth &- 1)
-      : DoubleWidth.isSigned && rhs._storage.high < (0 as High)
-        ? rhs % DoubleWidth(DoubleWidth.bitWidth) + rhs
-        : rhs % DoubleWidth(DoubleWidth.bitWidth)
+    let rhs = rhs._masked()
 
     guard rhs._storage.low < Base.bitWidth else {
       lhs._storage.high = High(
@@ -536,12 +553,7 @@ extension DoubleWidth : FixedWidthInteger {
   
   @_inlineable // FIXME(sil-serialize-all)
   public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    // FIXME(integers): test types with bit widths that aren't powers of 2
-    let rhs = DoubleWidth.bitWidth.nonzeroBitCount == 1
-      ? rhs & DoubleWidth(DoubleWidth.bitWidth &- 1)
-      : DoubleWidth.isSigned && rhs._storage.high < (0 as High)
-        ? rhs % DoubleWidth(DoubleWidth.bitWidth) + rhs
-        : rhs % DoubleWidth(DoubleWidth.bitWidth)
+    let rhs = rhs._masked()
 
     guard rhs._storage.low < Base.bitWidth else {
       lhs._storage.low = Low(

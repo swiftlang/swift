@@ -3098,13 +3098,15 @@ ${assignmentOperatorComment(x.operator, True)}
     // No LLVM primitives for checking overflow of division operations, so we
     // check manually.
     if _slowPath(rhs == (0 as ${Self})) {
-      _preconditionFailure("Division by zero")
+      _preconditionFailure(
+        "Division by zero${' in remainder operation' if x.operator == '%' else ''}")
     }
 %     if signed:
     if _slowPath(
       ${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}
     ) {
-      _preconditionFailure("Division results in an overflow")
+      _preconditionFailure(
+        "Division results in an overflow${' in remainder operation' if x.operator == '%' else ''}")
     }
 %     end
     let (result, overflow) =
@@ -3166,11 +3168,13 @@ ${assignmentOperatorComment('%', True)}
     // No LLVM primitives for checking overflow of division operations, so we
     // check manually.
     if _slowPath(rhs == (0 as ${Self})) {
-      _preconditionFailure("Division by zero")
+      _preconditionFailure(
+        "Division by zero in remainder operation")
     }
 %     if signed:
     if _slowPath(${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}) {
-      _preconditionFailure("Division results in an overflow")
+      _preconditionFailure(
+        "Division results in an overflow in remainder operation")
     }
 %     end
 
