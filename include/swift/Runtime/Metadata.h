@@ -2795,6 +2795,104 @@ struct TypeGenericContextDescriptorHeader {
     return Base;
   }
 };
+  
+/// Wrapper class for the pointer to a metadata access function that provides
+/// operator() overloads to call it with the right calling convention.
+class MetadataAccessFunction {
+  const Metadata * (*Function)(...);
+
+  static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
+                "Need to account for change in number of direct arguments");
+
+  template<typename T>
+  const Metadata *applyN(const void *arg0,
+                         const void *arg1,
+                         const void *arg2,
+                         llvm::ArrayRef<T *> argRest) const {
+    using FnN = const Metadata *(const void *,
+                                 const void *,
+                                 const void *,
+                                 const void *);
+    return reinterpret_cast<FnN*>(Function)(arg0, arg1, arg2, argRest.data());
+  }
+  
+  template<typename...Args>
+  const Metadata *variadic_apply(const void *arg0,
+                                 const void *arg1,
+                                 const void *arg2,
+                                 llvm::MutableArrayRef<const void *> argRest,
+                                 unsigned n,
+                                 const void *arg3,
+                                 Args...argN) const {
+    argRest[n] = arg3;
+    return variadic_apply(arg0, arg1, arg2, argRest, n+1, argN...);
+  }
+  
+  const Metadata *variadic_apply(const void *arg0,
+                                 const void *arg1,
+                                 const void *arg2,
+                                 llvm::MutableArrayRef<const void *> argRest,
+                                 unsigned n) const {
+    return applyN(arg0, arg1, arg2, argRest);
+  }
+
+public:
+  explicit MetadataAccessFunction(const Metadata * (*Function)(...))
+    : Function(Function)
+  {}
+  
+  explicit operator bool() const {
+    return Function != nullptr;
+  }
+  
+  // Invoke with an array of arguments.
+  template<typename T>
+  const Metadata *operator()(llvm::ArrayRef<T *> args) const {
+    switch (args.size()) {
+    case 0:
+      return (*this)();
+    case 1:
+      return (*this)(args[0]);
+    case 2:
+      return (*this)(args[0], args[1]);
+    case 3:
+      return (*this)(args[0], args[1], args[2]);
+    default:
+      return applyN(args[0], args[1], args[2], args);
+    }
+  }
+  
+  // Invoke with n arguments.
+  const Metadata *operator()() const {
+    using Fn0 = const Metadata *();
+    return reinterpret_cast<Fn0*>(Function)();
+  }
+  const Metadata *operator()(const void *arg0) const {
+    using Fn1 = const Metadata *(const void *);
+    return reinterpret_cast<Fn1*>(Function)(arg0);
+
+  }
+  const Metadata *operator()(const void *arg0,
+                             const void *arg1) const {
+    using Fn2 = const Metadata *(const void *, const void *);
+    return reinterpret_cast<Fn2*>(Function)(arg0, arg1);
+  }
+  const Metadata *operator()(const void *arg0,
+                             const void *arg1,
+                             const void *arg2) const {
+    using Fn3 = const Metadata *(const void *, const void *, const void *);
+    return reinterpret_cast<Fn3*>(Function)(arg0, arg1, arg2);
+  }
+  
+  template<typename...Args>
+  const Metadata *operator()(const void *arg0,
+                             const void *arg1,
+                             const void *arg2,
+                             Args...argN) const {
+    const void *args[3 + sizeof...(Args)];
+    return variadic_apply(arg0, arg1, arg2, args, 3, argN...);
+  }
+};
 
 template<typename Runtime>
 struct TargetTypeContextDescriptor final
@@ -2835,20 +2933,17 @@ public:
   /// The name of the type.
   TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
   
-  using NonGenericMetadataAccessFunction = const Metadata *();
-
   /// A pointer to the metadata access function for this type.
   ///
-  /// The type of the returned function is speculative; in reality, it
-  /// takes one argument for each of the generic requirements, in the order
-  /// they are listed.  Therefore, the function type is correct only if
-  /// this type is non-generic.
-  ///
-  /// Not all type metadata have access functions. If a type is not generic
-  /// and its metadata record does not rely on runtime-instantiated metadata,
-  /// then its metadata symbol can be addressed directly.
-  TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
-                              /*Nullable*/ true> AccessFunction;
+  /// The function type here is a stand-in. You should use getAccessFunction()
+  /// to wrap the function pointer in an accessor that uses the proper calling
+  /// convention for a given number of arguments.
+  TargetRelativeDirectPointer<Runtime, const Metadata *(...),
+                              /*Nullable*/ true> AccessFunctionPtr;
+  
+  MetadataAccessFunction getAccessFunction() const {
+    return MetadataAccessFunction(AccessFunctionPtr.get());
+  }
 
   // ABI TODO: These fields ought to be superseded by remote mirror metadata for
   // the type.

@@ -617,44 +617,10 @@ public:
       return BuiltType();
 
     // Call the access function.
-    auto accessFunction = typeDecl->AccessFunction.get();
+    auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
-                  "Need to account for change in number of direct arguments");
-    switch (allGenericArgs.size()) {
-    case 0:
-      return accessFunction();
-
-    case 1:
-      using GenericMetadataAccessFunction1 = const Metadata *(const void *);
-      return ((GenericMetadataAccessFunction1 *)accessFunction)(
-                                                          allGenericArgs[0]);
-
-    case 2:
-      using GenericMetadataAccessFunction2 =
-        const Metadata *(const void *, const void *);
-      return ((GenericMetadataAccessFunction2 *)accessFunction)(
-                                                          allGenericArgs[0],
-                                                          allGenericArgs[1]);
-
-    case 3:
-      using GenericMetadataAccessFunction3 =
-        const Metadata *(const void *, const void *, const void *);
-      return ((GenericMetadataAccessFunction3 *)accessFunction)(
-                                                          allGenericArgs[0],
-                                                          allGenericArgs[1],
-                                                          allGenericArgs[2]);
-    default:
-      using GenericMetadataAccessFunction4 =
-        const Metadata *(const void *, const void *, const void *,
-                         const void *);
-      return ((GenericMetadataAccessFunction4 *)accessFunction)(
-                                                      allGenericArgs[0],
-                                                      allGenericArgs[1],
-                                                      allGenericArgs[2],
-                                                      allGenericArgs.data());
-    }
+    return accessFunction(allGenericArgs);
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
