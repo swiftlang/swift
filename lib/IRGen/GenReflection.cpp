@@ -331,6 +331,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
                     bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
+    if (auto var = dyn_cast<VarDecl>(value))
+      flags.setIsVar(!var->isLet());
 
     B.addInt32(flags.getRawValue());
 
