@@ -2292,14 +2292,9 @@ commit_to_conversions:
       conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 
-    // Look through IUO's.
-    auto type1WithoutIUO = objectType1;
-    if (auto elt = type1WithoutIUO->getImplicitlyUnwrappedOptionalObjectType())
-      type1WithoutIUO = elt;
-
     // If we could perform a bridging cast, try it.
     if (auto bridged =
-          TC.getDynamicBridgedThroughObjCClass(DC, type1WithoutIUO, type2)) {
+            TC.getDynamicBridgedThroughObjCClass(DC, objectType1, type2)) {
       // Note: don't perform this recovery for NSNumber;
       bool useFix = true;
       if (auto classType = bridged->getAs<ClassType>()) {
@@ -3539,17 +3534,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (unwrappedToType->isAnyObject()) {
     countOptionalInjections();
     return SolutionKind::Solved;
-  }
-
-  // Unwrap one extra level of implicitly-unwrapped optional on the source,
-  // if needed.
-  if (numFromOptionals == numToOptionals + 1 &&
-      !type1->getImplicitlyUnwrappedOptionalObjectType().isNull()) {
-    --numFromOptionals;
-    increaseScore(SK_ForceUnchecked);
-    if (worseThanBestSolution()) {
-      return SolutionKind::Error;
-    }
   }
 
   // The source cannot be more optional than the destination, because bridging

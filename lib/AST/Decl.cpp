@@ -1696,18 +1696,6 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
-  // Translate implicitly unwrapped optionals into strict optionals.
-  if (auto inOutTy = type->getAs<InOutType>()) {
-    if (auto uncheckedOptOf =
-            inOutTy->getObjectType()
-                ->getImplicitlyUnwrappedOptionalObjectType()) {
-      type = InOutType::get(OptionalType::get(uncheckedOptOf));
-    }
-  } else if (auto uncheckedOptOf =
-                 type->getImplicitlyUnwrappedOptionalObjectType()) {
-    type = OptionalType::get(uncheckedOptOf);
-  }
-
   return mapSignatureType(ctx, type);
 }
 
