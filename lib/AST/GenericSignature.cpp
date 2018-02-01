@@ -42,7 +42,7 @@ void ConformanceAccessPath::dump() const {
   llvm::errs() << "\n";
 }
 
-GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
+GenericSignature::GenericSignature(TypeArrayView<GenericTypeParamType> params,
                                    ArrayRef<Requirement> requirements,
                                    bool isKnownCanonical)
   : NumGenericParams(params.size()), NumRequirements(requirements.size()),
@@ -77,10 +77,11 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
 #endif
 
   if (isKnownCanonical)
-    CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
+    CanonicalSignatureOrASTContext = &getASTContext(getGenericParams(),
+                                                    requirements);
 }
 
-ArrayRef<GenericTypeParamType *> 
+TypeArrayView<GenericTypeParamType>
 GenericSignature::getInnermostGenericParams() const {
   auto params = getGenericParams();
 
@@ -111,8 +112,8 @@ GenericSignature::getSubstitutableParams() const {
 }
 
 ASTContext &GenericSignature::getASTContext(
-                                ArrayRef<swift::GenericTypeParamType *> params,
-                                ArrayRef<swift::Requirement> requirements) {
+                                    TypeArrayView<GenericTypeParamType> params,
+                                    ArrayRef<swift::Requirement> requirements) {
   // The params and requirements cannot both be empty.
   if (!params.empty())
     return params.front()->getASTContext();
@@ -148,10 +149,10 @@ static unsigned getRequirementKindOrder(RequirementKind kind) {
 }
 #endif
 
-CanGenericSignature GenericSignature::getCanonical(
-                                        ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        bool skipValidation) {
+CanGenericSignature
+GenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
+                               ArrayRef<Requirement> requirements,
+                               bool skipValidation) {
   // Canonicalize the parameters and requirements.
   SmallVector<GenericTypeParamType*, 8> canonicalParams;
   canonicalParams.reserve(params.size());
@@ -341,7 +342,7 @@ bool GenericSignature::enumeratePairedRequirements(
   unsigned curReqIdx = 0, numReqs = reqs.size();
 
   // ... and walking through the list of generic parameters.
-  ArrayRef<GenericTypeParamType *> genericParams = getGenericParams();
+  auto genericParams = getGenericParams();
   unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
 
   // Figure out which generic parameters are complete.
@@ -1126,7 +1127,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 }
 
 unsigned GenericParamKey::findIndexIn(
-                  llvm::ArrayRef<GenericTypeParamType *> genericParams) const {
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that
   // we can return
   if (Depth == 0 && Index < genericParams.size() &&

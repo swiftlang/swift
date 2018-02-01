@@ -1474,8 +1474,8 @@ public:
   /// These are used to produce the "parameter = argument" bindings in the test.
   static std::string
   gatherGenericParamBindingsText(ArrayRef<Type> types,
-                                 ArrayRef<GenericTypeParamType *> genericParams,
-                                 TypeSubstitutionFn substitutions);
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              TypeSubstitutionFn substitutions);
 
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
@@ -1496,7 +1496,7 @@ public:
   /// notify callers about diagnosed errors.
   RequirementCheckResult checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-      ArrayRef<GenericTypeParamType *> genericParams,
+      TypeArrayView<GenericTypeParamType> genericParams,
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
