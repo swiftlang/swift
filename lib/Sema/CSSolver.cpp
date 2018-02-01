@@ -1788,9 +1788,10 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
     // Let's skip generic overload choices only in case if
     // non-generic score indicates that there were no forced
     // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, and no fixes required.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0
-        && score[SK_Fix] == 0)
+    // choices present in the solution, no fixes required,
+    // and there are no non-trivial function conversions.
+    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
+        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
       return true;
   }
 
