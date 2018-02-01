@@ -30,10 +30,8 @@ namespace DomTreeBuilder {
 using SILDomTree = llvm::DomTreeBase<swift::SILBasicBlock>;
 using SILPostDomTree = llvm::PostDomTreeBase<swift::SILBasicBlock>;
 
-extern template void Calculate<SILDomTree, swift::SILFunction>(
-    SILDomTree &DT, swift::SILFunction &F);
-extern template void Calculate<SILPostDomTree, swift::SILFunction>(
-    SILPostDomTree &DT, swift::SILFunction &F);
+extern template void Calculate<SILDomTree>(SILDomTree &DT);
+extern template void Calculate<SILPostDomTree>(SILPostDomTree &DT);
 } // namespace DomTreeBuilder
 } // namespace llvm
 

@@ -41,6 +41,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -62,7 +63,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/Coroutines.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -551,7 +551,7 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   // Create a target machine.
   llvm::TargetMachine *TargetMachine =
       Target->createTargetMachine(Triple.str(), CPU, targetFeatures, TargetOpts,
-                                  Reloc::PIC_, CodeModel::Default, OptLevel);
+                                  Reloc::PIC_, None, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                        Triple.str(), "no LLVM target machine");

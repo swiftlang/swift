@@ -1209,7 +1209,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
     IndexSymbol Info;
     Info.decl = nullptr;
     Info.symInfo = SymbolInfo{ SymbolKind::CommentTag, SymbolSubKind::None,
-      SymbolPropertySet(), SymbolLanguage::Swift };
+      SymbolLanguage::Swift, SymbolPropertySet() };
     Info.roles |= (unsigned)SymbolRole::Definition;
     Info.name = StringRef();
     SmallString<128> storage;

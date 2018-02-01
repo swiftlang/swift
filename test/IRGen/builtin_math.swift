@@ -20,21 +20,22 @@ public func test2(f : Double) -> Double {
   return _exp(f)
 }
 
-// LLVM's sqrt intrinsic does not have the same semantics as libm's sqrt.
-// In particular, llvm.sqrt(negative) is documented as being undef, but
-// we want sqrt(negative) to be defined to be NaN for IEEE 754 conformance.
-
 // CHECK-LABEL: define {{.*}}test3
 // CHECK: call double @sqrt
 
 public func test3(d : Double) -> Double {
+  // This call uses the sqrt function imported from C.
   return sqrt(d)
 }
 
 // CHECK-LABEL: define {{.*}}test4
-// CHECK: call float @sqrtf
+// CHECK: call float @llvm.sqrt.f32
 
 public func test4(f : Float) -> Float {
+  // This call does not match the signature for the C sqrt function
+  // (as opposed to sqrtf) so instead it gets compiled using the generic
+  // sqrt function from the stdlib's tgmath.swift. That translates to
+  // _stdlib_squareRootf and then to __builtin_sqrtf via SwiftShims.
   return sqrt(f)
 }
 

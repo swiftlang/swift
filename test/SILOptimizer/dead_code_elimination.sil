@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -dce %s | %FileCheck %s
 
+// REQUIRES: rdar34013900
+
 sil_stage canonical
 
 import Builtin

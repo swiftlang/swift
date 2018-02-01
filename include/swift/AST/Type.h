@@ -666,7 +666,7 @@ namespace llvm {
 
   // A Type is "pointer like".
   template<>
-  class PointerLikeTypeTraits<swift::Type> {
+  struct PointerLikeTypeTraits<swift::Type> {
   public:
     static inline void *getAsVoidPointer(swift::Type I) {
       return (void*)I.getPointer();
@@ -678,7 +678,7 @@ namespace llvm {
   };
   
   template<>
-  class PointerLikeTypeTraits<swift::CanType> :
+  struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
   public:
     static inline swift::CanType getFromVoidPointer(void *P) {
@@ -687,7 +687,7 @@ namespace llvm {
   };
 
   template<>
-  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
   public:
     static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
       return swift::CanGenericSignature((swift::GenericSignature*)P);

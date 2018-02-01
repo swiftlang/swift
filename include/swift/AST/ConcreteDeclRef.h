@@ -71,7 +71,7 @@ class ConcreteDeclRef {
 
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
 
-  friend class llvm::PointerLikeTypeTraits<ConcreteDeclRef>;
+  friend struct llvm::PointerLikeTypeTraits<ConcreteDeclRef>;
 
 public:
   /// Create an empty declaration reference.
@@ -140,7 +140,7 @@ public:
 } // end namespace swift
 
 namespace llvm {
-  template<> class PointerLikeTypeTraits<swift::ConcreteDeclRef> {
+  template<> struct PointerLikeTypeTraits<swift::ConcreteDeclRef> {
     typedef llvm::PointerUnion<swift::ValueDecl *,
                                swift::ConcreteDeclRef::SpecializedDeclRef *>
       DataPointer;

@@ -156,10 +156,11 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   }
 
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
-  std::unique_ptr<llvm::MemoryBuffer> NewBuffer =
-      llvm::MemoryBuffer::getNewUninitMemBuffer(InputFile->getBufferSize() + 1,
+  std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
+      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+                                              InputFile->getBufferSize() + 1,
                                               InputFile->getBufferIdentifier());
-  char *NewBuf = const_cast<char*>(NewBuffer->getBufferStart());
+  char *NewBuf = NewBuffer->getBufferStart();
   char *NewPos = std::copy(InputFile->getBufferStart(), Position, NewBuf);
   *NewPos = '\0';
   std::copy(Position, InputFile->getBufferEnd(), NewPos+1);

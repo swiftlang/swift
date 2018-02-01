@@ -191,9 +191,9 @@ namespace llvm {
   };
   
   // An Identifier is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
+  template<typename T> struct PointerLikeTypeTraits;
   template<>
-  class PointerLikeTypeTraits<swift::Identifier> {
+  struct PointerLikeTypeTraits<swift::Identifier> {
   public:
     static inline void *getAsVoidPointer(swift::Identifier I) {
       return const_cast<void *>(I.getAsOpaquePointer());
@@ -333,8 +333,8 @@ template<> struct DenseMapInfo<swift::DeclBaseName> {
 };
 
 // A DeclBaseName is "pointer like".
-template <typename T> class PointerLikeTypeTraits;
-template <> class PointerLikeTypeTraits<swift::DeclBaseName> {
+template <typename T> struct PointerLikeTypeTraits;
+template <> struct PointerLikeTypeTraits<swift::DeclBaseName> {
 public:
   static inline void *getAsVoidPointer(swift::DeclBaseName D) {
     return const_cast<void *>(D.getAsOpaquePointer());
@@ -687,9 +687,9 @@ public:
 
 namespace llvm {
   // A DeclName is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
+  template<typename T> struct PointerLikeTypeTraits;
   template<>
-  class PointerLikeTypeTraits<swift::DeclName> {
+  struct PointerLikeTypeTraits<swift::DeclName> {
   public:
     static inline void *getAsVoidPointer(swift::DeclName name) {
       return name.getOpaqueValue();
@@ -717,9 +717,9 @@ namespace llvm {
   };
 
   // An ObjCSelector is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
+  template<typename T> struct PointerLikeTypeTraits;
   template<>
-  class PointerLikeTypeTraits<swift::ObjCSelector> {
+  struct PointerLikeTypeTraits<swift::ObjCSelector> {
   public:
     static inline void *getAsVoidPointer(swift::ObjCSelector name) {
       return name.getOpaqueValue();

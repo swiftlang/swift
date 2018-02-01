@@ -309,7 +309,7 @@ function(swift_common_llvm_config target)
     else()
       # HACK: Otherwise (for example, for executables), use a plain signature,
       # because LLVM CMake does that already.
-      target_link_libraries("${target}" ${libnames})
+      target_link_libraries("${target}" PRIVATE ${libnames})
     endif()
   else()
     # If Swift was not built standalone, dispatch to 'llvm_config()'.
