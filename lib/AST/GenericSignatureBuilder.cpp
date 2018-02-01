@@ -6443,9 +6443,17 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
                                       /*allowConcreteGenericParams=*/true,
                                       /*allowBuilderToMove=*/true);
 
-    // Check whether the removed requirement
-    assert(!newSig->isRequirementSatisfied(requirements[victimIndex]) &&
-           "Generic signature is not minimal");
+    // If the removed requirement is satisfied by the new generic signature,
+    // it is redundant. Complain.
+    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+      SmallString<32> reqString;
+      {
+        llvm::raw_svector_ostream out(reqString);
+        requirements[victimIndex].print(out, PrintOptions());
+      }
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
+                             reqString, sig->getAsString());
+    }
 
     // Canonicalize the signature to check that it is canonical.
     (void)newSig->getCanonicalSignature();
