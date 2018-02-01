@@ -20,6 +20,19 @@
 // CHECK-32: mce: __C.MyCEnum
 // CHECK-32: (struct __C.MyCEnum)
 
+// CHECK-32: __C.MyCStruct
+// CHECK-32: -------------
+// CHECK-32: i: Swift.Int32
+// CHECK-32: (struct Swift.Int32)
+
+// CHECK-32: ip: Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int32>>
+// CHECK-32: (bound_generic_enum Swift.Optional
+// CHECK-32:   (bound_generic_struct Swift.UnsafeMutablePointer
+// CHECK-32:     (struct Swift.Int32)))
+
+// CHECK-32: c: Swift.Int8
+// CHECK-32: (struct Swift.Int8)
+
 // CHECK-32: TypesToReflect.AlsoHasCTypes
 // CHECK-32: ----------------------------
 
@@ -81,6 +94,19 @@
 
 // CHECK-64: mcu: __C.MyCUnion
 // CHECK-64: (struct __C.MyCUnion)
+
+// CHECK-64: __C.MyCStruct
+// CHECK-64: -------------
+// CHECK-64: i: Swift.Int32
+// CHECK-64: (struct Swift.Int32)
+
+// CHECK-64: ip: Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int32>>
+// CHECK-64: (bound_generic_enum Swift.Optional
+// CHECK-64:   (bound_generic_struct Swift.UnsafeMutablePointer
+// CHECK-64:     (struct Swift.Int32)))
+
+// CHECK-64: c: Swift.Int8
+// CHECK-64: (struct Swift.Int8)
 
 // CHECK-64: TypesToReflect.AlsoHasCTypes
 // CHECK-64: ----------------------------

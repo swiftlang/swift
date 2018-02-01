@@ -345,6 +345,15 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     } else {
       addTypeRef(value->getModuleContext(), type);
       addBuiltinTypeRefs(type);
+
+      // Trigger foreign struct metadata generation for each field,
+      // this is going to be used later on by reflection library.
+      type.visit([&](CanType nestedType) {
+        if (auto *NTD = nestedType->getAnyNominal()) {
+          if (NTD->hasClangNode() && isa<StructDecl>(NTD))
+            (void) IGM.getAddrOfForeignTypeMetadataCandidate(nestedType);
+        }
+      });
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
