@@ -222,7 +222,7 @@ internal extension ShapedArray {
 
 internal extension ShapedArray where Unit : AccelerableTensorUnit {
   @_versioned
-  init(moving cTensor: CTensor) {
+  init(owning cTensor: CTensor) {
     // Including \(Unit.self) into the message would cause non-deterministic crashes.
     debugLog("Initializing ShapedArray from CTensor.")
     shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
@@ -335,7 +335,7 @@ public extension ShapedArray {
 
 /// Tensor conversion
 extension ShapedArray where Unit : AccelerableTensorUnit {
-  var byteSize: Int {
+  var byteCount: Int {
     return MemoryLayout<Unit>.stride * unitCount
   }
 
@@ -344,16 +344,13 @@ extension ShapedArray where Unit : AccelerableTensorUnit {
     // `ShapedArray`s.
     switch buffer.allocation {
     case let .native(bufAddr):
-      let cTensor = TF_AllocateTensor(Unit.cDataType,
-                                      shape.map(Int64.init),
-                                      Int32(shape.count),
-                                      byteSize)!
-      TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
-        .initialize(from: bufAddr, count: unitCount)
-      defer {
-        TF_DeleteTensor(cTensor)
-      }
-      return TensorHandle(copyingFromCTensor: cTensor)
+      return TensorHandle<Unit>(
+        shape: shape,
+        unitsInitializer: { addr in
+          addr.initialize(from: bufAddr, count: unitCount)
+        }
+      )
+
     case let .tensorFlow(cTensor):
       return TensorHandle(copyingFromCTensor: cTensor)
     }
