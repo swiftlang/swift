@@ -956,7 +956,7 @@ extension Sequence {
 }
 
 @_versioned
-@_exhaustive
+@frozen
 internal enum _StopIteration : Error {
   case stop
 }

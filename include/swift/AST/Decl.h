@@ -3174,7 +3174,7 @@ public:
   ///
   /// Note that this property is \e not necessarily true for all children of
   /// \p useDC. In particular, an inlinable function does not get to switch
-  /// exhaustively over a non-exhaustive enum declared in the same module.
+  /// exhaustively over a non-frozen enum declared in the same module.
   bool isExhaustive(const DeclContext *useDC) const;
 };
 

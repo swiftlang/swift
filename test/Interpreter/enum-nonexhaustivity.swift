@@ -56,7 +56,7 @@ EnumTestSuite.test("TrapOnUnexpected/LyingExhaustive") {
   expectUnreachable()
 }
 
-@_exhaustive @objc enum SwiftEnum : Int32 {
+@frozen @objc enum SwiftEnum : Int32 {
   case A, B, C
 
   @inline(never) static func getExpectedValue() -> SwiftEnum {

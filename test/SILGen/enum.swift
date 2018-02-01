@@ -205,10 +205,10 @@ func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {
 
 
 public class SomeClass {}
-@_nonexhaustive public enum NonExhaustiveValues {
+@_nonfrozen public enum NonExhaustiveValues {
   case a, b
 }
-@_nonexhaustive public enum NonExhaustivePayload {
+@_nonfrozen public enum NonExhaustivePayload {
   case a
   case b(SomeClass)
 }

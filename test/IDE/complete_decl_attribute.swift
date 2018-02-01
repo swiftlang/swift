@@ -60,11 +60,10 @@ class C {}
 
 @#^KEYWORD4^#
 enum E {}
-// KEYWORD4:                  Begin completions, 4 items
+// KEYWORD4:                  Begin completions, 3 items
 // KEYWORD4-NEXT:             Keyword/None:                       available[#Enum Attribute#]; name=available{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       _exhaustive[#Enum Attribute#]; name=_exhaustive{{$}}
-// KEYWORD4-NEXT:             Keyword/None:                       _nonexhaustive[#Enum Attribute#]; name=_nonexhaustive{{$}}
+// KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen{{$}}
 // KEYWORD4-NEXT:             End completions
 
 
@@ -77,7 +76,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 20 items
+// KEYWORD_LAST:                  Begin completions, 19 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -96,6 +95,5 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       _exhaustive[#Declaration Attribute#]; name=_exhaustive{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       _nonexhaustive[#Declaration Attribute#]; name=_nonexhaustive{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       frozen[#Declaration Attribute#]; name=frozen{{$}}
 // KEYWORD_LAST-NEXT:             End completions

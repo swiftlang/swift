@@ -77,13 +77,13 @@ struct __PrivE2 : Equatable, RawRepresentable {
   typealias RawValue = UInt32
 }
 var __PrivE2A: __PrivE2 { get }
-@_nonexhaustive enum __PrivNSEnum : Int {
+@_nonfrozen enum __PrivNSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   typealias RawValue = Int
   case A
 }
-@_nonexhaustive enum NSEnum : Int {
+@_nonfrozen enum NSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   typealias RawValue = Int
