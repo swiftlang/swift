@@ -468,7 +468,7 @@ extension Substring {
       return ${_View}(_wholeString.${_property}, _bounds: startIndex..<endIndex)
     }
     set {
-      self = Substring(_base: _wholeString, startIndex..<endIndex)
+      self = Substring(newValue)
     }
   }
 
