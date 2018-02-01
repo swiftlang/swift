@@ -2507,27 +2507,28 @@ struct GenericContextDescriptorHeader {
 /// associated type.
 template<typename Runtime>
 class TargetGenericParamRef {
-  /// This is either a pointer to an associated type path stored out-of-line if
-  /// the `bool` flag is true, or the index of a directly-referenced
-  /// generic parameter stored inline if the `bool` flag is false.
-  RelativeDirectPointerIntPair<const void, bool> Value;
-  
-  unsigned getRootParamWord() const {
-    if (Value.getInt()) {
-      unsigned word;
-      memcpy(&word, Value.getPointer(), sizeof(unsigned));
-      return word;
-    } else {
-      return Value.getOpaqueValue();
-    }
-  }
-  
+  union {
+    /// The word of storage, whose low bit indicates whether there is an
+    /// associated type path stored out-of-line and whose upper bits describe
+    /// the generic parameter at root of the path.
+    uint32_t Word;
+
+    /// This is the associated type path stored out-of-line. The \c bool
+    /// is used for masking purposes and is otherwise unused; instead, check
+    /// the low bit of \c Word.
+    RelativeDirectPointerIntPair<const void, bool> AssociatedTypePath;
+  };
+
 public:
   /// Index of the parameter being referenced. 0 is the first generic parameter
   /// of the root of the context hierarchy, and subsequent parameters are
   /// numbered breadth-first from there.
   unsigned getRootParamIndex() const {
-    return getRootParamWord() >> 1;
+    // If there is no path, retrieve the index directly.
+    if ((Word & 0x01) == 0) return Word >> 1;
+
+    // Otherwise, the index is at the start of the associated type path.
+    return *reinterpret_cast<const unsigned *>(AssociatedTypePath.getPointer());
   }
   
   /// A reference to an associated type along the reference path.
@@ -2607,11 +2608,12 @@ public:
   
   /// Iterators for going through the associated type path from the root param.
   AssociatedTypeIterator begin() const {
-    if (Value.getInt()) {
+    if (Word & 0x01) {
       // The associated types start after the first word, which holds the
       // root param index.
       return AssociatedTypeIterator(
-        reinterpret_cast<const char*>(Value.getPointer()) + sizeof(unsigned));
+        reinterpret_cast<const char*>(AssociatedTypePath.getPointer()) +
+                                        sizeof(unsigned));
     } else {
       // This is a direct param reference, so there are no associated types.
       return end();
