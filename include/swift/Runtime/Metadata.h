@@ -956,6 +956,11 @@ public:
   }
 #endif
 
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger");
+#endif
+
 protected:
   friend struct TargetOpaqueMetadata<Runtime>;
   
