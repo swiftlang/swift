@@ -311,7 +311,7 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
 }
 
 void FrontendInputsAndOutputs::forEachOutputFilename(
-    llvm::function_ref<void(const std::string)> fn) const {
+    llvm::function_ref<void(const std::string &)> fn) const {
   forEachInputProducingAMainOutputFile(
       [&](const InputFile &input) -> void { fn(input.outputFilename()); });
 }
