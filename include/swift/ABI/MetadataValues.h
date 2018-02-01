@@ -398,6 +398,11 @@ public:
   int_type getIntValue() const {
     return Data;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+#endif
 };
 
 /// Flags that go in a ProtocolRequirement structure.
