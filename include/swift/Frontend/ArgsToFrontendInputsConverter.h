@@ -42,7 +42,7 @@ namespace swift {
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
-  FrontendInputs &Inputs;
+  FrontendInputsAndOutputs &InputsAndOutputs;
 
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
@@ -54,7 +54,7 @@ class ArgsToFrontendInputsConverter {
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags,
                                 const llvm::opt::ArgList &args,
-                                FrontendInputs &inputs);
+                                FrontendInputsAndOutputs &inputsAndOutputs);
 
   bool convert();
 
@@ -69,6 +69,8 @@ private:
   std::set<StringRef>
   createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles);
   bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles);
+
+  bool isSingleThreadedWMO() const;
 };
 
 } // namespace swift

@@ -36,12 +36,20 @@ class InputFile {
   /// Null if the contents are not overridden.
   llvm::MemoryBuffer *Buffer;
 
+  /// The specified output file.
+  /// If only a single outputfile is generated,
+  /// the name of the last specified file is taken.
+  std::string OutputFilename;
+
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+            llvm::MemoryBuffer *buffer = nullptr,
+            StringRef outputFilename = StringRef())
+      : Filename(
+            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
+        IsPrimary(isPrimary), Buffer(buffer), OutputFilename(outputFilename) {
     assert(!name.empty());
   }
 
@@ -57,6 +65,12 @@ public:
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
     return filename.equals("<stdin>") ? "-" : filename;
+  }
+
+  const std::string &outputFilename() const { return OutputFilename; }
+
+  void setOutputFilename(StringRef outputFilename) {
+    OutputFilename = outputFilename;
   }
 };
 

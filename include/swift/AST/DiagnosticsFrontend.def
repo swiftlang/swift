@@ -187,6 +187,9 @@ ERROR(error_index_failed_status_check,none,
 ERROR(error_index_inputs_more_than_outputs,none,
   "index output filenames do not match input source files", ())
 
+ERROR(error_too_many_supplementary_outputs,none,
+   "too many supplementary outputs '%0'", (StringRef))
+
 ERROR(error_formatting_multiple_file_ranges,none,
   "file ranges don't support multiple input files", ())
 

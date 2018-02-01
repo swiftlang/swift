@@ -37,7 +37,7 @@ private:
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
-  bool computeOutputFilenames();
+  bool computeOutputFilenamesAndSupplementaryFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -50,30 +50,9 @@ private:
   void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
                                   unsigned &valueToSet);
 
-  FrontendOptions::ActionType determineRequestedAction() const;
-
   bool setUpForSILOrLLVM();
 
-  /// Determine the correct output filename when none was specified.
-  ///
-  /// Such an absence should only occur when invoking the frontend
-  /// without the driver,
-  /// because the driver will always pass -o with an appropriate filename
-  /// if output is required for the requested action.
-  bool deriveOutputFilenameFromInputFile();
-
-  /// Determine the correct output filename when a directory was specified.
-  ///
-  /// Such a specification should only occur when invoking the frontend
-  /// directly, because the driver will always pass -o with an appropriate
-  /// filename if output is required for the requested action.
-  bool deriveOutputFilenameForDirectory(StringRef outputDir);
-
-  std::string determineBaseNameOfOutput() const;
-
-  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
-
-  void determineSupplementaryOutputFilenames();
+  bool checkUnusedSupplementaryOutputPaths() const;
 
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
@@ -91,6 +70,9 @@ public:
       : Diags(Diags), Args(Args), Opts(Opts) {}
 
   bool convert();
+
+  static FrontendOptions::ActionType
+  determineRequestedAction(const llvm::opt::ArgList &);
 };
 
 } // namespace swift
