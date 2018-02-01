@@ -824,7 +824,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
-  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType())
+  if (type->getReferenceStorageReferent()->getOptionalObjectType())
     return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
@@ -1015,8 +1015,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                     ->getObjectType();
                   OptionalTypeKind currOTK;
                   OptionalTypeKind otherOTK;
-                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
-                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
+                  (void)currParamTy->getOptionalObjectType(currOTK);
+                  (void)otherParamTy->getOptionalObjectType(otherOTK);
                   if (currOTK != OTK_None && otherOTK != OTK_None &&
                       currOTK != otherOTK) {
                     tc.diagnose(current, diag::deprecated_redecl_by_optionality,
@@ -5619,7 +5619,7 @@ public:
   static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
     // We've hit the result type.
     if (uncurryLevel == 0) {
-      if (auto objectTy = type->getAnyOptionalObjectType())
+      if (auto objectTy = type->getOptionalObjectType())
         return objectTy;
 
       return type;
@@ -5663,13 +5663,13 @@ public:
         return;
 
       OptionalTypeKind paramOTK;
-      (void)paramTy->getAnyOptionalObjectType(paramOTK);
+      (void)paramTy->getOptionalObjectType(paramOTK);
       if (paramOTK == OTK_Optional)
         if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
           return;
 
       OptionalTypeKind parentOTK;
-      (void)parentParamTy->getAnyOptionalObjectType(parentOTK);
+      (void)parentParamTy->getOptionalObjectType(parentOTK);
 
       TypeLoc TL = decl->getTypeLoc();
       if (!TL.getTypeRepr())
@@ -5746,7 +5746,7 @@ public:
         return;
 
       OptionalTypeKind resultOTK;
-      if (!resultTy->getAnyOptionalObjectType(resultOTK))
+      if (!resultTy->getOptionalObjectType(resultOTK))
         return;
 
       TypeRepr *TR = resultTL.getTypeRepr();
@@ -5756,7 +5756,7 @@ public:
         resultIsPlainOptional = false;
 
       if (resultIsPlainOptional || treatIUOResultAsError) {
-        if (parentResultTy->getAnyOptionalObjectType())
+        if (parentResultTy->getOptionalObjectType())
           return;
         emittedError = true;
         auto diag = TC.diagnose(resultTL.getSourceRange().Start,
@@ -5773,7 +5773,7 @@ public:
         return;
       }
 
-      if (!parentResultTy->getAnyOptionalObjectType())
+      if (!parentResultTy->getOptionalObjectType())
         return;
 
       // Allow silencing this warning using parens.
@@ -5984,7 +5984,7 @@ public:
               ->getAttrs()
               .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
           matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
-        baseParamTy = baseParamTy->getAnyOptionalObjectType();
+        baseParamTy = baseParamTy->getOptionalObjectType();
         if (baseParamTy->matches(derivedParamTy, matchMode))
           continue;
       }
@@ -6479,9 +6479,9 @@ public:
       
       // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
       bool IsSilentDifference = false;
-      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+      if (auto propertyTyNoOptional = propertyTy->getOptionalObjectType())
         if (auto parentPropertyTyNoOptional =
-            parentPropertyTy->getAnyOptionalObjectType())
+                parentPropertyTy->getOptionalObjectType())
           if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
             IsSilentDifference = true;
       
@@ -8460,7 +8460,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 #undef CHECK_LITERAL_PROTOCOL
 
     // For optional types, use 'nil'.
-    if (type->getAnyOptionalObjectType())
+    if (type->getOptionalObjectType())
       return std::string("nil");
 
     return None;

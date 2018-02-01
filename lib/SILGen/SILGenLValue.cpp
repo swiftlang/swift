@@ -2542,11 +2542,11 @@ static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &SGF,
                           const LValueTypeData &baseTypeData) {
   EnumElementDecl *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-  
+
   return {
-    baseTypeData.OrigFormalType.getAnyOptionalObjectType(),
-    baseTypeData.SubstFormalType.getAnyOptionalObjectType(),
-    baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
+      baseTypeData.OrigFormalType.getOptionalObjectType(),
+      baseTypeData.SubstFormalType.getOptionalObjectType(),
+      baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
   };
 }
 

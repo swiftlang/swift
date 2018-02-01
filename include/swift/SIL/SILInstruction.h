@@ -2481,8 +2481,8 @@ public:
     case Kind::OptionalForce:
       break;
     case Kind::OptionalWrap:
-      assert(ty->getAnyOptionalObjectType()
-             && "optional wrap didn't form optional?!");
+      assert(ty->getOptionalObjectType() &&
+             "optional wrap didn't form optional?!");
       break;
     case Kind::StoredProperty:
     case Kind::GettableProperty:

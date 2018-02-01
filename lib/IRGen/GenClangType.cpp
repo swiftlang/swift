@@ -423,7 +423,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect *Pointer<T>, ImplicitlyUnwrappedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
   if (auto underlyingTy =
-        SILType::getPrimitiveObjectType(type).getAnyOptionalObjectType()) {
+          SILType::getPrimitiveObjectType(type).getOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
     return Converter.convert(IGM, underlyingTy.getSwiftRValueType());

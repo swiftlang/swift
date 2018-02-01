@@ -2088,7 +2088,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (kind >= ConstraintKind::ArgumentConversion) {
       Type unwrappedType2 = type2;
       OptionalTypeKind type2OptionalKind;
-      if (Type unwrapped = type2->getAnyOptionalObjectType(type2OptionalKind))
+      if (Type unwrapped = type2->getOptionalObjectType(type2OptionalKind))
         unwrappedType2 = unwrapped;
       PointerTypeKind pointerKind;
       if (Type pointeeTy =
@@ -2129,7 +2129,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             Type unwrappedType1 = type1;
             OptionalTypeKind type1OptionalKind;
             if (Type unwrapped =
-                  type1->getAnyOptionalObjectType(type1OptionalKind)) {
+                    type1->getOptionalObjectType(type1OptionalKind)) {
               unwrappedType1 = unwrapped;
             }
 
@@ -2592,7 +2592,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // See if there's anything we can do to fix the conformance:
   OptionalTypeKind optionalKind;
-  if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
+  if (auto optionalObjectType = type->getOptionalObjectType(optionalKind)) {
     if (optionalKind == OTK_Optional) {
       TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
       // The underlying type of an optional may conform to the protocol if the
@@ -2790,7 +2790,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   }
   
   // If the base type is not optional, the constraint fails.
-  Type objectTy = optTy->getAnyOptionalObjectType();
+  Type objectTy = optTy->getOptionalObjectType();
   if (!objectTy)
     return SolutionKind::Error;
   
@@ -3168,8 +3168,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // type.
     if (isUnwrappedOptional) {
       auto ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
-                                    ->getInstanceType()
-                                    ->getAnyOptionalObjectType());
+                                             ->getInstanceType()
+                                             ->getOptionalObjectType());
       return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                          functionRefKind);
     }
@@ -3219,7 +3219,7 @@ retry_after_fail:
   if (result.ViableCandidates.empty() &&
       baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
-    if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
+    if (auto objectType = instanceTy->getOptionalObjectType()) {
       if (objectType->mayHaveMembers()) {
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
@@ -3474,7 +3474,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // unwrapped.
   auto unwrapType = [&](Type type) -> std::pair<Type, unsigned> {
     unsigned count = 0;
-    while (Type objectType = type->getAnyOptionalObjectType()) {
+    while (Type objectType = type->getOptionalObjectType()) {
       ++count;
 
       TypeMatchOptions unusedOptions;
@@ -4176,7 +4176,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 }
 
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
-  if (Type unwrapped = type->getAnyOptionalObjectType())
+  if (Type unwrapped = type->getOptionalObjectType())
     type = unwrapped.getPointer();
 
   auto pointeeTy = type->getAnyPointerElementType();

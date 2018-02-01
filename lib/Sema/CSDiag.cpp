@@ -1208,7 +1208,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     // This will only happen if we have an unresolved dot expression
     // (.foo) where foo is a protocol member and the contextual type is
     // an optional protocol metatype.
-    if (auto objectTy = instanceTy->getAnyOptionalObjectType()) {
+    if (auto objectTy = instanceTy->getOptionalObjectType()) {
       instanceTy = objectTy;
       baseObjTy = MetatypeType::get(objectTy);
     }
@@ -1644,7 +1644,7 @@ bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
   // comparison against nil was probably expected.
   // TODO: It would be nice to handle "!x" --> x == false, but we have no way
   // to get to the parent expr at present.
-  if (exprType->getAnyOptionalObjectType()) {
+  if (exprType->getOptionalObjectType()) {
     StringRef prefix = "((";
     StringRef suffix = ") != nil)";
     
@@ -2495,10 +2495,10 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       Type toType, KnownProtocolKind kind,
                                       const Expr *expr) {
   // The following fixes apply for optional destination types as well.
-  bool toTypeIsOptional = !toType->getAnyOptionalObjectType().isNull();
+  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
   toType = toType->lookThroughAllAnyOptionalTypes();
 
-  Type fromTypeUnwrapped = fromType->getAnyOptionalObjectType();
+  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
   bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
   if (fromTypeIsOptional)
     fromType = fromTypeUnwrapped;
@@ -4772,7 +4772,7 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   // Regardless of whether the type has reference or value semantics,
   // comparison with nil is illegal, albeit for different reasons spelled
   // out by the diagnosis.
-  if (otherType->getAnyOptionalObjectType() &&
+  if (otherType->getOptionalObjectType() &&
       (overloadName == "!==" || overloadName == "===")) {
     auto revisedName = overloadName;
     revisedName.pop_back();
@@ -6010,7 +6010,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     // If the contextual type is one of the UnsafePointer<T> types, then the
     // contextual type of the subexpression must be T.
     Type unwrappedType = contextualType;
-    if (auto unwrapped = contextualType->getAnyOptionalObjectType())
+    if (auto unwrapped = contextualType->getOptionalObjectType())
       unwrappedType = unwrapped;
 
     PointerTypeKind pointerKind;
@@ -6101,7 +6101,7 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getAnyOptionalObjectType().isNull()) {
+      argType->getOptionalObjectType().isNull()) {
     diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
@@ -6119,7 +6119,7 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getAnyOptionalObjectType().isNull()) {
+      argType->getOptionalObjectType().isNull()) {
     diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());

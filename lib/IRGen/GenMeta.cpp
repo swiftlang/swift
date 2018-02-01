@@ -1626,7 +1626,7 @@ namespace {
 
     llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type) {
       // Optionals have a lowered payload type, so we recurse here.
-      if (auto objectTy = CanType(type).getAnyOptionalObjectType()) {
+      if (auto objectTy = CanType(type).getOptionalObjectType()) {
         auto payloadMetadata = visit(objectTy);
         llvm::Value *args[] = { payloadMetadata };
         llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
@@ -2022,7 +2022,7 @@ namespace {
       case Ownership::Strong:
         llvm_unreachable("shouldn't be a ReferenceStorageType");
       case Ownership::Weak:
-        referent = type.getReferentType().getAnyOptionalObjectType();
+        referent = type.getReferentType().getOptionalObjectType();
         break;
       case Ownership::Unmanaged:
       case Ownership::Unowned:

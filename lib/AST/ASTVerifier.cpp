@@ -1686,10 +1686,10 @@ public:
                                  Expr *E) {
       auto optionalRVType = optionalType->getRValueType();
       auto objectRVType = objectType->getRValueType();
-      
-      checkSameType(objectRVType, optionalRVType->getAnyOptionalObjectType(),
+
+      checkSameType(objectRVType, optionalRVType->getOptionalObjectType(),
                     "optional object type");
-      
+
       if (objectType->is<LValueType>() != optionalType->is<LValueType>()) {
         Out << "optional operation must preserve lvalue-ness of base\n";
         E->print(Out);
@@ -1856,7 +1856,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying InjectIntoOptionalExpr",
                                       E);
 
-      auto valueType = E->getType()->getAnyOptionalObjectType();
+      auto valueType = E->getType()->getOptionalObjectType();
       if (!valueType) {
         Out << "InjectIntoOptionalExpr is not of Optional type";
         abort();
@@ -2320,7 +2320,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!varTy->getAnyOptionalObjectType()) {
+        if (!varTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
                  "with optional type\n";
           abort();
@@ -2688,7 +2688,7 @@ public:
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
-        CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
+        CD->getResultInterfaceType()->getOptionalObjectType(resultOptionality);
         auto declOptionality = CD->getFailability();
 
         if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
@@ -2702,8 +2702,10 @@ public:
         if (auto genericFn 
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
           resultOptionality = OTK_None;
-          genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
-            ->getAnyOptionalObjectType(resultOptionality);
+          genericFn->getResult()
+              ->castTo<AnyFunctionType>()
+              ->getResult()
+              ->getOptionalObjectType(resultOptionality);
           if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
               (resultOptionality == OTK_None || declOptionality == OTK_None)) {
             Out << "Initializer has result optionality/failability mismatch\n";
@@ -2732,7 +2734,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!resultTy->getAnyOptionalObjectType()) {
+        if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
           CD->dump(llvm::errs());
@@ -2900,7 +2902,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!resultTy->getAnyOptionalObjectType()) {
+        if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on functions with optional return types\n";
           abort();

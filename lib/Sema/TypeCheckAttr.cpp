@@ -477,7 +477,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Look through ownership types, and optionals.
   type = type->getReferenceStorageReferent();
   bool wasOptional = false;
-  if (Type underlying = type->getAnyOptionalObjectType()) {
+  if (Type underlying = type->getOptionalObjectType()) {
     type = underlying;
     wasOptional = true;
   }
@@ -881,7 +881,7 @@ public:
 static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
                                             ParamDecl *param) {
   Type ty = param->getType();
-  if (auto unwrapped = ty->getAnyOptionalObjectType())
+  if (auto unwrapped = ty->getOptionalObjectType())
     ty = unwrapped;
 
   if (auto classDecl = ty->getClassOrBoundGenericClass()) {
@@ -2066,7 +2066,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
       attr->setInvalid();
     }
 
-    if (Type objType = type->getAnyOptionalObjectType()) {
+    if (Type objType = type->getOptionalObjectType()) {
       underlyingType = objType;
     } else {
       // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.

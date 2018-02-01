@@ -441,7 +441,7 @@ static bool isLegalSILType(CanType type) {
 
   // Optionals are legal if their object type is legal and they're Optional.
   OptionalTypeKind optKind;
-  if (auto objectType = type.getAnyOptionalObjectType(optKind)) {
+  if (auto objectType = type.getOptionalObjectType(optKind)) {
     return (optKind == OTK_Optional && isLegalSILType(objectType));
   }
 
@@ -502,7 +502,7 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
+Type TypeBase::getOptionalObjectType(OptionalTypeKind &kind) {
   if (auto boundTy = getAs<BoundGenericEnumType>())
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
       return boundTy->getGenericArgs()[0];
@@ -510,8 +510,8 @@ Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   return Type();
 }
 
-CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
-                                              OptionalTypeKind &kind) {
+CanType CanType::getOptionalObjectTypeImpl(CanType type,
+                                           OptionalTypeKind &kind) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
       return boundTy.getGenericArgs()[0];
@@ -550,7 +550,7 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
 
 Type TypeBase::lookThroughAllAnyOptionalTypes() {
   Type type(this);
-  while (auto objType = type->getAnyOptionalObjectType())
+  while (auto objType = type->getOptionalObjectType())
     type = objType;
 
   return type;
@@ -558,7 +558,7 @@ Type TypeBase::lookThroughAllAnyOptionalTypes() {
 
 Type TypeBase::lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals){
   Type type(this);
-  while (auto objType = type->getAnyOptionalObjectType()) {
+  while (auto objType = type->getOptionalObjectType()) {
     optionals.push_back(type);
     type = objType;
   }
@@ -679,8 +679,8 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
     OptionalTypeKind resultOTK;
-    if (auto objectType = getAnyOptionalObjectType(resultOTK)) {
-      assert(!newResultType->getAnyOptionalObjectType());
+    if (auto objectType = getOptionalObjectType(resultOTK)) {
+      assert(!newResultType->getOptionalObjectType());
       return OptionalType::get(
           resultOTK,
           objectType->replaceCovariantResultType(
@@ -1728,7 +1728,7 @@ static bool isBridgeableObjectType(CanType type) {
 
 static bool hasRetainablePointerRepresentation(CanType type) {
   // Look through one level of Optional<> or ImplicitlyUnwrappedOptional<>.
-  if (auto objType = type.getAnyOptionalObjectType()) {
+  if (auto objType = type.getOptionalObjectType()) {
     type = objType;
   }
 
@@ -1840,7 +1840,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                         const DeclContext *dc) {
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
-  if (auto valueType = type->getAnyOptionalObjectType()) {
+  if (auto valueType = type->getOptionalObjectType()) {
     type = valueType;
     wasOptional = true;
   }
@@ -2019,7 +2019,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // Objective-C.
 
       // Allow one level of optionality.
-      if (auto objectType = pointerElt->getAnyOptionalObjectType())
+      if (auto objectType = pointerElt->getOptionalObjectType())
         pointerElt = objectType;
 
       if (language == ForeignLanguage::ObjectiveC &&
@@ -2046,7 +2046,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
     for (auto typeArg : boundGenericType->getGenericArgs()) {
       // Type arguments cannot be optional.
-      if (typeArg->getAnyOptionalObjectType())
+      if (typeArg->getOptionalObjectType())
         return failure();
 
       // A type parameter can appear here when we're looking at an
@@ -2214,9 +2214,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   // Make sure we only unwrap at most one layer of optional.
   if (insideOptional == OptionalUnwrapping::None) {
     // Value-to-optional and optional-to-optional.
-    if (auto obj2 = t2.getAnyOptionalObjectType()) {
+    if (auto obj2 = t2.getOptionalObjectType()) {
       // Optional-to-optional.
-      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+      if (auto obj1 = t1.getOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
                        OptionalUnwrapping::OptionalToOptional);
@@ -2236,7 +2236,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     } else if (matchMode.contains(
                  TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
       // Optional-to-value, normally disallowed.
-      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+      if (auto obj1 = t1.getOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
                        OptionalUnwrapping::OptionalToValue);
       }
@@ -3922,7 +3922,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
   }
 
-  if (Type Unwrapped = Ty->getAnyOptionalObjectType())
+  if (Type Unwrapped = Ty->getOptionalObjectType())
     return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
 
   if (auto TyD = Ty->getAnyNominal())

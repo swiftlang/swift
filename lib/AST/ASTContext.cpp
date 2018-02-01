@@ -3440,7 +3440,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
     return entry = new (C, arena) UnownedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
   case Ownership::Weak:
-    assert(T->getAnyOptionalObjectType() &&
+    assert(T->getOptionalObjectType() &&
            "object of weak storage type is not optional");
     return entry = new (C, arena)
                WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);

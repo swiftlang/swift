@@ -504,7 +504,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto argvTy = fnConv.getSILArgumentType(1);
 
     SILType unwrappedTy = argvTy;
-    if (Type innerTy = argvTy.getSwiftRValueType()->getAnyOptionalObjectType()){
+    if (Type innerTy = argvTy.getSwiftRValueType()->getOptionalObjectType()) {
       auto canInnerTy = innerTy->getCanonicalType();
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }

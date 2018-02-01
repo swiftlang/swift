@@ -374,8 +374,8 @@ public:
     PO.SkipAttributes = true;
     std::string TypeName;
     if (IsIUO) {
-      assert(Ty->getAnyOptionalObjectType());
-      TypeName = Ty->getAnyOptionalObjectType()->getStringAsComponent(PO) + "!";
+      assert(Ty->getOptionalObjectType());
+      TypeName = Ty->getOptionalObjectType()->getStringAsComponent(PO) + "!";
     } else {
       TypeName = Ty->getString(PO);
     }

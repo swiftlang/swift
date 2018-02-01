@@ -1191,7 +1191,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // of its payload.
   // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.
-  while (auto payloadTy = Ty.getAnyOptionalObjectType())
+  while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
   if (!Class || !Class->hasDestructor())
