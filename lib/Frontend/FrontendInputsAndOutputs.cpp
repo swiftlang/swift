@@ -292,7 +292,7 @@ void FrontendInputsAndOutputs::setMainOutputs(
     for (auto index : indices(AllInputs)) {
       InputFile &f = AllInputs[index];
       if (f.isPrimary())
-        f.setOutputFilename(outputFiles[i]);
+        f.setOutputFilename(outputFiles[i++]);
     }
   } else if (isSingleThreadedWMO()) {
     AllInputs[0].setOutputFilename(outputFiles[0]);
