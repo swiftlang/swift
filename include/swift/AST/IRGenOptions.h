@@ -190,6 +190,11 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
+  /// This function is used by (at least)
+  /// lldb/source/Symbol/SwiftASTContext.cpp:4603
+  /// FIXME: This function should go away in favor of
+  /// Instance.getFrontendOptions().InputsAndOutputs.getSingleOutputFilename
+  /// when batch mode handles all contingencies.
   StringRef getSingleOutputFilename() const {
     if (OutputFilenames.size() >= 1)
       return OutputFilenames.back();
