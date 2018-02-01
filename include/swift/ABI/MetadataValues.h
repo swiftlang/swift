@@ -20,6 +20,7 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
@@ -60,6 +61,8 @@ inline MetadataKind getEnumeratedMetadataKind(uint64_t kind) {
     return MetadataKind::Class;
   return MetadataKind(kind);
 }
+
+StringRef getStringForMetadataKind(MetadataKind kind);
 
 /// Kinds of Swift nominal type descriptor records.
 enum class NominalTypeKind : uint32_t {

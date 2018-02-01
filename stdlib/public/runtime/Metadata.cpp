@@ -2730,6 +2730,28 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 }
 #endif
 
+StringRef swift::getStringForMetadataKind(MetadataKind kind) {
+  switch (kind) {
+#define METADATAKIND(NAME, VALUE) \
+    case MetadataKind::NAME: \
+      return #NAME;
+#include "swift/ABI/MetadataKind.def"
+  }
+
+  swift_runtime_unreachable("Unhandled metadata kind?!");
+}
+
+#ifndef NDEBUG
+template <> void Metadata::dump() const {
+  printf("TargetMetadata.\n");
+  printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
+  printf("Value Witnesses: %p.\n", getValueWitnesses());
+  printf("Class Object: %p.\n", getClassObject());
+  printf("Type Context Description: %p.\n", getTypeContextDescriptor());
+  printf("Generic Args: %p.\n", getGenericArgs());
+}
+#endif
+
 /***************************************************************************/
 /*** Protocol witness tables ***********************************************/
 /***************************************************************************/
