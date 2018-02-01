@@ -465,7 +465,7 @@ namespace {
       // We have to look through optionals here without grabbing the
       // type lowering because the way that optionals are reabstracted
       // can trip recursion checks if we try to build a lowered type.
-      if (D->classifyAsOptionalType()) {
+      if (D->isOptionalDecl()) {
         return visit(type.getOptionalObjectType());
       }
 

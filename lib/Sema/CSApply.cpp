@@ -6228,7 +6228,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         
     case ConversionRestrictionKind::ValueToOptional: {
       auto toGenericType = toType->castTo<BoundGenericType>();
-      assert(toGenericType->getDecl()->classifyAsOptionalType());
+      assert(toGenericType->getDecl()->isOptionalDecl());
       tc.requireOptionalIntrinsics(expr->getLoc());
 
       Type valueType = toGenericType->getGenericArgs()[0];
@@ -6566,7 +6566,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Coercion to Optional<T>.
   if (auto toGenericType = toType->getAs<BoundGenericType>()) {
-    if (toGenericType->getDecl()->classifyAsOptionalType()) {
+    if (toGenericType->getDecl()->isOptionalDecl()) {
       tc.requireOptionalIntrinsics(expr->getLoc());
 
       Type valueType = toGenericType->getGenericArgs()[0];

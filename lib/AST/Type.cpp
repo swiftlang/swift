@@ -497,24 +497,30 @@ Type TypeBase::getRValueType() {
 
 Type TypeBase::getOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericEnumType>())
-    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
+    if (boundTy->getDecl()->isOptionalDecl())
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
 Type TypeBase::getOptionalObjectType(OptionalTypeKind &kind) {
-  if (auto boundTy = getAs<BoundGenericEnumType>())
-    if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
+  if (auto boundTy = getAs<BoundGenericEnumType>()) {
+    if (boundTy->getDecl()->isOptionalDecl()) {
+      kind = OTK_Optional;
       return boundTy->getGenericArgs()[0];
+    }
+  }
   kind = OTK_None;
   return Type();
 }
 
 CanType CanType::getOptionalObjectTypeImpl(CanType type,
                                            OptionalTypeKind &kind) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
-    if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type)) {
+    if (boundTy->getDecl()->isOptionalDecl()) {
+      kind = OTK_Optional;
       return boundTy.getGenericArgs()[0];
+    }
+  }
   kind = OTK_None;
   return CanType();
 }

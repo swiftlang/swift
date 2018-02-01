@@ -95,7 +95,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(!decl->hasClangNode());
 
   // This cannot be implemented correctly for Optional.Some.
-  assert(decl->getParentEnum()->classifyAsOptionalType() == OTK_None &&
+  assert(!decl->getParentEnum()->isOptionalDecl() &&
          "Optional.Some does not have a unique abstraction pattern because "
          "optionals are re-abstracted");
 

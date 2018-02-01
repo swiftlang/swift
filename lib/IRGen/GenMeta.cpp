@@ -2669,13 +2669,6 @@ namespace {
                          ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<FieldTypeInfo, 4> types;
 
-    // This is a terrible special case, but otherwise the archetypes
-    // aren't mapped correctly because the EnumImplStrategy ends up
-    // using the lowered cases, i.e. the cases for Optional<>.
-    if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
-      llvm_unreachable("Should not have IUOs.");
-    }
-
     for (auto &elt : enumElements) {
       auto caseType = elt.decl->getParentEnum()->mapTypeIntoContext(
         elt.decl->getArgumentInterfaceType())
@@ -5149,9 +5142,8 @@ namespace {
     }
 
     void addMetadataFlags() {
-      auto kind = Target->classifyAsOptionalType()
-                    ? MetadataKind::Optional
-                    : MetadataKind::Enum;
+      auto kind = Target->isOptionalDecl() ? MetadataKind::Optional
+                                           : MetadataKind::Enum;
       B.addInt(IGM.MetadataKindTy, unsigned(kind));
     }
 
