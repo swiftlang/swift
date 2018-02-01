@@ -81,6 +81,21 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 }
 #endif
 
+#ifndef NDEBUG
+template<> void ProtocolConformanceDescriptor::verify() const {
+  auto typeKind = unsigned(getTypeKind());
+  assert(((unsigned(TypeMetadataRecordKind::First_Kind) <= typeKind) &&
+          (unsigned(TypeMetadataRecordKind::Last_Kind) >= typeKind)) &&
+         "Corrupted type metadata record kind");
+
+  auto confKind = unsigned(getConformanceKind());
+  using ConformanceKind = ConformanceFlags::ConformanceKind;
+  assert(((unsigned(ConformanceKind::First_Kind) <= confKind) &&
+          (unsigned(ConformanceKind::Last_Kind) >= confKind)) &&
+         "Corrupted conformance kind");
+}
+#endif
+
 /// Take the type reference inside a protocol conformance record and fetch the
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
