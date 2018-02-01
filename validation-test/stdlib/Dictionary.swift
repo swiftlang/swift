@@ -1723,6 +1723,29 @@ DictionaryTestSuite.test("mapValues(_:)") {
   }
 }
 
+DictionaryTestSuite.test("capacity/init(minimumCapacity:)") {
+  let d0 = Dictionary<String, Int>(minimumCapacity: 0)
+  expectGE(d0.capacity, 0)
+
+  let d1 = Dictionary<String, Int>(minimumCapacity: 1)
+  expectGE(d1.capacity, 1)
+
+  let d3 = Dictionary<String, Int>(minimumCapacity: 3)
+  expectGE(d3.capacity, 3)
+
+  let d4 = Dictionary<String, Int>(minimumCapacity: 4)
+  expectGE(d4.capacity, 4)
+
+  let d10 = Dictionary<String, Int>(minimumCapacity: 10)
+  expectGE(d10.capacity, 10)
+
+  let d100 = Dictionary<String, Int>(minimumCapacity: 100)
+  expectGE(d100.capacity, 100)
+
+  let d1024 = Dictionary<String, Int>(minimumCapacity: 1024)
+  expectGE(d1024.capacity, 1024)
+}
+
 DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
   var d1 = [10: 1010, 20: 1020, 30: 1030]
   expectEqual(3, d1.capacity)
@@ -2314,8 +2337,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
 
   // Insert a new key-value pair.
   d[TestBridgedKeyTy(40)] = TestBridgedValueTy(2040)
+
   var identity2 = d._rawIdentifier()
-  assert(identity1 != identity2)
+  // Storage identity may or may not change depending on allocation behavior.
+  // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
+  //assert(identity1 != identity2)
+
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
@@ -2403,7 +2430,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
     assert(oldValue == nil)
     var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
+    // Storage identity may or may not change depending on allocation behavior.
+    // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
+    //assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
 
