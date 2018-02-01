@@ -10,7 +10,7 @@ setup similar to the values on Windows. The following assumes that
 are available. Currently, the runtime has been tested to build against the
 Windows 10 SDK at revision 10.10.586.
 
-```
+```bash
 # Visual Studio 2015 does not have VCToolsInstallDir, use VCINSTALLDIR's value
 export UCRTVersion=10.0.10586.0
 export UniversalCRTSdkDir=".../Windows Kits/10"
@@ -33,7 +33,7 @@ build the static libraries. Note that cross-compiling will require the use of
 lld. Ensure that lld-link.exe (lld-link) is available to clang via your path.
 Additionally, the ICU headers and libraries need to be provided for the build.
 
-```
+```bash
 --extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,-DCMAKE_AR=<path to llvm-ar>,-DCMAKE_RANLIB=<path to llvm-ranlib>,-DSWIFT_SDKS=WINDOWS,-DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>,-DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>,-DSWIFT_WINDOWS_ICU_I18N_LIB=<path to ICU i18n lib>,-DSWIFT_WINDOWS_ICU_UC_LIB=<path to ICU UC lib>
 ```
 
@@ -69,7 +69,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 
 ### 4. Get ready
 - From within a **developer** command prompt (not PowerShell nor cmd, but [the Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
-```
+```cmd
 VsDevCmd -arch=amd64
 ```
 If instead, you're compiling for a 32-bit Windows target, adapt the `arch` argument to `x86` and run
@@ -78,13 +78,13 @@ VsDevCmd -arch=x86
 ```
 
 - Then adapt the following command and run it.
-```
+```cmd
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
 
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly small project and should only take a few minutes to build.
-```
+```cmd
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/cmark"
@@ -95,7 +95,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 ### 6. Build LLVM/Clang/Compiler-RT
 - This must be done from within a developer command prompt. LLVM and Clang are large projects so building might take a few hours. Make sure that the build type (e.g. Debug/Release) for LLVM/Clang matches the build type for Swift.
 - Optionally, you can omit building compiler-rt by removing all lines referring to `compiler-rt` below, which should give faster build times.
-```
+```cmd
 mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%/clang"
 mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
@@ -117,7 +117,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 - This must be done from within a developer command prompt and could take up to two hours depending on your system.
 - You may need to adjust the SWIFT_WINDOWS_LIB_DIRECTORY parameter depending on your target platform or Windows SDK version.
 - While the commands here use MSVC to build, using clang-cl is recommended (see the **Clang-cl** section below).
-```
+```cmd
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
@@ -144,7 +144,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ni
 ```
 
 - To create a VisualStudio project, you'll need to change the generator and, if you have a 64 bit processor, specify the generator platform. Note that you may get multiple build errors compiling the `swift` project due to an MSBuild limitation that file paths cannot exceed 260 characters. These can be ignored, as they occur after the build when writing the last build status to a file.
-```
+```cmd
 cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
  -DCMAKE_GENERATOR_PLATFORM="x64"^
  ...
@@ -154,7 +154,7 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
 
 Follow the instructions for MSVC, but add the following lines to each CMake configuration command. `Clang-cl` 4.0.1 has been tested. You can remove the `SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE` definition, as overlays are supported with `clang-cl`, as it supports modules. The `Z7` flag is required to produce PDB files that MSVC's `link.exe` can read, and also enables proper stack traces.
 
-```
+```cmd
  -DCMAKE_C_COMPILER="<path-to-llvm-bin>/clang-cl.exe"^
  -DCMAKE_CXX_COMPILER="<path-to-llvm-bin>/bin/clang-cl.exe"^
  -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
