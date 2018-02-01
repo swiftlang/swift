@@ -1786,45 +1786,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-/// Given that we're accessing a member of an ImplicitlyUnwrappedOptional<T>, is
-/// the DC one of the special cases where we should not instead look at T?
-static bool isPrivilegedAccessToImplicitlyUnwrappedOptional(DeclContext *DC,
-                                                  NominalTypeDecl *D) {
-  assert(D == DC->getASTContext().getImplicitlyUnwrappedOptionalDecl());
-
-  // Walk up through the chain of current contexts.
-  for (; ; DC = DC->getParent()) {
-    assert(DC && "ran out of contexts before finding a module scope?");
-
-    // Look through local contexts.
-    if (DC->isLocalContext()) {
-      continue;
-
-    // If we're in a type context that's defining or extending
-    // ImplicitlyUnwrappedOptional<T>, we're privileged.
-    } else if (DC->isTypeContext()) {
-      if (DC->getAsNominalTypeOrNominalTypeExtensionContext() == D)
-        return true;
-
-    // Otherwise, we're privileged if we're within the same file that
-    // defines ImplicitlyUnwrappedOptional<T>.
-    } else {
-      assert(DC->isModuleScopeContext());
-      return (DC == D->getModuleScopeContext());
-    }
-  }
-}
-
-Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
-  if (auto boundTy = type->getAs<BoundGenericEnumType>()) {
-    auto boundDecl = boundTy->getDecl();
-    if (boundDecl == TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        !isPrivilegedAccessToImplicitlyUnwrappedOptional(DC, boundDecl))
-      return boundTy->getGenericArgs()[0];
-  }
-  return Type();
-}
-
 template <typename Fn>
 Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
