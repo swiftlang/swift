@@ -10,6 +10,7 @@
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
+#define NS_NOESCAPE CF_NOESCAPE
 
 typedef struct objc_object { void *isa; } *id;
 
