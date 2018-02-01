@@ -16,9 +16,6 @@
 
 import CTensorFlow
 
-// The C type is TF_TensorHandle*
-public typealias CTensorHandle = OpaquePointer
-
 /// TensorHandle<Unit> is the type used by "ops" and the #tfop() syntax
 /// specifically.  It includes an element type, which the tf-compiler internals
 /// depend on to know what the dtype of params are when they are extracted out
@@ -32,8 +29,40 @@ public final class TensorHandle<Unit : AccelerableTensorUnit> {
   /// require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
-  public init(cTensorHandle: CTensorHandle) {
-    self.cTensorHandle = cTensorHandle
+  init(copyingFromCTensor cTensor: CTensor) {
+    let status = TF_NewStatus()
+    let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    self.cTensorHandle = cTensorHandle!
+
+    TF_DeleteStatus(status)
+  }
+
+  /// Create a tensor handle with a closure that initializes the underlying
+  /// buffer.
+  ///
+  /// - Note: `unitsInitializer` must initialize all units in the underlying
+  /// buffer.
+  @_versioned
+  convenience init(
+    shape: [Int],
+    unitsInitializer: (UnsafeMutablePointer<Unit>) -> Void
+  ) {
+    let byteCount = shape.reduce(1, *) * MemoryLayout<Unit>.stride
+    // Initialize tensor and copy data.
+    // TF_AllocateTensor() never returns nil.
+    let cTensor = TF_AllocateTensor(
+      Unit.cDataType,
+      shape.map(Int64.init),
+      Int32(shape.count),
+      byteCount
+    )!
+    assert(TF_TensorByteSize(cTensor) == byteCount)
+    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
+    unitsInitializer(addr)
+
+    self.init(copyingFromCTensor: cTensor)
+    TF_DeleteTensor(cTensor)
   }
 
   deinit {
@@ -69,15 +98,7 @@ internal extension TensorHandle {
     TF_DeleteStatus(status)
     debugLog("# of dims is \(TF_NumDims(cTensor!))")
     debugLog("Returning a shaped array.")
-    return ShapedArray(moving: cTensor!)
-  }
-
-  convenience init(copyingFromCTensor cTensor: CTensor) {
-    let status = TF_NewStatus()
-    let cHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    self.init(cTensorHandle: cHandle!)
+    return ShapedArray(owning: cTensor!)
   }
 }
 

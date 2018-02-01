@@ -63,19 +63,25 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 // Type aliases
 //===----------------------------------------------------------------------===//
 
-/// TF_Status* type.
+/// TF_Status* type
 typealias CTFStatus = OpaquePointer
 
 /// TF_Function* type
 typealias CTFFunction = OpaquePointer
 
-/// TF_Tensor* type.
+/// TF_Tensor* type
 typealias CTensor = OpaquePointer
 
-/// TFE_Context* type.
+/// TF_TensorHandle* type
+///
+/// This is made public so that compiler generated code can read/write tensor
+/// handles when calling runtime APIs.
+public typealias CTensorHandle = OpaquePointer
+
+/// TFE_Context* type
 typealias CTFEContext = OpaquePointer
 
-/// TFE_Op* type.
+/// TFE_Op* type
 typealias CTFEOp = OpaquePointer
 
 //===----------------------------------------------------------------------===//

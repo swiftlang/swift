@@ -124,34 +124,26 @@ public extension Tensor {
     }
     /// Now we make assumption about the shape.
     let rowCount = matrix.count, columnCount = firstRow.count
-    let contiguousSize = rowCount * columnCount
-    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
     /// Check rest dimensions.
     for row in matrix.dropFirst() {
       precondition(row.count == columnCount,
                    "Each dimension must have equal number of subdimensions.")
     }
-    /// Initialize tensor and copy data.
     /// We don't want to delegate initialization to `init(shape:units:)`
     /// because flattening `matrix` to an array is unnecessary cost.
-    let cTensor = TF_AllocateTensor(Unit.cDataType,
-                                    [Int64(rowCount), Int64(columnCount)], 2,
-                                    byteSize)
-    let status = TF_NewStatus()
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
-    /// Copy to TF_Tensor memory, one row at a time.
-    for (i, row) in matrix.enumerated() {
-      row.withUnsafeBufferPointer { ptr in
-        addr.advanced(by: i * columnCount).assign(from: ptr.baseAddress!,
-                                                  count: columnCount)
+    let tensorHandle = TensorHandle<Unit>(
+      shape: [rowCount, columnCount],
+      unitsInitializer: { addr in
+        // Copy to TF_Tensor memory, one row at a time.
+        for (i, row) in matrix.enumerated() {
+          row.withUnsafeBufferPointer { ptr in
+            addr.advanced(by: i * columnCount).assign(from: ptr.baseAddress!,
+              count: columnCount)
+          }
+        }
       }
-    }
-    /// Create handle and we are done.
-    let cHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    TF_DeleteTensor(cTensor)
-    self.init(TensorHandle(cTensorHandle: cHandle!))
+    )
+    self.init(tensorHandle)
   }
 
   /// Initialize a tensor with arbitrary shape.
@@ -160,49 +152,31 @@ public extension Tensor {
   @_inlineable
   init(shape: [Int], units: [Unit]) {
     let contiguousSize = shape.reduce(1, *)
-    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
     precondition(units.count == contiguousSize, """
       The number of units doesn't match the shape.
       """)
-    let cTensor = TF_AllocateTensor(Unit.cDataType,
-                                    shape.map(Int64.init),
-                                    Int32(shape.count),
-                                    byteSize)
-    let status = TF_NewStatus()
-    /// Copy data
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
-    units.withUnsafeBufferPointer { ptr in
-      addr.assign(from: ptr.baseAddress!, count: contiguousSize)
-    }
-
-    /// Create handle and we are done
-    let cHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    TF_DeleteTensor(cTensor)
-    self.init(TensorHandle(cTensorHandle: cHandle!))
+    self.init(TensorHandle(
+        shape: shape,
+        unitsInitializer: { addr in
+          units.withUnsafeBufferPointer { ptr in
+            addr.assign(from: ptr.baseAddress!, count: contiguousSize)
+          }
+        }
+      )
+    )
   }
 
   @_inlineable
   init(shape: [Int], repeating repeatedValue: Unit) {
     let contiguousSize = shape.reduce(1, *)
-    let byteSize = contiguousSize * MemoryLayout<Unit>.stride
-    let cTensor = TF_AllocateTensor(Unit.cDataType,
-                                    shape.map(Int64.init),
-                                    Int32(shape.count),
-                                    byteSize)
-    let status = TF_NewStatus()
-    /// Copy data
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Unit.self)
-    /// Memset to `repeatedValue`
-    addr.initialize(repeating: repeatedValue, count: contiguousSize)
-
-    /// Create handle and we are done
-    let cHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    TF_DeleteTensor(cTensor)
-    self.init(TensorHandle(cTensorHandle: cHandle!))
+    self.init(TensorHandle(
+        shape: shape,
+        // Memset to `repeatedValue`
+        unitsInitializer: {
+          $0.initialize(repeating: repeatedValue, count: contiguousSize)
+        }
+      )
+    )
   }
 
   /// Initialize a degenerate tensor with no elements with the specified rank.
