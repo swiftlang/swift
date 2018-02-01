@@ -3295,18 +3295,6 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
 
-  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
-  // always an l-value if the input was.
-  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
-    increaseScore(SK_ForceUnchecked);
-    
-    baseObjTy = objTy;
-    if (baseTy->is<LValueType>())
-      baseTy = LValueType::get(objTy);
-    else
-      baseTy = objTy;
-  }
-
   auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
@@ -4096,13 +4084,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
-
-  // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
-  // r-value.
-  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
-    type2 = getFixedTypeRecursive(objTy, flags, /*wantRValue=*/true);
-    desugar2 = type2->getDesugaredType();
-  }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 

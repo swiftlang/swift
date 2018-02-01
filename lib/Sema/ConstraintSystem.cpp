@@ -1786,10 +1786,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
-  return Type();
-}
-
 template <typename Fn>
 Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
