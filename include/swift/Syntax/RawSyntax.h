@@ -112,11 +112,11 @@ using llvm::StringRef;
 #endif
 
 namespace swift {
-class ASTContext;
-
 namespace syntax {
 
-using CursorIndex = uint32_t;
+class SyntaxArena;
+
+using CursorIndex = size_t;
 
 /// Get a numeric index suitable for array/vector indexing
 /// from a syntax node's Cursor enum value.
@@ -265,24 +265,22 @@ class RawSyntax final
 
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
             SourcePresence Presence, bool ManualMemory);
-  RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence, bool ManualMemory,
+  RawSyntax(tok TokKind, OwnedString Text,
             ArrayRef<TriviaPiece> LeadingTrivia,
-            ArrayRef<TriviaPiece> TrailingTrivia);
+            ArrayRef<TriviaPiece> TrailingTrivia,
+            SourcePresence Presence, bool ManualMemory);
 
 public:
   ~RawSyntax();
 
   void Release() const {
-    //llvm::errs() << "Release: " << Bits.ManualMemory << "\n";
     if (Bits.ManualMemory)
       return;
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
   }
   void Retain() const {
-    //llvm::errs() << "Retain: " << Bits.ManualMemory << "\n";
-    if (Bits.ManualMemory) {
+    if (Bits.ManualMemory)
       return;
-    }
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
   }
 
@@ -290,27 +288,32 @@ public:
   /// @{
   
   /// Make a raw "layout" syntax node.
-  static RC<RawSyntax>
-  make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout, SourcePresence Presence,
-       llvm::function_ref<void *(size_t, size_t)> Allocate = {});
+  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                            SourcePresence Presence,
+                            SyntaxArena *Arena = nullptr);
 
   /// Make a raw "token" syntax node.
-  static RC<RawSyntax>
-  make(tok TokKind, OwnedString Text, SourcePresence Presence,
-       ArrayRef<TriviaPiece> LeadingTrivia,
-       ArrayRef<TriviaPiece> TrailingTrivia,
-       llvm::function_ref<void *(size_t, size_t)> Allocate = {});
+  static RC<RawSyntax> make(tok TokKind, OwnedString Text,
+                            ArrayRef<TriviaPiece> LeadingTrivia,
+                            ArrayRef<TriviaPiece> TrailingTrivia,
+                            SourcePresence Presence,
+                            SyntaxArena *Arena = nullptr);
 
   /// Make a missing raw "layout" syntax node.
-  static RC<RawSyntax> missing(SyntaxKind Kind) {
-    return make(Kind, {}, SourcePresence::Missing);
+  static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
+    return make(Kind, {}, SourcePresence::Missing, Arena);
   }
 
   /// Make a missing raw "token" syntax node.
-  static RC<RawSyntax> missing(tok TokKind, OwnedString Text) {
-    return make(TokKind, Text, SourcePresence::Missing,
-                ArrayRef<TriviaPiece>{}, ArrayRef<TriviaPiece>{});
+  static RC<RawSyntax> missing(tok TokKind, OwnedString Text,
+                               SyntaxArena *Arena = nullptr) {
+    return make(TokKind, Text, {}, {}, SourcePresence::Missing, Arena);
   }
+
+  static RC<RawSyntax> getToken(SyntaxArena &Arena, tok TokKind,
+                                OwnedString Text,
+                                ArrayRef<TriviaPiece> LeadingTrivia,
+                                ArrayRef<TriviaPiece> TrailingTrivia);
 
   /// @}
 
@@ -387,8 +390,8 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
-    return make(getTokenKind(), getTokenText(), getPresence(),
-                NewLeadingTrivia, getTrailingTrivia());
+    return make(getTokenKind(), getTokenText(), NewLeadingTrivia,
+                getTrailingTrivia(), getPresence());
   }
 
   RC<RawSyntax> withLeadingTrivia(Trivia NewLeadingTrivia) const {
@@ -399,8 +402,8 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
-    return make(getTokenKind(), getTokenText(), getPresence(),
-                getLeadingTrivia(), NewTrailingTrivia);
+    return make(getTokenKind(), getTokenText(), getLeadingTrivia(),
+                NewTrailingTrivia, getPresence());
   }
 
   RC<RawSyntax> withTrailingTrivia(Trivia NewTrailingTrivia) const {

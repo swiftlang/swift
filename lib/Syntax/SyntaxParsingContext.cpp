@@ -36,7 +36,7 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
     : RootDataOrParent(
           new RootContextData(SF, SF.getASTContext().Diags,
                               SF.getASTContext().SourceMgr, BufferID)),
-      CtxtHolder(CtxtHolder), C(SF.getASTContext()),
+      CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
       Enabled(SF.shouldKeepSyntaxInfo()) {
   CtxtHolder = this;
@@ -47,20 +47,14 @@ RC<RawSyntax>
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  return RawSyntax::make(Kind, Parts, SourcePresence::Present,
-                         [&](size_t size, size_t alignment) {
-                           return C.Allocate(size, alignment);
-                         });
+  return RawSyntax::make(Kind, Parts, SourcePresence::Present, &Arena);
 }
 
 RC<RawSyntax>
 SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
                                      ArrayRef<RC<RawSyntax>> Parts) {
   // Try to create the node of the given syntax.
-  if (auto Node = SyntaxFactory::createRaw(Kind, Parts,
-                                           [&](size_t size, size_t alignment) {
-                                             return C.Allocate(size, alignment);
-                                           }))
+  if (auto Node = SyntaxFactory::createRaw(Kind, Parts, &Arena))
     return Node;
 
   // Fallback to unknown syntax for the category.
@@ -144,13 +138,12 @@ SyntaxParsingContext *SyntaxParsingContext::getRoot() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(ASTContext &C, Token &Tok,
-                                    Trivia &LeadingTrivia,
+void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
                                     Trivia &TrailingTrivia) {
   if (!Enabled)
     return;
 
-  addRawSyntax(C.getRawTokenSyntax(Tok.getKind(), Tok.getText(),
+  addRawSyntax(RawSyntax::getToken(Arena, Tok.getKind(), Tok.getText(),
                                    LeadingTrivia.Pieces,
                                    TrailingTrivia.Pieces));
 }

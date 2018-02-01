@@ -12,6 +12,7 @@
 
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxArena.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -80,9 +81,10 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                           getTrailingObjects<RC<RawSyntax>>());
 }
 
-RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence, bool ManualMemory,
+RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
-                     ArrayRef<TriviaPiece> TrailingTrivia) {
+                     ArrayRef<TriviaPiece> TrailingTrivia,
+                     SourcePresence Presence, bool ManualMemory) {
   Bits.Kind = unsigned(SyntaxKind::Token);
   Bits.Presence = unsigned(Presence);
   Bits.ManualMemory = unsigned(ManualMemory);
@@ -115,30 +117,26 @@ RawSyntax::~RawSyntax() {
   }
 }
 
-RC<RawSyntax>
-RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                SourcePresence Presence,
-                llvm::function_ref<void *(size_t, size_t)> Allocate) {
+RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                              SourcePresence Presence, SyntaxArena *Arena) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
-  void *data =
-      Allocate ? Allocate(size, alignof(RawSyntax)) : ::operator new(size);
+  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+                     : ::operator new(size);
   return RC<RawSyntax>(new (data)
-                           RawSyntax(Kind, Layout, Presence, bool(Allocate)));
+                           RawSyntax(Kind, Layout, Presence, bool(Arena)));
 }
 
-RC<RawSyntax>
-RawSyntax::make(tok TokKind, OwnedString Text, SourcePresence Presence,
-                ArrayRef<TriviaPiece> LeadingTrivia,
-                ArrayRef<TriviaPiece> TrailingTrivia,
-                llvm::function_ref<void *(size_t, size_t)> Allocate) {
+RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
+                              ArrayRef<TriviaPiece> LeadingTrivia,
+                              ArrayRef<TriviaPiece> TrailingTrivia,
+                              SourcePresence Presence, SyntaxArena *Arena) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
-  void *data =
-      Allocate ? Allocate(size, alignof(RawSyntax)) : ::operator new(size);
-
+  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+                     : ::operator new(size);
   return RC<RawSyntax>(new (data) RawSyntax(
-      TokKind, Text, Presence, bool(Allocate), LeadingTrivia, TrailingTrivia));
+      TokKind, Text, LeadingTrivia, TrailingTrivia, Presence, bool(Arena)));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {

@@ -110,7 +110,7 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
 
-  ASTContext &C;
+  SyntaxArena &Arena;
 
   std::vector<RC<RawSyntax>> &Storage;
 
@@ -152,7 +152,7 @@ public:
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
-        C(CtxtHolder->C),
+        Arena(CtxtHolder->Arena),
         Storage(CtxtHolder->Storage), Offset(Storage.size()),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
@@ -191,7 +191,7 @@ public:
   void addRawSyntax(RC<RawSyntax> Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(ASTContext &C, Token &Tok, Trivia &LeadingTrivia,
+  void addToken(Token &Tok, Trivia &LeadingTrivia,
                 Trivia &TrailingTrivia);
 
   /// Add Syntax to the parts.

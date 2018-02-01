@@ -107,12 +107,8 @@ namespace swift {
 
   enum class KnownProtocolKind : uint8_t;
 
-  enum class tok;
-  class OwnedString;
-
 namespace syntax {
-  class RawSyntax;
-  class TriviaPiece;
+  class SyntaxArena;
 }
 
 /// \brief The arena in which a particular ASTContext allocation will go.
@@ -387,6 +383,9 @@ public:
                                               arena),
                               setVector.size());
   }
+
+  /// Retrive the syntax node memory manager for this context.
+  syntax::SyntaxArena &getSyntaxArena() const;
 
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
@@ -903,12 +902,6 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  /// Retrieve or create a libSyntax raw token with given info.
-  llvm::IntrusiveRefCntPtr<syntax::RawSyntax>
-  getRawTokenSyntax(tok TokKind, OwnedString Text,
-                    llvm::ArrayRef<syntax::TriviaPiece> LeadingTrivia,
-                    llvm::ArrayRef<syntax::TriviaPiece> TrailingTrivia);
-
   /// Whether our effective Swift version is in the Swift 3 family.
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
@@ -961,6 +954,7 @@ bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
                             Optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
+
 } // end namespace swift
 
 #endif

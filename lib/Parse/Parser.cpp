@@ -311,9 +311,9 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
-        auto ThisToken = RawSyntax::make(
-            Tok.getKind(), Tok.getText(), SourcePresence::Present,
-            LeadingTrivia.Pieces, TrailingTrivia.Pieces);
+        auto ThisToken =
+            RawSyntax::make(Tok.getKind(), Tok.getText(), LeadingTrivia.Pieces,
+                            TrailingTrivia.Pieces, SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
         Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
@@ -516,7 +516,7 @@ void Parser::consumeExtraToken(Token Extra) {
 
 SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
-  SyntaxContext->addToken(Context, Tok, LeadingTrivia, TrailingTrivia);
+  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
   return consumeTokenWithoutFeedingReceiver();
 }
 
@@ -552,7 +552,7 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
   Trivia EmptyTrivia;
-  SyntaxContext->addToken(Context, SplitTokens.back(), LeadingTrivia, EmptyTrivia);
+  SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
   LeadingTrivia.empty();
   TokReceiver->receive(SplitTokens.back());
 }

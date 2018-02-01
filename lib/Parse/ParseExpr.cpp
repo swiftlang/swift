@@ -1941,7 +1941,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       // such token to the context.
       Token content(tok::string_segment,
                     CharSourceRange(Segment.Loc, Segment.Length).str());
-      SyntaxContext->addToken(Context, content, EmptyTrivia, EmptyTrivia);
+      SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
       break;
     }
         
@@ -1951,7 +1951,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
 
       // Backslash is part of an expression segment.
       Token BackSlash(tok::backslash, "\\");
-      ExprContext.addToken(Context, BackSlash, EmptyTrivia, EmptyTrivia);
+      ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
           L->getStateForBeginningOfTokenLoc(Segment.Loc);
@@ -2035,7 +2035,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // Add the open quote to the context; the quote should have the leading trivia
   // of the entire string token and a void trailing trivia.
-  SyntaxContext->addToken(Context, OpenQuote, LeadingTrivia, EmptyTrivia);
+  SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
 
   // We don't expose the entire interpolated string as one token. Instead, we
   // should expose the tokens in each segment.
@@ -2057,7 +2057,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // Add the close quote the context; the quote should have a void leading trivia
   // and the trailing trivia of the entire string token.
-  SyntaxContext->addToken(Context, CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+  SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
 
   if (Exprs.empty()) {
     Status.setIsParseError();
