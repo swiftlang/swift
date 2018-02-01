@@ -590,7 +590,7 @@ public:
   printGenericSignature(const GenericSignature *genericSig, unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-      ArrayRef<GenericTypeParamType *> genericParams,
+      TypeArrayView<GenericTypeParamType> genericParams,
       ArrayRef<Requirement> requirements, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
@@ -1093,7 +1093,7 @@ void PrintAST::printGenericSignature(
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-    ArrayRef<GenericTypeParamType *> genericParams,
+    TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);

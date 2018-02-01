@@ -3788,7 +3788,8 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
   return result;
 }
 
-ArrayRef<GenericTypeParamType *> GenericFunctionType::getGenericParams() const{
+TypeArrayView<GenericTypeParamType>
+GenericFunctionType::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
@@ -4276,8 +4277,8 @@ CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
-                               ArrayRef<GenericTypeParamType *> genericParams,
-                               ArrayRef<Requirement> requirements) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              ArrayRef<Requirement> requirements) {
   for (auto p : genericParams)
     ID.AddPointer(p);
 
@@ -4291,9 +4292,21 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
   }
 }
 
-GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        bool isKnownCanonical) {
+GenericSignature *
+GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
+                      ArrayRef<Requirement> requirements,
+                      bool isKnownCanonical) {
+  SmallVector<Type, 4> paramTypes;
+  for (auto param : params)
+    paramTypes.push_back(param);
+  auto paramsView = TypeArrayView<GenericTypeParamType>(paramTypes);
+  return get(paramsView, requirements, isKnownCanonical);
+}
+
+GenericSignature *
+GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
+                      ArrayRef<Requirement> requirements,
+                      bool isKnownCanonical) {
   assert(!params.empty());
 
 #ifndef NDEBUG
@@ -4316,7 +4329,7 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   }
 
   // Allocate and construct the new signature.
-  size_t bytes = totalSizeToAlloc<GenericTypeParamType *, Requirement>(
+  size_t bytes = totalSizeToAlloc<Type, Requirement>(
       params.size(), requirements.size());
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
   auto newSig = new (mem) GenericSignature(params, requirements,

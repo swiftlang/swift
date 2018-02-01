@@ -1725,7 +1725,7 @@ bool ASTMangler::appendGenericSignature(const GenericSignature *sig,
   CurGenericSignature = canSig;
 
   unsigned initialParamDepth;
-  ArrayRef<GenericTypeParamType *> genericParams;
+  TypeArrayView<GenericTypeParamType> genericParams;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuffer;
   if (contextSig) {
@@ -1848,9 +1848,9 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
 }
 
 void ASTMangler::appendGenericSignatureParts(
-                                        ArrayRef<GenericTypeParamType*> params,
-                                        unsigned initialParamDepth,
-                                        ArrayRef<Requirement> requirements) {
+                                     TypeArrayView<GenericTypeParamType> params,
+                                     unsigned initialParamDepth,
+                                     ArrayRef<Requirement> requirements) {
   // Mangle the requirements.
   for (const Requirement &reqt : requirements) {
     appendRequirement(reqt);

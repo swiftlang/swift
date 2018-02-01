@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -605,6 +606,18 @@ public:
     return Signature;
   }
 };
+
+template <typename T>
+inline T *staticCastHelper(const Type &Ty) {
+  // The constructor of the ArrayRef<Type> must guarantee this invariant.
+  // XXX -- We use reinterpret_cast instead of static_cast so that files
+  // can avoid including Types.h if they want to.
+  return reinterpret_cast<T*>(Ty.getPointer());
+}
+/// TypeArrayView allows arrays of 'Type' to have a static type.
+template <typename T>
+using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
+                                   /*AllowOrigAccess*/true>;
 
 } // end namespace swift
 

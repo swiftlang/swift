@@ -1416,7 +1416,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
