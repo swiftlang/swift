@@ -43,7 +43,6 @@ Optional<std::vector<std::string>> ArgsToFrontendOutputsConverter::convert() {
   return None;
 }
 
-/// Try to read an output file list file.
 Optional<std::vector<std::string>>
 ArgsToFrontendOutputsConverter::readOutputFileList(const StringRef filelistPath,
                                                    DiagnosticEngine &diags) {

@@ -43,6 +43,7 @@ public:
 
   Optional<std::vector<std::string>> convert();
 
+  /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.
   static Optional<std::vector<std::string>>
   readOutputFileList(StringRef filelistPath, DiagnosticEngine &diags);
