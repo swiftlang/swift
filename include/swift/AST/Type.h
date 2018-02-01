@@ -66,6 +66,12 @@ using TypeSubstitutionFn
   = llvm::function_ref<Type(SubstitutableType *dependentType)>;
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
+/// replaces archetypes with their interface types.
+struct MapTypeOutOfContext {
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c TypeSubstitutionMap.
 struct QueryTypeSubstitutionMap {
   const TypeSubstitutionMap &substitutions;

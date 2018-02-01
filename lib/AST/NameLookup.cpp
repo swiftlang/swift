@@ -1558,6 +1558,18 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
 }
 
+Type AbstractStorageDecl::getStorageInterfaceType() const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    return var->getInterfaceType();
+  }
+  
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    return sub->getElementInterfaceType();
+  }
+  
+  llvm_unreachable("unhandled storage decl kind");
+}
+
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,

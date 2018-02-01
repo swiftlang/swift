@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
@@ -3813,7 +3814,7 @@ public:
           
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty: {
-          bool hasIndices = !component.getComputedPropertyIndices().empty();
+          bool hasIndices = !component.getSubscriptIndices().empty();
         
           // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
           {
@@ -3899,7 +3900,7 @@ public:
                     "setter should have no results");
           }
           
-          for (auto &index : component.getComputedPropertyIndices()) {
+          for (auto &index : component.getSubscriptIndices()) {
             auto opIndex = index.Operand;
             auto contextType =
               index.LoweredType.subst(F.getModule(), patternSubs);
@@ -3910,11 +3911,11 @@ public:
                     "pattern index formal type doesn't match lowered type");
           }
           
-          if (!component.getComputedPropertyIndices().empty()) {
+          if (!component.getSubscriptIndices().empty()) {
             // Equals should be
             // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
             {
-              auto equals = component.getComputedPropertyIndexEquals();
+              auto equals = component.getSubscriptIndexEquals();
               require(equals, "key path pattern with indexes must have equals "
                               "operator");
               
@@ -3946,7 +3947,7 @@ public:
             {
               // Hash should be
               // <Sig...> @convention(thin) (RawPointer) -> Int
-              auto hash = component.getComputedPropertyIndexHash();
+              auto hash = component.getSubscriptIndexHash();
               require(hash, "key path pattern with indexes must have hash "
                             "operator");
               
@@ -3974,11 +3975,51 @@ public:
                       "result should be Int");
             }
           } else {
-            require(!component.getComputedPropertyIndexEquals()
-                    && !component.getComputedPropertyIndexHash(),
+            require(!component.getSubscriptIndexEquals()
+                    && !component.getSubscriptIndexHash(),
                     "component without indexes must not have equals/hash");
           }
 
+          break;
+        }
+        case KeyPathPatternComponent::Kind::External: {
+          // The component type should match the substituted type of the
+          // referenced property.
+          auto decl = component.getExternalDecl();
+          auto sig = decl->getInnermostDeclContext()
+                         ->getGenericSignatureOfContext()
+                         ->getCanonicalSignature();
+          auto subs =
+                sig->getSubstitutionMap(component.getExternalSubstitutions());
+          auto substType = component.getExternalDecl()->getStorageInterfaceType()
+            .subst(subs);
+          require(substType->isEqual(component.getComponentType()),
+                  "component type should make storage type of referenced "
+                  "declaration");
+
+          // Index types should match the lowered index types expected by the
+          // external declaration.
+          if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+            auto indexParams = sub->getIndices();
+            require(indexParams->size() == component.getSubscriptIndices().size(),
+                    "number of subscript indices should match referenced decl");
+            for (unsigned i : indices(*indexParams)) {
+              auto param = (*indexParams)[i];
+              auto &index = component.getSubscriptIndices()[i];
+              auto paramTy = param->getInterfaceType()->getCanonicalType();
+              auto substParamTy = paramTy.subst(subs);
+              auto loweredTy = F.getModule().Types.getLoweredType(
+                AbstractionPattern(sig, paramTy), substParamTy);
+              requireSameType(index.LoweredType, loweredTy,
+                            "index lowered types should match referenced decl");
+              require(index.FormalType == substParamTy->getCanonicalType(),
+                      "index formal types should match referenced decl");
+            }
+          } else {
+            require(component.getSubscriptIndices().empty(),
+                    "external var reference should not apply indices");
+          }
+          
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalChain: {
