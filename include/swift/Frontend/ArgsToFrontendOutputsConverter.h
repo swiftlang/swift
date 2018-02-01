@@ -62,7 +62,7 @@ class OutputFilesComputer {
 
   OutputFilesComputer(const llvm::opt::ArgList &args, DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
-                      ArrayRef<std::string> outputFileArguments,
+                      std::vector<std::string> outputFileArguments,
                       StringRef outputDirectoryArgument, StringRef firstInput,
                       FrontendOptions::ActionType requestedAction,
                       const llvm::opt::Arg *moduleNameArg, StringRef suffix,

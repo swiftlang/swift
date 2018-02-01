@@ -105,7 +105,7 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
   }
 
   return OutputFilesComputer(
-      args, diags, inputsAndOutputs, outputFileArguments,
+      args, diags, inputsAndOutputs, std::move(outputFileArguments),
       outputDirectoryArgument, firstInput, requestedAction,
       args.getLastArg(options::OPT_module_name),
       FrontendOptions::suffixForPrincipalOutputFileForAction(requestedAction),
@@ -115,7 +115,7 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
 OutputFilesComputer::OutputFilesComputer(
     const llvm::opt::ArgList &args, DiagnosticEngine &diags,
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    ArrayRef<std::string> outputFileArguments,
+    std::vector<std::string> outputFileArguments,
     const StringRef outputDirectoryArgument, const StringRef firstInput,
     const FrontendOptions::ActionType requestedAction,
     const llvm::opt::Arg *moduleNameArg, const StringRef suffix,
