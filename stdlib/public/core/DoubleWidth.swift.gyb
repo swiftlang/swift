@@ -10,21 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A fixed-width integer that is twice the size of its base type.
+/// A fixed-width integer that has twice the bit width of its base type.
 ///
 /// You can use the `DoubleWidth` type to continue calculations with the result
 /// of a full width arithmetic operation. Normally, when you perform a full
-/// width operation, the result is a tuple of the high and low components of
-/// the result.
+/// width operation, the result is a tuple of the high and low parts of the
+/// result.
 ///
 ///     let a = 2241543570477705381
 ///     let b = 186319822866995413
 ///     let c = a.multipliedFullWidth(by: b)
-///     // c == (22640526660490081, 7959093232766896457)
+///     // c == (high: 22640526660490081, low: 7959093232766896457)
 ///
 /// The tuple `c` can't be used in any further comparisons or calculations. To
 /// use this value, create a `DoubleWidth` instance from the result. You can
-/// use the `DoubleWidth` instance the way you use any other integer type.
+/// use the `DoubleWidth` instance in the same way that you would use any other
+/// integer type.
 ///
 ///     let d = DoubleWidth(a.multipliedFullWidth(by: b))
 ///     // d == 417644001000058515200174966092417353
@@ -40,9 +41,9 @@
 ///     }
 ///     // Prints "Too big to be an 'Int'!"
 ///
-/// The `DoubleWidth` type is intended for intermediate calculations, not as a
-/// replacement for a variable-width integer type. Nesting `DoubleWidth`
-/// instances, in particular, can result in undesirable performance.
+/// The `DoubleWidth` type is not intended as a replacement for a variable-width
+/// integer type. Nesting `DoubleWidth` instances, in particular, may result in
+/// undesirable performance.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct DoubleWidth<Base : FixedWidthInteger> :
   _ExpressibleByBuiltinIntegerLiteral
@@ -60,26 +61,31 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   internal var _storage: (low: Low, high: High)
 #endif
 
+  /// The high part of the value.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var high: High {
     return _storage.high
   }
 
+  /// The low part of the value.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public var low: Low {
     return _storage.low
   }
 
+  /// Creates a new instance from the given tuple of high and low parts.
+  ///
+  /// - Parameter value: The tuple to use as the source of the new instance's
+  ///   high and low parts.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public // @testable
-  init(_ _value: (High, Low)) {
+  public init(_ value: (high: High, low: Low)) {
 #if _endian(big)
-    self._storage = (high: _value.0, low: _value.1)
+    self._storage = (high: value.0, low: value.1)
 #else
-    self._storage = (low: _value.1, high: _value.0)
+    self._storage = (low: value.1, high: value.0)
 #endif
   }
 
