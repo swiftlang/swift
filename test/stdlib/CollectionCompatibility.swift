@@ -5,6 +5,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 //===--- MyCollection -----------------------------------------------------===//
 /// A simple collection that attempts to use an Int16 IndexDistance
@@ -21,6 +22,24 @@ struct MyCollection<Element>: Collection {
 
   func index(after: Index) -> Index { return after+1 }
 }
+
+//===--- MyBidiCollection -------------------------------------------------===//
+/// A simple collection that attempts to use an Int16 IndexDistance
+struct MyBidiCollection<Element>: BidirectionalCollection {
+  var _elements: [Element]
+  
+  typealias Index = Int64
+  
+  var startIndex: Index { return 0 }
+  var endIndex: Index { return numericCast(_elements.count) }
+  
+  subscript(i: Index) -> Element { return _elements[Int(i)] }
+
+  func index(after: Index) -> Index { return after+1 }
+  func index(before: Index) -> Index { return before-1 }
+  func index(_ i: Index, advancedBy d: Int64) -> Index { return i+d }
+}
+
 
 let CollectionDistance = TestSuite("Collection.IndexDistance")
 
@@ -41,7 +60,7 @@ CollectionDistance.test("Int16/advance") {
   expectEqual(1, i)
   c.formIndex(&i, offsetBy: d)
   expectEqual(2, i)
-  var j = c.index(c.startIndex, offsetBy: d, limitedBy: c.endIndex)
+  let j = c.index(c.startIndex, offsetBy: d, limitedBy: c.endIndex)
   expectEqual(1, j)
   var b = c.formIndex(&i, offsetBy: d, limitedBy: c.endIndex)
   expectTrue(b)
@@ -51,6 +70,40 @@ CollectionDistance.test("Int16/advance") {
   expectEqual(3, i)
   let k = c.index(c.startIndex, offsetBy: d+5, limitedBy: c.endIndex)
   expectEqual(nil, k)
+
+  checkCollection(c, [1,2,3], stackTrace: SourceLocStack()) { $0 == $1 }
+}
+
+CollectionDistance.test("Int64/distance") {
+  let c = MyBidiCollection<Int>(_elements: [1,2,3])
+  let d: Int16 = c.distance(from: c.startIndex, to: c.endIndex)
+  expectEqual(3, d)
+  // without type context, you now get an Int
+  var i = c.distance(from: c.startIndex, to: c.endIndex)
+  expectType(Int.self, &i)
+  expectType(MyCollection<Int>.IndexDistance.self, &i)
+}
+
+CollectionDistance.test("Int64/advance") {
+  let c = MyBidiCollection<Int>(_elements: [1,2,3])
+  let d: Int16 = 1
+  var i = c.index(c.startIndex, offsetBy: d)
+  expectEqual(1, i)
+  c.formIndex(&i, offsetBy: d)
+  expectEqual(2, i)
+  let j = c.index(c.startIndex, offsetBy: d, limitedBy: c.endIndex)
+  expectEqual(1, j)
+  var b = c.formIndex(&i, offsetBy: d, limitedBy: c.endIndex)
+  expectTrue(b)
+  expectEqual(3, i)
+  b = c.formIndex(&i, offsetBy: d+5, limitedBy: c.endIndex)
+  expectFalse(b)
+  expectEqual(3, i)
+  let k = c.index(c.startIndex, offsetBy: d+5, limitedBy: c.endIndex)
+  expectEqual(nil, k)
+
+  checkCollection(c, [1,2,3], stackTrace: SourceLocStack()) { $0 == $1 }
+  checkBidirectionalCollection(c, [1,2,3])
 }
 
 runAllTests()
