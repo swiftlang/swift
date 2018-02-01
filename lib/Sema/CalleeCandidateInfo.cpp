@@ -38,10 +38,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
       ->getForwardingSubstitutions();
       entityType = GFT->substGenericArgs(subs);
     } else {
-      if (auto objType =
-          entityType->getImplicitlyUnwrappedOptionalObjectType())
-        entityType = objType;
-      
+      // FIXME: look through unforced IUOs here?
+
       entityType = DC->mapTypeIntoContext(entityType);
     }
   }

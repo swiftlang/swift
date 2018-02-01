@@ -4484,8 +4484,6 @@ namespace {
     void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
       // Don't diagnose when we're injecting into 
       auto toOptionalType = cs.getType(injection);
-      if (toOptionalType->getImplicitlyUnwrappedOptionalObjectType())
-        return;
 
       // Check whether we have a forced downcast.
       auto &tc = cs.getTypeChecker();
@@ -6248,10 +6246,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
     case ConversionRestrictionKind::ForceUnchecked: {
-      auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
-      assert(valueTy);
-      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy);
-      return coerceToType(expr, toType, locator);
+      llvm_unreachable("should never see ForceUnchecked");
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
