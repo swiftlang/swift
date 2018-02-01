@@ -6590,8 +6590,8 @@ public:
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
 
-    UNINTERESTING_ATTR(Exhaustive)
-    UNINTERESTING_ATTR(NonExhaustive)
+    UNINTERESTING_ATTR(Frozen)
+    UNINTERESTING_ATTR(NonFrozen)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -7719,20 +7719,20 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
 
-      // Public enums may be used in inlinable code, so we need to resolve their
-      // exhaustiveness.
+      // Public enums may be used in inlinable code, so we need to resolve
+      // whether they're frozen.
       if (ED->getFormalAccess() >= AccessLevel::Public ||
           ED->getAttrs().hasAttribute<VersionedAttr>()) {
-        if (!ED->getAttrs().hasAttribute<ExhaustiveAttr>() &&
-            !ED->getAttrs().hasAttribute<NonExhaustiveAttr>()) {
+        if (!ED->getAttrs().hasAttribute<FrozenAttr>() &&
+            !ED->getAttrs().hasAttribute<NonFrozenAttr>()) {
           if (Context.isSwiftVersionAtLeast(5) ||
               ED->getModuleContext()->getResilienceStrategy() ==
                 ResilienceStrategy::Resilient) {
             ED->getAttrs().add(
-                new (Context) NonExhaustiveAttr(/*implicit*/true));
+                new (Context) NonFrozenAttr(/*implicit*/true));
           } else {
             ED->getAttrs().add(
-                new (Context) ExhaustiveAttr(/*implicit*/true));
+                new (Context) FrozenAttr(/*implicit*/true));
           }
         }
       }

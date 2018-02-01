@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_exhaustive // FIXME(sil-serialize-all)
+  @frozen // FIXME(sil-serialize-all)
   public enum UTF16 {
   case _swift3Buffer(Unicode.UTF16.ForwardParser)
   }

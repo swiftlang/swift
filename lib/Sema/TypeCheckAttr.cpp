@@ -84,7 +84,7 @@ public:
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(Inlineable)
-  IGNORED_ATTR(NonExhaustive)
+  IGNORED_ATTR(NonFrozen)
   IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -244,9 +244,9 @@ public:
     }
   }
 
-  void visitExhaustiveAttr(ExhaustiveAttr *attr) {
-    if (D->getAttrs().hasAttribute<NonExhaustiveAttr>())
-      diagnoseAndRemoveAttr(attr, diag::enum_exhaustive_and_nonexhaustive);
+  void visitFrozenAttr(FrozenAttr *attr) {
+    if (D->getAttrs().hasAttribute<NonFrozenAttr>())
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_and_nonfrozen);
   }
 
   void visitIBActionAttr(IBActionAttr *attr);
@@ -883,8 +883,8 @@ public:
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void checkExhaustivity(DeclAttribute *attr);
-  void visitExhaustiveAttr(ExhaustiveAttr *attr);
-  void visitNonExhaustiveAttr(NonExhaustiveAttr *attr);
+  void visitFrozenAttr(FrozenAttr *attr);
+  void visitNonFrozenAttr(NonFrozenAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2037,14 +2037,14 @@ void AttributeChecker::checkExhaustivity(DeclAttribute *attr) {
     return;
   if (D->getAttrs().hasAttribute<VersionedAttr>())
     return;
-  diagnoseAndRemoveAttr(attr, diag::enum_exhaustive_nonpublic, attr);
+  diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
 }
 
-void AttributeChecker::visitExhaustiveAttr(ExhaustiveAttr *attr) {
+void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   checkExhaustivity(attr);
 }
 
-void AttributeChecker::visitNonExhaustiveAttr(NonExhaustiveAttr *attr) {
+void AttributeChecker::visitNonFrozenAttr(NonFrozenAttr *attr) {
   checkExhaustivity(attr);
 }
 

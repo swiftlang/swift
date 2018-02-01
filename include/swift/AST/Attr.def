@@ -307,8 +307,8 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
           LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
           /*Not serialized*/74)
 
-SIMPLE_DECL_ATTR(_exhaustive, Exhaustive, OnEnum, 75)
-SIMPLE_DECL_ATTR(_nonexhaustive, NonExhaustive, OnEnum, 76)
+SIMPLE_DECL_ATTR(frozen, Frozen, OnEnum, 75)
+SIMPLE_DECL_ATTR(_nonfrozen, NonFrozen, OnEnum | UserInaccessible, 76)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

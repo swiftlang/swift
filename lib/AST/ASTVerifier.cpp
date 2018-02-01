@@ -2682,9 +2682,9 @@ public:
 
     void verifyChecked(EnumDecl *ED) {
       if (ED->getFormalAccess() >= AccessLevel::Public) {
-        if (!ED->getAttrs().hasAttribute<ExhaustiveAttr>() &&
-            !ED->getAttrs().hasAttribute<NonExhaustiveAttr>()) {
-          Out << "Public enum is neither '@exhaustive' nor '@nonexhaustive'\n";
+        if (!ED->getAttrs().hasAttribute<FrozenAttr>() &&
+            !ED->getAttrs().hasAttribute<NonFrozenAttr>()) {
+          Out << "Public enum is neither '@frozen' nor '@_nonfrozen'\n";
           ED->dumpContext();
           abort();
         }

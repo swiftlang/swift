@@ -84,7 +84,7 @@ namespace {
     enum class DowngradeToWarning {
       No,
       ForSwift3Case,
-      ForSwift4Exhaustive,
+      ForSwift4Frozen,
     };
 
     /// A data structure for conveniently pattern-matching on the kinds of
@@ -894,7 +894,7 @@ namespace {
         return eed->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>();
       }
 
-      static bool isSwift4NonExhaustiveEnum(TypeChecker &TC,
+      static bool isSwift4NonFrozenEnum(TypeChecker &TC,
                                             const DeclContext *DC,
                                             Type tp) {
         if (TC.getLangOpts().isSwiftVersionAtLeast(5))
@@ -940,12 +940,12 @@ namespace {
                 llvm::transform(TTy->getElements(),
                                 std::back_inserter(constElemSpaces),
                                 [&](TupleTypeElt elt) {
-                  bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC,
+                  bool canDowngrade = isSwift4NonFrozenEnum(TC, DC,
                                                                 elt.getType());
                   return Space(elt.getType(), elt.getName(), canDowngrade);
                 });
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
-                bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC, TTy);
+                bool canDowngrade = isSwift4NonFrozenEnum(TC, DC, TTy);
                 constElemSpaces.push_back(Space(TTy->getUnderlyingType(),
                                                 Identifier(), canDowngrade));
               }
@@ -959,7 +959,7 @@ namespace {
           llvm::transform(TTy->getElements(),
                           std::back_inserter(constElemSpaces),
                           [&](TupleTypeElt elt) {
-            bool canDowngrade = isSwift4NonExhaustiveEnum(TC, DC,
+            bool canDowngrade = isSwift4NonFrozenEnum(TC, DC,
                                                           elt.getType());
             return Space(elt.getType(), elt.getName(), canDowngrade);
           });
@@ -980,12 +980,12 @@ namespace {
       }
 
       // HACK: Search the space for any remaining cases that were labelled
-      // @_downgrade_exhaustivity_check, or 'exhaustive' enums in Swift 4 mode.
+      // @_downgrade_exhaustivity_check, or @frozen enums in Swift 4 mode.
       DowngradeToWarning checkDowngradeToWarning() const {
         switch (getKind()) {
         case SpaceKind::Type:
           if (canDowngradeToWarning())
-            return DowngradeToWarning::ForSwift4Exhaustive;
+            return DowngradeToWarning::ForSwift4Frozen;
           return DowngradeToWarning::No;
         case SpaceKind::BooleanConstant:
         case SpaceKind::Empty:
@@ -1121,7 +1121,7 @@ namespace {
       }
       
       Space totalSpace(subjectType, Identifier(),
-                       Space::isSwift4NonExhaustiveEnum(TC, DC, subjectType));
+                       Space::isSwift4NonFrozenEnum(TC, DC, subjectType));
       Space coveredSpace(spaces);
 
       size_t totalSpaceSize = totalSpace.getSize(TC, DC);
@@ -1203,7 +1203,7 @@ namespace {
         if (sawDowngradablePattern)
           break;
         LLVM_FALLTHROUGH;
-      case DowngradeToWarning::ForSwift4Exhaustive:
+      case DowngradeToWarning::ForSwift4Frozen:
         mainDiagType = diag::non_exhaustive_switch_warn_swift3;
         break;
       }

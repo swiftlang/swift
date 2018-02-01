@@ -2651,8 +2651,8 @@ namespace {
         break;
       }
 
-      case EnumKind::NonExhaustiveEnum:
-      case EnumKind::ExhaustiveEnum: {
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
         auto &C = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
@@ -2756,13 +2756,13 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
-        // Annotate as '@exhaustive' or '@nonexhaustive' as appropriate.
-        bool nonExhaustiveIsDefault = C.isSwiftVersionAtLeast(5);
-        if (enumKind == EnumKind::ExhaustiveEnum) {
-          enumDecl->getAttrs().add(new (C) ExhaustiveAttr(/*implicit*/false));
+        // Annotate as '@frozen' or '@_nonfrozen' as appropriate.
+        if (enumKind == EnumKind::FrozenEnum) {
+          enumDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/false));
         } else {
+          bool nonFrozenIsDefault = C.isSwiftVersionAtLeast(5);
           enumDecl->getAttrs().add(
-              new (C) NonExhaustiveAttr(/*implicit*/nonExhaustiveIsDefault));
+              new (C) NonFrozenAttr(/*implicit*/nonFrozenIsDefault));
         }
 
         // Set up the C underlying type as its Swift raw type.
@@ -2868,8 +2868,8 @@ namespace {
         addEnumeratorsAsMembers = false;
         break;
       case EnumKind::Options:
-      case EnumKind::NonExhaustiveEnum:
-      case EnumKind::ExhaustiveEnum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
         addEnumeratorsAsMembers = true;
         break;
       }
@@ -2879,8 +2879,8 @@ namespace {
                                        EnumElementDecl *>, 8,
                           APSIntRefDenseMapInfo> canonicalEnumConstants;
 
-      if (enumKind == EnumKind::NonExhaustiveEnum ||
-          enumKind == EnumKind::ExhaustiveEnum) {
+      if (enumKind == EnumKind::NonFrozenEnum ||
+          enumKind == EnumKind::FrozenEnum) {
         for (auto constant : decl->enumerators()) {
           if (Impl.isUnavailableInSwift(constant))
             continue;
@@ -2941,8 +2941,8 @@ namespace {
             return true;
           });
           break;
-        case EnumKind::NonExhaustiveEnum:
-        case EnumKind::ExhaustiveEnum: {
+        case EnumKind::NonFrozenEnum:
+        case EnumKind::FrozenEnum: {
           auto canonicalCaseIter =
             canonicalEnumConstants.find(&constant->getInitVal());
 
@@ -3371,8 +3371,8 @@ namespace {
         return result;
       }
 
-      case EnumKind::NonExhaustiveEnum:
-      case EnumKind::ExhaustiveEnum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
       case EnumKind::Options: {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available

@@ -2549,12 +2549,9 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         llvm::dbgs() << '\n');
   auto failure = [this](SILLocation location) {
     // If we fail to match anything, we trap. This can happen with a switch
-    // over a non-exhaustive enum in Swift 4 mode. Note that this isn't
-    // strictly necessary when the enum in question isn't from a module with
-    // resilience enabled, but right now that distinction is only checked at
-    // the IRGen level, which makes it less likely that behavior will diverge.
+    // over a non-frozen enum in Swift 4 mode.
     // FIXME: Even if we can't say what the invalid value was, we should at
-    // least mention that this was because of a non-exhaustive enum.
+    // least mention that this was because of a non-frozen enum.
     B.createBuiltinTrap(location);
     B.createUnreachable(location);
   };

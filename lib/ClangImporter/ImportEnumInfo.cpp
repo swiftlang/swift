@@ -75,7 +75,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // First, check for attributes that denote the classification.
   if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
-    kind = EnumKind::NonExhaustiveEnum;
+    kind = EnumKind::NonFrozenEnum;
     nsErrorDomain = domainAttr->getErrorDomain()->getName();
   }
   if (decl->hasAttr<clang::FlagEnumAttr>()) {
@@ -84,9 +84,9 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   }
   if (auto *attr = getBestExtensibilityAttr(pp, decl)) {
     if (attr->getExtensibility() == clang::EnumExtensibilityAttr::Closed)
-      kind = EnumKind::ExhaustiveEnum;
+      kind = EnumKind::FrozenEnum;
     else
-      kind = EnumKind::NonExhaustiveEnum;
+      kind = EnumKind::NonFrozenEnum;
     return;
   }
   if (!nsErrorDomain.empty())
@@ -114,7 +114,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
         MacroName == "OBJC_ENUM" || MacroName == "SWIFT_ENUM" ||
         MacroName == "SWIFT_ENUM_NAMED") {
-      kind = EnumKind::NonExhaustiveEnum;
+      kind = EnumKind::NonFrozenEnum;
       return;
     }
     if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
@@ -126,7 +126,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // Hardcode a particular annoying case in the OS X headers.
   if (decl->getName() == "DYLD_BOOL") {
-    kind = EnumKind::ExhaustiveEnum;
+    kind = EnumKind::FrozenEnum;
     return;
   }
 
@@ -232,8 +232,8 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 /// within the given enum.
 void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
   switch (getKind()) {
-  case EnumKind::NonExhaustiveEnum:
-  case EnumKind::ExhaustiveEnum:
+  case EnumKind::NonFrozenEnum:
+  case EnumKind::FrozenEnum:
   case EnumKind::Options:
     // Enums are mapped to Swift enums, Options to Swift option sets, both
     // of which attempt prefix-stripping.

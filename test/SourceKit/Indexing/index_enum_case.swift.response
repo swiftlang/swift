@@ -96,7 +96,7 @@
       ],
       key.attributes: [
         {
-          key.attribute: source.decl.attribute._exhaustive
+          key.attribute: source.decl.attribute.frozen
         },
         {
           key.attribute: source.decl.attribute.public

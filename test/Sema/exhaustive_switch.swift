@@ -787,11 +787,11 @@ func checkLiteralTuples() {
   }
 }
 
-@_nonexhaustive public enum NonExhaustive {
+@_nonfrozen public enum NonExhaustive {
   case a, b
 }
 
-@_exhaustive public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)

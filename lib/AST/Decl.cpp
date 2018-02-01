@@ -2279,9 +2279,9 @@ bool NominalTypeDecl::isFormallyResilient() const {
                             /*respectVersionedAttr=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout attribute or 'exhaustive' modifier.
+  // Check for an explicit @_fixed_layout or @frozen attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>() ||
-      getAttrs().hasAttribute<ExhaustiveAttr>()) {
+      getAttrs().hasAttribute<FrozenAttr>()) {
     return false;
   }
 
@@ -3070,8 +3070,8 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
 }
 
 bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
-  // Enums explicitly marked exhaustive are exhaustive.
-  if (getAttrs().hasAttribute<ExhaustiveAttr>())
+  // Enums explicitly marked @frozen are exhaustive.
+  if (getAttrs().hasAttribute<FrozenAttr>())
     return true;
 
   // Non-public, non-versioned enums are always exhaustive.
