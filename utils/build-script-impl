@@ -2801,12 +2801,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
                 fi
 
+                # If we need to use the system debugserver, do so explicitly.
+                if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
+                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver"
+                else
+                    LLDB_TEST_DEBUG_SERVER=""
+                fi
+
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
                            SWIFTLIBS="${swift_build_dir}/lib/swift" \
                            "${LLDB_SOURCE_DIR}"/test/dotest.py \
                            --executable "${lldb_executable}" \
+                           ${LLDB_TEST_DEBUG_SERVER} \
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_TEST_CATEGORIES} \
                            ${LLDB_DOTEST_CC_OPTS} \
