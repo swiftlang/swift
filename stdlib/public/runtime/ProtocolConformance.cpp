@@ -314,7 +314,26 @@ struct ConformanceState {
                                     const ProtocolDescriptor *proto) {
     return Cache.find(ConformanceCacheKey(type, proto));
   }
+
+#ifndef NDEBUG
+  void verify() const LLVM_ATTRIBUTE_USED;
+#endif
 };
+
+#ifndef NDEBUG
+void ConformanceState::verify() const {
+  // Iterate over all of the sections and verify all of the protocol
+  // descriptors.
+  auto &Self = const_cast<ConformanceState &>(*this);
+  ScopedLock guard(Self.SectionsToScanLock);
+
+  for (const auto &Section : SectionsToScan) {
+    for (const auto &Record : Section) {
+      Record.get()->verify();
+    }
+  }
+}
+#endif
 
 static Lazy<ConformanceState> Conformances;
 
