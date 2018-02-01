@@ -30,6 +30,42 @@
 
 using namespace swift;
 
+#ifndef NDEBUG
+template <> void ProtocolDescriptor::dump() const {
+  unsigned NumInheritedProtocols =
+      InheritedProtocols ? InheritedProtocols->NumProtocols : 0;
+
+  printf("TargetProtocolDescriptor.\n"
+         "Name: \"%s\".\n"
+         "ObjC Isa: %p.\n",
+         Name, _ObjC_Isa);
+  Flags.dump();
+  printf("Has Inherited Protocols: %s.\n",
+         (NumInheritedProtocols ? "true" : "false"));
+  if (NumInheritedProtocols) {
+    printf("Inherited Protocol List:\n");
+    for (unsigned i = 0, e = NumInheritedProtocols; i != e; ++i) {
+      printf("%s\n", (*InheritedProtocols)[i]->Name);
+    }
+  }
+}
+
+void ProtocolDescriptorFlags::dump() const {
+  printf("ProtocolDescriptorFlags.\n");
+  printf("Is Swift: %s.\n", (isSwift() ? "true" : "false"));
+  printf("Needs Witness Table: %s.\n",
+         (needsWitnessTable() ? "true" : "false"));
+  printf("Is Resilient: %s.\n", (isResilient() ? "true" : "false"));
+  printf("Special Protocol: %s.\n",
+         (bool(getSpecialProtocol()) ? "Error" : "None"));
+  printf("Class Constraint: %s.\n",
+         (bool(getClassConstraint()) ? "Class" : "Any"));
+  printf("Dispatch Strategy: %s.\n",
+         (bool(getDispatchStrategy()) ? "Swift" : "ObjC"));
+}
+
+#endif
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 
@@ -78,6 +114,21 @@ template<> void ProtocolConformanceDescriptor::dump() const {
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
   }
+}
+#endif
+
+#ifndef NDEBUG
+template<> void ProtocolConformanceDescriptor::verify() const {
+  auto typeKind = unsigned(getTypeKind());
+  assert(((unsigned(TypeMetadataRecordKind::First_Kind) <= typeKind) &&
+          (unsigned(TypeMetadataRecordKind::Last_Kind) >= typeKind)) &&
+         "Corrupted type metadata record kind");
+
+  auto confKind = unsigned(getConformanceKind());
+  using ConformanceKind = ConformanceFlags::ConformanceKind;
+  assert(((unsigned(ConformanceKind::First_Kind) <= confKind) &&
+          (unsigned(ConformanceKind::Last_Kind) >= confKind)) &&
+         "Corrupted conformance kind");
 }
 #endif
 

@@ -1866,6 +1866,11 @@ struct TargetProtocolDescriptor {
       Superclass(nullptr),
       AssociatedTypeNames(nullptr)
   {}
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use in the debugger");
+#endif
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
@@ -2402,6 +2407,16 @@ public:
   
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
+#endif
+
+#ifndef NDEBUG
+  /// Verify that the protocol descriptor obeys all invariants.
+  ///
+  /// We currently check that the descriptor:
+  ///
+  /// 1. Has a valid TypeMetadataRecordKind.
+  /// 2. Has a valid conformance kind.
+  void verify() const LLVM_ATTRIBUTE_USED;
 #endif
 };
 using ProtocolConformanceDescriptor
