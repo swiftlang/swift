@@ -339,7 +339,8 @@ bool FrontendInputsAndOutputs::hasNamedOutputFile() const {
 
 void FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
     llvm::function_ref<void(const InputFile &)> fn) const {
-  isWholeModule()
-      ? fn(firstInput())
-      : hasPrimaryInputs() ? forEachPrimaryInput(fn) : forEachInput(fn);
+  if (hasPrimaryInputs())
+    forEachPrimaryInput(fn);
+  else
+    fn(firstInput());
 }
