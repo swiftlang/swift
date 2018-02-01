@@ -230,10 +230,9 @@ fileprivate extension _ExecutionContext {
       // Now that we have all of the TF_Function objects in the graph, copy them
       // to standalone TF_Function's.
       let funcCount = TF_GraphNumFunctions(graph)
-      // Allocate a buffer to accept functions.
-      let funcs =
-        UnsafeMutablePointer<CTFFunction?>.allocate(capacity: Int(funcCount))
-      TF_GraphGetFunctions(graph, funcs, funcCount, self.status)
+      // Allocate an array to accept functions.
+      var funcs = [CTFFunction?](repeating: nil, count: Int(funcCount))
+      TF_GraphGetFunctions(graph, &funcs, funcCount, self.status)
       checkOk(self.status)
       // Delete the graph as it's no longer needed.
       TF_DeleteGraph(graph)
@@ -246,8 +245,6 @@ fileprivate extension _ExecutionContext {
         TF_DeleteFunction(function)
       }
 
-      // Deallocate the function buffer as it's no longer used.
-      funcs.deallocate()
       // Memorize the loaded program by address.
       loadedPrograms.insert(address)
       debugLog("Done loading a new program.")
