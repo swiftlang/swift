@@ -2545,7 +2545,7 @@ public:
   class AssociatedTypeIterator {
     const void *addr;
     
-    explicit AssociatedTypeIterator(const void *startAddr) : addr(addr) {}
+    explicit AssociatedTypeIterator(const void *startAddr) : addr(startAddr) {}
     
     bool isEnd() const {
       if (addr == nullptr)
@@ -2556,6 +2556,9 @@ public:
         return true;
       return false;
     }
+
+    template <class> friend class TargetGenericParamRef;
+
   public:
     AssociatedTypeIterator() : addr(nullptr) {}
 
@@ -2652,6 +2655,46 @@ class TargetGenericRequirementDescriptor {
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
   };
+
+public:
+  constexpr GenericRequirementFlags getFlags() const {
+    return Flags;
+  }
+
+  constexpr GenericRequirementKind getKind() const {
+    return getFlags().getKind();
+  }
+
+  /// Retrieve the generic parameter that is the subject of this requirement.
+  const TargetGenericParamRef<Runtime> &getParam() const {
+    return Param;
+  }
+
+  /// Retrieve the protocol descriptor for a Protocol requirement.
+  const TargetProtocolDescriptor<Runtime> *getProtocol() const {
+    assert(getKind() == GenericRequirementKind::Protocol);
+    return Protocol;
+  }
+
+  /// Retrieve the right-hand type for a SameType or BaseClass requirement.
+  const char *getMangledTypeName() const {
+    assert(getKind() == GenericRequirementKind::SameType ||
+           getKind() == GenericRequirementKind::BaseClass);
+    return Type;
+  }
+
+  /// Retrieve the protocol conformance record for a SameConformance
+  /// requirement.
+  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+    assert(getKind() == GenericRequirementKind::SameConformance);
+    return Conformance;
+  }
+
+  /// Retrieve the layout constraint.
+  GenericRequirementLayoutKind getLayout() const {
+    assert(getKind() == GenericRequirementKind::Layout);
+    return Layout;
+  }
 };
 
 /// CRTP class for a context descriptor that includes trailing generic

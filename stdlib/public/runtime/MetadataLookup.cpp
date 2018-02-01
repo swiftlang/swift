@@ -571,8 +571,7 @@ public:
 
     // Gather all of the generic arguments.
     // FIXME: Need to also gather generic requirements.
-    std::vector<BuiltType> allGenericArgsVec;
-    ArrayRef<BuiltType> allGenericArgs;
+    std::vector<const void *> allGenericArgs;
     if (typeDecl->Parent->isGeneric()) {
       // TODO: The parent's generic arguments may not be a prefix of ours
       // if there are same type or protocol requirements.
@@ -590,27 +589,51 @@ public:
         return nullptr;
       
       if (parentGenericArgs) {
-        allGenericArgsVec.insert(
-         allGenericArgsVec.end(),
+        allGenericArgs.insert(
+         allGenericArgs.end(),
          parentGenericArgs,
          parentGenericArgs + parentNominal->getGenericContextHeader().NumParams);
       }
-
-      // Add the generic arguments for this type.
-      allGenericArgsVec.insert(allGenericArgsVec.end(),
-                               genericArgs.begin(), genericArgs.end());
-      allGenericArgs = allGenericArgsVec;
-    } else {
-      // Only one level of generic arguments to consider.
-      allGenericArgs = genericArgs;
     }
 
-    // FIXME: We don't want the number of "primary" parameters, we want the
-    // total number of parameters.
-    if (typeDecl->isGeneric()
-        && typeDecl->getGenericContextHeader().NumParams
-             != typeDecl->getGenericContextHeader().getNumArguments())
-      return BuiltType();
+    // If the type is generic
+    if (auto genericContext = typeDecl->getGenericContext()) {
+      auto genericParams = genericContext->getGenericParams();
+      if (genericArgs.size() != genericParams.size()) return nullptr;
+
+      // Add generic arguments for the key parameters in this type.
+      for (unsigned index = 0, endIndex = genericParams.size();
+           index != endIndex; ++index) {
+        if (genericParams[index].hasKeyArgument())
+          allGenericArgs.push_back(genericArgs[index]);
+      }
+
+      // Check whether the generic requirements are satisfied, collecting
+      // any extra arguments we need for the instantiation function.
+      bool failed =
+        _checkGenericRequirements(genericContext->getGenericRequirements(),
+                                  allGenericArgs,
+                                  [&](unsigned flatIndex) -> BuiltType {
+                                    // FIXME: Adjust for parents.
+                                    if (flatIndex < genericArgs.size())
+                                      return genericArgs[flatIndex];
+
+                                    return nullptr;
+                                  },
+                                  substGenericParameter);
+      if (failed)
+        return nullptr;
+
+      // If we still have the wrong number of generic arguments, this is
+      // some kind of metadata mismatch: fail.
+      if (typeDecl->getGenericContextHeader().getNumArguments() !=
+            allGenericArgs.size())
+        return nullptr;
+
+    } else if (!genericArgs.empty()) {
+      // Mangled name provided generic arguments for a non-generic type.
+      return nullptr;
+    }
 
     // Call the access function.
     auto accessFunction = typeDecl->getAccessFunction();
