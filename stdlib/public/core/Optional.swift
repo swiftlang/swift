@@ -426,7 +426,6 @@ extension Optional : Hashable where Wrapped : Hashable {
       result = 1
       result = _combineHashValues(result, wrapped.hashValue)
     }
-    result = _mixInt(result)
     return result
   }
 }

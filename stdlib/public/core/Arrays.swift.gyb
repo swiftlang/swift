@@ -2249,7 +2249,6 @@ extension ${Self} : Hashable where Element : Hashable {
     for element in self {
       result = _combineHashValues(result, element.hashValue)
     }
-    result = _mixInt(result)
     return result
   }
 }
