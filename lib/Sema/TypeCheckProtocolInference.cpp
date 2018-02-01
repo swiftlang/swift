@@ -1082,7 +1082,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto result =
     tc.checkGenericArguments(dc, SourceLoc(), SourceLoc(),
                              typeInContext,
-                             { proto->getProtocolSelfType() },
+                             { Type(proto->getProtocolSelfType()) },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(tc, dc),

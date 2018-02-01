@@ -625,7 +625,7 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
-ArrayRef<GenericTypeParamType *>
+TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
   if (auto sig = getGenericSignature())
     return sig->getInnermostGenericParams();
