@@ -172,6 +172,16 @@ SubstringTests.test("UTF16View") {
   expectEqual("", String(u.dropLast(10))!)
 }
 
+SubstringTests.test("Mutate Substring through UTF16View") {
+  let s = "abcdefg"
+  var ss = s[...]
+  expectEqual(s.startIndex, ss.startIndex)
+  expectEqual(s.count, ss.count)
+  ss.utf16.removeFirst()
+  expectEqual(s.index(after: s.startIndex), ss.startIndex)
+  expectEqual(s.count - 1, ss.count)
+}
+
 SubstringTests.test("UTF8View") {
   let s = "abcdefg"
   let t = s.utf8.dropFirst(2)
