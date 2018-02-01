@@ -1340,20 +1340,13 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
   auto Trace = Invocation.getFrontendOptions().TraceStats;
   SourceManager *SM = &Instance->getSourceMgr();
   clang::SourceManager *CSM = nullptr;
-    if (auto *clangImporter = static_cast<ClangImporter *>(
-                                                           Instance->getASTContext().getClangModuleLoader())) {
-        CSM = &clangImporter->getClangASTContext().getSourceManager();
-    }
-    return llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
-                                                            FEOpts.ModuleName,
-                                                            InputName,
-                                                            TripleName,
-                                                            OutputType,
-                                                            OptType,
-                                                            StatsOutputDir,
-                                                            SM, CSM,
-                                                            Trace);
-
+  if (auto *clangImporter = static_cast<ClangImporter *>(
+          Instance->getASTContext().getClangModuleLoader())) {
+    CSM = &clangImporter->getClangASTContext().getSourceManager();
+  }
+  return llvm::make_unique<UnifiedStatsReporter>(
+      "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
+      OptType, StatsOutputDir, SM, CSM, Trace);
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
@@ -1521,7 +1514,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   std::unique_ptr<UnifiedStatsReporter> StatsReporter =
-  computeStatsReporter(Invocation, Instance.get());
+      computeStatsReporter(Invocation, Instance.get());
   if (StatsReporter) {
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure
