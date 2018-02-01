@@ -829,11 +829,11 @@ public enum NonExhaustive {
 // case.
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProxy, flag: Bool) {
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
   case .a: break
   }
 
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
   case .a: break
   case .b: break
   }

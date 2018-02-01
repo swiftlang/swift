@@ -3892,6 +3892,8 @@ NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"
      "?", (bool))
+NOTE(missing_unknown_case,none,
+     "handle unknown values using \"@unknown case _\"", ())
 
 NOTE(missing_particular_case,none,
      "add missing case: '%0'", (StringRef))
@@ -3905,7 +3907,7 @@ NOTE(redundant_particular_literal_case_here,none,
 
 // HACK: Downgrades the above to warnings if any of the cases is marked
 // @_downgrade_exhaustivity_check.
-WARNING(non_exhaustive_switch_warn_swift3,none, "switch must be exhaustive", ())
+WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

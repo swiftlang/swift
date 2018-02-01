@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3 %s
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 enum Runcible {
   case spoon
@@ -107,7 +107,7 @@ func missingCases(x: Runcible?, y: Runcible?, z: Trioptional) {
   }
 
   // Should warn in S3 mode that `fork` isn't used
-  switch (x, y) { // expected-warning {{switch must be exhaustive}}
+  switch (x, y) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.some(.fork), _)'}}
   // expected-note@-2 {{add missing case: '(_, .some(.fork))'}}
   // expected-note@-3 {{add missing case: '(.some(.hat), .some(.fork))'}}
