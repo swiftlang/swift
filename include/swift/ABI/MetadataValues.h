@@ -203,6 +203,9 @@ enum class TypeMetadataRecordKind : unsigned {
   /// On platforms without Objective-C interoperability, this case is
   /// unused.
   IndirectObjCClass = 0x03,
+
+  First_Kind = DirectNominalTypeDescriptor,
+  Last_Kind = IndirectObjCClass,
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.
@@ -327,6 +330,11 @@ public:
   int_type getIntValue() const {
     return Data;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+#endif
 };
 
 /// Flags that go in a ProtocolRequirement structure.
@@ -389,7 +397,10 @@ public:
     /// A function pointer that can be called to access the protocol witness
     /// table whose conformance is conditional on additional requirements that
     /// must first be evaluated and then provided to the accessor function.
-    ConditionalWitnessTableAccessor
+    ConditionalWitnessTableAccessor,
+
+    First_Kind = WitnessTable,
+    Last_Kind = ConditionalWitnessTableAccessor,
   };
 
 private:
