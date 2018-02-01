@@ -2236,31 +2236,38 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 template <typename Runtime>
 struct TargetTypeMetadataRecord {
 private:
-  /// The nominal type descriptor.
-  RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
-                               TypeMetadataRecordKind>
-    TypeDescriptor;
+  union {
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+  };
 
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return TypeDescriptor.getInt();
+    return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetTypeContextDescriptor<Runtime> *
-  getNominalTypeDescriptor() const {
+  getTypeContextDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      break;
+      return DirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::Reserved:
+    case TypeMetadataRecordKind::IndirectObjCClass:
       return nullptr;
 
-    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not generic metadata pattern");
+      return *IndirectNominalTypeDescriptor.getPointer();
     }
     
-    return this->TypeDescriptor.getPointer();
+    return nullptr;
   }
 };
 

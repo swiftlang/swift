@@ -216,7 +216,7 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto ntd = record.getNominalTypeDescriptor()) {
+      if (auto ntd = record.getTypeContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node)) {
           return ntd;
         }
@@ -566,10 +566,6 @@ public:
     // If we already have metadata, return it.
     if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
       return metadata;
-
-    // Cannot specialize metadata.
-    if (metadataOrTypeDecl.is<const Metadata *>())
-      return BuiltType();
 
     auto typeDecl = metadataOrTypeDecl.get<const TypeContextDescriptor *>();
 
