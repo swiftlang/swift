@@ -3254,12 +3254,6 @@ public:
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
-  // FIXME: Both of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
-
-  bool isGenericOperatorOrUnavailable() const;
-  bool isSymmetricOperator() const;
-
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables);

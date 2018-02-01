@@ -1759,46 +1759,6 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-/// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
-                                        DisjunctionChoice &choice,
-                                        Optional<Score> &bestNonGenericScore) {
-  if (choice->isDisabled()) {
-    auto &TC = cs.TC;
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(cs.solverState->depth)
-      << "(skipping ";
-      choice->print(log, &TC.Context.SourceMgr);
-      log << '\n';
-    }
-
-    return true;
-  }
-
-  // Don't attempt to solve for generic operators if we already have
-  // a non-generic solution.
-
-  // FIXME: Less-horrible but still horrible hack to attempt to
-  //        speed things up. Skip the generic operators if we
-  //        already have a solution involving non-generic operators,
-  //        but continue looking for a better non-generic operator
-  //        solution.
-  if (bestNonGenericScore && choice.isGenericOperatorOrUnavailable()) {
-    auto &score = bestNonGenericScore->Data;
-    // Let's skip generic overload choices only in case if
-    // non-generic score indicates that there were no forced
-    // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return true;
-  }
-
-  return false;
-}
-
 Constraint *ConstraintSystem::selectDisjunction(
     SmallVectorImpl<Constraint *> &disjunctions) {
   if (disjunctions.empty())
@@ -1885,7 +1845,6 @@ bool ConstraintSystem::solveSimplified(
   CG.removeConstraint(disjunction);
 
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
-  Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
@@ -1893,8 +1852,6 @@ bool ConstraintSystem::solveSimplified(
   for (auto index : indices(constraints)) {
     auto currentChoice =
         DisjunctionChoice(this, disjunction, constraints[index]);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
-      continue;
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
@@ -1937,12 +1894,6 @@ bool ConstraintSystem::solveSimplified(
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!currentChoice.isGenericOperatorOrUnavailable() &&
-          currentChoice.isSymmetricOperator()) {
-        if (!bestNonGenericScore || score < bestNonGenericScore)
-          bestNonGenericScore = score;
-      }
-
       lastSolvedChoice = {currentChoice, *score};
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
@@ -1992,37 +1943,6 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
   }
 
   return bestScore;
-}
-
-bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {
-  auto *decl = getOperatorDecl(Choice);
-  if (!decl)
-    return false;
-
-  auto &ctx = decl->getASTContext();
-  if (decl->getAttrs().isUnavailable(ctx))
-    return true;
-
-  auto interfaceType = decl->getInterfaceType();
-  return interfaceType->is<GenericFunctionType>();
-}
-
-bool DisjunctionChoice::isSymmetricOperator() const {
-  auto *decl = getOperatorDecl(Choice);
-  if (!decl)
-    return false;
-
-  auto func = dyn_cast<FuncDecl>(decl);
-  auto paramList =
-      func->getParameterList(func->getDeclContext()->isTypeContext());
-  if (paramList->size() != 2)
-    return true;
-
-  auto firstType =
-      paramList->get(0)->getInterfaceType()->getWithoutSpecifierType();
-  auto secondType =
-      paramList->get(1)->getInterfaceType()->getWithoutSpecifierType();
-  return firstType->isEqual(secondType);
 }
 
 void DisjunctionChoice::propagateConversionInfo() const {
