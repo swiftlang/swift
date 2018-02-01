@@ -72,6 +72,11 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 ```
 VsDevCmd -arch=amd64
 ```
+If instead, you're compiling for a 32-bit Windows target, adapt the `arch` argument to `x86` and run
+```cmd
+VsDevCmd -arch=x86
+```
+
 - Then adapt the following command and run it.
 ```
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
