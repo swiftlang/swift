@@ -1866,6 +1866,11 @@ struct TargetProtocolDescriptor {
       Superclass(nullptr),
       AssociatedTypeNames(nullptr)
   {}
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use in the debugger");
+#endif
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
