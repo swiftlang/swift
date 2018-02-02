@@ -99,21 +99,13 @@ DictionaryTestSuite.test("Hashable") {
     let dd7: Dictionary<Int, Dictionary<Int, String>> = [:]
     checkHashable([dd1, dd2, dd3, dd4, dd5, dd6, dd7], equalityOracle: { $0 == $1 })
 
-    // d5 is equal to d6, but should be iterated differently
-    var d5: Dictionary<Int, String> = Dictionary()
-    d5.reserveCapacity(3)
-    d5[1] = "meow"
-    d5[4] = "mooo"
-    d5[2] = "meow"
-
-    var d6: Dictionary<Int, String> = Dictionary()
-    d6.reserveCapacity(3)
-    d6[2] = "meow"
-    d6[1] = "meow"
-    d6[4] = "mooo"
-
-    expectEqual(d5, d6)
-    expectEqual(d5.hashValue, d6.hashValue)
+    // Check that hash is equal even though dictionary is traversed differently
+    var d5: Dictionary<Int, String> = [1: "meow", 2: "meow", 4: "mooo"]
+    let expected = d5.hashValue
+    for capacity in [4, 8, 16, 32, 64, 128, 256] {
+        d5.reserveCapacity(capacity)
+        expectEqual(d5.hashValue, expected)
+    }
 }
 
 DictionaryTestSuite.test("valueDestruction") {
