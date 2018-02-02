@@ -43,6 +43,8 @@ func foo() {
   #warning("warnings can be nested in switch statements") // expected-warning {{warnings can be nested in switch statements}}
   #if true
   #error("errors can be nested in if-configs inside switch statements too") // expected-error {{errors can be nested in if-configs inside switch statements too}}
+  case 5:
+  #warning("way too many levels of nesting") // expected-warning {{way too many levels of nesting}}
   #elseif false
   #error("this still shouldn't trip")
   #endif

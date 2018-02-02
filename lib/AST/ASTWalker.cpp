@@ -189,7 +189,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-    // By default, ignore #erorr/#warning.
+    // By default, ignore #error/#warning.
     return false;
   }
 
