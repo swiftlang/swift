@@ -758,6 +758,18 @@ bool swift::_checkGenericRequirements(
       continue;
     }
 
+    case GenericRequirementKind::Layout: {
+      switch (req.getLayout()) {
+      case GenericRequirementLayoutKind::Class:
+        // Check whether the subject type is a class.
+        if (!subjectType->isAnyClass()) return true;
+        continue;
+      }
+
+      // Unknown layout.
+      return true;
+    }
+
     // FIXME: Handle all of the other cases.
     default:
       return true;

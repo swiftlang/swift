@@ -308,6 +308,15 @@ DemangleToMetadataTests.test("same-type requirements") {
   expectNil(_typeByMangledName("4main3SG8VyAA13ConformsToP4cVG"))
 }
 
+struct SG9<T: AnyObject> { }
+
+DemangleToMetadataTests.test("AnyObject requirements") {
+  expectEqual(SG9<C>.self,
+    _typeByMangledName("4main3SG9VyAA1CCG")!)
+
+  // Failure cases: failed AnyObject constraint.
+  expectNil(_typeByMangledName("4main3SG9VyAA1SVG"))
+}
 
 runAllTests()
 
