@@ -115,7 +115,7 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
     auto resultTy = I->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
-      return "__tfop_Const__cd:t__";
+      return "__tfop_Const,cd:t";
   }
 
   auto *BI = dyn_cast<BuiltinInst>(I);
@@ -137,7 +137,7 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   // for a tensor op.
   auto check = [&](bool cond, StringRef result) -> std::string {
     if (!cond) return std::string();
-    return "__tfop_" + result.str() + "__tt:t__";
+    return "__tfop_" + result.str() + ",tt:t";
   };
 
   // Given an overflowing operation, return true if the overflow result will be
@@ -1469,6 +1469,11 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
     return ourInst;
   };
 
+  // TODO: Attributes should support arrays as well as simple literals.
+  auto cloneAttrInst = [&](SILInstruction *inst) -> SILInstruction* {
+    return cloneSingleInst(inst);
+  };
+
   unsigned nextOperand = isa<ApplyInst>(inst);  // Skip callee.
   for (auto operandInfo : tfopInfo.operandDescriptors) {
     switch (operandInfo) {
@@ -1488,6 +1493,15 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
       llvm_unreachable("scalar operands should always be handled specially");
     }
   }
+
+  for (auto attrName : tfopInfo.attributeNames) {
+    (void)attrName;  // Attrname is encoded in builtinName.
+    auto attr = tfopInfo.getAttrOperand(nextOperand++);
+    args.push_back(cloneAttrInst(attr)->getResults()[0]);
+  }
+
+  assert(nextOperand == inst->getNumOperands() &&
+         "Some operands not consumed in TFPartition");
 
   auto name = B.getASTContext().getIdentifier(tfopInfo.builtinName);
   auto result = B.createBuiltin(loc, name, inst->getType(),
@@ -1789,10 +1803,10 @@ void PartitionCloner::finalizeOriginal() {
     // TA. Recall the calling convention of TO is that TO consumes TA at +1.
     //
     // For example, before removing instruction
-    // %r1 = builtin "__tfop_Add__tt:t__"(%arg1, %arg2),
+    // %r1 = builtin "__tfop_Add,tt:t"(%arg1, %arg2),
     // we first emit strong_release'es on %arg1 and %arg2.
     // If there is a subsequent instruction
-    // %r2 = builtin "__tfop_Add__tt:t__"(%r1, %arg3),
+    // %r2 = builtin "__tfop_Add,tt:t"(%r1, %arg3),
     // we only emit strong_release on %arg3, and not on %r1, since the
     // strong_retain on %r1 will be removed when all references of the first Add
     // instruction are dropped along with that instruction itself.

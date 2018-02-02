@@ -18,11 +18,11 @@ public func testTensor() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
 // CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:   %1 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %2 = builtin "__tfop_Sub__tt:t__"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %1 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %2 = builtin "__tfop_Sub,tt:t"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   %3 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%2 : $TensorHandle<Float>) : $()
 // CHECK-NEXT:   %4 = builtin "tensorflowReceive_0"<TensorHandle<Float>>() : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = builtin "__tfop_Add__tt:t__"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %5 : $TensorHandle<Float>
 
 
@@ -55,9 +55,9 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
 // CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
-// CHECK-NEXT:   %4 = builtin "__tfop_Add__tt:t__"(%3 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %2 = builtin "__tfop_Const,cd:t"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %3 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:   %4 = builtin "__tfop_Add,tt:t"(%3 : $TensorHandle<Float>, %3 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %4 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
@@ -96,8 +96,8 @@ public func testExitBranch(i : Int) {
 // CHECK: sil private @{{.*}}testExitBranch{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
 // CHECK-NEXT:   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   %2 = builtin "__tfop_Add__tt:t__"(%1 : $TensorHandle<Builtin.FPIEEE32>, %1 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:   %1 = builtin "__tfop_Const,cd:t"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %2 = builtin "__tfop_Add,tt:t"(%1 : $TensorHandle<Builtin.FPIEEE32>, %1 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %2 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
@@ -171,7 +171,7 @@ public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitl
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param2{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
-// CHECK-NEXT:    builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:    builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:    [[BOOL:%.*]] = builtin "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
 // CHECK-NEXT:    cond_br [[BOOL]]
 // ...
@@ -207,17 +207,17 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
-// CHECK-NEXT: builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
+// CHECK-NEXT: builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
 // CHECK-NEXT: integer_literal $Builtin.Int64, 0
-// CHECK-NEXT: builtin "__tfop_Const__cd:t__"(
-// CHECK-NEXT: builtin "__tfop_Less__tt:t__"(
+// CHECK-NEXT: builtin "__tfop_Const,cd:t"(
+// CHECK-NEXT: builtin "__tfop_Less,tt:t"(
 // CHECK-NEXT: builtin "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br %7, bb2, bb1
 
 // CHECK: bb3([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>, [[A:%.*]] : $TensorHandle<Float>):
-// CHECK-NEXT:  [[NEXTA:%.*]] = builtin "__tfop_Sub__tt:t__"([[A:%.*]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  [[NEXTCOUNT:%.*]] = builtin "__tfop_Add__tt:t__"([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>,
-// CHECK-NEXT: [[CONDT:%.*]] = builtin "__tfop_Less__tt:t__"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>,
+// CHECK-NEXT:  [[NEXTA:%.*]] = builtin "__tfop_Sub,tt:t"([[A:%.*]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  [[NEXTCOUNT:%.*]] = builtin "__tfop_Add,tt:t"([[COUNT:%.*]] : $TensorHandle<Builtin.Int64>,
+// CHECK-NEXT: [[CONDT:%.*]] = builtin "__tfop_Less,tt:t"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>,
 // CHECK-NEXT:   [[COND:%.*]] = builtin "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
 // CHECK-NEXT:   cond_br [[COND]], bb5, bb4
 
@@ -255,14 +255,14 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
 // CHECK-NEXT:  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:  %2 = builtin "__tfop_Const__cd:t__"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:  %2 = builtin "__tfop_Const,cd:t"(%1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %3 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:  %4 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%3 : $TensorHandle<Float>) : $()
 // CHECK-NEXT:  %5 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
-// CHECK-NEXT:  %6 = builtin "__tfop_Const__cd:t__"(%5 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %6 = builtin "__tfop_Const,cd:t"(%5 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:  %7 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %8 = builtin "__tfop_Add__tt:t__"(%7 : $TensorHandle<Builtin.FPIEEE32>, %6 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %9 = builtin "__tfop_Add__tt:t__"(%8 : $TensorHandle<Builtin.FPIEEE32>, %8 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
+// CHECK-NEXT:  %8 = builtin "__tfop_Add,tt:t"(%7 : $TensorHandle<Builtin.FPIEEE32>, %6 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %9 = builtin "__tfop_Add,tt:t"(%8 : $TensorHandle<Builtin.FPIEEE32>, %8 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:  return %9 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
@@ -281,9 +281,21 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
 // CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
-// CHECK-NEXT:  %3 = builtin "__tfop_Add__tt:t__"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  %4 = builtin "__tfop_Select__ttt:t__"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT: %5 = builtin "__tfop_Mul__tt:t__"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  %3 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  %4 = builtin "__tfop_Select,ttt:t"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT: %5 = builtin "__tfop_Mul,tt:t"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:  return %5 : $TensorHandle<Float>
 // CHECK-NEXT:}
+
+public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
+  return Tensor<Int32>(x+x)  // expected-note {{value used here}}
+} // expected-warning {{value implicitly copied to the accelerator}}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
+// CHECK: sil private @{{.*}}testCast{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Int32> {
+// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK-NEXT: %1 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:   %2 = metatype $@thick Int32.Type
+// CHECK:   %3 = builtin "__tfop_Cast,t:t,DstT"(%1 : $TensorHandle<Float>, %2 : $@thick Int32.Type) : $TensorHandle<Int32>
+// CHECK:   return %3 : $TensorHandle<Int32>
 

@@ -94,8 +94,7 @@ extension Tensor where Unit : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
   @_inlineable // make @_inlineable when implemented.
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
-    self.init(#tfop("Cast", "td:t", other.handle))
-    //self = Tensor<Unit>(#tfop("Cast", "td:t", other.handle))
+    self.init(#tfop("Cast", "t:t", other.handle, DstT: Unit.self))
   }
 }
 

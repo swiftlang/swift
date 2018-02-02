@@ -479,13 +479,49 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       auto type = isTensorHandle(inst->getType().getSwiftRValueType());
       assert(type && "Not a valid builtin");
       const char *attrName = "dtype";
-      if (tfopInfo.opName == "Cast")
-        attrName = "DstT";
       TF_SetAttrType(op, attrName, (TF_DataType)convertSwiftTypeToTF(type));
       break;
     }
     }
   }
+
+  // Process attributes as well.
+  for (auto attrName : tfopInfo.attributeNames) {
+    auto attr = tfopInfo.getAttrOperand(nextOperand++);
+
+    // Convert the not-necessarily-nul-terminated StringRef to an std::string
+    // so we can guarantee null termination for the "const char*" taking APIs.
+    std::string name = attrName.str();
+
+    // We add attributes based on what the type of the value is.
+    if (auto *ili = dyn_cast<IntegerLiteralInst>(attr)) {
+      uint64_t value = ili->getValue().getLimitedValue();
+      if (ili->getValue().getBitWidth() == 1)
+        TF_SetAttrBool(op, name.c_str(), (unsigned char)value);
+      else
+        TF_SetAttrInt(op, name.c_str(), (int64_t)value);
+    } else if (auto *fli = dyn_cast<FloatLiteralInst>(attr)) {
+      auto value = fli->getValue().convertToFloat();
+      TF_SetAttrFloat(op, name.c_str(), value);
+    } else if (auto *sli = dyn_cast<StringLiteralInst>(attr)) {
+      assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+             "only byte encodings are supported");
+      auto value = sli->getValue();
+      TF_SetAttrString(op, name.c_str(), value.data(), value.size());
+    } else if (auto *mti = dyn_cast<MetatypeInst>(attr)) {
+      auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
+      auto dtype = convertSwiftTypeToTF(ty);
+      assert(dtype && "expected a valid tensorflow type");
+      TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
+    } else {
+      llvm_unreachable("unexpected attribute instruction");
+    }
+
+    // TODO: If TF_SetAttrShape/TF_SetAttrTensor are important, we'll need to
+    // determine how to distinguish them from the forms they are ambiguous with,
+    // probably by mangling a magic distinguisher into the parameter label.
+  }
+
 
   auto *result = graphFn.finishOp(op, status);
 
