@@ -776,15 +776,21 @@ bool swift::_checkGenericRequirements(
         _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
       if (!baseType) return true;
 
+      // Check whether it's dynamically castable, which works as a superclass
+      // check.
       if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
 
       continue;
     }
 
-    // FIXME: Handle all of the other cases.
-    default:
-      return true;
+    case GenericRequirementKind::SameConformance: {
+      // FIXME: Implement this check.
+      continue;
     }
+    }
+
+    // Unknown generic requirement kind.
+    return true;
   }
 
   // Success!
