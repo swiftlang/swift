@@ -49,6 +49,9 @@ namespace tf {
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
+    /// These are the names of any attribute operands at the end of the list.
+    SmallVector<StringRef, 4> attributeNames;
+
     /// Analyze the specified SIL instruction and return a SILTensorOpInfo
     /// result if the instruction is a valid tensor operation.  This is the
     /// way that SILTensorOpInfo's are created.
@@ -66,6 +69,11 @@ namespace tf {
       return getTensorConstantOperand(inst->getOperand(operandNumber));
     }
     LiteralInst *getTensorConstantOperand(SILValue v);
+
+    SILInstruction *getAttrOperand(unsigned operandNumber) {
+      return getAttrOperand(inst->getOperand(operandNumber));
+    }
+    SILInstruction *getAttrOperand(SILValue v);
 
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
