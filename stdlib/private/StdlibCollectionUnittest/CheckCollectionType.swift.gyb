@@ -1556,7 +1556,7 @@ extension TestSuite {
       return
     }
 
-    func toCollection(_ r: CountableRange<Int>) -> C {
+    func toCollection(_ r: Range<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
     }
 

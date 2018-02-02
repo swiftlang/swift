@@ -170,18 +170,18 @@ extension RandomAccessCollection {
 // for random access collections with strideable indices.
 extension RandomAccessCollection where Index : Strideable, Index.Stride == Int {
   @_implements(Collection, Indices)
-  public typealias _Default_Indices = CountableRange<Index>
+  public typealias _Default_Indices = Range<Index>
 }
 
 extension RandomAccessCollection
 where Index : Strideable, 
       Index.Stride == Int,
-      Indices == CountableRange<Index> {
+      Indices == Range<Index> {
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   @_inlineable
-  public var indices: CountableRange<Index> {
+  public var indices: Range<Index> {
     return startIndex..<endIndex
   }
 

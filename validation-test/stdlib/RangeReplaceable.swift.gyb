@@ -78,11 +78,11 @@ RangeReplaceableTestSuite.test("removeAll/dispatch") {
   expectCustomizable(tester, tester.log.removeAll)
 }
 
-RangeReplaceableTestSuite.test("replaceSubrange/countableRange") {
+RangeReplaceableTestSuite.test("replaceSubrange/strideableRange") {
   for test in replaceRangeTests {
     var c =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
-    let rangeToReplace = test.rangeSelection.countableRange(in: c)
+    let rangeToReplace = test.rangeSelection.range(in: c)
     let newElements =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.newElements)
     c.replaceSubrange(rangeToReplace, with: newElements)
@@ -93,12 +93,12 @@ RangeReplaceableTestSuite.test("replaceSubrange/countableRange") {
   }
 }
 
-RangeReplaceableTestSuite.test("replaceSubrange/countableClosedRange") {
+RangeReplaceableTestSuite.test("replaceSubrange/strideableClosedRange") {
   for test in replaceRangeTests {
     guard let closedExpected = test.closedExpected else { continue }
     var c =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
-    let rangeToReplace = test.rangeSelection.countableClosedRange(in: c)
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
     let newElements =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.newElements)
     c.replaceSubrange(rangeToReplace, with: newElements)
@@ -109,10 +109,10 @@ RangeReplaceableTestSuite.test("replaceSubrange/countableClosedRange") {
   }
 }
 
-% withRangeTypes = ["countableRange", "countableClosedRange"]
+% withRangeTypes = ["range", "closedRange"]
 % for rangeType in withRangeTypes:
 RangeReplaceableTestSuite.test("removeSubrange/${rangeType}") {
-%   if rangeType is "countableClosedRange":
+%   if rangeType is "closedRange":
   for test in removeRangeTests.filter({ !$0.rangeSelection.isEmpty }) {
 %   else:
   for test in removeRangeTests {

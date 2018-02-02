@@ -204,16 +204,12 @@ public struct Substring : StringProtocol {
     _slice.replaceSubrange(bounds, with: newElements)
   }
 
-% for Range in ['Range', 'ClosedRange']:
-
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: Substring
+    _ bounds: Range<Index>, with newElements: Substring
   ) {
     replaceSubrange(bounds, with: newElements._slice)
   }
-
-% end
 
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.

@@ -123,7 +123,7 @@ public struct Slice<Base: Collection> {
   ///
   ///     let singleDigits = 0..<10
   ///     let singleNonZeroDigits = singleDigits.dropFirst()
-  ///     // singleNonZeroDigits is a Slice<CountableRange<Int>>
+  ///     // singleNonZeroDigits is a Slice<Range<Int>>
   ///
   ///     print(singleNonZeroDigits.count)
   ///     // Prints "9"
