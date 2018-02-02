@@ -2949,6 +2949,14 @@ static void simplifyDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
       auto *protocol = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
       assert(protocol && "requirement has to have protocol context!");
 
+      // If the declaration context of this overload choice
+      // is the same as requirement we identified, it might
+      // mean that this is a default witness for this requirement,
+      // if so, but we have no way to reliably prove that because
+      // default witnesses are calculated later.
+      if (nominal == protocol)
+        continue;
+
       ConformanceCheckOptions options;
       options |= ConformanceCheckFlags::InExpression;
       options |= ConformanceCheckFlags::SuppressDependencyTracking;
