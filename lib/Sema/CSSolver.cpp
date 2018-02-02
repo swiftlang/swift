@@ -1847,7 +1847,16 @@ bool ConstraintSystem::solveSimplified(
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   ++solverState->NumDisjunctions;
-  auto constraints = disjunction->getNestedConstraints();
+  llvm::SmallVector<Constraint *, 8> constraints;
+  constraints.reserve(disjunction->countActiveNestedConstraints());
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (!choice->isDisabled())
+      constraints.push_back(choice);
+  }
+
+  std::sort(constraints.begin(), constraints.end(),
+            [](Constraint *a, Constraint *b) { return a->isFavored(); });
+
   // Try each of the constraints within the disjunction.
   for (auto index : indices(constraints)) {
     auto currentChoice =

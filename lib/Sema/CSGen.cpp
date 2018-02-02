@@ -20,6 +20,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
@@ -2903,6 +2905,76 @@ namespace {
 
 } // end anonymous namespace
 
+static void simplifyDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
+  auto &TC = CS.TC;
+
+  // Collects all of the protocol requirement choices we have
+  // in this overload set, this would allow us to hide their
+  // witnesses until the requirement itself matches.
+  llvm::SmallVector<std::pair<Constraint *, ValueDecl *>, 8> requirements;
+
+  auto isValidChoice = [](Constraint *choice) -> bool {
+    return choice->getKind() == ConstraintKind::BindOverload &&
+           choice->getOverloadChoice().isDecl();
+  };
+
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (!isValidChoice(choice))
+      continue;
+
+    auto *decl = choice->getOverloadChoice().getDecl();
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (decl->isProtocolRequirement())
+        requirements.push_back({choice, decl});
+    }
+  }
+
+  // Try to hide witness choices under the main requirement
+  // choice, that helps to significately reduce the number
+  // of choices we consider blindly.
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (!isValidChoice(choice))
+      continue;
+
+    auto *decl = choice->getOverloadChoice().getDecl();
+    auto *nominal =
+        decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!nominal)
+      continue;
+
+    auto type = nominal->getDeclaredType();
+    for (auto &req : requirements) {
+      auto *requirementChoice = req.first;
+      const auto &requirement = req.second;
+      auto *protocol = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
+      assert(protocol && "requirement has to have protocol context!");
+
+      ConformanceCheckOptions options;
+      options |= ConformanceCheckFlags::InExpression;
+      options |= ConformanceCheckFlags::SuppressDependencyTracking;
+      options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+      auto result = TC.conformsToProtocol(type, protocol,
+                                          decl->getDeclContext(), options);
+
+      if (!result || !result->isConcrete())
+        continue;
+
+      auto conformance = result->getConcrete();
+      auto wintess = conformance->getWitnessDecl(req.second, &TC);
+      if (wintess == decl) {
+        // Looks like this choice satisfies protocol requirement
+        // already present in the overload set, let's record and
+        // hide the witness.
+        if (choice->isFavored())
+          requirementChoice->setFavored();
+
+        choice->setDisabled();
+      }
+    }
+  }
+}
+
 Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
@@ -2918,6 +2990,11 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   
   if (result)
     this->optimizeConstraints(result);
+
+  for (auto &constraint : getConstraints()) {
+    if (constraint.getKind() == ConstraintKind::Disjunction)
+      simplifyDisjunction(*this, &constraint);
+  }
 
   return result;
 }
