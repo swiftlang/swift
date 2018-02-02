@@ -34,6 +34,7 @@
   static uintptr_t __stop_##name = 0;
 
 extern "C" {
+DECLARE_SWIFT_SECTION(sw5prt)
 DECLARE_SWIFT_SECTION(sw5prtc)
 DECLARE_SWIFT_SECTION(sw5tymd)
 
@@ -59,6 +60,7 @@ static void swift_image_constructor() {
       nullptr,
       nullptr,
 
+      SWIFT_SECTION_RANGE(sw5prt),
       SWIFT_SECTION_RANGE(sw5prtc),
       SWIFT_SECTION_RANGE(sw5tymd),
 
