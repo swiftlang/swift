@@ -1893,16 +1893,8 @@ bool ConstraintSystem::solveSimplified(
       DisjunctionChoices.push_back({locator, index});
     }
 
-    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
+    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables))
       lastSolvedChoice = {currentChoice, *score};
-
-      // If we see a tuple-to-tuple conversion that succeeded, we're done.
-      // FIXME: This should be more general.
-      if (auto restriction = currentChoice->getRestriction()) {
-        if (*restriction == ConversionRestrictionKind::TupleToTuple)
-          break;
-      }
-    }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
