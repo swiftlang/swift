@@ -858,10 +858,6 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 }
 
 void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
-  assert(r->getTrue() && r->getFalse() &&
-         "FIXME: The only way we could be missing true or false is if there "
-         "is nothing being computed, but they could have side effects.");
-
   // Start by lowering any code that exists in the block that leads up to the
   // conditional branch.  This ensures that the condition bool is available.
   lowerBasicBlock(r->getBranchBB(), /*skipTerminator:*/ true);
@@ -880,14 +876,17 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   auto trueCodeFn = lowerToFunction([&]() {
     // Lower all of the code inside the region (which can of course recursively
     // create functions and call them as ops.
-    lowerRegion(r->getTrue());
+    if (auto trueRegion = r->getTrue())
+      lowerRegion(trueRegion);
   });
+
   if (errorOccurred)
     return;
   auto falseCodeFn = lowerToFunction([&]() {
     // Lower all of the code inside the region (which can of course recursively
     // create functions and call them as ops.
-    lowerRegion(r->getFalse());
+    if (auto falseRegion = r->getFalse())
+      lowerRegion(falseRegion);
   });
   if (errorOccurred)
     return;

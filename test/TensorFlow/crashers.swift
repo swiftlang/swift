@@ -22,3 +22,12 @@ public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<I
   return a
 }
 
+// This crashed the partition pass because there were no ops outside the loop at
+// the return site, and this prevented the return block from being included in
+// the post dom set for the partitioning pass.
+public func postdom_crash1(w1: Tensor<Float>, inputBatch: Tensor<Float>) {
+  let iterationCount = 1000
+  for _ in 0..<iterationCount {
+    _ = inputBatch ⊗ w1  // expected-note 2 {{value used here}}
+  }  // expected-warning 2 {{value implicitly copied to the accelerator}}
+}

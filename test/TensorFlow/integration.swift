@@ -80,11 +80,11 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 
-public func testExitBranch(i : Int) {
+public func testExitBranch1(i: Int) {
   var x = Tensor<Float>(1.0)
 
   if i == 0 {
-    return   // Should terminate the tensor program.
+    fatalError()   // Should terminate the tensor program.
   }
 
   x += x
@@ -93,8 +93,8 @@ public func testExitBranch(i : Int) {
 
 // The tensor program should have no branch.
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch{{.*}}
-// CHECK: sil private @{{.*}}testExitBranch{{.*}} : $@callee_owned () -> TensorHandle<Float> {
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
+// CHECK: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
@@ -107,7 +107,7 @@ public func testExitBranch(i : Int) {
 // The host program should kill the tensor program if the early exit happens,
 // and finish it on the normal path.
 
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testExitBranch{{.*}}
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testExitBranch1{{.*}}
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN]](
 // CHECK: cond_br
@@ -115,13 +115,41 @@ public func testExitBranch(i : Int) {
 // CHECK: bb1:
 // CHECK: [[TERMFN:%.*]] = function_ref @_swift_tfc_TerminateTensorComputation
 // CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@owned _TensorComputation) -> ()
-// CHECK: br bb3
+// CHECK: unreachable
 
 // CHECK: bb2:
 // CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
-// CHECK: bb3:
+
+
+public func testExitBranch2(i: Int) {  // expected-warning {{'i' implicitly copied to the accelerator}}
+  var x = Tensor<Float>(1.0)
+
+  if i == 0 {  // expected-note {{value used here}}
+    return
+  }
+
+  // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
+  x += x    // expected-warning {{value implicitly copied to the host}}
+  print(x)  // expected-note {{value used here}}
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
+// CHECK: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int64>) -> () {
+// CHECK: bb0(%0 : $TensorHandle<Builtin.Int64>):
+// CHECK:  cond_br {{.*}}, bb2, bb1
+
+// CHECK:      bb1:
+// CHECK-NEXT:   builtin "__tfop_Add,tt:t"(
+// CHECK-NEXT:   builtin "tensorflowSend_0"<TensorHandle<Float>>(
+// CHECK-NEXT:   br bb2
+
+// CHECK: bb2:
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT:  return
+// }
+
 
 
 
