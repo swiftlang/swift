@@ -125,15 +125,17 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
+typedef std::pair<StringRef, SILTensorOpInfo::AttributeModifier> AttributeEntry;
+
 
 /// Given a function name that might refer to a tensorflow op function, this
 /// returns the op name and operand description and returns true.  If the
 /// function name doesn't correspond to an op, this returns false.
 static bool decodeTensorOpName(StringRef name, StringRef &opName,
                                StringRef &typeDescriptorStr,
-                               SmallVectorImpl<StringRef> &attributeNames) {
+                               SmallVectorImpl<AttributeEntry> &attributes) {
   // Op functions are expected to be of the form:
-  //  __tfop_<OPNAME>__<OPERANDDESC>__<ATTRIBUTES>
+  //  __tfop_<OPNAME>,<OPERANDDESC>,<ATTRIBUTES>
   if (!name.startswith("__tfop_")) return false;
   name = name.substr(strlen("__tfop_"));
 
@@ -156,7 +158,10 @@ static bool decodeTensorOpName(StringRef name, StringRef &opName,
     pos = name.find(",");
     if (pos == StringRef::npos) pos = name.size();
 
-    attributeNames.push_back(name.substr(0, pos));
+    auto attrName = name.substr(0, pos);
+    attributes.push_back({
+      attrName, SILTensorOpInfo::AttributeModifier::Normal
+    });
     name = name.substr(pos);
   }
 
@@ -164,7 +169,7 @@ static bool decodeTensorOpName(StringRef name, StringRef &opName,
 }
 
 
-SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
+SILValue SILTensorOpInfo::getScalarOperand(SILValue v) const {
   // We have to handle two kinds of operands: SIL address operands and normal
   // values.
   if (!v->getType().isAddress()) {
@@ -192,23 +197,9 @@ SILValue SILTensorOpInfo::getScalarOperand(SILValue v) {
   return SILValue();
 }
 
-/// If the specified value is a valid value for a constant operand, return the
-/// literal it is initialized to, otherwise null.
-LiteralInst *SILTensorOpInfo::getTensorConstantOperand(SILValue v) {
-  // Simplify scalar operands in general.
-  v = getScalarOperand(v);
-  if (!v) return nullptr;
-
-  // If this is an integer or fp literal, we succeed.
-  if (isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v))
-    return cast<LiteralInst>(v);
-
-  return nullptr;
-}
-
 /// If the specified value is a valid value for an attribute, return the
 /// instruction that provides the value, otherwise null.
-SILInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
+SILInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
   // Simplify scalar operands in general.
   v = getScalarOperand(v);
   if (!v) return nullptr;
@@ -249,18 +240,6 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
     if (toiInfo.decodeBuiltin(builtinInst))
       return toiInfo;
 
-  // Operations which can conditionally run on the host or the accelerator are
-  // modeled as well-known function calls.  If they satisfy the requirements
-  // (e.g. that their parameters are constants we can analyze) then they get
-  // promoted to notional "ops".
-  if (auto *applyInst = dyn_cast<ApplyInst>(inst))
-    if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
-      auto callee = fnRef->getReferencedFunction()->getName();
-      if (callee == "__tf_init_scalar")
-        if (toiInfo.decodeTFInitScalar(applyInst))
-          return toiInfo;
-    }
-
   return None;
 }
 
@@ -272,9 +251,13 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   // If the name is valid, it isn't an op.
   StringRef typeDescriptorStr;
   if (!decodeTensorOpName(builtinName, opName, typeDescriptorStr,
-                          attributeNames))
+                          attributes))
     return false;
 
+  // This helper emits a diagnostic if the #tfop descriptor is malformed in a
+  // way that prevents it from ever working.  Errors that are a result of a
+  // client's misuse of the op is checked by checkAttributeConstants, because
+  // the location information is far more important to get right there.
   auto diagInvalid = [&](std::string problem) {
     diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
              diag::tfop_incorrect_operandinfo,
@@ -318,14 +301,6 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       }
       break;
     }
-    case OpDescriptor::AddDType: {
-      // 'd' doesn't correspond to an operand, but requires a tensor result.
-      if (!isTensorHandle(inst->getType().getSwiftRValueType())) {
-        diagInvalid("'d' operand requires a Tensor result");
-        return false;
-      }
-      break;
-    }
     case OpDescriptor::Scalar: {
       // This requires a scalar value.
       auto op = getNextOperand();
@@ -339,37 +314,40 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       assert(getScalarOperand(op) && "Invalid scalar operand");
       break;
     }
-
-    case OpDescriptor::Constant: {
-      // If this requires a constant value and doesn't have one (i.e., it's a
-      // variable), then we reject it.
-      auto op = getNextOperand();
-      if (!op) return false; // diagnostic already emitted.
-
-      // If it isn't a literal, don't treat it like a tensor op.
-      if (!getTensorConstantOperand(op)) {
-        diagInvalid("tensor operation requires an immediate constant argument");
-        return false;
-      }
-      break;
-    }
     }
   }
 
-  // Attribute values require constant values.  If we don't have one then this
-  // op is invalid and must be rejected.
-  for (auto attrName : attributeNames) {
+  // Attribute arguments come next.  We don't have to check their operands (they
+  // get checked in a separate pass so we can diagnose errors better), but do
+  // check to make sure that the attribute name doesn't have unsupported
+  // suffixes.
+  for (auto &attr : attributes) {
     auto op = getNextOperand();
     if (!op) return false; // diagnostic already emitted.
 
-    if (!getAttrOperand(op)) {
-      diagInvalid("attribute '" + attrName.str() +
-                  "' requires a constant argument");
+    // Figure out what the suffix is (if any) and reject invalid suffixes if
+    // present.
+    auto dollarLoc = attr.first.find('$');
+    if (dollarLoc == StringRef::npos) continue;
+
+    auto suffix = attr.first.drop_front(dollarLoc+1);
+    AttributeModifier suffixKind;
+    if (suffix == "tensor")
+      suffixKind = AttributeModifier::Tensor;
+    else if (suffix == "shape")
+      suffixKind = AttributeModifier::Shape;
+    else if (suffix == "dtype")
+      suffixKind = AttributeModifier::DType;
+    else {
+      diagInvalid("invalid attribute modifier '" + suffix.str() + "'");
       return false;
     }
+
+    // Slice the suffix off of the attribute name and add the decoded version.
+    attr = { attr.first.substr(0, dollarLoc), suffixKind };
   }
 
-  // Diagnose when the type descriptor didn't specify enough args.
+  // Diagnose when the type descriptor didn't specify the right number of args.
   if (nextOperand != inst->getNumOperands()) {
     diagInvalid("more arguments present than type descriptors specified");
     return false;
@@ -378,27 +356,43 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   return true;
 }
 
-/// Handle calls to __tf_init_scalar, which take a pointer to a stack slot
-/// and return a TensorHandle<T>.
-bool SILTensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
-  assert(inst->getNumOperands() == 2 &&
-         isTensorHandle(inst->getType().getSwiftRValueType()) &&
-         "Unexpected type signature for __tf_init_scalar");
+/// Verify that any attribute operands are passed acceptable constants,
+/// returning a non-empty error string to emit if that is not the case.
+std::string SILTensorOpInfo::checkAttributeConstants() const {
+  // Attribute arguments are always at the end.
+  unsigned operandNumber = inst->getNumOperands()-attributes.size();
 
-  // If we can't analyze the operand as a constant value, then give up.
-  if (getTensorConstantOperand(1) == nullptr)
-    return false;
+  // Attribute values require constant values.  If we don't have one then this
+  // op is invalid and must be rejected.
+  for (auto attr : attributes) {
+    auto operand = getAttrOperand(operandNumber++);
+    if (!operand)
+      return "attribute '" + attr.first.str() +"' requires a constant argument";
 
-  // Otherwise, good news everyone!  We can treat this as a Const op.
-  opName = "Const";
-  operandDescriptorStr = "cd";
-  resultDescriptorStr = "t";
-  builtinName = "__tfop_Const,cd:t";
-  operandDescriptors = { OpDescriptor::Constant, OpDescriptor::AddDType };
-  return true;
+    // Check additional requirements imposed by attribute modifiers.
+    switch (attr.second) {
+    case AttributeModifier::Normal:  // No modifier.
+      break;
+    case AttributeModifier::DType:   // This integer value is a dtype.
+      if (!isa<IntegerLiteralInst>(operand))
+        return "attribute '" + attr.first.str()+"' requires a constant integer";
+      break;
+    case AttributeModifier::Tensor:
+      // This array or scalar should be turned into a TF_Tensor.
+      if (!isa<IntegerLiteralInst>(operand) &&
+          !isa<FloatLiteralInst>(operand))
+        return "attribute '" + attr.first.str() +
+               "' requires a constant integer or floating point constant";
+      break;
+    case AttributeModifier::Shape:
+      // This array of integers is a shape specifier.
+      return "shape modifier not supported yet";
+    }
+  }
+
+  // Otherwise everything is ok.
+  return "";
 }
-
-
 
 
 /// The SIL location for operations we process are usually deep in the bowels

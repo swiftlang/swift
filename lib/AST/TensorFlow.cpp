@@ -51,8 +51,6 @@ decodeDescriptorString(StringRef operandAndResult) -> ParseErrorInfo {
       switch (c) {
         case 't': kind = OpDescriptor::Tensor; break;
         case 's': kind = OpDescriptor::Scalar; break;
-        case 'c': kind = OpDescriptor::Constant; break;
-        case 'd': kind = OpDescriptor::AddDType; break;
         default:
           return {
             str.data()+str.find(c),

@@ -242,7 +242,8 @@ WARNING(tf_value_implicitly_copied_to_host, none,
         ())
 NOTE(tf_value_implicitly_copied_to_host_computed_used_here, none,
      "value used here", ())
-
+ERROR(tf_op_misuse, none,
+      "%0", (StringRef))
 
 
 // Control flow diagnostics.

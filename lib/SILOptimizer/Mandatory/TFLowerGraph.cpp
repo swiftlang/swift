@@ -459,56 +459,56 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     }
     case OpDescriptor::Scalar:
       llvm_unreachable("Scalar operands should never reach graphgen");
-
-    case OpDescriptor::Constant: {
-      auto lit = tfopInfo.getTensorConstantOperand(nextOperand++);
-
-      auto dtype = getTensorFlowDataType(lit->getType(), inst->getLoc());
-
-      // Set the tensor as the 'value' attribute on the graph node.
-      auto tensor = convertConstantToTensor(lit, dtype);
-      TF_SetAttrTensor(op, "value", tensor, status);
-      TF_DeleteTensor(tensor);
-
-      if (checkStatus(inst->getLoc())) return;
-      break;
-    }
-
-    case OpDescriptor::AddDType: {
-      // This command adds the dtype of the result tensor as a dtype attribute.
-      auto type = isTensorHandle(inst->getType().getSwiftRValueType());
-      assert(type && "Not a valid builtin");
-      const char *attrName = "dtype";
-      TF_SetAttrType(op, attrName, (TF_DataType)convertSwiftTypeToTF(type));
-      break;
-    }
     }
   }
 
   // Process attributes as well.
-  for (auto attrName : tfopInfo.attributeNames) {
-    auto attr = tfopInfo.getAttrOperand(nextOperand++);
+  for (auto attr : tfopInfo.attributes) {
+    auto attrValue = tfopInfo.getAttrOperand(nextOperand++);
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
-    std::string name = attrName.str();
+    std::string name = attr.first.str();
+
+    switch (attr.second) {
+    case SILTensorOpInfo::AttributeModifier::Normal:  // No modifier.
+      break;
+    case SILTensorOpInfo::AttributeModifier::DType: {
+      // This integer value is a dtype.
+      auto val = cast<IntegerLiteralInst>(attrValue)->getValue();
+      TF_SetAttrType(op, name.c_str(), (TF_DataType)val.getLimitedValue());
+      continue;
+    }
+    case SILTensorOpInfo::AttributeModifier::Tensor: {
+      auto val = cast<LiteralInst>(attrValue);
+      auto dtype = getTensorFlowDataType(val->getType(), inst->getLoc());
+      // Set the tensor as the attribute on the graph node.
+      auto tensor = convertConstantToTensor(val, dtype);
+      TF_SetAttrTensor(op, name.c_str(), tensor, status);
+      TF_DeleteTensor(tensor);
+      if (checkStatus(inst->getLoc())) return;
+      continue;
+    }
+    case SILTensorOpInfo::AttributeModifier::Shape:
+      llvm_unreachable("not supported yet");
+    }
 
     // We add attributes based on what the type of the value is.
-    if (auto *ili = dyn_cast<IntegerLiteralInst>(attr)) {
+    if (auto *ili = dyn_cast<IntegerLiteralInst>(attrValue)) {
       uint64_t value = ili->getValue().getLimitedValue();
       if (ili->getValue().getBitWidth() == 1)
         TF_SetAttrBool(op, name.c_str(), (unsigned char)value);
       else
         TF_SetAttrInt(op, name.c_str(), (int64_t)value);
-    } else if (auto *fli = dyn_cast<FloatLiteralInst>(attr)) {
+    } else if (auto *fli = dyn_cast<FloatLiteralInst>(attrValue)) {
       auto value = fli->getValue().convertToFloat();
       TF_SetAttrFloat(op, name.c_str(), value);
-    } else if (auto *sli = dyn_cast<StringLiteralInst>(attr)) {
+    } else if (auto *sli = dyn_cast<StringLiteralInst>(attrValue)) {
       assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
              "only byte encodings are supported");
       auto value = sli->getValue();
       TF_SetAttrString(op, name.c_str(), value.data(), value.size());
-    } else if (auto *mti = dyn_cast<MetatypeInst>(attr)) {
+    } else if (auto *mti = dyn_cast<MetatypeInst>(attrValue)) {
       auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
       auto dtype = convertSwiftTypeToTF(ty);
       assert(dtype && "expected a valid tensorflow type");

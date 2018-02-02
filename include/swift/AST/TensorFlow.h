@@ -34,14 +34,6 @@ enum class OpDescriptor {
   /// 's' - This is a scalar (non-tensor) operand or result value, whose type
   /// is inferred from context.
   Scalar,
-
-  /// 'd' - GraphGen should add the 'dtype' attribute to the generated TF graph
-  /// node, where the type added is the element type of the op's tensor result.
-  AddDType,
-
-  /// 'c' - This operand is required to be a scalar constant after
-  /// deabstraction.
-  Constant,
 };
 
 /// Represent decoded information about a TensorFlow operation.
