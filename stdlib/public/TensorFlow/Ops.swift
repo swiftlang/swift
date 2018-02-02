@@ -29,7 +29,7 @@
 // The ops themselves are defined by the primitive #tfop(...) syntax, here are
 // some examples:
 //     result = #tfop("Add", "tt:t", lhs, rhs)
-//     result = #tfop("Const", "dc:t", Float.self, 4.0)
+//     result = #tfop("Const", ":t", dtype: Float.self, value$tensor: 4.0)
 //
 // The first two parameters to this syntax are the TensorFlow op name as a
 // string, and then a constraint string - which specifies information about the
@@ -41,11 +41,6 @@
 // so far:
 //
 //    t: the next operand is a TensorHandle, and is an "input" to the TF node.
-//    d: the next operand is a metatype value, and is added as a 'dtype'
-//       attribute to the TF node. [TODO: Use param label to genericize name].
-//    c: the next operand is a standard library integer or FP type.  We should
-//       pass the value(s) as the 'value' attribute.  [TODO: Use param label to
-//       genericize to names other than 'value'].
 //    s: the next operand is a standard library integer or FP scalar.
 //
 // The codes for the results are currently:

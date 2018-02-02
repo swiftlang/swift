@@ -1,19 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -O -emit-sil -verify %s
 
 import TensorFlow
 
-
-// Verify AccelerableTensorUnit makes it into the test.
-func testAccelerableTensorUnit<T : AccelerableTensorUnit>(a : T) -> T {
-  return a
-}
-
-
-func testTensor() {
-  _ = Tensor<Float>(1.0)
-  _ = Tensor<Int>(2)
-  _ = Tensor<Int>([1.0, 2.0]) // expected-error {{cannot convert value of type '[Double]'}}
-}
 
 // Show inference of the tensor element type based on context.  This also
 // exposed a SILGen bug handling cleanup generation when emitting into let
@@ -24,4 +12,12 @@ func testInferredElementResult() -> TensorHandle<Int> {
   let x : TensorHandle<Int> = #tfop("foo", ":t")
 
   _ = #tfop("bar", ":t") as TensorHandle<Int>
+}
+
+// This shows passing a non-constant value into an attribute.
+// TODO: Improve this to talk about the parameter "keepingDimensions" instead
+// of the internal attribute name.
+public func nonConstantAttribute(x: Tensor<Float>, someBool: Bool) {
+  // expected-error @+1 {{attribute 'keep_dims' requires a constant argument}}
+  print(x.mean(alongAxes: 1,2,3, keepingDimensions: someBool))
 }
