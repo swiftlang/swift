@@ -525,6 +525,28 @@ struct PostSILGenInputs {
   ModuleOrSourceFile ModuleOrPrimarySourceFile;
 };
 
+static bool precompileBridgingHeader(CompilerInvocation &Invocation,
+                                     CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  auto &ImporterOpts = Invocation.getClangImporterOptions();
+  auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
+  if (!PCHOutDir.empty()) {
+    ImporterOpts.BridgingHeader =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.getFilenameOfFirstInput();
+    // Create or validate a persistent PCH.
+    auto SwiftPCHHash = Invocation.getPCHHash();
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+    return !PCH.hasValue();
+  }
+  return clangImporter->emitBridgingPCH(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -555,27 +577,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been asked to precompile a bridging header; we want to
   // avoid touching any other inputs and just parse, emit and exit.
-  if (Action == FrontendOptions::ActionType::EmitPCH) {
-    auto clangImporter = static_cast<ClangImporter *>(
-      Instance.getASTContext().getClangModuleLoader());
-    auto &ImporterOpts = Invocation.getClangImporterOptions();
-    auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
-    if (!PCHOutDir.empty()) {
-      ImporterOpts.BridgingHeader =
-          Invocation.getFrontendOptions()
-              .InputsAndOutputs.getFilenameOfFirstInput();
-      // Create or validate a persistent PCH.
-      auto SwiftPCHHash = Invocation.getPCHHash();
-      auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
-      return !PCH.hasValue();
-    }
-    return clangImporter->emitBridgingPCH(
-        Invocation.getFrontendOptions()
-            .InputsAndOutputs.getFilenameOfFirstInput(),
-        opts.InputsAndOutputs.getSingleOutputFilename());
-  }
-
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  if (Action == FrontendOptions::ActionType::EmitPCH)
+    return precompileBridgingHeader(Invocation, Instance);
 
   bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;
   if (inputIsLLVMIr) {
@@ -614,6 +617,7 @@ static bool performCompile(CompilerInstance &Instance,
     }
 
     // TODO: remove once the frontend understands what action it should perform
+    IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
     IRGenOpts.OutputKind = getOutputKind(Action);
 
     return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
