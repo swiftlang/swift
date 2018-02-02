@@ -793,6 +793,10 @@ void swift::performSILDiagnoseUnreachable(SILModule *M) {
 namespace {
 class NoReturnFolding : public SILFunctionTransform {
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     performNoReturnFunctionProcessing(*getFunction(), this);
   }
   };
@@ -804,6 +808,8 @@ SILTransform *swift::createNoReturnFolding() {
 
 
 namespace {
+// This pass reruns on deserialized SIL because diagnostic constant propagation
+// can expose unreachable blocks which are then removed by this pass.
 class DiagnoseUnreachable : public SILFunctionTransform {
   void run() override {
     diagnoseUnreachable(*getFunction());
