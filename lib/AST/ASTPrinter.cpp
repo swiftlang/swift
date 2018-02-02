@@ -1925,7 +1925,7 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
     Printer << tok::pound_warning; 
   }
 
-  Printer << '"' << PDD->getMessage()->getValue() << '"';
+  Printer << '("' << PDD->getMessage()->getValue() << '")';
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
