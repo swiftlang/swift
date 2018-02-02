@@ -34,7 +34,6 @@
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Syntax/Trivia.h"
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Casting.h"
@@ -49,7 +48,7 @@ using llvm::StringRef;
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
   ({                                                                           \
-    if (auto &__Child = Raw->getChild(Cursor))                                 \
+    if (auto &__Child = Raw->getChild(Cursor::CursorName))                     \
       assert(__Child->getKind() == ExpectedKind);                              \
   })
 #else
@@ -114,9 +113,7 @@ using llvm::StringRef;
 namespace swift {
 namespace syntax {
 
-class SyntaxArena;
-
-using CursorIndex = size_t;
+using CursorIndex = uint32_t;
 
 /// Get a numeric index suitable for array/vector indexing
 /// from a syntax node's Cursor enum value.
@@ -228,9 +225,6 @@ class RawSyntax final
       unsigned Kind : bitmax(NumSyntaxKindBits, 8);
       /// Whether this piece of syntax was actually present in the source.
       unsigned Presence : 1;
-      /// Whether this piece of syntax was constructed with manually managed
-      /// memory.
-      unsigned ManualMemory : 1;
     };
     enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
 
@@ -264,56 +258,37 @@ class RawSyntax final
   }
 
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-            SourcePresence Presence, bool ManualMemory);
-  RawSyntax(tok TokKind, OwnedString Text,
+            SourcePresence Presence);
+  RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
             ArrayRef<TriviaPiece> LeadingTrivia,
-            ArrayRef<TriviaPiece> TrailingTrivia,
-            SourcePresence Presence, bool ManualMemory);
+            ArrayRef<TriviaPiece> TrailingTrivia);
 
 public:
   ~RawSyntax();
-
-  void Release() const {
-    if (Bits.ManualMemory)
-      return;
-    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
-  }
-  void Retain() const {
-    if (Bits.ManualMemory)
-      return;
-    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
-  }
 
   /// \name Factory methods.
   /// @{
   
   /// Make a raw "layout" syntax node.
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                            SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            SourcePresence Presence);
 
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text,
-                            ArrayRef<TriviaPiece> LeadingTrivia,
-                            ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            ArrayRef<TriviaPiece> LeadingTrivia,
+                            ArrayRef<TriviaPiece> TrailingTrivia);
 
   /// Make a missing raw "layout" syntax node.
-  static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
-    return make(Kind, {}, SourcePresence::Missing, Arena);
+  static RC<RawSyntax> missing(SyntaxKind Kind) {
+    return make(Kind, {}, SourcePresence::Missing);
   }
 
   /// Make a missing raw "token" syntax node.
-  static RC<RawSyntax> missing(tok TokKind, OwnedString Text,
-                               SyntaxArena *Arena = nullptr) {
-    return make(TokKind, Text, {}, {}, SourcePresence::Missing, Arena);
+  static RC<RawSyntax> missing(tok TokKind, OwnedString Text) {
+    return make(TokKind, Text, SourcePresence::Missing,
+                ArrayRef<TriviaPiece>{}, ArrayRef<TriviaPiece>{});
   }
-
-  static RC<RawSyntax> getToken(SyntaxArena &Arena, tok TokKind,
-                                OwnedString Text,
-                                ArrayRef<TriviaPiece> LeadingTrivia,
-                                ArrayRef<TriviaPiece> TrailingTrivia);
 
   /// @}
 
@@ -390,8 +365,8 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
-    return make(getTokenKind(), getTokenText(), NewLeadingTrivia,
-                getTrailingTrivia(), getPresence());
+    return make(getTokenKind(), getTokenText(), getPresence(),
+                NewLeadingTrivia, getTrailingTrivia());
   }
 
   RC<RawSyntax> withLeadingTrivia(Trivia NewLeadingTrivia) const {
@@ -402,8 +377,8 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
-    return make(getTokenKind(), getTokenText(), getLeadingTrivia(),
-                NewTrailingTrivia, getPresence());
+    return make(getTokenKind(), getTokenText(), getPresence(),
+                getLeadingTrivia(), NewTrailingTrivia);
   }
 
   RC<RawSyntax> withTrailingTrivia(Trivia NewTrailingTrivia) const {
@@ -466,10 +441,6 @@ public:
 
   /// Dump this piece of syntax recursively.
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-
-  static void Profile(llvm::FoldingSetNodeID &ID, tok TokKind, OwnedString Text,
-                      ArrayRef<TriviaPiece> LeadingTrivia,
-                      ArrayRef<TriviaPiece> TrailingTrivia);
 };
 
 } // end namespace syntax

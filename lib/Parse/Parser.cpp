@@ -311,9 +311,9 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
-        auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Tok.getText(), LeadingTrivia.Pieces,
-                            TrailingTrivia.Pieces, SourcePresence::Present);
+        auto ThisToken = RawSyntax::make(
+            Tok.getKind(), Tok.getText(), SourcePresence::Present,
+            LeadingTrivia.Pieces, TrailingTrivia.Pieces);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
         Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
@@ -468,7 +468,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF, Diags, SourceMgr,
                                            L->getBufferID())) {
   State = PersistentState;
   if (!State) {

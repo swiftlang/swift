@@ -233,7 +233,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   auto makeMetatypeTypeSyntax = [&]() {
     if (!SyntaxContext->isEnabled())
       return;
-    MetatypeTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+    MetatypeTypeSyntaxBuilder Builder;
     Builder
       .useTypeOrProtocol(SyntaxContext->popToken())
       .usePeriod(SyntaxContext->popToken())
@@ -424,6 +424,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         diag::rethrowing_function_type : diag::throw_in_function_type;
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
+      if (Tok.is(tok::kw_throw))
+        Tok.setKind(tok::kw_throws);
     }
     throwsLoc = consumeToken();
   }
@@ -439,7 +441,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return nullptr;
 
     if (SyntaxContext->isEnabled()) {
-      FunctionTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      FunctionTypeSyntaxBuilder Builder;
       Builder.useReturnType(SyntaxContext->popIf<TypeSyntax>().getValue());
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
@@ -690,7 +692,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     consumeToken(); // consume '&'
 
     if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-      CompositionTypeElementSyntaxBuilder Builder(Context.getSyntaxArena());
+      CompositionTypeElementSyntaxBuilder Builder;
       Builder
         .useAmpersand(SyntaxContext->popToken())
         .useType(SyntaxContext->popIf<TypeSyntax>().getValue());
@@ -1101,7 +1103,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     TyR = new (Context)
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
     if (SyntaxContext->isEnabled()) {
-      DictionaryTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      DictionaryTypeSyntaxBuilder Builder;
       Builder
         .useRightSquareBracket(SyntaxContext->popToken())
         .useValueType(SyntaxContext->popIf<TypeSyntax>().getValue())
@@ -1114,7 +1116,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
     if (SyntaxContext->isEnabled()) {
-      ArrayTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      ArrayTypeSyntaxBuilder Builder;
       Builder
         .useRightSquareBracket(SyntaxContext->popToken())
         .useElementType(SyntaxContext->popIf<TypeSyntax>().getValue())
@@ -1174,7 +1176,7 @@ Parser::parseTypeOptional(TypeRepr *base) {
   auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
   llvm::Optional<TypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+    OptionalTypeSyntaxBuilder Builder;
     Builder
       .useQuestionMark(SyntaxContext->popToken())
       .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
@@ -1192,8 +1194,7 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
   llvm::Optional<TypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    ImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(
-        Context.getSyntaxArena());
+    ImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder;
     Builder
       .useExclamationMark(SyntaxContext->popToken())
       .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
