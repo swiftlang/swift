@@ -1056,6 +1056,29 @@ static void ensureSILModuleIsSerialized(SILModule *SM) {
     SM->serialize();
 }
 
+static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
+                                                CompilerInstance &Instance,
+                                                std::unique_ptr<SILModule> SM,
+                                                ModuleOrSourceFile MSF,
+                                                FrontendObserver *observer,
+                                                int &ReturnValue) {
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  IRGenOpts.UseJIT = true;
+  IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+  const ProcessCmdLine &CmdLine =
+      ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
+  Instance.setSILModule(std::move(SM));
+
+  if (observer)
+    observer->aboutToRunImmediately(Instance);
+
+  ReturnValue =
+      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
+  return Instance.getASTContext().hadError();
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1191,23 +1214,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
-  if (Action == FrontendOptions::ActionType::Immediate) {
-    assert(!MSF.is<SourceFile*>() &&
-           "-i doesn't work in -primary-file mode");
-    IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
-    const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
-                                                   opts.ImmediateArgv.end());
-    Instance.setSILModule(std::move(SM));
-
-    if (observer) {
-      observer->aboutToRunImmediately(Instance);
-    }
-
-    ReturnValue =
-      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
-    return Context.hadError();
-  }
+  if (Action == FrontendOptions::ActionType::Immediate)
+    return processCommandLineAndRunImmediately(
+        Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
