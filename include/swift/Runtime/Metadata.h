@@ -2241,31 +2241,38 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 template <typename Runtime>
 struct TargetTypeMetadataRecord {
 private:
-  /// The nominal type descriptor.
-  RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
-                               TypeMetadataRecordKind>
-    TypeDescriptor;
+  union {
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+  };
 
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return TypeDescriptor.getInt();
+    return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetTypeContextDescriptor<Runtime> *
-  getNominalTypeDescriptor() const {
+  getTypeContextDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      break;
+      return DirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::Reserved:
+    case TypeMetadataRecordKind::IndirectObjCClass:
       return nullptr;
 
-    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not generic metadata pattern");
+      return *IndirectNominalTypeDescriptor.getPointer();
     }
     
-    return this->TypeDescriptor.getPointer();
+    return nullptr;
   }
 };
 
@@ -2505,27 +2512,28 @@ struct GenericContextDescriptorHeader {
 /// associated type.
 template<typename Runtime>
 class TargetGenericParamRef {
-  /// This is either a pointer to an associated type path stored out-of-line if
-  /// the `bool` flag is true, or the index of a directly-referenced
-  /// generic parameter stored inline if the `bool` flag is false.
-  RelativeDirectPointerIntPair<const void, bool> Value;
-  
-  unsigned getRootParamWord() const {
-    if (Value.getInt()) {
-      unsigned word;
-      memcpy(&word, Value.getPointer(), sizeof(unsigned));
-      return word;
-    } else {
-      return Value.getOpaqueValue();
-    }
-  }
-  
+  union {
+    /// The word of storage, whose low bit indicates whether there is an
+    /// associated type path stored out-of-line and whose upper bits describe
+    /// the generic parameter at root of the path.
+    uint32_t Word;
+
+    /// This is the associated type path stored out-of-line. The \c bool
+    /// is used for masking purposes and is otherwise unused; instead, check
+    /// the low bit of \c Word.
+    RelativeDirectPointerIntPair<const void, bool> AssociatedTypePath;
+  };
+
 public:
   /// Index of the parameter being referenced. 0 is the first generic parameter
   /// of the root of the context hierarchy, and subsequent parameters are
   /// numbered breadth-first from there.
   unsigned getRootParamIndex() const {
-    return getRootParamWord() >> 1;
+    // If there is no path, retrieve the index directly.
+    if ((Word & 0x01) == 0) return Word >> 1;
+
+    // Otherwise, the index is at the start of the associated type path.
+    return *reinterpret_cast<const unsigned *>(AssociatedTypePath.getPointer());
   }
   
   /// A reference to an associated type along the reference path.
@@ -2543,7 +2551,7 @@ public:
   class AssociatedTypeIterator {
     const void *addr;
     
-    explicit AssociatedTypeIterator(const void *startAddr) : addr(addr) {}
+    explicit AssociatedTypeIterator(const void *startAddr) : addr(startAddr) {}
     
     bool isEnd() const {
       if (addr == nullptr)
@@ -2554,6 +2562,9 @@ public:
         return true;
       return false;
     }
+
+    template <class> friend class TargetGenericParamRef;
+
   public:
     AssociatedTypeIterator() : addr(nullptr) {}
 
@@ -2602,11 +2613,12 @@ public:
   
   /// Iterators for going through the associated type path from the root param.
   AssociatedTypeIterator begin() const {
-    if (Value.getInt()) {
+    if (Word & 0x01) {
       // The associated types start after the first word, which holds the
       // root param index.
       return AssociatedTypeIterator(
-        reinterpret_cast<const char*>(Value.getPointer()) + sizeof(unsigned));
+        reinterpret_cast<const char*>(AssociatedTypePath.getPointer()) +
+                                        sizeof(unsigned));
     } else {
       // This is a direct param reference, so there are no associated types.
       return end();
@@ -2650,6 +2662,46 @@ class TargetGenericRequirementDescriptor {
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
   };
+
+public:
+  constexpr GenericRequirementFlags getFlags() const {
+    return Flags;
+  }
+
+  constexpr GenericRequirementKind getKind() const {
+    return getFlags().getKind();
+  }
+
+  /// Retrieve the generic parameter that is the subject of this requirement.
+  const TargetGenericParamRef<Runtime> &getParam() const {
+    return Param;
+  }
+
+  /// Retrieve the protocol descriptor for a Protocol requirement.
+  const TargetProtocolDescriptor<Runtime> *getProtocol() const {
+    assert(getKind() == GenericRequirementKind::Protocol);
+    return Protocol;
+  }
+
+  /// Retrieve the right-hand type for a SameType or BaseClass requirement.
+  const char *getMangledTypeName() const {
+    assert(getKind() == GenericRequirementKind::SameType ||
+           getKind() == GenericRequirementKind::BaseClass);
+    return Type;
+  }
+
+  /// Retrieve the protocol conformance record for a SameConformance
+  /// requirement.
+  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+    assert(getKind() == GenericRequirementKind::SameConformance);
+    return Conformance;
+  }
+
+  /// Retrieve the layout constraint.
+  GenericRequirementLayoutKind getLayout() const {
+    assert(getKind() == GenericRequirementKind::Layout);
+    return Layout;
+  }
 };
 
 /// CRTP class for a context descriptor that includes trailing generic

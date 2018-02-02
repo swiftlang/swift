@@ -172,6 +172,38 @@ namespace swift {
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
 
+  /// Callback used to provide the substitution for a generic parameter
+  /// referenced by a "flat" index (where all depths have been collapsed)
+  /// to its metadata.
+  using SubstFlatGenericParameterFn =
+    llvm::function_ref<const Metadata *(unsigned flatIndex)>;
+
+  /// Callback used to provide the substitution of a generic parameter
+  /// (described by depth/index) to its metadata.
+  using SubstGenericParameterFn =
+    llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
+
+  /// FIXME: Remove once this is in Metadata.h
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<InProcess>;
+
+  /// Check the given generic requirements using the given set of generic
+  /// arguments, collecting the key arguments (e.g., witness tables) for
+  /// the caller.
+  ///
+  /// \param requirements The set of requirements to evaluate.
+  ///
+  /// \param extraArguments The extra arguments determined while checking
+  /// generic requirements (e.g., those that need to be
+  /// passed to an instantiation function) will be added to this vector.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool _checkGenericRequirements(
+                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+                    std::vector<const void *> &extraArguments,
+                    SubstFlatGenericParameterFn substFlatGenericParam,
+                    SubstGenericParameterFn substGenericParam);
+
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
   /// "initializing" memory that might have been initialized to the correct
