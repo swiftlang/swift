@@ -1481,7 +1481,8 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
       } else
         return nullptr;
     } else {
-      assert(isa<IfConfigDecl>(N.get<Decl*>()));
+      assert(isa<IfConfigDecl>(N.get<Decl*>()) || 
+             isa<PoundDiagnosticDecl>(N.get<Decl*>()));
       if (doIt(N.get<Decl*>()))
         return nullptr;
     }

@@ -2026,13 +2026,22 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
         cases.emplace_back(ICD);
 
         for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl*>() && isa<IfConfigDecl>(Entry.get<Decl*>()))
+          if (Entry.is<Decl*>() && 
+              (isa<IfConfigDecl>(Entry.get<Decl*>())))
             // Don't hoist nested '#if'.
             continue;
 
-          assert(Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>()));
+          assert((Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>())) ||
+                 (Entry.is<Decl*>() && 
+                   isa<PoundDiagnosticDecl>(Entry.get<Decl*>())));
           cases.push_back(Entry);
         }
+      }
+    } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
+      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
+      Status |= PoundDiagnosticResult;
+      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
+        cases.emplace_back(PDD);
       }
     } else {
       // If there are non-case-label statements at the start of the switch body,
