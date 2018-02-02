@@ -83,7 +83,7 @@ func test_too_many_but_some_better() {
 // type variables.
 _ = [Any]().withUnsafeBufferPointer { (buf) -> [Any] in
   guard let base = buf.baseAddress else { return [] }
-  return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<UnsafePointer<Any>>' has no member 'm'}}
+  return (base ..< base + buf.count).m // expected-error {{value of type 'Range<UnsafePointer<Any>>' has no member 'm'}}
 }
 
 // Typo correction with class-bound archetypes.

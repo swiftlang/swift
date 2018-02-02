@@ -618,7 +618,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
     return count
   }
 
-  internal typealias Indices = CountableRange<Int>
+  internal typealias Indices = Range<Int>
 }
 
 extension Sequence {
