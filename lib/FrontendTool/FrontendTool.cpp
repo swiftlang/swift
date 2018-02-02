@@ -1187,11 +1187,19 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   version::Version EffectiveLanguageVersion =
     Context.LangOpts.EffectiveLanguageVersion;
 
-  // Free up some compiler resources now that we have an IRModule.
-  // NB: Don't free if we have a stats collector; it makes some use
-  // of the AST context during shutdown.
-  if (!Stats)
-    Instance.freeContextAndSIL();
+  if (!Stats) {
+    // Free up some compiler resources now that we have an IRModule.
+    Instance.freeSILModule();
+
+    // If there are multiple primary inputs it is too soon to free
+    // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
+    // primary input, then freeing it after processing the last primary is
+    // unlikely to reduce the peak heap size. So, only optimize the
+    // single-primary-case (or WMO).
+    if (!Invocation.getFrontendOptions()
+             .InputsAndOutputs.hasMultiplePrimaryInputs())
+      Instance.freeASTContext();
+  }
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
