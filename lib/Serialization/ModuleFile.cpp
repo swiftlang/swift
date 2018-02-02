@@ -1115,6 +1115,7 @@ ModuleFile::ModuleFile(
       Name = info.name;
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
+      IsSIB = extInfo->isSIB();
 
       hasValidControlBlock = true;
       break;
