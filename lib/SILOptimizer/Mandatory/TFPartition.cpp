@@ -437,6 +437,13 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
     }
   }
 
+  // In addition to blocks with ops in them, we also add any block that has a
+  // return, since that will be the head of the post dominator tree, and it is
+  // possible that there are no ops in that block.
+  for (auto &bb : fn.getBlocks())
+    if (isa<ReturnInst>(bb.getTerminator()))
+      worklist.push_back(&bb);
+
   // Make sure the nodes are never reallocated out from under us.
   nodes.reserve(fn.getBlocks().size());
 
