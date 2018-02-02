@@ -31,3 +31,12 @@ public func postdom_crash1(w1: Tensor<Float>, inputBatch: Tensor<Float>) {
     _ = inputBatch ⊗ w1  // expected-note 2 {{value used here}}
   }  // expected-warning 2 {{value implicitly copied to the accelerator}}
 }
+
+// This crashed the partitioning pass because the 1.0 scalar was hoisted out of
+// the loop.  The partitioning pass tried to sink it back in, but failed.
+public func sinking_crash(w1: Tensor<Float>) {
+  for _ in 0..<1000 {
+    let pred = w1+w1 // expected-warning {{value implicitly copied to the accelerator}}
+    let _ = 1.0 / Tensor<Float>(pred.unitCountTensor)
+  }
+}

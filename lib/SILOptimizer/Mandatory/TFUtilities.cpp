@@ -13,6 +13,7 @@
 #include "TFUtilities.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -393,6 +394,57 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
   // Otherwise everything is ok.
   return "";
 }
+
+/// Replace any indirect memory operands with direct references to the
+/// scalars they reference.  This potentially replaces the builtin
+/// instruction, so it returns the right one to use.
+// TODO(clattner): Remove this when deabstraction exists.
+SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
+  SmallVector<SILValue, 8> operands;
+
+  // Handle normal operands.
+  bool changed = false;
+  unsigned nextOperand = 0;
+  for (auto op: operandDescriptors) {
+    switch (op) {
+    case OpDescriptor::Tensor:
+      operands.push_back(inst->getOperand(nextOperand++));
+      break;
+    case OpDescriptor::Scalar:
+      auto operand = inst->getOperand(nextOperand++);
+      auto scalar = getScalarOperand(operand);
+      operands.push_back(scalar);
+      changed |= operand != scalar;
+      break;
+    }
+  }
+
+  // Handle attributes.
+  for (auto attr : attributes) { (void)attr;
+    auto operand = inst->getOperand(nextOperand++);
+    auto attrOperand = getAttrOperand(operand)->getResults()[0];
+    operands.push_back(attrOperand);
+    changed |= operand != attrOperand;
+  }
+  assert(nextOperand == inst->getNumOperands() && "Unexpected operands?");
+
+  // If everything is already copasetic, just return our existing instruction.
+  if (!changed)
+    return inst;
+
+  // Otherwise, rebuild a new builtin instruction with the simplified operands.
+  SILBuilder B(inst);
+
+  auto newInst =
+    B.createBuiltin(inst->getLoc(),
+                    B.getASTContext().getIdentifier(builtinName),
+                    inst->getResults()[0]->getType(), /*no substitions*/{},
+                    operands);
+  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->eraseFromParent();
+  return inst = newInst;
+}
+
 
 
 /// The SIL location for operations we process are usually deep in the bowels
