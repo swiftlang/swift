@@ -49,36 +49,43 @@ namespace tf {
     /// This is the TensorFlow name for the op.
     StringRef opName;
 
+    enum class AttributeModifier {
+      Normal,  // No modifier.
+      DType,   // This integer value is a dtype.
+      Tensor,  // This array or scalar should be turned into a TF_Tensor.
+      Shape,   // This array of integers is a shape specifier.
+    };
+
     /// These are the names of any attribute operands at the end of the list.
-    SmallVector<StringRef, 4> attributeNames;
+    SmallVector<std::pair<StringRef, AttributeModifier>, 4> attributes;
 
     /// Analyze the specified SIL instruction and return a SILTensorOpInfo
     /// result if the instruction is a valid tensor operation.  This is the
     /// way that SILTensorOpInfo's are created.
     static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
 
+    /// Verify that any attribute operands are passed acceptable constants,
+    /// returning a non-empty error string to emit if that is not the case.
+    std::string checkAttributeConstants() const;
+
+
     /// Return the SILValue for the specified scalar operand.
-    SILValue getScalarOperand(unsigned operandNumber) {
+    SILValue getScalarOperand(unsigned operandNumber) const {
       return getScalarOperand(inst->getOperand(operandNumber));
     }
-    SILValue getScalarOperand(SILValue v);
+    SILValue getScalarOperand(SILValue v) const;
 
-    /// If the specified value is a valid value for a constant operand, return
-    /// the literal it is initialized to, otherwise null.
-    LiteralInst *getTensorConstantOperand(unsigned operandNumber) {
-      return getTensorConstantOperand(inst->getOperand(operandNumber));
-    }
-    LiteralInst *getTensorConstantOperand(SILValue v);
-
-    SILInstruction *getAttrOperand(unsigned operandNumber) {
+    /// Return the constant instruction that defines the specified attribute
+    /// operand, or null if the defining value isn't a valid constant for an
+    /// attribute.
+    SILInstruction *getAttrOperand(unsigned operandNumber) const {
       return getAttrOperand(inst->getOperand(operandNumber));
     }
-    SILInstruction *getAttrOperand(SILValue v);
+    SILInstruction *getAttrOperand(SILValue v) const;
 
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
     bool decodeBuiltin(BuiltinInst *inst);
-    bool decodeTFInitScalar(ApplyInst *inst);
   };
 
 

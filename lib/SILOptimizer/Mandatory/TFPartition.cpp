@@ -115,7 +115,7 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
     auto resultTy = I->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
-      return "__tfop_Const,cd:t";
+      return "__tfop_Const";
   }
 
   auto *BI = dyn_cast<BuiltinInst>(I);
@@ -912,13 +912,6 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
       // Scalar operands are recursively marked.
       markValue(tfopInfo.getScalarOperand(nextOperand++), &inst);
       break;
-    case OpDescriptor::AddDType:
-      // No operand to mark.
-      break;
-    case OpDescriptor::Constant:
-      // No need to mark these operands.
-      ++nextOperand;
-      break;
     }
   }
 }
@@ -1174,10 +1167,26 @@ bool TFFunctionPartition::markFunction() {
   SmallVector<SILInstruction*, 32> tensorOps;
   for (auto *BB : llvm::depth_first(&fn)) {
     for (auto &inst : *BB) {
-      if (SILTensorOpInfo::decode(&inst)) {
-        tensorOps.push_back(&inst);
-        tensorOpsSet.insert(&inst);
+      auto opInfo = SILTensorOpInfo::decode(&inst);
+      if (!opInfo)
+        continue;
+
+      // Check to see if the usage of this op looks ok.  If not, reject it with
+      // an error and ignore it.
+      auto error = opInfo.getValue().checkAttributeConstants();
+      if (!error.empty()) {
+        // TODO: improve the diagnostic to talk about the parameter label in the
+        // user code, not the internal op attribute.  The bookkeeping for this
+        // isn't obvious though.
+        auto loc = getUserSourceLocation(inst.getDebugLocation());
+        diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+                 diag::tf_op_misuse, error)
+          .highlight(loc.getSourceRange());
+        continue;
       }
+
+      tensorOps.push_back(&inst);
+      tensorOpsSet.insert(&inst);
     }
   }
 
@@ -1481,21 +1490,13 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
       // Tensor operands just become operands.
       args.push_back(remapValue(inst->getOperand(nextOperand++)));
       break;
-    case OpDescriptor::Constant: {
-      auto cst = tfopInfo.getTensorConstantOperand(nextOperand++);
-      args.push_back(cloneSingleInst(cst)->getResults()[0]);
-      break;
-    }
-    case OpDescriptor::AddDType:
-      // Nothing to do for this.
-      break;
     case OpDescriptor::Scalar:
       llvm_unreachable("scalar operands should always be handled specially");
     }
   }
 
-  for (auto attrName : tfopInfo.attributeNames) {
-    (void)attrName;  // Attrname is encoded in builtinName.
+  for (auto attrInfo : tfopInfo.attributes) {
+    (void)attrInfo;  // Attrname is already encoded in builtinName.
     auto attr = tfopInfo.getAttrOperand(nextOperand++);
     args.push_back(cloneAttrInst(attr)->getResults()[0]);
   }
@@ -1573,19 +1574,25 @@ void PartitionCloner::visitApplyInst(ApplyInst *inst) {
 ///
 void PartitionCloner::visitLiteralInst(LiteralInst *inst) {
   auto loc = remapLocation(inst->getLoc());
-
-  auto opName = getPartitionedScalarOpName(inst);
-  assert(!opName.empty() && "Should correspond to an op");
   auto &B = getBuilder();
 
-  auto name = B.getASTContext().getIdentifier(opName);
+  auto &ctx = B.getASTContext();
+  auto opName = "__tfop_Const,:t,dtype$dtype,value$tensor";
+  auto name = ctx.getIdentifier(opName);
+
+  // Emit the dtype value to use as an integer.
+  auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
+  auto dtypeCst =
+    B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx), dtype);
+
+  // Emit the constant we're going to use.
   auto ourCst = inst->clone();
   ourCst->setDebugLocation(B.getSILDebugLocation(loc));
   B.getInsertionBB()->push_back(ourCst);
 
   auto result =
-    B.createBuiltin(loc, name, remapType(inst->getType()),
-                    /*substitutionlist*/{}, { SILValue(ourCst) });
+    B.createBuiltin(loc, name, remapType(inst->getType()), /*substitutions*/{},
+                    { SILValue(dtypeCst), SILValue(ourCst) });
   ValueMap[inst] = result;
 }
 

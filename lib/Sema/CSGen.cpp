@@ -1352,13 +1352,9 @@ namespace {
           break;
         }
         case tf::OpDescriptor::Scalar:       // Scalar operand.
-        case tf::OpDescriptor::Constant: {   // Constant integer or fp value.
           auto ty = CS.createTypeVariable(locator, 0);
           argTypes.push_back(TupleTypeElt(ty));
           break;
-        }
-        case tf::OpDescriptor::AddDType:
-          break;  // Nothing to do here.
         }
       }
 
