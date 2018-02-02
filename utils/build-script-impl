@@ -2746,7 +2746,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 else
                     with_pushd ${lldb_build_dir} \
-                        ninja check-lldb-unit
+                        ${NINJA_BIN} check-lldb-unit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
