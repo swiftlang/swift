@@ -486,7 +486,9 @@ namespace {
       : PhysicalPathComponent(typeData, RefElementKind),
         Field(field), SubstFieldType(substFieldType),
         IsNonAccessing(options.IsNonAccessing) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base.getType().isObject() &&
@@ -521,7 +523,9 @@ namespace {
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
       : PhysicalPathComponent(typeData, TupleElementKind),
         ElementIndex(elementIndex) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -545,7 +549,9 @@ namespace {
                            LValueTypeData typeData)
       : PhysicalPathComponent(typeData, StructElementKind),
         Field(field), SubstFieldType(substFieldType) {}
-    
+
+    virtual bool isLoadingPure() const override { return true; }
+
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
@@ -588,6 +594,8 @@ namespace {
       : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind) {
       assert(getSubstFormalType() == openedArchetype);
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
@@ -636,6 +644,8 @@ namespace {
                                       LValueTypeData typeData)
       : LogicalPathComponent(typeData, OpenNonOpaqueExistentialKind),
         OpenedArchetype(openedArchetype) {}
+
+    virtual bool isLoadingPure() const override { return true; }
 
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
@@ -736,6 +746,8 @@ namespace {
       IsRValue(isRValue) {
         assert(IsRValue || value.getType().isAddress());
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
@@ -1714,6 +1726,8 @@ namespace {
         OrigType(origType)
     {}
 
+    virtual bool isLoadingPure() const override { return true; }
+
     RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                        RValue &&rv, SGFContext c) && override {
       return SGF.emitSubstToOrigValue(loc, std::move(rv), OrigType,
@@ -1753,6 +1767,8 @@ namespace {
                              SubstToOrigKind)
     {}
 
+    virtual bool isLoadingPure() const override { return true; }
+
     RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                        RValue &&rv, SGFContext c) && override {
       return SGF.emitOrigToSubstValue(loc, std::move(rv), getOrigFormalType(),
@@ -1787,6 +1803,8 @@ namespace {
     OwnershipComponent(LValueTypeData typeData)
       : LogicalPathComponent(typeData, OwnershipKind) {
     }
+
+    virtual bool isLoadingPure() const override { return true; }
 
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
