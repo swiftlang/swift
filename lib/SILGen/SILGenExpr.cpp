@@ -5066,8 +5066,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
   // If this is an implicit force of an ImplicitlyUnwrappedOptional,
   // and we're emitting into an unbridging conversion, try adjusting the
   // context.
-  if (loc->isImplicit() &&
-      E->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
+  if (loc->isImplicit() && loc->isForceOfImplicitlyUnwrappedOptional()) {
     if (auto conv = C.getAsConversion()) {
       if (auto adjusted = conv->getConversion().adjustForInitialForceValue()) {
         auto value =

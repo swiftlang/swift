@@ -1252,9 +1252,7 @@ internal struct RawKeyPathComponent {
                            argument?.data.count ?? 0))
 
     case .optionalChain:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       _sanityCheck(_isOptional(LeafValue.self),
                    "leaf result should be optional")
@@ -1267,16 +1265,12 @@ internal struct RawKeyPathComponent {
       }
 
     case .optionalForce:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       return .continue(unsafeBitCast(base, to: Optional<NewValue>.self)!)
 
     case .optionalWrap:
-      // TODO: IUO shouldn't be a first class type
-      _sanityCheck(NewValue.self == Optional<CurValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<CurValue>.self,
+      _sanityCheck(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
@@ -1365,9 +1359,7 @@ internal struct RawKeyPathComponent {
       return UnsafeRawPointer(Builtin.addressof(&writeback.value))
 
     case .optionalForce:
-      // TODO: ImplicitlyUnwrappedOptional should not be a first-class type
-      _sanityCheck(CurValue.self == Optional<NewValue>.self
-                   || CurValue.self == ImplicitlyUnwrappedOptional<NewValue>.self,
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping an optional value")
       // Optional's layout happens to always put the payload at the start
       // address of the Optional value itself, if a value is present at all.

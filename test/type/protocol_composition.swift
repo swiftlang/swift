@@ -146,7 +146,7 @@ typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition 
 typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type 'P1.Protocol' cannot be used within a protocol-constrained type}}
 typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
 typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
-typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2!' cannot be used within a protocol-constrained type}}
+typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2?' cannot be used within a protocol-constrained type}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
 typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}

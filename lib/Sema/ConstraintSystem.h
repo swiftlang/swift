@@ -462,12 +462,8 @@ enum ScoreKind {
   SK_KeyPathSubscript,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
-  /// A conversion from 'inout Optional<T>' to 'inout
-  /// ImplicitlyUnwrappedOptional<T>' or vice-versa.
-  /// FIXME: This goes away when IUO-as-a-type goes away.
-  SK_InOutOptionalityConversion,
 
-  SK_LastScoreKind = SK_InOutOptionalityConversion,
+  SK_LastScoreKind = SK_ValueToPointerConversion,
 };
 
 /// The number of score kinds.
@@ -2445,6 +2441,15 @@ public:
     auto *disjunctionLocator = getConstraintLocator(
         locator, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
     buildDisjunctionForOptionalVsUnderlying(boundTy, type, disjunctionLocator);
+  }
+
+  // Build a disjunction for dynamic lookup results, which are
+  // implicitly unwrapped if needed.
+  void buildDisjunctionForDynamicLookupResult(Type boundTy, Type type,
+                                              ConstraintLocator *locator) {
+    auto *dynamicLocator =
+        getConstraintLocator(locator, ConstraintLocator::DynamicLookupResult);
+    buildDisjunctionForOptionalVsUnderlying(boundTy, type, dynamicLocator);
   }
 
   /// \brief Resolve the given overload set to the given choice.
