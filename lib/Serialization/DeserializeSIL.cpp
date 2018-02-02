@@ -506,6 +506,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
+  // Mark this function as deserialized. This avoids rerunning diagnostic
+  // passes. Certain passes in the madatory pipeline may expect not to rerun
+  // after arbitrary optimization and lowering.
+  fn->setWasDeserializedCanonical();
 
   assert(fn->empty() &&
          "SILFunction to be deserialized starts being empty.");
