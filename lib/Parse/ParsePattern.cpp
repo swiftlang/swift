@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
