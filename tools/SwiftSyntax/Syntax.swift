@@ -21,7 +21,7 @@ public protocol Syntax:
 internal protocol _SyntaxBase: Syntax {
   /// The type of sequence containing the indices of present children.
   typealias PresentChildIndicesSequence =
-    LazyFilterSequence<CountableRange<Int>>
+    LazyFilterSequence<Range<Int>>
     
   /// The root of the tree this node is currently in.
   var _root: SyntaxData { get } // Must be of type SyntaxData

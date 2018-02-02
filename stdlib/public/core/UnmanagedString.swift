@@ -116,7 +116,7 @@ extension _UnmanagedString : RandomAccessCollection {
   // integer subscripts as a convenience, in a separate extension below.
   internal typealias Index = UnsafePointer<CodeUnit>
   internal typealias IndexDistance = Int
-  internal typealias Indices = CountableRange<Index>
+  internal typealias Indices = Range<Index>
   internal typealias SubSequence = _UnmanagedString
 
   @_inlineable

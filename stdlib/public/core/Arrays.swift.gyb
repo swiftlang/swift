@@ -492,7 +492,7 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
 
 extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':
@@ -844,7 +844,7 @@ extension ${Self} {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
-      subRange: Range(buffer.indices),
+      subRange: buffer.indices,
       initializing: newBuffer.firstElementAddress)
     buffer = _Buffer(
       _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
@@ -1325,7 +1325,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
         _uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._copyContents(
-        subRange: Range(_buffer.indices),
+        subRange: _buffer.indices,
         initializing: newBuffer.firstElementAddress)
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
@@ -1630,7 +1630,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
       _buffer = _Buffer()
     }
     else {
-      self.replaceSubrange(Range(self.indices), with: EmptyCollection())
+      self.replaceSubrange(indices, with: EmptyCollection())
     }
   }
 
