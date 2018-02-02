@@ -48,23 +48,22 @@ extension String {
   ///     string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
-    if count == 0 {
-      self = ""
-    } else if count == 1 {
-      self = repeatedValue
+    guard count > 1 else {
+      self = count == 0 ? "" : repeatedValue
+      return
+    }
+
+    precondition(count > 0, "Negative count not allowed")
+    defer { _fixLifetime(repeatedValue) }
+    if _slowPath(repeatedValue._guts._isOpaque) {
+      let opaque = repeatedValue._guts._asOpaque()
+      self.init(_StringGuts(opaque._repeated(count)))
+    } else if repeatedValue._guts.isASCII {
+      let ascii = repeatedValue._guts._unmanagedASCIIView
+      self.init(_StringGuts(ascii._repeated(count)))
     } else {
-      precondition(count > 0, "Negative count not allowed")
-      defer { _fixLifetime(repeatedValue) }
-      if _slowPath(repeatedValue._guts._isOpaque) {
-        let opaque = repeatedValue._guts._asOpaque()
-        self.init(_StringGuts(opaque._repeated(count)))
-      } else if repeatedValue._guts.isASCII {
-        let ascii = repeatedValue._guts._unmanagedASCIIView
-        self.init(_StringGuts(ascii._repeated(count)))
-      } else {
-        let utf16 = repeatedValue._guts._unmanagedUTF16View
-        self.init(_StringGuts(utf16._repeated(count)))
-      }
+      let utf16 = repeatedValue._guts._unmanagedUTF16View
+      self.init(_StringGuts(utf16._repeated(count)))
     }
   }
 
