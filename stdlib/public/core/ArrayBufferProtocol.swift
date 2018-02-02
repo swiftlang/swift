@@ -135,6 +135,7 @@ extension _ArrayBufferProtocol where Indices == CountableRange<Int>{
   }
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @_inlineable
   @inline(never)
   @_versioned
   internal init(copying buffer: Self) {
