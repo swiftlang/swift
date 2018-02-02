@@ -1099,10 +1099,9 @@ namespace {
     }
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-      const char *name = PDD->isError() ?
-        "pound_error_decl" : "pound_warning_decl";
-      printCommon(PDD, name);
-      OS << "\n";
+      printCommon(PDD, "pound_diagnostic_decl");
+      auto kind = PDD->isError() ? "error" : "warning";
+      OS << " kind=" << kind << "\n";
       Indent += 2;
       printRec(PDD->getMessage());
       Indent -= 2;
