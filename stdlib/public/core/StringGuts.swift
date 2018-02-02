@@ -500,12 +500,7 @@ extension _StringGuts {
       return _taggedCocoaObject
     }
     _sanityCheck(_object.isUnmanaged)
-    if _object.isSingleByte {
-      return _NSContiguousString(_StringGuts(_asUnmanaged(of: UInt8.self)))
-    }
-
-    return _NSContiguousString(
-      _StringGuts(_asUnmanaged(of: UTF16.CodeUnit.self)))
+    return _NSContiguousString(_unmanaged: self)
   }
 
   /// Return an NSString instance containing a slice of this string.
