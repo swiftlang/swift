@@ -228,8 +228,7 @@ func testStraightLineXORTraining() {
   let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
 
   // Training loop
-  // FIXME: Partitioner assertion "Marking instructions out of the tensor region?"
-  // for i in 0..<iterationCount {
+  for i in 0..<iterationCount {
     let mmul1 = inputBatch ⊗ w1
     let l1 = mmul1 + b1
     // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
@@ -265,7 +264,7 @@ func testStraightLineXORTraining() {
     b1 -= (dB1 * learningRate)
     w2 -= (dW2 * learningRate)
     b2 -= (dB2 * learningRate)
-  // }
+  }
 }
 TensorTests.testCPUAndGPU("StraightLineXORTraining", testStraightLineXORTraining)
 #endif
@@ -310,8 +309,7 @@ func testXORClassifierTraining() {
     mutating func train(inputBatch x: Tensor<Float>,
                         outputBatch expected: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
-      /// FIXME: Partitioner assertion: "BasicBlock not in our subset".
-      for i in 0..<iterationCount {
+      for _ in 0..<iterationCount {
         let
           mmul1 = x ⊗ w1,
           l1 = mmul1 + b1,
@@ -323,8 +321,8 @@ func testXORClassifierTraining() {
         // Loss
         let
           sub = expected - pred,
-          sqr = pow(sub, 2),
-          mean = sqr.mean()
+          sqr = pow(sub, 2)
+          // mean = sqr.mean()   <- unused.
 
         // Gradient
         let

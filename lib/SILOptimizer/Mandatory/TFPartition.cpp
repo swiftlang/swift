@@ -604,7 +604,7 @@ private:
   void markArgument(SILArgument *arg, SILInstruction *user);
   void markValue(SILValue value, SILInstruction *user);
 
-  bool sinkValueIntoRegionForPromotion(SILInstruction *inst);
+  bool sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   // Rewriting the host function.
   PartitionedTensorProgram insertTensorComputationStartEndTerminate();
@@ -1020,7 +1020,7 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
 /// NOTE: This trivially simple implementation currently can't fail, but when
 /// we generalize it later it can, so we return a bool to indicate success.
 bool TFFunctionPartition::
-sinkValueIntoRegionForPromotion(SILInstruction *inst) {
+sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
   // If this is too complex, don't try to sink it.
   // Right now, we just handle floating point and integer literals.
   assert(isa<LiteralInst>(inst) &&
@@ -1029,12 +1029,13 @@ sinkValueIntoRegionForPromotion(SILInstruction *inst) {
 
   // We can't generally sink this beyond other users, so we clone the
   // instruction instead.
+  auto oldInst = inst;
   inst = inst->clone(tensorStartPoint);
   tensorStartPoint = inst;
 
   // Replace uses of the original instruction with the new one, if they are
   // within the tensor program.
-  for (auto result : inst->getResults()) {
+  for (auto result : oldInst->getResults()) {
     for (auto it = result->use_begin(), e = result->use_end(); it != e; ) {
       auto *operand = *it++;
       auto user = operand->getUser();
@@ -1173,27 +1174,39 @@ bool TFFunctionPartition::markFunction() {
   // operation.
   SmallVector<SILInstruction*, 32> tensorOps;
   for (auto *BB : llvm::depth_first(&fn)) {
-    for (auto &inst : *BB) {
-      auto opInfo = SILTensorOpInfo::decode(&inst);
+    for (auto I = BB->begin(), E = BB->end(); I != E; ) {
+      // Manually move iterator to avoid invalidation if we replace 'inst'.
+      auto *inst = &*I++;
+
+      auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
 
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
-      auto error = opInfo.getValue().checkAttributeConstants();
+      auto error = opInfo->checkAttributeConstants();
       if (!error.empty()) {
         // TODO: improve the diagnostic to talk about the parameter label in the
         // user code, not the internal op attribute.  The bookkeeping for this
         // isn't obvious though.
-        auto loc = getUserSourceLocation(inst.getDebugLocation());
+        auto loc = getUserSourceLocation(inst->getDebugLocation());
         diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
                  diag::tf_op_misuse, error)
           .highlight(loc.getSourceRange());
         continue;
       }
 
-      tensorOps.push_back(&inst);
-      tensorOpsSet.insert(&inst);
+      // Because we don't have deabstraction yet, and because generic
+      // deabstraction doesn't know about our builtins, we get scalars and
+      // constants passed by reference through a stack allocation.  We support
+      // this form on input, but want to canonicalize this away so the
+      // partitioning pass and data flow analysis code doesn't have to reason
+      // about it.
+      // TODO(clattner): Remove this when deabstraction exists.
+      inst = opInfo->canonicalizeOperands();
+
+      tensorOps.push_back(inst);
+      tensorOpsSet.insert(inst);
     }
   }
 
