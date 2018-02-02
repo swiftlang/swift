@@ -692,3 +692,83 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 
   return nullptr;
 }
+
+/// Resolve a reference to a generic parameter to type metadata.
+static const Metadata *resolveGenericParamRef(
+                            const GenericParamRef &param,
+                            SubstFlatGenericParameterFn substFlatGenericParam) {
+  // Resolve the root generic parameter.
+  const Metadata *current = substFlatGenericParam(param.getRootParamIndex());
+  if (!current) return nullptr;
+
+  // Follow the associated type path.
+  for (const auto &assocTypeRef : param) {
+    // Look for the witness table.
+    auto witnessTable =
+      swift_conformsToProtocol(current, assocTypeRef.Protocol);
+    if (!witnessTable) return nullptr;
+
+    // Call the associated type access function.
+    using AssociatedTypeAccessFn =
+      const Metadata *(*)(const Metadata *base, const WitnessTable *);
+    unsigned adjustedIndex =
+      assocTypeRef.Index + WitnessTableFirstRequirementOffset;
+    current =
+      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
+        (current, witnessTable);
+    if (!current) return nullptr;
+  }
+
+  return current;
+}
+
+bool swift::_checkGenericRequirements(
+                      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+                      std::vector<const void *> &extraArguments,
+                      SubstFlatGenericParameterFn substFlatGenericParam,
+                      SubstGenericParameterFn substGenericParam) {
+  for (const auto &req : requirements) {
+    // Make sure we understand the requirement we're dealing with.
+    switch (req.getKind()) {
+    case GenericRequirementKind::BaseClass:
+    case GenericRequirementKind::Layout:
+    case GenericRequirementKind::Protocol:
+    case GenericRequirementKind::SameConformance:
+    case GenericRequirementKind::SameType:
+      break;
+
+    default:
+      // Unknown requirement kind. Bail out.
+      return true;
+    }
+
+    // Resolve the subject generic parameter.
+    auto subjectType =
+      resolveGenericParamRef(req.getParam(), substFlatGenericParam);
+    if (!subjectType) return true;
+
+    // Check the requirement.
+    switch (req.getKind()) {
+    case GenericRequirementKind::Protocol: {
+      // Look for a witness table to satisfy this conformance.
+      auto witnessTable =
+        swift_conformsToProtocol(subjectType, req.getProtocol());
+      if (!witnessTable) return true;
+
+      // If this requirement provides an extra argument, add the witness table
+      // as that argument.
+      if (req.getFlags().hasExtraArgument())
+        extraArguments.push_back(witnessTable);
+
+      continue;
+    }
+
+    // FIXME: Handle all of the other cases.
+    default:
+      return true;
+    }
+  }
+
+  // Success!
+  return false;
+}

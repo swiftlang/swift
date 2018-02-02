@@ -178,6 +178,7 @@ enum EG<T, U> { case a }
 
 class CG3<T, U, V> { }
 
+
 DemangleToMetadataTests.test("simple generic specializations") {
   expectEqual([Int].self, _typeByMangledName("SaySiG")!)
   expectEqual(EG<Int, String>.self, _typeByMangledName("4main2EGOySiSSG")!)
@@ -228,6 +229,53 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.NativeObject.self, _typeByMangledName("Bo")!)
   expectEqual(Builtin.BridgeObject.self, _typeByMangledName("Bb")!)
   expectEqual(Builtin.UnsafeValueBuffer.self, _typeByMangledName("BB")!)
+}
+
+class CG4<T: P1, U: P2> {
+  struct InnerGeneric<V: P3> { }
+}
+
+struct ConformsToP1: P1 { }
+struct ConformsToP2: P2 { }
+struct ConformsToP3: P3 { }
+
+DemangleToMetadataTests.test("protocol conformance requirements") {
+  expectEqual(CG4<ConformsToP1, ConformsToP2>.self,
+    _typeByMangledName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP2VG")!)
+  expectEqual(CG4<ConformsToP1, ConformsToP2>.InnerGeneric<ConformsToP3>.self,
+    _typeByMangledName("4main3CG4C12InnerGenericVyAA12ConformsToP1VAA12ConformsToP2V_AA12ConformsToP3VG")!)
+
+  // Failure cases: failed conformance requirements.
+  expectNil(_typeByMangledName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP1VG"))
+  expectNil(_typeByMangledName("4main3CG4CyAA12ConformsToP2VAA12ConformsToP2VG"))
+  expectNil(_typeByMangledName("4main3CG4C12InnerGenericVyAA12ConformsToP1VAA12ConformsToP2V_AA12ConformsToP2VG"))
+}
+
+struct SG5<T: P4> where T.Assoc1: P1, T.Assoc2: P2 { }
+
+struct ConformsToP4a : P4 {
+  typealias Assoc1 = ConformsToP1
+  typealias Assoc2 = ConformsToP2
+}
+
+struct ConformsToP4b : P4 {
+  typealias Assoc1 = ConformsToP1
+  typealias Assoc2 = ConformsToP1
+}
+
+struct ConformsToP4c : P4 {
+  typealias Assoc1 = ConformsToP2
+  typealias Assoc2 = ConformsToP2
+}
+
+DemangleToMetadataTests.test("associated type conformance requirements") {
+  expectEqual(SG5<ConformsToP4a>.self,
+    _typeByMangledName("4main3SG5VyAA13ConformsToP4aVG")!)
+
+  // Failure cases: failed conformance requirements.
+  expectNil(_typeByMangledName("4main3SG5VyAA13ConformsToP4bVG"))
+  expectNil(_typeByMangledName("4main3SG5VyAA13ConformsToP4cVG"))
+  expectNil(_typeByMangledName("4main3SG5VyAA12ConformsToP1cVG"))
 }
 
 runAllTests()
