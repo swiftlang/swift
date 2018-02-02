@@ -763,10 +763,53 @@ bool swift::_checkGenericRequirements(
       continue;
     }
 
-    // FIXME: Handle all of the other cases.
-    default:
+    case GenericRequirementKind::SameType: {
+      // Demangle the second type under the given substitutions.
+      auto otherType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!otherType) return true;
+
+      assert(!req.getFlags().hasExtraArgument());
+
+      // Check that the types are equivalent.
+      if (subjectType != otherType) return true;
+
+      continue;
+    }
+
+    case GenericRequirementKind::Layout: {
+      switch (req.getLayout()) {
+      case GenericRequirementLayoutKind::Class:
+        // Check whether the subject type is a class.
+        if (!subjectType->isAnyClass()) return true;
+        continue;
+      }
+
+      // Unknown layout.
       return true;
     }
+
+    case GenericRequirementKind::BaseClass: {
+      // Demangle the base type under the given substitutions.
+      auto baseType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!baseType) return true;
+
+      // Check whether it's dynamically castable, which works as a superclass
+      // check.
+      if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
+
+      continue;
+    }
+
+    case GenericRequirementKind::SameConformance: {
+      // FIXME: Implement this check.
+      continue;
+    }
+    }
+
+    // Unknown generic requirement kind.
+    return true;
   }
 
   // Success!

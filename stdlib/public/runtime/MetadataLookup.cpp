@@ -420,7 +420,7 @@ depthIndexToFlatIndex(unsigned depth, unsigned index,
   if (depth >= paramCounts.size()) return None;
 
   // Compute the flat index.
-  unsigned flatIndex = index + depth == 0 ? 0 :  paramCounts[depth - 1];
+  unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
   if (flatIndex >= paramCounts[depth]) return None;
@@ -829,13 +829,9 @@ public:
 
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
-                           size_t numberOfLevels,
-                           size_t *parametersPerLevel,
-                           const Metadata * const *flatSubstitutions) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+const Metadata *swift::_getTypeByMangledName(
+                          StringRef typeName,
+                          SubstGenericParameterFn substGenericParam) {
 
   Demangler demangler;
   NodePointer node;
@@ -860,20 +856,7 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
     if (!node) return nullptr;
   }
 
-  DecodedMetadataBuilder builder(demangler,
-    [&](unsigned depth, unsigned index) -> const Metadata * {
-      if (depth >= numberOfLevels)
-        return nullptr;
-
-      if (index >= parametersPerLevel[depth])
-        return nullptr;
-
-      unsigned flatIndex = index;
-      for (unsigned i = 0; i < depth; ++i)
-        flatIndex += parametersPerLevel[i];
-
-      return flatSubstitutions[flatIndex];
-    },
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
     [](const Metadata *base, StringRef assocType,
        const ProtocolDescriptor *protocol) -> const Metadata * {
       // Look for a conformance of the base type to the protocol.
@@ -892,4 +875,27 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
     });
 
   return Demangle::decodeMangledType(builder, node);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata * _Nullable
+swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+                           size_t numberOfLevels,
+                           size_t *parametersPerLevel,
+                           const Metadata * const *flatSubstitutions) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  return _getTypeByMangledName(typeName,
+    [&](unsigned depth, unsigned index) -> const Metadata * {
+      if (depth >= numberOfLevels)
+        return nullptr;
+
+      if (index >= parametersPerLevel[depth])
+        return nullptr;
+
+      unsigned flatIndex = index;
+      for (unsigned i = 0; i < depth; ++i)
+        flatIndex += parametersPerLevel[i];
+
+      return flatSubstitutions[flatIndex];
+    });
 }

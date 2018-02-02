@@ -183,6 +183,14 @@ namespace swift {
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Retrieve the type metadata described by the given type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  const Metadata *_getTypeByMangledName(
+                                    StringRef typeName,
+                                    SubstGenericParameterFn substGenericParam);
+
   /// FIXME: Remove once this is in Metadata.h
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<InProcess>;
