@@ -136,9 +136,7 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    self.init(Unicode.Scalar(_builtinUnicodeScalarLiteral: value))
   }
 
   // Inlining ensures that the whole constructor can be folded away to a single
