@@ -196,10 +196,11 @@ extension _StringGuts {
     }
   }
 
+  // TODO(SSO): consider a small-checking variant
   @_versioned
   @inline(__always)
   internal
-  init<CodeUnit>(_ storage: _SwiftStringStorage<CodeUnit>)
+  init<CodeUnit>(_large storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(storage.count >= 0)
     self.init(
@@ -268,10 +269,11 @@ extension _StringGuts {
     return _UnmanagedString(start: start, count: _cocoaCount)
   }
 
+  // TODO(SSO): consider a small-checking variant
   @_versioned
   internal
   init(
-    _nonTaggedCocoaObject s: _CocoaString,
+    _largeNonTaggedCocoaObject s: _CocoaString,
     count: Int,
     isSingleByte: Bool,
     start: UnsafeRawPointer?
@@ -306,10 +308,11 @@ extension _StringGuts {
     }
   }
 
+  // TODO(SSO): consider a small-checking variant
   @inline(never)
   @_versioned
   internal
-  init<S: _OpaqueString>(opaqueString: S) {
+  init<S: _OpaqueString>(_large opaqueString: S) {
     self.init(
       object: _StringObject(opaqueString: opaqueString),
       otherBits: UInt(bitPattern: opaqueString.length))
@@ -352,9 +355,10 @@ extension _StringGuts {
     return _UnmanagedString(start: start, count: count)
   }
 
+  // TODO(SSO): consider a small-checking variant
   @_versioned
   @_inlineable
-  init<CodeUnit>(_ s: _UnmanagedString<CodeUnit>)
+  init<CodeUnit>(_large s: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(s.count >= 0)
     self.init(
@@ -398,6 +402,7 @@ extension _StringGuts {
     }
   }
 
+  // TODO(SSO): Replace with small strings
   @_versioned
   @inline(never) // Hide CF dependency
   internal init(_taggedCocoaObject object: _CocoaString) {
@@ -486,6 +491,9 @@ extension _StringGuts {
   /// The returned object may contain unmanaged pointers into the
   /// storage of this string; you are responsible for ensuring that
   /// it will not outlive `self`.
+  //
+  // TODO(Comparison): Remove this with new comparison work.
+  //
   @_versioned
   @_inlineable
   internal
@@ -670,8 +678,12 @@ extension _StringGuts {
       _object.isContiguous && CodeUnit.bitWidth == _object.bitWidth) {
       return self
     }
+
+    // TODO (TODO: JIRA): check if we're small, extract that.
+
     let count = self.count
-    return _StringGuts(_copyToNativeStorage(of: CodeUnit.self, from: 0..<count))
+    return _StringGuts(
+      _large: _copyToNativeStorage(of: CodeUnit.self, from: 0..<count))
   }
 
   @_versioned
@@ -725,18 +737,23 @@ extension _StringGuts {
   @_inlineable
   public // @testable
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
+
+    // TODO (TODO: JIRA): check if we're and/or range is small
+
     if range.isEmpty { return _StringGuts() }
     if range == 0..<count { return self }
     switch (isASCII, _object.isUnmanaged) {
     case (true, true):
-        return _StringGuts(_asUnmanaged(of: UInt8.self)[range])
+        return _StringGuts(_large: _asUnmanaged(of: UInt8.self)[range])
     case (true, false):
-      return _StringGuts(_copyToNativeStorage(of: UInt8.self, from: range))
+      return _StringGuts(
+        _large: _copyToNativeStorage(of: UInt8.self, from: range))
     case (false, true):
-      return _StringGuts(_asUnmanaged(of: UTF16.CodeUnit.self)[range])
+      return _StringGuts(
+        _large: _asUnmanaged(of: UTF16.CodeUnit.self)[range])
     case (false, false):
       return _StringGuts(
-        _copyToNativeStorage(of: UTF16.CodeUnit.self, from: range))
+        _large: _copyToNativeStorage(of: UTF16.CodeUnit.self, from: range))
     }
   }
 
@@ -781,6 +798,9 @@ extension _StringGuts {
     _ body: (Unmanaged<_SwiftStringStorage<CodeUnit>>) -> R
   ) -> R
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
+
+    // TODO (TODO: JIRA): check if we're small and still within capacity
+
     let paramsOpt = allocationParametersForMutableStorage(
       of: CodeUnit.self,
       unusedCapacity: unusedCapacity)
@@ -798,7 +818,7 @@ extension _StringGuts {
         from: 0..<params.count,
         unusedCapacity: params.capacity - params.count))
     let result = body(unmanagedRef)
-    self = _StringGuts(unmanagedRef.takeRetainedValue())
+    self = _StringGuts(_large: unmanagedRef.takeRetainedValue())
     _fixLifetime(self)
     return result
   }
@@ -934,18 +954,21 @@ extension _StringGuts {
         return
       }
     }
+
+    // TODO (TODO: JIRA): check if we're small and still within capacity
+
     if ascii {
       let storage = _copyToNativeStorage(
         of: UInt8.self,
         from: 0..<self.count,
         unusedCapacity: unusedCapacity)
-      self = _StringGuts(storage)
+      self = _StringGuts(_large: storage)
     } else {
       let storage = _copyToNativeStorage(
         of: UTF16.CodeUnit.self,
         from: 0..<self.count,
         unusedCapacity: unusedCapacity)
-      self = _StringGuts(storage)
+      self = _StringGuts(_large: storage)
     }
     _invariantCheck()
   }
@@ -958,18 +981,21 @@ extension _StringGuts {
         return
       }
     }
+
+    // TODO (TODO: JIRA): check if we're small and still within capacity
+
     if isASCII {
       let storage = _copyToNativeStorage(
         of: UInt8.self,
         from: 0..<self.count,
         unusedCapacity: Swift.max(capacity - count, 0))
-      self = _StringGuts(storage)
+      self = _StringGuts(_large: storage)
     } else {
       let storage = _copyToNativeStorage(
         of: UTF16.CodeUnit.self,
         from: 0..<self.count,
         unusedCapacity: Swift.max(capacity - count, 0))
-      self = _StringGuts(storage)
+      self = _StringGuts(_large: storage)
     }
     _invariantCheck()
   }
@@ -1149,7 +1175,7 @@ extension _StringGuts {
       range: suffixRange,
       into: UnsafeMutableBufferPointer(start: dst, count: suffixRange.count))
     _sanityCheck(dst + suffixRange.count == storage.end)
-    self = _StringGuts(storage)
+    self = _StringGuts(_large: storage)
     _invariantCheck()
   }
 
@@ -1247,6 +1273,8 @@ extension _StringGuts {
     minimumCapacity: Int = 0
   ) -> (_StringGuts?, hadError: Bool)
   where Input.Element == Encoding.CodeUnit {
+    // TODO(SSO): Small string check and support
+
     // Determine how many UTF-16 code units we'll need
     guard let (utf16Count, isASCII) = UTF16.transcodedLength(
       of: input.makeIterator(),
@@ -1261,7 +1289,7 @@ extension _StringGuts {
       let hadError = storage._initialize(
         fromCodeUnits: input,
         encoding: Encoding.self)
-      return (_StringGuts(storage), hadError)
+      return (_StringGuts(_large: storage), hadError)
     }
     let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
       capacity: Swift.max(minimumCapacity, utf16Count),
@@ -1269,7 +1297,7 @@ extension _StringGuts {
     let hadError = storage._initialize(
       fromCodeUnits: input,
       encoding: Encoding.self)
-    return (_StringGuts(storage), hadError)
+    return (_StringGuts(_large: storage), hadError)
   }
 }
 

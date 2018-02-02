@@ -318,6 +318,9 @@ extension String {
     minimumCapacity: Int = 0
   ) -> (String?, hadError: Bool)
   where Input.Element == Encoding.CodeUnit {
+
+    // TODO(SSO): small check
+
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isASCII) = UTF16.transcodedLength(
@@ -344,7 +347,7 @@ extension String {
         into: sink)
       _sanityCheck(!hadError,
         "string cannot be ASCII if there were decoding errors")
-      return (String(_storage: storage), hadError)
+      return (String(_largeStorage: storage), hadError)
     } else {
       let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
         capacity: capacity,
@@ -359,7 +362,7 @@ extension String {
         from: encoding, to: UTF16.self,
         stoppingOnError: !repairIllFormedSequences,
         into: sink)
-      return (String(_storage: storage), hadError)
+      return (String(_largeStorage: storage), hadError)
     }
   }
 
@@ -867,7 +870,10 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
-    self = String(_StringGuts(_UnmanagedString<UTF16.CodeUnit>(
+
+    // TODO(SSO): small check
+
+    self = String(_StringGuts(_large: _UnmanagedString<UTF16.CodeUnit>(
           start: UnsafePointer(start),
           count: Int(utf16CodeUnitCount))))
   }
@@ -882,12 +888,15 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
+
+    // TODO(SSO): small check
+
     if Int(utf8CodeUnitCount) == 0 {
       self.init()
       return
     }
     if _fastPath(Bool(isASCII)) {
-      self = String(_StringGuts(_UnmanagedString<UInt8>(
+      self = String(_StringGuts(_large: _UnmanagedString<UInt8>(
             start: UnsafePointer(start),
             count: Int(utf8CodeUnitCount))))
       return
@@ -1023,11 +1032,12 @@ extension String {
     Builtin.unreachable()
   }
 
+  // TODO(SSO): Consider small-checking version
   @_inlineable // FIXME(sil-serialize-all)
   public
-  init<CodeUnit>(_storage: _SwiftStringStorage<CodeUnit>)
+  init<CodeUnit>(_largeStorage storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _guts = _StringGuts(_storage)
+    _guts = _StringGuts(_large: storage)
   }
 }
 
@@ -1128,11 +1138,13 @@ extension Sequence where Element: StringProtocol {
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     let result = _SwiftStringStorage<CodeUnit>.create(capacity: capacity)
 
+    // TODO(TODO: JIRA): check for small
+
     guard let separator = separator else {
       for x in self {
         result._appendInPlace(x)
       }
-      return String(_storage: result)
+      return String(_largeStorage: result)
     }
 
     var iter = makeIterator()
@@ -1143,7 +1155,7 @@ extension Sequence where Element: StringProtocol {
         result._appendInPlace(next)
       }
     }
-    return String(_storage: result)
+    return String(_largeStorage: result)
   }
 }
 
@@ -1186,6 +1198,9 @@ internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
+
+  // TODO (TODO: JIRA): check for small
+
   let guts = str._guts._extractContiguousUTF16()
   defer { _fixLifetime(guts) }
   let utf16 = guts._unmanagedUTF16View
@@ -1209,12 +1224,15 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
       utf16.start, Int32(utf16.count))
   }
   storage.count = correctSize
-  return String(_storage: storage)
+  return String(_largeStorage: storage)
 }
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
+
+  // TODO (TODO: JIRA): check for small
+
   let guts = str._guts._extractContiguousUTF16()
   defer { _fixLifetime(guts) }
   let utf16 = guts._unmanagedUTF16View
@@ -1238,7 +1256,7 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
       utf16.start, Int32(utf16.count))
   }
   storage.count = correctSize
-  return String(_storage: storage)
+  return String(_largeStorage: storage)
 }
 #endif
 

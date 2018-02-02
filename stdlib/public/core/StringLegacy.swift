@@ -55,15 +55,16 @@ extension String {
 
     precondition(count > 0, "Negative count not allowed")
     defer { _fixLifetime(repeatedValue) }
+    // TODO (TODO: JIRA): Small string detection, micro-benchmarking, etc.
     if _slowPath(repeatedValue._guts._isOpaque) {
       let opaque = repeatedValue._guts._asOpaque()
-      self.init(_StringGuts(opaque._repeated(count)))
+      self.init(_StringGuts(_large: opaque._repeated(count)))
     } else if repeatedValue._guts.isASCII {
       let ascii = repeatedValue._guts._unmanagedASCIIView
-      self.init(_StringGuts(ascii._repeated(count)))
+      self.init(_StringGuts(_large: ascii._repeated(count)))
     } else {
       let utf16 = repeatedValue._guts._unmanagedUTF16View
-      self.init(_StringGuts(utf16._repeated(count)))
+      self.init(_StringGuts(_large: utf16._repeated(count)))
     }
   }
 
