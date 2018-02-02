@@ -1,4 +1,4 @@
-//===--- ArgsToFrontendInputsConverter.cpp ----------------------*- C++ -*-===//
+//===--- ArgsToFrontendInputsConverter.cpp --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,6 +13,7 @@
 #include "swift/Frontend/ArgsToFrontendInputsConverter.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -29,8 +30,9 @@ using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args, FrontendInputs &inputs)
-    : Diags(diags), Args(args), Inputs(inputs),
+    DiagnosticEngine &diags, const ArgList &args,
+    FrontendInputsAndOutputs &inputsAndOutputs)
+    : Diags(diags), Args(args), InputsAndOutputs(inputsAndOutputs),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
@@ -45,7 +47,16 @@ bool ArgsToFrontendInputsConverter::convert() {
     return true;
   std::set<StringRef> unusedPrimaryFiles =
       createInputFilesConsumingPrimaries(*primaryFiles);
-  return checkForMissingPrimaryFiles(unusedPrimaryFiles);
+
+  if (checkForMissingPrimaryFiles(unusedPrimaryFiles))
+    return true;
+
+  // Must be set before iterating over inputs needing outputs.
+  InputsAndOutputs.setIsSingleThreadedWMO(isSingleThreadedWMO());
+
+  InputsAndOutputs.setBypassBatchModeChecks(
+      Args.hasArg(options::OPT_bypass_batch_mode_checks));
+  return false;
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -131,7 +142,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
     std::set<StringRef> primaryFiles) {
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    Inputs.addInput(InputFile(file, isPrimary));
+    InputsAndOutputs.addInput(InputFile(file, isPrimary));
     if (isPrimary)
       primaryFiles.erase(file);
   }
@@ -148,4 +159,12 @@ bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
                    FilelistPathArg->getValue());
   }
   return !primaryFiles.empty();
+}
+
+bool ArgsToFrontendInputsConverter::isSingleThreadedWMO() const {
+  Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                       Diags);
+  return InputsAndOutputs.hasInputs() && !InputsAndOutputs.hasPrimaryInputs() &&
+         userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1;
 }
