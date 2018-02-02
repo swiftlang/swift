@@ -547,6 +547,49 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool compileLLVMIR(CompilerInvocation &Invocation,
+                          CompilerInstance &Instance,
+                          UnifiedStatsReporter *Stats) {
+  auto &LLVMContext = getGlobalLLVMContext();
+
+  // Load in bitcode file.
+  assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
+         "We expect a single input for bitcode input!");
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(
+          Invocation.getFrontendOptions()
+              .InputsAndOutputs.getFilenameOfFirstInput());
+  if (!FileBufOrErr) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::error_open_input_file,
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.getFilenameOfFirstInput(),
+        FileBufOrErr.getError().message());
+    return true;
+  }
+  llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
+
+  llvm::SMDiagnostic Err;
+  std::unique_ptr<llvm::Module> Module =
+      llvm::parseIR(MainFile->getMemBufferRef(), Err, LLVMContext);
+  if (!Module) {
+    // TODO: Translate from the diagnostic info to the SourceManager location
+    // if available.
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::error_parse_input_file,
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.getFilenameOfFirstInput(),
+        Err.getMessage());
+    return true;
+  }
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  // TODO: remove once the frontend understands what action it should perform
+  IRGenOpts.OutputKind =
+      getOutputKind(Invocation.getFrontendOptions().RequestedAction);
+
+  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -580,48 +623,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-  bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;
-  if (inputIsLLVMIr) {
-    auto &LLVMContext = getGlobalLLVMContext();
-
-    // Load in bitcode file.
-    assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
-           "We expect a single input for bitcode input!");
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-        llvm::MemoryBuffer::getFileOrSTDIN(
-            Invocation.getFrontendOptions()
-                .InputsAndOutputs.getFilenameOfFirstInput());
-    if (!FileBufOrErr) {
-      Instance.getASTContext().Diags.diagnose(
-          SourceLoc(), diag::error_open_input_file,
-          Invocation.getFrontendOptions()
-              .InputsAndOutputs.getFilenameOfFirstInput(),
-          FileBufOrErr.getError().message());
-      return true;
-    }
-    llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
-
-    llvm::SMDiagnostic Err;
-    std::unique_ptr<llvm::Module> Module = llvm::parseIR(
-                                             MainFile->getMemBufferRef(),
-                                             Err, LLVMContext);
-    if (!Module) {
-      // TODO: Translate from the diagnostic info to the SourceManager location
-      // if available.
-      Instance.getASTContext().Diags.diagnose(
-          SourceLoc(), diag::error_parse_input_file,
-          Invocation.getFrontendOptions()
-              .InputsAndOutputs.getFilenameOfFirstInput(),
-          Err.getMessage());
-      return true;
-    }
-
-    // TODO: remove once the frontend understands what action it should perform
-    IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-    IRGenOpts.OutputKind = getOutputKind(Action);
-
-    return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
-  }
+    if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
+      return compileLLVMIR(Invocation, Instance, Stats);
 
   ReferencedNameTracker nameTracker;
   bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
