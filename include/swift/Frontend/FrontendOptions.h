@@ -14,7 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Frontend/FrontendInputs.h"
+#include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 
@@ -33,37 +33,15 @@ class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
 public:
-  FrontendInputs Inputs;
+  FrontendInputsAndOutputs InputsAndOutputs;
 
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  /// The specified output files. If only a single outputfile is generated,
-  /// the name of the last specified file is taken.
-  std::vector<std::string> OutputFilenames;
+  void forAllOutputPaths(const InputFile &input,
+                         std::function<void(const std::string &)> fn) const;
 
-  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
-
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
-  /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
-  }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
-  }
   bool isOutputFileDirectory() const;
-  bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
-  }
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -315,7 +293,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasSingleInput();
+    return InputKind == InputFileKind::IFK_Swift &&
+           InputsAndOutputs.hasSingleInput();
   }
 
 private:
