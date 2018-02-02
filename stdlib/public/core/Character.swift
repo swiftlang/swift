@@ -225,7 +225,9 @@ extension Character
         | UInt64(utf16[3]) &<< 48
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
-      _representation = .large(_StringGuts(utf16)._extractNativeStorage())
+      // TODO(SSO): small check
+      _representation = .large(
+        _StringGuts(_large: utf16)._extractNativeStorage())
     }
   }
 
@@ -450,7 +452,8 @@ extension String {
       self = String(decoding: utf16, as: Unicode.UTF16.self)
     }
     else {
-      self = String(_StringGuts(c._largeUTF16!))
+      // TODO(SSO): small check
+      self = String(_StringGuts(_large: c._largeUTF16!))
     }
   }
 }
