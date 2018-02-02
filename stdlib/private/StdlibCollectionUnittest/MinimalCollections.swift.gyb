@@ -160,7 +160,7 @@ internal enum _CollectionOperation : Equatable {
     case .reserveCapacity:
       let invalidIndices = newElementsIds.indices
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -180,7 +180,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -189,7 +189,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -200,7 +200,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -209,7 +209,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = index..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -222,7 +222,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -592,7 +592,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
 %     if StrideableIndex:
-  public typealias Indices = CountableRange<${Index}>
+  public typealias Indices = Range<${Index}>
 %     elif Traversal == 'RandomAccess':
   // FIXME: this shouldn't be necessary, should come by default
   public typealias Indices = DefaultIndices<${Self}<T>>
@@ -866,7 +866,7 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Index = ${Index}
 
 %   if StrideableIndex:
-  public typealias Indices = CountableRange<${Index}>
+  public typealias Indices = Range<${Index}>
 %  elif Traversal == 'RandomAccess':
   // FIXME: this shouldn't be necessary, should come by default
   public typealias Indices = DefaultIndices<${Self}<Element>>

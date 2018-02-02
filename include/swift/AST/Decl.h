@@ -1416,7 +1416,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -1682,6 +1682,20 @@ public:
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
   bool isConstrainedExtension() const;
+  
+  /// Determine whether this extension context is interchangeable with the
+  /// original nominal type context.
+  ///
+  /// False if any of the following properties hold:
+  /// - the extension is defined in a different module from the original
+  ///   nominal type decl,
+  /// - the extension is constrained, or
+  /// - the extension is to a protocol.
+  /// FIXME: In a world where protocol extensions are dynamically dispatched,
+  /// "extension is to a protocol" would no longer be a reason to use the
+  /// extension mangling, because an extension method implementation could be
+  /// resiliently moved into the original protocol itself.
+  bool isEquivalentToExtendedContext() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

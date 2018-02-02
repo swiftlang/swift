@@ -41,15 +41,28 @@ ${node.name}Builder::use${child.name}(${child.type_name} ${child.name}) {
 ${node.name}Builder &
 ${node.name}Builder::add${child_elt}(${child_elt_type} ${child_elt}) {
   auto &raw = Layout[cursorIndex(${node.name}::Cursor::${child.name})];
-  raw = raw->append(${child_elt}.getRaw());
+  if (!raw)
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()},
+                          SourcePresence::Present, Arena);
+  else
+    raw = raw->append(${child_elt}.getRaw());
   return *this;
 }
 %       end
 %     end
 ${node.name}
 ${node.name}Builder::build() {
+% if node.children:
+%   for (idx, child) in enumerate(node.children):
+%     if not child.is_optional:
+  if (!Layout[${idx}])
+    Layout[${idx}] = ${make_missing_child(child)};
+%     end
+%   end
+% end
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, 
-    Layout, SourcePresence::Present);
+    Layout, SourcePresence::Present, Arena);
   return make<${node.name}>(raw);
 }
 

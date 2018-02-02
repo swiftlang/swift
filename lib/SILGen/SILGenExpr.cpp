@@ -2773,12 +2773,13 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
   auto *vd = cast<ParamDecl>(dre->getDecl());
   ManagedValue selfValue;
 
+  Scope S(SGF, loc);
+  Optional<FormalEvaluationScope> FES;
   // If we have not exclusively borrowed self, we need to do so now.
   if (SGF.SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
     // We need to use a full scope here to ensure that any underlying
     // "normal cleanup" borrows are cleaned up.
-    Scope S(SGF, loc);
-    selfValue = S.popPreservingValue(SGF.emitRValueAsSingleValue(dre));
+    selfValue = SGF.emitRValueAsSingleValue(dre);
   } else {
     // If we already exclusively borrowed self, then we need to emit self
     // using formal evaluation primitives.
@@ -2788,6 +2789,7 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
     // This needs to be inlined since there is a Formal Evaluation Scope
     // in emitRValueForDecl that causing any borrow for this LValue to be
     // popped too soon.
+    FES.emplace(SGF);
     selfValue =
         SGF.emitLValueForDecl(dre, vd, dre->getType()->getCanonicalType(),
                               AccessKind::Read, dre->getAccessSemantics());
@@ -2796,9 +2798,7 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
                        selfValue.getLValueAddress(), ctx)
                     .getAsSingleValue(SGF, loc);
   }
-  assert(selfValue && !selfValue.hasCleanup());
 
-  // Check if we need to perform a conversion here.
   return SGF.B.createValueMetatype(loc, metaTy, selfValue.getValue());
 }
 
@@ -2814,7 +2814,6 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
                                   SGFContext::AllowImmediatePlusZero).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
   }
-
   SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
   // If the lowered metatype has a thick representation, we need to derive it
   // dynamically from the instance.
@@ -2836,7 +2835,6 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
         .getValue();
   }
-  
   // Otherwise, ignore the base and return the static thin metatype.
   emitIgnoredExpr(baseExpr);
   return B.createMetatype(loc, metaTy);
@@ -5068,8 +5066,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
   // If this is an implicit force of an ImplicitlyUnwrappedOptional,
   // and we're emitting into an unbridging conversion, try adjusting the
   // context.
-  if (loc->isImplicit() &&
-      E->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
+  if (loc->isImplicit() && loc->isForceOfImplicitlyUnwrappedOptional()) {
     if (auto conv = C.getAsConversion()) {
       if (auto adjusted = conv->getConversion().adjustForInitialForceValue()) {
         auto value =

@@ -75,15 +75,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType) {
-  if (!Context.getImplicitlyUnwrappedOptionalDecl()) {
-    diagnose(loc, diag::sugar_type_not_found, 2);
-    return Type();
-  }
-
-  return ImplicitlyUnwrappedOptionalType::get(elementType);
-}
-
 static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
                            PointerTypeKind kind) {
   auto pointerDecl = [&] {
@@ -2352,9 +2343,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   SmallVector<Substitution, 4> genericArgs;
   if (genericSig) {
     TypeSubstitutionMap genericArgMap;
-    ArrayRef<GenericTypeParamType *> params;
 
-    params = genericSig->getGenericParams();
+    auto params = genericSig->getGenericParams();
     if (repr->getGenericArguments().size()
           != genericSig->getSubstitutionListSize()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
@@ -2846,8 +2836,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (!baseTy || baseTy->hasError()) return baseTy;
 
   Type uncheckedOptionalTy;
-  uncheckedOptionalTy =
-      TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
+  uncheckedOptionalTy = TC.getOptionalType(repr->getExclamationLoc(), baseTy);
 
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);

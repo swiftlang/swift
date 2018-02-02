@@ -37,6 +37,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -406,6 +407,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   }
   
   llvm::FoldingSet<SILLayout> SILLayouts;
+
+  syntax::SyntaxArena TheSyntaxArena;
 };
 
 ASTContext::Implementation::Implementation()
@@ -503,6 +506,10 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
+}
+
+syntax::SyntaxArena &ASTContext::getSyntaxArena() const {
+  return Impl.TheSyntaxArena;
 }
 
 LazyResolver *ASTContext::getLazyResolver() const {
@@ -3266,18 +3273,18 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
   BoundGenericType *newType;
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericClassType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz = BoundGenericClassType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericClassType), arena);
     newType = new (mem) BoundGenericClassType(
         theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericStructType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz =BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericStructType), arena);
     newType = new (mem) BoundGenericStructType(
         theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
-    auto mem = C.Allocate(sizeof(BoundGenericEnumType) + sizeof(Type) *
-                          GenericArgs.size(), alignof(Type), arena);
+    auto sz = BoundGenericEnumType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto mem = C.Allocate(sz, alignof(BoundGenericEnumType), arena);
     newType = new (mem) BoundGenericEnumType(
         theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else {
@@ -3418,8 +3425,8 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
     return compTy;
 
   // Use trailing objects for member type storage
-  auto mem = C.Allocate(sizeof(ProtocolCompositionType) + sizeof(Type) *
-                        Members.size(), alignof(Type), arena);
+  auto size = totalSizeToAlloc<Type>(Members.size());
+  auto mem = C.Allocate(size, alignof(ProtocolCompositionType), arena);
   auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
                                                   Members,
                                                   HasExplicitAnyObject,
@@ -3788,7 +3795,8 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
   return result;
 }
 
-ArrayRef<GenericTypeParamType *> GenericFunctionType::getGenericParams() const{
+TypeArrayView<GenericTypeParamType>
+GenericFunctionType::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
@@ -4276,8 +4284,8 @@ CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
-                               ArrayRef<GenericTypeParamType *> genericParams,
-                               ArrayRef<Requirement> requirements) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              ArrayRef<Requirement> requirements) {
   for (auto p : genericParams)
     ID.AddPointer(p);
 
@@ -4291,9 +4299,21 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
   }
 }
 
-GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        bool isKnownCanonical) {
+GenericSignature *
+GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
+                      ArrayRef<Requirement> requirements,
+                      bool isKnownCanonical) {
+  SmallVector<Type, 4> paramTypes;
+  for (auto param : params)
+    paramTypes.push_back(param);
+  auto paramsView = TypeArrayView<GenericTypeParamType>(paramTypes);
+  return get(paramsView, requirements, isKnownCanonical);
+}
+
+GenericSignature *
+GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
+                      ArrayRef<Requirement> requirements,
+                      bool isKnownCanonical) {
   assert(!params.empty());
 
 #ifndef NDEBUG
@@ -4316,7 +4336,7 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   }
 
   // Allocate and construct the new signature.
-  size_t bytes = totalSizeToAlloc<GenericTypeParamType *, Requirement>(
+  size_t bytes = totalSizeToAlloc<Type, Requirement>(
       params.size(), requirements.size());
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
   auto newSig = new (mem) GenericSignature(params, requirements,

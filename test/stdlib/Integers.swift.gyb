@@ -740,6 +740,18 @@ tests.test("Remainder/DividingBy0") {
   _ = f(42, 0)
 }
 
+tests.test("RemainderReportingOverflow/DividingByMinusOne") {
+  // Work around SR-5964.
+  func minusOne<T : SignedInteger>() -> T {
+    return -1 as T
+  }
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x.remainderReportingOverflow(dividingBy: y).partialValue
+  }
+  expectEqual(f(.max, minusOne()), 0)
+  expectEqual(f(.min, minusOne()), 0)
+}
+
 tests.test("Division/By0") {
   func f(_ x: Int, _ y: Int) -> Int {
     return x / y

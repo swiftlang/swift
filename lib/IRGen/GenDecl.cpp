@@ -64,6 +64,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "ProtocolInfo.h"
 #include "Signature.h"
 #include "StructLayout.h"
 
@@ -722,6 +723,102 @@ void IRGenModule::emitRuntimeRegistration() {
   RegIGF.Builder.CreateRetVoid();
 }
 
+/// Return the address of the context descriptor representing the given
+/// decl context.
+///
+/// For a nominal type context, this returns the address of the nominal type
+/// descriptor.
+/// For an extension context, this returns the address of the extension
+/// context descriptor.
+/// For a module or file unit context, this returns the address of the module
+/// context descriptor.
+/// For any other kind of context, this returns an anonymous context descriptor
+/// for the context.
+ConstantReference
+IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
+  // Some types get special treatment.
+  if (auto Type = dyn_cast<NominalTypeDecl>(from)) {
+    // Use a special module context if we have one.
+    if (auto context = Mangle::ASTMangler::getSpecialManglingContext(Type)) {
+      switch (*context) {
+      case Mangle::ASTMangler::ObjCContext:
+        return {getAddrOfObjCModuleContextDescriptor(),
+                ConstantReference::Direct};
+      case Mangle::ASTMangler::ClangImporterContext:
+        return {getAddrOfClangImporterModuleContextDescriptor(),
+                ConstantReference::Direct};
+      }
+    }
+
+    // Wrap up private types in an anonymous context for the containing file
+    // unit so that the runtime knows they have unstable identity.
+    if (Type->isOutermostPrivateOrFilePrivateScope())
+      return {getAddrOfAnonymousContextDescriptor(Type),
+              ConstantReference::Direct};
+  }
+  
+  auto parent = from->getParent();
+  
+  switch (parent->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return {getAddrOfAnonymousContextDescriptor(from),
+            ConstantReference::Direct};
+
+  case DeclContextKind::GenericTypeDecl:
+    if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
+      return {getAddrOfTypeContextDescriptor(nomTy),
+              ConstantReference::Direct};
+    }
+    return {getAddrOfAnonymousContextDescriptor(from),
+            ConstantReference::Direct};
+
+  case DeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(parent);
+    // If the extension is equivalent to its extended context (that is, it's
+    // in the same module as the original non-protocol type and
+    // has no constraints), then we can use the original nominal type context
+    // (assuming there is one).
+    if (ext->isEquivalentToExtendedContext()) {
+      auto nominal = ext->getExtendedType()->getAnyNominal();
+      // If the extended type is an ObjC class, it won't have a nominal type
+      // descriptor, so we'll just emit an extension context.
+      auto clas = dyn_cast<ClassDecl>(nominal);
+      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+        // Some targets don't support relative references to undefined symbols.
+        // If the extension is in a different file from the original type
+        // declaration, it may not get emitted in this TU. Use an indirect
+        // reference to work around the object format limitation.
+        auto shouldBeIndirect =
+            parent->getModuleScopeContext() != from->getModuleScopeContext()
+          ? ConstantReference::Indirect
+          : ConstantReference::Direct;
+        
+        return getAddrOfLLVMVariableOrGOTEquivalent(
+                                LinkEntity::forNominalTypeDescriptor(nominal),
+                                Alignment(4),
+                                NominalTypeDescriptorTy,
+                                shouldBeIndirect);
+      }
+    }
+    return {getAddrOfExtensionContextDescriptor(ext),
+            ConstantReference::Direct};
+  }
+      
+  case DeclContextKind::FileUnit:
+    parent = parent->getParentModule();
+    LLVM_FALLTHROUGH;
+      
+  case DeclContextKind::Module:
+    return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
+            ConstantReference::Direct};
+  }
+}
+
 /// Add the given global value to @llvm.used.
 ///
 /// This value must have a definition by the time the module is finalized.
@@ -743,45 +840,90 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
     ObjCNonLazyClasses.push_back(classPtr);
 }
 
-static bool
-hasExplicitProtocolConformance(NominalTypeDecl *decl) {
-  auto conformances = decl->getAllConformances();
-  for (auto conformance : conformances) {
-    // inherited protocols do not emit explicit conformance records
-    // TODO any special handling required for Specialized conformances?
-    if (conformance->getKind() == ProtocolConformanceKind::Inherited)
-      continue;
-
-    // Ignore conformances synthesized by the Clang importer.
-    if (isa<ClangModuleUnit>(
-                conformance->getDeclContext()->getModuleScopeContext()))
-      continue;
-
-    auto P = conformance->getProtocol();
-
-    // @objc protocols do not have conformance records
-    if (P->isObjC())
-      continue;
-
-    return true;
-  }
-
-  return false;
-}
-
 void IRGenModule::addRuntimeResolvableType(CanType type) {
-  // Don't emit type metadata records for types that can be found in the protocol
-  // conformance table as the runtime will search both tables when resolving a
-  // type by name.
+  // Collect the nominal type records we emit into a special section.
   if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
-    if (!hasExplicitProtocolConformance(Nominal))
-      RuntimeResolvableTypes.push_back(type);
+    RuntimeResolvableTypes.push_back(type);
 
     // As soon as the type metadata is available, all the type's conformances
     // must be available, too. The reason is that a type (with the help of its
     // metadata) can be checked at runtime if it conforms to a protocol.
     addLazyConformances(Nominal);
   }
+}
+
+ConstantReference
+IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
+  if (proto->isObjC()) {
+    // ObjC protocol descriptors don't have a unique address, but get uniqued
+    // by the Objective-C runtime at load time.
+    // Get the indirected address of the protocol descriptor reference variable
+    // that the ObjC runtime uniques.
+    auto refVar = getAddrOfObjCProtocolRef(proto, NotForDefinition);
+    return ConstantReference(refVar, ConstantReference::Indirect);
+  }
+  
+  // Try to form a direct reference to the nominal type descriptor if it's in
+  // the same binary, or use the GOT entry if it's from another binary.
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+                                     LinkEntity::forProtocolDescriptor(proto),
+                                     getPointerAlignment(),
+                                     ProtocolDescriptorStructTy);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
+                                                   GenericSignature *sig,
+                                                   CanDependentMemberType dmt) {
+  llvm::SmallVector<AssociatedTypeDecl *, 4> assocTypePath;
+
+  // Get the base ordinal.
+  auto baseDMT = dmt;
+  CanType base;
+  do {
+    base = baseDMT.getBase();
+    assocTypePath.push_back(baseDMT->getAssocType());
+    baseDMT = dyn_cast<DependentMemberType>(base);
+  } while (baseDMT);
+  auto ordinal = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(base));
+  
+  // Generate a symbol name for the descriptor. This is a private symbol, so
+  // isn't ABI, but is useful for ODR coalescing within the same binary.
+  IRGenMangler Mangler;
+  auto symbolName = Mangler
+    .mangleAssociatedTypeGenericParamRef(ordinal, dmt);
+  
+  // Use an existing definition if we have one.
+  if (auto existingVar = Module.getGlobalVariable(symbolName))
+    return existingVar;
+  
+  // Otherwise, build the reference path.
+  ConstantInitBuilder builder(*this);
+  auto B = builder.beginStruct();
+  B.addInt32(ordinal << 1);
+
+  for (auto *assocType : reversed(assocTypePath)) {
+    auto proto = getConstantReferenceForProtocolDescriptor(
+                                                      assocType->getProtocol());
+    B.addRelativeAddress(proto);
+    
+    // Find the offset of the associated type entry in witness tables of this
+    // protocol.
+    auto &protoInfo = getProtocolInfo(assocType->getProtocol());
+    auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
+      .getValue();
+    
+    B.addInt32(index);
+  }
+  
+  // Null terminator.
+  B.addInt32(0);
+  
+  auto var = B.finishAndCreateGlobal(symbolName, Alignment(4),
+                                     /*constant*/ true);
+  var->setLinkage(llvm::GlobalValue::LinkOnceODRLinkage);
+  var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  setTrueConstGlobal(var);
+  return var;
 }
 
 void IRGenModule::addLazyConformances(NominalTypeDecl *Nominal) {
@@ -1367,6 +1509,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
+      
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+    return SILLinkage::Shared;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1420,6 +1567,11 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+    return false;
+
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -2191,8 +2343,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
 /// relative references to the GOT entry for the variable in the object file.
 ConstantReference
 IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-                                                  Alignment alignment,
-                                                  llvm::Type *defaultType) {
+                              Alignment alignment,
+                              llvm::Type *defaultType,
+                              ConstantReference::Directness forceIndirectness) {
   // Ensure the variable is at least forward-declared.
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
@@ -2218,16 +2371,21 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     return false;
   };
 
-  // If the variable isn't public, or has already been defined in this TU,
+  // If the variable has already been defined in this TU,
   // then it definitely doesn't need a GOT entry, and we can
   // relative-reference it directly.
   //
-  // TODO: Internal symbols from other TUs we know are destined to be linked
-  // into the same image as us could use direct
-  // relative references too, to avoid producing unnecessary GOT entries in
-  // the final image.
+  // TODO: If we know the target entry is going to be linked into the same
+  // binary, then we ought to be able to directly relative-reference the
+  // symbol. However, some platforms don't have the necessary relocations to
+  // represent a relative reference to an undefined symbol, so conservatively
+  // produce an indirect reference in this case. Also, some JIT modes
+  // incrementally add new definitions that refer back to existing ones
+  // relatively, so always use indirect references in this situation.
   auto entry = GlobalVars[entity];
-  if (!entity.isAvailableExternally(*this) || isDefinition(entry)) {
+  if (forceIndirectness == ConstantReference::Direct &&
+      !IRGen.Opts.UseJIT &&
+      (!entity.isAvailableExternally(*this) || isDefinition(entry))) {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its
     // aliasee to work around that.
@@ -2486,9 +2644,8 @@ namespace {
     void addFlags() {
       // Miscellaneous flags.
       Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
-      Flags = Flags.withIsSynthesizedNonUnique(
-                isa<ClangModuleUnit>(
-                      Conformance->getDeclContext()->getModuleScopeContext()));
+      Flags =
+        Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
 
       // Add the flags.
       B.addInt32(Flags.getIntValue());
@@ -2537,8 +2694,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
     auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
     auto descriptor =
-      getAddrOfLLVMVariableOrGOTEquivalent(entity, getPointerAlignment(),
-                                           ProtocolConformanceDescriptorTy);
+      getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                            ProtocolConformanceDescriptorTy, DebugTypeInfo());
     descriptorArray.addRelativeAddress(descriptor);
   }
 
@@ -2569,8 +2726,10 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
   var->setSection(sectionName);
   addUsedGlobal(var);
+  
   return var;
 }
+
 
 /// Emit type metadata for types that might not have explicit protocol conformances.
 llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
@@ -2637,6 +2796,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   var->setSection(sectionName);
   var->setAlignment(4);
   addUsedGlobal(var);
+  
   return var;
 }
 
@@ -3022,13 +3182,13 @@ IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
 
 /// Return the address of a nominal type descriptor.  Right now, this
 /// must always be for purposes of defining it.
-llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
-                                                ConstantInitFuture definition) {
-  assert(definition && "not defining nominal type descriptor?");
+llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
+                                                      ConstantInit definition) {
+  IRGen.addLazyTypeMetadata(D);
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(),
+  return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
-                               definition.getType(),
+                               NominalTypeDescriptorTy,
                                DebugTypeInfo());
 }
 

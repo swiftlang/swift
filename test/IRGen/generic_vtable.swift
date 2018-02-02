@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %utils/chex.py < %s > %t/generic_vtable.swift
+// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK
 
 // REQUIRES: CPU=x86_64
 
@@ -21,18 +23,14 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Base' does not have any method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 0,
+// -- flags: has vtable, is class, is unique
+// CHECK-SAME: <i32 0x8000_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 10,
 // -- vtable size
 // CHECK-SAME: i32 3
 // -- no method descriptors -- class is fully concrete
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Base' has a static vtable.
 
@@ -50,12 +48,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Derived' has method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 1,
+// -- flags: has vtable, is class, is unique, is generic
+// CHECK-SAME: <i32 0x8000_00D0>,
 // -- vtable offset
 // CHECK-SAME: i32 14,
 // -- vtable size
@@ -63,7 +57,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for m3()
 // CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m3yyF"
 // --
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
@@ -80,12 +74,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Concrete' has method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(protected )?}}constant
-// -- nesting depth
-// CHECK-SAME: i16 1,
-// -- flags: has vtable
-// CHECK-SAME: i16 4,
-// -- generic parameters at depth 0
-// CHECK-SAME: i32 0,
+// -- flags: has vtable, is class, is unique
+// CHECK-SAME: <i32 0x8000_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 15,
 // -- vtable size
@@ -93,7 +83,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for m4()
 // CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
 // --
-// CHECK-SAME: section "{{.*}}", align 8
+// CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
 //// filled in at initialization time.

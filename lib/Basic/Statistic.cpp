@@ -260,19 +260,23 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
 
 UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
     StringRef EventName,
-    TraceEntity Entity,
+    const void *Entity,
+    const TraceFormatter *Formatter,
     UnifiedStatsReporter *Reporter)
   : Reporter(Reporter),
     SavedTime(llvm::TimeRecord::getCurrentTime()),
     EventName(EventName),
-    Entity(Entity)
+    Entity(Entity),
+    Formatter(Formatter)
 {
   if (Reporter)
     Reporter->saveAnyFrontendStatsEvents(*this, true);
 }
 
 UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer()
-  : Reporter(nullptr)
+  : Reporter(nullptr),
+    Entity(nullptr),
+    Formatter(nullptr)
 {
 }
 
@@ -284,6 +288,7 @@ UnifiedStatsReporter::FrontendStatsTracer::operator=(
   SavedTime = other.SavedTime;
   EventName = other.EventName;
   Entity = other.Entity;
+  Formatter = other.Formatter;
   other.Reporter = nullptr;
   return *this;
 }
@@ -293,7 +298,8 @@ UnifiedStatsReporter::FrontendStatsTracer::FrontendStatsTracer(
   : Reporter(other.Reporter),
     SavedTime(other.SavedTime),
     EventName(other.EventName),
-    Entity(other.Entity)
+    Entity(other.Entity),
+    Formatter(other.Formatter)
 {
   other.Reporter = nullptr;
 }
@@ -302,47 +308,6 @@ UnifiedStatsReporter::FrontendStatsTracer::~FrontendStatsTracer()
 {
   if (Reporter)
     Reporter->saveAnyFrontendStatsEvents(*this, false);
-}
-
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const Decl *D)
-{
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, D, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
-}
-
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const Expr *E) {
-  if (LastTracedFrontendCounters)
-    return FrontendStatsTracer(EventName, E, this);
-  else
-    return FrontendStatsTracer();
-}
-
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const clang::Decl *D)
-{
-  if (LastTracedFrontendCounters)
-    return FrontendStatsTracer(EventName, D, this);
-  else
-    return FrontendStatsTracer();
-}
-
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const SILFunction *F)
-{
-  if (LastTracedFrontendCounters)
-    return FrontendStatsTracer(EventName, F, this);
-  else
-    return FrontendStatsTracer();
 }
 
 void
@@ -366,7 +331,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
       LastTracedFrontendCounters->NAME = C.NAME;              \
       FrontendStatsEvents.emplace_back(FrontendStatsEvent {   \
           NowUS, LiveUS, IsEntry, T.EventName, name,          \
-            delta, total, T.Entity});                         \
+            delta, total, T.Entity, T.Formatter});            \
     }                                                         \
   } while (0);
 #include "swift/Basic/Statistics.def"
@@ -382,56 +347,7 @@ UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
       dummyInstanceVariableToGetConstructorToParse(0) {
 }
 
-static inline void
-printTraceEntityName(raw_ostream &OS,
-                     UnifiedStatsReporter::TraceEntity E) {
-  if (auto const *CD = E.dyn_cast<const clang::Decl*>()) {
-    if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
-      ND->printName(OS);
-    }
-  } else if (auto const *D = E.dyn_cast<const Decl*>()) {
-    if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
-      VD->getFullName().print(OS, false);
-    }
-  } else if (auto const *X = E.dyn_cast<const Expr*>()) {
-    // Exprs don't have names
-  } else if (auto const *F = E.dyn_cast<const SILFunction*>()) {
-    OS << F->getName();
-  }
-}
-
-static inline void
-printClangShortLoc(raw_ostream &OS,
-                   clang::SourceManager *CSM,
-                   clang::SourceLocation L) {
-  if (!L.isValid() || !L.isFileID())
-    return;
-  auto PLoc = CSM->getPresumedLoc(L);
-  OS << llvm::sys::path::filename(PLoc.getFilename())
-     << ':' << PLoc.getLine()
-     << ':' << PLoc.getColumn();
-}
-
-static inline void
-printTraceEntityLoc(raw_ostream &OS,
-                    SourceManager *SM,
-                    clang::SourceManager *CSM,
-                    UnifiedStatsReporter::TraceEntity E) {
-  if (auto const *CD = E.dyn_cast<const clang::Decl*>()) {
-    if (CSM) {
-      auto Range = CD->getSourceRange();
-      printClangShortLoc(OS, CSM, Range.getBegin());
-      OS << '-';
-      printClangShortLoc(OS, CSM, Range.getEnd());
-    }
-  } else if (auto const *D = E.dyn_cast<const Decl*>()) {
-    D->getSourceRange().print(OS, *SM, false);
-  } else if (auto const *X = E.dyn_cast<const Expr*>()) {
-    X->getSourceRange().print(OS, *SM, false);
-  } else if (auto const *F = E.dyn_cast<const SILFunction*>()) {
-    F->getLocation().getSourceRange().print(OS, *SM, false);
-  }
-}
+UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
@@ -519,10 +435,12 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
               << E.CounterDelta << ','
               << E.CounterValue << ',';
       tstream << '"';
-      printTraceEntityName(tstream, E.Entity);
+      if (E.Formatter)
+        E.Formatter->traceName(E.Entity, tstream);
       tstream << '"' << ',';
       tstream << '"';
-      printTraceEntityLoc(tstream, SourceMgr, ClangSourceMgr, E.Entity);
+      if (E.Formatter)
+        E.Formatter->traceLoc(E.Entity, SourceMgr, ClangSourceMgr, tstream);
       tstream << '"' << '\n';
     }
   }

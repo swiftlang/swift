@@ -549,7 +549,9 @@ static void reportRelated(ASTContext &Ctx,
     // Otherwise, report the inheritance of the type alias itself.
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
-    passInherits(TD->getInherited(), Consumer);
+    llvm::SmallVector<TypeLoc, 4> AllInherits;
+    getInheritedForPrinting(TD, [](const Decl* d) { return true; }, AllInherits);
+    passInherits(AllInherits, Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
   } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -771,13 +773,13 @@ private:
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
-  Invocation.getFrontendOptions().Inputs.clearInputs();
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
-  Invocation.getFrontendOptions().Inputs.addInput(
+  Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
   if (CI.setup(Invocation))
     return true;
@@ -1092,7 +1094,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
 
   EditorDiagConsumer DiagConsumer;
   CI.addDiagnosticConsumer(&DiagConsumer);
-  Invocation.getFrontendOptions().Inputs.addInput(
+  Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
   if (CI.setup(Invocation))
     return true;
@@ -1365,7 +1367,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     return nullptr;
   }
   Invocation.setInputKind(InputFileKind::IFK_Swift);
-  Invocation.getFrontendOptions().Inputs.addInput(
+  Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 
   if (ParseCI.setup(Invocation)) {
@@ -1441,7 +1443,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
                                     StringRef Error)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  Invocation.getFrontendOptions().Inputs.clearInputs();
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
 
   CompilerInstance CI;
   // Display diagnostics to stderr.

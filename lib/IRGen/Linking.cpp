@@ -109,6 +109,15 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::NominalTypeDescriptor:
       return mangler.mangleNominalTypeDescriptor(
                                           cast<NominalTypeDecl>(getDecl()));
+      
+    case Kind::ModuleDescriptor:
+      return mangler.mangleModuleDescriptor(cast<ModuleDecl>(getDecl()));
+  
+    case Kind::ExtensionDescriptor:
+      return mangler.mangleExtensionDescriptor(getExtension());
+    
+    case Kind::AnonymousDescriptor:
+      return mangler.mangleAnonymousDescriptor(getDeclContext());
 
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));

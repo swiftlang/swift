@@ -67,8 +67,12 @@ swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
                              uintptr_t *outIsaMask) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto isaMask = Context->readIsaMask();
-  *outIsaMask = isaMask.second;
-  return isaMask.first;
+  if (isaMask) {
+    *outIsaMask = *isaMask;
+    return true;
+  }
+  *outIsaMask = 0;
+  return false;
 }
 
 swift_typeref_t
@@ -84,9 +88,9 @@ swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress.first)
+  if (!MetadataAddress)
     return 0;
-  auto TR = Context->readTypeFromMetadata(MetadataAddress.second);
+  auto TR = Context->readTypeFromMetadata(*MetadataAddress);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 

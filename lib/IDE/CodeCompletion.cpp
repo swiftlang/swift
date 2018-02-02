@@ -1944,9 +1944,6 @@ public:
       suffix = "!";
     }
 
-    // FIXME: This goes away when IUOs are removed from the type system.
-    assert(T->getReferenceStorageReferent()->getImplicitlyUnwrappedOptionalObjectType());
-
     Type ObjectType =
         T->getReferenceStorageReferent()->getAnyOptionalObjectType();
 
@@ -2644,9 +2641,15 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
-      addTypeAnnotation(Builder,
-                        Result.hasValue() ? Result.getValue() :
-                                            ConstructorType->getResult());
+      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        addTypeAnnotationForImplicitlyUnwrappedOptional(
+            Builder, Result.hasValue() ? Result.getValue()
+                                       : ConstructorType->getResult());
+      } else {
+        addTypeAnnotation(Builder, Result.hasValue()
+                                       ? Result.getValue()
+                                       : ConstructorType->getResult());
+      }
     };
 
     if (ConstructorType && hasInterestingDefaultValues(CD))
@@ -3182,6 +3185,8 @@ public:
         }
       }
     } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
+      // FIXME: This can go away when IUOs have been removed from the type
+      // system.
       lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                TypeResolver.get(),
                                IncludeInstanceMembers);

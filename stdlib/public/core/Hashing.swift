@@ -199,7 +199,7 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 /// specific hashing logic can be refined without requiring major changes to the
 /// code that creates the synthesized AST nodes.
 ///
-/// [ref]: http://goanna.cs.rmit.edu.au/~jz/fulltext/jasist-tch.pdf
+/// [ref]: https://pdfs.semanticscholar.org/03bf/7be88e88ba047c6ab28036d0f28510299226.pdf
 @_transparent
 public // @testable
 func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {

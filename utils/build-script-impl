@@ -345,17 +345,6 @@ function is_swift_lto_enabled() {
     fi
 }
 
-# Enable module-builds of llvm only when asan is disabled.
-# FIXME: rdar://problem/28356072
-function is_llvm_module_build_enabled() {
-    if [[ "$(true_false ${LLVM_ENABLE_MODULES})" == "TRUE" ]] &&
-       [[ "$(true_false ${ENABLE_ASAN})" == "FALSE" ]]; then
-        echo "TRUE"
-    else
-        echo "FALSE"
-    fi
-}
-
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -411,7 +400,6 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_SDK=
     SWIFT_HOST_VARIANT_ARCH=
     SWIFT_HOST_TRIPLE=
-    USE_GOLD_LINKER=
     local host="$1"
 
     # Hosts which can be cross-compiled must specify:
@@ -422,7 +410,6 @@ function set_build_options_for_host() {
             SWIFT_HOST_VARIANT="freebsd"
             SWIFT_HOST_VARIANT_SDK="FREEBSD"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
-            USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
             SWIFT_HOST_VARIANT="cygwin"
@@ -437,7 +424,6 @@ function set_build_options_for_host() {
         linux-*)
             SWIFT_HOST_VARIANT="linux"
             SWIFT_HOST_VARIANT_SDK="LINUX"
-            USE_GOLD_LINKER=1
             case ${host} in
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
@@ -650,7 +636,7 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
-                -DLLVM_ENABLE_MODULES:BOOL="$(is_llvm_module_build_enabled)"
+                -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
@@ -1922,22 +1908,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
         cmake_options=("${common_cmake_options_host[@]}")
 
-        # Add in gold linker support if requested.
-        if [[ "${USE_GOLD_LINKER}" ]]; then
-            echo "${product}: using gold linker"
-            if [[ "${product}" != "swift" ]]; then
-                # All other projects override the linker flags to add in
-                # gold linker support.
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    -DCMAKE_EXE_LINKER_FLAGS:STRING="-fuse-ld=gold"
-                    -DCMAKE_SHARED_LINKER_FLAGS:STRING="-fuse-ld=gold"
-                )
-            fi
-        else
-            echo "${product}: using standard linker"
-        fi
-
         llvm_build_dir=$(build_directory ${host} llvm)
         module_cache="${build_dir}/module-cache"
 
@@ -2035,17 +2005,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
             swift)
 
-                if [[ "${USE_GOLD_LINKER}" ]]; then
-                    # Swift will selectively use the gold linker on all
-                    # parts except building the standard library.  We
-                    # let the Swift cmake setup figure out how to apply
-                    # that.
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_ENABLE_GOLD_LINKER=TRUE
-                    )
-                fi
-
                 if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2118,6 +2077,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [ "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}" == "" ] ; then
+                    SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS="${SWIFT_STDLIB_ENABLE_ASSERTIONS}"
+                fi
+                        
+
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
@@ -2131,6 +2095,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
                     -DSWIFT_STDLIB_USE_NONATOMIC_RC:BOOL=$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")
+                    -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -2372,6 +2337,7 @@ for host in "${ALL_HOSTS[@]}"; do
                                 -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                                 -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                                 -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+				-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                                 -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                                 -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                                 -DLLDB_ALLOW_STATIC_BINDINGS=1
@@ -2443,10 +2409,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS="-DLIBDISPATCH_SOURCE_DIR=${LIBDISPATCH_SOURCE_DIR} -DLIBDISPATCH_BUILD_DIR=${LIBDISPATCH_BUILD_DIR}"
-                fi
-
-                if [[ "${USE_GOLD_LINKER}" ]]; then
-                    SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
 
                 # FIXME CROSSCOMPILING:
@@ -2821,8 +2783,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Handle test subdirectory clause
                 if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
+                    LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
+                    LLDB_TEST_CATEGORIES=""
                 fi
 
                 # figure out which C/C++ compiler we should use for building test inferiors.
@@ -2837,14 +2801,22 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
                 fi
 
+                # If we need to use the system debugserver, do so explicitly.
+                if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
+                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver"
+                else
+                    LLDB_TEST_DEBUG_SERVER=""
+                fi
+
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
                            SWIFTLIBS="${swift_build_dir}/lib/swift" \
                            "${LLDB_SOURCE_DIR}"/test/dotest.py \
                            --executable "${lldb_executable}" \
-                           --rerun-all-issues \
+                           ${LLDB_TEST_DEBUG_SERVER} \
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
+                           ${LLDB_TEST_CATEGORIES} \
                            ${LLDB_DOTEST_CC_OPTS} \
                            ${LLDB_FORMATTER_OPTS}
                 continue

@@ -675,8 +675,18 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     verify(SF);
 
     // Verify imported modules.
+    //
+    // Skip per-file verification in whole-module mode. Verifying imports
+    // between files could cause the importer to cache declarations without
+    // adding them to the ASTContext. This happens when the importer registers a
+    // declaration without a valid TypeChecker instance, as is the case during
+    // verification. A subsequent file may require that declaration to be fully
+    // imported (e.g. to synthesized a function body), but since it has already
+    // been cached, it will never be added to the ASTContext. The solution is to
+    // skip verification and avoid caching it.
 #ifndef NDEBUG
-    if (SF.Kind != SourceFileKind::REPL &&
+    if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking) &&
+        SF.Kind != SourceFileKind::REPL &&
         SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
@@ -692,6 +702,21 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   Ctx.diagnoseObjCMethodConflicts(SF);
   Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+
+  // In whole-module mode, import verification is deferred until all files have
+  // been type checked. This avoids caching imported declarations when a valid
+  // type checker is not present. The same declaration may need to be fully
+  // imported by subsequent files.
+  //
+  // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
+  // verification enabled.
+#if 0
+  if (SF.Kind != SourceFileKind::REPL &&
+      SF.Kind != SourceFileKind::SIL &&
+      !Ctx.LangOpts.DebuggerSupport) {
+    Ctx.verifyAllLoadedModules();
+  }
+#endif
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,

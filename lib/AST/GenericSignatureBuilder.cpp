@@ -114,7 +114,7 @@ struct GenericSignatureBuilder::Implementation {
 
   /// The generic parameters that this generic signature builder is working
   /// with.
-  SmallVector<GenericTypeParamType *, 4> GenericParams;
+  SmallVector<Type, 4> GenericParams;
 
   /// The potential archetypes for the generic parameters in \c GenericParams.
   SmallVector<PotentialArchetype *, 4> PotentialArchetypes;
@@ -385,7 +385,7 @@ namespace llvm {
 namespace {
   /// Retrieve the type described by the given unresolved tyoe.
   Type getUnresolvedType(GSBUnresolvedType type,
-                         ArrayRef<GenericTypeParamType *> genericParams) {
+                         TypeArrayView<GenericTypeParamType> genericParams) {
     if (auto concrete = type.dyn_cast<Type>())
       return concrete;
 
@@ -1651,7 +1651,7 @@ bool EquivalenceClass::recordSameTypeConstraint(
 
 template<typename T>
 Type Constraint<T>::getSubjectDependentType(
-                        ArrayRef<GenericTypeParamType *> genericParams) const {
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
   if (auto type = subject.dyn_cast<Type>())
     return type;
 
@@ -1932,7 +1932,7 @@ static bool pathContainsEquivalenceClass(GenericSignatureBuilder &builder,
 
 Type EquivalenceClass::getAnchor(
                             GenericSignatureBuilder &builder,
-                            ArrayRef<GenericTypeParamType *> genericParams) {
+                            TypeArrayView<GenericTypeParamType> genericParams) {
   // Check whether the cache is valid.
   if (archetypeAnchorCache.anchor &&
       archetypeAnchorCache.numMembers == members.size()) {
@@ -2021,8 +2021,7 @@ Type EquivalenceClass::getAnchor(
 
 Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
                                         GenericEnvironment *genericEnv) {
-  ArrayRef<GenericTypeParamType *> genericParams =
-    genericEnv->getGenericParams();
+  auto genericParams = genericEnv->getGenericParams();
 
   // The anchor descr
   Type anchor = getAnchor(builder, genericParams);
@@ -2750,7 +2749,7 @@ void ArchetypeType::resolveNestedType(
 }
 
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
-                        ArrayRef<GenericTypeParamType *> genericParams) const {
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
   if (auto parent = getParent()) {
     Type parentType = parent->getDependentType(genericParams);
     if (parentType->hasError())
@@ -3003,7 +3002,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
-                                                           Impl->GenericParams);
+                                                            getGenericParams());
     if (index < Impl->GenericParams.size()) {
       return ResolvedType(Impl->PotentialArchetypes[index]);
     }
@@ -3139,9 +3138,9 @@ bool GenericSignatureBuilder::areInSameEquivalenceClass(Type type1,
     == resolveEquivalenceClass(type2, ArchetypeResolutionKind::WellFormed);
 }
 
-ArrayRef<GenericTypeParamType *>
+TypeArrayView<GenericTypeParamType>
 GenericSignatureBuilder::getGenericParams() const {
-  return Impl->GenericParams;
+  return TypeArrayView<GenericTypeParamType>(Impl->GenericParams);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
@@ -3152,7 +3151,7 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericP
 bool GenericSignatureBuilder::addGenericParameterRequirements(
                                            GenericTypeParamDecl *GenericParam) {
   GenericParamKey Key(GenericParam);
-  auto PA = Impl->PotentialArchetypes[Key.findIndexIn(Impl->GenericParams)];
+  auto PA = Impl->PotentialArchetypes[Key.findIndexIn(getGenericParams())];
   
   // Add the requirements from the declaration.
   return isErrorResult(
@@ -3162,10 +3161,11 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   GenericParamKey Key(GenericParam);
-  assert(Impl->GenericParams.empty() ||
-         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
-           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
-          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
+  auto params = getGenericParams();
+  assert(params.empty() ||
+         ((Key.Depth == params.back()->getDepth() &&
+           Key.Index == params.back()->getIndex() + 1) ||
+          (Key.Depth > params.back()->getDepth() &&
            Key.Index == 0)));
 
   // Create a potential archetype for this type parameter.
@@ -4600,8 +4600,8 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
 
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
-                           ArrayRef<GenericTypeParamType *> genericParams,
-                           bool allowConcreteGenericParams) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              bool allowConcreteGenericParams) {
   // Process any delayed requirements that we can handle now.
   processDelayedRequirements();
 
@@ -4755,7 +4755,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     SmallPtrSet<PotentialArchetype *, 4> visited;
     
     unsigned depth = 0;
-    for (const auto &gp : Impl->GenericParams)
+    for (const auto gp : getGenericParams())
       depth = std::max(depth, gp->getDepth());
 
     for (const auto pa : Impl->PotentialArchetypes) {
@@ -4915,7 +4915,7 @@ void GenericSignatureBuilder::processDelayedRequirements() {
 
 template<typename T>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
-                           ArrayRef<GenericTypeParamType *> genericParams,
+                           TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
@@ -5021,7 +5021,7 @@ namespace {
 
 template<typename T, typename DiagT>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
-                           ArrayRef<GenericTypeParamType *> genericParams,
+                           TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
@@ -5187,7 +5187,7 @@ static bool isRedundantlyInheritableObjCProtocol(
 }
 
 void GenericSignatureBuilder::checkConformanceConstraints(
-                          ArrayRef<GenericTypeParamType *> genericParams,
+                          TypeArrayView<GenericTypeParamType> genericParams,
                           EquivalenceClass *equivClass) {
   for (auto &entry : equivClass->conformsTo) {
     // Remove self-derived constraints.
@@ -5715,7 +5715,7 @@ static void collapseSameTypeComponents(
 }
 
 void GenericSignatureBuilder::checkSameTypeConstraints(
-                          ArrayRef<GenericTypeParamType *> genericParams,
+                          TypeArrayView<GenericTypeParamType> genericParams,
                           EquivalenceClass *equivClass) {
   if (!equivClass->derivedSameTypeComponents.empty())
     return;
@@ -5918,8 +5918,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 }
 
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
-                                 ArrayRef<GenericTypeParamType *> genericParams,
-                                 EquivalenceClass *equivClass) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              EquivalenceClass *equivClass) {
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints,
     [&](const ConcreteConstraint &constraint) {
@@ -5951,8 +5951,8 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
-                                 ArrayRef<GenericTypeParamType *> genericParams,
-                                 EquivalenceClass *equivClass) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              EquivalenceClass *equivClass) {
   assert(equivClass->superclass && "No superclass constraint?");
 
   // FIXME: We should be substituting in the canonical type in context so
@@ -6038,8 +6038,8 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 }
 
 void GenericSignatureBuilder::checkLayoutConstraints(
-                                ArrayRef<GenericTypeParamType *> genericParams,
-                                EquivalenceClass *equivClass) {
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              EquivalenceClass *equivClass) {
   if (!equivClass->layout) return;
 
   checkConstraintList<LayoutConstraint>(
@@ -6096,7 +6096,7 @@ static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
 }
 
 void GenericSignatureBuilder::enumerateRequirements(
-                   ArrayRef<GenericTypeParamType *> genericParams,
+                   TypeArrayView<GenericTypeParamType> genericParams,
                    llvm::function_ref<
                      void (RequirementKind kind,
                            Type type,
@@ -6300,7 +6300,7 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
 /// Collect the set of requirements placed on the given generic parameters and
 /// their associated types.
 static void collectRequirements(GenericSignatureBuilder &builder,
-                                ArrayRef<GenericTypeParamType *> params,
+                                TypeArrayView<GenericTypeParamType> params,
                                 SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements(
       params,
@@ -6348,14 +6348,14 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
                                           bool allowBuilderToMove) && {
   // Finalize the builder, producing any necessary diagnostics.
-  finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
+  finalize(loc, getGenericParams(), allowConcreteGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
-  collectRequirements(*this, Impl->GenericParams, requirements);
+  collectRequirements(*this, getGenericParams(), requirements);
 
   // Form the generic signature.
-  auto sig = GenericSignature::get(Impl->GenericParams, requirements);
+  auto sig = GenericSignature::get(getGenericParams(), requirements);
 
   // When we can, move this generic signature builder to make it the canonical
   // builder, rather than constructing a new generic signature builder that
@@ -6443,9 +6443,17 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
                                       /*allowConcreteGenericParams=*/true,
                                       /*allowBuilderToMove=*/true);
 
-    // Check whether the removed requirement
-    assert(!newSig->isRequirementSatisfied(requirements[victimIndex]) &&
-           "Generic signature is not minimal");
+    // If the removed requirement is satisfied by the new generic signature,
+    // it is redundant. Complain.
+    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+      SmallString<32> reqString;
+      {
+        llvm::raw_svector_ostream out(reqString);
+        requirements[victimIndex].print(out, PrintOptions());
+      }
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
+                             reqString, sig->getAsString());
+    }
 
     // Canonicalize the signature to check that it is canonical.
     (void)newSig->getCanonicalSignature();

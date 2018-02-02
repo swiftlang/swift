@@ -21,9 +21,9 @@ func1()
 _ = 4+7
 
 var bind_test1 : () -> () = func1
-var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused l-value}}
+var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused variable}}
 
-(func1, func2) // expected-error {{expression resolves to an unused l-value}}
+(func1, func2) // expected-error {{expression resolves to an unused variable}}
 
 func basictest() {
   // Simple integer variables.
@@ -757,7 +757,7 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
   _ = a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{8-9=}}
   _ = a?.customMirror
 
-  _ = b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
+  _ = b?   // expected-error {{optional chain has no effect, expression already produces 'Int?'}}
   _ = b?.customMirror
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
@@ -765,7 +765,7 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
 
 
 // <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
-func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>?) {
+func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
@@ -776,7 +776,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'CountableClosedRange<Int>'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   

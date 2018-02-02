@@ -18,7 +18,7 @@ public func run_Combos(_ N: Int) {
   var combos = [[Character]]()
 
   for _ in 1...10*N {
-    combos = combinations("ABCDEFGHIJ".characters, "0123456789".characters).map {
+    combos = combinations("ABCDEFGHIJ", "0123456789").map {
       return [$0] + [$1]
     }
 

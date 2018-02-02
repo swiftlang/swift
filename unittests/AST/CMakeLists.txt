@@ -10,4 +10,5 @@ target_link_libraries(SwiftASTTests
    # FIXME: Circular dependencies.
    swiftParse
    swiftSema
+   swiftSIL
 )

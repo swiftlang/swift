@@ -129,12 +129,12 @@ set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
 # Indicate whether Swift should attempt to use the lld linker.
-set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
+set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
     "Enable using the lld linker when available")
 
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
-set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
+set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(SWIFT_SDKS "" CACHE STRING
@@ -298,6 +298,10 @@ option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
 
 option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   "Build the standard libraries, overlays, and runtime with normal arguments at +0"
+  FALSE)
+
+option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
+  "Enable runtime function counters and expose the API."
   FALSE)
 
 #

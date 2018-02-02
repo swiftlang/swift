@@ -11,6 +11,7 @@ add_swift_library(swiftSyntax STATIC
   Trivia.cpp
   RawSyntax.cpp
   Syntax.cpp
+  SyntaxArena.cpp
   SyntaxData.cpp
   UnknownSyntax.cpp
   SyntaxParsingContext.cpp)
