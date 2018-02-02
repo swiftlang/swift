@@ -209,8 +209,8 @@ public extension _ShapedArrayProtocol
   where Shape : Collection, Shape.Element == Int {
   /// Returns the number of element tensors in a ShapedArray (equivalent to the
   /// first dimension).
-  /// Note that `count` is distinct from `unitCount`, which represents the total
-  /// number of units.
+  /// - Note: `count` is distinct from `unitCount`, which represents the total
+  ///   number of units.
   var count: Int {
     return shape.first ?? 0
   }
@@ -236,6 +236,28 @@ fileprivate extension _ShapedArrayProtocol
   ) -> CountableRange<Int> {
     return unitIndex(fromIndex: tensorSubrange.lowerBound)
       ..< unitIndex(fromIndex: tensorSubrange.upperBound)
+  }
+}
+
+/// Common public protocol implementations
+fileprivate extension _ShapedArrayProtocol
+  where Element : _ShapedArrayProtocol {
+  var _description: String {
+    if let scalar = scalar {
+      return String(describing: scalar)
+    }
+    return "[\( map({"\($0)"}).joined(separator: ", ") )]"
+  }
+}
+
+fileprivate extension _ShapedArrayProtocol
+  where Shape : Equatable, Unit : Equatable {
+  func _isEqual(to other: Self) -> Bool {
+    return shape == other.shape && withUnsafeBufferPointer { selfBuf in
+      other.withUnsafeBufferPointer { otherBuf in
+        selfBuf.elementsEqual(otherBuf)
+      }
+    }
   }
 }
 
@@ -400,9 +422,9 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
                    "Negative ShapedArray index is out of range")
       precondition(shape.dropFirst().elementsEqual(newValue.shape),
                    "Element shape mismatch")
+      let unitIndex = self.unitIndex(fromIndex: index)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(
-          by: unitIndex(fromIndex: index))
+        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -429,9 +451,9 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
         "ShapedArray indices are out of range")
       let subTensorShape = [bounds.count] + shape.dropFirst()
       precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
+      let unitIndex = self.unitIndex(fromIndex: bounds.lowerBound)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(
-          by: unitIndex(fromIndex: bounds.lowerBound))
+        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -487,6 +509,19 @@ extension ShapedArray where Unit : AccelerableTensorUnit {
 public extension Tensor where Unit : AccelerableTensorUnit {
   init(_ other: ShapedArray<Unit>) {
     self.init(other.makeTensorHandle())
+  }
+}
+
+/// Equatable conformance
+extension ShapedArray : Equatable where Unit : Equatable {
+  static public func == (lhs: ShapedArray, rhs: ShapedArray) -> Bool {
+    return lhs._isEqual(to: rhs)
+  }
+}
+
+extension ShapedArray : CustomStringConvertible {
+  public var description: String {
+    return _description
   }
 }
 
@@ -591,10 +626,7 @@ public extension ShapedArraySlice {
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Slice initializers
-//===----------------------------------------------------------------------===//
-
+/// Slice initializers
 public extension ShapedArraySlice {
   init(shape: [Int], units: [Unit]) {
     self.init(base: ShapedArray(shape: shape, units: units))
@@ -667,8 +699,8 @@ public extension ShapedArraySlice {
 
 extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   public typealias Index = Int
-  public typealias Element = ShapedArraySlice<Unit>
-  public typealias SubSequence = ShapedArraySlice<Unit>
+  public typealias Element = ShapedArraySlice
+  public typealias SubSequence = ShapedArraySlice
 
   public var indices: CountableRange<Int> {
     if let bounds = bounds {
@@ -708,9 +740,9 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
                    "ShapeArraySlice index is out of range (before startIndex)")
       precondition(shape.dropFirst().elementsEqual(newValue.shape),
                    "Element shape mismatch")
+      let unitIndex = self.unitIndex(fromIndex: index)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(
-          by: unitIndex(fromIndex: index))
+        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -739,9 +771,9 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
         "ShapedArraySlice indices are out of range")
       let subTensorShape = [bounds.count] + shape.dropFirst()
       precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
+      let unitIndex = self.unitIndex(fromIndex: bounds.lowerBound)
       withUnsafeMutableBufferPointer { destBuffPtr in
-        let ptr = destBuffPtr.baseAddress!.advanced(
-          by: unitIndex(fromIndex: bounds.lowerBound))
+        let ptr = destBuffPtr.baseAddress!.advanced(by: unitIndex)
         newValue.withUnsafeBufferPointer { srcBuffPtr in
           ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
         }
@@ -757,18 +789,17 @@ public extension ShapedArraySlice where Unit : AccelerableTensorUnit {
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Description and visualization
-//===----------------------------------------------------------------------===//
-
-public extension _ShapedArrayProtocol where Self.Element : _ShapedArrayProtocol {
-  var description: String {
-    if let scalar = scalar {
-      return String(describing: scalar)
-    }
-    return "[\( map({"\($0)"}).joined(separator: ", ") )]"
+/// Equatable conformance
+extension ShapedArraySlice : Equatable where Unit : Equatable {
+  static public func == (lhs: ShapedArraySlice, rhs: ShapedArraySlice) -> Bool {
+    return lhs._isEqual(to: rhs)
   }
 }
 
-extension ShapedArray : CustomStringConvertible {}
-extension ShapedArraySlice : CustomStringConvertible {}
+/// String conversion
+extension ShapedArraySlice : CustomStringConvertible {
+  /// A textual implementation of this shaped array.
+  public var description: String {
+    return _description
+  }
+}
