@@ -919,6 +919,10 @@ private:
 
   /// Given the address of a nominal type descriptor, attempt to read it.
   ContextDescriptorRef
+  // FIXME: There's a miscompile/UB going on that causes many tests to
+  // fail in lldb if this function is built with optimization, so, for now,
+  // as workaround we slapt optnone on it.
+  __attribute__((optnone))
   readContextDescriptor(StoredPointer address) {
     if (address == 0)
       return nullptr;
