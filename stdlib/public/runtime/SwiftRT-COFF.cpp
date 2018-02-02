@@ -25,11 +25,11 @@
 #define PRAGMA(pragma) _Pragma(#pragma)
 
 #define DECLARE_SWIFT_SECTION(name)                                            \
-  PRAGMA(section("." #name "$A", long, read, write))                           \
+  PRAGMA(section("." #name "$A", long, read))                                  \
   __declspec(allocate("." #name "$A"))                                         \
   static uintptr_t __start_##name = 0;                                         \
                                                                                \
-  PRAGMA(section("." #name "$C", long, read, write))                           \
+  PRAGMA(section("." #name "$C", long, read))                                  \
   __declspec(allocate("." #name "$C"))                                         \
   static uintptr_t __stop_##name = 0;
 
