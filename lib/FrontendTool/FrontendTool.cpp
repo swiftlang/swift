@@ -590,6 +590,16 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
   return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
 }
 
+static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
+                                            ASTContext &Context) {
+  auto verifyGenericSignaturesInModule =
+      Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
+  if (verifyGenericSignaturesInModule.empty())
+    return;
+  if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
+    GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -655,13 +665,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   ASTContext &Context = Instance.getASTContext();
 
-
-  auto verifyGenericSignaturesInModule =
-    Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
-  if (!verifyGenericSignaturesInModule.empty()) {
-    if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
-      GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
-  }
+  verifyGenericSignaturesIfNeeded(Invocation, Context);
 
   if (Invocation.getMigratorOptions().shouldRunMigrator()) {
     migrator::updateCodeAndEmitRemap(&Instance, Invocation);
