@@ -2278,6 +2278,13 @@ public:
 
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
 
+template<typename Runtime> struct TargetContextDescriptor;
+
+template<typename Runtime>
+using RelativeContextPointer =
+  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
+                              /*nullable*/ true>;
+
 /// The structure of a protocol reference record.
 template <typename Runtime>
 struct TargetProtocolRecord {
@@ -2290,17 +2297,36 @@ struct TargetProtocolRecord {
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
+template<typename Runtime> class TargetGenericRequirementDescriptor;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 template <typename Runtime>
-struct TargetProtocolConformanceDescriptor {
+struct TargetProtocolConformanceDescriptor
+  : public swift::ABI::TrailingObjects<
+             TargetProtocolConformanceDescriptor<Runtime>,
+             RelativeContextPointer<Runtime>,
+             TargetGenericRequirementDescriptor<Runtime>> {
+
+  using TrailingObjects = swift::ABI::TrailingObjects<
+                             TargetProtocolConformanceDescriptor<Runtime>,
+                             RelativeContextPointer<Runtime>,
+                             TargetGenericRequirementDescriptor<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
 public:
   using WitnessTableAccessorFn
     = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
                                           const TargetWitnessTable<Runtime> **,
                                           size_t);
+
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<Runtime>;
 
 private:
   /// The protocol being conformed to.
@@ -2381,7 +2407,22 @@ public:
     
     return nullptr;
   }
-  
+
+  /// Retrieve the context of a retroactive conformance.
+  const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
+    if (!Flags.isRetroactive()) return nullptr;
+
+    return this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
+  }
+
+  /// Retrieve the conditional requirements that must also be
+  /// satisfied
+  llvm::ArrayRef<GenericRequirementDescriptor>
+  getConditionalRequirements() const {
+    return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
+            Flags.getNumConditionalRequirements()};
+  }
+
   /// Get the directly-referenced static witness table.
   const swift::TargetWitnessTable<Runtime> *getStaticWitnessTable() const {
     switch (getConformanceKind()) {
@@ -2416,7 +2457,7 @@ public:
   /// type.
   const swift::TargetWitnessTable<Runtime> *
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
-  
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
@@ -2430,6 +2471,16 @@ public:
   /// 2. Has a valid conformance kind.
   void verify() const LLVM_ATTRIBUTE_USED;
 #endif
+
+private:
+  size_t numTrailingObjects(
+                        OverloadToken<RelativeContextPointer<Runtime>>) const {
+    return Flags.isRetroactive() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+    return Flags.getNumConditionalRequirements();
+  }
 };
 using ProtocolConformanceDescriptor
   = TargetProtocolConformanceDescriptor<InProcess>;
@@ -2440,14 +2491,6 @@ using TargetProtocolConformanceRecord =
                         /*Nullable=*/false>;
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
-
-
-template<typename Runtime> struct TargetContextDescriptor;
-
-template<typename Runtime>
-using RelativeContextPointer =
-  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
-                              /*nullable*/ true>;
 
 template<typename Runtime>
 struct TargetGenericContext;

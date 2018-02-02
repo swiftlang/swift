@@ -40,6 +40,7 @@ namespace swift {
 namespace irgen {
   class Callee;
   class ConstantReference;
+  class ConstantStructBuilder;
   class Explosion;
   class FieldTypeInfo;
   class FunctionPointer;
@@ -317,6 +318,25 @@ namespace irgen {
   /// Use the argument as the 'self' type metadata.
   void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                      CanType abstractType);
+
+  /// Description of the metadata emitted by adding generic requirements.
+  struct GenericRequirementsMetadata {
+    unsigned NumRequirements = 0;
+    unsigned NumGenericKeyArguments = 0;
+    unsigned NumGenericExtraArguments = 0;
+  };
+
+  /// Add generic requirements to the given constant struct builder.
+  ///
+  /// \param sig The generic signature against which the requirements are
+  /// described.
+  ///
+  /// \param requirements The requirements to add.
+  GenericRequirementsMetadata addGenericRequirements(
+                                          IRGenModule &IGM,
+                                          ConstantStructBuilder &B,
+                                          GenericSignature *sig,
+                                          ArrayRef<Requirement> requirements);
 
 } // end namespace irgen
 } // end namespace swift
