@@ -50,7 +50,7 @@ namespace swift {
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
-  void performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T);
+  void performSILDiagnoseUnreachable(SILModule *M);
 
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
