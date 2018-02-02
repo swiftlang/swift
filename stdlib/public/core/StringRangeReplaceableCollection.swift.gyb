@@ -574,6 +574,34 @@ extension Sequence {
 }
 
 extension Collection {
+  /// Returns an array containing the non-`nil` strings resulting from the given
+  /// transformation on each element of this sequence.
+  ///
+  /// Use this method to receive an array of non-optional strings when your
+  /// transformation produces a `String?`.
+  ///
+  /// In this example, note the difference in the result of using `map` and
+  /// `compactMap` with a transformation that returns a `String?` value.
+  ///
+  ///     let errorLookup = [400: "Bad request",
+  ///                        403: "Forbidden",
+  ///                        404: "Not found"]
+  ///
+  ///     let errorCodes = [400, 407, 404]
+  ///
+  ///     let mapped: [String?] = errorCodes.map { code in errorLookup[code] }
+  ///     // ["Bad request", nil, "Not found"]
+  ///
+  ///     let compactMapped: [String] = errorCodes.compactMap { code in errorLookup[code] }
+  ///     // ["Bad request", "Not found"]
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  ///   sequence as its argument and returns a `String?`.
+  /// - Returns: An array of the non-`nil` results of calling `transform`
+  ///   with each element of the sequence.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
+  ///   and *n* is the length of the result.
   @_inlineable // FIXME(sil-serialize-all)
   public func compactMap(
     _ transform: (Element) throws -> String?
