@@ -107,6 +107,10 @@ namespace swift {
 
   enum class KnownProtocolKind : uint8_t;
 
+namespace syntax {
+  class SyntaxArena;
+}
+
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
   /// \brief The permanent arena, which is tied to the lifetime of
@@ -379,6 +383,9 @@ public:
                                               arena),
                               setVector.size());
   }
+
+  /// Retrive the syntax node memory manager for this context.
+  syntax::SyntaxArena &getSyntaxArena() const;
 
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;

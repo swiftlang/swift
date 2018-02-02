@@ -89,7 +89,7 @@ ${node.name} ${node.name}::with${child.name}(
     raw = New${child.type_name}->getRaw();
   } else {
 % if child.is_optional:
-    raw = nullptr; //${make_missing_child(child)};
+    raw = nullptr;
 % else:
     raw = ${make_missing_child(child)};
 % end
