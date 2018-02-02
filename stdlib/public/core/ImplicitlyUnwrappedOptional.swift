@@ -21,7 +21,7 @@
 ///
 ///     // An optional integer
 ///     let possibleNumber: Int? = 5
-@_fixed_layout
+@frozen
 public enum ImplicitlyUnwrappedOptional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using

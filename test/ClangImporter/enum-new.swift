@@ -5,11 +5,11 @@ _ = .Red as Color
 _ = .Cyan as MoreColor
 
 func test() {
-  switch getColor() {
+  switch getColor() { // expected-warning {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   case .Red, .Blue, .Green: break
   } // no-error
 
-  switch getMoreColor() {
+  switch getMoreColor() { // expected-warning {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   case .Yellow, .Magenta, .Black, .Cyan: break
   } // no-error
 

@@ -4900,10 +4900,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.enum,
     key.name: "FooComparisonResult",
     key.usr: "c:@E@FooComparisonResult",
-    key.doc.full_as_xml: "<Enum line=\"1\" column=\"1\"><Name>FooComparisonResult</Name><USR>c:@E@FooComparisonResult</USR><Declaration>enum FooComparisonResult : Int</Declaration><Abstract><Para> Aaa.  FooComparisonResult.  Bbb.</Para></Abstract></Enum>",
+    key.doc.full_as_xml: "<Enum line=\"1\" column=\"1\"><Name>FooComparisonResult</Name><USR>c:@E@FooComparisonResult</USR><Declaration>@_nonfrozen enum FooComparisonResult : Int</Declaration><Abstract><Para> Aaa.  FooComparisonResult.  Bbb.</Para></Abstract></Enum>",
     key.offset: 814,
     key.length: 196,
-    key.fully_annotated_decl: "<decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>FooComparisonResult</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
+    key.fully_annotated_decl: "<decl.enum><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@_nonfrozen</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>FooComparisonResult</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.struct,
@@ -7002,7 +7002,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@ABAuthorizationStatus",
     key.offset: 7199,
     key.length: 170,
-    key.fully_annotated_decl: "<decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>ABAuthorizationStatus</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
+    key.fully_annotated_decl: "<decl.enum><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@_nonfrozen</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>ABAuthorizationStatus</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.struct,

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership -enable-resilience -module-name Swift %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -191,6 +191,7 @@ func Foo_cases() {
   _ = Foo.A
 }
 
+
 enum Indirect<T> {
   indirect case payload((T, other: T))
   case none
@@ -201,3 +202,98 @@ enum Indirect<T> {
 func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {
   return Indirect.payload((payload, other: payload))
 }
+
+
+public class SomeClass {}
+@_nonfrozen public enum NonExhaustiveValues {
+  case a, b
+}
+@_nonfrozen public enum NonExhaustivePayload {
+  case a
+  case b(SomeClass)
+}
+
+// Make the function inlineable to force it to deal with future cases.
+@_inlineable public func testNonExhaustiveSwitch(
+    _ value: NonExhaustiveValues, _ payloaded: NonExhaustivePayload) {
+  // This particular test will not work in Swift 5, where a nonexhaustive switch
+  // is disallowed by Sema. In Swift 4 mode it's just a warning.
+  switch value {
+  case .a: break
+  case .b: break
+  }
+
+  switch payloaded {
+  case .a: break
+  case .b(_): break
+  }
+}
+
+// CHECK-LABEL: sil [serialized] @$Ss23testNonExhaustiveSwitchyys0bC6ValuesO_s0bC7PayloadOtF
+// CHECK: switch_enum_addr [[VALUE:%.+]] : $*NonExhaustiveValues, case #NonExhaustiveValues.a!enumelt: [[bb_a:[^ ]+]], case #NonExhaustiveValues.b!enumelt: [[bb_b:[^ ]+]], default [[bb_default:[^ ]+]]
+// CHECK: [[bb_a]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustiveValues
+// CHECK-NEXT: br [[bb_done:[^ ]+]]
+// CHECK: [[bb_b]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustiveValues
+// CHECK-NEXT: br [[bb_done]]
+// CHECK: [[bb_default]]:
+// CHECK-NEXT: builtin "int_trap"()
+// CHECK-NEXT: unreachable
+// CHECK: [[bb_done]]:
+// CHECK: switch_enum_addr [[VALUE:%.+]] : $*NonExhaustivePayload, case #NonExhaustivePayload.a!enumelt: [[bb_a:[^ ]+]], case #NonExhaustivePayload.b!enumelt.1: [[bb_b:[^ ]+]], default [[bb_default:[^ ]+]]
+// CHECK: [[bb_a]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustivePayload
+// CHECK-NEXT: br [[bb_done:[^ ]+]]
+// CHECK: [[bb_b]]:
+// CHECK-NEXT: [[PAYLOAD:%.+]] = unchecked_take_enum_data_addr [[VALUE]] : $*NonExhaustivePayload, #NonExhaustivePayload.b!enumelt.1
+// CHECK-NEXT: [[REF:%.+]] = load [take] [[PAYLOAD]] : $*SomeClass
+// CHECK-NEXT: destroy_value [[REF]] : $SomeClass
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustivePayload
+// CHECK: br [[bb_done]]
+// CHECK: [[bb_default]]:
+// CHECK-NEXT: builtin "int_trap"()
+// CHECK-NEXT: unreachable
+// CHECK: [[bb_done]]:
+// CHECK: return
+// CHECK: } // end sil function '$Ss23testNonExhaustiveSwitchyys0bC6ValuesO_s0bC7PayloadOtF'
+
+public func testNonExhaustiveSwitchWithinModule(
+    _ value: NonExhaustiveValues, _ payloaded: NonExhaustivePayload) {
+  // This particular test will not work in Swift 5, where a nonexhaustive switch
+  // is disallowed by Sema. In Swift 4 mode it's just a warning.
+  switch value {
+  case .a: break
+  case .b: break
+  }
+
+  switch payloaded {
+  case .a: break
+  case .b(_): break
+  }
+}
+
+// CHECK-LABEL: sil @$Ss35testNonExhaustiveSwitchWithinModuleyys0bC6ValuesO_s0bC7PayloadOtF
+// CHECK: switch_enum_addr [[VALUE:%.+]] : $*NonExhaustiveValues, case #NonExhaustiveValues.a!enumelt: [[bb_a:[^ ]+]], case #NonExhaustiveValues.b!enumelt: [[bb_b:[^ ]+]]
+// CHECK-NOT: default
+// CHECK: [[bb_a]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustiveValues
+// CHECK-NEXT: br [[bb_done:[^ ]+]]
+// CHECK: [[bb_b]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustiveValues
+// CHECK-NEXT: br [[bb_done]]
+// CHECK: [[bb_done]]:
+// CHECK: switch_enum_addr [[VALUE:%.+]] : $*NonExhaustivePayload, case #NonExhaustivePayload.a!enumelt: [[bb_a:[^ ]+]], case #NonExhaustivePayload.b!enumelt.1: [[bb_b:[^ ]+]]
+// CHECK-NOT: default
+// CHECK: [[bb_a]]:
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustivePayload
+// CHECK-NEXT: br [[bb_done:[^ ]+]]
+// CHECK: [[bb_b]]:
+// CHECK-NEXT: [[PAYLOAD:%.+]] = unchecked_take_enum_data_addr [[VALUE]] : $*NonExhaustivePayload, #NonExhaustivePayload.b!enumelt.1
+// CHECK-NEXT: [[REF:%.+]] = load [take] [[PAYLOAD]] : $*SomeClass
+// CHECK-NEXT: destroy_value [[REF]] : $SomeClass
+// CHECK-NEXT: dealloc_stack [[VALUE]] : $*NonExhaustivePayload
+// CHECK: br [[bb_done]]
+// CHECK: [[bb_done]]:
+// CHECK: return
+// CHECK: } // end sil function '$Ss35testNonExhaustiveSwitchWithinModuleyys0bC6ValuesO_s0bC7PayloadOtF'

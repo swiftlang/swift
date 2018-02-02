@@ -2680,6 +2680,18 @@ public:
       verifyCheckedBase(PD);
     }
 
+    void verifyChecked(EnumDecl *ED) {
+      if (ED->getFormalAccess() >= AccessLevel::Public) {
+        if (!ED->getAttrs().hasAttribute<FrozenAttr>() &&
+            !ED->getAttrs().hasAttribute<NonFrozenAttr>()) {
+          Out << "Public enum is neither '@frozen' nor '@_nonfrozen'\n";
+          ED->dumpContext();
+          abort();
+        }
+      }
+      verifyCheckedBase(ED);
+    }
+
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 

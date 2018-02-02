@@ -39,7 +39,7 @@
 ///     let pointPointer = UnsafeMutableRawPointer.allocate(
 ///             bytes: count * MemoryLayout<Point>.stride,
 ///             alignedTo: MemoryLayout<Point>.alignment)
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // FIXME(sil-serialize-all)
 public enum MemoryLayout<T> {
   /// The contiguous memory footprint of `T`, in bytes.
   ///

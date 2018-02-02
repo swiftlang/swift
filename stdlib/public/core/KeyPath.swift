@@ -163,7 +163,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathKind { case readOnly, value, reference }
 
@@ -400,7 +400,7 @@ public class ReferenceWritableKeyPath<
 
 // MARK: Implementation details
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponentKind {
   /// The keypath projects within the storage of the outer value, like a
@@ -487,7 +487,7 @@ internal struct ComputedArgumentWitnesses {
   internal let hash: Hash
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponent: Hashable {
   @_fixed_layout // FIXME(sil-serialize-all)
@@ -1193,7 +1193,7 @@ internal struct RawKeyPathComponent {
       count: buffer.count - componentSize)
   }
 
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @frozen // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal enum ProjectionResult<NewValue, LeafValue> {
     /// Continue projecting the key path with the given new value.

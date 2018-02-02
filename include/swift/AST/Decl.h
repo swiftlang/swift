@@ -2818,6 +2818,8 @@ public:
   ///
   /// This is used for diagnostics, because we do not want a behavior
   /// change between builds with resilience enabled and disabled.
+  /// For enums, this means clients can assume the representation will not
+  /// change, although more cases may be added within that representation.
   bool isFormallyResilient() const;
 
   /// \brief Do we need to use resilient access patterns outside of this type's
@@ -3167,6 +3169,13 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+
+  /// True if the enum can be exhaustively switched within \p useDC.
+  ///
+  /// Note that this property is \e not necessarily true for all children of
+  /// \p useDC. In particular, an inlinable function does not get to switch
+  /// exhaustively over a non-frozen enum declared in the same module.
+  bool isExhaustive(const DeclContext *useDC) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:

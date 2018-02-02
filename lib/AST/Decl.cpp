@@ -2279,9 +2279,11 @@ bool NominalTypeDecl::isFormallyResilient() const {
                             /*respectVersionedAttr=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout attribute.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+  // Check for an explicit @_fixed_layout or @frozen attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>() ||
+      getAttrs().hasAttribute<FrozenAttr>()) {
     return false;
+  }
 
   // Structs and enums imported from C *always* have a fixed layout.
   // We know their size, and pass them as values in SIL and IRGen.
@@ -3065,6 +3067,38 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
     = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
   return true;
+}
+
+bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
+  // Enums explicitly marked @frozen are exhaustive.
+  if (getAttrs().hasAttribute<FrozenAttr>())
+    return true;
+
+  // Non-public, non-versioned enums are always exhaustive.
+  AccessScope accessScope = getFormalAccessScope(/*useDC*/nullptr,
+                                                 /*respectVersioned*/true);
+  if (!accessScope.isPublic())
+    return true;
+
+  // Using from an arbitrary module must assume the enum is non-exhaustive at
+  // this point.
+  if (!useDC)
+    return false;
+
+  // Enums in the same module are exhaustive /unless/ the use site is inlinable.
+  const ModuleDecl *containingModule = getModuleContext();
+  if (useDC->getResilienceExpansion() == ResilienceExpansion::Maximal)
+    if (useDC->getParentModule() == containingModule)
+      return true;
+
+  // Testably imported enums are exhaustive, on the grounds that only the author
+  // of the original library can import it testably.
+  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+    if (useSF->hasTestableImport(containingModule))
+      return true;
+
+  // Otherwise, the enum is non-exhaustive.
+  return false;
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,

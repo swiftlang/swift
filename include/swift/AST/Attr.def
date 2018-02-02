@@ -163,7 +163,7 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-                 OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
+                 OnVar | OnClass | OnStruct | UserInaccessible, 31)
 
 SIMPLE_DECL_ATTR(_inlineable, Inlineable,
                  OnVar | OnSubscript | OnFunc | OnConstructor | OnDestructor |
@@ -306,6 +306,9 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
           OnClass | OnStruct | OnEnum | OnProtocol | OnTypeAlias |
           LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
           /*Not serialized*/74)
+
+SIMPLE_DECL_ATTR(frozen, Frozen, OnEnum, 75)
+SIMPLE_DECL_ATTR(_nonfrozen, NonFrozen, OnEnum | UserInaccessible, 76)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

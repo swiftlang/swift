@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// How children of this value should be presented in the IDE.
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // FIXME(sil-serialize-all)
 public enum _MirrorDisposition {
   /// As a struct.
   case `struct`

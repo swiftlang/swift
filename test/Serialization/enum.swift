@@ -4,7 +4,12 @@
 // RUN: %target-swift-frontend -typecheck -I %t %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -I %t %s -o /dev/null
 
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=def_enum -I %t -source-filename=%s | %FileCheck -check-prefix=CHECK-PRINT %s
+
 // CHECK-NOT: UnknownCode
+
+// CHECK-PRINT-DAG: @frozen enum Exhaustive {
+// CHECK-PRINT-DAG: @_nonfrozen enum NonExhaustive {
 
 import def_enum
 

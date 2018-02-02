@@ -70,47 +70,48 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
-  IGNORED_ATTR(CDecl)
-  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Available)
+  IGNORED_ATTR(CDecl)
+  IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
+  IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(DowngradeExhaustivityCheck)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(FixedLayout)
+  IGNORED_ATTR(Implements)
+  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Inlineable)
+  IGNORED_ATTR(NonFrozen)
+  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
-  IGNORED_ATTR(RestatedObjCConformance)
+  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
   IGNORED_ATTR(RequiresStoredPropertyInits)
+  IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(ShowInInterface)
+  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Specialize)
+  IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
-  IGNORED_ATTR(ShowInInterface)
-  IGNORED_ATTR(DiscardableResult)
-  IGNORED_ATTR(Implements)
-  IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(DowngradeExhaustivityCheck)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
-  IGNORED_ATTR(ClangImporterSynthesizedType)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -241,6 +242,11 @@ public:
     if (!D->getDeclContext()->isTypeContext()) {
       diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
     }
+  }
+
+  void visitFrozenAttr(FrozenAttr *attr) {
+    if (D->getAttrs().hasAttribute<NonFrozenAttr>())
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_and_nonfrozen);
   }
 
   void visitIBActionAttr(IBActionAttr *attr);
@@ -875,6 +881,10 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+
+  void checkExhaustivity(DeclAttribute *attr);
+  void visitFrozenAttr(FrozenAttr *attr);
+  void visitNonFrozenAttr(NonFrozenAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2020,6 +2030,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
                 diag::implements_attr_non_protocol_type)
       .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
+}
+
+void AttributeChecker::checkExhaustivity(DeclAttribute *attr) {
+  if (cast<EnumDecl>(D)->getFormalAccess() >= AccessLevel::Public)
+    return;
+  if (D->getAttrs().hasAttribute<VersionedAttr>())
+    return;
+  diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+}
+
+void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
+  checkExhaustivity(attr);
+}
+
+void AttributeChecker::visitNonFrozenAttr(NonFrozenAttr *attr) {
+  checkExhaustivity(attr);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
