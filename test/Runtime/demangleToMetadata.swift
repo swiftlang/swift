@@ -318,5 +318,20 @@ DemangleToMetadataTests.test("AnyObject requirements") {
   expectNil(_typeByMangledName("4main3SG9VyAA1SVG"))
 }
 
+struct SG10<T: C> { }
+
+class C2 : C { }
+class C3 { }
+
+DemangleToMetadataTests.test("superclass requirements") {
+  expectEqual(SG10<C>.self,
+    _typeByMangledName("4main4SG10VyAA1CCG")!)
+  expectEqual(SG10<C2>.self,
+    _typeByMangledName("4main4SG10VyAA2C2CG")!)
+
+  // Failure cases: not a subclass.
+  expectNil(_typeByMangledName("4main4SG10VyAA2C3CG"))
+}
+
 runAllTests()
 

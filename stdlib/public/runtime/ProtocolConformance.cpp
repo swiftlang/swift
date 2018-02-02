@@ -770,6 +770,17 @@ bool swift::_checkGenericRequirements(
       return true;
     }
 
+    case GenericRequirementKind::BaseClass: {
+      // Demangle the base type under the given substitutions.
+      auto baseType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!baseType) return true;
+
+      if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
+
+      continue;
+    }
+
     // FIXME: Handle all of the other cases.
     default:
       return true;
