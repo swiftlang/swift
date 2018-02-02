@@ -25,17 +25,17 @@ public protocol StringProtocol
 
   associatedtype UTF8View : /*Bidirectional*/Collection
   where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
-  
+
   associatedtype UTF16View : BidirectionalCollection
   where UTF16View.Element == UInt16 // Unicode.UTF16.CodeUnit
 
   associatedtype UnicodeScalarView : BidirectionalCollection
   where UnicodeScalarView.Element == Unicode.Scalar
-  
+
   var utf8: UTF8View { get }
   var utf16: UTF16View { get }
   var unicodeScalars: UnicodeScalarView { get }
-  
+
 #if _runtime(_ObjC)
   func hasPrefix(_ prefix: String) -> Bool
   func hasSuffix(_ prefix: String) -> Bool
@@ -63,7 +63,7 @@ public protocol StringProtocol
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
   init(cString nullTerminatedUTF8: UnsafePointer<CChar>)
-  
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -76,7 +76,7 @@ public protocol StringProtocol
   init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type)
-  
+
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
   ///
@@ -151,7 +151,7 @@ internal protocol _SwiftStringView {
   /// A `String`, having the same contents as `self`, that may be unsuitable for
   /// long-term storage.
   var _ephemeralContent : String { get }
-  
+
   /// A `String`, having the same contents as `self`, that is suitable for
   /// long-term storage.
   //
@@ -206,8 +206,8 @@ extension String : _SwiftStringView {
 @_versioned // FIXME(sil-serialize-all)
 internal func _withCString<
   Source : Collection,
-  SourceEncoding : Unicode.Encoding, 
-  TargetEncoding : Unicode.Encoding, 
+  SourceEncoding : Unicode.Encoding,
+  TargetEncoding : Unicode.Encoding,
   Result
 >(
   encodedAs targetEncoding: TargetEncoding.Type,
@@ -227,8 +227,8 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
 @_semantics("optimize.sil.specialize.generic.partial.never")
 internal func _withCStringAndLength<
   Source : Collection,
-  SourceEncoding : Unicode.Encoding, 
-  TargetEncoding : Unicode.Encoding, 
+  SourceEncoding : Unicode.Encoding,
+  TargetEncoding : Unicode.Encoding,
   Result
 >(
   encodedAs targetEncoding: TargetEncoding.Type,
@@ -383,7 +383,7 @@ extension String {
       repairIllFormedSequences: true)
     self = result!
   }
-  
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -404,7 +404,7 @@ extension String {
     )
     self.init(decoding: codeUnits, as: sourceEncoding)
   }
-  
+
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
   ///
@@ -1063,7 +1063,7 @@ extension String {
     start: UnsafeMutablePointer<UTF8.CodeUnit>,
     utf8CodeUnitCount: Int
   ) {
-    resultStorage.initialize(to: 
+    resultStorage.initialize(to:
       String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
@@ -1356,7 +1356,7 @@ extension String {
     return _nativeUnicodeUppercaseString(self)
 #endif
   }
-  
+
   /// Creates an instance from the description of a given
   /// `LosslessStringConvertible` instance.
   @_inlineable // FIXME(sil-serialize-all)
