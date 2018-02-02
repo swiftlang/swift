@@ -180,7 +180,7 @@ obj.generic4!(5) // expected-error{{value of type 'Id' (aka 'AnyObject') has no 
 // Find properties via dynamic lookup.
 var prop1Result : Int = obj.prop1!
 var prop2Result : String = obj.prop2!
-obj.prop2 = "hello" // expected-error{{cannot assign to property: 'obj' is immutable}}
+obj.prop2 = "hello" // expected-error{{cannot assign to immutable expression of type 'String?'}}
 var protoPropResult : Int = obj.protoProp!
 
 // Find subscripts via dynamic lookup
@@ -217,8 +217,8 @@ let uopt : AnyObject! = nil
 uopt.wibble!()
 
 // Should not be able to see private or internal @objc methods.
-uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
-uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
+uopt.privateFoo!() // expected-error{{value of type 'AnyObject?' has no member 'privateFoo'}}
+uopt.internalFoo!() // expected-error{{value of type 'AnyObject?' has no member 'internalFoo'}}
 
 let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
@@ -290,9 +290,9 @@ let _: String = o[s]
 let _: String = o[s]!
 let _: String? = o[s]
 // FIXME: These should all produce lvalues that we can write through
-o.s = s // expected-error {{cannot assign to property: 'o' is immutable}}
-o.s! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
-o[s] = s // expected-error {{cannot assign to immutable expression of type 'String!'}}
+o.s = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
+o.s! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o[s] = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
 o[s]! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
 
 let _: String = o.t
@@ -309,6 +309,6 @@ let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
-o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO!!'}}
-o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO!'}}
+o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
+o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}

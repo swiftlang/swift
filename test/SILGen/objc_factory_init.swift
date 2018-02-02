@@ -5,11 +5,11 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo4HiveC5queenSQyABGSQySo3BeeCG_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : @owned $Optional<Bee>, [[HIVE_META:%[0-9]+]] : @trivial $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
-  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = objc_method [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = objc_method [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   destroy_value [[QUEEN]]
   // CHECK-NEXT:   return [[HIVE]] : $Optional<Hive>
@@ -34,7 +34,7 @@ extension Hive {
   // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt.1, [[COPIED_BORROWED_QUEEN]]
-  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   [[NEW_HIVE:%.*]] = apply [[FACTORY]]([[OPT_COPIED_BORROWED_QUEEN]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   destroy_value [[OPT_COPIED_BORROWED_QUEEN]]
   // CHECK:   end_borrow [[BORROWED_QUEEN]] from [[QUEEN]]
