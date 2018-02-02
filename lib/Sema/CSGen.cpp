@@ -1362,11 +1362,30 @@ namespace {
         }
       }
 
+      // Check to see if we have any keyword arguments: these are attributes.
+      // If so, add them as well.  We have no type constraints on these
+      // attributes since we just know their name.
+      if (tt->getNumElements() > argTypes.size()) {
+        for (unsigned i = argTypes.size(), e = tt->getNumElements(); i != e;
+             ++i) {
+          // We have to have a keyword argument name for attributes.
+          if (tt->getElementName(i).empty()) {
+            tc.diagnose(tt->getElement(i)->getStartLoc(), diag::invalid_tfop,
+                        "expected keyword argument for attribute name, "
+                        "or an additional letter in constraint string");
+            return nullptr;
+          }
+
+          auto ty = CS.createTypeVariable(locator, 0);
+          argTypes.push_back(TupleTypeElt(ty, tt->getElementName(i)));
+        }
+      }
+
       // Now that we know what all of the arguments are supposed to be, add a
       // constraint to the constraint system to check this for us.
       auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                       CS.getType(expr->getArg()), desiredArgTypes,
+                       CS.getType(tt), desiredArgTypes,
                        CS.getConstraintLocator(expr,
                                          ConstraintLocator::ApplyArgument));
 

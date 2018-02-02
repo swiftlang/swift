@@ -2952,16 +2952,24 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   if (!E->isTFOp())
     return visit(E->getSemanticExpr(), C);
 
+  // If this is a tensorflow operation, we have a bit more work to do: we emit
+  // a builtin instruction with the operation name and the constraint characters
+  // name mangled into the basename.
   auto tuple = cast<TupleExpr>(E->getArg());
   auto opName = cast<StringLiteralExpr>(tuple->getElement(0))->getValue();
   auto constraints = cast<StringLiteralExpr>(tuple->getElement(1))->getValue();
 
-  // If this is a tensorflow operation, we have a bit more work to do: we emit
-  // a builtin instruction with the operation name and the constraint characters
-  // name mangled into the basename.
   std::string name =
-    "__tfop_" + opName.str() + "__" + constraints.str() + "__";
+    "__tfop_" + opName.str() + "," + constraints.str();
 
+  // Attribute names are specified with keyword arguments.  Add these attribute
+  // names to the end of our builtin name, separated by commas.
+  for (unsigned i = 2, e = tuple->getNumElements(); i != e; ++i) {
+    if (!tuple->getElementName(i).empty())
+      name += "," + tuple->getElementName(i).str().str();
+  }
+
+  // Emit the tensor arguments as well as the attribute values.
   SmallVector<SILValue, 4> args;
   for (auto &elt : tuple->getElements().drop_front(2)) {
     args.push_back(visit(elt).getScalarValue().forward(SGF));

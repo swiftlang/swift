@@ -13,7 +13,7 @@ sil [noinline] @__tf_init_scalar : $@convention(thin) <τ_0_0 where τ_0_0 : Acc
 // CHECK-LABEL: -- TFPartition Accelerator Result: simple_test
 // CHECK: bb0:
 // CHECK-NEXT: %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT: %1 = builtin "__tfop_Const__cd:t__"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Float>
+// CHECK-NEXT: %1 = builtin "__tfop_Const,cd:t"(%0 : $Builtin.FPIEEE32) : $TensorHandle<Float>
 // CHECK-NEXT: return %1 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
