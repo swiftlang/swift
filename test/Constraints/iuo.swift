@@ -101,13 +101,13 @@ func cflow(i: Int!, j: inout Bool!, s: S) {
     if s.i == 7 {
     }
   }
-  let _ = i ? 7 : 0 // expected-error {{optional type 'Int!' cannot be used as a boolean; test for '!= nil' instead}}
+  let _ = i ? 7 : 0 // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   let _ = b ? i : k
   let _ = b ? i : m
   let _ = b ? j : b
-  let _ = i ? i : k // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int?'}}
-  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int'}}
-  let _ = s.i ? s.j : s.k // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int'}}
+  let _ = i ? i : k // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
+  let _ = s.i ? s.j : s.k // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
   let _ = b ? s.j : s.k
 
   if j {}
@@ -153,13 +153,13 @@ let _: Int = overloadedForcedStructResult().i
 let x: Int? = 1
 let y0: Int = x as Int! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 let y1: Int = (x as Int!)! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let z0: Int = x as! Int! // expected-warning {{forced cast from 'Int?' to 'Int!' always succeeds; did you mean to use 'as'?}}
+let z0: Int = x as! Int! // expected-warning {{forced cast of 'Int?' to same type has no effect}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let z1: Int = (x as! Int!)! // expected-warning {{forced cast from 'Int?' to 'Int!' always succeeds; did you mean to use 'as'?}}
+let z1: Int = (x as! Int!)! // expected-warning {{forced cast of 'Int?' to same type has no effect}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
+let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' to 'Int?' always succeeds}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
+let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int?' always succeeds}}
 // expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 
 func id<T>(_ t: T) -> T { return t }
@@ -186,12 +186,8 @@ func takesInOutOpt(_ o: inout Int?) {}
 
 func overloadedByOptionality(_ a: inout Int!) {}
 // expected-note@-1 {{'overloadedByOptionality' previously declared here}}
-// expected-note@-2 {{'overloadedByOptionality' previously declared here}}
 func overloadedByOptionality(_ a: inout Int?) {}
-// expected-warning@-1 {{invalid redeclaration of 'overloadedByOptionality' which differs only by the kind of optional passed as an inout argument ('Int?' vs. 'Int!')}}
-// expected-warning@-2 {{invalid redeclaration of 'overloadedByOptionality' which differs only by the kind of optional passed as an inout argument ('Int?' vs. 'Int!')}}
-// expected-note@-3 {{overloading by kind of optional is deprecated and will be removed in a future release}}
-// expected-note@-4 {{overloading by kind of optional is deprecated and will be removed in a future release}}
+// expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality'}}
 
 func testInOutOptionality() {
   var i: Int! = 1

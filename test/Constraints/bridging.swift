@@ -321,11 +321,11 @@ func force_cast_fixit(_ a : [NSString]) -> [NSString] {
 
 // <rdar://problem/21244068> QoI: IUO prevents specific diagnostic + fixit about non-implicitly converted bridge types
 func rdar21244068(_ n: NSString!) -> String {
-  return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
+  return n  // expected-error {{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
 }
 
 func forceBridgeDiag(_ obj: BridgedClass!) -> BridgedStruct {
-  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
+  return obj // expected-error{{'BridgedClass' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
 }
 
 struct KnownUnbridged {}

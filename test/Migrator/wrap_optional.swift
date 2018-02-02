@@ -1,4 +1,6 @@
 // REQUIRES: objc_interop
+// FIXME: Disable until we deal with IUO being removed as a type
+// REQUIRES: rdar37040141
 // RUN: %empty-directory(%t.mod)
 // RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
 // RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -disable-migrator-fixits -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/API.json -emit-migrated-file-path %t/wrap_optional.swift.result -o /dev/null

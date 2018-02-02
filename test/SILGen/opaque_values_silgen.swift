@@ -782,14 +782,14 @@ func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
 
 // Tests contextual init() of opaque value types
 // ---
-// CHECK-LABEL: sil hidden @$S20opaque_values_silgen21s370_____optToOptCastyxSgSQyxGlF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden @$S20opaque_values_silgen21s370_____optToOptCastyxSgAClF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
 // CHECK: bb0([[ARG:%.*]] : $Optional<T>):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $Optional<T>, $Optional<T>
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[COPY__ARG]] : $Optional<T>
-// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s370_____optToOptCastyxSgSQyxGlF'
+// CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s370_____optToOptCastyxSgAClF'
 func s370_____optToOptCast<T>(_ x : T!) -> T? {
   return x
 }

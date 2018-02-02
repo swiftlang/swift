@@ -394,7 +394,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses21IUOFailableClassModelCAA011NonFailableC10Refinement{{[_0-9a-zA-Z]*}}fCTW
   // CHECK: bb0({{.*}}):
-  // CHECK:   [[FUNC:%.*]] = function_ref @$S9witnesses21IUOFailableClassModelC3fooSQyACGSi_tcfC : $@convention(method) (Int, @thick IUOFailableClassModel.Type) -> @owned Optional<IUOFailableClassModel>
+  // CHECK:   [[FUNC:%.*]] = function_ref @$S9witnesses21IUOFailableClassModelC3fooACSgSi_tcfC : $@convention(method) (Int, @thick IUOFailableClassModel.Type) -> @owned Optional<IUOFailableClassModel>
   // CHECK:   [[VALUE:%.*]] = apply [[FUNC]]({{.*}})
   // CHECK:   switch_enum [[VALUE]] : $Optional<IUOFailableClassModel>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NONEBB:bb[0-9]+]]
   //

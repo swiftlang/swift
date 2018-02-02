@@ -57,7 +57,7 @@ sil private @$S33class_isa_pointers_armv7k_watchos7MongrelC6methodyyFTo : $@conv
 entry(%0 : $Purebred):
   unreachable
 }
-sil private @$S33class_isa_pointers_armv7k_watchos7MongrelC7bellsOnSQyACGSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
+sil private @$S33class_isa_pointers_armv7k_watchos7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
 entry(%0 : $Int, %1 : $Purebred):
   unreachable
 }

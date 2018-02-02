@@ -66,3 +66,12 @@ func testInoutOpaque(_ c: C, i: Int) {
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCSiIegly_ACSiytIeglir_TR : $@convention(thin) (@inout C, @in Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCSiytIeglir_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in Int) -> @out ()) -> () {
+
+func closureTakingOptional(_ fn: (Int?) -> ()) {}
+closureTakingOptional({ (_: Any) -> () in })
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypIgi_SiSgIgy_TR : $@convention(thin) (Optional<Int>, @guaranteed @noescape @callee_guaranteed (@in Any) -> ()) -> ()
+// CHECK:   [[ANYADDR:%.*]] = alloc_stack $Any
+// CHECK:   [[OPTADDR:%.*]] = init_existential_addr [[ANYADDR]] : $*Any, $Optional<Int>
+// CHECK:   store %0 to [trivial] [[OPTADDR]] : $*Optional<Int>
+// CHECK:   apply %1([[ANYADDR]]) : $@noescape @callee_guaranteed (@in Any) -> ()
