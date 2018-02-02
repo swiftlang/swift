@@ -600,6 +600,119 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
+static void dumpOneScopeMapLocation(unsigned bufferID,
+                                    std::pair<unsigned, unsigned> lineColumn,
+                                    SourceManager &sourceMgr, ASTScope &scope) {
+  SourceLoc loc =
+      sourceMgr.getLocForLineCol(bufferID, lineColumn.first, lineColumn.second);
+  if (loc.isInvalid())
+    return;
+
+  llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
+               << "***\n";
+  auto locScope = scope.findInnermostEnclosingScope(loc);
+  locScope->print(llvm::errs(), 0, false, false);
+
+  // Dump the AST context, too.
+  if (auto dc = locScope->getDeclContext()) {
+    dc->printContext(llvm::errs());
+  }
+
+  // Grab the local bindings introduced by this scope.
+  auto localBindings = locScope->getLocalBindings();
+  if (!localBindings.empty()) {
+    llvm::errs() << "Local bindings: ";
+    interleave(localBindings.begin(), localBindings.end(),
+               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
+               [&]() { llvm::errs() << " "; });
+    llvm::errs() << "\n";
+  }
+}
+
+static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
+                                 CompilerInstance &Instance, SourceFile *SF) {
+  ASTScope &scope = SF->getScope();
+
+  if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
+    scope.expandAll();
+  } else if (auto bufferID = SF->getBufferID()) {
+    SourceManager &sourceMgr = Instance.getSourceMgr();
+    // Probe each of the locations, and dump what we find.
+    for (auto lineColumn :
+         Invocation.getFrontendOptions().DumpScopeMapLocations)
+      dumpOneScopeMapLocation(*bufferID, lineColumn, sourceMgr, scope);
+
+    llvm::errs() << "***Complete scope map***\n";
+  }
+  // Print the resulting map.
+  scope.print(llvm::errs());
+}
+
+static SourceFile *
+getSourceFileOfCodeToBeGenerated(CompilerInvocation &Invocation,
+                                 CompilerInstance &Instance) {
+  SourceFile *SF = Instance.getPrimarySourceFile();
+  if (!SF) {
+    SourceFileKind Kind = Invocation.getSourceFileKind();
+    SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+  }
+  return SF;
+}
+
+/// We may have been told to dump the AST (either after parsing or
+/// type-checking, which is already differentiated in
+/// CompilerInstance::performSema()), so dump or print the main source file and
+/// return.
+
+static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
+                                      CompilerInstance &Instance) {
+  FrontendOptions &opts = Invocation.getFrontendOptions();
+  FrontendOptions::ActionType Action = opts.RequestedAction;
+  ASTContext &Context = Instance.getASTContext();
+  switch (Action) {
+  default:
+    return None;
+
+  case FrontendOptions::ActionType::PrintAST:
+    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+        ->print(llvm::outs(), PrintOptions::printEverything());
+    break;
+
+  case FrontendOptions::ActionType::DumpScopeMaps:
+    dumpAndPrintScopeMap(
+        Invocation, Instance,
+        getSourceFileOfCodeToBeGenerated(Invocation, Instance));
+    break;
+
+  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+        ->getTypeRefinementContext()
+        ->dump(llvm::errs(), Context.SourceMgr);
+    break;
+
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+        ->dumpInterfaceHash(llvm::errs());
+    break;
+
+  case FrontendOptions::ActionType::EmitSyntax:
+    emitSyntax(getSourceFileOfCodeToBeGenerated(Invocation, Instance),
+               Invocation.getLangOptions(), Instance.getSourceMgr(),
+               opts.InputsAndOutputs.getSingleOutputFilename());
+    break;
+
+  case FrontendOptions::ActionType::DumpParse:
+  case FrontendOptions::ActionType::DumpAST:
+    getSourceFileOfCodeToBeGenerated(Invocation, Instance)->dump();
+    break;
+
+  case FrontendOptions::ActionType::EmitImportedModules:
+    emitImportedModules(Context, Instance.getMainModule(), opts);
+    break;
+  }
+  return Context.hadError();
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -677,82 +790,8 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  // We've been told to dump the AST (either after parsing or type-checking,
-  // which is already differentiated in CompilerInstance::performSema()),
-  // so dump or print the main source file and return.
-  if (Action == FrontendOptions::ActionType::DumpParse ||
-      Action == FrontendOptions::ActionType::DumpAST ||
-      Action == FrontendOptions::ActionType::EmitSyntax ||
-      Action == FrontendOptions::ActionType::PrintAST ||
-      Action == FrontendOptions::ActionType::DumpScopeMaps ||
-      Action == FrontendOptions::ActionType::DumpTypeRefinementContexts ||
-      Action == FrontendOptions::ActionType::DumpInterfaceHash) {
-    SourceFile *SF = Instance.getPrimarySourceFile();
-    if (!SF) {
-      SourceFileKind Kind = Invocation.getSourceFileKind();
-      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
-    }
-    if (Action == FrontendOptions::ActionType::PrintAST)
-      SF->print(llvm::outs(), PrintOptions::printEverything());
-    else if (Action == FrontendOptions::ActionType::DumpScopeMaps) {
-      ASTScope &scope = SF->getScope();
-
-      if (opts.DumpScopeMapLocations.empty()) {
-        scope.expandAll();
-      } else if (auto bufferID = SF->getBufferID()) {
-        SourceManager &sourceMgr = Instance.getSourceMgr();
-        // Probe each of the locations, and dump what we find.
-        for (auto lineColumn : opts.DumpScopeMapLocations) {
-          SourceLoc loc = sourceMgr.getLocForLineCol(*bufferID,
-                                                     lineColumn.first,
-                                                     lineColumn.second);
-          if (loc.isInvalid()) continue;
-
-          llvm::errs() << "***Scope at " << lineColumn.first << ":"
-            << lineColumn.second << "***\n";
-          auto locScope = scope.findInnermostEnclosingScope(loc);
-          locScope->print(llvm::errs(), 0, false, false);
-
-          // Dump the AST context, too.
-          if (auto dc = locScope->getDeclContext()) {
-            dc->printContext(llvm::errs());
-          }
-
-          // Grab the local bindings introduced by this scope.
-          auto localBindings = locScope->getLocalBindings();
-          if (!localBindings.empty()) {
-            llvm::errs() << "Local bindings: ";
-            interleave(localBindings.begin(), localBindings.end(),
-                       [&](ValueDecl *value) {
-                         llvm::errs() << value->getFullName();
-                       },
-                       [&]() {
-                         llvm::errs() << " ";
-                       });
-            llvm::errs() << "\n";
-          }
-        }
-
-        llvm::errs() << "***Complete scope map***\n";
-      }
-
-      // Print the resulting map.
-      scope.print(llvm::errs());
-    } else if (Action ==
-               FrontendOptions::ActionType::DumpTypeRefinementContexts)
-      SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
-    else if (Action == FrontendOptions::ActionType::DumpInterfaceHash)
-      SF->dumpInterfaceHash(llvm::errs());
-    else if (Action == FrontendOptions::ActionType::EmitSyntax) {
-      emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
-                 opts.InputsAndOutputs.getSingleOutputFilename());
-    } else
-      SF->dump();
-    return Context.hadError();
-  } else if (Action == FrontendOptions::ActionType::EmitImportedModules) {
-    emitImportedModules(Context, Instance.getMainModule(), opts);
-    return Context.hadError();
-  }
+  if (auto r = dumpASTIfNeeded(Invocation, Instance))
+    return *r;
 
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())
