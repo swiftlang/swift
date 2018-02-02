@@ -152,7 +152,6 @@ TYPE_NODES = [
                    token_choices=[
                        'ThrowsToken',
                        'RethrowsToken',
-                       'ThrowToken',
                    ]),
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),

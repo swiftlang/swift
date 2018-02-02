@@ -110,8 +110,6 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
 
-  SyntaxArena &Arena;
-
   std::vector<RC<RawSyntax>> &Storage;
 
   // Offet for 'Storage' this context owns from.
@@ -139,20 +137,14 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
     return makeArrayRef(Storage).drop_front(Offset);
   }
 
-  RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<RC<RawSyntax>> Parts);
-  RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts);
-  RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts);
-
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
-                       unsigned BufferID);
+    DiagnosticEngine &Diags, SourceManager &SourceMgr, unsigned BufferID);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
-        Arena(CtxtHolder->Arena),
         Storage(CtxtHolder->Storage), Offset(Storage.size()),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
@@ -191,8 +183,7 @@ public:
   void addRawSyntax(RC<RawSyntax> Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(Token &Tok, Trivia &LeadingTrivia,
-                Trivia &TrailingTrivia);
+  void addToken(Token &Tok, Trivia &LeadingTrivia, Trivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
   void addSyntax(Syntax Node);
