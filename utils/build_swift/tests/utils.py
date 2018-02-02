@@ -22,7 +22,16 @@ __all__ = [
     'redirect_stderr',
     'redirect_stdout',
     'TestCase',
+
+    'UTILS_PATH',
 ]
+
+
+UTILS_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__),
+    os.pardir,
+    os.pardir,
+))
 
 
 # -----------------------------------------------------------------------------
