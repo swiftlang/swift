@@ -209,7 +209,7 @@ public extension Tensor {
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
-                              keep_dims: keepingDimensions))
+                              keep_dims: keepingDimensions, Tidx: Int.self))
   }
 
   @_inlineable
@@ -225,7 +225,7 @@ public extension Tensor {
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Min", "tt:t", handle, Tensor<Int>(axes).handle,
-                              keep_dims: keepingDimensions))
+                              keep_dims: keepingDimensions, Tidx: Int.self))
   }
 
   @_inlineable
@@ -241,7 +241,7 @@ public extension Tensor {
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Max", "tt:t", handle, Tensor<Int>(axes).handle,
-                        keep_dims: keepingDimensions))
+                              keep_dims: keepingDimensions, Tidx: Int.self))
   }
 
   @_inlineable
@@ -257,7 +257,7 @@ public extension Tensor {
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle,
-                              keep_dims: keepingDimensions))
+                              keep_dims: keepingDimensions, Tidx: Int.self))
   }
 
   @inline(never) // make @_inlineable when implemented.
@@ -726,6 +726,17 @@ public enum Padding {
   case same, valid
 }
 
+internal extension Padding {
+  @_inlineable
+  @_versioned
+  var cName: String {
+    switch self {
+    case .same: return "SAME"
+    case .valid: return "VALID"
+    }
+  }
+}
+
 public extension Tensor where Unit : FloatingPoint {
   @_inlineable
   // @differentiable(
@@ -737,8 +748,8 @@ public extension Tensor where Unit : FloatingPoint {
     strides: [Int],
     padding: Padding
   ) -> Tensor {
-    // FIXME: handle attributes (strides and padding)
-    return Tensor(#tfop("Conv2D", "tt:t", handle, filter.handle))
+    return Tensor(#tfop("Conv2D", "tt:t", handle, filter.handle,
+                        strides: strides, padding: padding.cName))
   }
 
   @_inlineable
@@ -754,7 +765,7 @@ public extension Tensor where Unit : FloatingPoint {
   ) -> Tensor {
     return Tensor(#tfop("MaxPoolV2", "ttt:t", handle,
                   Tensor<Int32>(kernelSize).handle,
-                  Tensor<Int32>(strides).handle))
+                  Tensor<Int32>(strides).handle, padding: padding.cName))
   }
 
   @_inlineable
@@ -763,7 +774,6 @@ public extension Tensor where Unit : FloatingPoint {
     strides: [Int],
     padding: Padding
   ) -> Tensor {
-    // FIXME: handle attributes (padding)
     return maxPooled(kernelSize: Tensor<Int>(kernelSize),
                      strides: Tensor<Int>(strides),
                      padding: padding)
@@ -781,6 +791,8 @@ public extension Tensor where Unit : FloatingPoint {
     padding: Padding
   ) -> Tensor {
     // FIXME: handle attributes (ksize, strides, padding)
-    return Tensor(#tfop("AvgPool", "t:t", handle))
+    return Tensor(#tfop("AvgPool", "t:t", handle,
+                        ksize: kernelSize, strides: strides,
+                        padding: padding.cName))
   }
 }

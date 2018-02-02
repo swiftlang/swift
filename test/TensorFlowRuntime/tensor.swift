@@ -33,34 +33,52 @@ func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
   expectLT(abs(lhs - rhs), error)
 }
 
-@inline(never)
-func testInitializers() {
+TensorTests.testCPUAndGPU("Initializers") {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
-  expectEqual(Array(x.array.units),
-    [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
+  expectEqual(x.units, [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
 }
-TensorTests.testCPUAndGPU("Initializers", testInitializers)
 
-@inline(never)
-func testFactoryInitializers() {
+TensorTests.testCPUAndGPU("FactoryInitializers") {
   let x = Tensor<Float>.ones(shape: [1, 10])
-  expectEqual(Array(x.array.units),
-    Array(repeating: 1, count: 10))
+  expectEqual(x.units, Array(repeating: 1, count: 10))
 }
-TensorTests.testCPUAndGPU("FactoryInitializers", testFactoryInitializers)
 
-@inline(never)
-func testSimpleMath() {
+TensorTests.testCPUAndGPU("DataTypeCast") {
+  let x: Tensor<Int32> = .ones(shape: [5, 5])
+  let ints = Tensor<Int>(x)
+  let floats = Tensor<Float>(x)
+  let i8s = Tensor<Int8>(floats)
+  expectEqual(ints.array, ShapedArray(shape: [5, 5], repeating: 1))
+  expectEqual(floats.array, ShapedArray(shape: [5, 5], repeating: 1))
+  expectEqual(i8s.array, ShapedArray(shape: [5, 5], repeating: 1))
+}
+
+TensorTests.testCPUAndGPU("Reduction") {
+  let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
+  let sum = x.sum(alongAxes: 0, keepingDimensions: true)
+  expectEqual(ShapedArray(shape: [1, 5], units: [2, 4, 6, 8, 10]), sum.array)
+}
+
+TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2]).toDevice()
   let y = tanh(x)
   let array = y.array
   expectNearlyEqual(array.units[0], 0.833655, byError: 0.0001)
   expectNearlyEqual(array.units[1], 0.833655, byError: 0.0001)
 }
-TensorTests.testCPUAndGPU("SimpleMath", testSimpleMath)
 
-@inline(never)
-func test3Adds() {
+#if false
+TensorTests.testCPUAndGPU("Convolution") {
+  let x = Tensor<Float>(shape: [1, 3, 3, 1], repeating: 0.5)
+  let filter = Tensor<Float>(shape: [1, 3, 3, 1],
+                             units: [0, 1, 0, 1, 1, 1, 0, 1, 0])
+  // FIXME: Bug "attribute 'strides' requires a constant argument".
+  let y = x.convolved2D(withFilter: filter,
+                        strides: [1, 1, 1, 1], padding: .same)
+}
+#endif
+
+TensorTests.testCPUAndGPU("3Adds") {
   let a = Tensor([1]).toDevice()
   let b = Tensor([2]).toDevice()
   let c = Tensor([3]).toDevice()
@@ -68,10 +86,8 @@ func test3Adds() {
   let o = a + b + c
   expectEqual(o.array.units[0], 6)
 }
-TensorTests.testCPUAndGPU("test3Adds", test3Adds)
 
-@inline(never)
-func testMultiOpMath() {
+TensorTests.testCPUAndGPU("testMultiOpMath") {
   let x = Tensor<Float>([1.2, 1.2]).toDevice()
   let y = Tensor<Float>([4.3, 4.3]).toDevice()
   let sum = x + y
@@ -80,10 +96,8 @@ func testMultiOpMath() {
   _ = expsqr
   // TODO: Check result
 }
-TensorTests.testCPUAndGPU("testMultiOpMath", testMultiOpMath)
 
-@inline(never)
-func testXWPlusB() {
+TensorTests.testCPUAndGPU("testXWPlusB") {
   // Shape: 4
   let x = Tensor([1.0, 2.0, 2.0, 1.0]).toDevice()
   // Shape: 2 x 4
@@ -94,11 +108,9 @@ func testXWPlusB() {
   _ = x ⊗ w + b
   // TODO: Check result
 }
-TensorTests.testCPUAndGPU("testXWPlusB", testXWPlusB)
 
-
-@inline(never)
-func simpleCounterLoop() {
+// FIXME: The While op doesn't work on the CPU.
+TensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
   var a = Tensor<Int>(0)
   let b = Tensor<Int>(1)
@@ -113,11 +125,6 @@ func simpleCounterLoop() {
   a -= b
   expectEqual(a.scalar, 8)
 }
-
-// FIXME: The While op doesn't work on the CPU.
-TensorTests.testGPU("simpleCounterLoop", simpleCounterLoop)
-
-
 
 #if false // FIXME: Exposing partitioning bugs.
 @inline(never)
@@ -303,6 +310,7 @@ func testXORClassifierTraining() {
     mutating func train(inputBatch x: Tensor<Float>,
                         outputBatch expected: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
+      /// FIXME: Partitioner assertion: "BasicBlock not in our subset".
       for i in 0..<iterationCount {
         let
           mmul1 = x ⊗ w1,
