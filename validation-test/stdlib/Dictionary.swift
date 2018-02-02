@@ -100,7 +100,7 @@ DictionaryTestSuite.test("Hashable") {
     checkHashable([dd1, dd2, dd3, dd4, dd5, dd6, dd7], equalityOracle: { $0 == $1 })
 
     // Check that hash is equal even though dictionary is traversed differently
-    var d5: Dictionary<Int, String> = [1: "meow", 2: "meow", 4: "mooo"]
+    var d5: Dictionary<Int, String> = [1: "meow", 2: "meow", 3: "mooo", 4: "woof", 5: "baah", 6: "mooo"]
     let expected = d5.hashValue
     for capacity in [4, 8, 16, 32, 64, 128, 256] {
         d5.reserveCapacity(capacity)
