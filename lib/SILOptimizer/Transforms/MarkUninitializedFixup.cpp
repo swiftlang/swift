@@ -74,6 +74,10 @@ namespace {
 
 struct MarkUninitializedFixup : SILFunctionTransform {
   void run() override {
+    // Don't rerun on deserialized functions. Nothing should have changed.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     bool MadeChange = false;
     for (auto &BB : *getFunction()) {
       for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
