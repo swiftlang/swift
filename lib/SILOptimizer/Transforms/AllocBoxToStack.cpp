@@ -823,6 +823,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     PromotedParamCloner Cloner(F, Serialized, PromotedArgIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
+    pass.T->notifyAddFunction(ClonedFn, F);
   }
 
   // Now create the new partial_apply using the cloned function.
