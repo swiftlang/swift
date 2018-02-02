@@ -1418,7 +1418,10 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
     s.insert(TestObjCKeyTy(2040) as TestBridgedKeyTy)
 
     var identity2 = s._rawIdentifier()
-    expectNotEqual(identity1, identity2)
+    // Storage identity may or may not change depending on allocation behavior.
+    // (s is eagerly bridged to a regular uniquely referenced native Set.)
+    //expectNotEqual(identity1, identity2)
+
     expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
 
@@ -1572,10 +1575,13 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
 
   expectEqual(identity1, s._rawIdentifier())
 
-  // Inserting an item should now create storage unique from the bridged set.
   s.insert(TestBridgedKeyTy(4040))
   var identity2 = s._rawIdentifier()
-  expectNotEqual(identity1, identity2)
+
+  // Storage identity may or may not change depending on allocation behavior.
+  // (s is eagerly bridged to a regular uniquely referenced native Set.)
+  //expectNotEqual(identity1, identity2)
+
   expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
@@ -3153,6 +3159,29 @@ SetTestSuite.test("first") {
 
   expectTrue(s1.contains(s1.first!))
   expectNil(emptySet.first)
+}
+
+SetTestSuite.test("capacity/init(minimumCapacity:)") {
+  let s0 = Set<String>(minimumCapacity: 0)
+  expectGE(s0.capacity, 0)
+
+  let s1 = Set<String>(minimumCapacity: 1)
+  expectGE(s1.capacity, 1)
+
+  let s3 = Set<String>(minimumCapacity: 3)
+  expectGE(s3.capacity, 3)
+
+  let s4 = Set<String>(minimumCapacity: 4)
+  expectGE(s4.capacity, 4)
+
+  let s10 = Set<String>(minimumCapacity: 10)
+  expectGE(s10.capacity, 10)
+
+  let s100 = Set<String>(minimumCapacity: 100)
+  expectGE(s100.capacity, 100)
+
+  let s1024 = Set<String>(minimumCapacity: 1024)
+  expectGE(s1024.capacity, 1024)
 }
 
 SetTestSuite.test("capacity/reserveCapacity(_:)") {
