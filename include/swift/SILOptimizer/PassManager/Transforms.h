@@ -122,7 +122,6 @@ namespace swift {
     /// pipeline on it.
     void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
 
-  protected:
     SILFunction *getFunction() { return F; }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
