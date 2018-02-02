@@ -97,8 +97,7 @@ public struct Bool {
   public static func random(
     using generator: RandomNumberGenerator = Random.default
   ) -> Bool {
-    let random = Int8.random(in: 0 ... 1, using: generator)
-    return self.init(Builtin.trunc_Int8_Int1(random._value))
+    return generator.next() % 2 == 0
   }
 }
 

@@ -13,9 +13,9 @@ RandomTests.test("basic random numbers") {
   expectTrue(randomNumber1 != randomNumber2)
 
   let randomDouble1 = Double.random(in: 0 ..< 1)
-  expectTrue(randomDouble1 < 1 && randomDouble1 > 0)
+  expectTrue(randomDouble1 < 1 && randomDouble1 >= 0)
   let randomDouble2 = Double.random(in: 0 ..< 1)
-  expectTrue(randomDouble1 < 1 && randomDouble2 > 0)
+  expectTrue(randomDouble1 < 1 && randomDouble2 >= 0)
   expectTrue(randomDouble1 != randomDouble2)
 }
 
@@ -119,14 +119,86 @@ RandomTests.test("random elements from collection") {
   }
 }
 
-// uniform distribution
+// Shuffle
+
+RandomTests.test("shuffling") {
+  var alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l",
+                  "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+                  "y", "z"]
+  for _ in 0 ..< 1_000 {
+    let newAlphabet = alphabet.shuffled()
+    expectTrue(newAlphabet != alphabet)
+    alphabet = newAlphabet
+  }
+}
+
+// Different RNGS
+
+public class LCRNG: RandomNumberGenerator {
+  private var state: UInt64
+  private static let m: UInt64 = 1 << 48
+  private static let a: UInt64 = 25214903917
+  private static let c: UInt64 = 11
+
+  public init(seed: UInt64) {
+    self.state = seed
+  }
+  
+  private func next() -> UInt32 {
+    state = (LCRNG.a &* state &+ LCRNG.c) % LCRNG.m
+    return UInt32(truncatingIfNeeded: state >> 15)
+  }
+  
+  public func next() -> UInt64 {
+    return UInt64(next() as UInt32) << 32 | UInt64(next() as UInt32)
+  }
+}
+
+RandomTests.test("different random number generators") {
+  // 0 = first pass array, 1 = second pass array
+  var intPasses: [[Int]] = [[], []]
+  var doublePasses: [[Double]] = [[], []]
+  var boolPasses: [[Bool]] = [[], []]
+  var collectionPasses: [[Int]] = [[], []]
+  var shufflePasses: [[[Int]]] = [[], []]
+  
+  for i in 0 ..< 2 {
+    let seed: UInt64 = 1234567890
+    let rng = LCRNG(seed: seed)
+    
+    for _ in 0 ..< 1_000 {
+      let randomInt = Int.random(in: 0 ... 100, using: rng)
+      intPasses[i].append(randomInt)
+      
+      let randomDouble = Double.random(in: 0 ..< 1, using: rng)
+      doublePasses[i].append(randomDouble)
+      
+      let randomBool = Bool.random(using: rng)
+      boolPasses[i].append(randomBool)
+      
+      let randomIntFromCollection = Array(0 ... 100).random(using: rng)
+      expectNotNil(randomIntFromCollection)
+      collectionPasses[i].append(randomIntFromCollection!)
+      
+      let randomShuffledCollection = Array(0 ... 100).shuffled(using: rng)
+      shufflePasses[i].append(randomShuffledCollection)
+    }
+  }
+  
+  expectTrue(intPasses[0] == intPasses[1])
+  expectTrue(doublePasses[0] == doublePasses[1])
+  expectTrue(boolPasses[0] == boolPasses[1])
+  expectTrue(collectionPasses[0] == collectionPasses[1])
+  expectTrue(shufflePasses[0] == shufflePasses[1])
+}
+
+// Uniform Distribution
 
 func chi2Test(_ samples: [Double]) -> Bool {
-  let upperBound = 50
-  let numberOfTrials = 500_000
-  let expected = Double(numberOfTrials / upperBound)
-  let cvLow = 28.9 // 1% with a degree of freedom of (50 - 1)
-  let cvHigh = 74.9 // 99% with a degree of freedom of (50 - 1)
+  precondition(samples.count == 50, "confidence interval requires 50 samples")
+  let expected = samples.reduce(0, +) / Double(samples.count)
+  let cvLow = 23.983 // 0.1% with a degree of freedom of (50 - 1)
+  let cvHigh = 85.351 // 99.9% with a degree of freedom of (50 - 1)
   let chi2 = samples.map {
     (($0 - expected) * ($0 - expected)) / expected
   }.reduce(0, +)
