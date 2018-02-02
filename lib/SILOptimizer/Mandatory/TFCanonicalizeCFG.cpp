@@ -80,16 +80,16 @@ void ConditionalSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const 
   OS << "\n";
   if (auto t = getTrue()) {
     t->print(OS, indent+2);
-    OS << "\n";
   } else {
-    OS.indent(indent+2) << "empty true condition block\n";
+    OS.indent(indent+2) << "<<null true condition block>>";
   }
+  OS << "\n";
   if (auto f = getFalse()) {
     f->print(OS, indent+2);
-    OS << "}";
   } else {
-    OS.indent(indent+2) << "empty false condition block}";
+    OS.indent(indent+2) << "<<null false condition block>>";
   }
+  OS << "}";
 }
 
 //===----------------------------------------------------------------------===//
