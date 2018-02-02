@@ -835,21 +835,6 @@ extension ${Self} {
     return Builtin.unsafeCastToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI)#12 : move to an initializer on _Buffer.
-  // Make sure the compiler does not inline _copyBuffer to reduce code size.
-  @inline(never)
-  @_inlineable
-  @_versioned
-  static internal func _copyBuffer(_ buffer: inout _Buffer) {
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._copyContents(
-      subRange: buffer.indices,
-      initializing: newBuffer.firstElementAddress)
-    buffer = _Buffer(
-      _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
-  }
-
   @_inlineable
   @_versioned
   @_semantics("array.make_mutable")
