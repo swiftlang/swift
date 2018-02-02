@@ -1245,23 +1245,23 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_indirect) {
   Metadata *metadata2 = &testMetadata2.base;
 
   auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
-  swift_retain(refAndObjectAddr.first);
+  swift_retain(refAndObjectAddr.object);
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
-  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+  } existBox{{{refAndObjectAddr.object, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.object), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
@@ -1281,23 +1281,23 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
   Metadata *metadata2 = &testMetadata2.base;
 
   auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
-  swift_retain(refAndObjectAddr.first);
+  swift_retain(refAndObjectAddr.object);
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
-  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+  } existBox{{{refAndObjectAddr.object, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.object), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
@@ -1322,15 +1322,15 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
@@ -1355,15 +1355,15 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
@@ -1384,13 +1384,13 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
 
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   void *someAddr = &anyVWT;
-  swift_retain(refAndObjectAddr2.first);
+  swift_retain(refAndObjectAddr2.object);
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
   } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
-    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
@@ -1400,7 +1400,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
@@ -1421,13 +1421,13 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
 
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   void *someAddr = &anyVWT;
-  swift_retain(refAndObjectAddr2.first);
+  swift_retain(refAndObjectAddr2.object);
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
   } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
-    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
@@ -1437,7 +1437,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithCopy_pod) {
@@ -1530,15 +1530,15 @@ TEST(TestOpaqueExistentialBox, test_initWithCopy_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->initializeWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                              reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
@@ -1563,13 +1563,13 @@ TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->initializeWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                              reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
