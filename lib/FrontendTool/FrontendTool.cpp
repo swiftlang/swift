@@ -713,6 +713,22 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
+static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty())
+    return;
+  if (Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    emitReferenceDependencies(Instance.getASTContext().Diags, SF,
+                              *Instance.getDependencyTracker(),
+                              Invocation.getFrontendOptions());
+  }
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -750,8 +766,7 @@ static bool performCompile(CompilerInstance &Instance,
       return compileLLVMIR(Invocation, Instance, Stats);
 
   ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
-  if (shouldTrackReferences)
+  if (!opts.ReferenceDependenciesFilePath.empty())
     Instance.setReferencedNameTracker(&nameTracker);
 
   if (FrontendOptions::shouldActionOnlyParse(Action))
@@ -801,15 +816,7 @@ static bool performCompile(CompilerInstance &Instance,
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
-  if (shouldTrackReferences) {
-    if (Instance.getPrimarySourceFiles().empty())
-      Context.Diags.diagnose(
-          SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
-    for (auto *SF : Instance.getPrimarySourceFiles()) {
-      emitReferenceDependencies(Context.Diags, SF,
-                                *Instance.getDependencyTracker(), opts);
-    }
-  }
+  emitReferenceDependenciesIfNeeded(Invocation, Instance);
 
   (void)emitLoadedModuleTraceIfNeeded(Context, *Instance.getDependencyTracker(),
                                       opts);
