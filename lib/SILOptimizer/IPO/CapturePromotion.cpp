@@ -1306,6 +1306,9 @@ class CapturePromotionPass : public SILModuleTransform {
   void run() override {
     SmallVector<SILFunction*, 128> Worklist;
     for (auto &F : *getModule()) {
+      if (F.wasDeserialized())
+        continue;
+
       processFunction(&F, Worklist);
     }
 

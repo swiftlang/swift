@@ -614,7 +614,11 @@ class MandatoryInlining : public SILModuleTransform {
     ImmutableFunctionSet::Factory SetFactory;
 
     for (auto &F : *M) {
-      
+      // Don't inline into deserialized functions. They have already inlined all
+      // mandatory callees.
+      if (F.wasDeserialized())
+        continue;
+
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
         continue;

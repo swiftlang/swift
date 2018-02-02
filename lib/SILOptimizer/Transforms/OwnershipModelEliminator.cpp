@@ -297,6 +297,9 @@ namespace {
 struct OwnershipModelEliminator : SILModuleTransform {
   void run() override {
     for (auto &F : *getModule()) {
+      if (F.wasDeserialized())
+        continue;
+
       // Set F to have unqualified ownership.
       F.setUnqualifiedOwnership();
 
