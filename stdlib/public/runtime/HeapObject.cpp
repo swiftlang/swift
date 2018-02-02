@@ -236,11 +236,6 @@ BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
 }
 
 BoxPair swift::swift_allocBox(const Metadata *type) {
-  return _swift_allocBox(type);
-}
-
-SWIFT_CC(swift)
-static BoxPair _swift_allocBox_(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
@@ -251,8 +246,6 @@ static BoxPair _swift_allocBox_(const Metadata *type) {
 
   return BoxPair{allocation, projection};
 }
-
-auto swift::_swift_allocBox = _swift_allocBox_;
 
 void swift::swift_deallocBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
