@@ -83,11 +83,11 @@ func warnNestedOptionalToOptionalAnyCoercion(_ a: Int?, _ b: Any??, _ c: Int???,
 }
 
 func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
-  _ = takeAny(a, b) // expected-warning {{expression implicitly coerced from 'Int!' to 'Any'}}
+  _ = takeAny(a, b) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
   // expected-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
   // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{16-16= as Any}}
-  // expected-warning@-4 {{expression implicitly coerced from 'Any?!' to 'Any'}}
+  // expected-warning@-4 {{expression implicitly coerced from 'Any??' to 'Any'}}
   // expected-note@-5 {{force-unwrap the value to avoid this warning}}{{19-19=!!}}
   // expected-note@-6 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{19-19= as Any}}
 
@@ -95,7 +95,7 @@ func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
 }
 
 func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
-  takesOptionalAny(a, b) // expected-warning {{expression implicitly coerced from 'Any?!' to 'Any?'}}
+  takesOptionalAny(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any?'}}
   // expected-note@-1 {{provide a default value to avoid this warning}}{{24-24= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{24-24=!}}
   // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
@@ -104,10 +104,10 @@ func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any??
   takesOptionalAny(a, b!)
   takesOptionalAny(a, b as Any?)
 
-  takesOptionalAny(c, d) // expected-warning {{expression implicitly coerced from 'Int??!' to 'Any?'}}
+  takesOptionalAny(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any?'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{21-21=!!}}
   // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{21-21= as Any?}}
-  // expected-warning@-3 {{expression implicitly coerced from 'Any???!' to 'Any?'}}
+  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any?'}}
   // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{24-24=!!!}}
   // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
 
@@ -118,7 +118,7 @@ func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any??
 func takesIUO(_: Any!, _: Any!) {}
 
 func warnOptionalToIUOAny(_ a: Int?, _ b: Any??, _ c: Int???, _ d: Any????) {
-  takesIUO(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any!'}}
+  takesIUO(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any?'}}
   // expected-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
   // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{16-16= as Any?}}
@@ -127,10 +127,10 @@ func warnOptionalToIUOAny(_ a: Int?, _ b: Any??, _ c: Int???, _ d: Any????) {
   takesIUO(a, b!)
   takesIUO(a, b as Any?)
 
-  takesIUO(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any!'}}
+  takesIUO(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any?'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{13-13=!!}}
   // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{13-13= as Any?}}
-  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any!'}}
+  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any?'}}
   // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{16-16=!!!}}
   // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{16-16= as Any?}}
 

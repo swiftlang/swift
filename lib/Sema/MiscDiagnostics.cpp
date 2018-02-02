@@ -3524,11 +3524,6 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
-      // Treat an IUO destination type as a regular Optional type, as we cannot
-      // suggest a fix-it of e.g 'as Any!'.
-      if (auto baseType = destType->getImplicitlyUnwrappedOptionalObjectType())
-        destType = OptionalType::get(baseType);
-
       SmallString<16> coercionString;
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();
