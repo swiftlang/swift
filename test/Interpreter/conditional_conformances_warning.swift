@@ -7,7 +7,7 @@ protocol P {
 }
 
 struct X : P {
-  func foo() { print("X.P") }
+  func foo() { print("X.foo") }
 }
 
 struct Y<T> {
@@ -25,7 +25,9 @@ func tryAsP(_ value: Any) {
 }
 
 extension Dictionary: P where Value == (Key) -> Bool {
-  func foo() { }
+  func foo() {
+    print("Dictionary.foo")
+  }
 }
 
 
@@ -33,3 +35,5 @@ let yx = Y(wrapped: X())
 
 // CHECK_WARNINGS: warning: Swift runtime does not yet support dynamically querying conditional conformance ('a.Y<a.X>': 'a.P')
 tryAsP(yx)
+let dict: [Int : (Int) -> Bool] = [:]
+tryAsP(dict)

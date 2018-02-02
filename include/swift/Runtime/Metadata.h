@@ -2304,7 +2304,7 @@ template<typename Runtime> class TargetGenericRequirementDescriptor;
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 template <typename Runtime>
-struct TargetProtocolConformanceDescriptor
+struct TargetProtocolConformanceDescriptor final
   : public swift::ABI::TrailingObjects<
              TargetProtocolConformanceDescriptor<Runtime>,
              RelativeContextPointer<Runtime>,
@@ -2745,7 +2745,25 @@ public:
     assert(getKind() == GenericRequirementKind::Layout);
     return Layout;
   }
+
+  /// Determine whether this generic requirement has a known kind.
+  ///
+  /// \returns \c false for any future generic requirement kinds.
+  bool hasKnownKind() const {
+    switch (getKind()) {
+    case GenericRequirementKind::BaseClass:
+    case GenericRequirementKind::Layout:
+    case GenericRequirementKind::Protocol:
+    case GenericRequirementKind::SameConformance:
+    case GenericRequirementKind::SameType:
+      return true;
+    }
+
+    return false;
+  }
 };
+using GenericRequirementDescriptor =
+  TargetGenericRequirementDescriptor<InProcess>;
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.

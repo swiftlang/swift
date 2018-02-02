@@ -160,8 +160,6 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
   switch (getConformanceKind()) {
   case ConformanceFlags::ConformanceKind::WitnessTable:
     return getStaticWitnessTable();
@@ -170,33 +168,36 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     return getWitnessTableAccessor()(type, nullptr, 0);
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
-    // FIXME: this needs to query the conditional requirements to form the
-    // array of witness tables to pass along to the accessor.
+    // Check the conditional requirements.
+    std::vector<unsigned> genericParamCounts;
+    (void)_gatherGenericParameterCounts(type->getTypeContextDescriptor(),
+                                        genericParamCounts);
+    auto genericArgs = type->getGenericArgs();
+    std::vector<const void *> conditionalArgs;
+    bool failed =
+      _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
+        [&](unsigned flatIndex) {
+          // FIXME: Adjust for non-key type parameters.
+          return genericArgs[flatIndex];
+        },
+        [&](unsigned depth, unsigned index) -> const Metadata *  {
+          // FIXME: Adjust for non-key type parameters.
+          if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
+                                                      genericParamCounts)) {
+            return genericArgs[*flatIndex];
+          }
 
-    // Pretty-print the type name.
-    auto typeNamePair = TypeNamePair(
-      swift_getTypeName(type, /*qualified=*/true));
-    std::string typeName(typeNamePair.data,
-                         typeNamePair.data + typeNamePair.length);
+          return nullptr;
+        });
+    if (failed) return nullptr;
 
-    // Demangle the protocol name.
-    DemangleOptions options;
-    options.DisplayEntityTypes = false;
-    std::string demangledProtocolName =
-      demangleSymbolAsString(StringRef(getProtocol()->Name), options);
-
-    warning(/*flag=*/0,
-            "warning: Swift runtime does not yet support dynamically "
-            "querying conditional conformance ('%s': '%s')\n",
-            typeName.c_str(), demangledProtocolName.c_str());
-    return nullptr;
+    return getWitnessTableAccessor()(
+                           type,
+                           (const swift::WitnessTable**)conditionalArgs.data(),
+                           conditionalArgs.size());
   }
-
-  default:
-    return nullptr;
   }
-#pragma clang diagnostic pop
-
+  return nullptr;
 }
 
 namespace {
@@ -584,6 +585,43 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     return nullptr;
   }
 
+  /// Local function to retrieve the witness table and record the result.
+  auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
+                                const Metadata *type) {
+    switch (descriptor.getConformanceKind()) {
+    case ConformanceFlags::ConformanceKind::WitnessTable:
+      // If the record provides a nondependent witness table for all
+      // instances of a generic type, cache it for the generic pattern.
+      C.cacheSuccess(type->getTypeContextDescriptor(), protocol,
+                     descriptor.getStaticWitnessTable());
+      return;
+
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+      // If the record provides a dependent witness table accessor,
+      // cache the result for the instantiated type metadata.
+      C.cacheSuccess(type, protocol, descriptor.getWitnessTable(type));
+      return;
+
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
+      // Note: we might end up doing more scanning for other conformances
+      // when checking the conditional requirements, so do a gross unlock/lock.
+      // FIXME: Don't do this :)
+      C.SectionsToScanLock.unlock();
+      auto witnessTable = descriptor.getWitnessTable(type);
+      C.SectionsToScanLock.lock();
+      if (witnessTable)
+        C.cacheSuccess(type, protocol, witnessTable);
+      else
+        C.cacheFailure(type, protocol);
+      return;
+    }
+    }
+
+    // Always fail, because we cannot interpret a future conformance
+    // kind.
+    C.cacheFailure(type, protocol);
+  };
+
   // Really scan conformance records.
 
   for (unsigned sectionIdx = startSectionIdx;
@@ -605,13 +643,8 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
-        // Store the type-protocol pair in the cache.
-        auto witness = descriptor.getWitnessTable(metadata);
-        if (witness) {
-          C.cacheSuccess(metadata, P, witness);
-        } else {
-          C.cacheFailure(metadata, P);
-        }
+        // Record the witness table.
+        recordWitnessTable(descriptor, metadata);
 
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
@@ -630,31 +663,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
-        // Store the type-protocol pair in the cache.
-        switch (descriptor.getConformanceKind()) {
-        case ConformanceFlags::ConformanceKind::WitnessTable:
-          // If the record provides a nondependent witness table for all
-          // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(type->getTypeContextDescriptor(), P,
-                         descriptor.getStaticWitnessTable());
-          break;
-
-        case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-        case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
-          // If the record provides a dependent witness table accessor,
-          // cache the result for the instantiated type metadata.
-          C.cacheSuccess(type, P, descriptor.getWitnessTable(type));
-          break;
-
-        default:
-          // Always fail, because we cannot interpret a future conformance
-          // kind.
-          C.cacheFailure(metadata, P);
-          break;
-        }
-#pragma clang diagnostic pop
+        recordWitnessTable(descriptor, type);
       }
     }
   }
@@ -729,18 +738,7 @@ bool swift::_checkGenericRequirements(
                       SubstGenericParameterFn substGenericParam) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
-    switch (req.getKind()) {
-    case GenericRequirementKind::BaseClass:
-    case GenericRequirementKind::Layout:
-    case GenericRequirementKind::Protocol:
-    case GenericRequirementKind::SameConformance:
-    case GenericRequirementKind::SameType:
-      break;
-
-    default:
-      // Unknown requirement kind. Bail out.
-      return true;
-    }
+    if (!req.hasKnownKind()) return true;
 
     // Resolve the subject generic parameter.
     auto subjectType =
