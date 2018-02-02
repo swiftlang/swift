@@ -538,6 +538,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
 
+  for (auto *favored : FavoredChoices)
+    favored->setFavored(false);
+
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
@@ -1791,6 +1794,27 @@ Constraint *ConstraintSystem::selectDisjunction(
   return disjunction;
 }
 
+static void
+favorLinkedChoices(ConstraintSystem &cs, const ValueDecl *op,
+                   llvm::function_ref<void(const Constraint *)> callback) {
+  for (const auto &constraint : cs.getConstraints()) {
+    if (constraint.getKind() != ConstraintKind::Disjunction)
+      continue;
+
+    auto *choice = constraint.getNestedConstraints()[0];
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      continue;
+
+    auto overload = choice->getOverloadChoice();
+    if (!overload.isDecl())
+      continue;
+
+    auto *decl = overload.getDecl();
+    if (decl->isOperator() && decl->getBaseName() == op->getBaseName())
+      callback(&constraint);
+  }
+}
+
 bool ConstraintSystem::solveSimplified(
     Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1901,6 +1925,14 @@ bool ConstraintSystem::solveSimplified(
       auto locator = disjunction->getLocator();
       assert(locator && "remembered disjunction doesn't have a locator?");
       DisjunctionChoices.push_back({locator, index});
+    }
+
+    if (auto *op = currentChoice.getOperatorDecl()) {
+      favorLinkedChoices(*this, op, [&](const Constraint *relatedDisjunction) {
+        auto favoredChoice = relatedDisjunction->getNestedConstraints()[index];
+        favoredChoice->setFavored();
+        scope.FavoredChoices.push_back(favoredChoice);
+      });
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables))

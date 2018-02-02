@@ -510,7 +510,7 @@ public:
   }
 
   /// Mark or retrieve whether this constraint should be favored in the system.
-  void setFavored() { IsFavored = true; }
+  void setFavored(bool flag = true) { IsFavored = flag; }
   bool isFavored() const { return IsFavored; }
 
   /// Whether the solver should remember which choice was taken for

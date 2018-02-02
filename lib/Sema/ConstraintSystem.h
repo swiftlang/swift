@@ -1451,6 +1451,8 @@ public:
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
+    llvm::SmallVector<Constraint *, 4> FavoredChoices;
+
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;
 
@@ -3253,6 +3255,8 @@ public:
   Constraint *operator->() const { return Choice; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
+
+  ValueDecl *getOperatorDecl() const { return getOperatorDecl(Choice); }
 
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
