@@ -925,6 +925,35 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
+/// Perform "stable" optimizations that are invariant across compiler versions.
+static bool performMandatorySILPasses(CompilerInvocation &Invocation,
+                                      SILModule *SM,
+                                      FrontendObserver *observer) {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::MergeModules) {
+    // Don't run diagnostic passes at all.
+  } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
+    if (runSILDiagnosticPasses(*SM))
+      return true;
+
+    if (observer) {
+      observer->performedSILDiagnostics(*SM);
+    }
+  } else {
+    // Even if we are not supposed to run the diagnostic passes, we still need
+    // to run the ownership evaluator.
+    if (runSILOwnershipEliminatorPass(*SM))
+      return true;
+  }
+
+  // Now if we are asked to link all, link all.
+  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
+    performSILLinking(SM, true);
+
+  if (Invocation.getSILOptions().MergePartialModules)
+    SM->linkAllFromCurrentModule();
+  return false;
+}
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
@@ -983,29 +1012,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                *OptRecordFile, &Instance.getSourceMgr()),
                            std::move(OptRecordFile));
 
-  // Perform "stable" optimizations that are invariant across compiler versions.
-  if (Action == FrontendOptions::ActionType::MergeModules) {
-    // Don't run diagnostic passes at all.
-  } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
-    if (runSILDiagnosticPasses(*SM))
-      return true;
-
-    if (observer) {
-      observer->performedSILDiagnostics(*SM);
-    }
-  } else {
-    // Even if we are not supposed to run the diagnostic passes, we still need
-    // to run the ownership evaluator.
-    if (runSILOwnershipEliminatorPass(*SM))
-      return true;
-  }
-
-  // Now if we are asked to link all, link all.
-  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM.get(), true);
-
-  if (Invocation.getSILOptions().MergePartialModules)
-    SM->linkAllFromCurrentModule();
+  if (performMandatorySILPasses(Invocation, SM.get(), observer))
+    return true;
 
   {
     SharedTimer timer("SIL verification, pre-optimization");
