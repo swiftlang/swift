@@ -24,6 +24,8 @@ internal protocol _ArrayBufferProtocol
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
   init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
+  init(copying buffer: Self)
+
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
@@ -124,12 +126,25 @@ internal protocol _ArrayBufferProtocol
   var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol where Indices == CountableRange<Int>{
 
   @_inlineable
   @_versioned
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
+  }
+
+  // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @_inlineable
+  @inline(never)
+  @_versioned
+  internal init(copying buffer: Self) {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+    buffer._copyContents(
+      subRange: Range(buffer.indices),
+      initializing: newBuffer.firstElementAddress)
+    self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
   @_inlineable
