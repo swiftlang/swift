@@ -14,8 +14,15 @@
 #error() // expected-error {{expected string literal in #error directive}}
 #warning() // expected-error {{expected string literal in #warning directive}}
 
-#error "no parentheses error" // expected-error {{expected '(' in #error directive}}
-#warning "no parentheses warning" // expected-error {{expected '(' in #warning directive}}
+#error(test 123) // expected-error {{expected string literal in #error directive}}{{8-8="}}{{16-16="}}
+
+#error test 123 // expected-error {{expected string literal in #error directive}}{{8-8=("}}{{16-16=")}}
+
+#error "no parentheses error" // expected-error {{#error directive requires parentheses}}{{8-8=(}}{{30-30=)}}
+#warning "no parentheses warning" // expected-error {{#warning directive requires parentheses}}{{10-10=(}}{{34-34=)}}
+
+#error "left parentheses error") // expected-error {{expected '(' in #error directive}}{{8-8=(}}
+#warning("right parentheses warning" // expected-error {{expected ')' in #warning directive}}{{37-37=)}}
 
 #error("interp\("olation")") // expected-error {{string interpolation is not allowed in #error directive}}
 #warning("interp\("olation")") // expected-error {{string interpolation is not allowed in #warning directive}}

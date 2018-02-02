@@ -3121,29 +3121,65 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
   SourceLoc startLoc = 
     consumeToken(isError ? tok::pound_error : tok::pound_warning);
 
-  SourceLoc lParenLoc;
-  if (parseToken(tok::l_paren, lParenLoc, 
-                 diag::pound_diagnostic_expected, "(", isError))
-    return makeParserError();
+  SourceLoc lParenLoc = Tok.getLoc();
+  bool hadLParen = consumeIf(tok::l_paren);
 
   if (!Tok.is(tok::string_literal)) {
-    diagnose(startLoc, diag::pound_diagnostic_expected_string, isError);
+    // Catch #warning(oops, forgot the quotes)
+    SourceLoc wordsStartLoc = Tok.getLoc();
+
+    while (!Tok.isAtStartOfLine() && Tok.isNot(tok::r_paren)) {
+      skipSingle();
+    }
+
+    SourceLoc wordsEndLoc = getEndOfPreviousLoc();
+
+    auto diag = diagnose(wordsStartLoc, 
+                          diag::pound_diagnostic_expected_string, isError);
+    if (wordsEndLoc != wordsStartLoc) {
+      diag.fixItInsert(wordsStartLoc, hadLParen ? "\"" : "(\"")
+          .fixItInsert(wordsEndLoc, Tok.is(tok::r_paren) ? "\"" : "\")");
+    }
     return makeParserError();
   }
-  
+
   auto string = parseExprStringLiteral();
   if (string.isNull())
     return makeParserError();
 
   auto messageExpr = string.get();
-  SourceLoc rParenLoc;
-  if (parseToken(tok::r_paren, rParenLoc,
-                 diag::pound_diagnostic_expected, ")", isError))
+
+  SourceLoc rParenLoc = Tok.getLoc();
+  bool hadRParen = consumeIf(tok::r_paren);
+
+  if (!hadLParen && !hadRParen) {
+    // Catch if the user forgot parentheses around the string, e.g.
+    // #warning "foo"
+    diagnose(lParenLoc, diag::pound_diagnostic_expected_parens, isError)
+      .highlight(messageExpr->getSourceRange())
+      .fixItInsert(messageExpr->getStartLoc(), "(")
+      .fixItInsertAfter(messageExpr->getEndLoc(), ")");
     return makeParserError();
+  } else if (hadRParen && !hadLParen) {
+    // Catch if the user forgot a left paren before the string, e.g.
+    // #warning "foo")
+    diagnose(messageExpr->getStartLoc(), diag::pound_diagnostic_expected,
+             "(", isError)
+      .fixItInsert(messageExpr->getStartLoc(), "(");
+    return makeParserError();
+  } else if (hadLParen && !hadRParen) {
+    // Catch if the user forgot a right paren after the string, e.g.
+    // #warning("foo"
+    diagnose(messageExpr->getEndLoc(), diag::pound_diagnostic_expected,
+             ")", isError)
+      .fixItInsertAfter(messageExpr->getEndLoc(), ")");
+    return makeParserError();
+  }
 
   if (messageExpr->getKind() == ExprKind::InterpolatedStringLiteral) {
     diagnose(messageExpr->getStartLoc(), diag::pound_diagnostic_interpolation,
-             isError);
+             isError)
+      .highlight(messageExpr->getSourceRange());
     return makeParserError();
   }
 

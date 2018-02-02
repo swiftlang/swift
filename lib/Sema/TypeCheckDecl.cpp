@@ -7149,7 +7149,8 @@ public:
     PDD->markEmitted();
     TC.diagnose(PDD->getMessage()->getStartLoc(),
       PDD->isError() ? diag::pound_error : diag::pound_warning,
-      PDD->getMessage()->getValue());
+      PDD->getMessage()->getValue())
+      .highlight(PDD->getMessage()->getSourceRange());
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
