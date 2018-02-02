@@ -299,7 +299,7 @@ internal func _integerToString<T : FixedWidthInteger>(
         uppercase: uppercase))
     value = q
   }
-  
+
   if isNegative {
     result.append(_ascii8("-"))
   }
@@ -321,7 +321,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
-  /// 
+  ///
   ///     let v = 999_999
   ///     print(String(v, radix: 2))
   ///     // Prints "11110100001000111111"
@@ -354,7 +354,7 @@ extension String {
       self = _integerToString(value, radix: radix, uppercase: uppercase)
     }
   }
-  
+
   /// Creates a string representing the given value in base 10, or some other
   /// specified base.
   ///
@@ -367,7 +367,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
-  /// 
+  ///
   ///     let v = 999_999
   ///     print(String(v, radix: 2))
   ///     // Prints "11110100001000111111"
@@ -398,7 +398,7 @@ extension String {
       self = _integerToString(value, radix: radix, uppercase: uppercase)
     }
   }
-  
+
   /// Creates a string representing the given value in base 10, or some other
   /// specified base.
   ///
@@ -441,7 +441,7 @@ extension String {
       self = _integerToString(value, radix: radix, uppercase: uppercase)
     }
   }
-  
+
   /// Creates a string representing the given value in base 10, or some other
   /// specified base.
   ///
@@ -454,7 +454,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
-  /// 
+  ///
   ///     let v = 999_999
   ///     print(String(v, radix: 2))
   ///     // Prints "11110100001000111111"
@@ -480,7 +480,7 @@ extension String {
     self = _int64ToString(
       Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
-  
+
   /// Creates a string representing the given value in base 10, or some other
   /// specified base.
   ///
