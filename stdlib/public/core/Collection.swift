@@ -449,6 +449,18 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
+  /// Accesses a contiguous subrange of the collection's elements with an
+  /// offsetting range.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection uses. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  ///
+  /// - Parameter offset: A range of values that will offset the collections 
+  ///   starting index.
+  subscript(offset offset: Range<Int>) -> SubSequence { get }
+
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : Collection = DefaultIndices<Self>
