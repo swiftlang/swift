@@ -75,6 +75,8 @@ static void swift_image_constructor() {
   swift_addNewDSOImage(&sections);
 }
 
+#pragma section(".CRT$XCIS", long, read)
+
 __declspec(allocate(".CRT$XCIS"))
 extern "C" void (*pSwiftImageConstructor)(void) = &swift_image_constructor;
 #pragma comment(linker, "/include:" STRING(C_LABEL(pSwiftImageConstructor)))
