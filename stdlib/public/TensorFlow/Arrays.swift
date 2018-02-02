@@ -121,7 +121,8 @@ extension TensorBuffer {
 // ShapedArray, Array, Array2D, etc, will conform to.
 //===----------------------------------------------------------------------===//
 
-public protocol ShapedArrayProtocol {
+public protocol _ShapedArrayProtocol
+  : RandomAccessCollection, MutableCollection {
   associatedtype Unit
   associatedtype Shape
 
@@ -166,20 +167,75 @@ public protocol ShapedArrayProtocol {
   ) rethrows -> R
 }
 
-public extension ShapedArrayProtocol {
+public extension _ShapedArrayProtocol {
   /// The units of the shaped array in row-major order.
   var units: [Unit] {
-    return withUnsafeBufferPointer(Array.init)
+    get {
+      return withUnsafeBufferPointer(Array.init)
+    }
+    set {
+      precondition(newValue.count == unitCount, "Unit count mismatch")
+      withUnsafeMutableBufferPointer { ptr in
+        ptr.baseAddress!.assign(from: newValue, count: newValue.count)
+      }
+    }
+  }
+
+  /// Returns true if the ShapedArray has rank 0.
+  var isScalar: Bool {
+    return rank == 0
+  }
+
+  /// Returns the underlying scalar from a 0-ranked ShapedArray.
+  /// - precondition: ShapedArray is 0-ranked.
+  var scalar: Unit? {
+    guard rank == 0 else { return nil }
+    return units.first
   }
 }
 
-public extension ShapedArrayProtocol where Unit : Equatable, Shape : Equatable {
+public extension _ShapedArrayProtocol
+  where Unit : Equatable, Shape : Equatable {
   static func == <Other>(lhs: Self, rhs: Other) -> Bool
     where Shape == Other.Shape,
-          Other : ShapedArrayProtocol,
+          Other : _ShapedArrayProtocol,
           Unit == Other.Unit {
     return lhs.shape == rhs.shape &&
       lhs.units.elementsEqual(rhs.units)
+  }
+}
+
+public extension _ShapedArrayProtocol
+  where Shape : Collection, Shape.Element == Int {
+  /// Returns the number of element tensors in a ShapedArray (equivalent to the
+  /// first dimension).
+  /// Note that `count` is distinct from `unitCount`, which represents the total
+  /// number of units.
+  var count: Int {
+    return shape.first ?? 0
+  }
+}
+
+fileprivate extension _ShapedArrayProtocol
+  where Shape : Collection, Shape.Element == Int {
+  /// Returns the unit count for an element in a ShapedArray.
+  var unitCountPerElement: Int {
+    return shape.isEmpty ? 0 : shape.dropFirst().reduce(1, *)
+  }
+
+  /// Returns the unit index corresponding to an index in the leading dimension
+  /// of a ShapedArray.
+  func unitIndex(fromIndex index: Int) -> Int {
+    return unitCountPerElement * index
+  }
+
+  /// Returns the range of units corresponding to a range in the leading
+  /// dimension of a ShapedArray.
+  func unitSubrange(
+    from tensorSubrange: CountableRange<Int>
+  ) -> CountableRange<Int> {
+    return unitIndex(fromIndex: tensorSubrange.lowerBound)
+      ..< unitIndex(fromIndex: tensorSubrange.upperBound)
   }
 }
 
@@ -187,8 +243,10 @@ public extension ShapedArrayProtocol where Unit : Equatable, Shape : Equatable {
 // ShapedArray
 //===----------------------------------------------------------------------===//
 
-/// ShapedArray
-public struct ShapedArray<Unit> : ShapedArrayProtocol {
+/// `ShapedArray` is a representation of a multidimensional array. It has a
+/// shape, which has type `[Int]` and defines the array dimensions, and uses
+/// `TensorBuffer` internally as storage.
+public struct ShapedArray<Unit> : _ShapedArrayProtocol {
   public typealias Shape = [Int]
 
   /// Contiguous memory storing units.
@@ -223,7 +281,8 @@ internal extension ShapedArray {
 internal extension ShapedArray where Unit : AccelerableTensorUnit {
   @_versioned
   init(owning cTensor: CTensor) {
-    // Including \(Unit.self) into the message would cause non-deterministic crashes.
+    // Including \(Unit.self) into the message would cause non-deterministic
+    // crashes.
     debugLog("Initializing ShapedArray from CTensor.")
     shape = (0..<TF_NumDims(cTensor)).map { Int(TF_Dim(cTensor, $0)) }
     if _RuntimeConfig.printsDebugLog {
@@ -245,15 +304,6 @@ public extension ShapedArray {
 
   var unitCount: Int {
     return buffer.count
-  }
-
-  var isScalar: Bool {
-    return rank == 0
-  }
-
-  var scalar: Unit? {
-    guard rank == 0 else { return nil }
-    return units.first
   }
 
   init(_ other: ShapedArray) {
@@ -314,6 +364,82 @@ public extension ShapedArray {
   }
 }
 
+extension ShapedArray : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias Element = ShapedArraySlice<Unit>
+  public typealias SubSequence = ShapedArraySlice<Unit>
+
+  public var indices: CountableRange<Int> {
+    return 0..<count
+  }
+
+  public var startIndex: Int {
+    return 0
+  }
+
+  public var endIndex: Int {
+    return count
+  }
+
+  /// Access the element tensor specified by an index in the leading dimension.
+  /// - parameter index: index of the element tensor
+  public subscript(index: Int) -> Element {
+    get {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(index < endIndex, "ShapedArray index is out of range")
+      precondition(index >= startIndex,
+                   "Negative ShapedArray index is out of range")
+      return ShapedArraySlice(base: self, baseIndices: [index])
+    }
+    set {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(index < endIndex, "ShapedArray index is out of range")
+      precondition(index >= startIndex,
+                   "Negative ShapedArray index is out of range")
+      precondition(shape.dropFirst().elementsEqual(newValue.shape),
+                   "Element shape mismatch")
+      withUnsafeMutableBufferPointer { destBuffPtr in
+        let ptr = destBuffPtr.baseAddress!.advanced(
+          by: unitIndex(fromIndex: index))
+        newValue.withUnsafeBufferPointer { srcBuffPtr in
+          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+        }
+      }
+    }
+  }
+
+  /// Access the subtensor specified by a contiguous range of indices.
+  /// - parameter bounds: contiguous range of indices
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "ShapedArray indices are out of range")
+      return ShapedArraySlice(base: self, bounds: CountableRange(bounds))
+    }
+    set {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "ShapedArray indices are out of range")
+      let subTensorShape = [bounds.count] + shape.dropFirst()
+      precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
+      withUnsafeMutableBufferPointer { destBuffPtr in
+        let ptr = destBuffPtr.baseAddress!.advanced(
+          by: unitIndex(fromIndex: bounds.lowerBound))
+        newValue.withUnsafeBufferPointer { srcBuffPtr in
+          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+        }
+      }
+    }
+  }
+}
+
 public extension ShapedArray {
   func withUnsafeBufferPointer<Result>(
     _ body: (UnsafeBufferPointer<Unit>) throws -> Result
@@ -368,12 +494,61 @@ public extension Tensor where Unit : AccelerableTensorUnit {
 // ShapedArraySlice
 //===----------------------------------------------------------------------===//
 
-/// ShapedArraySlice
-public struct ShapedArraySlice<Unit> /*: ShapedArrayProtocol */ {
+/// A contiguous slice of a `ShapedArray` or `ShapedArraySlice` instance.
+///
+/// `ShapedArraySlice` enables fast, efficient operations on contiguous slices
+/// of `ShapedArray` instances. `ShapedArraySlice` instances do not have their
+/// own storage. Instead, they provides a view onto the storage of their base
+/// `ShapedArray`. `ShapedArraySlice` can represent two different kinds of
+/// slices: element tensors and subtensors.
+///
+/// Element tensors are subdimensional elements of a `ShapedArray`: their rank
+/// is one less than that of their base. Element tensor slices are obtained by
+/// indexing a `ShapedArray` instance with a singular `Int` index.
+///
+/// For example:
+///
+///     let matrix = ShapedArray(shape: [2, 2], units: [0, 1, 2, 3])
+///     // `matrix` represents [[0, 1], [2, 3]].
+///
+///     let element = matrix[0]
+///     // `element` is a `ShapedArraySlice` with shape [2]. It is an element
+///     // tensor, specifically the first element in `matrix`: [0, 1].
+///
+///     matrix[1] = ShapedArraySlice(shape: [2], units: [4, 8])
+///     // The second element in `matrix` has been mutated.
+///     // `matrix` now represents [[0, 1, 4, 8]].
+///
+/// Subtensors are a contiguous range of the elements in a `ShapedArray`.
+/// The rank of a subtensor is the same as that of its base, but its leading
+/// dimension may be smaller. Subtensor slices are obtained by indexing a
+/// `ShapedArray` with a `Range<Int>` that represents a range of elements (in
+/// the leading dimension). Methods like `prefix(:)` and `suffix(:)` that
+/// internally index with a range also produce subtensors.
+///
+/// For example:
+///
+///     let zeros = ShapedArray(shape: [3, 2], repeating: 0)
+///     var matrix = ShapedArray(shape: [3, 2], units: Array(0..<6))
+///     // `zeros` represents [[0, 0], [0, 0], [0, 0]].
+///     // `matrix` represents [[0, 1], [2, 3], [4, 5]].
+///
+///     let subtensor = matrix.prefix(2)
+///     // `subtensor` is a `ShapedArraySlice` with shape [2, 2]. It is a slice
+///     // of the first 2 elements in `matrix` and represents [[0, 1], [2, 3]].
+///
+///     matrix[0..<2] = zeros.prefix(2)
+///     // The first 2 elements in `matrix` have been mutated.
+///     // `matrix` now represents [[0, 0], [0, 0], [4, 5]].
+
+public struct ShapedArraySlice<Unit> : _ShapedArrayProtocol {
   public typealias Shape = [Int]
 
+  /// The underlying `ShapedArray` of a slice.
   private var base: ShapedArray<Unit>
+  /// The subdimensional indices of a slice.
   private var baseIndices: [Int]
+  /// The subtensor bounds of a slice.
   private var bounds: CountableRange<Int>?
 
   /// Initialize a shaped array slice from a shaped array as base, with
@@ -383,13 +558,42 @@ public struct ShapedArraySlice<Unit> /*: ShapedArrayProtocol */ {
     baseIndices indices: [Int] = [],
     bounds: CountableRange<Int>? = nil
   ) {
-    precondition(indices.count <= base.rank, "Element indices are out of bounds.")
-    precondition(zip(base.shape, indices).forAll { $1 >= 0 && $1 < $0 })
+    precondition(indices.count <= base.rank,
+                 "Number of base indices exceeds base rank")
+    precondition(zip(base.shape, indices).forAll { $1 >= 0 && $1 < $0 },
+                 "Base indices are out of range")
     self.base = base
     self.baseIndices = indices
     self.bounds = bounds
   }
 }
+
+public extension ShapedArraySlice {
+  /// Indexing depth of this slice, i.e. the difference in rank between the base
+  /// and the slice.
+  private var indexingDepth: Int {
+    return baseIndices.count
+  }
+
+  var rank: Int {
+    return base.rank - indexingDepth
+  }
+
+  var shape: Shape {
+    if let bounds = bounds {
+      return [bounds.count] + Array(base.shape.dropFirst(indexingDepth + 1))
+    }
+    return Array(base.shape.dropFirst(indexingDepth))
+  }
+
+  var unitCount: Int {
+    return shape.reduce(1, *)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Slice initializers
+//===----------------------------------------------------------------------===//
 
 public extension ShapedArraySlice {
   init(shape: [Int], units: [Unit]) {
@@ -413,20 +617,158 @@ public extension ShapedArraySlice {
   }
 }
 
+private extension ShapedArraySlice {
+  /// The range of units from the base ShapedArray represented by a
+  /// ShapedArraySlice.
+  var unitRange: CountableRange<Int> {
+    let trimmedShape = base.shape.dropFirst()
+    var (start, end) = baseIndices.enumerated()
+      .reduce((0, base.unitCount)) { (acc, next) in
+      let stride = trimmedShape.dropFirst(next.offset).reduce(1, *)
+      if next.offset == indexingDepth - 1 {
+        let temp = acc.0 + next.element * stride
+        return (temp, temp + stride)
+      }
+      return (acc.0 + next.element * stride, acc.1)
+    }
+    if let bounds = bounds {
+      let stride = trimmedShape.dropFirst(indexingDepth).reduce(1, *)
+      let oldStart = start
+      start = start + bounds.startIndex * stride
+      end = oldStart + bounds.endIndex * stride
+    }
+    return start..<end
+  }
+}
+
+public extension ShapedArraySlice {
+  func withUnsafeBufferPointer<Result>(
+    _ body: (UnsafeBufferPointer<Unit>) throws -> Result
+  ) rethrows -> Result {
+    return try base.buffer.withUnsafeMutablePointerToUnits { basePtr in
+      let ptr = UnsafeBufferPointer(
+        start: basePtr.advanced(by: unitRange.startIndex),
+        count: unitRange.count)
+      return try body(ptr)
+    }
+  }
+
+  mutating func withUnsafeMutableBufferPointer<Result>(
+    _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> Result
+  ) rethrows -> Result {
+    return try base.buffer.withUnsafeMutablePointerToUnits { basePtr in
+      var ptr = UnsafeMutableBufferPointer(
+        start: basePtr.advanced(by: unitRange.startIndex),
+        count: unitRange.count)
+      return try body(&ptr)
+    }
+  }
+}
+
+extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias Element = ShapedArraySlice<Unit>
+  public typealias SubSequence = ShapedArraySlice<Unit>
+
+  public var indices: CountableRange<Int> {
+    if let bounds = bounds {
+      return bounds
+    } else if indexingDepth < base.rank {
+      return 0..<base.shape[indexingDepth]
+    }
+    return 0..<0
+  }
+
+  public var startIndex: Int {
+    return indices.startIndex
+  }
+
+  public var endIndex: Int {
+    return indices.endIndex
+  }
+
+  /// Access the element tensor specified by an index in the leading dimension.
+  /// - parameter index: index of the element tensor
+  public subscript(index: Int) -> Element {
+    get {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(index < endIndex, "ShapedArraySlice index is out of range")
+      precondition(index >= startIndex,
+                   "ShapeArraySlice index is out of range (before startIndex)")
+      return ShapedArraySlice(base: base,
+                              baseIndices: baseIndices + [index],
+                              bounds: bounds)
+    }
+    set {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted.")
+      precondition(index < endIndex, "ShapedArraySlice index is out of range")
+      precondition(index >= startIndex,
+                   "ShapeArraySlice index is out of range (before startIndex)")
+      precondition(shape.dropFirst().elementsEqual(newValue.shape),
+                   "Element shape mismatch")
+      withUnsafeMutableBufferPointer { destBuffPtr in
+        let ptr = destBuffPtr.baseAddress!.advanced(
+          by: unitIndex(fromIndex: index))
+        newValue.withUnsafeBufferPointer { srcBuffPtr in
+          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+        }
+      }
+    }
+  }
+
+  /// Access the subtensor specified by a contiguous range of indices.
+  /// - parameter bounds: contiguous range of indices
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted")
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "ShapedArraySlice indices are out of range")
+      return ShapedArraySlice(base: base,
+                              baseIndices: baseIndices,
+                              bounds: CountableRange(bounds))
+    }
+    set {
+      precondition(!isScalar,
+                   "Scalar has no elements and cannot be subscripted")
+      precondition(
+        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        "ShapedArraySlice indices are out of range")
+      let subTensorShape = [bounds.count] + shape.dropFirst()
+      precondition(subTensorShape == newValue.shape, "Subtensor shape mismatch")
+      withUnsafeMutableBufferPointer { destBuffPtr in
+        let ptr = destBuffPtr.baseAddress!.advanced(
+          by: unitIndex(fromIndex: bounds.lowerBound))
+        newValue.withUnsafeBufferPointer { srcBuffPtr in
+          ptr.assign(from: srcBuffPtr.baseAddress!, count: srcBuffPtr.count)
+        }
+      }
+    }
+  }
+}
+
+/// Tensor conversion
 public extension ShapedArraySlice where Unit : AccelerableTensorUnit {
   init(_ other: Tensor<Unit>) {
     self.init(base: other.array)
   }
 }
 
-/// FIXME: Implement after `ShapedArraySlice` and `subscript` are implemented.
-// extension ShapedArray : CustomStringConvertible {
-//   public var description: String {
-//     if isScalar {
-//       return withUnsafeBufferPointer { bufPtr in
-//         String(describing: bufPtr[0])
-//       }
-//     }
-//     return "[\( map({"\($0)"}).joined(separator: ", ") )]")
-//   }
-// }
+//===----------------------------------------------------------------------===//
+// Description and visualization
+//===----------------------------------------------------------------------===//
+
+public extension _ShapedArrayProtocol where Self.Element : _ShapedArrayProtocol {
+  var description: String {
+    if let scalar = scalar {
+      return String(describing: scalar)
+    }
+    return "[\( map({"\($0)"}).joined(separator: ", ") )]"
+  }
+}
+
+extension ShapedArray : CustomStringConvertible {}
+extension ShapedArraySlice : CustomStringConvertible {}
