@@ -729,6 +729,20 @@ static void emitReferenceDependenciesIfNeeded(CompilerInvocation &Invocation,
   }
 }
 
+static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
+                             CompilerInstance &Instance) {
+  StringRef TBDPath = Invocation.getFrontendOptions().TBDPath;
+  if (TBDPath.empty())
+    return false;
+  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
+                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
+                         : Invocation.getFrontendOptions().TBDInstallName;
+
+  return writeTBD(Instance.getMainModule(),
+                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
+                  installName);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -853,16 +867,8 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  auto &SILOpts = Invocation.getSILOptions();
-  if (!opts.TBDPath.empty()) {
-    auto installName = opts.TBDInstallName.empty()
-                           ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                           : opts.TBDInstallName;
-
-    if (writeTBD(Instance.getMainModule(), SILOpts.hasMultipleIGMs(),
-                 opts.TBDPath, installName))
-      return true;
-  }
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
 
   assert(Action >= FrontendOptions::ActionType::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
