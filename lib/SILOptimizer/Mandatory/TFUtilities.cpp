@@ -130,22 +130,36 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 /// returns the op name and operand description and returns true.  If the
 /// function name doesn't correspond to an op, this returns false.
 static bool decodeTensorOpName(StringRef name, StringRef &opName,
-                               StringRef &typeInfo) {
+                               StringRef &typeDescriptorStr,
+                               SmallVectorImpl<StringRef> &attributeNames) {
   // Op functions are expected to be of the form:
-  //  ...__tfop_<OPNAME>__<OPERANDDESC>__...
-  // an example for the 'Add' op might be _T013__tfop_Add__Tf4gg_n
-  auto pos = name.find("__tfop_");
-  if (pos == StringRef::npos) return false;
-  name = name.substr(pos+strlen("__tfop_"));
+  //  __tfop_<OPNAME>__<OPERANDDESC>__<ATTRIBUTES>
+  if (!name.startswith("__tfop_")) return false;
+  name = name.substr(strlen("__tfop_"));
 
-  pos = name.find("__");
+  auto pos = name.find(",");
   if (pos == StringRef::npos) return false;
   opName = name.substr(0, pos);
-  name = name.substr(pos+strlen("__"));
+  name = name.substr(pos+strlen(","));
 
-  pos = name.find("__");
-  if (pos == StringRef::npos) return false;
-  typeInfo = name.substr(0, pos);
+  pos = name.find(",");
+  typeDescriptorStr = name.substr(0, pos);
+  if (pos == StringRef::npos)
+    return true;
+  name = name.substr(pos);
+
+  // Parse out any attribute names.
+  while (!name.empty()) {
+    assert(name[0] == ',');
+    name = name.drop_front(1);
+
+    pos = name.find(",");
+    if (pos == StringRef::npos) pos = name.size();
+
+    attributeNames.push_back(name.substr(0, pos));
+    name = name.substr(pos);
+  }
+
   return true;
 }
 
@@ -192,6 +206,29 @@ LiteralInst *SILTensorOpInfo::getTensorConstantOperand(SILValue v) {
   return nullptr;
 }
 
+/// If the specified value is a valid value for an attribute, return the
+/// instruction that provides the value, otherwise null.
+SILInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
+  // Simplify scalar operands in general.
+  v = getScalarOperand(v);
+  if (!v) return nullptr;
+
+  // If we have an acceptable values for an attribute, return it.
+  if (auto *fli = dyn_cast<FloatLiteralInst>(v))
+    return fli;
+  if (auto *ili = dyn_cast<IntegerLiteralInst>(v))
+    return ili->getValue().getBitWidth() <= 64 ? ili : nullptr;
+  if (auto *sli = dyn_cast<StringLiteralInst>(v))
+    return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
+           ? sli : nullptr;
+  if (auto *mti = dyn_cast<MetatypeInst>(v)) {
+    auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
+    if (convertSwiftTypeToTF(ty) != 0) return mti;
+  }
+
+  return nullptr;
+}
+
 
 /// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
 /// the instruction is a valid tensor operation.  This is the way that
@@ -234,7 +271,8 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 
   // If the name is valid, it isn't an op.
   StringRef typeDescriptorStr;
-  if (!decodeTensorOpName(builtinName, opName, typeDescriptorStr))
+  if (!decodeTensorOpName(builtinName, opName, typeDescriptorStr,
+                          attributeNames))
     return false;
 
   auto diagInvalid = [&](std::string problem) {
@@ -318,6 +356,19 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
     }
   }
 
+  // Attribute values require constant values.  If we don't have one then this
+  // op is invalid and must be rejected.
+  for (auto attrName : attributeNames) {
+    auto op = getNextOperand();
+    if (!op) return false; // diagnostic already emitted.
+
+    if (!getAttrOperand(op)) {
+      diagInvalid("attribute '" + attrName.str() +
+                  "' requires a constant argument");
+      return false;
+    }
+  }
+
   // Diagnose when the type descriptor didn't specify enough args.
   if (nextOperand != inst->getNumOperands()) {
     diagInvalid("more arguments present than type descriptors specified");
@@ -342,7 +393,7 @@ bool SILTensorOpInfo::decodeTFInitScalar(ApplyInst *inst) {
   opName = "Const";
   operandDescriptorStr = "cd";
   resultDescriptorStr = "t";
-  builtinName = "__tfop_Const__cd:t__";
+  builtinName = "__tfop_Const,cd:t";
   operandDescriptors = { OpDescriptor::Constant, OpDescriptor::AddDType };
   return true;
 }

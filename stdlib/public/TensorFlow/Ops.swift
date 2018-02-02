@@ -213,8 +213,8 @@ public extension Tensor {
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    // FIXME: handle attribute (keep_dims)
-    return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle))
+    return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
+                              keep_dims: keepingDimensions))
   }
 
   @_inlineable
@@ -229,8 +229,8 @@ public extension Tensor {
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    // FIXME: handle attribute (keep_dims)
-    return Tensor<Unit>(#tfop("Min", "tt:t", handle, Tensor<Int>(axes).handle))
+    return Tensor<Unit>(#tfop("Min", "tt:t", handle, Tensor<Int>(axes).handle,
+                              keep_dims: keepingDimensions))
   }
 
   @_inlineable
@@ -245,8 +245,8 @@ public extension Tensor {
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    // FIXME: handle attribute (keep_dims)
-    return Tensor<Unit>(#tfop("Max", "tt:t", handle, Tensor<Int>(axes).handle))
+    return Tensor<Unit>(#tfop("Max", "tt:t", handle, Tensor<Int>(axes).handle,
+                        keep_dims: keepingDimensions))
   }
 
   @_inlineable
@@ -261,8 +261,8 @@ public extension Tensor {
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
-    // FIXME: handle attribute (keep_dims)
-    return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle))
+    return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle,
+                              keep_dims: keepingDimensions))
   }
 
   @inline(never) // make @_inlineable when implemented.
