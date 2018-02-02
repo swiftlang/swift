@@ -103,25 +103,28 @@ extension ClosedRangeIndex : Hashable where Bound : Hashable {
 /// A `CountableClosedRange` instance contains both its lower bound and its
 /// upper bound.
 ///
-///     print(throughFive.contains(3))      // Prints "true"
-///     print(throughFive.contains(10))     // Prints "false"
-///     print(throughFive.contains(5))      // Prints "true"
+///     throughFive.contains(3)
+///     // true
+///     throughFive.contains(10)
+///     // false
+///     throughFive.contains(5)
+///     // true
 ///
 /// Because a closed range includes its upper bound, a closed range whose lower
-/// bound is equal to the upper bound contains one element. Therefore, a
+/// bound is equal to the upper bound contains that value. Therefore, a
 /// `CountableClosedRange` instance cannot represent an empty range.
 ///
 ///     let zeroInclusive = 0...0
-///     print(zeroInclusive.isEmpty)
-///     // Prints "false"
-///     print(zeroInclusive.count)
-///     // Prints "1"
+///     zeroInclusive.contains(0)
+///     // true
+///     zeroInclusive.isEmpty
+///     // false
 ///
 /// You can use a `for`-`in` loop or any sequence or collection method with a
 /// countable range. The elements of the range are the consecutive values from
 /// its lower bound up to, and including, its upper bound.
 ///
-///     for n in throughFive.suffix(3) {
+///     for n in 3...5 {
 ///         print(n)
 ///     }
 ///     // Prints "3"
