@@ -1229,6 +1229,70 @@ extension Collection {
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
   }
+
+  @_inlineable
+  public subscript(offset offset: ClosedRange<IndexDistance>) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[start...end]
+  }
+  
+  @_inlineable
+  public subscript(offset offset: Range<IndexDistance>) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[start..<end]
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeFrom<IndexDistance>
+  ) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    return self[start...]
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeThrough<IndexDistance>
+  ) -> SubSequence {
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[...end]
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeUpTo<IndexDistance>
+  ) -> SubSequence {
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[..<end]
+  }
+
+  @_inlineable
+  public subscript(
+    offset offset: CountablePartialRangeFrom<IndexDistance>
+  ) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    return self[start...]
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: CountableClosedRange<IndexDistance>
+  ) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[start...end]
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: CountableRange<IndexDistance>
+  ) -> SubSequence {
+    let start = index(startIndex, offsetBy: offset.lowerBound)
+    let end = index(startIndex, offsetBy: offset.upperBound)
+    return self[start..<end]
+  }
 }
 extension MutableCollection {
   @_inlineable
@@ -1249,6 +1313,125 @@ extension MutableCollection {
     }
     set {
       self[startIndex...] = newValue
+    }
+  }
+
+  @_inlineable
+  public subscript(offset offset: ClosedRange<IndexDistance>) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[start...end]
+    }
+    
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[start...end] = newValue
+    }
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: Range<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[start..<end]
+    }
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[start..<end] = newValue
+    } 
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeFrom<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      return self[start...]
+    }
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      self[start...] = newValue
+    }
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeThrough<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[...end]
+    }
+    set {
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[...end] = newValue
+    }
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: PartialRangeUpTo<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[..<end]
+    }
+    set {
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[..<end] = newValue
+    }
+  }
+
+  @_inlineable
+  public subscript(
+    offset offset: CountablePartialRangeFrom<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      return self[start...]
+    }
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      self[start...] = newValue
+    }
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: CountableClosedRange<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[start...end]
+    }
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[start...end] = newValue
+    }
+  }
+  
+  @_inlineable
+  public subscript(
+    offset offset: CountableRange<IndexDistance>
+  ) -> SubSequence {
+    get {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      return self[start..<end]
+    }
+    set {
+      let start = index(startIndex, offsetBy: offset.lowerBound)
+      let end = index(startIndex, offsetBy: offset.upperBound)
+      self[start..<end] = newValue
     }
   }
 }
