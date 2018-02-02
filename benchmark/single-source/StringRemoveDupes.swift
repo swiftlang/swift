@@ -24,12 +24,12 @@ public func run_StringRemoveDupes(_ N: Int) {
   for _ in 1...10*N {
     s = text.removeDuplicates()
 
-    if s.characters.count != textLengthRef {
+    if s.count != textLengthRef {
       break
     }
   }
 
-  CheckResults(s.characters.count == textLengthRef)
+  CheckResults(s.count == textLengthRef)
 }
 
 // removes all but first occurrence from a sequence, returning an array.
@@ -46,6 +46,6 @@ func uniq<S: Sequence,
 // all duplicates removed
 extension String {
   func removeDuplicates() -> String {
-    return String(uniq(self.characters))
+    return String(uniq(self))
   }
 }
