@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func use<T>(_: T) {}
 
@@ -21,10 +21,10 @@ func foo<T>(x: T, y: Int) {
     }
   }
 
-  // CHECK-LABEL: function_ref getter of readonly #1 in foo<A>(x:y:)
+  // CHECK: function_ref getter of readonly #1 : Swift.Int in generic_local_property.foo<A>(x: A, y: Swift.Int) -> ()
   _ = readonly
-  // CHECK-LABEL: function_ref getter of mutable #1 in foo<A>(x:y:)
+  // CHECK-LABEL: function_ref getter of mutable #1 : Swift.Int in generic_local_property.foo<A>(x: A, y: Swift.Int) -> ()
   _ = mutable
-  // CHECK-LABEL: function_ref setter of mutable #1 in foo<A>(x:y:)
+  // CHECK-LABEL: function_ref setter of mutable #1 : Swift.Int in generic_local_property.foo<A>(x: A, y: Swift.Int) -> ()
   mutable = y
 }

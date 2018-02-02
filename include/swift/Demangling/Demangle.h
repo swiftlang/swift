@@ -47,6 +47,7 @@ struct DemangleOptions {
   bool ShortenThunk = false;
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
+  bool ShowLocalDiscriminators = true;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
 
@@ -67,6 +68,7 @@ struct DemangleOptions {
     Opt.ShortenThunk = true;
     Opt.ShortenValueWitness = true;
     Opt.ShortenArchetype = true;
+    Opt.ShowLocalDiscriminators = false;
     Opt.ShowPrivateDiscriminators = false;
     Opt.ShowFunctionArgumentTypes = false;
     return Opt;

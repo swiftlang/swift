@@ -100,8 +100,10 @@ static void _buildNameForMetadata(const Metadata *type,
 
   Demangle::DemangleOptions options;
   options.QualifyEntities = qualified;
-  if (!qualified)
+  if (!qualified) {
+    options.ShowLocalDiscriminators = false;
     options.ShowPrivateDiscriminators = false;
+  }
   result = Demangle::nodeToString(demangling, options);
 }
 

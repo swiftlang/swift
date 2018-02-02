@@ -1007,7 +1007,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
                        /*hasName*/true);
   case Node::Kind::LocalDeclName:
     print(Node->getChild(1));
-    Printer << " #" << (Node->getChild(0)->getIndex() + 1);
+    if (Options.ShowLocalDiscriminators)
+      Printer << " #" << (Node->getChild(0)->getIndex() + 1);
     return nullptr;
   case Node::Kind::PrivateDeclName:
     if (Node->getNumChildren() > 1) {
