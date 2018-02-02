@@ -631,11 +631,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::ActionType::Parse ||
-      Action == FrontendOptions::ActionType::DumpParse ||
-      Action == FrontendOptions::ActionType::EmitSyntax ||
-      Action == FrontendOptions::ActionType::DumpInterfaceHash ||
-      Action == FrontendOptions::ActionType::EmitImportedModules)
+  if (FrontendOptions::shouldActionOnlyParse(Action))
     Instance.performParseOnly();
   else
     Instance.performSema();
