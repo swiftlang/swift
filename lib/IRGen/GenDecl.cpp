@@ -465,6 +465,7 @@ public:
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   PrettySourceFileEmission StackEntry(SF);
+  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile, &SF);
 
   // Emit types and other global decls.
   for (unsigned i = StartElem, e = SF.Decls.size(); i != e; ++i)
@@ -1098,6 +1099,16 @@ void IRGenModule::finishEmitAfterTopLevel() {
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *Nominal) {
+  // We may have emitted a partial type context descriptor with some empty
+  // fields, and then later discovered we're emitting complete metadata.
+  // Remove existing definitions of the type context so that we can regenerate
+  // a complete descriptor.
+  auto existingContext = dyn_cast_or_null<llvm::GlobalVariable>(
+    IGM.getAddrOfTypeContextDescriptor(Nominal)->stripPointerCasts());
+  if (existingContext && !existingContext->isDeclaration()) {
+    existingContext->setInitializer(nullptr);
+  }
+
   if (auto sd = dyn_cast<StructDecl>(Nominal)) {
     return emitStructMetadata(IGM, sd);
   } else if (auto ed = dyn_cast<EnumDecl>(Nominal)) {
@@ -1131,6 +1142,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyMetadata.empty() ||
+         !LazyTypeContextDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
          !LazyFieldTypeAccessors.empty() ||
          !LazyWitnessTables.empty()) {
@@ -1142,6 +1154,14 @@ void IRGenerator::emitLazyDefinitions() {
       if (eligibleLazyMetadata.count(Nominal) != 0) {
         CurrentIGMPtr IGM = getGenModule(Nominal->getDeclContext());
         emitLazyTypeMetadata(*IGM.get(), Nominal);
+      }
+    }
+    while (!LazyTypeContextDescriptors.empty()) {
+      NominalTypeDecl *Nominal = LazyTypeContextDescriptors.pop_back_val();
+      assert(scheduledLazyTypeContextDescriptors.count(Nominal) == 1);
+      if (eligibleLazyMetadata.count(Nominal) != 0) {
+        CurrentIGMPtr IGM = getGenModule(Nominal->getDeclContext());
+        emitLazyTypeContextDescriptor(*IGM.get(), Nominal);
       }
     }
     while (!LazyFieldTypeAccessors.empty()) {
@@ -2263,7 +2283,8 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
     // forward declaration.
     if (definitionType) {
       assert(existing->isDeclaration() && "already defined");
-      assert(entry->getType()->getPointerElementType() == defaultType);
+      assert(entry->getType()->getPointerElementType() == defaultType
+          || entry->getType()->getPointerElementType() == definition.getType());
       updateLinkageForDefinition(*this, existing, entity);
 
       // If the existing entry is a variable of the right type,
@@ -2671,8 +2692,8 @@ namespace {
 
       auto nominal = Conformance->getType()->getAnyNominal();
       irgen::addGenericRequirements(IGM, B,
-                                    nominal->getGenericSignatureOfContext(),
-                                    Conformance->getConditionalRequirements());
+        nominal->getGenericSignatureOfContext(),
+        Conformance->getConditionalRequirements());
     }
   };
 }
@@ -3208,7 +3229,7 @@ IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
 /// must always be for purposes of defining it.
 llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                                       ConstantInit definition) {
-  IRGen.addLazyTypeMetadata(D);
+  IRGen.addLazyTypeContextDescriptor(D);
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,

@@ -1952,6 +1952,19 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   mangleAssocTypePath(node->getChild(1));
   Buffer << "MXA";
 }
+  
+void Remangler::mangleUnresolvedSymbolicReference(Node *node) {
+  Buffer << "$";
+  char bytes[4];
+  uint32_t value = node->getIndex();
+  memcpy(bytes, &value, 4);
+  Buffer << StringRef(bytes, 4);
+}
+
+void Remangler::mangleSymbolicReference(Node *node) {
+  unreachable("should not try to mangle a symbolic reference; "
+              "resolve it to a non-symbolic demangling tree instead");
+}
 
 } // anonymous namespace
 

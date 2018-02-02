@@ -291,6 +291,28 @@ public:
 
   void *allocateMetadata(size_t size, size_t align);
 
+  Demangle::NodePointer
+  _buildDemanglingForContext(const ContextDescriptor *context,
+                             llvm::ArrayRef<NodePointer> demangledGenerics,
+                             bool concretizedGenerics,
+                             Demangle::Demangler &Dem);
+  
+  /// Symbolic reference resolver that produces the demangling tree for the
+  /// referenced context.
+  class ResolveToDemanglingForContext {
+    Demangle::Demangler &Dem;
+  public:
+    explicit ResolveToDemanglingForContext(Demangle::Demangler &Dem)
+      : Dem(Dem) {}
+    
+    Demangle::NodePointer operator()(int32_t offset, const void *base) {
+      auto descriptor =
+        (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
+      
+      return _buildDemanglingForContext(descriptor, {}, false, Dem);
+    }
+  };
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */
