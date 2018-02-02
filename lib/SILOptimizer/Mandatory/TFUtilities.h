@@ -68,6 +68,11 @@ namespace tf {
     /// returning a non-empty error string to emit if that is not the case.
     std::string checkAttributeConstants() const;
 
+    /// Replace any indirect memory operands with direct references to the
+    /// scalars they reference.  This potentially replaces the builtin
+    /// instruction, so it returns the right one to use.
+    // TODO(clattner): Remove this when deabstraction exists.
+    SILInstruction *canonicalizeOperands();
 
     /// Return the SILValue for the specified scalar operand.
     SILValue getScalarOperand(unsigned operandNumber) const {
