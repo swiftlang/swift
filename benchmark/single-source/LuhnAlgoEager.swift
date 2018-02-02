@@ -220,7 +220,7 @@ let combineDoubleDigits = {
 // removing lazy at start of pipeline
 // switches to array-based version
 let eagerchecksum = { (ccnum: String) -> Bool in
-    ccnum.characters//.lazy
+    ccnum //.lazy
     |> { $0.reversed().lazy }
     |> { mapSome($0, charToInt) }
     |> { mapEveryN($0, 2, double) }
