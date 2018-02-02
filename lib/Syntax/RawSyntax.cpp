@@ -12,6 +12,7 @@
 
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxArena.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -67,11 +68,12 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
 } // end of anonymous namespace
 
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence) {
+                     SourcePresence Presence, bool ManualMemory) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
   Bits.Kind = unsigned(Kind);
   Bits.Presence = unsigned(Presence);
+  Bits.ManualMemory = unsigned(ManualMemory);
   Bits.NumChildren = Layout.size();
 
   // Initialize layout data.
@@ -79,11 +81,13 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                           getTrailingObjects<RC<RawSyntax>>());
 }
 
-RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
+RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
-                     ArrayRef<TriviaPiece> TrailingTrivia) {
+                     ArrayRef<TriviaPiece> TrailingTrivia,
+                     SourcePresence Presence, bool ManualMemory) {
   Bits.Kind = unsigned(SyntaxKind::Token);
   Bits.Presence = unsigned(Presence);
+  Bits.ManualMemory = unsigned(ManualMemory);
   Bits.TokenKind = unsigned(TokKind);
   Bits.NumLeadingTrivia = LeadingTrivia.size();
   Bits.NumTrailingTrivia = TrailingTrivia.size();
@@ -103,34 +107,36 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text, SourcePresence Presence,
 RawSyntax::~RawSyntax() {
   if (isToken()) {
     getTrailingObjects<OwnedString>()->~OwnedString();
-    for (auto trivia : getLeadingTrivia())
+    for (auto &trivia : getLeadingTrivia())
       trivia.~TriviaPiece();
-    for (auto trivia : getTrailingTrivia())
+    for (auto &trivia : getTrailingTrivia())
       trivia.~TriviaPiece();
   } else {
-    for (auto child : getLayout())
+    for (auto &child : getLayout())
       child.~RC<RawSyntax>();
   }
 }
 
-RC<RawSyntax> RawSyntax::make(SyntaxKind Kind,
-                                ArrayRef<RC<RawSyntax>> Layout,
-                                SourcePresence Presence) {
+RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                              SourcePresence Presence, SyntaxArena *Arena) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
-  void *data = ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(Kind, Layout, Presence));
+  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+                     : ::operator new(size);
+  return RC<RawSyntax>(new (data)
+                           RawSyntax(Kind, Layout, Presence, bool(Arena)));
 }
 
 RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
-                              SourcePresence Presence,
                               ArrayRef<TriviaPiece> LeadingTrivia,
-                              ArrayRef<TriviaPiece> TrailingTrivia) {
+                              ArrayRef<TriviaPiece> TrailingTrivia,
+                              SourcePresence Presence, SyntaxArena *Arena) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
-  void *data = ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(TokKind, Text, Presence,
-                                            LeadingTrivia, TrailingTrivia));
+  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+                     : ::operator new(size);
+  return RC<RawSyntax>(new (data) RawSyntax(
+      TokKind, Text, LeadingTrivia, TrailingTrivia, Presence, bool(Arena)));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
@@ -265,4 +271,25 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << "line=" << getLine() << " ";
   OS << "column=" << getColumn();
   OS << ')';
+}
+
+void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
+                        OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+                        ArrayRef<TriviaPiece> TrailingTrivia) {
+  ID.AddInteger(unsigned(TokKind));
+  switch (TokKind) {
+#define TOKEN_DEFAULT(NAME) case tok::NAME:
+#define PUNCTUATOR(NAME, X) TOKEN_DEFAULT(NAME)
+#define KEYWORD(KW) TOKEN_DEFAULT(kw_##KW)
+#define POUND_KEYWORD(KW) TOKEN_DEFAULT(pound_##KW)
+#include "swift/Syntax/TokenKinds.def"
+    break;
+  default:
+    ID.AddString(Text.str());
+    break;
+  }
+  for (auto &Piece : LeadingTrivia)
+    Piece.Profile(ID);
+  for (auto &Piece : TrailingTrivia)
+    Piece.Profile(ID);
 }
