@@ -592,8 +592,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     case ConformanceFlags::ConformanceKind::WitnessTable:
       // If the record provides a nondependent witness table for all
       // instances of a generic type, cache it for the generic pattern.
-      C.cacheSuccess(type->getTypeContextDescriptor(), protocol,
-                     descriptor.getStaticWitnessTable());
+      C.cacheSuccess(type, protocol, descriptor.getStaticWitnessTable());
       return;
 
     case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
