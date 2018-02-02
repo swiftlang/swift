@@ -278,5 +278,36 @@ DemangleToMetadataTests.test("associated type conformance requirements") {
   expectNil(_typeByMangledName("4main3SG5VyAA12ConformsToP1cVG"))
 }
 
+struct SG6<T: P4> where T.Assoc1 == T.Assoc2 { }
+struct SG7<T: P4> where T.Assoc1 == Int { }
+struct SG8<T: P4> where T.Assoc1 == [T.Assoc2] { }
+
+struct ConformsToP4d : P4 {
+  typealias Assoc1 = [ConformsToP2]
+  typealias Assoc2 = ConformsToP2
+}
+
+DemangleToMetadataTests.test("same-type requirements") {
+  // Concrete type.
+  expectEqual(SG7<S>.self,
+    _typeByMangledName("4main3SG7VyAA1SVG")!)
+
+  // Other associated type.
+  expectEqual(SG6<ConformsToP4b>.self,
+    _typeByMangledName("4main3SG6VyAA13ConformsToP4bVG")!)
+  expectEqual(SG6<ConformsToP4c>.self,
+    _typeByMangledName("4main3SG6VyAA13ConformsToP4cVG")!)
+
+  // Structural type.
+  expectEqual(SG8<ConformsToP4d>.self,
+    _typeByMangledName("4main3SG8VyAA13ConformsToP4dVG")!)
+
+  // Failure cases: types don't match.
+  expectNil(_typeByMangledName("4main3SG7VyAA13ConformsToP4aVG"))
+  expectNil(_typeByMangledName("4main3SG6VyAA13ConformsToP4aVG"))
+  expectNil(_typeByMangledName("4main3SG8VyAA13ConformsToP4cVG"))
+}
+
+
 runAllTests()
 

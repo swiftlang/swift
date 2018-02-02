@@ -744,6 +744,20 @@ bool swift::_checkGenericRequirements(
       continue;
     }
 
+    case GenericRequirementKind::SameType: {
+      // Demangle the second type under the given substitutions.
+      auto otherType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!otherType) return true;
+
+      assert(!req.getFlags().hasExtraArgument());
+
+      // Check that the types are equivalent.
+      if (subjectType != otherType) return true;
+
+      continue;
+    }
+
     // FIXME: Handle all of the other cases.
     default:
       return true;
