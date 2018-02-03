@@ -3140,6 +3140,10 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
       diag.fixItInsert(wordsStartLoc, hadLParen ? "\"" : "(\"")
           .fixItInsert(wordsEndLoc, Tok.is(tok::r_paren) ? "\"" : "\")");
     }
+
+    // Consume the right paren to finish the decl, if it's there.
+    consumeIf(tok::r_paren);
+
     return makeParserError();
   }
 
