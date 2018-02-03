@@ -1044,6 +1044,19 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
+static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
+                         ASTContext &Context, ModuleOrSourceFile MSF) {
+  const std::string &moduleOutputPath = opts.ModuleOutputPath;
+  assert(!moduleOutputPath.empty() && "must have an output path");
+
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = moduleOutputPath.c_str();
+  serializationOpts.SerializeAllSIL = true;
+  serializationOpts.IsSIB = true;
+  serialize(MSF, serializationOpts, SM);
+  return Context.hadError();
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1076,15 +1089,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-
-    if (!opts.ModuleOutputPath.empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-      serializationOpts.SerializeAllSIL = true;
-      serializationOpts.IsSIB = true;
-
-      serialize(MSF, serializationOpts, SM.get());
-    }
+    serializeSIB(Invocation.getFrontendOptions(), SM.get(),
+                 Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1148,17 +1154,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                       opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
-  if (Action == FrontendOptions::ActionType::EmitSIB) {
-    if (!opts.ModuleOutputPath.empty()) {
-      SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-      serializationOpts.SerializeAllSIL = true;
-      serializationOpts.IsSIB = true;
-
-      serialize(MSF, serializationOpts, SM.get());
-    }
-    return Context.hadError();
-  }
+  if (Action == FrontendOptions::ActionType::EmitSIB)
+    return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
+                        Instance.getASTContext(), MSF);
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     // Serialize the SILModule if it was not serialized yet.
