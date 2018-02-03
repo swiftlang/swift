@@ -1057,6 +1057,12 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
   return Context.hadError();
 }
 
+/// Serialize the SILModule if it was not serialized yet.
+static void ensureSILModuleIsSerialized(SILModule *SM) {
+  if (!SM->isSerialized())
+    SM->serialize();
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1159,9 +1165,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                         Instance.getASTContext(), MSF);
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-    // Serialize the SILModule if it was not serialized yet.
-    if (!SM.get()->isSerialized())
-      SM.get()->serialize();
+    ensureSILModuleIsSerialized(SM.get());
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
       if (shouldIndex) {
