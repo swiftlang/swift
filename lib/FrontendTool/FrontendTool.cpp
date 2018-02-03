@@ -1056,6 +1056,22 @@ static void ensureSILModuleIsSerialized(SILModule *SM) {
     SM->serialize();
 }
 
+static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
+                       StringRef OutputFilename, ModuleOrSourceFile MSF,
+                       std::unique_ptr<llvm::Module> &IRModule,
+                       llvm::GlobalVariable *&HashGlobal) {
+  // FIXME: We shouldn't need to use the global context here, but
+  // something is persisting across calls to performIRGeneration.
+  auto &LLVMContext = getGlobalLLVMContext();
+  IRModule = MSF.is<SourceFile *>()
+                 ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
+                                       std::move(SM), OutputFilename,
+                                       LLVMContext, 0, &HashGlobal)
+                 : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
+                                       std::move(SM), OutputFilename,
+                                       LLVMContext, &HashGlobal);
+}
+
 static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
                                                 CompilerInstance &Instance,
                                                 std::unique_ptr<SILModule> SM,
@@ -1218,23 +1234,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = getGlobalLLVMContext();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  if (MSF.is<SourceFile*>()) {
-    IRModule = performIRGeneration(IRGenOpts,
-                                   *MSF.get<SourceFile*>(),
-                                   std::move(SM),
-                                   opts.InputsAndOutputs.getSingleOutputFilename(), LLVMContext,
-                                   0, &HashGlobal);
-  } else {
-    IRModule = performIRGeneration(IRGenOpts, MSF.get<ModuleDecl*>(),
-                                   std::move(SM),
-                                   opts.InputsAndOutputs.getSingleOutputFilename(), LLVMContext,
-                                   &HashGlobal);
-  }
+  generateIR(IRGenOpts, std::move(SM),
+             Invocation.getFrontendOptions()
+                 .InputsAndOutputs.getSingleOutputFilename(),
+             MSF, IRModule, HashGlobal);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
