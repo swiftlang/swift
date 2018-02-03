@@ -30,8 +30,6 @@ struct _StringObject {
     case strong(AnyObject) // _bits stores flags
     case unmanagedSingleByte // _bits is the start address
     case unmanagedDoubleByte // _bits is the start address
-    case smallSingleByte // _bits is the payload
-    case smallDoubleByte // _bits is the payload
     // TODO small strings
   }
 
@@ -122,7 +120,7 @@ extension _StringObject {
 // +------------------------------------+ +------------------------------------+
 // + .unmanaged{Single,Double}Byte      | | start address (32 bits)            |
 // +------------------------------------+ +------------------------------------+
-// + .small{Single,Double}Byte          | | payload (32 bits)                  |
+// + TODO: Small strings                   
 // +------------------------------------+ +------------------------------------+
 //  msb                              lsb   msb                              lsb
 //
@@ -509,12 +507,8 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      switch _variant {
-      case .smallSingleByte, .smallDoubleByte:
-        return true
-      default:
-        return false
-      }
+      // TODO: 32-bit small strings
+      return false
 #else
       return _variantBits == _StringObject._variantMask
 #endif
@@ -536,8 +530,6 @@ extension _StringObject {
         return _bits & _StringObject._isOpaqueBit == 0
       case .unmanagedSingleByte, .unmanagedDoubleByte:
         return true
-      case .smallSingleByte, .smallDoubleByte:
-        return false
       }
 #else
       return UInt(truncatingIfNeeded: rawBits) & _StringObject._isOpaqueBit == 0
@@ -578,9 +570,9 @@ extension _StringObject {
       switch _variant {
       case .strong(_):
         return _bits & _StringObject._twoByteBit == 0
-      case .unmanagedSingleByte, .smallSingleByte:
+      case .unmanagedSingleByte:
         return true
-      case .unmanagedDoubleByte, .smallDoubleByte:
+      case .unmanagedDoubleByte:
         return false
       }
 #else
@@ -706,8 +698,8 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
     if isValue {
       if isSmallOrObjC {
-        _sanityCheck(isOpaque)
-        self.init(isTwoByte ? .smallDoubleByte : .smallSingleByte, _payloadBits)
+        _sanityCheckFailure("shouldn't be reachable")
+        self.init()
       } else {
         _sanityCheck(!isOpaque)
         self.init(
