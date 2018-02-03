@@ -3035,9 +3035,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "Test command: ${dry_run_command_output}"
 
                     if [[ ! "${test_paths}" ]]; then
-                        sh -e -x -c "${dry_run_command_output}"
+                        env bash -ex <(echo -e "${dry_run_command_output}")
                     else
-                        sh -e -x -c "${dry_run_command_output} $(echo ${test_paths[@]})"
+                        env bash -ex <(echo -e "${dry_run_command_output}" "${test_paths[@]}")
                     fi
                 else
                     call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
