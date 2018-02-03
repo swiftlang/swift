@@ -386,7 +386,7 @@ extension StrideTo : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = Int
   public typealias SubSequence = Slice<StrideTo<Element>>
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   @_inlineable
   public var startIndex: Index { return 0 }

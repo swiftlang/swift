@@ -104,7 +104,7 @@ extension Unsafe${Mutable}BufferPointer: Sequence {
 
 extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessCollection {
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// The index of the first element in a nonempty buffer.
   ///

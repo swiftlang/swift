@@ -36,7 +36,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"

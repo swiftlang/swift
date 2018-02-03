@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SYNTAX_PARSING_CONTEXT_H
-#define SWIFT_SYNTAX_PARSING_CONTEXT_H
+#ifndef SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
+#define SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
@@ -19,7 +19,6 @@
 #include "swift/Syntax/TokenSyntax.h"
 
 namespace swift {
-class SourceLoc;
 class SourceFile;
 class Token;
 class DiagnosticEngine;
@@ -27,6 +26,9 @@ class DiagnosticEngine;
 namespace syntax {
 class RawSyntax;
 enum class SyntaxKind;
+}
+
+using namespace swift::syntax;
 
 enum class SyntaxContextKind {
   Decl,
@@ -38,53 +40,6 @@ enum class SyntaxContextKind {
 };
 
 constexpr size_t SyntaxAlignInBits = 3;
-
-/// Indicates what action should be performed on the destruction of
-///  SyntaxParsingContext
-enum class AccumulationMode {
-  // Coerece the result to one of ContextKind.
-  // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
-  // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
-  CoerceKind,
-
-  // Construct a result Syntax with specified SyntaxKind.
-  CreateSyntax,
-
-  // Pass through all parts to the parent context.
-  Transparent,
-
-  // Discard all parts in the context.
-  Discard,
-
-  // Construct SourceFile syntax to the specified SF.
-  Root,
-
-  // Invalid.
-  NotSet,
-};
-
-/// The shared data for all syntax parsing contexts with the same root.
-/// This should be accessible from the root context only.
-struct alignas(1 << SyntaxAlignInBits) RootContextData {
-  // The source file under parsing.
-  SourceFile &SF;
-
-  // Where to issue diagnostics.
-  DiagnosticEngine &Diags;
-
-  SourceManager &SourceMgr;
-
-  unsigned BufferID;
-
-  // Storage for Collected parts.
-  std::vector<RC<RawSyntax>> Storage;
-
-  RootContextData(SourceFile &SF,
-                  DiagnosticEngine &Diags,
-                  SourceManager &SourceMgr,
-                  unsigned BufferID): SF(SF), Diags(Diags),
-                    SourceMgr(SourceMgr), BufferID(BufferID) {}
-};
 
 /// RAII object which receive RawSyntax parts. On destruction, this constructs
 /// a specified syntax node from received parts and propagate it to the parent
@@ -102,6 +57,53 @@ struct alignas(1 << SyntaxAlignInBits) RootContextData {
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
 class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
+public:
+  /// The shared data for all syntax parsing contexts with the same root.
+  /// This should be accessible from the root context only.
+  struct alignas(1 << SyntaxAlignInBits) RootContextData {
+    // The source file under parsing.
+    SourceFile &SF;
+
+    // Where to issue diagnostics.
+    DiagnosticEngine &Diags;
+
+    SourceManager &SourceMgr;
+
+    unsigned BufferID;
+
+    // Storage for Collected parts.
+    std::vector<RC<RawSyntax>> Storage;
+
+    RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
+                    SourceManager &SourceMgr, unsigned BufferID)
+        : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID) {}
+  };
+
+private:
+  /// Indicates what action should be performed on the destruction of
+  ///  SyntaxParsingContext
+  enum class AccumulationMode {
+    // Coerece the result to one of ContextKind.
+    // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
+    // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
+    CoerceKind,
+
+    // Construct a result Syntax with specified SyntaxKind.
+    CreateSyntax,
+
+    // Pass through all parts to the parent context.
+    Transparent,
+
+    // Discard all parts in the context.
+    Discard,
+
+    // Construct SourceFile syntax to the specified SF.
+    Root,
+
+    // Invalid.
+    NotSet,
+  };
+
   // When this context is a root, this points to an instance of RootContextData;
   // When this context isn't a root, this points to the parent context.
   const llvm::PointerUnion<RootContextData *, SyntaxParsingContext *>
@@ -109,6 +111,8 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
 
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
+
+  SyntaxArena &Arena;
 
   std::vector<RC<RawSyntax>> &Storage;
 
@@ -137,14 +141,20 @@ class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
     return makeArrayRef(Storage).drop_front(Offset);
   }
 
+  RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
+                                  ArrayRef<RC<RawSyntax>> Parts);
+  RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts);
+  RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts);
+
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
-    DiagnosticEngine &Diags, SourceManager &SourceMgr, unsigned BufferID);
+                       unsigned BufferID);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
+        Arena(CtxtHolder->Arena),
         Storage(CtxtHolder->Storage), Offset(Storage.size()),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
@@ -183,7 +193,8 @@ public:
   void addRawSyntax(RC<RawSyntax> Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(Token &Tok, Trivia &LeadingTrivia, Trivia &TrailingTrivia);
+  void addToken(Token &Tok, Trivia &LeadingTrivia,
+                Trivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
   void addSyntax(Syntax Node);
@@ -246,6 +257,5 @@ public:
 
 };
 
-} // namespace syntax
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

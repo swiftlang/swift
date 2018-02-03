@@ -41,7 +41,8 @@ ArrayRef<Type> GenericEnvironment::getContextTypes() const {
                         Signature->getGenericParams().size());
 }
 
-ArrayRef<GenericTypeParamType *> GenericEnvironment::getGenericParams() const {
+TypeArrayView<GenericTypeParamType>
+GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 

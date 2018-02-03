@@ -99,7 +99,7 @@ set(SWIFTLIB_ESSENTIAL
   Print.swift
   Random.swift
   RandomAccessCollection.swift
-  Range.swift.gyb
+  Range.swift
   RangeReplaceableCollection.swift
   ReflectionLegacy.swift
   Repeat.swift

@@ -16,20 +16,8 @@
                     {
                       "kind": "StructDecl",
                       "layout": [
-                        {
-                          "kind": "AttributeList",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "DeclModifier",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -65,9 +53,7 @@
                             "kind": "identifier",
                             "text": "Foo"
                           },
-                          "leadingTrivia": [
-
-                          ],
+                          "leadingTrivia": [],
                           "trailingTrivia": [
                             {
                               "kind": "Space",
@@ -76,27 +62,9 @@
                           ],
                           "presence": "Present"
                         },
-                        {
-                          "kind": "GenericParameterClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "TypeInheritanceClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "GenericWhereClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
+                        null,
                         {
                           "kind": "MemberDeclBlock",
                           "layout": [
@@ -104,12 +72,8 @@
                               "tokenKind": {
                                 "kind": "l_brace"
                               },
-                              "leadingTrivia": [
-
-                              ],
-                              "trailingTrivia": [
-
-                              ],
+                              "leadingTrivia": [],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             },
                             {
@@ -118,20 +82,8 @@
                                 {
                                   "kind": "VariableDecl",
                                   "layout": [
-                                    {
-                                      "kind": "AttributeList",
-                                      "layout": [
-
-                                      ],
-                                      "presence": "Missing"
-                                    },
-                                    {
-                                      "kind": "ModifierList",
-                                      "layout": [
-
-                                      ],
-                                      "presence": "Missing"
-                                    },
+                                    null,
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "kw_let"
@@ -168,9 +120,7 @@
                                                     "kind": "identifier",
                                                     "text": "bar"
                                                   },
-                                                  "leadingTrivia": [
-
-                                                  ],
+                                                  "leadingTrivia": [],
                                                   "trailingTrivia": [
                                                     {
                                                       "kind": "Space",
@@ -189,9 +139,7 @@
                                                   "tokenKind": {
                                                     "kind": "colon"
                                                   },
-                                                  "leadingTrivia": [
-
-                                                  ],
+                                                  "leadingTrivia": [],
                                                   "trailingTrivia": [
                                                     {
                                                       "kind": "Space",
@@ -208,53 +156,20 @@
                                                         "kind": "identifier",
                                                         "text": "Int"
                                                       },
-                                                      "leadingTrivia": [
-
-                                                      ],
-                                                      "trailingTrivia": [
-
-                                                      ],
+                                                      "leadingTrivia": [],
+                                                      "trailingTrivia": [],
                                                       "presence": "Present"
                                                     },
-                                                    {
-                                                      "kind": "GenericArgumentClause",
-                                                      "layout": [
-
-                                                      ],
-                                                      "presence": "Missing"
-                                                    }
+                                                    null
                                                   ],
                                                   "presence": "Present"
                                                 }
                                               ],
                                               "presence": "Present"
                                             },
-                                            {
-                                              "kind": "InitializerClause",
-                                              "layout": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            },
-                                            {
-                                              "kind": "AccessorBlock",
-                                              "layout": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            },
-                                            {
-                                              "tokenKind": {
-                                                "kind": "comma"
-                                              },
-                                              "leadingTrivia": [
-
-                                              ],
-                                              "trailingTrivia": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            }
+                                            null,
+                                            null,
+                                            null
                                           ],
                                           "presence": "Present"
                                         }
@@ -267,20 +182,8 @@
                                 {
                                   "kind": "VariableDecl",
                                   "layout": [
-                                    {
-                                      "kind": "AttributeList",
-                                      "layout": [
-
-                                      ],
-                                      "presence": "Missing"
-                                    },
-                                    {
-                                      "kind": "ModifierList",
-                                      "layout": [
-
-                                      ],
-                                      "presence": "Missing"
-                                    },
+                                    null,
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "kw_let"
@@ -317,9 +220,7 @@
                                                     "kind": "identifier",
                                                     "text": "baz"
                                                   },
-                                                  "leadingTrivia": [
-
-                                                  ],
+                                                  "leadingTrivia": [],
                                                   "trailingTrivia": [
                                                     {
                                                       "kind": "Space",
@@ -338,9 +239,7 @@
                                                   "tokenKind": {
                                                     "kind": "colon"
                                                   },
-                                                  "leadingTrivia": [
-
-                                                  ],
+                                                  "leadingTrivia": [],
                                                   "trailingTrivia": [
                                                     {
                                                       "kind": "Space",
@@ -357,9 +256,7 @@
                                                         "kind": "identifier",
                                                         "text": "Array"
                                                       },
-                                                      "leadingTrivia": [
-
-                                                      ],
+                                                      "leadingTrivia": [],
                                                       "trailingTrivia": [
                                                         {
                                                           "kind": "Space",
@@ -375,9 +272,7 @@
                                                           "tokenKind": {
                                                             "kind": "l_angle"
                                                           },
-                                                          "leadingTrivia": [
-
-                                                          ],
+                                                          "leadingTrivia": [],
                                                           "trailingTrivia": [
                                                             {
                                                               "kind": "Space",
@@ -400,9 +295,7 @@
                                                                         "kind": "identifier",
                                                                         "text": "Int"
                                                                       },
-                                                                      "leadingTrivia": [
-
-                                                                      ],
+                                                                      "leadingTrivia": [],
                                                                       "trailingTrivia": [
                                                                         {
                                                                           "kind": "Space",
@@ -411,28 +304,11 @@
                                                                       ],
                                                                       "presence": "Present"
                                                                     },
-                                                                    {
-                                                                      "kind": "GenericArgumentClause",
-                                                                      "layout": [
-
-                                                                      ],
-                                                                      "presence": "Missing"
-                                                                    }
+                                                                    null
                                                                   ],
                                                                   "presence": "Present"
                                                                 },
-                                                                {
-                                                                  "tokenKind": {
-                                                                    "kind": "comma"
-                                                                  },
-                                                                  "leadingTrivia": [
-
-                                                                  ],
-                                                                  "trailingTrivia": [
-
-                                                                  ],
-                                                                  "presence": "Missing"
-                                                                }
+                                                                null
                                                               ],
                                                               "presence": "Present"
                                                             }
@@ -443,12 +319,8 @@
                                                           "tokenKind": {
                                                             "kind": "r_angle"
                                                           },
-                                                          "leadingTrivia": [
-
-                                                          ],
-                                                          "trailingTrivia": [
-
-                                                          ],
+                                                          "leadingTrivia": [],
+                                                          "trailingTrivia": [],
                                                           "presence": "Present"
                                                         }
                                                       ],
@@ -460,32 +332,9 @@
                                               ],
                                               "presence": "Present"
                                             },
-                                            {
-                                              "kind": "InitializerClause",
-                                              "layout": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            },
-                                            {
-                                              "kind": "AccessorBlock",
-                                              "layout": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            },
-                                            {
-                                              "tokenKind": {
-                                                "kind": "comma"
-                                              },
-                                              "leadingTrivia": [
-
-                                              ],
-                                              "trailingTrivia": [
-
-                                              ],
-                                              "presence": "Missing"
-                                            }
+                                            null,
+                                            null,
+                                            null
                                           ],
                                           "presence": "Present"
                                         }
@@ -512,9 +361,7 @@
                                   "value": 6
                                 }
                               ],
-                              "trailingTrivia": [
-
-                              ],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             }
                           ],
@@ -523,18 +370,7 @@
                       ],
                       "presence": "Present"
                     },
-                    {
-                      "tokenKind": {
-                        "kind": "semi"
-                      },
-                      "leadingTrivia": [
-
-                      ],
-                      "trailingTrivia": [
-
-                      ],
-                      "presence": "Missing"
-                    }
+                    null
                   ],
                   "presence": "Present"
                 }
@@ -557,9 +393,7 @@
           "value": 1
         }
       ],
-      "trailingTrivia": [
-
-      ],
+      "trailingTrivia": [],
       "presence": "Present"
     }
   ],

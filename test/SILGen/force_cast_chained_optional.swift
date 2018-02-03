@@ -14,7 +14,7 @@ class D: C {}
 // CHECK-LABEL: sil hidden @$S27force_cast_chained_optional4testyAA1DCAA3FooCF
 // CHECK: bb0([[ARG:%.*]] : @owned $Foo):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   class_method [[BORROWED_ARG]] : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar!, $@convention(method) (@guaranteed Foo) ->
+// CHECK:   class_method [[BORROWED_ARG]] : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar?, $@convention(method) (@guaranteed Foo) ->
 // CHECK:   select_enum_addr
 // CHECK:   cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]
 //
@@ -25,7 +25,7 @@ class D: C {}
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:   [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
 // CHECK:   [[BORROWED_BAR:%.*]] = begin_borrow [[BAR]]
-// CHECK:   [[METHOD:%.*]] = class_method [[BORROWED_BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C!, $@convention(method) (@guaranteed Bar) ->
+// CHECK:   [[METHOD:%.*]] = class_method [[BORROWED_BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C?, $@convention(method) (@guaranteed Bar) ->
 // CHECK:   apply [[METHOD]]([[BORROWED_BAR]])
 // CHECK:   end_borrow [[BORROWED_BAR]] from [[BAR]]
 // CHECK:   unconditional_checked_cast {{%.*}} : $C to $D

@@ -16,20 +16,8 @@
                     {
                       "kind": "StructDecl",
                       "layout": [
-                        {
-                          "kind": "AttributeList",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "DeclModifier",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -65,9 +53,7 @@
                             "kind": "identifier",
                             "text": "A"
                           },
-                          "leadingTrivia": [
-
-                          ],
+                          "leadingTrivia": [],
                           "trailingTrivia": [
                             {
                               "kind": "Space",
@@ -76,27 +62,9 @@
                           ],
                           "presence": "Present"
                         },
-                        {
-                          "kind": "GenericParameterClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "TypeInheritanceClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "GenericWhereClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
+                        null,
                         {
                           "kind": "MemberDeclBlock",
                           "layout": [
@@ -104,19 +72,13 @@
                               "tokenKind": {
                                 "kind": "l_brace"
                               },
-                              "leadingTrivia": [
-
-                              ],
-                              "trailingTrivia": [
-
-                              ],
+                              "leadingTrivia": [],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             },
                             {
                               "kind": "DeclList",
-                              "layout": [
-
-                              ],
+                              "layout": [],
                               "presence": "Present"
                             },
                             {
@@ -129,9 +91,7 @@
                                   "value": 1
                                 }
                               ],
-                              "trailingTrivia": [
-
-                              ],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             }
                           ],
@@ -140,18 +100,7 @@
                       ],
                       "presence": "Present"
                     },
-                    {
-                      "tokenKind": {
-                        "kind": "semi"
-                      },
-                      "leadingTrivia": [
-
-                      ],
-                      "trailingTrivia": [
-
-                      ],
-                      "presence": "Missing"
-                    }
+                    null
                   ],
                   "presence": "Present"
                 },
@@ -161,20 +110,8 @@
                     {
                       "kind": "StructDecl",
                       "layout": [
-                        {
-                          "kind": "AttributeList",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "DeclModifier",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -198,9 +135,7 @@
                             "kind": "identifier",
                             "text": "B"
                           },
-                          "leadingTrivia": [
-
-                          ],
+                          "leadingTrivia": [],
                           "trailingTrivia": [
                             {
                               "kind": "Space",
@@ -209,27 +144,9 @@
                           ],
                           "presence": "Present"
                         },
-                        {
-                          "kind": "GenericParameterClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "TypeInheritanceClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
-                        {
-                          "kind": "GenericWhereClause",
-                          "layout": [
-
-                          ],
-                          "presence": "Missing"
-                        },
+                        null,
+                        null,
+                        null,
                         {
                           "kind": "MemberDeclBlock",
                           "layout": [
@@ -237,19 +154,13 @@
                               "tokenKind": {
                                 "kind": "l_brace"
                               },
-                              "leadingTrivia": [
-
-                              ],
-                              "trailingTrivia": [
-
-                              ],
+                              "leadingTrivia": [],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             },
                             {
                               "kind": "DeclList",
-                              "layout": [
-
-                              ],
+                              "layout": [],
                               "presence": "Present"
                             },
                             {
@@ -262,9 +173,7 @@
                                   "value": 1
                                 }
                               ],
-                              "trailingTrivia": [
-
-                              ],
+                              "trailingTrivia": [],
                               "presence": "Present"
                             }
                           ],
@@ -273,18 +182,7 @@
                       ],
                       "presence": "Present"
                     },
-                    {
-                      "tokenKind": {
-                        "kind": "semi"
-                      },
-                      "leadingTrivia": [
-
-                      ],
-                      "trailingTrivia": [
-
-                      ],
-                      "presence": "Missing"
-                    }
+                    null
                   ],
                   "presence": "Present"
                 }
@@ -307,9 +205,7 @@
           "value": 1
         }
       ],
-      "trailingTrivia": [
-
-      ],
+      "trailingTrivia": [],
       "presence": "Present"
     }
   ],

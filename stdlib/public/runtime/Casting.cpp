@@ -113,9 +113,8 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-TwoWordPair<const char *, uintptr_t>::Return
+TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
-  using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
   static StaticReadWriteLock TypeNameCacheLock;
@@ -132,7 +131,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return Pair{result.first, result.second};
+      return TypeNamePair{result.first, result.second};
     }
   }
 
@@ -145,7 +144,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return Pair{result.first, result.second};
+      return TypeNamePair{result.first, result.second};
     }
 
     // Build the metadata name.
@@ -157,7 +156,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     result[size] = 0;
 
     cache.insert({key, {result, size}});
-    return Pair{result, size};
+    return TypeNamePair{result, size};
   }
 }
 
@@ -266,8 +265,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 
 /// Dynamically cast a class instance to a Swift class type.
 const void *swift::swift_dynamicCastClass(const void *object,
-                                          const ClassMetadata *targetType)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                                          const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
 
@@ -567,7 +565,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT
 id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -595,7 +593,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   }
 }
 
-SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT
 id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -643,7 +641,7 @@ id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.AnyHashable.
-extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
+extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
 
 static bool isAnyHashableType(const StructMetadata *type) {
   return type->getDescription() == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
@@ -955,7 +953,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       (canConsumeDynamicValue && (flags & DynamicCastFlags::TakeOnSuccess));
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue, isTake);
-    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.first);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.object);
     maybeDeallocateSource(true);
     return true;
   }
@@ -1977,7 +1975,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.object);
 }
 
 #endif
@@ -2122,13 +2120,13 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.Array.
-extern "C" const NominalTypeDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
+extern "C" const TypeContextDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const TypeContextDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,
@@ -2403,8 +2401,7 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                               const Metadata *srcType,
                               const Metadata *targetType,
-                              DynamicCastFlags flags)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+                              DynamicCastFlags flags) {
   auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
                                                    targetType, flags);
   srcType = unwrapResult.payloadType;
@@ -3235,13 +3232,13 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
 }
 
 // Called by compiler-generated cast code.
-SWIFT_CC(c) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API
 bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
 // Called by compiler-generated code.
-SWIFT_CC(c) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API
 bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }

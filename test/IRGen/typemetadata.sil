@@ -30,7 +30,7 @@ bb0:
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @"$S12typemetadata1CCML", align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      [[T0:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass({{.*}} @"$S12typemetadata1CCMf", {{.*}})
+// CHECK:      [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass({{.*}} @"$S12typemetadata1CCMf", {{.*}})
 // CHECK-NEXT: [[T1:%.*]] = bitcast %objc_class* [[T0]] to %swift.type*
 // CHECK:      store atomic %swift.type* [[T1]], %swift.type** @"$S12typemetadata1CCML" release, align 8
 // CHECK-NEXT: br label

@@ -58,16 +58,16 @@ func callWotsit(_ w: Wotsit) {
 // CHECK: sil_vtable Hoozit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : @$S12vtables_objc6HoozitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : @$S12vtables_objc6HoozitC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit? : @$S12vtables_objc6HoozitCACSgycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit? : @$S12vtables_objc6HoozitC7bellsOnACSgSi_tcfc
 // CHECK-NEXT:   #Hoozit.deinit!deallocator: @$S12vtables_objc6HoozitCfD
 // CHECK-NEXT: }
 
 // CHECK: sil_vtable Wotsit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : @$S12vtables_objc6WotsitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : @$S12vtables_objc6WotsitC7bellsOnSQyACGSi_tcfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit? : @$S12vtables_objc6WotsitCACSgycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit? : @$S12vtables_objc6WotsitC7bellsOnACSgSi_tcfc
 // CHECK-NEXT:   #Wotsit.deinit!deallocator: @$S12vtables_objc6WotsitCfD
 // CHECK-NEXT: }
 

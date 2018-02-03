@@ -404,25 +404,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  DefaultCC = SWIFT_LLVM_CC(DefaultCC);
-  // If it is an interpreter, don't use try to use any
-  // advanced calling conventions and use instead a
-  // more conservative C calling convention. This
-  // makes sure that none of the registers eventually
-  // used by the dynamic linker are used by generated code.
-  // TODO: Check that the deployment target supports the new
-  // calling convention. Older versions of the runtime library
-  // may not contain the entries using the new calling convention.
-
-  // Only use the new calling conventions on platforms that support it.
-  auto Arch = Triple.getArch();
-  (void)Arch;
-  if (SWIFT_RT_USE_RegisterPreservingCC &&
-      Arch == llvm::Triple::ArchType::aarch64)
-    RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  else
-    RegisterPreservingCC = DefaultCC;
-
+  DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
@@ -530,123 +512,13 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   return cache;
 }
 
-llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
-                                    llvm::Constant *&cache,
-                                    char const *name,
-                                    char const *symbol,
-                                    llvm::CallingConv::ID cc,
-                                    llvm::ArrayRef<llvm::Type *> retTypes,
-                                    llvm::ArrayRef<llvm::Type *> argTypes,
-                                    ArrayRef<Attribute::AttrKind> attrs) {
-  assert(symbol && "Symbol name should be defined for a wrapper function");
-  // Wrapper names should have a prefix to distinguish them from the
-  // actual runtime functions.
-  llvm::SmallString<128> wrapperNameStr;
-  llvm::raw_svector_ostream buffer(wrapperNameStr);
-  buffer << SWIFT_WRAPPER_PREFIX;
-  buffer << name;
-  const char *wrapperName = wrapperNameStr.c_str();
-  auto fn = getRuntimeFn(Module, cache, wrapperName, cc,
-                         retTypes, argTypes, attrs);
-  auto *fun = dyn_cast<llvm::Function>(fn);
-  assert(fun && "Wrapper should be an llvm::Function");
-  // Do not inline wrappers, because this would result in a code size increase.
-  fun->addAttribute(llvm::AttributeList::FunctionIndex,
-                    llvm::Attribute::NoInline);
-  assert(fun->hasFnAttribute(llvm::Attribute::NoInline) &&
-         "Wrappers should not be inlined");
-  if (fun->empty()) {
-    // All wrappers should have ODR linkage so that a linker can detect them
-    // and leave only one copy.
-    fun->setLinkage(llvm::Function::LinkOnceODRLinkage);
-    fun->setVisibility(llvm::Function::HiddenVisibility);
-    fun->setDLLStorageClass(llvm::Function::DefaultStorageClass);
-    fun->setDoesNotThrow();
-
-    // Add the body of a wrapper.
-    // It simply invokes the actual implementation of the runtime entry
-    // by means of indirect call through a pointer stored in the
-    // global variable.
-    llvm::IRBuilder<> Builder(Module.getContext());
-    llvm::BasicBlock *bb =
-        llvm::BasicBlock::Create(Module.getContext(), "entry", fun);
-    Builder.SetInsertPoint(bb);
-    auto fnTy = fun->getFunctionType();
-    auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
-
-    auto *globalFnPtr = new llvm::GlobalVariable(
-        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
-        symbol);
-    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())))
-      globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-
-    // Forward all arguments.
-    llvm::SmallVector<llvm::Value *, 4> args;
-    for (auto &arg: fun->args()) {
-      args.push_back(&arg);
-    }
-
-
-    auto fnPtr = Builder.CreateLoad(globalFnPtr, "load");
-
-    auto call = Builder.CreateCall(fnPtr, args);
-    call->setCallingConv(cc);
-    call->setTailCall(true);
-    for (auto Attr : attrs)
-      if (isReturnedAttribute(Attr)) {
-        call->addParamAttr(0, llvm::Attribute::Returned);
-      }
-    auto VoidTy = llvm::Type::getVoidTy(Module.getContext());
-    if (retTypes.size() == 1 && *retTypes.begin() == VoidTy)
-      Builder.CreateRetVoid();
-    else
-      Builder.CreateRet(call);
-  }
-
-  return fn;
-}
-
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION_FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)             \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_SwiftCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)          \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS,    \
-                                               ATTRS)                          \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SWIFT_RT_ENTRY_REF(NAME), CC,     \
-                                   QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
 #define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
-  FUNCTION_FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS),            \
-                         QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_DefaultCC(ID, NAME, SYMBOL, CC,   \
-                                                       RETURNS, ARGS, ATTRS)   \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_RegisterPreservingCC(             \
-    ID, NAME, SYMBOL, CC, RETURNS, ARGS, ATTRS)                                \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
-                                   QUOTE(ARGS), QUOTE(ATTRS))
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
-                                             RETURNS, ARGS, ATTRS)             \
-  FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_##CC(                                   \
-      ID, NAME, SYMBOL, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
-
-#define RETURNS(...)                                                           \
-  { __VA_ARGS__ }
+#define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }
@@ -656,14 +528,6 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC, RETURNS, ARGS, ATTRS);      \
-  }
-
-#define FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL_NAME, CC, RETURNS,   \
-                                         ARGS, ATTRS)                          \
-  llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
-    using namespace RuntimeConstants;                                          \
-    return getWrapperFn(Module, ID##Fn, #NAME, STR(SYMBOL_NAME), CC, RETURNS,  \
-                        ARGS, ATTRS);                                          \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"

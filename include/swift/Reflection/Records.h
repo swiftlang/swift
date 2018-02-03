@@ -30,7 +30,10 @@ class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
     // Is this an indirect enum case?
-    IsIndirectCase = 0x1
+    IsIndirectCase = 0x1,
+    
+    // Is this a mutable `var` property?
+    IsVar = 0x2,
   };
   int_type Data = 0;
 
@@ -39,11 +42,22 @@ public:
     return (Data & IsIndirectCase) == IsIndirectCase;
   }
 
+  bool isVar() const {
+    return (Data & IsVar) == IsVar;
+  }
+
   void setIsIndirectCase(bool IndirectCase=true) {
     if (IndirectCase)
       Data |= IsIndirectCase;
     else
       Data &= ~IsIndirectCase;
+  }
+
+  void setIsVar(bool Var=true) {
+    if (Var)
+      Data |= IsVar;
+    else
+      Data &= ~IsVar;
   }
 
   int_type getRawValue() const {

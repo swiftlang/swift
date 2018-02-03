@@ -223,7 +223,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                 SGFContext());
   }
 
-  B.createUnreachable(loc);
+  B.createUnreachable(ArtificialUnreachableLocation());
   B.clearInsertionPoint();
   B.emitBlock(contBB);
 
@@ -1153,8 +1153,7 @@ Optional<Conversion> Conversion::adjustForInitialForceValue() const {
 
   case BridgeToObjC: {
     auto sourceOptType =
-      ImplicitlyUnwrappedOptionalType::get(getBridgingSourceType())
-        ->getCanonicalType();
+      OptionalType::get(getBridgingSourceType())->getCanonicalType();
     return Conversion::getBridging(ForceAndBridgeToObjC,
                                    sourceOptType,
                                    getBridgingResultType(),

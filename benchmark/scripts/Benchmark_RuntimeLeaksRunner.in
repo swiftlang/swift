@@ -81,29 +81,35 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def prepare_input(self, name):
         return {'num_samples': self.num_samples, 'num_iters': self.num_iters}
 
+    def run_test_inner(self, data, num_iters):
+        p = subprocess.Popen([
+            data['path'],
+            "--num-samples={}".format(data['num_samples']),
+            "--num-iters={}".format(num_iters), data['test_name']],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        error_out = p.communicate()[1].split("\n")
+        result = p.returncode
+        if result is None:
+            raise RuntimeError("Expected one line of output")
+        if result != 0:
+            raise RuntimeError("Process segfaulted")
+        return error_out
+
     def run_test(self, data, num_iters):
         try:
-            p = subprocess.Popen([
-                data['path'],
-                "--num-samples={}".format(data['num_samples']),
-                "--num-iters={}".format(num_iters), data['test_name']],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            error_out = p.communicate()[1].split("\n")
-            result = p.returncode
-            if result is None:
-                raise RuntimeError("Expected one line of output")
-            if result != 0:
-                raise RuntimeError("Process segfaulted")
-        except Exception:
-            sys.stderr.write("Child Process Failed! (%s,%s)\n" % (
-                data['path'], data['test_name']))
+            args = [data, num_iters]
+            result = perf_test_driver.run_with_timeout(self.run_test_inner,
+                                                       args)
+        except Exception, e:
+            sys.stderr.write("Child Process Failed! (%s,%s). Error: %s\n" % (
+                data['path'], data['test_name'], e))
             sys.stderr.flush()
             return None
 
         try:
             # We grab the second line since swift globals get lazily created in
             # the first iteration.
-            d = json.loads(error_out[1])
+            d = json.loads(result[1])
             d['objc_objects'] = [x for x in d['objc_objects']
                                  if x not in IGNORABLE_GLOBAL_OBJC_CLASSES]
             d['objc_count'] = len(d['objc_objects'])

@@ -31,7 +31,7 @@ mark() // CHECK-NEXT: --[[@LINE]]--
 private class ArchivedTwice {}
 
 checkArchiving(ArchivedTwice.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.(ArchivedTwice in {{.+}})' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedTwice'
+// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.+}}).ArchivedTwice' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedTwice'
 // CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedTwice)
 // CHECK-NEXT: @objc(ABCArchivedTwice)
 mark() // CHECK-NEXT: --[[@LINE]]--
@@ -41,7 +41,7 @@ mark() // CHECK-NEXT: --[[@LINE]]--
 private class UnarchivedTwice {}
 
 checkUnarchiving(UnarchivedTwice.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.(UnarchivedTwice in {{.+}})' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedTwice'
+// CHECK-NEXT: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedTwice' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedTwice'
 // CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedTwice)
 // CHECK-NEXT: @objc(ABCUnarchivedTwice)
 mark() // CHECK-NEXT: --[[@LINE]]--
@@ -51,7 +51,7 @@ mark() // CHECK-NEXT: --[[@LINE]]--
 private class ArchivedThenUnarchived {}
 
 checkArchiving(ArchivedThenUnarchived.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.(ArchivedThenUnarchived in {{.+}})' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedThenUnarchived'
+// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.+}}).ArchivedThenUnarchived' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedThenUnarchived'
 // CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedThenUnarchived)
 // CHECK-NEXT: @objc(ABCArchivedThenUnarchived)
 mark() // CHECK-NEXT: --[[@LINE]]--
@@ -61,7 +61,7 @@ mark() // CHECK-NEXT: --[[@LINE]]--
 private class UnarchivedThenArchived {}
 
 checkUnarchiving(UnarchivedThenArchived.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.(UnarchivedThenArchived in {{.+}})' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedThenArchived'
+// CHECK-NEXT: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedThenArchived' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedThenArchived'
 // CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedThenArchived)
 // CHECK-NEXT: @objc(ABCUnarchivedThenArchived)
 mark() // CHECK-NEXT: --[[@LINE]]--
@@ -111,7 +111,7 @@ mark() // CHECK-NEXT: --[[@LINE]]--
 private class 日本語 {}
 
 checkArchiving(日本語.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.(日本語 in {{.+}})'
+// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.*}}).日本語'
 // CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}9日本語)
 // CHECK-NEXT: @objc(ABCMyModel)
 mark() // CHECK-NEXT: --[[@LINE]]--

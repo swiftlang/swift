@@ -37,13 +37,12 @@ namespace swift {
 ///
 /// \return true if the cast succeeded. Depending on the flags,
 ///   swift_dynamicCast may fail rather than return false.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 bool
 swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,
                   const Metadata *targetType,
-                  DynamicCastFlags flags)
-    SWIFT_CC(RegisterPreservingCC);
+                  DynamicCastFlags flags);
 
 /// \brief Checked dynamic cast to a Swift class type.
 ///
@@ -52,10 +51,9 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
 /// a Swift class type.
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 const void *
-swift_dynamicCastClass(const void *object, const ClassMetadata *targetType)
-    SWIFT_CC(RegisterPreservingCC);
+swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
 
 /// \brief Unconditional, checked dynamic cast to a Swift class type.
 ///

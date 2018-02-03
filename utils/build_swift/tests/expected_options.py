@@ -106,8 +106,7 @@ EXPECTED_DEFAULTS = {
         defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
     'darwin_deployment_version_watchos':
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
-    'darwin_xcrun_toolchain':
-        defaults.DARWIN_XCRUN_TOOLCHAIN,
+    'darwin_xcrun_toolchain': None,
     'distcc': False,
     'dry_run': False,
     'enable_asan': False,

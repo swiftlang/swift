@@ -28,4 +28,4 @@ _ = d! // expected-error {{cannot force unwrap value of non-optional type 'D'}}
 _ = dopt == nil
 _ = diuopt == nil
 _ = diuopt is ExpressibleByNilLiteral // expected-warning {{'is' test is always true}}
-// expected-warning@-1 {{conditional cast from 'D!' to 'ExpressibleByNilLiteral' always succeeds}}
+// expected-warning@-1 {{conditional cast from 'D?' to 'ExpressibleByNilLiteral' always succeeds}}

@@ -1,12 +1,13 @@
-// RUN: %empty-directory(%T)
-// RUN: %target-clang -x objective-c -c %S/Inputs/arc_36509461.m  -o %T/arc_36509461.m.o
-// RUN: %target-swift-frontend -c -O -import-objc-header %S/Inputs/arc_36509461.h -sanitize=address %s -o %T/arc_36509461.swift.o
-// RUN: %target-build-swift %T/arc_36509461.m.o %T/arc_36509461.swift.o -sanitize=address -o %t
-// RUN: %t
+// RUN: %empty-directory(%t)
+// RUN: %target-clang -x objective-c -c %S/Inputs/arc_36509461.m  -o %t/arc_36509461.m.o
+// RUN: %target-swift-frontend -c -O -import-objc-header %S/Inputs/arc_36509461.h -sanitize=address %s -o %t/arc_36509461.swift.o
+// RUN: %target-build-swift %t/arc_36509461.m.o %t/arc_36509461.swift.o -sanitize=address -o %t/arc_36509461
+// RUN: %target-run %t/arc_36509461
 
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import Foundation
 

@@ -81,7 +81,7 @@ internal func _cocoaStringSlice(
   _ target: _CocoaString, _ bounds: Range<Int>
 ) -> _CocoaString {
   let cfSelf: _swift_shims_CFStringRef = target
-  
+
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")

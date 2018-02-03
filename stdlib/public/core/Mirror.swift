@@ -565,7 +565,7 @@ internal extension Mirror {
   @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal struct LegacyChildren : RandomAccessCollection {
-    internal typealias Indices = CountableRange<Int>
+    internal typealias Indices = Range<Int>
     
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
@@ -871,7 +871,7 @@ public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 /// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   
   /// The position of the first element in a nonempty collection.
   ///

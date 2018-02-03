@@ -47,14 +47,15 @@ function(add_swift_unittest test_dirname)
       LINK_FLAGS " -latomic")
   endif()
 
-  if(SWIFT_ENABLE_GOLD_LINKER AND
+  find_program(LDLLD_PATH "ld.lld")
+  # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+  if(SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fuse-ld=lld")
+  elseif(SWIFT_ENABLE_GOLD_LINKER AND
      "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER)
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -fuse-ld=lld")
   endif()
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)

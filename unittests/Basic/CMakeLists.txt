@@ -15,6 +15,7 @@ add_swift_unittest(SwiftBasicTests
   EncodedSequenceTest.cpp
   FileSystemTest.cpp
   ImmutablePointerSetTest.cpp
+  JSONSerialization.cpp
   OptionSetTest.cpp
   OwnedStringTest.cpp
   PointerIntEnumTest.cpp

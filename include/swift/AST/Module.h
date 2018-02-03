@@ -81,8 +81,6 @@ namespace swift {
   
 namespace syntax {
   class SourceFileSyntax;
-  class SyntaxParsingContext;
-  class SyntaxParsingContextRoot;
 }
 
 /// Discriminator for file-units.
