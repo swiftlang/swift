@@ -410,7 +410,7 @@ public:
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
-  /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
+  /// Retrieve the declaration of Swift.Optional.
   EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
@@ -418,12 +418,6 @@ public:
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalSomeDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
 
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;

@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 393; // SILLinkage::PublicNonABI
+const uint16_t VERSION_MINOR = 394; // Remove IUO serialization and decl
 
 using DeclIDField = BCFixed<31>;
 
@@ -790,8 +790,6 @@ namespace decls_block {
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
-  using ImplicitlyUnwrappedOptionalTypeLayout =
-    SyntaxSugarTypeLayout<UNCHECKED_OPTIONAL_TYPE>;
 
   using DictionaryTypeLayout = BCRecordLayout<
     DICTIONARY_TYPE,

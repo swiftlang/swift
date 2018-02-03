@@ -2489,8 +2489,6 @@ OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   const ASTContext &ctx = getASTContext();
   if (this == ctx.getOptionalDecl()) {
     return OTK_Optional;
-  } else if (this == ctx.getImplicitlyUnwrappedOptionalDecl()) {
-    return OTK_ImplicitlyUnwrappedOptional;
   } else {
     return OTK_None;
   }

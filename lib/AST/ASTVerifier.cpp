@@ -2684,11 +2684,9 @@ public:
 
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
-      if (!CD->isInvalid() && 
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getOptionalDecl() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
+      if (!CD->isInvalid() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
+              Ctx.getOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
         auto declOptionality = CD->getFailability();

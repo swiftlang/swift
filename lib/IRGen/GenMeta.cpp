@@ -2673,13 +2673,7 @@ namespace {
     // aren't mapped correctly because the EnumImplStrategy ends up
     // using the lowered cases, i.e. the cases for Optional<>.
     if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
-      assert(enumElements.size() == 1);
-      auto decl = IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl();
-      auto caseType = decl->getParentEnum()->mapTypeIntoContext(
-        decl->getArgumentInterfaceType())
-          ->getCanonicalType();
-      types.push_back(FieldTypeInfo(caseType, false, false));
-      return getFieldTypeAccessorFn(IGM, type, types);
+      llvm_unreachable("Should not have IUOs.");
     }
 
     for (auto &elt : enumElements) {

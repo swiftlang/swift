@@ -4722,18 +4722,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::UNCHECKED_OPTIONAL_TYPE: {
-    TypeID baseID;
-    decls_block::ImplicitlyUnwrappedOptionalTypeLayout::readRecord(scratch, baseID);
-
-    auto baseTy = getTypeChecked(baseID);
-    if (!baseTy)
-      return baseTy.takeError();
-
-    typeOrOffset = ImplicitlyUnwrappedOptionalType::get(baseTy.get());
-    break;
-  }
-
   case decls_block::UNBOUND_GENERIC_TYPE: {
     DeclID genericID;
     TypeID parentID;

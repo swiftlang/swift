@@ -4115,7 +4115,8 @@ class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
                         RecursiveTypeProperties properties)
     : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
                            properties) {
-    //llvm_unreachable("ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
+    llvm_unreachable(
+        "ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
   }
 
 public:
