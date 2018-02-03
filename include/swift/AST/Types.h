@@ -4102,26 +4102,6 @@ public:
   }
 };
 
-/// The type T!, which is always sugar for a library type.
-class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
-  ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
-                        RecursiveTypeProperties properties)
-    : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
-                           properties) {
-    llvm_unreachable(
-        "ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
-  }
-
-public:
-  /// Return a uniqued optional type with the specified base type.
-  static ImplicitlyUnwrappedOptionalType *get(Type baseTy);
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ImplicitlyUnwrappedOptional;
-  }
-};
-
 /// The dictionary type [K : V], which is syntactic sugar for Dictionary<K, V>.
 ///
 /// Example:

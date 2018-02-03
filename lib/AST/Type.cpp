@@ -1289,9 +1289,6 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::Optional:
     implDecl = Context->getOptionalDecl();
     break;
-  case TypeKind::ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should no longer have IUOs");
-    break;
   case TypeKind::Dictionary:
     implDecl = Context->getDictionaryDecl();
     break;
@@ -3779,18 +3776,6 @@ case TypeKind::Id:
       return *this;
 
     return OptionalType::get(baseTy);
-  }
-
-  case TypeKind::ImplicitlyUnwrappedOptional: {
-    auto optional = cast<ImplicitlyUnwrappedOptionalType>(base);
-    auto baseTy = optional->getBaseType().transformRec(fn);
-    if (!baseTy)
-      return Type();
-
-    if (baseTy.getPointer() == optional->getBaseType().getPointer())
-      return *this;
-
-    return ImplicitlyUnwrappedOptionalType::get(baseTy);
   }
 
   case TypeKind::Dictionary: {
