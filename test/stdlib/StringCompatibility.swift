@@ -116,8 +116,6 @@ extension MyString : Hashable {
   }
 }
 
-#if _runtime(_ObjC)
-
 extension MyString {
   public func hasPrefix(_ prefix: String) -> Bool {
     return self.base.hasPrefix(prefix)
@@ -127,8 +125,6 @@ extension MyString {
     return self.base.hasSuffix(suffix)
   }
 }
-
-#endif
 
 extension MyString : StringProtocol {
   typealias UTF8Index = String.UTF8Index
