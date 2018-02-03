@@ -1005,6 +1005,18 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
   }
 }
 
+/// Get the main source file's private discriminator and attach it to
+/// the compile unit's flags.
+static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
+                                            ModuleOrSourceFile MSF) {
+  if (IRGenOpts.DebugInfoKind == IRGenDebugInfoKind::None ||
+      !MSF.is<SourceFile *>())
+    return;
+  Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
+  if (!PD.empty())
+    IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1108,14 +1120,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     performSILInstCount(&*SM);
   }
 
-  // Get the main source file's private discriminator and attach it to
-  // the compile unit's flags.
-  if (IRGenOpts.DebugInfoKind != IRGenDebugInfoKind::None &&
-      MSF.is<SourceFile*>()) {
-    Identifier PD = MSF.get<SourceFile*>()->getPrivateDiscriminator();
-    if (!PD.empty())
-      IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
-  }
+  setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
   if (!opts.ObjCHeaderOutputPath.empty()) {
     (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
