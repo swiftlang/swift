@@ -120,8 +120,8 @@ enum class LocalDeclContextKind : uint8_t {
 ///
 /// The enumerators are ordered in terms of decreasing preference:
 /// an inherited conformance is best, followed by explicit
-/// conformances, then implied conformances. Earlier conformance
-/// kinds supersede later conformance kinds, possibly with a
+/// conformances, then synthesized and implied conformances. Earlier
+/// conformance kinds supersede later conformance kinds, possibly with a
 /// diagnostic (e.g., if an inherited conformance supersedes an
 /// explicit conformance).
 enum class ConformanceEntryKind : unsigned {
@@ -131,11 +131,11 @@ enum class ConformanceEntryKind : unsigned {
   /// Explicitly specified.
   Explicit,
 
-  /// Implied by an explicitly-specified conformance.
-  Implied,
-
   /// Implicitly synthesized.
   Synthesized,
+
+  /// Implied by an explicitly-specified conformance.
+  Implied,
 };
 
 /// Describes the kind of conformance lookup desired.
