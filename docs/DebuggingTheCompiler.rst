@@ -249,7 +249,17 @@ to be invoked with the sil function body. Note,
 ``sil-mode-display-function-cfg`` does not take any arguments.
 
 **NOTE** viewcfg must be in the $PATH for viewcfg to work.
+
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
+
+There is another useful script to view the CFG of a disassembled function:
+``./utils/dev-scripts/blockifyasm``.
+It splits a disassembled function up into basic blocks which can then be
+used with viewcfg::
+
+    (lldb) disassemble 
+      <copy-paste output to file.s>
+    $ blockifyasm < file.s | viewcfg
 
 Using Breakpoints
 ~~~~~~~~~~~~~~~~~
