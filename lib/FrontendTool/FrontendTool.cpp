@@ -955,6 +955,34 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
   return false;
 }
 
+static SerializationOptions
+computeSerializationOptions(const CompilerInvocation &Invocation,
+                            bool moduleIsPublic) {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+  if (opts.SerializeBridgingHeader)
+    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.ExtraClangOptions =
+      Invocation.getClangImporterOptions().ExtraArgs;
+  serializationOpts.EnableNestedTypeLookupTable =
+      opts.EnableSerializationNestedTypeLookupTable;
+  if (!Invocation.getIRGenOptions().ForceLoadSymbolName.empty())
+    serializationOpts.AutolinkForceLoad = true;
+
+  // Options contain information about the developer's computer,
+  // so only serialize them if the module isn't going to be shipped to
+  // the public.
+  serializationOpts.SerializeOptionsForDebugging =
+      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
+  return serializationOpts;
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1027,31 +1055,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-      if (!opts.ModuleOutputPath.empty()) {
-        SerializationOptions serializationOpts;
-        serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-        serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
-        serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-        if (opts.SerializeBridgingHeader)
-          serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-        serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-        serializationOpts.ExtraClangOptions =
-            Invocation.getClangImporterOptions().ExtraArgs;
-        serializationOpts.EnableNestedTypeLookupTable =
-            opts.EnableSerializationNestedTypeLookupTable;
-        if (!IRGenOpts.ForceLoadSymbolName.empty())
-          serializationOpts.AutolinkForceLoad = true;
+    if (opts.ModuleOutputPath.empty())
+      return;
 
-        // Options contain information about the developer's computer,
-        // so only serialize them if the module isn't going to be shipped to
-        // the public.
-        serializationOpts.SerializeOptionsForDebugging =
-            !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
-
-        serialize(MSF, serializationOpts, SM.get());
-      }
-    }
+    SerializationOptions serializationOpts =
+        computeSerializationOptions(Invocation, moduleIsPublic);
+    serialize(MSF, serializationOpts, SM.get());
   };
 
   // Set the serialization action, so that the SIL module
