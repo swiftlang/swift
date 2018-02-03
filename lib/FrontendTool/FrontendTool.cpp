@@ -1095,6 +1095,31 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   return Instance.getASTContext().hadError();
 }
 
+static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
+                                ModuleOrSourceFile MSF,
+                                bool astGuaranteedToCorrespondToSIL,
+                                llvm::Module &IRModule) {
+  if (!astGuaranteedToCorrespondToSIL ||
+      !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
+    return false;
+
+  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  // Ensure all cases are covered by using a switch here.
+  switch (mode) {
+  case FrontendOptions::TBDValidationMode::None:
+    return false;
+  case FrontendOptions::TBDValidationMode::All:
+  case FrontendOptions::TBDValidationMode::MissingFromTBD:
+    break;
+  }
+  const auto hasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
+  return MSF.is<SourceFile *>() ? validateTBD(MSF.get<SourceFile *>(), IRModule,
+                                              hasMultipleIGMs, allSymbols)
+                                : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
+                                              hasMultipleIGMs, allSymbols);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1256,35 +1281,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return HadError;
   }
 
-  bool allSymbols = false;
-  switch (opts.ValidateTBDAgainstIR) {
-  case FrontendOptions::TBDValidationMode::None:
-    break;
-  case FrontendOptions::TBDValidationMode::All:
-    allSymbols = true;
-    LLVM_FALLTHROUGH;
-  case FrontendOptions::TBDValidationMode::MissingFromTBD: {
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()) ||
-        !astGuaranteedToCorrespondToSIL)
-      break;
-
-    const auto &SILOpts = Invocation.getSILOptions();
-    const auto hasMultipleIGMs = SILOpts.hasMultipleIGMs();
-    bool error;
-    if (MSF.is<SourceFile*>())
-      error = validateTBD(MSF.get<SourceFile*>(),
-                          *IRModule, hasMultipleIGMs,
-                          allSymbols);
-    else
-      error = validateTBD(MSF.get<ModuleDecl*>(),
-                          *IRModule, hasMultipleIGMs,
-                          allSymbols);
-    if (error)
-      return true;
-
-    break;
-  }
-  }
+  if (validateTBDIfNeeded(Invocation, MSF, astGuaranteedToCorrespondToSIL,
+                          *IRModule))
+    return true;
 
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
     createTargetMachine(IRGenOpts, Context);
