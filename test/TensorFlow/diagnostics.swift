@@ -21,3 +21,9 @@ public func nonConstantAttribute(x: Tensor<Float>, someBool: Bool) {
   // expected-error @+1 {{attribute 'keep_dims' requires a constant argument}}
   print(x.mean(alongAxes: 1,2,3, keepingDimensions: someBool))
 }
+
+public func shapeError() {
+  // expected-error @+1 {{tensor literal should have 9 units for this shape, but has 8}}
+  let _ = Tensor<Float>(shape: [1, 3, 3, 1],
+                        units: [0, 1, 0, 1, 1, 1, 0, 1])
+}

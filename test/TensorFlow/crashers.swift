@@ -4,6 +4,8 @@
 
 import TensorFlow
 
+var someGlobal = Tensor<Int>(1)
+
 public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<Int> {
   // expected-warning @-1 {{'c' implicitly copied to the accelerator}}
 
@@ -15,7 +17,7 @@ public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<I
     if d { fatalError() }
 
     // expected-warning @+1 {{value implicitly copied to the accelerator}}
-    a = Tensor<Int>([1,2,3])  // expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
+    a = someGlobal  // expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
   }
 
   a = a * a  // expected-note {{value used here}}

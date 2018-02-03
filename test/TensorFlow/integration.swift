@@ -2,15 +2,15 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 import TensorFlow
 
-public func testTensor() {
-  var x = Tensor<Float>([1.0, 2.0, 3.0])  // expected-warning {{'Tensor<Float>' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
+  var x = a  // expected-warning {{value implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
   x += x  // expected-note {{value used here}}
 
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
   // GraphGen doesn't support sends yet: expected-error @-1 {{internal error generating TensorFlow graph}}
 
   print(x) // expected-note {{value used here}}
-  var y = Tensor1D<Float>(1, 2, 3.0).toDevice()
+  var y = b.toDevice()
   y += y
   print(y)
 }
@@ -27,7 +27,7 @@ public func testTensor() {
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
-// CHECK: sil @{{.*}}testTensor{{.*}} : $@convention(thin) () -> () {
+// CHECK: sil shared @{{.*}}testTensor{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> () {
 
 // Graph lowering fails on testTensor because it requires send and receive instructions.
 // CHECK: string_literal bytes ""
@@ -154,9 +154,10 @@ public func testExitBranch2(i: Int) {  // expected-warning {{'i' implicitly copi
 
 
 // This program results in a boolean parameter being passed in.
-public func test_bool_param(cond: Bool) {// expected-warning {{'cond' implicitly copied to the accelerator}}
-  var a = Tensor1D<Float>(1,2,3).toDevice()
-  let b = Tensor1D<Float>(1,2,4).toDevice()
+public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
+                            x: Tensor1D<Float>, y: Tensor1D<Float>) {
+  var a = x.toDevice()
+  let b = y.toDevice()
 
   if cond {  // expected-note {{value used here}}
     a -= b
@@ -185,9 +186,10 @@ public func test_bool_param(cond: Bool) {// expected-warning {{'cond' implicitly
 // CHECK-NEXT:  dealloc_stack
 
 
-public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitly copied to the accelerator}}
-  var a = Tensor1D<Float>(1,2,3).toDevice()
-  let b = Tensor1D<Float>(1,2,4).toDevice()
+public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
+                             x: Tensor1D<Float>, y: Tensor1D<Float>) {
+  var a = x.toDevice()
+  let b = y.toDevice()
 
   a += b
 
@@ -208,7 +210,7 @@ public func test_bool_param2(cond: Bool) {// expected-warning {{'cond' implicitl
 // CHECK: }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $Bool)
+// CHECK: bb0(%0 : $Bool, %1 : $Tensor1D<Float>, %2 : $Tensor1D<Float>):
 // CHECK: [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
 // CHECK: function_ref @_swift_tfc_CreateCTensorHandle
 // CHECK: [[BOOLADDR:%.*]] = alloc_stack $Builtin.Int1
@@ -353,6 +355,24 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:  return %8 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
+
+
+// Testcase for an op that uses the $tensor and $shape modifiers.
+public func testConstantArray() -> TensorHandle<Float> {
+  return #tfop("Const", ":t", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
+// CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
+// CHECK: bb0:
+// CHECK-NEXT:  %0 = metatype $@thin Float.Type
+// CHECK-NEXT:  %1 = metatype $@thin Double.Type
+// CHECK-NEXT:  %2 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+// CHECK-NEXT:  %3 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
+// CHECK-NEXT:  %4 = metatype $@thin Int.Type
+// CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:  %6 = builtin "__tfop_Const,:t,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
+// CHECK-NEXT:  return %6 : $TensorHandle<Float>
 
 
 

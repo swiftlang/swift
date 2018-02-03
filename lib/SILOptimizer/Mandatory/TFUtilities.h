@@ -105,6 +105,7 @@ namespace tf {
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}
     bool decodeBuiltin(BuiltinInst *inst);
+    bool decodeTensorFromUnits(ApplyInst *inst);
   };
 
 
