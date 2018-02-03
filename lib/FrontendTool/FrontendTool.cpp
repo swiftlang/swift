@@ -1120,6 +1120,36 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
                                               hasMultipleIGMs, allSymbols);
 }
 
+static bool generateCode(CompilerInvocation &Invocation,
+                         CompilerInstance &Instance, std::string OutputFilename,
+                         llvm::Module *IRModule,
+                         llvm::GlobalVariable *HashGlobal,
+                         UnifiedStatsReporter *Stats) {
+  std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
+      Invocation.getIRGenOptions(), Instance.getASTContext());
+  version::Version EffectiveLanguageVersion =
+      Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
+
+  if (!Stats) {
+    // Free up some compiler resources now that we have an IRModule.
+    Instance.freeSILModule();
+
+    // If there are multiple primary inputs it is too soon to free
+    // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
+    // primary input, then freeing it after processing the last primary is
+    // unlikely to reduce the peak heap size. So, only optimize the
+    // single-primary-case (or WMO).
+    if (!Invocation.getFrontendOptions()
+             .InputsAndOutputs.hasMultiplePrimaryInputs())
+      Instance.freeASTContext();
+  }
+
+  // Now that we have a single IR Module, hand it over to performLLVM.
+  return performLLVM(Invocation.getIRGenOptions(), &Instance.getDiags(),
+                     nullptr, HashGlobal, IRModule, TargetMachine.get(),
+                     EffectiveLanguageVersion, OutputFilename, Stats);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1285,30 +1315,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                           *IRModule))
     return true;
 
-  std::unique_ptr<llvm::TargetMachine> TargetMachine =
-    createTargetMachine(IRGenOpts, Context);
-  version::Version EffectiveLanguageVersion =
-    Context.LangOpts.EffectiveLanguageVersion;
-
-  if (!Stats) {
-    // Free up some compiler resources now that we have an IRModule.
-    Instance.freeSILModule();
-
-    // If there are multiple primary inputs it is too soon to free
-    // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
-    // primary input, then freeing it after processing the last primary is
-    // unlikely to reduce the peak heap size. So, only optimize the
-    // single-primary-case (or WMO).
-    if (!Invocation.getFrontendOptions()
-             .InputsAndOutputs.hasMultiplePrimaryInputs())
-      Instance.freeASTContext();
-  }
-
-  // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
-                     IRModule.get(), TargetMachine.get(),
-                     EffectiveLanguageVersion,
-                     opts.InputsAndOutputs.getSingleOutputFilename(), Stats) ||
+  return generateCode(Invocation, Instance,
+                      Invocation.getFrontendOptions()
+                          .InputsAndOutputs.getSingleOutputFilename(),
+                      IRModule.get(), HashGlobal, Stats) ||
          HadError;
 }
 
