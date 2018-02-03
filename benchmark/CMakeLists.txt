@@ -113,6 +113,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
+    single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
     single-source/RangeAssignment
