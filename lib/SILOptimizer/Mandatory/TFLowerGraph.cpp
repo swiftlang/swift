@@ -283,6 +283,7 @@ public:  // Lowering functionality.
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {}
   void visitFloatLiteralInst(FloatLiteralInst *inst) {}
   void visitMetatypeInst(MetatypeInst *inst) {}
+  void visitStringLiteralInst(StringLiteralInst *inst) {}
 
   void visitBuiltinInst(BuiltinInst *inst);
   void visitBuiltinTFSendInst(BuiltinInst *inst) {
@@ -463,8 +464,23 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   }
 
   // Process attributes as well.
-  for (auto attr : tfopInfo.attributes) {
+  for (unsigned attrIndex = 0, e = tfopInfo.attributes.size(); attrIndex != e;){
+    auto attr = tfopInfo.attributes[attrIndex++];
     auto attrValue = tfopInfo.getAttrOperand(nextOperand++);
+
+    // Helper function to collect subsequent elements that contribute to an
+    // array value.
+    auto collectArrayElements =
+                    [&](SmallVectorImpl<SingleValueInstruction*> &elements) {
+      while (attrIndex < e &&
+             tfopInfo.attributes[attrIndex].second ==
+                     SILTensorOpInfo::AttributeModifier::ArrayElement) {
+        auto eltValue = tfopInfo.getAttrOperand(nextOperand++);
+        elements.push_back(cast<SingleValueInstruction>(eltValue));
+        ++attrIndex;
+      }
+    };
+
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
@@ -472,14 +488,43 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
 
     switch (attr.second) {
     case SILTensorOpInfo::AttributeModifier::Normal:  // No modifier.
+      // We add attributes based on what the type of the value is.
+      if (auto *ili = dyn_cast<IntegerLiteralInst>(attrValue)) {
+        uint64_t value = ili->getValue().getLimitedValue();
+        if (ili->getValue().getBitWidth() == 1)
+          TF_SetAttrBool(op, name.c_str(), (unsigned char)value);
+        else
+          TF_SetAttrInt(op, name.c_str(), (int64_t)value);
+      } else if (auto *fli = dyn_cast<FloatLiteralInst>(attrValue)) {
+        auto value = fli->getValue().convertToFloat();
+        TF_SetAttrFloat(op, name.c_str(), value);
+      } else if (auto *sli = dyn_cast<StringLiteralInst>(attrValue)) {
+        assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+               "only byte encodings are supported");
+        auto value = sli->getValue();
+        TF_SetAttrString(op, name.c_str(), value.data(), value.size());
+      } else if (auto *mti = dyn_cast<MetatypeInst>(attrValue)) {
+        auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
+        auto dtype = convertSwiftTypeToTF(ty);
+        assert(dtype && "expected a valid tensorflow type");
+        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
+      } else {
+        llvm_unreachable("unexpected attribute instruction");
+      }
       break;
     case SILTensorOpInfo::AttributeModifier::DType: {
       // This integer value is a dtype.
       auto val = cast<IntegerLiteralInst>(attrValue)->getValue();
       TF_SetAttrType(op, name.c_str(), (TF_DataType)val.getLimitedValue());
-      continue;
+      break;
     }
     case SILTensorOpInfo::AttributeModifier::Tensor: {
+      // Tensor can support two cases: an array case, where 'attrValue' is a
+      // metatype, and a scalar case.
+      if (isa<MetatypeInst>(attrValue)) {
+        llvm_unreachable("Tensor array attributes not supported yet");
+      }
+
       auto val = cast<LiteralInst>(attrValue);
       auto dtype = getTensorFlowDataType(val->getType(), inst->getLoc());
       // Set the tensor as the attribute on the graph node.
@@ -487,39 +532,72 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc())) return;
-      continue;
+      break;
     }
     case SILTensorOpInfo::AttributeModifier::Shape:
-      llvm_unreachable("not supported yet");
-    }
+      // TODO: TF_SetAttrShape/TF_SetAttrShapeList
+      llvm_unreachable("shape not supported yet");
+    case SILTensorOpInfo::AttributeModifier::Array: {
+      // We have the metatype for the array element, which we need to know the
+      // element type in case the array was empty.
+      auto metatype = cast<MetatypeInst>(attrValue)->getType();
+      auto eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
 
-    // We add attributes based on what the type of the value is.
-    if (auto *ili = dyn_cast<IntegerLiteralInst>(attrValue)) {
-      uint64_t value = ili->getValue().getLimitedValue();
-      if (ili->getValue().getBitWidth() == 1)
-        TF_SetAttrBool(op, name.c_str(), (unsigned char)value);
-      else
-        TF_SetAttrInt(op, name.c_str(), (int64_t)value);
-    } else if (auto *fli = dyn_cast<FloatLiteralInst>(attrValue)) {
-      auto value = fli->getValue().convertToFloat();
-      TF_SetAttrFloat(op, name.c_str(), value);
-    } else if (auto *sli = dyn_cast<StringLiteralInst>(attrValue)) {
-      assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
-             "only byte encodings are supported");
-      auto value = sli->getValue();
-      TF_SetAttrString(op, name.c_str(), value.data(), value.size());
-    } else if (auto *mti = dyn_cast<MetatypeInst>(attrValue)) {
-      auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
-      auto dtype = convertSwiftTypeToTF(ty);
-      assert(dtype && "expected a valid tensorflow type");
-      TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
-    } else {
-      llvm_unreachable("unexpected attribute instruction");
-    }
+      // Get all of the elements that contribute to this array value.
+      SmallVector<SingleValueInstruction*, 4> elements;
+      collectArrayElements(elements);
 
-    // TODO: If TF_SetAttrShape/TF_SetAttrTensor are important, we'll need to
-    // determine how to distinguish them from the forms they are ambiguous with,
-    // probably by mangling a magic distinguisher into the parameter label.
+      if (eltType->getString() == "String") {
+        SmallVector<const void*, 4> pointers;
+        SmallVector<size_t, 4> sizes;
+        for (auto elt : elements) {
+          auto *sli = cast<StringLiteralInst>(elt);
+          assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+                 "only byte encodings are supported");
+          pointers.push_back(sli->getValue().data());
+          sizes.push_back(sli->getValue().size());
+        }
+        TF_SetAttrStringList(op, name.c_str(), pointers.data(), sizes.data(),
+                             elements.size());
+        break;
+      }
+
+      auto typeName = eltType->getString();
+      if (StringRef(typeName).startswith("Int")) {
+        SmallVector<int64_t, 4> values;
+        for (auto elt : elements) {
+          auto *ili = cast<IntegerLiteralInst>(elt);
+          values.push_back(ili->getValue().getLimitedValue());
+        }
+        TF_SetAttrIntList(op, name.c_str(), values.data(), values.size());
+        break;
+      }
+      if (typeName == "Float" || typeName == "Double") {
+        SmallVector<float, 4> values;
+        for (auto elt : elements) {
+          auto *fli = cast<FloatLiteralInst>(elt);
+          values.push_back(fli->getValue().convertToFloat());
+        }
+        TF_SetAttrFloatList(op, name.c_str(), values.data(), values.size());
+        break;
+      }
+      if (typeName == "Bool") {
+        SmallVector<unsigned char, 4> values;
+        for (auto elt : elements) {
+          auto *ili = cast<IntegerLiteralInst>(elt);
+          values.push_back(ili->getValue().getLimitedValue() != 0);
+        }
+        TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
+        break;
+      }
+
+      // TODO: TF_SetAttrTypeList
+      llvm_unreachable(("unknown attribute array type: " + typeName).c_str());
+    }
+    case SILTensorOpInfo::AttributeModifier::ArrayElement:
+      llvm_unreachable("Array elements are handled by the array that "
+                       "precedes them");
+    }
   }
 
 

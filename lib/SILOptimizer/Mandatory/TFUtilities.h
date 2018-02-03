@@ -50,11 +50,17 @@ namespace tf {
     StringRef opName;
 
     enum class AttributeModifier {
-      Normal,  // No modifier.
-      DType,   // This integer value is a dtype.
-      Tensor,  // This array or scalar should be turned into a TF_Tensor.
-      Shape,   // This array of integers is a shape specifier.
+      Normal,       // No modifier.
+      DType,        // This integer value is a dtype.
+      Tensor,       // This array or scalar should be turned into a TF_Tensor.
+      Shape,        // This array of integers is a shape specifier.
+
+      Array,        // This marks a normal array value, the value is a metatype.
+      ArrayElement, // This is a continuation element of an attribute array.
     };
+
+    /// Return the string suffix for the specified attribute modifier.
+    static const char *getAttributeModifierSuffix(AttributeModifier modifier);
 
     /// These are the names of any attribute operands at the end of the list.
     SmallVector<std::pair<StringRef, AttributeModifier>, 4> attributes;
@@ -83,10 +89,18 @@ namespace tf {
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
     /// attribute.
-    SILInstruction *getAttrOperand(unsigned operandNumber) const {
+    SingleValueInstruction *getAttrOperand(unsigned operandNumber) const {
       return getAttrOperand(inst->getOperand(operandNumber));
     }
-    SILInstruction *getAttrOperand(SILValue v) const;
+    SingleValueInstruction *getAttrOperand(SILValue v) const;
+
+    /// Given a SILValue that may be an array, attempt to decode it into the
+    /// literal constant values that make up its elements.  If this fails or if
+    /// the value is not an array, this returns false.  Otherwise it decodes the
+    /// array and returns the element initializer in elements.
+    bool decodeArrayElements(SILValue value,
+                             SmallVectorImpl<SingleValueInstruction*> &elements,
+                             Type &elementType) const;
 
   private:
     SILTensorOpInfo(SILInstruction &inst) : inst(&inst) {}

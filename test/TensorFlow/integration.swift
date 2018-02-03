@@ -332,3 +332,27 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 // CHECK:   %3 = builtin "__tfop_Cast,t:t,DstT"(%1 : $TensorHandle<Float>, %2 : $@thick Int32.Type) : $TensorHandle<Int32>
 // CHECK:   return %3 : $TensorHandle<Int32>
 
+
+
+// This tests the attributes necessary to get arrays of integers and strings going.
+public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
+  return x.toDevice().convolved2D(withFilter: filter.toDevice(),
+                       strides: [1, 2, 3, 4], padding: .same)
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
+// CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// CHECK-NEXT:  %2 = metatype $@thin Int.Type
+// CHECK-NEXT:  %3 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:  %4 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:  %6 = integer_literal $Builtin.Int64, 4
+// CHECK-NEXT:  %7 = string_literal utf8 "SAME"
+// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,tt:t,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int.Type, %3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK-NEXT:  return %8 : $TensorHandle<Float>
+// CHECK-NEXT:}
+
+
+
+
