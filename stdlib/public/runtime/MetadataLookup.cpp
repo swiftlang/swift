@@ -412,10 +412,9 @@ static Optional<StringRef> getObjCClassOrProtocolName(
 }
 #endif
 
-/// Map depth/index to a flat index.
-static Optional<unsigned>
-depthIndexToFlatIndex(unsigned depth, unsigned index,
-                      ArrayRef<unsigned> paramCounts) {
+Optional<unsigned> swift::_depthIndexToFlatIndex(
+                                              unsigned depth, unsigned index,
+                                              ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
   if (depth >= paramCounts.size()) return None;
 
@@ -431,7 +430,7 @@ depthIndexToFlatIndex(unsigned depth, unsigned index,
 /// Gather generic parameter counts from a context descriptor.
 ///
 /// \returns true if the innermost descriptor is generic.
-static bool gatherGenericParameterCounts(
+bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
                                  std::vector<unsigned> &genericParamCounts) {
   // Once we hit a non-generic descriptor, we're done.
@@ -439,7 +438,7 @@ static bool gatherGenericParameterCounts(
 
   // Recurse to record the parent context's generic parameters.
   if (auto parent = descriptor->Parent.get())
-    (void)gatherGenericParameterCounts(parent, genericParamCounts);
+    (void)_gatherGenericParameterCounts(parent, genericParamCounts);
 
   // Record a new level of generic parameters if the count exceeds the
   // previous count.
@@ -614,7 +613,7 @@ public:
     // this type.
     std::vector<unsigned> genericParamCounts;
     bool innermostIsGeneric =
-      gatherGenericParameterCounts(typeDecl, genericParamCounts);
+      _gatherGenericParameterCounts(typeDecl, genericParamCounts);
     bool isGeneric = !genericParamCounts.empty();
 
     // Gather the generic arguments.
@@ -673,8 +672,8 @@ public:
               return BuiltType();
             },
             [&](unsigned depth, unsigned index) -> BuiltType {
-              auto flatIndex = depthIndexToFlatIndex(depth, index,
-                                                     genericParamCounts);
+              auto flatIndex = _depthIndexToFlatIndex(depth, index,
+                                                      genericParamCounts);
               // FIXME: Wrong for same-type-to-concrete
               // constraints.
               if (flatIndex && *flatIndex < allGenericArgsVec.size())
