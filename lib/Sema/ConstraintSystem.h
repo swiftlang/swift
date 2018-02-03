@@ -2177,11 +2177,6 @@ public:
                       DeclContext *useDC, ConstraintLocator *locator,
                       OverloadChoice *favored = nullptr);
 
-  /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
-  /// that should transparently look through ImplicitlyUnwrappedOptional types,
-  /// return T.
-  Type lookThroughImplicitlyUnwrappedOptionalType(Type type);
-
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
 

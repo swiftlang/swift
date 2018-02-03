@@ -3158,6 +3158,8 @@ public:
     // FIXME: consider types convertible to T?.
 
     ExprType = ExprType->getRValueType();
+    // FIXME: We don't always pass down whether a type is from an
+    // unforced IUO.
     if (isIUO) {
       if (Type Unwrapped = ExprType->getAnyOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
@@ -3184,12 +3186,6 @@ public:
                                    IncludeInstanceMembers);
         }
       }
-    } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
-      // FIXME: This can go away when IUOs have been removed from the type
-      // system.
-      lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                               TypeResolver.get(),
-                               IncludeInstanceMembers);
     } else {
       return false;
     }
