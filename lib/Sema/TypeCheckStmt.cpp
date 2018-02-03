@@ -599,16 +599,7 @@ public:
       return nullptr;
     }
     
-    // If the sequence is an implicitly unwrapped optional, force it.
     Expr *sequence = S->getSequence();
-    if (auto objectTy
-          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
-      sequence = new (TC.Context) ForceValueExpr(sequence,
-                                                 sequence->getEndLoc());
-      sequence->setType(objectTy);
-      sequence->setImplicit();
-      S->setSequence(sequence);
-    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;

@@ -5399,12 +5399,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
-  auto getFuncType = [](Type type) -> Type {
-    auto fnType = type->getRValueType();
-    if (auto objectType = fnType->getImplicitlyUnwrappedOptionalObjectType())
-      return objectType;
-    return fnType;
-  };
+  auto getFuncType = [](Type type) -> Type { return type->getRValueType(); };
 
   auto fnType = getFuncType(CS.getType(fnExpr));
 

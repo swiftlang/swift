@@ -502,13 +502,6 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getImplicitlyUnwrappedOptionalObjectType() {
-  if (auto boundTy = getAs<BoundGenericEnumType>())
-    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional)
-      return boundTy->getGenericArgs()[0];
-  return Type();
-}
-
 Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   if (auto boundTy = getAs<BoundGenericEnumType>())
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
@@ -2300,17 +2293,6 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
     return matchesFunctionType(fn1, fn2, matchMode, insideOptional,
                                paramsAndResultMatch);
-  }
-
-  if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
-      (paramPosition == ParameterPosition::Parameter ||
-       paramPosition == ParameterPosition::ParameterTupleElement) &&
-      insideOptional == OptionalUnwrapping::None) {
-    // Allow T to override T! in certain cases.
-    if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
-      t1 = obj1->getCanonicalType();
-      if (t1 == t2) return true;
-    }
   }
 
   // Class-to-class.
