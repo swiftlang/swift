@@ -519,13 +519,6 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
   return CanType();
 }
 
-CanType CanType::getOptionalObjectTypeImpl(CanType type) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
-    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
-      return boundTy.getGenericArgs()[0];
-  return CanType();
-}
-
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   auto &C = getASTContext();
   if (auto nominalTy = getAs<NominalType>()) {
