@@ -33,7 +33,7 @@ Swift 5.0
 
 	Runtime query of conditional conformances is now implemented. Therefore,
 	a dynamic cast such as `value as? P`, where the dynamic type of `value`
-	conditional conforms to `P`, will succeed when the conditional
+	conditionally conforms to `P`, will succeed when the conditional
 	requirements are met.
 
 Swift 4.1
