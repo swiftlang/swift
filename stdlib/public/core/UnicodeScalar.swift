@@ -419,7 +419,7 @@ extension Unicode.Scalar {
 
 extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// The position of the first code unit.
   @_inlineable // FIXME(sil-serialize-all)

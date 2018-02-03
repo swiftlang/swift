@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Syntax/SyntaxParsingContext.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
@@ -27,33 +30,100 @@
 using namespace swift;
 using namespace swift::syntax;
 
-namespace {
-static RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
-                                       ArrayRef<RC<RawSyntax>> Parts) {
-  assert(isUnknownKind(Kind));
-  return RawSyntax::make(Kind, Parts, SourcePresence::Present);
+using RootContextData = SyntaxParsingContext::RootContextData;
+
+SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
+                                           SourceFile &SF, unsigned BufferID)
+    : RootDataOrParent(new RootContextData(SF, SF.getASTContext().Diags,
+                                           SF.getASTContext().SourceMgr,
+                                           BufferID)),
+      CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
+      Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
+      Enabled(SF.shouldKeepSyntaxInfo()) {
+  CtxtHolder = this;
+  Storage.reserve(128);
 }
 
-RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
+RC<RawSyntax>
+SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
+                                        ArrayRef<RC<RawSyntax>> Parts) {
+  assert(isUnknownKind(Kind));
+  return RawSyntax::make(Kind, Parts, SourcePresence::Present, &Arena);
+}
+
+RC<RawSyntax>
+SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
+                                     ArrayRef<RC<RawSyntax>> Parts) {
   // Try to create the node of the given syntax.
-  if (auto Node = SyntaxFactory::createRaw(Kind, Parts))
+  if (auto Node = SyntaxFactory::createRaw(Kind, Parts, &Arena))
     return Node;
 
   // Fallback to unknown syntax for the category.
-  return makeUnknownSyntax(getUnknownKind(Kind), Parts);
+  return makeUnknownSyntax(
+      getUnknownKind(Kind), Parts);
 }
-}// End of anonymous namespace
 
-SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
-                                           SourceFile &SF,
-                                           DiagnosticEngine &Diags,
-                                           SourceManager &SourceMgr,
-                                           unsigned BufferID)
-    : RootDataOrParent(new RootContextData(SF, Diags, SourceMgr, BufferID)),
-      CtxtHolder(CtxtHolder), Storage(getRootData().Storage), Offset(0),
-      Mode(AccumulationMode::Root), Enabled(SF.shouldKeepSyntaxInfo()) {
-  CtxtHolder = this;
-  Storage.reserve(128);
+RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
+                                             ArrayRef<RC<RawSyntax>> Parts) {
+  if (Parts.size() == 1) {
+    auto RawNode = Parts.front();
+    switch (Kind) {
+    case SyntaxContextKind::Stmt: {
+      if (RawNode->isStmt())
+        return RawNode;
+      else if (RawNode->isDecl())
+        return createSyntaxAs(SyntaxKind::DeclarationStmt, Parts);
+      else if (RawNode->isExpr())
+        return createSyntaxAs(SyntaxKind::ExpressionStmt, Parts);
+      else
+        return makeUnknownSyntax(SyntaxKind::UnknownStmt, Parts);
+      break;
+    }
+    case SyntaxContextKind::Decl:
+      if (!RawNode->isDecl())
+        return makeUnknownSyntax(SyntaxKind::UnknownDecl, Parts);
+      break;
+    case SyntaxContextKind::Expr:
+      if (!RawNode->isExpr())
+        return makeUnknownSyntax(SyntaxKind::UnknownExpr, Parts);
+      break;
+    case SyntaxContextKind::Type:
+      if (!RawNode->isType())
+        return makeUnknownSyntax(SyntaxKind::UnknownType, Parts);
+      break;
+    case SyntaxContextKind::Pattern:
+      if (!RawNode->isPattern())
+        return makeUnknownSyntax(SyntaxKind::UnknownPattern, Parts);
+      break;
+    case SyntaxContextKind::Syntax:
+      // We don't need to coerce in this case.
+      break;
+    }
+    return RawNode;
+  } else {
+    SyntaxKind UnknownKind;
+    switch (Kind) {
+    case SyntaxContextKind::Stmt:
+      UnknownKind = SyntaxKind::UnknownStmt;
+      break;
+    case SyntaxContextKind::Decl:
+      UnknownKind = SyntaxKind::UnknownDecl;
+      break;
+    case SyntaxContextKind::Expr:
+      UnknownKind = SyntaxKind::UnknownExpr;
+      break;
+    case SyntaxContextKind::Type:
+      UnknownKind = SyntaxKind::UnknownType;
+      break;
+    case SyntaxContextKind::Pattern:
+      UnknownKind = SyntaxKind::UnknownPattern;
+      break;
+    case SyntaxContextKind::Syntax:
+      UnknownKind = SyntaxKind::Unknown;
+      break;
+    }
+    return makeUnknownSyntax(UnknownKind, Parts);
+  }
 }
 
 /// Add RawSyntax to the parts.
@@ -74,9 +144,9 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  addRawSyntax(RawSyntax::make(Tok.getKind(), Tok.getText(),
-                               SourcePresence::Present, LeadingTrivia.Pieces,
-                               TrailingTrivia.Pieces));
+  addRawSyntax(RawSyntax::getToken(Arena, Tok.getKind(), Tok.getText(),
+                                   LeadingTrivia.Pieces,
+                                   TrailingTrivia.Pieces));
 }
 
 /// Add Syntax to the parts.
@@ -148,69 +218,6 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind) {
     createNodeInPlace(ColletionKind, Count);
 }
 
-namespace {
-RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
-  if (Parts.size() == 1) {
-    auto RawNode = Parts.front();
-    switch (Kind) {
-    case SyntaxContextKind::Stmt: {
-      if (RawNode->isStmt())
-        return RawNode;
-      else if (RawNode->isDecl())
-        return createSyntaxAs(SyntaxKind::DeclarationStmt, Parts);
-      else if (RawNode->isExpr())
-        return createSyntaxAs(SyntaxKind::ExpressionStmt, Parts);
-      else
-        return makeUnknownSyntax(SyntaxKind::UnknownStmt, Parts);
-      break;
-    }
-    case SyntaxContextKind::Decl:
-      if (!RawNode->isDecl())
-        return makeUnknownSyntax(SyntaxKind::UnknownDecl, Parts);
-      break;
-    case SyntaxContextKind::Expr:
-      if (!RawNode->isExpr())
-        return makeUnknownSyntax(SyntaxKind::UnknownExpr, Parts);
-      break;
-    case SyntaxContextKind::Type:
-      if (!RawNode->isType())
-        return makeUnknownSyntax(SyntaxKind::UnknownType, Parts);
-      break;
-    case SyntaxContextKind::Pattern:
-      if (!RawNode->isPattern())
-        return makeUnknownSyntax(SyntaxKind::UnknownPattern, Parts);
-      break;
-    case SyntaxContextKind::Syntax:
-      // We don't need to coerce in this case.
-      break;
-    }
-    return RawNode;
-  } else {
-    SyntaxKind UnknownKind;
-    switch (Kind) {
-    case SyntaxContextKind::Stmt:
-      UnknownKind = SyntaxKind::UnknownStmt;
-      break;
-    case SyntaxContextKind::Decl:
-      UnknownKind = SyntaxKind::UnknownDecl;
-      break;
-    case SyntaxContextKind::Expr:
-      UnknownKind = SyntaxKind::UnknownExpr;
-      break;
-    case SyntaxContextKind::Type:
-      UnknownKind = SyntaxKind::UnknownType;
-      break;
-    case SyntaxContextKind::Pattern:
-      UnknownKind = SyntaxKind::UnknownPattern;
-      break;
-    case SyntaxContextKind::Syntax:
-      UnknownKind = SyntaxKind::Unknown;
-      break;
-    }
-    return makeUnknownSyntax(UnknownKind, Parts);
-  }
-}
-
 /// This verifier traverses a syntax node to emit proper diagnostics.
 class SyntaxVerifier: public SyntaxVisitor {
   RootContextData &RootData;
@@ -237,6 +244,7 @@ public:
   }
 };
 
+namespace {
 void finalizeSourceFile(RootContextData &RootData,
                         ArrayRef<RC<RawSyntax>> Parts) {
   SourceFile &SF = RootData.SF;

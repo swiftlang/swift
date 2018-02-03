@@ -1515,7 +1515,7 @@ func r32214649_3<X>(_ a: [X]) -> [X] {
 
 func rdar32301091_1(_ :((Int, Int) -> ())!) {}
 rdar32301091_1 { _ in }
-// expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,_ }}
+// expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '((Int, Int) -> ())?'}}
 
 func rdar32301091_2(_ :(Int, Int) -> ()) {}
 rdar32301091_2 { _ in }

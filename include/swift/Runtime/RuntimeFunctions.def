@@ -38,7 +38,7 @@
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
 #endif
 
-FUNCTION(AllocBox, swift_allocBox, C_CC,
+FUNCTION(AllocBox, swift_allocBox, SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
@@ -46,7 +46,7 @@ FUNCTION(AllocBox, swift_allocBox, C_CC,
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
          swift_makeBoxUnique,
-         C_CC,
+         SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind))
@@ -1311,7 +1311,7 @@ FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         ARGS(),
         ATTRS(NoUnwind))
 
-FUNCTION(AllocError, swift_allocError, C_CC,
+FUNCTION(AllocError, swift_allocError, SwiftCC,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind))

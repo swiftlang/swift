@@ -252,7 +252,7 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc0({#self: FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any!) -> FooClassBase!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any?) -> FooClassBase?#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassBase!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassBase!#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFuncOverridden()[#Void#]{{; name=.+$}}
@@ -260,13 +260,13 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseClassFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#(x): Int32#})[#FooClassBase!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth3()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth3({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth3({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth2()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth2({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth2({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .nonInternalMeth()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .nonInternalMeth({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth1()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: End completions
 }
 
@@ -288,17 +288,17 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc0({#self: FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any!) -> FooClassBase!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any?) -> FooClassBase?#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFuncOverridden()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseClassFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth3()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth3({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth3({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth2()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth2({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth2({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .nonInternalMeth()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth1()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 

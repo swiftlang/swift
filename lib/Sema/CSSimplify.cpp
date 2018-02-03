@@ -1863,32 +1863,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         locator.withPathElement(
                           ConstraintLocator::ArrayElementType));
     
-    case TypeKind::InOut: {
+    case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind == ConstraintKind::BindParam ||
           kind >= ConstraintKind::OperatorArgumentConversion)
         return getTypeMatchFailure(locator);
-
-      auto inoutObjTy1 = cast<InOutType>(desugar1)->getObjectType();
-      auto inoutObjTy2 = cast<InOutType>(desugar2)->getObjectType();
-
-      OptionalTypeKind OTK1;
-      OptionalTypeKind OTK2;
-      auto optionalObjTy1 = inoutObjTy1->getAnyOptionalObjectType(OTK1);
-      auto optionalObjTy2 = inoutObjTy2->getAnyOptionalObjectType(OTK2);
-      if (OTK1 != OTK2 && optionalObjTy1 && optionalObjTy2) {
-        increaseScore(ScoreKind::SK_InOutOptionalityConversion);
-        return matchTypes(inoutObjTy1,
-                          inoutObjTy2,
-                          ConstraintKind::ArgumentConversion, subflags,
-                          locator.withPathElement(ConstraintLocator::ArrayElementType));
-      } else {
-        return matchTypes(inoutObjTy1,
-                          inoutObjTy2,
-                          ConstraintKind::Equal, subflags,
-                          locator.withPathElement(ConstraintLocator::ArrayElementType));
-      }
-    }
+      
+      return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
+                        cast<InOutType>(desugar2)->getObjectType(),
+                        ConstraintKind::Equal, subflags,
+                  locator.withPathElement(ConstraintLocator::ArrayElementType));
 
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
@@ -3576,8 +3560,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   // Explicit bridging from a value type to an Objective-C class type.
   if (unwrappedFromType->isPotentiallyBridgedValueType() &&
-      unwrappedFromType->getAnyNominal()
-        != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
       !flags.contains(TMF_ApplyingOperatorParameter) &&
       (unwrappedToType->isBridgeableObjectType() ||
        (unwrappedToType->isExistentialType() &&
@@ -3593,9 +3575,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // Note that specifically require a class or class-constrained archetype
   // here, because archetypes cannot be bridged.
   if (unwrappedFromType->mayHaveSuperclass() &&
-      unwrappedToType->isPotentiallyBridgedValueType() &&
-      unwrappedToType->getAnyNominal()
-        != TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
+      unwrappedToType->isPotentiallyBridgedValueType()) {
     Type bridgedValueType;
     if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
                                                      &bridgedValueType)) {

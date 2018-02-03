@@ -996,7 +996,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Base64DecodingOptions = NSData.Base64DecodingOptions
     
     public typealias Index = Int
-    public typealias Indices = CountableRange<Int>
+    public typealias Indices = Range<Int>
     
     @_versioned internal var _backing : _DataStorage
     @_versioned internal var _sliceRange: Range<Index>
@@ -1537,12 +1537,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inline(__always)
-    public mutating func replaceSubrange(_ subrange: CountableRange<Index>, with data: Data) {
-        let range: Range<Int> = subrange.lowerBound..<subrange.upperBound
-        replaceSubrange(range, with: data)
-    }
-    
     /// Replace a region of bytes in the data with new bytes from a buffer.
     ///
     /// This will resize the data if required, to fit the entire contents of `buffer`.
@@ -1743,7 +1737,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         return i + 1
     }
     
-    public var indices: CountableRange<Int> {
+    public var indices: Range<Int> {
         @inline(__always)
         get {
             return startIndex..<endIndex

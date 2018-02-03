@@ -1235,9 +1235,6 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
                                    boundGeneric->getGenericArgs()[1]);
       if (boundGeneric->getDecl() == ctx.getOptionalDecl())
         return OptionalType::get(boundGeneric->getGenericArgs()[0]);
-      if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
-        return ImplicitlyUnwrappedOptionalType::
-        get(boundGeneric->getGenericArgs()[0]);
     }
     return Ty;
   };
@@ -1294,7 +1291,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     implDecl = Context->getOptionalDecl();
     break;
   case TypeKind::ImplicitlyUnwrappedOptional:
-    implDecl = Context->getImplicitlyUnwrappedOptionalDecl();
+    llvm_unreachable("Should no longer have IUOs");
     break;
   case TypeKind::Dictionary:
     implDecl = Context->getDictionaryDecl();

@@ -80,8 +80,6 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_ValueToPointerConversion:
       log << "value-to-pointer conversion";
       break;
-    case SK_InOutOptionalityConversion:
-      log << "inout optionality conversion";
     }
     log << ")\n";
   }

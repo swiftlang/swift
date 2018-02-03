@@ -37,6 +37,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -406,6 +407,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   }
   
   llvm::FoldingSet<SILLayout> SILLayouts;
+
+  syntax::SyntaxArena TheSyntaxArena;
 };
 
 ASTContext::Implementation::Implementation()
@@ -503,6 +506,10 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
+}
+
+syntax::SyntaxArena &ASTContext::getSyntaxArena() const {
+  return Impl.TheSyntaxArena;
 }
 
 LazyResolver *ASTContext::getLazyResolver() const {
@@ -643,7 +650,7 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
   case OTK_None:
     llvm_unreachable("not optional");
   case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalDecl();
+    llvm_unreachable("Should no longer have IUOs");
   case OTK_Optional:
     return getOptionalDecl();
   }
@@ -656,7 +663,7 @@ EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
   case OTK_Optional:
     return getOptionalSomeDecl();
   case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalSomeDecl();
+    llvm_unreachable("Should not have IUOs.");
   case OTK_None:
     llvm_unreachable("getting Some decl for non-optional type?");
   }
@@ -668,7 +675,7 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
   case OTK_Optional:
     return getOptionalNoneDecl();
   case OTK_ImplicitlyUnwrappedOptional:
-    return getImplicitlyUnwrappedOptionalNoneDecl();
+    llvm_unreachable("Should not have IUOs.");
   case OTK_None:
     llvm_unreachable("getting None decl for non-optional type?");
   }
@@ -685,20 +692,6 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
     Impl.OptionalNoneDecl =getOptionalDecl()->getUniqueElement(/*hasVal*/false);
   return Impl.OptionalNoneDecl;
-}
-
-EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
-  if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
-    Impl.ImplicitlyUnwrappedOptionalSomeDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/true);
-  return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
-}
-
-EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
-  if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
-    Impl.ImplicitlyUnwrappedOptionalNoneDecl =
-      getImplicitlyUnwrappedOptionalDecl()->getUniqueElement(/*hasVal*/false);
-  return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
 static VarDecl *getPointeeProperty(VarDecl *&cache,

@@ -154,7 +154,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		}
 	}
 
-	private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: CountableRange<Index>) {
+	private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Index>) {
 		var copiedCount = 0
 		if range.isEmpty { return }
 		let rangeSize = range.count
@@ -195,8 +195,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
 	/// - parameter range: The range in the `Data` to copy.
 	/// - warning: This method does not verify that the contents at pointer have enough space to hold the required number of bytes.
-	@available(swift, deprecated: 4, message: "Use copyBytes(to: UnsafeMutableRawBufferPointer, from: CountableRange<Index>) instead")
-	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: CountableRange<Index>) {
+	@available(swift, deprecated: 4, message: "Use copyBytes(to: UnsafeMutableRawBufferPointer, from: Range<Index>) instead")
+	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: Range<Index>) {
 		_copyBytesHelper(to: pointer, from: range)
 	}
 
@@ -205,7 +205,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into. The buffer must be large
 	///	enough to hold `count` bytes.
 	/// - parameter range: The range in the `Data` to copy.
-	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, from range: CountableRange<Index>) {
+	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, from range: Range<Index>) {
 		assert(range.count <= pointer.count, "Buffer too small to copy \(range.count) bytes")
 		guard pointer.baseAddress != nil else { return }
 		_copyBytesHelper(to: pointer.baseAddress!, from: range)
@@ -218,11 +218,11 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter buffer: A buffer to copy the data into.
 	/// - parameter range: A range in the data to copy into the buffer. If the range is empty, this function will return 0 without copying anything. If the range is nil, as much data as will fit into `buffer` is copied.
 	/// - returns: Number of bytes copied into the destination buffer.
-	public func copyBytes<DestinationType>(to buffer: UnsafeMutableBufferPointer<DestinationType>, from range: CountableRange<Index>? = nil) -> Int {
+	public func copyBytes<DestinationType>(to buffer: UnsafeMutableBufferPointer<DestinationType>, from range: Range<Index>? = nil) -> Int {
 		let cnt = count
 		guard cnt > 0 else { return 0 }
 
-		let copyRange : CountableRange<Index>
+		let copyRange : Range<Index>
 		if let r = range {
 			guard !r.isEmpty else { return 0 }
 			precondition(r.startIndex >= 0)
@@ -262,7 +262,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// Return a new copy of the data in a specified range.
 	///
 	/// - parameter range: The range to copy.
-	public func subdata(in range: CountableRange<Index>) -> DispatchData {
+	public func subdata(in range: Range<Index>) -> DispatchData {
 		let subrange = __dispatch_data_create_subrange(
 			__wrapped, range.startIndex, range.endIndex - range.startIndex)
 		return DispatchData(data: subrange)

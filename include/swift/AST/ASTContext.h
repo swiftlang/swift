@@ -107,6 +107,10 @@ namespace swift {
 
   enum class KnownProtocolKind : uint8_t;
 
+namespace syntax {
+  class SyntaxArena;
+}
+
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
   /// \brief The permanent arena, which is tied to the lifetime of
@@ -380,6 +384,9 @@ public:
                               setVector.size());
   }
 
+  /// Retrive the syntax node memory manager for this context.
+  syntax::SyntaxArena &getSyntaxArena() const;
+
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -403,7 +410,7 @@ public:
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
-  /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
+  /// Retrieve the declaration of Swift.Optional.
   EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
@@ -411,12 +418,6 @@ public:
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalSomeDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
 
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;

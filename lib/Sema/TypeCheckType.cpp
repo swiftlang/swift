@@ -75,15 +75,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType) {
-  if (!Context.getImplicitlyUnwrappedOptionalDecl()) {
-    diagnose(loc, diag::sugar_type_not_found, 2);
-    return Type();
-  }
-
-  return ImplicitlyUnwrappedOptionalType::get(elementType);
-}
-
 static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
                            PointerTypeKind kind) {
   auto pointerDecl = [&] {
@@ -1184,71 +1175,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
     comp->setInvalid();
     return ErrorType::get(TC.Context);
-  }
-
-  // Emit diagnostics related to ImplicitlyUnwrappedOptional.
-  if (comp->getIdentifier() == TC.Context.Id_ImplicitlyUnwrappedOptional) {
-    if (options.contains(TypeResolutionFlags::AllowIUO)) {
-      if (isa<GenericIdentTypeRepr>(comp)) {
-        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
-        assert(genericTyR->getGenericArgs().size() == 1);
-        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
-
-        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated_with_fixit;
-
-        // For Swift 5 and later, spelling the full name is an error.
-        if (TC.Context.isSwiftVersionAtLeast(5))
-          diag = diag::
-              implicitly_unwrapped_optional_spelling_error_with_bang_fixit;
-
-        TC.diagnose(comp->getStartLoc(), diag)
-          .fixItRemoveChars(
-              genericTyR->getStartLoc(),
-              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
-          .fixItInsertAfter(genericArgTyR->getEndLoc(), "!")
-          .fixItRemoveChars(
-              genericTyR->getAngleBrackets().End,
-              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
-      } else {
-        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated;
-
-        // For Swift 5 and later, spelling the full name is an error.
-        if (TC.Context.isSwiftVersionAtLeast(5))
-          diag = diag::implicitly_unwrapped_optional_spelling_error;
-
-        TC.diagnose(comp->getStartLoc(), diag);
-      }
-    } else if (isa<GenericIdentTypeRepr>(comp)) {
-      Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
-
-      if (TC.Context.isSwiftVersionAtLeast(5))
-        diag = diag::implicitly_unwrapped_optional_spelling_in_illegal_position;
-
-      auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
-      assert(genericTyR->getGenericArgs().size() == 1);
-      auto *genericArgTyR = genericTyR->getGenericArgs()[0];
-
-      TC.diagnose(comp->getStartLoc(), diag)
-          .fixItRemoveChars(
-              genericTyR->getStartLoc(),
-              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
-          .fixItInsertAfter(genericArgTyR->getEndLoc(), "?")
-          .fixItRemoveChars(
-              genericTyR->getAngleBrackets().End,
-              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
-    } else {
-      Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
-
-      if (TC.Context.isSwiftVersionAtLeast(5))
-        diag = diag::
-            implicitly_unwrapped_optional_spelling_error_with_optional_fixit;
-
-      SourceRange R = SourceRange(comp->getIdLoc());
-
-      TC.diagnose(comp->getStartLoc(), diag).fixItReplace(R, "Optional");
-    }
   }
 
   // If we found nothing, complain and give ourselves a chance to recover.
@@ -2827,7 +2753,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
     Diagnostic diag = diag::
-        implicitly_unwrapped_optional_in_illegal_position_suggest_optional;
+        implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional;
 
     if (TC.Context.isSwiftVersionAtLeast(5))
       diag = diag::implicitly_unwrapped_optional_in_illegal_position;
@@ -2845,8 +2771,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (!baseTy || baseTy->hasError()) return baseTy;
 
   Type uncheckedOptionalTy;
-  uncheckedOptionalTy =
-      TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
+  uncheckedOptionalTy = TC.getOptionalType(repr->getExclamationLoc(), baseTy);
 
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);

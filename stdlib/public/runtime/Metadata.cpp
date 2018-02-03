@@ -591,8 +591,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
   BoxPair refAndValueAddr(swift_allocBox(metatype));
-  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 /// Generic tuple value witness for 'destroy'.
@@ -2672,8 +2672,8 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
 
   // Allocate the box.
   BoxPair refAndValueAddr(swift_allocBox(this));
-  buffer->PrivateData[0] = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  buffer->PrivateData[0] = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
@@ -2727,6 +2727,28 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
     fprintf(stderr, "  compiler value: ");
     presentValue(staticValue);
   }
+}
+#endif
+
+StringRef swift::getStringForMetadataKind(MetadataKind kind) {
+  switch (kind) {
+#define METADATAKIND(NAME, VALUE) \
+    case MetadataKind::NAME: \
+      return #NAME;
+#include "swift/ABI/MetadataKind.def"
+  }
+
+  swift_runtime_unreachable("Unhandled metadata kind?!");
+}
+
+#ifndef NDEBUG
+template <> void Metadata::dump() const {
+  printf("TargetMetadata.\n");
+  printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
+  printf("Value Witnesses: %p.\n", getValueWitnesses());
+  printf("Class Object: %p.\n", getClassObject());
+  printf("Type Context Description: %p.\n", getTypeContextDescriptor());
+  printf("Generic Args: %p.\n", getGenericArgs());
 }
 #endif
 

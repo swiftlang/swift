@@ -61,7 +61,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   public typealias SubSequence = EmptyCollection<Element>
 
   /// Always zero, just like `endIndex`.
@@ -152,18 +152,15 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _debugPrecondition(index == 0, "out of bounds")
-    _debugPrecondition(bounds == Range(indices),
-      "invalid bounds for an empty collection")
+    _debugPrecondition(bounds == indices, "invalid bounds for an empty collection")
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
-    _debugPrecondition(range == Range(indices),
-      "invalid range for an empty collection")
-    _debugPrecondition(bounds == Range(indices),
-      "invalid bounds for an empty collection")
+    _debugPrecondition(range == indices, "invalid range for an empty collection")
+    _debugPrecondition(bounds == indices, "invalid bounds for an empty collection")
   }
 }
 

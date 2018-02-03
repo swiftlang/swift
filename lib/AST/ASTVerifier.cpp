@@ -1069,17 +1069,8 @@ public:
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
                                 "result of InOutExpr");
       auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
-
-      // HACK: Allow differences in optionality of the source and
-      // result types. When IUO is gone from the type system we'll no
-      // longer need this.
-      auto srcOptObjTy = srcObj->getAnyOptionalObjectType();
-      auto dstOptObjTy = DestTy->getAnyOptionalObjectType();
-      if (srcOptObjTy && dstOptObjTy) {
-        checkSameType(srcOptObjTy, dstOptObjTy, "object types for InOutExpr");
-      } else {
-        checkSameType(DestTy, srcObj, "object types for InOutExpr");
-      }
+      
+      checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
     }
 
@@ -2693,11 +2684,9 @@ public:
 
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
-      if (!CD->isInvalid() && 
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getOptionalDecl() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
+      if (!CD->isInvalid() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
+              Ctx.getOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
         auto declOptionality = CD->getFailability();

@@ -1720,11 +1720,11 @@ extension Collection {
     return index(i, offsetBy: Int(n))
   }
   @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: Index, offsetBy n: T) {
-    return formIndex(i, offsetBy: Int(n))
+  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
+    return formIndex(&i, offsetBy: Int(n))
   }
   @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index {
+  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
     return index(i, offsetBy: Int(n), limitedBy: limit)
   }
   @available(*, deprecated, message: "all index distances are now of type Int")

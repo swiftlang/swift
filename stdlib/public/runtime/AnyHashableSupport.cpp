@@ -179,8 +179,8 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
         type->vw_destroy(value);
 #else
         _swift_makeAnyHashableUpcastingToHashableBaseType(
-            unboxedValue, anyHashableResultPointer, unboxedType,
-            unboxedHashableWT);
+            const_cast<OpaqueValue *>(unboxedValue), anyHashableResultPointer,
+            unboxedType, unboxedHashableWT);
 #endif
         return;
       }

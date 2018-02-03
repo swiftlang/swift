@@ -492,7 +492,7 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
 
 extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':
@@ -835,27 +835,12 @@ extension ${Self} {
     return Builtin.unsafeCastToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI)#12 : move to an initializer on _Buffer.
-  // Make sure the compiler does not inline _copyBuffer to reduce code size.
-  @inline(never)
-  @_inlineable
-  @_versioned
-  static internal func _copyBuffer(_ buffer: inout _Buffer) {
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._copyContents(
-      subRange: Range(buffer.indices),
-      initializing: newBuffer.firstElementAddress)
-    buffer = _Buffer(
-      _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
-  }
-
   @_inlineable
   @_versioned
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
@@ -864,7 +849,7 @@ extension ${Self} {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      ${Self}._copyBuffer(&_buffer)
+      _buffer = _Buffer(copying: _buffer)
     }
   }
 
@@ -1325,7 +1310,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
         _uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._copyContents(
-        subRange: Range(_buffer.indices),
+        subRange: _buffer.indices,
         initializing: newBuffer.firstElementAddress)
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
@@ -1543,8 +1528,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_inlineable
   public mutating func popLast() -> Element? {
     let newCount = _getCount() - 1
-    guard newCount >= 0 else { return nil }
-    _makeUniqueAndReserveCapacityIfNotUnique()
+    guard !isEmpty else { return nil }
+    return _customRemoveLast().unsafelyUnwrapped
     let pointer = (_buffer.firstElementAddress + newCount)
     let element = pointer.move()
     _buffer.count = newCount
@@ -1630,7 +1615,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
       _buffer = _Buffer()
     }
     else {
-      self.replaceSubrange(Range(self.indices), with: EmptyCollection())
+      self.replaceSubrange(indices, with: EmptyCollection())
     }
   }
 

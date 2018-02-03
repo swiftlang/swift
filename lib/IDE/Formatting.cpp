@@ -510,6 +510,7 @@ class FormatWalker : public SourceEntityWalker {
       bool operator==(const SourceLocIterator& rhs) {return It==rhs.It;}
       bool operator!=(const SourceLocIterator& rhs) {return It!=rhs.It;}
       SourceLoc operator*() {return It->getLoc();}
+      const SourceLoc operator*() const { return It->getLoc(); }
     };
 
     void adjustTokenIteratorToImmediateAfter(SourceLoc End) {

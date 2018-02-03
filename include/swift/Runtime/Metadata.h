@@ -956,6 +956,11 @@ public:
   }
 #endif
 
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger");
+#endif
+
 protected:
   friend struct TargetOpaqueMetadata<Runtime>;
   
@@ -1866,6 +1871,11 @@ struct TargetProtocolDescriptor {
       Superclass(nullptr),
       AssociatedTypeNames(nullptr)
   {}
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use in the debugger");
+#endif
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
@@ -2231,35 +2241,49 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 template <typename Runtime>
 struct TargetTypeMetadataRecord {
 private:
-  /// The nominal type descriptor.
-  RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
-                               TypeMetadataRecordKind>
-    TypeDescriptor;
+  union {
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
+                                 TypeMetadataRecordKind>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime> * const,
+                                 TypeMetadataRecordKind>
+      IndirectNominalTypeDescriptor;
+  };
 
 public:
   TypeMetadataRecordKind getTypeKind() const {
-    return TypeDescriptor.getInt();
+    return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetTypeContextDescriptor<Runtime> *
-  getNominalTypeDescriptor() const {
+  getTypeContextDescriptor() const {
     switch (getTypeKind()) {
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      break;
+      return DirectNominalTypeDescriptor.getPointer();
 
     case TypeMetadataRecordKind::Reserved:
+    case TypeMetadataRecordKind::IndirectObjCClass:
       return nullptr;
 
-    case TypeMetadataRecordKind::IndirectObjCClass:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not generic metadata pattern");
+      return *IndirectNominalTypeDescriptor.getPointer();
     }
     
-    return this->TypeDescriptor.getPointer();
+    return nullptr;
   }
 };
 
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
+
+template<typename Runtime> struct TargetContextDescriptor;
+
+template<typename Runtime>
+using RelativeContextPointer =
+  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
+                              /*nullable*/ true>;
 
 /// The structure of a protocol reference record.
 template <typename Runtime>
@@ -2273,17 +2297,36 @@ struct TargetProtocolRecord {
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
+template<typename Runtime> class TargetGenericRequirementDescriptor;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 template <typename Runtime>
-struct TargetProtocolConformanceDescriptor {
+struct TargetProtocolConformanceDescriptor final
+  : public swift::ABI::TrailingObjects<
+             TargetProtocolConformanceDescriptor<Runtime>,
+             RelativeContextPointer<Runtime>,
+             TargetGenericRequirementDescriptor<Runtime>> {
+
+  using TrailingObjects = swift::ABI::TrailingObjects<
+                             TargetProtocolConformanceDescriptor<Runtime>,
+                             RelativeContextPointer<Runtime>,
+                             TargetGenericRequirementDescriptor<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
 public:
   using WitnessTableAccessorFn
     = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
                                           const TargetWitnessTable<Runtime> **,
                                           size_t);
+
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<Runtime>;
 
 private:
   /// The protocol being conformed to.
@@ -2364,7 +2407,22 @@ public:
     
     return nullptr;
   }
-  
+
+  /// Retrieve the context of a retroactive conformance.
+  const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
+    if (!Flags.isRetroactive()) return nullptr;
+
+    return this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
+  }
+
+  /// Retrieve the conditional requirements that must also be
+  /// satisfied
+  llvm::ArrayRef<GenericRequirementDescriptor>
+  getConditionalRequirements() const {
+    return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
+            Flags.getNumConditionalRequirements()};
+  }
+
   /// Get the directly-referenced static witness table.
   const swift::TargetWitnessTable<Runtime> *getStaticWitnessTable() const {
     switch (getConformanceKind()) {
@@ -2399,10 +2457,30 @@ public:
   /// type.
   const swift::TargetWitnessTable<Runtime> *
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
-  
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
+
+#ifndef NDEBUG
+  /// Verify that the protocol descriptor obeys all invariants.
+  ///
+  /// We currently check that the descriptor:
+  ///
+  /// 1. Has a valid TypeMetadataRecordKind.
+  /// 2. Has a valid conformance kind.
+  void verify() const LLVM_ATTRIBUTE_USED;
+#endif
+
+private:
+  size_t numTrailingObjects(
+                        OverloadToken<RelativeContextPointer<Runtime>>) const {
+    return Flags.isRetroactive() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+    return Flags.getNumConditionalRequirements();
+  }
 };
 using ProtocolConformanceDescriptor
   = TargetProtocolConformanceDescriptor<InProcess>;
@@ -2413,14 +2491,6 @@ using TargetProtocolConformanceRecord =
                         /*Nullable=*/false>;
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
-
-
-template<typename Runtime> struct TargetContextDescriptor;
-
-template<typename Runtime>
-using RelativeContextPointer =
-  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
-                              /*nullable*/ true>;
 
 template<typename Runtime>
 struct TargetGenericContext;
@@ -2485,27 +2555,28 @@ struct GenericContextDescriptorHeader {
 /// associated type.
 template<typename Runtime>
 class TargetGenericParamRef {
-  /// This is either a pointer to an associated type path stored out-of-line if
-  /// the `bool` flag is true, or the index of a directly-referenced
-  /// generic parameter stored inline if the `bool` flag is false.
-  RelativeDirectPointerIntPair<const void, bool> Value;
-  
-  unsigned getRootParamWord() const {
-    if (Value.getInt()) {
-      unsigned word;
-      memcpy(&word, Value.getPointer(), sizeof(unsigned));
-      return word;
-    } else {
-      return Value.getOpaqueValue();
-    }
-  }
-  
+  union {
+    /// The word of storage, whose low bit indicates whether there is an
+    /// associated type path stored out-of-line and whose upper bits describe
+    /// the generic parameter at root of the path.
+    uint32_t Word;
+
+    /// This is the associated type path stored out-of-line. The \c bool
+    /// is used for masking purposes and is otherwise unused; instead, check
+    /// the low bit of \c Word.
+    RelativeDirectPointerIntPair<const void, bool> AssociatedTypePath;
+  };
+
 public:
   /// Index of the parameter being referenced. 0 is the first generic parameter
   /// of the root of the context hierarchy, and subsequent parameters are
   /// numbered breadth-first from there.
   unsigned getRootParamIndex() const {
-    return getRootParamWord() >> 1;
+    // If there is no path, retrieve the index directly.
+    if ((Word & 0x01) == 0) return Word >> 1;
+
+    // Otherwise, the index is at the start of the associated type path.
+    return *reinterpret_cast<const unsigned *>(AssociatedTypePath.getPointer());
   }
   
   /// A reference to an associated type along the reference path.
@@ -2523,7 +2594,7 @@ public:
   class AssociatedTypeIterator {
     const void *addr;
     
-    explicit AssociatedTypeIterator(const void *startAddr) : addr(addr) {}
+    explicit AssociatedTypeIterator(const void *startAddr) : addr(startAddr) {}
     
     bool isEnd() const {
       if (addr == nullptr)
@@ -2534,6 +2605,9 @@ public:
         return true;
       return false;
     }
+
+    template <class> friend class TargetGenericParamRef;
+
   public:
     AssociatedTypeIterator() : addr(nullptr) {}
 
@@ -2582,11 +2656,12 @@ public:
   
   /// Iterators for going through the associated type path from the root param.
   AssociatedTypeIterator begin() const {
-    if (Value.getInt()) {
+    if (Word & 0x01) {
       // The associated types start after the first word, which holds the
       // root param index.
       return AssociatedTypeIterator(
-        reinterpret_cast<const char*>(Value.getPointer()) + sizeof(unsigned));
+        reinterpret_cast<const char*>(AssociatedTypePath.getPointer()) +
+                                        sizeof(unsigned));
     } else {
       // This is a direct param reference, so there are no associated types.
       return end();
@@ -2630,7 +2705,65 @@ class TargetGenericRequirementDescriptor {
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
   };
+
+public:
+  constexpr GenericRequirementFlags getFlags() const {
+    return Flags;
+  }
+
+  constexpr GenericRequirementKind getKind() const {
+    return getFlags().getKind();
+  }
+
+  /// Retrieve the generic parameter that is the subject of this requirement.
+  const TargetGenericParamRef<Runtime> &getParam() const {
+    return Param;
+  }
+
+  /// Retrieve the protocol descriptor for a Protocol requirement.
+  const TargetProtocolDescriptor<Runtime> *getProtocol() const {
+    assert(getKind() == GenericRequirementKind::Protocol);
+    return Protocol;
+  }
+
+  /// Retrieve the right-hand type for a SameType or BaseClass requirement.
+  const char *getMangledTypeName() const {
+    assert(getKind() == GenericRequirementKind::SameType ||
+           getKind() == GenericRequirementKind::BaseClass);
+    return Type;
+  }
+
+  /// Retrieve the protocol conformance record for a SameConformance
+  /// requirement.
+  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+    assert(getKind() == GenericRequirementKind::SameConformance);
+    return Conformance;
+  }
+
+  /// Retrieve the layout constraint.
+  GenericRequirementLayoutKind getLayout() const {
+    assert(getKind() == GenericRequirementKind::Layout);
+    return Layout;
+  }
+
+  /// Determine whether this generic requirement has a known kind.
+  ///
+  /// \returns \c false for any future generic requirement kinds.
+  bool hasKnownKind() const {
+    switch (getKind()) {
+    case GenericRequirementKind::BaseClass:
+    case GenericRequirementKind::Layout:
+    case GenericRequirementKind::Protocol:
+    case GenericRequirementKind::SameConformance:
+    case GenericRequirementKind::SameType:
+      return true;
+    }
+
+    return false;
+  }
 };
+using GenericRequirementDescriptor =
+  TargetGenericRequirementDescriptor<InProcess>;
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
