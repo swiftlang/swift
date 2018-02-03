@@ -430,9 +430,10 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-static bool emitIndexData(SourceFile *PrimarySourceFile,
-      const CompilerInvocation &Invocation,
-      CompilerInstance &Instance);
+/// \return true on error.
+static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
+                                  const CompilerInvocation &Invocation,
+                                  CompilerInstance &Instance);
 
 static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
                                    CompilerInstance &Instance,
@@ -893,15 +894,10 @@ static bool performCompile(CompilerInstance &Instance,
   (void)emitLoadedModuleTraceIfNeeded(Context, *Instance.getDependencyTracker(),
                                       opts);
 
-  bool shouldIndex = !opts.IndexStorePath.empty();
-
   if (Context.hadError()) {
-    if (shouldIndex) {
-      //  Emit the index store data even if there were compiler errors.
-      if (emitIndexData(Instance.getPrimarySourceFile(),
-                        Invocation, Instance))
-        return true;
-    }
+    //  Emit the index store data even if there were compiler errors.
+    (void)emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
+                                Instance);
     return true;
   }
 
@@ -917,12 +913,9 @@ static bool performCompile(CompilerInstance &Instance,
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
-    if (shouldIndex) {
-      if (emitIndexData(Instance.getPrimarySourceFile(),
-                        Invocation, Instance))
-        return true;
-    }
-    return Context.hadError();
+    return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
+                                 Instance) ||
+           Context.hadError();
   }
 
   if (writeTBDIfNeeded(Invocation, Instance))
@@ -1078,7 +1071,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   ASTContext &Context = Instance.getASTContext();
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  bool shouldIndex = !opts.IndexStorePath.empty();
 
   if (observer) {
     observer->performedSILGeneration(*SM);
@@ -1164,16 +1156,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
                         Instance.getASTContext(), MSF);
 
-  if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
+  const bool haveModulePath =
+      !opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty();
+  if (haveModulePath)
     ensureSILModuleIsSerialized(SM.get());
+
+  if (haveModulePath) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      if (shouldIndex) {
-        if (emitIndexData(MSF.dyn_cast<SourceFile*>(),
-                          Invocation, Instance))
-          return true;
-      }
-      return Context.hadError();
+      return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
+                                   Instance) ||
+             Context.hadError();
     }
   }
 
@@ -1236,10 +1229,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.
-  if (shouldIndex) {
-    if (emitIndexData(MSF.dyn_cast<SourceFile*>(), Invocation, Instance))
-      return true;
-  }
+  if (emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation, Instance))
+    return true;
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
@@ -1308,11 +1299,14 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
          HadError;
 }
 
-static bool emitIndexData(SourceFile *PrimarySourceFile,
-      const CompilerInvocation &Invocation,
-      CompilerInstance &Instance) {
+static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
+                                  const CompilerInvocation &Invocation,
+                                  CompilerInstance &Instance) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  assert(!opts.IndexStorePath.empty());
+
+  if (opts.IndexStorePath.empty())
+    return false;
+
   // FIXME: provide index unit token(s) explicitly and only use output file
   // paths as a fallback.
 
