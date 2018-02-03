@@ -48,7 +48,26 @@ extension RandomNumberGenerator {
   /// generated number to any unsigned integer.
   @_inlineable
   public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
-    return T(truncatingIfNeeded: self.next())
+    if T.bitWidth == UInt64.bitWidth {
+      return T(self.next())
+    }
+
+    let (quotient, remainder) = T.bitWidth.quotientAndRemainder(
+      dividingBy: UInt64.bitWidth
+    )
+    var tmp: T = 0
+
+    for i in 0 ..< quotient {
+      tmp += T(truncatingIfNeeded: self.next()) &<< (UInt64.bitWidth * i)
+    }
+
+    if remainder != 0 {
+      let random = self.next()
+      let mask = UInt64.max &>> (UInt64.bitWidth - remainder)
+      tmp += T(truncatingIfNeeded: random & mask) &<< (UInt64.bitWidth * quotient)
+    }
+
+    return tmp
   }
 
   /// Produces the next randomly generated number that is constricted by an
@@ -85,7 +104,7 @@ extension RandomNumberGenerator {
 /// Using the preferred way:
 ///
 ///     let random = UInt8.random(in: .min ... .max)
-///     let randomToTen = UInt32.random(in: 0 ... 128)
+///     let randomToTen = UInt32.random(in: 0 ..< 10)
 ///
 /// - Note: The default implementation of randomness is cryptographically secure.
 ///   It utilizes arc4random(3) on newer versions of macOS, iOS, etc. On older

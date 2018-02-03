@@ -2344,7 +2344,7 @@ ${assignmentOperatorComment(x.operator, False)}
   % end
 }
 
-% for Range in ['CountableRange', 'CountableClosedRange']:
+% for Range in ['Range', 'ClosedRange']:
 
 extension FixedWidthInteger
 where Self.Stride : SignedInteger,
