@@ -224,15 +224,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
       // have information in the protocol.
       break;
     }
-  } else {
-    // FIXME: Until IUOs are removed from the type system, make
-    // sure we turn these both into optionals for the purpose of
-    // comparing types since we could be producing IUOs in some
-    // places and optionals in others.
-    if (auto objTy = reqtType->getImplicitlyUnwrappedOptionalObjectType())
-      reqtType = OptionalType::get(objTy);
-    if (auto objTy = witnessType->getImplicitlyUnwrappedOptionalObjectType())
-      witnessType = OptionalType::get(objTy);
   }
 
   return std::make_tuple(reqtType, witnessType, optAdjustment);

@@ -993,10 +993,6 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is ImplicitlyUnwrappedOptional<T>; otherwise, return
-  /// the null type.
-  Type getImplicitlyUnwrappedOptionalObjectType();
-
   /// Return T if this type is Optional<T> or ImplicitlyUnwrappedOptional<T>;
   /// otherwise, return the null type.
   Type getAnyOptionalObjectType(OptionalTypeKind &kind);

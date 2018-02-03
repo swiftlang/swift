@@ -177,8 +177,6 @@ namespace {
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
       auto IR = Visit(type.getTypePtr());
-      assert(!IR.AbstractType ||
-             !IR.AbstractType->getImplicitlyUnwrappedOptionalObjectType());
       return IR;
     }
 
@@ -1161,10 +1159,6 @@ static ImportedType adjustTypeForConcreteImport(
     bool allowNSUIntegerAsInt, Bridgeability bridging, OptionalTypeKind optKind,
     bool resugarNSErrorPointer) {
 
-  // We never expect an IUO type to be passed in.
-  assert(!importedType ||
-         !importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   if (importKind == ImportTypeKind::Abstract) {
     return {importedType, false};
   }
@@ -1187,8 +1181,6 @@ static ImportedType adjustTypeForConcreteImport(
   // abstractly, give up now.
   if (!importedType)
     return {Type(), false};
-
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
 
   // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
   auto maybeImportNSErrorPointer = [&]() -> Type {
@@ -1232,7 +1224,6 @@ static ImportedType adjustTypeForConcreteImport(
   };
 
   if (Type result = maybeImportNSErrorPointer()) {
-    assert(!result->getImplicitlyUnwrappedOptionalObjectType());
     return {result, false};
   }
 
@@ -1278,11 +1269,9 @@ static ImportedType adjustTypeForConcreteImport(
     resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                     pointerName,
                                                     resultTy);
-    assert(!resultTy->getImplicitlyUnwrappedOptionalObjectType());
     return resultTy;
   };
   if (Type outParamTy = maybeImportCFOutParameter()) {
-    assert(!outParamTy->getImplicitlyUnwrappedOptionalObjectType());
     importedType = outParamTy;
   }
 
@@ -1381,9 +1370,6 @@ static ImportedType adjustTypeForConcreteImport(
       importedType = OptionalType::get(importedType);
   }
 
-  // We do not expect to return actual IUO types.
-  assert(!importedType->getImplicitlyUnwrappedOptionalObjectType());
-
   return {importedType, isIUO};
 }
 
@@ -1437,10 +1423,6 @@ ImportedType ClangImporter::Implementation::importType(
       *this, type, importResult.AbstractType, importKind, importResult.Hint,
       allowNSUIntegerAsInt, bridging, optionality, resugarNSErrorPointer);
 
-  // We should never get an actual IUO type back.
-  assert(!adjustedType ||
-         !adjustedType.getType()->getImplicitlyUnwrappedOptionalObjectType());
-
   return adjustedType;
 }
 
@@ -1451,9 +1433,6 @@ Type ClangImporter::Implementation::importTypeIgnoreIUO(
 
   auto importedType = importType(type, importKind, allowNSUIntegerAsInt,
                                  bridging, optionality, resugarNSErrorPointer);
-
-  assert(!importedType ||
-         !importedType.getType()->getImplicitlyUnwrappedOptionalObjectType());
 
   return importedType.getType();
 }
@@ -1569,9 +1548,6 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t
-      assert(!SwiftContext.getIntDecl()
-                  ->getDeclaredType()
-                  ->getImplicitlyUnwrappedOptionalObjectType());
       return {SwiftContext.getIntDecl()->getDeclaredType(), false};
     default:
       break;
