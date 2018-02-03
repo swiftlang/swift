@@ -1786,10 +1786,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
-  return Type();
-}
-
 template <typename Fn>
 Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
@@ -1815,22 +1811,6 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       auto *module = cs.DC->getParentModule();
-
-      // "Force" the IUO for substitution purposes. We can end up in
-      // this situation if we use the results of overload resolution
-      // as a generic type and the overload resolution resulted in an
-      // IUO-typed entity.
-      while (auto objectType =
-             lookupBaseType->getImplicitlyUnwrappedOptionalObjectType()) {
-        // If we're accessing a type member of the IUO itself,
-        // stop here. Ugh...
-        if (module->lookupConformance(lookupBaseType,
-                                      assocType->getProtocol())) {
-          break;
-        }
-
-        lookupBaseType = objectType;
-      }
 
       if (lookupBaseType->mayHaveMembers()) {
         auto subs = lookupBaseType->getContextSubstitutionMap(

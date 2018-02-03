@@ -639,12 +639,10 @@ public:
     }
 #endif
 
-    if (!isIUO) {
-      assert(!ty->getImplicitlyUnwrappedOptionalObjectType());
+    if (!isIUO)
       return;
-    } else {
-      assert(ty->getAnyOptionalObjectType());
-    }
+
+    assert(ty->getOptionalObjectType());
 
     auto *IUOAttr = new (SwiftContext)
         ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);

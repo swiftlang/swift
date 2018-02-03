@@ -445,21 +445,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       type = type->getWithoutImmediateLabel();
     }
 
-    // Don't deduce IUO types.
-    Type alternateType;
-    bool adjustedIUO = false;
-    if (kind == AllowedBindingKind::Supertypes &&
-        constraint->getKind() >= ConstraintKind::Conversion &&
-        constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
-      auto innerType = type->getWithoutSpecifierType();
-      if (auto objectType =
-              lookThroughImplicitlyUnwrappedOptionalType(innerType)) {
-        type = OptionalType::get(objectType);
-        alternateType = objectType;
-        adjustedIUO = true;
-      }
-    }
-
     // Make sure we aren't trying to equate type variables with different
     // lvalue-binding rules.
     if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
@@ -483,12 +468,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      result.addPotentialBinding({type, kind, constraint->getKind()},
-                                 /*allowJoinMeet=*/!adjustedIUO);
-    if (alternateType &&
-        exactTypes.insert(alternateType->getCanonicalType()).second)
-      result.addPotentialBinding({alternateType, kind, constraint->getKind()},
-                                 /*allowJoinMeet=*/false);
+      result.addPotentialBinding({type, kind, constraint->getKind()});
   }
 
   // If we have any literal constraints, check whether there is already a
