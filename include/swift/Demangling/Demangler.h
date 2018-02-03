@@ -445,7 +445,7 @@ protected:
   NodePointer popAssocTypePath();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
-  NodePointer popProtocolConformance();
+  NodePointer demangleProtocolConformance();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();

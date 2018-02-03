@@ -308,3 +308,4 @@ _T0So11CrappyColorVs16RawRepresentableSCMA --> reflection metadata associated ty
 $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc --> protocol conformance descriptor for protocol_conformance_records.NativeValueType : protocol_conformance_records.Runcible in protocol_conformance_records
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
 $S20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAg_AiJ1QAAg1_GF -> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$S20mangling_retroactive5test2yyAA2Z3Vy12RetroactiveB1XVA2G0E1A1PAAg_AJg0_GF -> mangling_retroactive.test2(mangling_retroactive.Z3<RetroactiveB.X, RetroactiveB.X>) -> ()

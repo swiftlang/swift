@@ -148,7 +148,7 @@ func class_bounded_erasure(_ x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %T22class_bounded_generics13ConcreteClassC* [[INSTANCE:%.*]] to %objc_object*
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* [[INSTANCE_OPAQUE]], 0
-  // CHECK: [[T1:%.*]] = insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$S22class_bounded_generics13ConcreteClassCAA0E5BoundAAWP", i32 0, i32 0), 1
+  // CHECK: [[T1:%.*]] = insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$S22class_bounded_generics13ConcreteClassCAA0E5BoundAAHWP", i32 0, i32 0), 1
   // CHECK: ret { %objc_object*, i8** } [[T1]]
 }
 

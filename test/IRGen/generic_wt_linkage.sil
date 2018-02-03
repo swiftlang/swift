@@ -45,6 +45,6 @@ sil_default_witness_table hidden DerivedFromSimpleAssoc {
 }
 
 // CHECK: @"$S4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG" = internal constant
-// CHECK: define internal void @"$S4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"
+// CHECK: define internal void @"$S4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAHWI"
 
 

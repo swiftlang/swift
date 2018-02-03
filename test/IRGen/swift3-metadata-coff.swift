@@ -30,6 +30,6 @@ public func f(s : S) -> (() -> ()) {
 // CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"none\00", section ".sw5rfst$B"
 // CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"some\00", section ".sw5rfst$B"
 // CHECK-DAG: @"$SSqMF" = internal constant {{.*}}, section ".sw5flmd$B"
-// CHECK-DAG: @"$Ss1SVs1PsMA" = internal constant {{.*}}, section ".sw5asty$B"
+// CHECK-DAG: @"$Ss1SVs1PsHMA" = internal constant {{.*}}, section ".sw5asty$B"
 // CHECK-DAG: @"$SBoMB" = internal constant {{.*}}, section ".sw5bltn$B"
 
