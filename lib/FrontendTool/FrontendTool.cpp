@@ -291,6 +291,14 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   return false;
 }
 
+static bool writeSIL(SILModule &SM, CompilerInstance &Instance,
+                     CompilerInvocation &Invocation) {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+  return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                  opts.InputsAndOutputs.getSingleOutputFilename(),
+                  opts.EmitSortedSIL);
+}
+
 static bool printAsObjC(const std::string &outputPath, ModuleDecl *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
@@ -939,6 +947,13 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
+/// If we are asked to link all, link all.
+static void linkAllIfNeeded(const CompilerInvocation &Invocation,
+                            SILModule *SM) {
+  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
+    performSILLinking(SM, true);
+}
+
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM,
@@ -960,9 +975,7 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
       return true;
   }
 
-  // Now if we are asked to link all, link all.
-  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM, true);
+  linkAllIfNeeded(Invocation, SM);
 
   if (Invocation.getSILOptions().MergePartialModules)
     SM->linkAllFromCurrentModule();
@@ -1057,18 +1070,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
-    // If we are asked to link all, link all.
-    if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-      performSILLinking(SM.get(), true);
-    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.InputsAndOutputs.getSingleOutputFilename(),
-                    opts.EmitSortedSIL);
+    linkAllIfNeeded(Invocation, SM.get());
+    return writeSIL(*SM, Instance, Invocation);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
-    // If we are asked to link all, link all.
-    if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-      performSILLinking(SM.get(), true);
+    linkAllIfNeeded(Invocation, SM.get());
 
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
@@ -1172,11 +1179,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
          "All actions not requiring SILPasses must have been handled!");
 
   // We've been told to write canonical SIL, so write it now.
-  if (Action == FrontendOptions::ActionType::EmitSIL) {
-    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.InputsAndOutputs.getSingleOutputFilename(),
-                    opts.EmitSortedSIL);
-  }
+  if (Action == FrontendOptions::ActionType::EmitSIL)
+    return writeSIL(*SM, Instance, Invocation);
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
          "All actions not requiring IRGen must have been handled!");
