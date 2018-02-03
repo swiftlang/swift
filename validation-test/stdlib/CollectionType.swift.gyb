@@ -598,6 +598,40 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/slice
 }
 
 //===----------------------------------------------------------------------===//
+// subscript(offset: Range<Int>), Collection.SubSequence
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("subscript(offset: Range<Int>)/writeback") {
+  var collection = MinimalMutableRandomAccessCollection(
+    elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
+  var i = 0
+  var j = 5
+  collection[offset: i..<j].sort()
+  expectEqualSequence(
+    [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
+}
+
+CollectionTypeTests.test("subscript(offset: Range<Int>)/defaultImplementation/sliceTooLarge")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a larger size")
+  .code {
+  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  expectCrashLater()
+  x.withUnsafeMutableBufferPointer { buffer in
+    buffer[offset: 2..<4] = buffer[offset: 4..<8]
+  }
+}
+
+CollectionTypeTests.test("subscript(offset: Range<Int>)/defaultImplementation/sliceTooSmall")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+  .code {
+  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  expectCrashLater()
+  x.withUnsafeMutableBufferPointer { buffer in
+    buffer[offset: 2..<6] = buffer[offset: 6..<8]
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // isEmpty
 //===----------------------------------------------------------------------===//
 
