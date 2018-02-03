@@ -130,7 +130,8 @@ where SubSequence: MutableCollection
   ///
   ///
   /// - Parameter offset: A range of values that will offset the collections 
-  ///   starting index.
+  ///   starting index to form a new range of indices relative to the 
+  ///   collection.
   subscript(offset offset: Range<Int>) -> SubSequence { get }
 
   /// Reorders the elements of the collection such that all the elements

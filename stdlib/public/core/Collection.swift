@@ -458,7 +458,8 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   ///
   /// - Parameter offset: A range of values that will offset the collections 
-  ///   starting index.
+  ///   starting index to form a new range of indices relative to the 
+  ///   collection.
   subscript(offset offset: Range<Int>) -> SubSequence { get }
 
   /// A type that represents the indices that are valid for subscripting the
