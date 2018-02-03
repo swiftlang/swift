@@ -6211,11 +6211,12 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   // neither parameter nor return type diagnostics itself,
   // but if we have function type inside, that might
   // signficantly improve diagnostic quality.
-  if (contextualType) {
-    if (auto IUO =
-            CS.lookThroughImplicitlyUnwrappedOptionalType(contextualType))
-      contextualType = IUO;
-  }
+  // FIXME: We need to rework this with IUOs out of the type system.
+  // if (contextualType) {
+  //   if (auto IUO =
+  //           CS.lookThroughImplicitlyUnwrappedOptionalType(contextualType))
+  //     contextualType = IUO;
+  // }
 
   Type expectedResultType;
 
@@ -7457,8 +7458,9 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
-  if (auto objTy = CS.lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-    baseTy = baseObjTy = objTy;
+  // FIXME: We need to rework this with IUOs out of the type system.
+  // if (auto objTy = CS.lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
+  //   baseTy = baseObjTy = objTy;
 
   // If the base of this property access is a function that takes an empty
   // argument list, then the most likely problem is that the user wanted to
