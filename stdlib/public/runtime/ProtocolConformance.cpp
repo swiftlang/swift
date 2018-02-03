@@ -174,10 +174,10 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     // array of witness tables to pass along to the accessor.
 
     // Pretty-print the type name.
-    auto typeNamePair = TwoWordPair<const char *, uintptr_t>(
+    auto typeNamePair = TypeNamePair(
       swift_getTypeName(type, /*qualified=*/true));
-    std::string typeName(typeNamePair.first,
-                         typeNamePair.first + typeNamePair.second);
+    std::string typeName(typeNamePair.data,
+                         typeNamePair.data + typeNamePair.length);
 
     // Demangle the protocol name.
     DemangleOptions options;

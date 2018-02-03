@@ -210,7 +210,7 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
+BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
   auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
   HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
@@ -222,8 +222,8 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
     // Copy the data.
-    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
-    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    type->vw_initializeWithCopy(refAndObjectAddr.buffer, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.object;
     // Release ownership of the old box.
     swift_release(box);
     return refAndObjectAddr;
@@ -235,11 +235,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
   }
 }
 
-BoxPair::Return swift::swift_allocBox(const Metadata *type) {
-  return _swift_allocBox(type);
-}
-
-static BoxPair::Return _swift_allocBox_(const Metadata *type) {
+BoxPair swift::swift_allocBox(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
@@ -250,8 +246,6 @@ static BoxPair::Return _swift_allocBox_(const Metadata *type) {
 
   return BoxPair{allocation, projection};
 }
-
-auto swift::_swift_allocBox = _swift_allocBox_;
 
 void swift::swift_deallocBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
