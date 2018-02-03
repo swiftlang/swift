@@ -184,9 +184,9 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
-static bool emitLoadedModuleTrace(ASTContext &ctxt,
-                                  DependencyTracker &depTracker,
-                                  const FrontendOptions &opts) {
+static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
+                                          DependencyTracker &depTracker,
+                                          const FrontendOptions &opts) {
   if (opts.LoadedModuleTracePath.empty())
     return false;
   std::error_code EC;
@@ -769,7 +769,8 @@ static bool performCompile(CompilerInstance &Instance,
     }
   }
 
-  (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(), opts);
+  (void)emitLoadedModuleTraceIfNeeded(Context, *Instance.getDependencyTracker(),
+                                      opts);
 
   bool shouldIndex = !opts.IndexStorePath.empty();
 
