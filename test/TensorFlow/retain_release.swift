@@ -1,20 +1,20 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -o -
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 import TensorFlow
 
 // Unit tests on generating balanced retain/release SIL instructions.
 
-public func test3Adds() {
-  let a = Tensor([1]).toDevice()
-  let b = Tensor([2]).toDevice()
-  let c = Tensor([3]).toDevice()
+public func test3Adds(x: Tensor<Int>, y: Tensor<Int>, z: Tensor<Int>) {
+  let a = x.toDevice()
+  let b = y.toDevice()
+  let c = z.toDevice()
   let _ = a + b + c
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test3Adds{{.*}}
-// CHECK: sil @{{.*}}test3Adds{{.*}} : $@convention(thin) () -> () {
+// CHECK: sil [thunk] [always_inline] @{{.*}}test3Adds{{.*}} : $@convention(thin) (@owned Tensor<Int>, @owned Tensor<Int>, @owned Tensor<Int>) -> () {
 //
-// TThese 2 retains are to prepare for the first a + a.
+// These 2 retains are to prepare for the first a + a.
 // CHECK: strong_retain [[Ha:%.*]] : $TensorHandle<Int>
 // CHECK: strong_retain [[Hb:%.*]] : $TensorHandle<Int>
 //
@@ -38,13 +38,13 @@ public func test3Adds() {
 // CHECK: strong_release {{.*}} : $TensorHandle<Int>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int>
 
-public func testAddsWithIntermediateTensorSingleUse() {
-  let a = Tensor([1]).toDevice()
+public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int>) {
+  let a = x.toDevice()
   let _ = a + a + a
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorSingleUse{{.*}}
-// CHECK: sil @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) () -> () {
+// CHECK: sil [thunk] [always_inline] @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) (@owned Tensor<Int>) -> () {
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int>, #Tensor.handle
 //
@@ -69,15 +69,15 @@ public func testAddsWithIntermediateTensorSingleUse() {
 // This final release balances the original instruction that generated H.
 // CHECK: strong_release [[H]] : $TensorHandle<Int>
 
-public func testAddsWithIntermediateTensorMultiUses() {
-  let a = Tensor([1]).toDevice()
+public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int>) {
+  let a = x.toDevice()
   let tmp1 = a + a
   let tmp2 = tmp1 + a
   let _ = tmp1 + tmp2
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorMultiUses{{.*}}
-// CHECK: sil @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin) () -> () {
+// CHECK: sil [thunk] [always_inline] @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin)
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int>, #Tensor.handle
 //

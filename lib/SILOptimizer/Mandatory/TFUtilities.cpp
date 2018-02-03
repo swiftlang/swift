@@ -297,6 +297,21 @@ decodeArrayElements(SILValue value,
       value = urci->getOperand();
     } else if (auto *uci = dyn_cast<UpcastInst>(value)) {
       value = uci->getOperand();
+    } else if (auto *globalValue = dyn_cast<GlobalValueInst>(value)) {
+      // If we found a GlobalValueInst, then we're referring to an array that
+      // got moved to being a static initializer.
+      auto *init = dyn_cast_or_null<ObjectInst>(
+              globalValue->getReferencedGlobal()->getStaticInitializerValue());
+      if (!init) return false;
+
+      // The initializer elements are the tail elements of the object_inst, see
+      // if they are all decodable.
+      for (auto elt : init->getTailElements()) {
+        auto attrElt = getAttrOperand(elt);
+        if (!attrElt) return false;
+        elements.push_back(attrElt);
+      }
+      return true;
     } else {
       return false;
     }
@@ -382,6 +397,18 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
   if (auto *builtinInst = dyn_cast<BuiltinInst>(inst))
     if (toiInfo.decodeBuiltin(builtinInst))
       return toiInfo;
+
+  // Operations which can conditionally run on the host or the accelerator are
+  // modeled as well-known function calls.  If they satisfy the requirements
+  // (e.g. that their parameters are constants we can analyze) then they get
+  // promoted to notional "ops".
+  if (auto *applyInst = dyn_cast<ApplyInst>(inst))
+    if (auto *fnRef = dyn_cast<FunctionRefInst>(applyInst->getCallee())) {
+      auto callee = fnRef->getReferencedFunction()->getName();
+      if (callee == "__tf_tensor_from_units" &&
+          toiInfo.decodeTensorFromUnits(applyInst))
+        return toiInfo;
+    }
 
   return None;
 }
@@ -503,6 +530,40 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
   return true;
 }
 
+/// If all the operands to a call to __tf_tensor_from_units are constants, we
+/// can promote this to a 'Const' node with an attached TF_Tensor attribute.
+///
+/// It takes a 1D array of units, a shape as a 1D array of integers, and a
+/// metatype that corresponds to the Unit type.  This has been carefully set up
+/// to align with what the Const op wants to see.
+///
+bool SILTensorOpInfo::decodeTensorFromUnits(ApplyInst *inst) {
+  assert(inst->getNumOperands() == 4 &&
+         isTensorHandle(inst->getType().getSwiftRValueType()) &&
+         "Unexpected type signature for __tf_tensor_from_units");
+
+  // If we can't analyze the operands as arrays of constants, give up.
+  auto unitsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
+  auto shapeArray = dyn_cast_or_null<StructInst>(getAttrOperand(2));
+  if (!unitsArray || !shapeArray ||
+      !dyn_cast_or_null<MetatypeInst>(getAttrOperand(3)))
+    return false;
+
+  // Otherwise, good news everyone!  We can treat this as a Const op.  The first
+  // operand is the $tensor value, the second is the $shape for it, and the
+  // third is the dtype for the result.
+  opName = "Const";
+  operandDescriptorStr = "";
+  resultDescriptorStr = "t";
+  builtinName = "__tfop_Const,:t";
+  attributes.push_back({"value", AttributeModifier::Tensor });
+  attributes.push_back({"value", AttributeModifier::Shape });
+  attributes.push_back({"dtype", AttributeModifier::Normal });
+  return true;
+}
+
+
+
 /// Return the string suffix for the specified attribute modifier.
 const char *SILTensorOpInfo::
 getAttributeModifierSuffix(AttributeModifier modifier) {
@@ -525,7 +586,8 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
 
   // Attribute values require constant values.  If we don't have one then this
   // op is invalid and must be rejected.
-  for (auto attr : attributes) {
+  for (unsigned attrId = 0, e = attributes.size(); attrId != e; ) {
+    auto attr = attributes[attrId++];
     auto operand = getAttrOperand(operandNumber++);
     if (!operand)
       return "attribute '" + attr.first.str() +"' requires a constant argument";
@@ -539,12 +601,54 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
         return "attribute '" + attr.first.str()+"' requires a constant integer";
       break;
     case AttributeModifier::Tensor:
-      // This array or scalar should be turned into a TF_Tensor.
-      if (!isa<IntegerLiteralInst>(operand) &&
-          !isa<FloatLiteralInst>(operand))
-        return "attribute '" + attr.first.str() +
-               "' requires a constant integer or floating point constant";
-      break;
+      // If this an integer or float, it should be turned into a TF_Tensor.
+      if (isa<IntegerLiteralInst>(operand) ||
+          isa<FloatLiteralInst>(operand))
+        break;
+
+      // Otherwise, if it is an array, it should be decodable and should be
+      // followed by a shape.
+      if (isa<StructInst>(operand)) {
+        Type unitsElementType;
+        SmallVector<SingleValueInstruction*, 16> units;
+        if (!decodeArrayElements(operand, units, unitsElementType)) {
+          return "attribute '" + attr.first.str() +
+                 "' requires an array of constant values";
+        }
+
+        // The next operand must be a shape.
+        if (attrId >= attributes.size() ||
+            attr.first != attributes[attrId].first ||
+            attributes[attrId].second != AttributeModifier::Shape) {
+          return "tensor array attribute '" + attr.first.str() +
+                 "' must be followed by a shape";
+        }
+
+        auto shapeOperand = getAttrOperand(operandNumber++);
+        ++attrId;
+        if (!shapeOperand || !isa<StructInst>(shapeOperand))
+          return "attribute '" + attr.first.str() + "' has invalid shape";
+
+        Type shapeElementType;
+        SmallVector<SingleValueInstruction*, 4> shape;
+        if (!decodeArrayElements(shapeOperand, shape, shapeElementType))
+          return "attribute '" + attr.first.str() + "' has non-constant shape";
+
+        // Verify we have the right number of units.
+        uint64_t unitCount = 1;
+        for (auto elt : shape)
+          unitCount *= cast<IntegerLiteralInst>(elt)
+                                                ->getValue().getLimitedValue();
+        if (unitCount != units.size())
+          return "tensor literal should have " + llvm::utostr(unitCount) +
+                 " units for this shape, but has " + llvm::utostr(units.size());
+
+        // If everything is ok, then we're good to go.
+        break;
+      }
+
+      return "attribute '" + attr.first.str() +
+        "' requires a constant integer or floating point constant";
     case AttributeModifier::Shape:
       // This array of integers is a shape specifier.
       return "shape modifier not supported yet";
@@ -571,6 +675,14 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   // Handle normal operands.
   bool changed = false;
   unsigned nextOperand = 0;
+
+  // If this is a well-known call we're promoting to a graph operations, always
+  // canonicalize it.
+  if (isa<ApplyInst>(inst)) {
+    changed = true;
+    nextOperand = 1;  // Skip the callee argument.
+  }
+
   for (auto op: operandDescriptors) {
     switch (op) {
     case OpDescriptor::Tensor:
@@ -621,13 +733,31 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     operands.push_back(B.createMetatype(inst->getLoc(),
                                 SILType::getPrimitiveObjectType(metatypeType)));
 
-    // Add all of the operands as explicit values.
+    // Add all of the operands as explicit values.  If the instructions came
+    // from an out of line array initializer, make sure to clone them over to
+    // our function.
     for (auto elt : elements) {
+      if (elt->getFunction() != inst->getFunction()) {
+        // Make a copy of the instruction.  We can't even use the normal cloning
+        // facilities here, because they don't support cloning across functions.
+        if (auto *eltInt = dyn_cast<IntegerLiteralInst>(elt))
+          elt = B.createIntegerLiteral(elt->getLoc(), eltInt->getType(),
+                                       eltInt->getValue());
+        else if (auto *eltFP = dyn_cast<FloatLiteralInst>(elt))
+          elt = B.createFloatLiteral(elt->getLoc(), eltFP->getType(),
+                                     eltFP->getValue());
+        else
+          llvm_unreachable("Unknown instruction to initialize array");
+        elt->setDebugLocation(B.getSILDebugLocation(inst->getLoc()));
+      }
+
       operands.push_back(elt);
       name += ",";
       name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
     }
 
+    // Emit a release of the array, since we've dropped the consuming use of it.
+    B.emitDestroyValueOperation(inst->getLoc(), attrOperand);
     changed = true;
   }
   assert(nextOperand == inst->getNumOperands() && "Unexpected operands?");

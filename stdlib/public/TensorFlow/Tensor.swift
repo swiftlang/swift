@@ -69,6 +69,26 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
   return handle.makeHostCopy().scalar
 }
 
+/// This compiler builtin is known by the partitioning pass, which recognizes it
+/// and promotes calls to it to being in graph when it can.  This signature was
+/// designed to align with the requirements of the 'Const' Tensorflow operation.
+@_versioned @inline(never)
+@_silgen_name("__tf_tensor_from_units")
+func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int], dtype: Unit.Type)
+    -> TensorHandle<Unit> {
+  let contiguousSize = shape.reduce(1, *)
+  precondition(units.count == contiguousSize,
+               "The number of units doesn't match the shape.")
+  return TensorHandle(
+      shape: shape,
+      unitsInitializer: { addr in
+        units.withUnsafeBufferPointer { ptr in
+          addr.assign(from: ptr.baseAddress!, count: contiguousSize)
+        }
+    })
+}
+
+
 //===----------------------------------------------------------------------===//
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
@@ -150,19 +170,7 @@ public extension Tensor {
   /// product of all of shape's dimensions.
   @_inlineable
   init(shape: [Int], units: [Unit]) {
-    let contiguousSize = shape.reduce(1, *)
-    precondition(units.count == contiguousSize, """
-      The number of units doesn't match the shape.
-      """)
-    self.init(TensorHandle(
-        shape: shape,
-        unitsInitializer: { addr in
-          units.withUnsafeBufferPointer { ptr in
-            addr.assign(from: ptr.baseAddress!, count: contiguousSize)
-          }
-        }
-      )
-    )
+    self.init(_TFTensorFromUnits(units, shape: shape, dtype: Unit.self))
   }
 
   @_inlineable
