@@ -200,7 +200,48 @@ SILValue SILTensorOpInfo::getScalarOperand(SILValue v) const {
 
 /// If the specified value is a valid value for an attribute, return the
 /// instruction that provides the value, otherwise null.
-SILInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
+SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
+  // If the value is a string value, then we need to peel off all the SIL
+  // instructions between the String struct value and the underlying
+  // string_literal instruction.
+  auto &ctx = inst->getFunction()->getASTContext();
+  if (v->getType().getSwiftRValueType()->isEqual(
+                                     ctx.getStringDecl()->getDeclaredType())) {
+    auto str = v;
+    // Strip off the specific set of instructions we expect to form the string
+    // literal.
+    while (1) {
+      if (auto sli = dyn_cast<StringLiteralInst>(str))
+        return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
+                ? sli : nullptr;
+
+      if (auto si = dyn_cast<StructInst>(str)) {
+        assert(si->getNumOperands() >= 1 &&
+               "Expect String, UnsafeMutableRawPointer, and _StringCore types");
+        str = si->getOperand(0);
+        continue;
+      }
+
+      if (auto ei = dyn_cast<EnumInst>(str)) {
+        assert(ei->getNumOperands() == 1 && "expect non-null optional");
+        str = ei->getOperand();
+        continue;
+      }
+
+      // It is possible that we have a variable string, we want to reject it
+      // as a non-constant value.
+      return nullptr;
+    }
+  }
+
+  // Handle cases that create a literal array.
+  if (auto *si = dyn_cast<StructInst>(v)) {
+    SmallVector<SingleValueInstruction*, 8> elements;
+    Type elementType;
+    if (decodeArrayElements(v, elements, elementType))
+      return si;
+  }
+
   // Simplify scalar operands in general.
   v = getScalarOperand(v);
   if (!v) return nullptr;
@@ -221,6 +262,107 @@ SILInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) const {
   return nullptr;
 }
 
+/// Given a SILValue that may be an array, attempt to decode it into the
+/// literal constant values that make up its elements.  If this fails or if
+/// the value is not an array, this returns false.  Otherwise it decodes the
+/// array and returns the element initializer in elements.
+bool SILTensorOpInfo::
+decodeArrayElements(SILValue value,
+                    SmallVectorImpl<SingleValueInstruction*> &elements,
+                    Type &elementType) const {
+  auto bgst = value->getType().getAs<BoundGenericStructType>();
+  if (!bgst ||
+      bgst->getDecl() != inst->getModule().getASTContext().getArrayDecl())
+    return false;
+  elementType = bgst->getGenericArgs()[0];
+
+
+  // Handle the standard pattern for array initialization.  'Value' is an
+  // alloc_ref that is wrapped up in abstractions like this:
+  //
+  // %39 = alloc_ref [tail_elems $Int * %0 : $Builtin.Word] $_Contiguo....<Int>
+  // %43 = unchecked_ref_cast %39 : $_ContiguousArrayStorage<Int> to ...
+  // %44 = struct $_BridgeStorage<...> (%43 : $Builtin.BridgeObject)
+  // %45 = struct $_ArrayBuffer<Int> (%44 : $_BridgeStorage<...>)
+  // %46 = struct $Array<Int> (%45 : $_ArrayBuffer<Int>)
+  //
+  // Targets without ObjC bridging are slightly different, we handle both forms
+  // here.
+  AllocRefInst *allocRef = nullptr;
+  while (!(allocRef = dyn_cast<AllocRefInst>(value))) {
+    if (auto *si = dyn_cast<StructInst>(value)) {
+      if (si->getNumOperands() != 1) return false;
+      value = si->getOperand(0);
+    } else if (auto *urci = dyn_cast<UncheckedRefCastInst>(value)) {
+      value = urci->getOperand();
+    } else if (auto *uci = dyn_cast<UpcastInst>(value)) {
+      value = uci->getOperand();
+    } else {
+      return false;
+    }
+  }
+
+  // The allocation must be of a constant number of elements.
+  if (allocRef->getNumOperands() != 1 ||
+      !isa<IntegerLiteralInst>(allocRef->getOperand(0)))
+    return false;
+
+  uint64_t numElements = cast<IntegerLiteralInst>(allocRef->getOperand(0))
+                                            ->getValue().getLimitedValue();
+
+  // Given the allocation, we then look for stores.  First there is going to be
+  // an upcast to _ContiguousArrayStorageBase which is an internal
+  // implementation detail that has the tail elements on it.  Then there will
+  // be a ref_tail_addr, then indexed stores will hang off of it, like this:
+  //
+  // %40 = upcast %39 : $_ContiguousArrayStorage<Int> to $_ContiguousArra...
+  // %47 = ref_tail_addr %40 : $_ContiguousArrayStorageBase, $Int
+  // store %13 to %47 : $*Int
+  // %49 = index_addr %47 : $*Int, %14 : $Builtin.Word
+  // store %13 to %49 : $*Int
+  auto *uci = allocRef->getSingleUserOfType<UpcastInst>();
+  if (!uci) return false;
+  auto *rti = uci->getSingleUserOfType<RefTailAddrInst>();
+  if (!rti) return false;
+
+  elements.resize(numElements);
+
+  for (auto *use : rti->getUses()) {
+    auto *user = use->getUser();
+
+    uint64_t index = 0;
+    if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+      auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
+      if (!ili) return false;
+      index = ili->getValue().getLimitedValue();
+      if (auto *iaiUse = iai->getSingleUse())
+        user = iaiUse->getUser();
+      else
+        return false;
+    }
+
+    // Check to see if we have a store to a valid index that hasn't been stored
+    // to yet.
+    auto *si = dyn_cast<StoreInst>(user);
+    if (!si || index >= elements.size() || elements[index] != nullptr)
+      return false;
+
+    // If we got a store to a valid index, check to see if the stored value is
+    // itself a valid constant.
+    auto *elt = getAttrOperand(si->getOperand(0));
+    if (!elt) return false;
+    elements[index] = elt;
+
+    // Track how many elements we see so we can know if we got them all.
+    --numElements;
+  }
+
+  // Make sure that all of the elements were found.
+  if (numElements != 0)
+    return false;
+
+  return true;
+}
 
 /// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
 /// the instruction is a valid tensor operation.  This is the way that
@@ -339,6 +481,10 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
       suffixKind = AttributeModifier::Shape;
     else if (suffix == "dtype")
       suffixKind = AttributeModifier::DType;
+    else if (suffix == "array")
+      suffixKind = AttributeModifier::Array;
+    else if (suffix == "elt")
+      suffixKind = AttributeModifier::ArrayElement;
     else {
       diagInvalid("invalid attribute modifier '" + suffix.str() + "'");
       return false;
@@ -356,6 +502,20 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 
   return true;
 }
+
+/// Return the string suffix for the specified attribute modifier.
+const char *SILTensorOpInfo::
+getAttributeModifierSuffix(AttributeModifier modifier) {
+  switch (modifier) {
+  case AttributeModifier::Normal: return "";
+  case AttributeModifier::DType: return "$dtype";
+  case AttributeModifier::Tensor: return "$tensor";
+  case AttributeModifier::Shape: return "$shape";
+  case AttributeModifier::Array: return "$array";
+  case AttributeModifier::ArrayElement: return "$elt";
+  }
+}
+
 
 /// Verify that any attribute operands are passed acceptable constants,
 /// returning a non-empty error string to emit if that is not the case.
@@ -388,6 +548,9 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
     case AttributeModifier::Shape:
       // This array of integers is a shape specifier.
       return "shape modifier not supported yet";
+    case AttributeModifier::Array:
+    case AttributeModifier::ArrayElement:
+      llvm_unreachable("$array and $elt shouldn't be written by users");
     }
   }
 
@@ -401,6 +564,9 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
 // TODO(clattner): Remove this when deabstraction exists.
 SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   SmallVector<SILValue, 8> operands;
+
+  std::string name = "__tfop_" + opName.str() + "," +
+    operandDescriptorStr.str()+":"+resultDescriptorStr.str();
 
   // Handle normal operands.
   bool changed = false;
@@ -419,12 +585,50 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     }
   }
 
+  SILBuilder B(inst);
+
   // Handle attributes.
-  for (auto attr : attributes) { (void)attr;
+  for (auto attr : attributes) {
     auto operand = inst->getOperand(nextOperand++);
     auto attrOperand = getAttrOperand(operand)->getResults()[0];
-    operands.push_back(attrOperand);
-    changed |= operand != attrOperand;
+
+    // If this is a normal operand, just add it.
+    auto *si = dyn_cast<StructInst>(attrOperand);
+    if (!si) {
+      // Otherwise, this is a normal operand.
+      operands.push_back(attrOperand);
+      changed |= operand != attrOperand;
+      name += ","+attr.first.str()+getAttributeModifierSuffix(attr.second);
+      continue;
+    }
+
+    // Otherwise, this is an array attribute, so expand it out.
+    SmallVector<SingleValueInstruction*, 8> elements;
+    Type elementType;
+    bool isArray = decodeArrayElements(attrOperand, elements, elementType);
+    assert(isArray && "Unexpected attribute operand"); (void)isArray;
+
+    // Add the first operand, which is the metatype for the element.  If it was
+    // a 'Normal' operand, change it to an Array so we can distinguish it in the
+    // case of an empty array.
+    if (attr.second == AttributeModifier::Normal)
+      attr.second = AttributeModifier::Array;
+    name += ","+attr.first.str()+getAttributeModifierSuffix(attr.second);
+
+    auto metatypeType =
+      MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+         ->getCanonicalType();
+    operands.push_back(B.createMetatype(inst->getLoc(),
+                                SILType::getPrimitiveObjectType(metatypeType)));
+
+    // Add all of the operands as explicit values.
+    for (auto elt : elements) {
+      operands.push_back(elt);
+      name += ",";
+      name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
+    }
+
+    changed = true;
   }
   assert(nextOperand == inst->getNumOperands() && "Unexpected operands?");
 
@@ -433,16 +637,20 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     return inst;
 
   // Otherwise, rebuild a new builtin instruction with the simplified operands.
-  SILBuilder B(inst);
-
   auto newInst =
     B.createBuiltin(inst->getLoc(),
-                    B.getASTContext().getIdentifier(builtinName),
+                    B.getASTContext().getIdentifier(name),
                     inst->getResults()[0]->getType(), /*no substitions*/{},
                     operands);
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
-  return inst = newInst;
+
+  // Now that we have a new instruction, reparse it to make sure that our
+  // internal state is all up to date, and that we built it correctly.
+  auto newResult = decode(newInst);
+  assert(newResult.hasValue() && "Misformed builting when canonicalizing");
+  *this = newResult.getValue();
+  return newInst;
 }
 
 
