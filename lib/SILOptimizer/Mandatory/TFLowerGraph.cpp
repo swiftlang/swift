@@ -394,24 +394,36 @@ TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
 
-static TF_Tensor *convertConstantToTensor(LiteralInst *LI, TF_DataType dtype) {
+static TF_Tensor *convertValuesToTensor(ArrayRef<SingleValueInstruction*> elts,
+                                        ArrayRef<int64_t> shape,
+                                        TF_DataType dtype) {
   assert(dtype != TF_DataType() && "Expected to get a type!");
   auto dtypeSize = TF_DataTypeSize(dtype);
 
-  // Make an uninitialized tensor that is big enough for our value.
-  int64_t dim = 1;
-  auto *tensor = TF_AllocateTensor(dtype, &dim, 1, dtypeSize);
+  // Compute the total memory size of the tensor value.
+  unsigned totalElements = 1;
+  for (auto dim : shape)
+    totalElements *= dim;
 
-  // Set up its contents.
+  // Make an uninitialized tensor that is big enough for our value.
+  auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
+                                   dtypeSize*totalElements);
+
+  // Set up its contents, element-wise.
+  auto *ptr = (char*)TF_TensorData(tensor);
   APInt value;
-  if (auto *ILI = dyn_cast<IntegerLiteralInst>(LI)) {
-    value = ILI->getValue();
-  } else {
-    value = cast<FloatLiteralInst>(LI)->getBits();
+  for (auto elt : elts) {
+    if (auto *ILI = dyn_cast<IntegerLiteralInst>(elt)) {
+      value = ILI->getValue();
+    } else {
+      value = cast<FloatLiteralInst>(elt)->getBits();
+    }
+
+    // FIXME: This will need a byte swap for big endian hosts.
+    memcpy(ptr, value.getRawData(), dtypeSize);
+    ptr += dtypeSize;
   }
 
-  // FIXME: This will need a byte swap for big endian hosts.
-  memcpy(TF_TensorData(tensor), value.getRawData(), dtypeSize);
   return tensor;
 }
 
@@ -471,12 +483,32 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     // Helper function to collect subsequent elements that contribute to an
     // array value.
     auto collectArrayElements =
-                    [&](SmallVectorImpl<SingleValueInstruction*> &elements) {
+                    [&](SILValue attrValue, Type &eltType,
+                        SmallVectorImpl<SingleValueInstruction*> &elements) {
+      // We have the metatype for the array element, which we need to know the
+      // element type in case the array was empty.
+      auto metatype = cast<MetatypeInst>(attrValue)->getType();
+      eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
+
       while (attrIndex < e &&
              tfopInfo.attributes[attrIndex].second ==
                      SILTensorOpInfo::AttributeModifier::ArrayElement) {
         auto eltValue = tfopInfo.getAttrOperand(nextOperand++);
         elements.push_back(cast<SingleValueInstruction>(eltValue));
+        ++attrIndex;
+      }
+    };
+
+    auto decodeShapeElements = [&](SILValue attrValue,
+                                   SmallVectorImpl<int64_t> &shape) {
+      assert(isa<MetatypeInst>(attrValue) &&
+             "$shape should start with a metatype");
+      while (attrIndex < e &&
+             tfopInfo.attributes[attrIndex].second ==
+                     SILTensorOpInfo::AttributeModifier::ArrayElement) {
+        auto eltValue = tfopInfo.getAttrOperand(nextOperand++);
+        auto intValue = cast<IntegerLiteralInst>(eltValue);
+        shape.push_back(intValue->getValue().getLimitedValue());
         ++attrIndex;
       }
     };
@@ -521,31 +553,48 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
     case SILTensorOpInfo::AttributeModifier::Tensor: {
       // Tensor can support two cases: an array case, where 'attrValue' is a
       // metatype, and a scalar case.
-      if (isa<MetatypeInst>(attrValue)) {
-        llvm_unreachable("Tensor array attributes not supported yet");
+      TF_DataType dtype;
+      SmallVector<SingleValueInstruction*, 4> elements;
+      SmallVector<int64_t, 4> shape;
+      if (!isa<MetatypeInst>(attrValue)) {
+        // The scalar case is very simple.
+        dtype = getTensorFlowDataType(attrValue->getType(), inst->getLoc());
+        elements.push_back(cast<LiteralInst>(attrValue));
+        shape.push_back(1);
+      } else {
+        // Handle the array case by decoding the array itself, then decoding the
+        // shape value that follows it.
+        Type eltType;
+        collectArrayElements(attrValue, eltType, elements);
+
+        auto shapeAttr = tfopInfo.attributes[attrIndex++]; (void)shapeAttr;
+        assert(shapeAttr.second == SILTensorOpInfo::AttributeModifier::Shape);
+        auto shapeAttrValue = tfopInfo.getAttrOperand(nextOperand++);
+        decodeShapeElements(shapeAttrValue, shape);
+
+        auto eltSILType =
+          SILType::getPrimitiveObjectType(eltType->getCanonicalType());
+        dtype = getTensorFlowDataType(eltSILType, inst->getLoc());
       }
 
-      auto val = cast<LiteralInst>(attrValue);
-      auto dtype = getTensorFlowDataType(val->getType(), inst->getLoc());
       // Set the tensor as the attribute on the graph node.
-      auto tensor = convertConstantToTensor(val, dtype);
+      auto tensor = convertValuesToTensor(elements, shape, dtype);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc())) return;
       break;
     }
-    case SILTensorOpInfo::AttributeModifier::Shape:
-      // TODO: TF_SetAttrShape/TF_SetAttrShapeList
-      llvm_unreachable("shape not supported yet");
+    case SILTensorOpInfo::AttributeModifier::Shape: {
+      SmallVector<int64_t, 4> shape;
+      decodeShapeElements(attrValue, shape);
+      TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
+      break;
+    }
     case SILTensorOpInfo::AttributeModifier::Array: {
-      // We have the metatype for the array element, which we need to know the
-      // element type in case the array was empty.
-      auto metatype = cast<MetatypeInst>(attrValue)->getType();
-      auto eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
-
       // Get all of the elements that contribute to this array value.
+      Type eltType;
       SmallVector<SingleValueInstruction*, 4> elements;
-      collectArrayElements(elements);
+      collectArrayElements(attrValue, eltType, elements);
 
       if (eltType->getString() == "String") {
         SmallVector<const void*, 4> pointers;
@@ -591,6 +640,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         break;
       }
 
+      // TODO: TF_SetAttrShapeList
       // TODO: TF_SetAttrTypeList
       llvm_unreachable(("unknown attribute array type: " + typeName).c_str());
     }

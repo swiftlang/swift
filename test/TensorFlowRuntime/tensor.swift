@@ -44,7 +44,7 @@ TensorTests.testCPUAndGPU("FactoryInitializers") {
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
-  let x: Tensor<Int32> = .ones(shape: [5, 5])
+  let x = Tensor<Int32>.ones(shape: [5, 5]).toDevice()
   let ints = Tensor<Int>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
@@ -60,7 +60,7 @@ TensorTests.testCPUAndGPU("Reduction") {
 }
 
 TensorTests.testCPUAndGPU("SimpleMath") {
-  let x = Tensor<Float>([1.2, 1.2]).toDevice()
+  let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
   expectNearlyEqual(array.units[0], 0.833655, byError: 0.0001)
@@ -79,17 +79,17 @@ TensorTests.testCPUAndGPU("Convolution") {
 #endif
 
 TensorTests.testCPUAndGPU("3Adds") {
-  let a = Tensor([1]).toDevice()
-  let b = Tensor([2]).toDevice()
-  let c = Tensor([3]).toDevice()
+  let a = Tensor([1])
+  let b = Tensor([2])
+  let c = Tensor([3])
 
   let o = a + b + c
   expectEqual(o.array.units[0], 6)
 }
 
 TensorTests.testCPUAndGPU("testMultiOpMath") {
-  let x = Tensor<Float>([1.2, 1.2]).toDevice()
-  let y = Tensor<Float>([4.3, 4.3]).toDevice()
+  let x = Tensor<Float>([1.2, 1.2])
+  let y = Tensor<Float>([4.3, 4.3])
   let sum = x + y
   let squared = sum * sum
   let expsqr = exp(squared)
@@ -98,12 +98,12 @@ TensorTests.testCPUAndGPU("testMultiOpMath") {
 }
 
 TensorTests.testCPUAndGPU("testXWPlusB") {
-  // Shape: 4
-  let x = Tensor([1.0, 2.0, 2.0, 1.0]).toDevice()
+  // Shape: 1 x 4
+  let x = Tensor([[1.0, 2.0, 2.0, 1.0]]).toDevice()
   // Shape: 2 x 4
   let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]]).toDevice()
   // Shape: 2
-  let b = Tensor([0.5, 0.5]).toDevice()
+  let b = Tensor([0.5, 0.5])
   // Do xW+b!
   _ = x ⊗ w + b
   // TODO: Check result
@@ -192,7 +192,7 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
     }
   }
   let classifier = MLPClassifier()
-  let _ = classifier.prediction(for: Tensor([[1, 0.5]]).toDevice())
+  let _ = classifier.prediction(for: Tensor([[1, 0.5]]))
   // TODO: Check result.
 }
 
