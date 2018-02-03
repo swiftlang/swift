@@ -1177,71 +1177,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return ErrorType::get(TC.Context);
   }
 
-  // Emit diagnostics related to ImplicitlyUnwrappedOptional.
-  if (comp->getIdentifier() == TC.Context.Id_ImplicitlyUnwrappedOptional) {
-    if (options.contains(TypeResolutionFlags::AllowIUO)) {
-      if (isa<GenericIdentTypeRepr>(comp)) {
-        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
-        assert(genericTyR->getGenericArgs().size() == 1);
-        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
-
-        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated_with_fixit;
-
-        // For Swift 5 and later, spelling the full name is an error.
-        if (TC.Context.isSwiftVersionAtLeast(5))
-          diag = diag::
-              implicitly_unwrapped_optional_spelling_error_with_bang_fixit;
-
-        TC.diagnose(comp->getStartLoc(), diag)
-          .fixItRemoveChars(
-              genericTyR->getStartLoc(),
-              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
-          .fixItInsertAfter(genericArgTyR->getEndLoc(), "!")
-          .fixItRemoveChars(
-              genericTyR->getAngleBrackets().End,
-              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
-      } else {
-        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated;
-
-        // For Swift 5 and later, spelling the full name is an error.
-        if (TC.Context.isSwiftVersionAtLeast(5))
-          diag = diag::implicitly_unwrapped_optional_spelling_error;
-
-        TC.diagnose(comp->getStartLoc(), diag);
-      }
-    } else if (isa<GenericIdentTypeRepr>(comp)) {
-      Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
-
-      if (TC.Context.isSwiftVersionAtLeast(5))
-        diag = diag::implicitly_unwrapped_optional_spelling_in_illegal_position;
-
-      auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
-      assert(genericTyR->getGenericArgs().size() == 1);
-      auto *genericArgTyR = genericTyR->getGenericArgs()[0];
-
-      TC.diagnose(comp->getStartLoc(), diag)
-          .fixItRemoveChars(
-              genericTyR->getStartLoc(),
-              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
-          .fixItInsertAfter(genericArgTyR->getEndLoc(), "?")
-          .fixItRemoveChars(
-              genericTyR->getAngleBrackets().End,
-              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
-    } else {
-      Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
-
-      if (TC.Context.isSwiftVersionAtLeast(5))
-        diag = diag::
-            implicitly_unwrapped_optional_spelling_error_with_optional_fixit;
-
-      SourceRange R = SourceRange(comp->getIdLoc());
-
-      TC.diagnose(comp->getStartLoc(), diag).fixItReplace(R, "Optional");
-    }
-  }
-
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
@@ -2818,7 +2753,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
     Diagnostic diag = diag::
-        implicitly_unwrapped_optional_in_illegal_position_suggest_optional;
+        implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional;
 
     if (TC.Context.isSwiftVersionAtLeast(5))
       diag = diag::implicitly_unwrapped_optional_in_illegal_position;

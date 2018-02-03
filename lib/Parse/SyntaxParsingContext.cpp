@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Syntax/SyntaxParsingContext.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
@@ -27,15 +30,13 @@
 using namespace swift;
 using namespace swift::syntax;
 
-namespace {
-}// End of anonymous namespace
+using RootContextData = SyntaxParsingContext::RootContextData;
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
-                                           SourceFile &SF,
-                                           unsigned BufferID)
-    : RootDataOrParent(
-          new RootContextData(SF, SF.getASTContext().Diags,
-                              SF.getASTContext().SourceMgr, BufferID)),
+                                           SourceFile &SF, unsigned BufferID)
+    : RootDataOrParent(new RootContextData(SF, SF.getASTContext().Diags,
+                                           SF.getASTContext().SourceMgr,
+                                           BufferID)),
       CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
       Enabled(SF.shouldKeepSyntaxInfo()) {

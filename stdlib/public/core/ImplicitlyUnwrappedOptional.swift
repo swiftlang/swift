@@ -21,31 +21,5 @@
 ///
 ///     // An optional integer
 ///     let possibleNumber: Int? = 5
-@_fixed_layout
-public enum ImplicitlyUnwrappedOptional<Wrapped> : ExpressibleByNilLiteral {
-  // The compiler has special knowledge of the existence of
-  // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
-  // the library intrinsics below.
-  
-  /// The absence of a value. Typically written using the nil literal, `nil`.
-  case none
-
-  /// The presence of a value, stored as `Wrapped`.
-  case some(Wrapped)
-
-  /// Creates an instance that stores the given value.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ some: Wrapped) { self = .some(some) }
-
-  /// Creates an instance initialized with `nil`.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you initialize an `Optional` instance with a `nil` literal. For example:
-  ///
-  ///     let i: Index! = nil
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(nilLiteral: ()) {
-    self = .none
-  }
-}
+@available(*, unavailable, renamed: "Optional")
+public typealias ImplicitlyUnwrappedOptional<Wrapped> = Optional<Wrapped>
