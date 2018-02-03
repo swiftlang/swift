@@ -2753,13 +2753,14 @@ WARNING(optional_pattern_match_promotion,none,
         "pattern match introduces an implicit promotion from %0 to %1",
         (Type, Type))
 WARNING(optional_to_any_coercion,none,
-        "expression implicitly coerced from %0 to Any", (Type))
+        "expression implicitly coerced from %0 to %1", (Type, Type))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
-     "explicitly cast to Any with 'as Any' to silence this warning", ())
+     "explicitly cast to %0 with '%1' to silence this warning",
+     (Type, StringRef))
 WARNING(optional_in_string_interpolation_segment,none,
         "string interpolation produces a debug description for an optional "
         "value; did you mean to make this explicit?",
