@@ -1937,6 +1937,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     llvm_unreachable("does not have access control");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     // Does not have access control.
   case DeclKind::EnumCase:
     // Handled at the EnumElement level.
@@ -7143,6 +7144,15 @@ public:
     TC.checkDeclAttributes(ICD);
   }
 
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+    if (PDD->hasBeenEmitted()) { return; }
+    PDD->markEmitted();
+    TC.diagnose(PDD->getMessage()->getStartLoc(),
+      PDD->isError() ? diag::pound_error : diag::pound_warning,
+      PDD->getMessage()->getValue())
+      .highlight(PDD->getMessage()->getSourceRange());
+  }
+
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (!IsFirstPass) {
       if (CD->getBody()) {
@@ -7615,6 +7625,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8203,6 +8214,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 

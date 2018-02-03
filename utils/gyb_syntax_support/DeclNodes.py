@@ -83,6 +83,22 @@ DECL_NODES = [
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
+    Node('PoundErrorDecl', kind='Decl',
+         children=[
+             Child('PoundError', kind='PoundErrorToken'),
+             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('Message', kind='StringLiteralExpr'),
+             Child('RightParenToken', kind='RightParenToken')
+         ]),
+
+    Node('PoundWarningDecl', kind='Decl',
+         children=[
+             Child('PoundWarning', kind='PoundWarningToken'),
+             Child('LeftParenToken', kind='LeftParenToken'),
+             Child('Message', kind='StringLiteralExpr'),
+             Child('RightParenToken', kind='RightParenToken')
+         ]),
+
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token',

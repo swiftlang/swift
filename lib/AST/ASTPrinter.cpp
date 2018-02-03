@@ -1917,6 +1917,17 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
   Printer << tok::pound_endif;
 }
 
+void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+  /// TODO: Should we even print #error/#warning?
+  if (PDD->isError()) {
+    Printer << tok::pound_error;
+  } else {
+    Printer << tok::pound_warning; 
+  }
+
+  Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
+}
+
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);

@@ -11,6 +11,9 @@ import A.B.C
 @objc import typealias A.B
 import struct A.B
 
+#warning("test warning")
+#error("test error")
+
 #if Blah
 class C {
   func bar(_ a: Int) {}

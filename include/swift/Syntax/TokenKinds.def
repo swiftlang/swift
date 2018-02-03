@@ -259,6 +259,8 @@ POUND_KEYWORD(keyPath)
 POUND_KEYWORD(line)
 POUND_KEYWORD(sourceLocation)
 POUND_KEYWORD(selector)
+POUND_KEYWORD(warning)
+POUND_KEYWORD(error)
 
 // Keywords prefixed with a '#' that are build configurations.
 POUND_CONFIG(available)
