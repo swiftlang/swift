@@ -983,6 +983,28 @@ computeSerializationOptions(const CompilerInvocation &Invocation,
   return serializationOpts;
 }
 
+/// Perform SIL optimization passes if optimizations haven't been disabled.
+/// These may change across compiler versions.
+static void performSILOptimizations(CompilerInvocation &Invocation,
+                                    SILModule *SM) {
+  SharedTimer timer("SIL optimization");
+  if (Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::MergeModules ||
+      !Invocation.getSILOptions().shouldOptimize()) {
+    runSILPassesForOnone(*SM);
+    return;
+  }
+  runSILOptPreparePasses(*SM);
+
+  StringRef CustomPipelinePath =
+      Invocation.getSILOptions().ExternalPassPipelineFilename;
+  if (!CustomPipelinePath.empty()) {
+    runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
+  } else {
+    runSILOptimizationPasses(*SM);
+  }
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           CompilerInvocation &Invocation,
                                           std::unique_ptr<SILModule> SM,
@@ -1067,26 +1089,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // can be serialized at any moment, e.g. during the optimization pipeline.
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
-  // Perform SIL optimization passes if optimizations haven't been disabled.
-  // These may change across compiler versions.
-  {
-    SharedTimer timer("SIL optimization");
-    if (Action != FrontendOptions::ActionType::MergeModules &&
-        Invocation.getSILOptions().shouldOptimize()) {
-
-      runSILOptPreparePasses(*SM);
-
-      StringRef CustomPipelinePath =
-        Invocation.getSILOptions().ExternalPassPipelineFilename;
-      if (!CustomPipelinePath.empty()) {
-        runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
-      } else {
-        runSILOptimizationPasses(*SM);
-      }
-    } else {
-      runSILPassesForOnone(*SM);
-    }
-  }
+  performSILOptimizations(Invocation, SM.get());
 
   if (observer) {
     observer->performedSILOptimization(*SM);
