@@ -2298,117 +2298,17 @@ namespace {
     }
     
     void addGenericRequirements() {
-      assert(asImpl().getGenericSignature());
-      GenericSignature *sig = asImpl().getGenericSignature();
-      assert(sig);
-      auto canSig = sig->getCanonicalSignature();
-      
-      unsigned numRequirements = 0;
-      for (auto &requirement : canSig->getRequirements()) {
-        ++numRequirements;
-        
-        switch (auto kind = requirement.getKind()) {
-        case RequirementKind::Layout:
-          switch (auto layoutKind =
-                    requirement.getLayoutConstraint()->getKind()) {
-          case LayoutConstraintKind::Class: {
-            // Encode the class constraint.
-            auto flags = GenericRequirementFlags(GenericRequirementKind::Layout,
-                                                 /*key argument*/ false,
-                                                 /*extra argument*/ false);
-            asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-             [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
-            break;
-          }
-          default:
-            // No other layout constraints are supported in source-level Swift
-            // today.
-            llvm_unreachable("shouldn't show up in ABI");
-          }
-          break;
+      auto metadata =
+        irgen::addGenericRequirements(IGM, B, asImpl().getGenericSignature(),
+                            asImpl().getGenericSignature()->getRequirements());
 
-        case RequirementKind::Conformance: {
-          // ABI TODO: We also need a *key* argument that uniquely identifies
-          // the conformance for conformance requirements as well.
-          auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
-                                               /*TODO key argument*/ false,
-                                               /*extra argument*/ true);
-          auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
-            ->getDecl();
-          auto descriptorRef =
-            IGM.getConstantReferenceForProtocolDescriptor(protocol);
-          asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-            [&]{ B.addRelativeAddress(descriptorRef); });
-          break;
-        }
-          
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass: {
-          auto abiKind = kind == RequirementKind::SameType
-            ? GenericRequirementKind::SameType
-            : GenericRequirementKind::BaseClass;
-          
-          auto flags = GenericRequirementFlags(abiKind, false, false);
-          auto typeName =
-            getMangledTypeName(IGM,
-                               requirement.getSecondType()->getCanonicalType(),
-                               /*willBeRelativelyAddressed*/ true);
-          
-          asImpl().addGenericRequirement(flags, requirement.getFirstType(),
-            [&]{ B.addRelativeAddress(typeName); });
-
-          // ABI TODO: Same type and superclass constraints also imply
-          // "same conformance" constraints on any protocol requirements of
-          // the constrained type, which we should emit.
-          break;
-        }
-        }
-      }
-      
       // Fill in the final requirement count.
       B.fillPlaceholderWithInt(*GenericRequirementCount, IGM.Int32Ty,
-                               numRequirements);
+                               metadata.NumRequirements);
+      NumGenericKeyArguments += metadata.NumGenericKeyArguments;
+      NumGenericExtraArguments += metadata.NumGenericExtraArguments;
     }
 
-    void addGenericRequirement(GenericRequirementFlags flags,
-                               Type paramType,
-                               llvm::function_ref<void ()> addReference) {
-      if (flags.hasKeyArgument())
-        ++NumGenericKeyArguments;
-      if (flags.hasExtraArgument())
-        ++NumGenericExtraArguments;
-      
-      B.addInt(IGM.Int32Ty, flags.getIntValue());
-      asImpl().addGenericParamRef(paramType->getCanonicalType());
-      addReference();
-    }
-    
-    void addGenericParamRef(CanType type) {
-      // type should be either a generic parameter or dependent member type
-      // thereof.
-      
-      if (auto genericParam = dyn_cast<GenericTypeParamType>(type)) {
-        // We can encode the ordinal of a direct type parameter reference
-        // inline.
-        auto ordinal = asImpl().getGenericSignature()
-          ->getGenericParamOrdinal(genericParam);
-        B.addInt32(ordinal << 1);
-        return;
-      }
-      
-      if (auto dmt = dyn_cast<DependentMemberType>(type)) {
-        // We have to encode the associated type path out-of-line.
-        auto assocTypeRecord = IGM.getAddrOfAssociatedTypeGenericParamRef(
-          asImpl().getGenericSignature(),
-          dmt);
-
-        B.addTaggedRelativeOffset(IGM.Int32Ty, assocTypeRecord, 1);
-        return;
-      }
-      
-      llvm_unreachable("not a generic parameter");
-    }
-    
     void finishGenericParameters() {
       B.fillPlaceholderWithInt(*GenericKeyArgumentCount, IGM.Int32Ty,
                                NumGenericKeyArguments);
@@ -2773,13 +2673,7 @@ namespace {
     // aren't mapped correctly because the EnumImplStrategy ends up
     // using the lowered cases, i.e. the cases for Optional<>.
     if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
-      assert(enumElements.size() == 1);
-      auto decl = IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl();
-      auto caseType = decl->getParentEnum()->mapTypeIntoContext(
-        decl->getArgumentInterfaceType())
-          ->getCanonicalType();
-      types.push_back(FieldTypeInfo(caseType, false, false));
-      return getFieldTypeAccessorFn(IGM, type, types);
+      llvm_unreachable("Should not have IUOs.");
     }
 
     for (auto &elt : enumElements) {
@@ -6131,6 +6025,125 @@ llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
   val = IGF.Builder.CreateBitCast(val,
                           IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
   return val;
+}
+
+//===----------------------------------------------------------------------===//
+// Generic requirements.
+//===----------------------------------------------------------------------===//
+
+/// Add a generic parameter reference to the given constant struct builder.
+static void addGenericParamRef(IRGenModule &IGM, ConstantStructBuilder &B,
+                               GenericSignature *sig, CanType type) {
+  // type should be either a generic parameter or dependent member type
+  // thereof.
+
+  if (auto genericParam = dyn_cast<GenericTypeParamType>(type)) {
+    // We can encode the ordinal of a direct type parameter reference
+    // inline.
+    auto ordinal = sig->getGenericParamOrdinal(genericParam);
+    B.addInt32(ordinal << 1);
+    return;
+  }
+
+  if (auto dmt = dyn_cast<DependentMemberType>(type)) {
+    // We have to encode the associated type path out-of-line.
+    auto assocTypeRecord = IGM.getAddrOfAssociatedTypeGenericParamRef(sig, dmt);
+
+    B.addTaggedRelativeOffset(IGM.Int32Ty, assocTypeRecord, 1);
+    return;
+  }
+
+  llvm_unreachable("not a generic parameter");
+}
+
+/// Add a generic requirement to the given constant struct builder.
+static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
+                                  GenericRequirementsMetadata &metadata,
+                                  GenericSignature *sig,
+                                  GenericRequirementFlags flags,
+                                  Type paramType,
+                                  llvm::function_ref<void ()> addReference) {
+  if (flags.hasKeyArgument())
+    ++metadata.NumGenericKeyArguments;
+  if (flags.hasExtraArgument())
+    ++metadata.NumGenericExtraArguments;
+
+  B.addInt(IGM.Int32Ty, flags.getIntValue());
+  addGenericParamRef(IGM, B, sig, paramType->getCanonicalType());
+  addReference();
+}
+
+GenericRequirementsMetadata irgen::addGenericRequirements(
+                                   IRGenModule &IGM, ConstantStructBuilder &B,
+                                   GenericSignature *sig,
+                                   ArrayRef<Requirement> requirements) {
+  assert(sig);
+  GenericRequirementsMetadata metadata;
+  for (auto &requirement : requirements) {
+    ++metadata.NumRequirements;
+
+    switch (auto kind = requirement.getKind()) {
+    case RequirementKind::Layout:
+      switch (auto layoutKind =
+                requirement.getLayoutConstraint()->getKind()) {
+      case LayoutConstraintKind::Class: {
+        // Encode the class constraint.
+        auto flags = GenericRequirementFlags(GenericRequirementKind::Layout,
+                                             /*key argument*/ false,
+                                             /*extra argument*/ false);
+        addGenericRequirement(IGM, B, metadata, sig, flags,
+                              requirement.getFirstType(),
+         [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
+        break;
+      }
+      default:
+        // No other layout constraints are supported in source-level Swift
+        // today.
+        llvm_unreachable("shouldn't show up in ABI");
+      }
+      break;
+
+    case RequirementKind::Conformance: {
+      // ABI TODO: We also need a *key* argument that uniquely identifies
+      // the conformance for conformance requirements as well.
+      auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
+                                           /*TODO key argument*/ false,
+                                           /*extra argument*/ true);
+      auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
+        ->getDecl();
+      auto descriptorRef =
+        IGM.getConstantReferenceForProtocolDescriptor(protocol);
+      addGenericRequirement(IGM, B, metadata, sig, flags,
+                            requirement.getFirstType(),
+        [&]{ B.addRelativeAddress(descriptorRef); });
+      break;
+    }
+
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass: {
+      auto abiKind = kind == RequirementKind::SameType
+        ? GenericRequirementKind::SameType
+        : GenericRequirementKind::BaseClass;
+
+      auto flags = GenericRequirementFlags(abiKind, false, false);
+      auto typeName =
+        getMangledTypeName(IGM,
+                           requirement.getSecondType()->getCanonicalType(),
+                           /*willBeRelativelyAddressed*/ true);
+
+      addGenericRequirement(IGM, B, metadata, sig, flags,
+                            requirement.getFirstType(),
+        [&]{ B.addRelativeAddress(typeName); });
+
+      // ABI TODO: Same type and superclass constraints also imply
+      // "same conformance" constraints on any protocol requirements of
+      // the constrained type, which we should emit.
+      break;
+    }
+    }
+  }
+
+  return metadata;
 }
 
 //===----------------------------------------------------------------------===//

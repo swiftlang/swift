@@ -191,9 +191,16 @@ namespace swift {
                                     StringRef typeName,
                                     SubstGenericParameterFn substGenericParam);
 
-  /// FIXME: Remove once this is in Metadata.h
-  using GenericRequirementDescriptor =
-    TargetGenericRequirementDescriptor<InProcess>;
+  /// Gather generic parameter counts from a context descriptor.
+  ///
+  /// \returns true if the innermost descriptor is generic.
+  bool _gatherGenericParameterCounts(const ContextDescriptor *descriptor,
+                                     std::vector<unsigned> &genericParamCounts);
+
+  /// Map depth/index to a flat index.
+  llvm::Optional<unsigned> _depthIndexToFlatIndex(
+                                          unsigned depth, unsigned index,
+                                          llvm::ArrayRef<unsigned> paramCounts);
 
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for

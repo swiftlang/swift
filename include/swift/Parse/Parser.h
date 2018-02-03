@@ -33,7 +33,7 @@
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -344,7 +344,7 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
   /// Current syntax parsing context where call backs should be directed to.
-  syntax::SyntaxParsingContext *SyntaxContext;
+  SyntaxParsingContext *SyntaxContext;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
@@ -409,7 +409,7 @@ public:
     DiagnosticTransaction DT;
     /// This context immediately deconstructed with transparent accumulation
     /// on cancelBacktrack().
-    llvm::Optional<syntax::SyntaxParsingContext> SynContext;
+    llvm::Optional<SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
   public:

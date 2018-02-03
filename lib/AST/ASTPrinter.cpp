@@ -3337,11 +3337,6 @@ public:
         Printer << "?";
         return;
       }
-      if (NT == Ctx.getImplicitlyUnwrappedOptionalDecl()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "!";
-        return;
-      }
     }
     if (auto ParentType = T->getParent()) {
       visit(ParentType);

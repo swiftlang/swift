@@ -756,11 +756,7 @@ void ASTMangler::appendType(Type type) {
       return appendSugaredType<SyntaxSugarType>(type);
 
     case TypeKind::ImplicitlyUnwrappedOptional: {
-      assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto *IUO = cast<ImplicitlyUnwrappedOptionalType>(tybase);
-      auto implDecl = tybase->getASTContext().getImplicitlyUnwrappedOptionalDecl();
-      auto GenTy = BoundGenericType::get(implDecl, Type(), IUO->getBaseType());
-      return appendType(GenTy);
+      llvm_unreachable("Should no longer have IUOs");
     }
 
     case TypeKind::ExistentialMetatype: {
