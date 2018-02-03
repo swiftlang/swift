@@ -2579,6 +2579,8 @@ namespace {
       addConformingType();
       addWitnessTable();
       addFlags();
+      addContext();
+      addConditionalRequirements();
 
       B.suggestType(IGM.ProtocolConformanceDescriptorTy);
     }
@@ -2649,6 +2651,27 @@ namespace {
 
       // Add the flags.
       B.addInt32(Flags.getIntValue());
+    }
+
+    void addContext() {
+      if (!Conformance->isRetroactive())
+        return;
+
+      auto moduleContext =
+        Conformance->getDeclContext()->getModuleScopeContext();
+      ConstantReference moduleContextRef =
+        IGM.getAddrOfParentContextDescriptor(moduleContext);
+      B.addRelativeAddress(moduleContextRef);
+    }
+
+    void addConditionalRequirements() {
+      if (Conformance->getConditionalRequirements().empty())
+        return;
+
+      auto nominal = Conformance->getType()->getAnyNominal();
+      irgen::addGenericRequirements(IGM, B,
+                                    nominal->getGenericSignatureOfContext(),
+                                    Conformance->getConditionalRequirements());
     }
   };
 }

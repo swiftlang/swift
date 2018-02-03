@@ -29,6 +29,12 @@ Swift 5.0
   circumstances with very simple values, so this is unlikely to affect
   real-world code.)
 
+* [SE-0143][]
+
+	Runtime query of conditional conformances is now implemented. Therefore,
+	a dynamic cast such as `value as? P`, where the dynamic type of `value`
+	conditional conforms to `P`, will succeed when the conditional
+	requirements are met.
 
 Swift 4.1
 ---------
