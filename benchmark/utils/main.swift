@@ -101,6 +101,7 @@ import Prims
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
+import Queue
 import RC4
 import RGBHistogram
 import RangeAssignment
@@ -243,6 +244,8 @@ registerBenchmark(Prims)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
+registerBenchmark(QueueGeneric)
+registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(RangeAssignment)
