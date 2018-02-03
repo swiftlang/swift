@@ -1718,6 +1718,7 @@ static bool shouldSerializeMember(Decl *D) {
     llvm_unreachable("should never need to reserialize a member placeholder");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     return false;
 
   case DeclKind::EnumCase:
@@ -2643,6 +2644,9 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::IfConfig:
     llvm_unreachable("#if block declarations should not be serialized");
+
+  case DeclKind::PoundDiagnostic:
+    llvm_unreachable("#warning/#error declarations should not be serialized");
 
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);

@@ -60,7 +60,7 @@
    ;; Operators
    `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
    ;; Keywords that begin with a number sign
-   `("#\\(if\\|endif\\|elseif\\|else\\|available\\)\\b" . font-lock-string-face)
+   `("#\\(if\\|endif\\|elseif\\|else\\|available\\|error\\|warning\\)\\b" . font-lock-string-face)
    `("#\\(file\\|line\\|column\\|function\\|selector\\)\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
    `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")

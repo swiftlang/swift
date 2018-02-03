@@ -831,6 +831,13 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto node : S->getRawCases()) {
+      if (!node.is<Decl*>()) continue;
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+    }
+
     auto cases = S->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
