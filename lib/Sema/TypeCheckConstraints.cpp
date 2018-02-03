@@ -1015,7 +1015,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   GenericTypeToArchetypeResolver resolver(closure);
 
-  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
+  if (TC.typeCheckParameterList(PL, DC, options, resolver, true)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.

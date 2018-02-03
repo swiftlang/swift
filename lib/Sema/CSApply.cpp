@@ -7611,6 +7611,10 @@ namespace {
         if (tc.coerceParameterListToType(params, closure, fnType))
           return { false, nullptr };
 
+        // Require layout of dependent types that could be used to materialize
+        // metadata types/conformances during IRGen.
+        tc.requestRequiredNominalTypeLayoutForParameters(params);
+
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
         if (closure->hasSingleExpressionBody()) {

@@ -506,7 +506,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   for (auto params : func->getParameterLists()) {
     // Check the pattern.
     if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
-                                  resolver))
+                                  resolver, func->hasBody()))
       badType = true;
 
     // Infer requirements from the pattern.
@@ -1004,9 +1004,8 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   auto params = subscript->getIndices();
   TypeResolutionOptions options = TypeResolutionFlags::SubscriptParameters;
 
-  badType |= tc.typeCheckParameterList(params, subscript,
-                                       options,
-                                       resolver);
+  badType |=
+      tc.typeCheckParameterList(params, subscript, options, resolver, false);
 
   // Infer requirements from the pattern.
   if (builder) {

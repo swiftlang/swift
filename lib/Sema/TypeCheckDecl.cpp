@@ -4354,9 +4354,8 @@ public:
     TypeResolutionOptions options;
     options |= TypeResolutionFlags::SubscriptParameters;
 
-    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
-                                           options,
-                                           resolver);
+    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD, options,
+                                           resolver, false);
 
     if (isInvalid || SD->isInvalid()) {
       SD->setInterfaceType(ErrorType::get(TC.Context));
@@ -4906,8 +4905,8 @@ public:
                              GenericTypeResolver &resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
-      hadError |= TC.typeCheckParameterList(paramList, fd,
-                                            TypeResolutionOptions(), resolver);
+      hadError |= TC.typeCheckParameterList(
+          paramList, fd, TypeResolutionOptions(), resolver, fd->hasBody());
     }
 
     return hadError;
@@ -5341,6 +5340,10 @@ public:
       case AccessorKind::IsMaterializeForSet:
         break;
       }
+      // Request nominal layout for any types that could be sources of
+      // typemetadata or conformances.
+      if (accessor->hasBody())
+        TC.requestRequiredNominalTypeLayoutForParameters(valueParams);
     }
 
     // Before anything else, set up the 'self' argument correctly if present.
