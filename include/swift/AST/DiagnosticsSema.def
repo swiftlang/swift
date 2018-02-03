@@ -2362,11 +2362,15 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (DeclName, DeclName))
 
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(differentiable_attr_func_only,none,
-      "@differentiable can only be applied to functions", ())
 // FIXME(rxwei): implement better diagnostics for adjoint function type checking
-ERROR(differentiable_attr_cannot_resolve_gradient_function,none,
-      "cannot resolve gradient function %0", (DeclName))
+ERROR(differentiable_attr_no_arguments,none,
+      "%0 has no arguments to differentiate with respect to", (DeclName))
+ERROR(differentiable_attr_specified_gradient_not_function,none,
+      "%0 is not a function", (DeclName))
+ERROR(differentiable_attr_gradient_undefined_identifier,none,
+      "undefined identifier %0 as gradients function", (DeclName))
+ERROR(differentiable_attr_gradient_overload_not_found,none,
+      "%0 does not have an overload with expected type %1", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
