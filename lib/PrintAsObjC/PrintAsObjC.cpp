@@ -1911,7 +1911,7 @@ public:
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
     if (isFuncParam)
-      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+      if (auto fnTy = ty->lookThroughAllOptionalTypes()
                         ->getAs<AnyFunctionType>())
         if (fnTy->isNoEscape())
           os << "SWIFT_NOESCAPE ";

@@ -3477,13 +3477,13 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
                                  size_t &difference) {
       SmallVector<Type, 4> destOptionals;
       auto destValueType =
-        destType->lookThroughAllAnyOptionalTypes(destOptionals);
+        destType->lookThroughAllOptionalTypes(destOptionals);
 
       if (!destValueType->isAny())
         return false;
 
       SmallVector<Type, 4> srcOptionals;
-      srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
+      srcType->lookThroughAllOptionalTypes(srcOptionals);
 
       if (srcOptionals.size() > destOptionals.size()) {
         difference = srcOptionals.size() - destOptionals.size();

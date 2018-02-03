@@ -384,7 +384,7 @@ public:
 
     // Look through optional types and type aliases to find out if we have
     // function/closure parameter type that is not an autoclosure.
-    Ty = Ty->lookThroughAllAnyOptionalTypes();
+    Ty = Ty->lookThroughAllOptionalTypes();
     if (auto AFT = Ty->getAs<AnyFunctionType>()) {
       if (!AFT->isAutoClosure()) {
         // If this is a closure type, add ChunkKind::CallParameterClosureType.

@@ -1002,13 +1002,13 @@ public:
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes();
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes();
 
-  /// Return the type T after looking through all of the optional or
-  /// implicitly-unwrapped optional types.
-  Type lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals);
+  /// Return the type T after looking through all of the optional
+  /// types.
+  Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();

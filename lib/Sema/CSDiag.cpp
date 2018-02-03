@@ -2496,7 +2496,7 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       const Expr *expr) {
   // The following fixes apply for optional destination types as well.
   bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
-  toType = toType->lookThroughAllAnyOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
 
   Type fromTypeUnwrapped = fromType->getOptionalObjectType();
   bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
@@ -2697,7 +2697,7 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
                                Type fromType, Type toType, Expr *expr) {
   // Look through optional types; casts can add them, but can't remove extra
   // ones.
-  toType = toType->lookThroughAllAnyOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
 
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
       fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
@@ -2736,7 +2736,7 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(
   // the event of an implicit promotion.
   auto srcFT = srcType->getAs<AnyFunctionType>();
   auto dstFT =
-      dstType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
+      dstType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
 
   if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
@@ -4294,7 +4294,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       isa<ConstructorDecl>(candidate.getDecl()) && candidate.level == 1) {
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
-        candidate.getResultType()->lookThroughAllAnyOptionalTypes();
+        candidate.getResultType()->lookThroughAllOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
@@ -4338,8 +4338,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 static bool isRawRepresentableMismatch(Type fromType, Type toType,
                                        KnownProtocolKind kind,
                                        const ConstraintSystem &CS) {
-  toType = toType->lookThroughAllAnyOptionalTypes();
-  fromType = fromType->lookThroughAllAnyOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
+  fromType = fromType->lookThroughAllOptionalTypes();
 
   // First check if this is an attempt to convert from something to
   // raw representable.
@@ -6636,7 +6636,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
   Type currentType = rootType;
   auto updateState = [&](bool isProperty, Type newType) {
     // Strip off optionals.
-    newType = newType->lookThroughAllAnyOptionalTypes();
+    newType = newType->lookThroughAllOptionalTypes();
 
     // If updating to a type, just set the new type; there's nothing
     // more to do.
@@ -7027,7 +7027,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
   // If our contextual type is an optional, look through them, because we're
   // surely initializing whatever is inside.
-  contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+  contextualType = contextualType->lookThroughAllOptionalTypes();
 
   // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
   // figure out what the contextual element type is in place.
@@ -7115,7 +7115,7 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   if (auto contextualType = CS.getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
-    contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+    contextualType = contextualType->lookThroughAllOptionalTypes();
 
     auto DLC = CS.TC.getProtocol(
         E->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);

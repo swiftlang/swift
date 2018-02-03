@@ -1670,7 +1670,7 @@ private:
     bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
     for (auto expectedType : ExpectedTypes) {
       if (expectedType &&
-          expectedType->lookThroughAllAnyOptionalTypes()
+          expectedType->lookThroughAllOptionalTypes()
               ->is<AnyFunctionType>() &&
           calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
                                        /*UseFuncResultType=*/false) >=
@@ -3746,7 +3746,7 @@ public:
       bool addedSelector = false;
       bool addedKeyPath = false;
       for (auto T : ExpectedTypes) {
-        T = T->lookThroughAllAnyOptionalTypes();
+        T = T->lookThroughAllOptionalTypes();
         if (auto structDecl = T->getStructOrBoundGenericStruct()) {
           if (!addedSelector &&
               structDecl->getName() == Ctx.Id_Selector &&

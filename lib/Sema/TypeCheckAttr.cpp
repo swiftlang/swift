@@ -1397,7 +1397,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
       if (hasThrowingFunctionParameter(param->getType()
-              ->lookThroughAllAnyOptionalTypes()
+              ->lookThroughAllOptionalTypes()
               ->getCanonicalType()))
         return;
   }

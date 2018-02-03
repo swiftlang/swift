@@ -3176,9 +3176,9 @@ namespace {
 
       // Dig through the optionals in the from/to types.
       SmallVector<Type, 2> fromOptionals;
-      fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
+      fromType->lookThroughAllOptionalTypes(fromOptionals);
       SmallVector<Type, 2> toOptionals;
-      toType->lookThroughAllAnyOptionalTypes(toOptionals);
+      toType->lookThroughAllOptionalTypes(toOptionals);
 
       // If we have an imbalance of optionals or a collection
       // downcast, handle this as a checked cast followed by a
@@ -3293,11 +3293,11 @@ namespace {
       Type srcType = cs.getType(subExpr);
 
       SmallVector<Type, 4> srcOptionals;
-      srcType = srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
+      srcType = srcType->lookThroughAllOptionalTypes(srcOptionals);
 
       SmallVector<Type, 4> destOptionals;
       auto destValueType
-        = finalResultType->lookThroughAllAnyOptionalTypes(destOptionals);
+        = finalResultType->lookThroughAllOptionalTypes(destOptionals);
 
       // When performing a bridging operation, if the destination value type
       // is 'AnyObject', leave any extra optionals on the source in place.
@@ -5359,10 +5359,10 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   tc.requireOptionalIntrinsics(expr->getLoc());
 
   SmallVector<Type, 4> fromOptionals;
-  (void)fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
+  (void)fromType->lookThroughAllOptionalTypes(fromOptionals);
 
   SmallVector<Type, 4> toOptionals;
-  (void)toType->lookThroughAllAnyOptionalTypes(toOptionals);
+  (void)toType->lookThroughAllOptionalTypes(toOptionals);
 
   assert(!toOptionals.empty());
   assert(!fromOptionals.empty());

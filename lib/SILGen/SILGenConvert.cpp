@@ -1280,7 +1280,7 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   }
 
   if (from->isAny()) {
-    assert(to->lookThroughAllAnyOptionalTypes()->isAnyObject());
+    assert(to->lookThroughAllOptionalTypes()->isAnyObject());
     return true;
   }
   return false;

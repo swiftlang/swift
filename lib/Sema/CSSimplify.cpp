@@ -1370,10 +1370,10 @@ static void enumerateOptionalConversionRestrictions(
                     ConstraintKind kind, ConstraintLocatorBuilder locator,
                     llvm::function_ref<void(ConversionRestrictionKind)> fn) {
   SmallVector<Type, 2> optionals1;
-  Type objType1 = type1->lookThroughAllAnyOptionalTypes(optionals1);
+  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
 
   SmallVector<Type, 2> optionals2;
-  Type objType2 = type2->lookThroughAllAnyOptionalTypes(optionals2);
+  Type objType2 = type2->lookThroughAllOptionalTypes(optionals2);
 
   if (optionals1.empty() && optionals2.empty())
     return;
@@ -2653,8 +2653,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     // Peel off optionals metatypes from the types, because we might cast through
     // them.
-    toType = toType->lookThroughAllAnyOptionalTypes();
-    fromType = fromType->lookThroughAllAnyOptionalTypes();
+    toType = toType->lookThroughAllOptionalTypes();
+    fromType = fromType->lookThroughAllOptionalTypes();
 
     // Peel off metatypes, since if we can cast two types, we can cast their
     // metatypes.
@@ -4511,7 +4511,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
     if (isAnyHashableType(
-            type1->getRValueType()->lookThroughAllAnyOptionalTypes())) {
+            type1->getRValueType()->lookThroughAllOptionalTypes())) {
       return SolutionKind::Error;
     }
 

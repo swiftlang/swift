@@ -1221,9 +1221,9 @@ recur:
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
-    type->lookThroughAllAnyOptionalTypes(inputTypeOptionals);
+    type->lookThroughAllOptionalTypes(inputTypeOptionals);
     SmallVector<Type, 2> castTypeOptionals;
-    castType->lookThroughAllAnyOptionalTypes(castTypeOptionals);
+    castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
     // If we have extra optionals on the input type. Create ".Some" patterns
     // wrapping the isa pattern to balance out the optionals.
