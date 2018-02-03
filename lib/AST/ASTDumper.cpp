@@ -1098,6 +1098,16 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+      printCommon(PDD, "pound_diagnostic_decl");
+      auto kind = PDD->isError() ? "error" : "warning";
+      OS << " kind=" << kind << "\n";
+      Indent += 2;
+      printRec(PDD->getMessage());
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
       printCommon(PGD, "precedence_group_decl ");
       OS << PGD->getName() << "\n";

@@ -168,6 +168,10 @@ public:
     // We only care about the active members, which were already subsumed by the
     // enclosing type.
   }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
+    // We don't care about diagnostics at this stage.
+  }
 };
 
 } // end namespace swift
