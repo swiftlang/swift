@@ -27,6 +27,9 @@
 #error("interp\("olation")") // expected-error {{string interpolation is not allowed in #error directive}}
 #warning("interp\("olation")") // expected-error {{string interpolation is not allowed in #warning directive}}
 
+#error("extra tokens") var i = 0 // expected-error {{extra tokens following #error directive}}
+#warning("extra tokens") var j = 0 // expected-error {{extra tokens following #warning directive}}
+
 class RegularClass {
   #error("errors can be nested in classes") // expected-error {{errors can be nested in classes}}
 }

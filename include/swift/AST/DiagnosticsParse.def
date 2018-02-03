@@ -76,6 +76,8 @@ ERROR(pound_diagnostic_expected_parens,none,
       "%select{#warning|#error}0 directive requires parentheses",(bool))
 ERROR(pound_diagnostic_interpolation,none,
       "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
+ERROR(extra_tokens_pound_diagnostic_directive,none,
+      "extra tokens following %select{#warning|#error}0 directive", (bool))
 
 ERROR(sourceLocation_expected,none,
       "expected '%0' in #sourceLocation directive", (StringRef))

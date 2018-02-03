@@ -3156,6 +3156,12 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
   SourceLoc rParenLoc = Tok.getLoc();
   bool hadRParen = consumeIf(tok::r_paren);
 
+  if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
+    diagnose(Tok.getLoc(),
+             diag::extra_tokens_pound_diagnostic_directive, isError);
+    return makeParserError();
+  }
+
   if (!hadLParen && !hadRParen) {
     // Catch if the user forgot parentheses around the string, e.g.
     // #warning "foo"
