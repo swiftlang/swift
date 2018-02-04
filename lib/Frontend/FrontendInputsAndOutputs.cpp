@@ -100,7 +100,7 @@ void FrontendInputsAndOutputs::forEachPrimaryInput(
 }
 
 void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
-  assert(primaryInputCount() < 2 &&
+  assert(!hasMultiplePrimaryInputs() &&
          "have not implemented >1 primary input yet");
 }
 
