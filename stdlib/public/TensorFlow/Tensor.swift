@@ -74,7 +74,7 @@ func _TFScalarize<Unit>(_ handle: TensorHandle<Unit>) -> Unit? {
 /// designed to align with the requirements of the 'Const' Tensorflow operation.
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_units")
-func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int], dtype: Unit.Type)
+func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int])
     -> TensorHandle<Unit> {
   let contiguousSize = shape.reduce(1, *)
   precondition(units.count == contiguousSize,
@@ -88,6 +88,11 @@ func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int], dtype: Unit.Type)
     })
 }
 
+@_versioned @inline(never)
+@_silgen_name("__tf_tensor_from_units_1d")
+func _TFTensorFromUnits1D<Unit>(_ units: [Unit]) -> TensorHandle<Unit> {
+  return _TFTensorFromUnits(units, shape: [units.count])
+}
 
 //===----------------------------------------------------------------------===//
 // Memory transfer markers
@@ -112,7 +117,8 @@ public extension Tensor {
 
 extension Tensor where Unit : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
-  @_inlineable // make @_inlineable when implemented.
+  @_inlineable
+  @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
     self.init(#tfop("Cast", "t:t", other.handle, DstT: Unit.self))
   }
@@ -121,14 +127,16 @@ extension Tensor where Unit : Numeric {
 public extension Tensor {
   /// Initialize a tensor with a unit representing a scalar value.
   @_inlineable
+  @inline(__always)
   init(_ value: Unit) {
     self.init(#tfop("tfc.scalarToTensor", "s:t", value))
   }
 
   /// Initialize a tensor with an array representing a vector.
   @_inlineable
+  @inline(__always)
   init(_ vector: [Unit]) {
-    self.init(shape: [vector.count], units: vector)
+    self.init(_TFTensorFromUnits1D(vector))
   }
 
   /// Initialize a tensor with an array of arrays representing a matrix.
@@ -170,20 +178,16 @@ public extension Tensor {
   /// product of all of shape's dimensions.
   @_inlineable
   init(shape: [Int], units: [Unit]) {
-    self.init(_TFTensorFromUnits(units, shape: shape, dtype: Unit.self))
+    self.init(_TFTensorFromUnits(units, shape: shape))
   }
 
+  /// Initialize a tensor of a specified shape, filled with a single value.
   @_inlineable
+  @inline(__always)
   init(shape: [Int], repeating repeatedValue: Unit) {
-    let contiguousSize = shape.reduce(1, *)
-    self.init(TensorHandle(
-        shape: shape,
-        // Memset to `repeatedValue`
-        unitsInitializer: {
-          $0.initialize(repeating: repeatedValue, count: contiguousSize)
-        }
-      )
-    )
+    let valueTensor = Tensor(repeatedValue).handle
+    let shapeTensor = Tensor<Int32>(Tensor<Int>(shape)).handle
+    self.init(#tfop("Fill", "tt:t", shapeTensor, valueTensor))
   }
 
   /// Initialize a degenerate tensor with no elements with the specified rank.
@@ -235,24 +239,28 @@ public extension Tensor {
 public extension Tensor where Unit : Numeric {
   /// Zero initializer, takes a list of dimensions.
   @_inlineable
+  @inline(__always)
   static func zeros(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 0)
   }
 
   /// Zero initializer, takes variadic dimensions.
   @_inlineable
+  @inline(__always)
   static func zeros(shape: Int...) -> Tensor {
     return zeros(shape: shape)
   }
 
   /// Ones initializer, takes a list of dimensions.
   @_inlineable
+  @inline(__always)
   static func ones(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 1)
   }
 
   /// Ones initializer, takes variadic dimensions.
   @_inlineable
+  @inline(__always)
   static func ones(shape: Int...) -> Tensor {
     return ones(shape: shape)
   }
