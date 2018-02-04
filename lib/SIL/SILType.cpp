@@ -336,16 +336,18 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     return SILType(objectType, getCategory());
   }
 
+  // If the case is indirect, then the payload is boxed.
+  if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
+    auto box = M.Types.getBoxTypeForEnumElement(*this, elt);
+    return SILType(SILType::getPrimitiveObjectType(box).getSwiftRValueType(),
+                   getCategory());
+  }
+
   auto substEltTy =
     getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
-
-  // If the case is indirect, then the payload is boxed.
-  if (elt->isIndirect() || elt->getParentEnum()->isIndirect())
-    loweredTy = SILType::getPrimitiveObjectType(
-      SILBoxType::get(loweredTy.getSwiftRValueType()));
 
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }

@@ -153,7 +153,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// Always zero, which is the index of the first byte in a nonempty buffer.
   @_inlineable

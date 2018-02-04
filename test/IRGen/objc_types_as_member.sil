@@ -22,6 +22,6 @@ bb0(%0 : $OuterType.InnerType):
 }
 
 // CHECK-LABEL: define {{.*}}%swift.type* @"$SSo9OuterTypeCMa"()
-// CHECK:  [[TMP:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(
+// CHECK:  [[TMP:%.*]] = call %objc_class* @swift_getInitializedObjCClass(
 // CHECK:  call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[TMP]])
 // CHECK:  ret

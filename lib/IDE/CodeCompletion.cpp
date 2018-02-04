@@ -548,6 +548,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
@@ -1944,9 +1945,6 @@ public:
       suffix = "!";
     }
 
-    // FIXME: This goes away when IUOs are removed from the type system.
-    assert(T->getReferenceStorageReferent()->getImplicitlyUnwrappedOptionalObjectType());
-
     Type ObjectType =
         T->getReferenceStorageReferent()->getAnyOptionalObjectType();
 
@@ -2644,9 +2642,15 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
-      addTypeAnnotation(Builder,
-                        Result.hasValue() ? Result.getValue() :
-                                            ConstructorType->getResult());
+      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        addTypeAnnotationForImplicitlyUnwrappedOptional(
+            Builder, Result.hasValue() ? Result.getValue()
+                                       : ConstructorType->getResult());
+      } else {
+        addTypeAnnotation(Builder, Result.hasValue()
+                                       ? Result.getValue()
+                                       : ConstructorType->getResult());
+      }
     };
 
     if (ConstructorType && hasInterestingDefaultValues(CD))
@@ -3155,6 +3159,8 @@ public:
     // FIXME: consider types convertible to T?.
 
     ExprType = ExprType->getRValueType();
+    // FIXME: We don't always pass down whether a type is from an
+    // unforced IUO.
     if (isIUO) {
       if (Type Unwrapped = ExprType->getAnyOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
@@ -3181,10 +3187,6 @@ public:
                                    IncludeInstanceMembers);
         }
       }
-    } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
-      lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                               TypeResolver.get(),
-                               IncludeInstanceMembers);
     } else {
       return false;
     }

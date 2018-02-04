@@ -7,7 +7,7 @@
 }
 
 extension P3 {
-  // CHECK-LABEL: sil hidden @$S40definite_init_failable_initializers_objc2P3PAAE3p3aSQyxGs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Optional<Self>
+  // CHECK-LABEL: sil hidden @$S40definite_init_failable_initializers_objc2P3PAAE3p3axSgs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Optional<Self>
   init!(p3a: Int64) {
     self.init(p3: p3a)! // unnecessary-but-correct '!'
   }

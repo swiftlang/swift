@@ -69,6 +69,7 @@ static bool declIsPrivate(const Decl *member) {
     case DeclKind::EnumCase:
     case DeclKind::TopLevelCode:
     case DeclKind::IfConfig:
+    case DeclKind::PoundDiagnostic:
       return true;
 
     case DeclKind::Extension:
@@ -240,6 +241,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::PatternBinding:
     case DeclKind::TopLevelCode:
     case DeclKind::IfConfig:
+    case DeclKind::PoundDiagnostic:
       // No action necessary.
       break;
 

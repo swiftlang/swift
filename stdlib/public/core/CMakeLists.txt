@@ -98,7 +98,7 @@ set(SWIFTLIB_ESSENTIAL
   PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
-  Range.swift.gyb
+  Range.swift
   RangeReplaceableCollection.swift
   ReflectionLegacy.swift
   Repeat.swift

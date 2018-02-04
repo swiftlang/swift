@@ -161,7 +161,7 @@ static Class getSwiftNativeNSErrorClass() {
 }
 
 /// Allocate a catchable error object.
-BoxPair::Return
+BoxPair
 swift::swift_allocError(const Metadata *type,
                         const WitnessTable *errorConformance,
                         OpaqueValue *initialValue,
@@ -382,10 +382,13 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
     reinterpret_cast<GetDefaultFn*> (dlsym(RTLD_DEFAULT,
     MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)))));
   if (!foundationGetDefaultUserInfo) {
-    T->vw_destroy(error);
+    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
     return nullptr;
   }
 
+  // +0 Convention: In the case where we have the +1 convention, this will
+  // destroy the error for us, otherwise, it will take the value guaranteed. The
+  // conclusion is that we can leave this alone.
   return foundationGetDefaultUserInfo(error, T, Error);
 }
 

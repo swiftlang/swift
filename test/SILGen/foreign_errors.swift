@@ -167,7 +167,7 @@ func testArgs() throws {
 }
 // CHECK-LABEL: sil hidden @$S14foreign_errors8testArgsyyKF : $@convention(thin) () -> @error Error
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 1
-// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (Any!) throws -> (), $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (Any?) throws -> (), $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)

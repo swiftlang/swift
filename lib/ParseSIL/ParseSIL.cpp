@@ -1529,7 +1529,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
-              ArrayRef<ProtocolType *> protocols,
+              ExistentialLayout::ProtocolTypeArrayRef protocols,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
@@ -1578,11 +1578,12 @@ bool getApplySubstitutionsFromParsed(
       parses = parses.slice(1);
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
-      SmallVector<ProtocolType *, 2> protocols;
+      SmallVector<Type, 2> protocols;
       for (auto reqt : reqts)
-        protocols.push_back(reqt.getSecondType()->castTo<ProtocolType>());
+        protocols.push_back(reqt.getSecondType());
 
-      if (getConformancesForSubstitution(SP.P, protocols,
+      if (getConformancesForSubstitution(SP.P,
+                             ExistentialLayout::ProtocolTypeArrayRef(protocols),
                                          parsed.replacement,
                                          parsed.loc, conformances))
         return true;

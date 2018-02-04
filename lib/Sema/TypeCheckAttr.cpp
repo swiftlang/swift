@@ -497,9 +497,8 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     TC.diagnose(symbolLoc, diag::note_make_optional,
                 OptionalType::get(type))
       .fixItInsert(symbolLoc, "?");
-    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional,
-                ImplicitlyUnwrappedOptionalType::get(type))
-      .fixItInsert(symbolLoc, "!");
+    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional)
+        .fixItInsert(symbolLoc, "!");
   }
 }
 

@@ -87,8 +87,6 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 10 };
-
   /// A single property.
   ///
   /// Note that the property polarities should be chosen so that 0 is
@@ -124,7 +122,10 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+
+    Last_Property = HasDependentMember
   };
+  enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
 private:
   unsigned Bits;
@@ -775,6 +776,15 @@ public:
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);
 
+  bool matchesParameter(Type other, TypeMatchOptions matchMode);
+
+  /// \brief Determines whether this function type is similar to \p
+  /// other as defined by \p matchOptions and the callback \p
+  /// paramsAndResultMatch which determines in a client-specific way
+  /// whether the parameters and result of the types match.
+  bool matchesFunctionType(Type other, TypeMatchOptions matchOptions,
+                           std::function<bool()> paramsAndResultMatch);
+
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
   /// possibly nil pointer that can be unknown-retained and
@@ -982,10 +992,6 @@ public:
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
-
-  /// Return T if this type is ImplicitlyUnwrappedOptional<T>; otherwise, return
-  /// the null type.
-  Type getImplicitlyUnwrappedOptionalObjectType();
 
   /// Return T if this type is Optional<T> or ImplicitlyUnwrappedOptional<T>;
   /// otherwise, return the null type.
@@ -2900,7 +2906,7 @@ public:
   }
   
   /// Retrieve the generic parameters of this polymorphic function type.
-  ArrayRef<GenericTypeParamType *> getGenericParams() const;
+  TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
   /// Retrieve the requirements of this polymorphic function type.
   ArrayRef<Requirement> getRequirements() const;
@@ -4104,7 +4110,10 @@ class ImplicitlyUnwrappedOptionalType : public UnarySyntaxSugarType {
   ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)
     : UnarySyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base,
-                           properties) {}
+                           properties) {
+    llvm_unreachable(
+        "ImplicitlyUnwrappedOptionalType::ImplicitlyUnwrappedOptionalType");
+  }
 
 public:
   /// Return a uniqued optional type with the specified base type.

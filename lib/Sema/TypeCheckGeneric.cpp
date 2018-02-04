@@ -361,9 +361,9 @@ void TypeChecker::validateRequirements(
 
 std::string
 TypeChecker::gatherGenericParamBindingsText(
-                                ArrayRef<Type> types,
-                                ArrayRef<GenericTypeParamType *> genericParams,
-                                TypeSubstitutionFn substitutions) {
+                              ArrayRef<Type> types,
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              TypeSubstitutionFn substitutions) {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
     if (type.isNull()) continue;
@@ -877,7 +877,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
-      funcTy = OptionalType::get(ctor->getFailability(), funcTy);
+      funcTy = OptionalType::get(funcTy);
 
     // Set the IUO attribute on the decl if this was declared with !.
     if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
@@ -1270,7 +1270,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    ArrayRef<GenericTypeParamType *> genericParams,
+    TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,

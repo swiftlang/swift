@@ -219,7 +219,7 @@ let combineDoubleDigits = {
 
 // first, the lazy version of checksum calcuation
 let lazychecksum = { (ccnum: String) -> Bool in
-    ccnum.characters.lazy
+    ccnum.lazy
     |> reverse
     |> { mapSome($0, charToInt) }
     |> { mapEveryN($0, 2, double) }

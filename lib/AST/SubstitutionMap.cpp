@@ -178,7 +178,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-      auto known = conformanceMap.find(type->getCanonicalType().getPointer());
+      auto known = conformanceMap.find(type->getCanonicalType());
       if (known == conformanceMap.end())
         return None;
 
@@ -266,7 +266,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   assert(!isa<ArchetypeType>(type));
-  conformanceMap[type.getPointer()].push_back(conformance);
+  conformanceMap[type].push_back(conformance);
 }
 
 SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {

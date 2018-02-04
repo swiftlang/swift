@@ -125,6 +125,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumCase);
   TRIVIAL_KIND(TopLevelCode);
   TRIVIAL_KIND(IfConfig);
+  TRIVIAL_KIND(PoundDiagnostic);
   TRIVIAL_KIND(PatternBinding);
   TRIVIAL_KIND(PrecedenceGroup);
   TRIVIAL_KIND(InfixOperator);
@@ -235,6 +236,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumCase, "case");
   ENTRY(TopLevelCode, "top-level code");
   ENTRY(IfConfig, "conditional block");
+  ENTRY(PoundDiagnostic, "diagnostic");
   ENTRY(PatternBinding, "pattern binding");
   ENTRY(Var, "var");
   ENTRY(Param, "parameter");
@@ -625,7 +627,7 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
-ArrayRef<GenericTypeParamType *>
+TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
   if (auto sig = getGenericSignature())
     return sig->getInnermostGenericParams();
@@ -769,6 +771,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PostfixOperator:
   case DeclKind::EnumCase:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     llvm_unreachable("not a ValueDecl");
@@ -923,6 +926,12 @@ bool ExtensionDecl::isConstrainedExtension() const {
     != nominal->getGenericSignature()->getCanonicalSignature();
 }
 
+bool ExtensionDecl::isEquivalentToExtendedContext() const {
+  auto decl = getExtendedType()->getAnyNominal();
+  return getParentModule() == decl->getParentModule()
+    && !isConstrainedExtension()
+    && !getDeclaredInterfaceType()->isExistentialType();
+}
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
@@ -1529,6 +1538,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     assert(!isa<ValueDecl>(this));
@@ -1572,6 +1582,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
     llvm_unreachable("Not a ValueDecl");
@@ -1690,18 +1701,6 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
-  // Translate implicitly unwrapped optionals into strict optionals.
-  if (auto inOutTy = type->getAs<InOutType>()) {
-    if (auto uncheckedOptOf =
-            inOutTy->getObjectType()
-                ->getImplicitlyUnwrappedOptionalObjectType()) {
-      type = InOutType::get(OptionalType::get(uncheckedOptOf));
-    }
-  } else if (auto uncheckedOptOf =
-                 type->getImplicitlyUnwrappedOptionalObjectType()) {
-    type = OptionalType::get(uncheckedOptOf);
-  }
-
   return mapSignatureType(ctx, type);
 }
 
@@ -2483,8 +2482,6 @@ OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   const ASTContext &ctx = getASTContext();
   if (this == ctx.getOptionalDecl()) {
     return OTK_Optional;
-  } else if (this == ctx.getImplicitlyUnwrappedOptionalDecl()) {
-    return OTK_ImplicitlyUnwrappedOptional;
   } else {
     return OTK_None;
   }
@@ -5657,4 +5654,38 @@ void Decl::setClangNode(ClangNode Node) {
 #include "swift/AST/DeclNodes.def"
   }
   *(ptr - 1) = Node.getOpaqueValue();
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Decl *D = static_cast<const Decl *>(Entity);
+    if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
+      VD->getFullName().print(OS, false);
+    }
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Decl *D = static_cast<const Decl *>(Entity);
+    D->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static DeclTraceFormatter TF;
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef EventName, const Decl *D) {
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(EventName, D, &TF, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
 }

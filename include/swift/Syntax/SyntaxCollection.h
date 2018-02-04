@@ -58,6 +58,7 @@ private:
   static RC<SyntaxData>
   makeData(std::initializer_list<Element> &Elements) {
     std::vector<RC<RawSyntax>> List;
+    List.reserve(Elements.size());
     for (auto &Elt : Elements)
       List.push_back(Elt.getRaw());
     auto Raw = RawSyntax::make(CollectionKind, List,
@@ -105,9 +106,7 @@ public:
   Element operator[](const size_t Index) const {
     assert(Index < size());
     assert(!empty());
-
-    auto ChildData = Data->getChild(Index);
-    return Element { Root, ChildData.get() };
+    return { Root, Data->getChild(Index).get() };
   }
 
   /// Return a new collection with the given element added to the end.
@@ -161,6 +160,7 @@ public:
     assert(i <= size());
     auto OldLayout = getRaw()->getLayout();
     std::vector<RC<RawSyntax>> NewLayout;
+    NewLayout.reserve(OldLayout.size() + 1);
 
     std::copy(OldLayout.begin(), OldLayout.begin() + i,
               std::back_inserter(NewLayout));
@@ -185,8 +185,12 @@ public:
     return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
+  static bool kindof(SyntaxKind Kind) {
+    return Kind == CollectionKind;
+  }
+
   static bool classof(const Syntax *S) {
-    return S->getKind() == CollectionKind;
+    return kindof(S->getKind());
   }
 };
 

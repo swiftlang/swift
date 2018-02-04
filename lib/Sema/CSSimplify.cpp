@@ -2292,14 +2292,9 @@ commit_to_conversions:
       conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 
-    // Look through IUO's.
-    auto type1WithoutIUO = objectType1;
-    if (auto elt = type1WithoutIUO->getImplicitlyUnwrappedOptionalObjectType())
-      type1WithoutIUO = elt;
-
     // If we could perform a bridging cast, try it.
     if (auto bridged =
-          TC.getDynamicBridgedThroughObjCClass(DC, type1WithoutIUO, type2)) {
+            TC.getDynamicBridgedThroughObjCClass(DC, objectType1, type2)) {
       // Note: don't perform this recovery for NSNumber;
       bool useFix = true;
       if (auto classType = bridged->getAs<ClassType>()) {
@@ -3295,18 +3290,6 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
 
-  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
-  // always an l-value if the input was.
-  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
-    increaseScore(SK_ForceUnchecked);
-    
-    baseObjTy = objTy;
-    if (baseTy->is<LValueType>())
-      baseTy = LValueType::get(objTy);
-    else
-      baseTy = objTy;
-  }
-
   auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
@@ -3541,17 +3524,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return SolutionKind::Solved;
   }
 
-  // Unwrap one extra level of implicitly-unwrapped optional on the source,
-  // if needed.
-  if (numFromOptionals == numToOptionals + 1 &&
-      !type1->getImplicitlyUnwrappedOptionalObjectType().isNull()) {
-    --numFromOptionals;
-    increaseScore(SK_ForceUnchecked);
-    if (worseThanBestSolution()) {
-      return SolutionKind::Error;
-    }
-  }
-
   // The source cannot be more optional than the destination, because bridging
   // conversions don't allow us to implicitly check for a value in the optional.
   if (numFromOptionals > numToOptionals) {
@@ -3560,8 +3532,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   // Explicit bridging from a value type to an Objective-C class type.
   if (unwrappedFromType->isPotentiallyBridgedValueType() &&
-      unwrappedFromType->getAnyNominal()
-        != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
       !flags.contains(TMF_ApplyingOperatorParameter) &&
       (unwrappedToType->isBridgeableObjectType() ||
        (unwrappedToType->isExistentialType() &&
@@ -3577,9 +3547,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // Note that specifically require a class or class-constrained archetype
   // here, because archetypes cannot be bridged.
   if (unwrappedFromType->mayHaveSuperclass() &&
-      unwrappedToType->isPotentiallyBridgedValueType() &&
-      unwrappedToType->getAnyNominal()
-        != TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
+      unwrappedToType->isPotentiallyBridgedValueType()) {
     Type bridgedValueType;
     if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
                                                      &bridgedValueType)) {
@@ -4100,13 +4068,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
-
-  // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
-  // r-value.
-  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
-    type2 = getFixedTypeRecursive(objTy, flags, /*wantRValue=*/true);
-    desugar2 = type2->getDesugaredType();
-  }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 

@@ -39,23 +39,25 @@ using namespace swift;
 using namespace swift::syntax;
 
 TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
-                                     SourcePresence Presence,
                                      const Trivia &LeadingTrivia,
-                                     const Trivia &TrailingTrivia) {
-  return make<TokenSyntax>(RawSyntax::make(Kind, Text, Presence,
-                                           LeadingTrivia.Pieces,
-                                           TrailingTrivia.Pieces));
+                                     const Trivia &TrailingTrivia,
+                                     SourcePresence Presence,
+                                     SyntaxArena *Arena) {
+  return make<TokenSyntax>(RawSyntax::make(Kind, Text, LeadingTrivia.Pieces,
+                                           TrailingTrivia.Pieces, Presence,
+                                           Arena));
 }
 
 UnknownSyntax
-SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
+SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
+                                 SyntaxArena *Arena) {
   std::vector<RC<RawSyntax>> Layout;
   Layout.reserve(Tokens.size());
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
   }
   auto Raw = RawSyntax::make(SyntaxKind::Unknown, Layout,
-                             SourcePresence::Present);
+                             SourcePresence::Present, Arena);
   return make<UnknownSyntax>(Raw);
 }
 
@@ -87,111 +89,88 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
   }
 }
 
-bool SyntaxFactory::
-canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
+                                                  const RC<RawSyntax> &Member) {
   switch (CollectionKind) {
 % for node in SYNTAX_NODES:
-%     if node.is_syntax_collection():
-  case SyntaxKind::${node.syntax_kind}: {
-%       if node.collection_element_choices:
-%         element_checks = []
-%         for choice in node.collection_element_choices:
-%           element_checks.append("Member.getKind() == SyntaxKind::%s" % choice)
-%         all_checks = ' || '.join(element_checks)
-    return ${all_checks};
-%       else:
-    return Member.is<${node.collection_element_type}>();
+%   if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}:
+%     if node.collection_element_choices:
+%       element_checks = []
+%       for choice in node.collection_element_choices:
+%         element_checks.append("" + choice + "Syntax::kindof(Member->getKind())")
 %       end
-  }
+    return ${' || '.join(element_checks)};
+%     else:
+    return ${node.collection_element_type}::kindof(Member->getKind());
 %     end
+%   end
 % end
   default:
     llvm_unreachable("Not collection kind.");
   }
 }
 
-Optional<Syntax>
-SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
-  switch(Kind) {
+bool SyntaxFactory::
+canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+  return canServeAsCollectionMemberRaw(CollectionKind, Member.getRaw());
+}
+
+RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
+                                       llvm::ArrayRef<RC<RawSyntax>> Elements,
+                                       SyntaxArena *Arena) {
+  switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
-%    child_count = len(node.children)
-    static std::pair<bool, std::function<bool(const Syntax&)>>
-      ChildrenConditions[${child_count}] = {
-%    for child in node.children:
-%       check = check_child_condition(child)
-%       if child.is_optional:
-%         option = "true"
-%       else:
-%         option = "false"
-%       end
-        {   ${option}, ${check} },
-%    end
-    };
-    Optional<Syntax> Parameters[${child_count}];
-    unsigned CurCond = 0;
-    for (unsigned I = 0, N = Elements.size(); I < N; ) {
-      // We should use all elements.
-      if (CurCond == ${child_count}) {
-        return None;
-      }
-      if (ChildrenConditions[CurCond].second(Elements[I])) {
-        // we find a node that satisfies the condition.
-        Parameters[CurCond].emplace(Elements[I]);
-        CurCond ++;
-        I ++;
-      } else if (ChildrenConditions[CurCond].first) {
-        // If the unsatisfied condition is optional, move on to the next condition.
-        CurCond ++;
-      } else {
-        // Mandatory condition is not satisfied.
-        return None;
-      }
+%   child_count = len(node.children)
+    RC<RawSyntax> Layout[${child_count}];
+    unsigned I = 0;
+%   for (child_idx, child) in enumerate(node.children):
+    // child[${child_idx}] ${child.name}
+    if (I == Elements.size() ||
+        !${check_child_condition_raw(child)}(Elements[I])) {
+%     if child.is_optional:
+      Layout[${child_idx}] = nullptr;
+%     else:
+      return nullptr;
+%     end
+    } else {
+      Layout[${child_idx}] = Elements[I];
+      ++I;
     }
-    for (; CurCond < ${child_count}; CurCond ++) {
-      if (!ChildrenConditions[CurCond].first) {
-        // if the remaining condition is mandatory, we cannot create.
-        return None;
-      }
-    }
-    assert(CurCond == ${child_count});
-    return make${node.syntax_kind}(
-% params = []
-% for i, child in enumerate(node.children):
-%   child = node.children[i]
-%   if child.is_optional:
-%      params.append("/*Optional %s*/ Parameters[%s].hasValue() ?" \
-%       "(*Parameters[%s]).getAs<%s>().getValue() : (Optional<%s>) None" %
-%         (child.name, i, i, child.type_name, child.type_name))
-%   else:
-%      params.append("/*%s*/ (*Parameters[%s]).getAs<%s>().getValue()" %
-%        (child.name, i, child.type_name))
 %   end
-% end
-% child_parms = '\n, '.join(params)
-      ${child_parms}
-    );
+    if (I != Elements.size())
+      return nullptr;
+    return RawSyntax::make(Kind, Layout, SourcePresence::Present, Arena);
 % elif node.is_syntax_collection():
-      std::vector<${node.collection_element_type}> Parts;
-      for (auto &E: Elements) {
-        if (!canServeAsCollectionMember(SyntaxKind::${node.syntax_kind}, E))
-          return None;
-        if (auto P = E.getAs<${node.collection_element_type}>()) {
-          Parts.emplace_back(make<${node.collection_element_type}>(P->getRaw()));
-        } else {
-          return None;
-        }
-      }
-      return make${node.syntax_kind}(Parts);
+    for (auto &E : Elements) {
+      if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
+        return nullptr;
+    }
+    return RawSyntax::make(Kind, Elements, SourcePresence::Present, Arena);
 % else:
-    return None;
+    return nullptr;
 % end
-   }
+  }
 % end
   default:
-    return None;
+    return nullptr;
   }
+}
+
+Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
+                                             llvm::ArrayRef<Syntax> Elements,
+                                             SyntaxArena *Arena) {
+  std::vector<RC<RawSyntax>> Layout;
+  Layout.reserve(Elements.size());
+  for (auto &E : Elements)
+    Layout.emplace_back(E.getRaw());
+
+  if (auto Raw = createRaw(Kind, Layout, Arena))
+    return make<Syntax>(Raw);
+  else
+    return None;
 }
 
 % for node in SYNTAX_NODES:
@@ -204,41 +183,46 @@ SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
 %         child_params.append("%s %s" % (param_type, child.name))
 %     child_params = ', '.join(child_params)
 ${node.name}
-SyntaxFactory::make${node.syntax_kind}(${child_params}) {
+SyntaxFactory::make${node.syntax_kind}(${child_params},
+                                       SyntaxArena *Arena) {
   auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
-    ${child.name}.hasValue() ? ${child.name}->getRaw() :
-        cast<RawSyntax>(${make_missing_child(child)}),
+    ${child.name}.hasValue() ? ${child.name}->getRaw() : nullptr,
 %       else:
     ${child.name}.getRaw(),
 %       end
 %     end
-  }, SourcePresence::Present);
+  }, SourcePresence::Present, Arena);
   return make<${node.name}>(Raw);
 }
 %   elif node.is_syntax_collection():
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
-  const std::vector<${node.collection_element_type}> &elements) {
+    const std::vector<${node.collection_element_type}> &elements,
+    SyntaxArena *Arena) {
   std::vector<RC<RawSyntax>> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind},
-                             layout, SourcePresence::Present);
+                             layout, SourcePresence::Present, Arena);
   return make<${node.name}>(raw);
 }
 %   end
 
 ${node.name}
-SyntaxFactory::makeBlank${node.syntax_kind}() {
+SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %   for child in node.children:
+%       if child.is_optional:
+    nullptr,
+%       else:
     ${make_missing_child(child)},
+%       end
 %   end
-  }, SourcePresence::Present);
+  }, SourcePresence::Present, Arena);
   return make<${node.name}>(raw);
 }
 % end
@@ -247,86 +231,102 @@ SyntaxFactory::makeBlank${node.syntax_kind}() {
 %   if token.is_keyword:
   TokenSyntax
   SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
-                                          const Trivia &TrailingTrivia) {
+                                          const Trivia &TrailingTrivia,
+                                          SyntaxArena *Arena) {
     return makeToken(tok::${token.kind}, "${token.text}",
-                     SourcePresence::Present,
-                     LeadingTrivia, TrailingTrivia);
+                     LeadingTrivia, TrailingTrivia,
+                     SourcePresence::Present, Arena);
   }
 %   elif token.text:
   TokenSyntax
   SyntaxFactory::make${token.name}Token(const Trivia &LeadingTrivia,
-                                        const Trivia &TrailingTrivia) {
+                                        const Trivia &TrailingTrivia,
+                                        SyntaxArena *Arena) {
     return makeToken(tok::${token.kind}, "${token.text}",
-                     SourcePresence::Present,
-                     LeadingTrivia, TrailingTrivia);
+                     LeadingTrivia, TrailingTrivia,
+                     SourcePresence::Present, Arena);
   }
 %   else:
   TokenSyntax
   SyntaxFactory::make${token.name}(OwnedString Text,
                                    const Trivia &LeadingTrivia,
-                                   const Trivia &TrailingTrivia) {
-    return makeToken(tok::${token.kind}, Text, SourcePresence::Present,
-                     LeadingTrivia, TrailingTrivia);
+                                   const Trivia &TrailingTrivia,
+                                   SyntaxArena *Arena) {
+    return makeToken(tok::${token.kind}, Text,
+                     LeadingTrivia, TrailingTrivia,
+                     SourcePresence::Present, Arena);
   }
 %   end
 % end
 
-TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
-  return makeTupleType(makeLeftParenToken({}, {}),
-                       makeBlankTupleTypeElementList(),
-                       makeRightParenToken({}, {}));
+TupleTypeSyntax SyntaxFactory::makeVoidTupleType(SyntaxArena *Arena) {
+  return makeTupleType(makeLeftParenToken({}, {}, Arena),
+                       makeBlankTupleTypeElementList(Arena),
+                       makeRightParenToken({}, {}, Arena),
+                       Arena);
 }
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
                                     llvm::Optional<TokenSyntax> Colon,
                                     TypeSyntax Type,
-                                    llvm::Optional<TokenSyntax> TrailingComma) {
+                                    llvm::Optional<TokenSyntax> TrailingComma,
+                                    SyntaxArena *Arena) {
   return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
-                              TrailingComma);
+                              TrailingComma, Arena);
 }
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
-                                    llvm::Optional<TokenSyntax> TrailingComma) {
+                                    llvm::Optional<TokenSyntax> TrailingComma,
+                                    SyntaxArena *Arena) {
   return makeTupleTypeElement(None, None, None, None, Type, None, None,
-                              TrailingComma);
+                              TrailingComma, Arena);
 }
 
 GenericParameterSyntax
 SyntaxFactory::makeGenericParameter(TokenSyntax Name,
-  llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeGenericParameter(None, Name, None, None, TrailingComma);
+                                    llvm::Optional<TokenSyntax> TrailingComma,
+                                    SyntaxArena *Arena) {
+  return makeGenericParameter(None, Name, None, None, TrailingComma, Arena);
 }
 
 TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
-    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  auto identifier = makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
-  return makeSimpleTypeIdentifier(identifier, None);
+                                             const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia,
+                                             SyntaxArena *Arena) {
+  auto identifier =
+      makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia, Arena);
+  return makeSimpleTypeIdentifier(identifier, None, Arena);
 }
 
-TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(
-    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
+TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(const Trivia &LeadingTrivia,
+                                                const Trivia &TrailingTrivia,
+                                                SyntaxArena *Arena) {
+  return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(
-    const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
+TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(const Trivia &LeadingTrivia,
+                                                 const Trivia &TrailingTrivia,
+                                                 SyntaxArena *Arena) {
+  return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeTypeToken(
-  const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  return makeIdentifier("Type", LeadingTrivia, TrailingTrivia);
+TokenSyntax SyntaxFactory::makeTypeToken(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia,
+                                         SyntaxArena *Arena) {
+  return makeIdentifier("Type", LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeProtocolToken(
-  const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  return makeIdentifier("Protocol", LeadingTrivia, TrailingTrivia);
+TokenSyntax SyntaxFactory::makeProtocolToken(const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia,
+                                             SyntaxArena *Arena) {
+  return makeIdentifier("Protocol", LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeEqualityOperator(
-const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
-  return makeToken(tok::oper_binary_spaced, "==", SourcePresence::Present,
-                   LeadingTrivia, TrailingTrivia);
+TokenSyntax SyntaxFactory::makeEqualityOperator(const Trivia &LeadingTrivia,
+                                                const Trivia &TrailingTrivia,
+                                                SyntaxArena *Arena) {
+  return makeToken(tok::oper_binary_spaced, "==", LeadingTrivia, TrailingTrivia,
+                   SourcePresence::Present, Arena);
 }

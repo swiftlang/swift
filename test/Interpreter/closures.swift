@@ -82,3 +82,13 @@ func f() -> Bool? { return nil }
   let c = { b = true }
   _ = (b, c)
 })()
+
+// This used to crash at one point in optimized mode because we had the wrong
+// memory effects on swift_getFunctionTypeMetadata.
+func crash() {
+    let f: (Int, Int, Int, Int) -> Int = { _, _, _, _ in 21 }
+    let fs = [f, f]
+    // CHECK: fs: [(Function), (Function)]
+    print("fs: \(fs)")
+}
+crash()

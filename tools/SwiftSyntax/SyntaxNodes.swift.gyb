@@ -127,11 +127,11 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %       cast = '' if child.type_name == 'Syntax' \
 %                 else '%s %s' % (cast_symbol, child.type_name)
   public var ${child.swift_name}: ${ret_type} {
-%       if child.is_optional:
-    guard raw[Cursor.${child.swift_name}].isPresent else { return nil }
-%       end
     let child = data.cachedChild(at: Cursor.${child.swift_name})
-    return makeSyntax(root: _root, data: child) ${cast}
+%       if child.is_optional:
+    if child == nil { return nil }
+%       end
+    return makeSyntax(root: _root, data: child!) ${cast}
   }
 %       child_node = NODE_MAP.get(child.syntax_kind)
 %       if child_node and child_node.is_syntax_collection():
@@ -139,8 +139,14 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 %         child_elt_type = child_node.collection_element_type
 
   public func add${child_elt}(_ elt: ${child_elt_type}) -> ${node.name} {
-    let childRaw = raw[Cursor.${child.swift_name}].appending(elt.raw)
-    let (root, newData) = data.replacingChild(childRaw,
+    var collection: RawSyntax
+    if let col = raw[Cursor.${child.swift_name}] {
+      collection = col.appending(elt.raw)
+    } else {
+      collection = RawSyntax.node(SyntaxKind.${child_node.swift_syntax_kind},
+                                  [elt.raw], .present)
+    }
+    let (root, newData) = data.replacingChild(collection,
                                               at: Cursor.${child.swift_name})
     return ${node.name}(root: root, data: newData)
   }

@@ -1382,6 +1382,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     break;
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:

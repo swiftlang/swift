@@ -1937,6 +1937,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     llvm_unreachable("does not have access control");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     // Does not have access control.
   case DeclKind::EnumCase:
     // Handled at the EnumElement level.
@@ -4373,6 +4374,13 @@ public:
 
     validateAttributes(TC, SD);
 
+    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = SD->getASTContext();
+      SD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
     if (!checkOverrides(TC, SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
@@ -4413,13 +4421,6 @@ public:
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
         !SD->getSetter()->getBody()) {
       synthesizeSetterForMutableAddressedStorage(SD, TC);
-    }
-
-    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = SD->getASTContext();
-      SD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
     }
 
     TC.checkDeclAttributes(SD);
@@ -5746,7 +5747,11 @@ public:
 
       TypeRepr *TR = resultTL.getTypeRepr();
 
-      if (resultOTK == OTK_Optional || treatIUOResultAsError) {
+      bool resultIsPlainOptional = resultOTK == OTK_Optional;
+      if (member->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+        resultIsPlainOptional = false;
+
+      if (resultIsPlainOptional || treatIUOResultAsError) {
         if (parentResultTy->getAnyOptionalObjectType())
           return;
         emittedError = true;
@@ -5931,6 +5936,60 @@ public:
                            matchDecl->getFullName());
       }
     }
+  }
+
+  static bool parameterTypesMatch(const ValueDecl *derivedDecl,
+                                  const ValueDecl *baseDecl,
+                                  TypeMatchOptions matchMode) {
+    const ParameterList *derivedParams;
+    const ParameterList *baseParams;
+    if (auto *derived = dyn_cast<AbstractFunctionDecl>(derivedDecl)) {
+      auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getParameterList(1);
+      derivedParams = derived->getParameterList(1);
+    } else {
+      auto *base = dyn_cast<SubscriptDecl>(baseDecl);
+      if (!base)
+        return false;
+      baseParams = base->getIndices();
+      derivedParams = cast<SubscriptDecl>(derivedDecl)->getIndices();
+    }
+
+    if (baseParams->size() != derivedParams->size())
+      return false;
+
+    auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
+                                                          /*derivedSubs=*/None);
+
+    for (auto i : indices(baseParams->getArray())) {
+      auto baseItfTy = baseParams->get(i)->getInterfaceType();
+      auto baseParamTy =
+          baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+      baseParamTy = baseParamTy.subst(subs);
+      auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParams->get(i)
+              ->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getAnyOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
+
+      // If there is no match, then we're done.
+      return false;
+    }
+
+    return true;
   }
 
   /// Determine which method or subscript this method or subscript overrides
@@ -6119,7 +6178,13 @@ public:
         auto canDeclTy = declTy->getCanonicalType(genericSig);
         auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
-        if (canDeclTy == canParentDeclTy) {
+        auto declIUOAttr =
+            decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        auto parentDeclIUOAttr =
+            parentDecl->getAttrs()
+                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+        if (declIUOAttr == parentDeclIUOAttr && canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
           hadExactMatch = true;
           continue;
@@ -6145,8 +6210,22 @@ public:
               TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
-        if (declTy->matches(parentDeclTy, matchMode)) {
-          // If the Objective-C selectors match, always call it exact.
+        auto declFnTy = declTy->getAs<AnyFunctionType>();
+        auto parentDeclFnTy = parentDeclTy->getAs<AnyFunctionType>();
+        if (declFnTy && parentDeclFnTy) {
+          auto paramsAndResultMatch = [=]() -> bool {
+            return parameterTypesMatch(decl, parentDecl, matchMode) &&
+                   declFnTy->getResult()->matches(parentDeclFnTy->getResult(),
+                                                  matchMode);
+          };
+
+          if (declFnTy->matchesFunctionType(parentDeclFnTy, matchMode,
+                                            paramsAndResultMatch)) {
+            matches.push_back({parentDecl, objCMatch, parentDeclTy});
+            hadExactMatch |= objCMatch;
+            continue;
+          }
+        } else if (declTy->matches(parentDeclTy, matchMode)) {
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
           continue;
@@ -6321,8 +6400,13 @@ public:
         (attempt == OverrideCheckingAttempt::MismatchedOptional ||
          attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
 
+    auto declIUOAttr =
+        decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto matchDeclIUOAttr =
+        matchDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
     // If this is an exact type match, we're successful!
-    if (declTy->isEqual(matchType)) {
+    if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(matchType)) {
       // Nothing to do.
       
     } else if (method) {
@@ -7060,6 +7144,15 @@ public:
     TC.checkDeclAttributes(ICD);
   }
 
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+    if (PDD->hasBeenEmitted()) { return; }
+    PDD->markEmitted();
+    TC.diagnose(PDD->getMessage()->getStartLoc(),
+      PDD->isError() ? diag::pound_error : diag::pound_warning,
+      PDD->getMessage()->getValue())
+      .highlight(PDD->getMessage()->getSourceRange());
+  }
+
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (!IsFirstPass) {
       if (CD->getBody()) {
@@ -7532,6 +7625,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
@@ -8120,6 +8214,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 

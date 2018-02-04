@@ -1215,7 +1215,7 @@ class TailAllocatedDebugVariable {
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       unsigned ArgNo : 16;
-      bool Constant : 1;
+      unsigned Constant : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.

@@ -249,6 +249,7 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
   containsNonObjCProtocol = !protoDecl->isObjC();
 
   singleProtocol = type;
+  protocols = { &singleProtocol, 1 };
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
@@ -270,10 +271,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   }
 
   singleProtocol = nullptr;
-  multipleProtocols = {
-    reinterpret_cast<ProtocolType * const *>(members.data()),
-    members.size()
-  };
+  protocols = { members.data(), members.size() };
 }
 
 
@@ -504,13 +502,6 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getImplicitlyUnwrappedOptionalObjectType() {
-  if (auto boundTy = getAs<BoundGenericEnumType>())
-    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional)
-      return boundTy->getGenericArgs()[0];
-  return Type();
-}
-
 Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   if (auto boundTy = getAs<BoundGenericEnumType>())
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
@@ -525,6 +516,13 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
       return boundTy.getGenericArgs()[0];
   kind = OTK_None;
+  return CanType();
+}
+
+CanType CanType::getOptionalObjectTypeImpl(CanType type) {
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
+      return boundTy.getGenericArgs()[0];
   return CanType();
 }
 
@@ -1237,9 +1235,6 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
                                    boundGeneric->getGenericArgs()[1]);
       if (boundGeneric->getDecl() == ctx.getOptionalDecl())
         return OptionalType::get(boundGeneric->getGenericArgs()[0]);
-      if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
-        return ImplicitlyUnwrappedOptionalType::
-        get(boundGeneric->getGenericArgs()[0]);
     }
     return Ty;
   };
@@ -1296,7 +1291,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     implDecl = Context->getOptionalDecl();
     break;
   case TypeKind::ImplicitlyUnwrappedOptional:
-    implDecl = Context->getImplicitlyUnwrappedOptionalDecl();
+    llvm_unreachable("Should no longer have IUOs");
     break;
   case TypeKind::Dictionary:
     implDecl = Context->getDictionaryDecl();
@@ -2182,10 +2177,10 @@ namespace {
   };
 } // end anonymous namespace
 
-static bool matchFunctionTypes(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
-                               TypeMatchOptions matchMode,
-                               OptionalUnwrapping insideOptional,
-                               std::function<bool()> paramsAndResultMatch) {
+static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
+                                TypeMatchOptions matchMode,
+                                OptionalUnwrapping insideOptional,
+                                std::function<bool()> paramsAndResultMatch) {
   // FIXME: Handle generic functions in non-ABI matches.
   if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
     if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
@@ -2303,19 +2298,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                       OptionalUnwrapping::None));
     };
 
-    return matchFunctionTypes(fn1, fn2, matchMode, insideOptional,
-                              paramsAndResultMatch);
-  }
-
-  if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
-      (paramPosition == ParameterPosition::Parameter ||
-       paramPosition == ParameterPosition::ParameterTupleElement) &&
-      insideOptional == OptionalUnwrapping::None) {
-    // Allow T to override T! in certain cases.
-    if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
-      t1 = obj1->getCanonicalType();
-      if (t1 == t2) return true;
-    }
+    return matchesFunctionType(fn1, fn2, matchMode, insideOptional,
+                               paramsAndResultMatch);
   }
 
   // Class-to-class.
@@ -2333,6 +2317,21 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 bool TypeBase::matches(Type other, TypeMatchOptions matchMode) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
                    ParameterPosition::NotParameter, OptionalUnwrapping::None);
+}
+
+bool TypeBase::matchesParameter(Type other, TypeMatchOptions matchMode) {
+  return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
+                   ParameterPosition::Parameter, OptionalUnwrapping::None);
+}
+
+bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
+                                   std::function<bool()> paramsAndResultMatch) {
+  auto thisFnTy = dyn_cast<AnyFunctionType>(getCanonicalType());
+  auto otherFnTy = dyn_cast<AnyFunctionType>(other->getCanonicalType());
+
+  assert(thisFnTy && otherFnTy);
+  return ::matchesFunctionType(thisFnTy, otherFnTy, matchMode,
+                               OptionalUnwrapping::None, paramsAndResultMatch);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,

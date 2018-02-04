@@ -255,6 +255,10 @@ function(_add_variant_c_compile_flags)
   else()
     list(APPEND result "-DNDEBUG")
   endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
@@ -315,6 +319,10 @@ function(_add_variant_swift_compile_flags
 
   if (SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
     list(APPEND result "-Xfrontend" "-enable-guaranteed-normal-arguments")
+  endif()
+  
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -396,14 +404,15 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(SWIFT_ENABLE_GOLD_LINKER AND
-       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      list(APPEND result "-fuse-ld=gold")
-    endif()
-    if(SWIFT_ENABLE_LLD_LINKER OR
+    find_program(LDLLD_PATH "ld.lld")
+    # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
+    elseif(SWIFT_ENABLE_GOLD_LINKER AND
+       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      list(APPEND result "-fuse-ld=gold")
     endif()
   endif()
 

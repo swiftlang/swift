@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2275,4 +2276,33 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Property:
     llvm_unreachable("no hashable conformances for this kind");
   }
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct ExprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    // Exprs don't have names.
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Expr *D = static_cast<const Expr *>(Entity);
+    D->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static ExprTraceFormatter TF;
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef EventName, const Expr *E) {
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(EventName, E, &TF, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
 }

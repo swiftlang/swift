@@ -20,9 +20,6 @@ using namespace swift;
 unsigned Output::beginArray() {
   StateStack.push_back(ArrayFirstValue);
   Stream << '[';
-  if (PrettyPrint) {
-    Stream << '\n';
-  }
   return 0;
 }
 
@@ -30,11 +27,11 @@ bool Output::preflightElement(unsigned, void *&) {
   if (StateStack.back() != ArrayFirstValue) {
     assert(StateStack.back() == ArrayOtherValue && "We must be in a sequence!");
     Stream << ',';
-    if (PrettyPrint)
-      Stream << '\n';
   }
-  if (PrettyPrint)
+  if (PrettyPrint) {
+    Stream << '\n';
     indent();
+  }
   return true;
 }
 
@@ -46,8 +43,9 @@ void Output::postflightElement(void*) {
 }
 
 void Output::endArray() {
+  bool HadContent = StateStack.back() != ArrayFirstValue;
   StateStack.pop_back();
-  if (PrettyPrint) {
+  if (PrettyPrint && HadContent) {
     Stream << '\n';
     indent();
   }
@@ -66,13 +64,12 @@ bool Output::canElideEmptyArray() {
 void Output::beginObject() {
   StateStack.push_back(ObjectFirstKey);
   Stream << "{";
-  if (PrettyPrint)
-    Stream << '\n';
 }
 
 void Output::endObject() {
+  bool HadContent = StateStack.back() != ObjectFirstKey;
   StateStack.pop_back();
-  if (PrettyPrint) {
+  if (PrettyPrint && HadContent) {
     Stream << '\n';
     indent();
   }
@@ -86,11 +83,11 @@ bool Output::preflightKey(const char *Key, bool Required, bool SameAsDefault,
     if (StateStack.back() != ObjectFirstKey) {
       assert(StateStack.back() == ObjectOtherKey && "We must be in an object!");
       Stream << ',';
-      if (PrettyPrint)
-        Stream << '\n';
     }
-    if (PrettyPrint)
+    if (PrettyPrint) {
+      Stream << '\n';
       indent();
+    }
     Stream << '"' << Key << "\":";
     if (PrettyPrint)
       Stream << ' ';
@@ -220,6 +217,10 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
   }
   else
     Stream << S;
+}
+
+void Output::null() {
+  Stream << "null";
 }
 
 void Output::indent() {

@@ -72,7 +72,8 @@ final class SyntaxData: Equatable {
   ///
   /// - Parameter index: The index to create and cache.
   /// - Returns: The child's data at the provided index.
-  func cachedChild(at index: Int) -> SyntaxData {
+  func cachedChild(at index: Int) -> SyntaxData? {
+    if raw.layout[index] == nil { return nil }
     return childCaches[index].value { realizeChild(index) }
   }
 
@@ -84,7 +85,7 @@ final class SyntaxData: Equatable {
   /// - Parameter cursor: The cursor to create and cache.
   /// - Returns: The child's data at the provided cursor.
   func cachedChild<CursorType: RawRepresentable>(
-    at cursor: CursorType) -> SyntaxData
+    at cursor: CursorType) -> SyntaxData?
     where CursorType.RawValue == Int {
     return cachedChild(at: cursor.rawValue)
   }
@@ -123,7 +124,7 @@ final class SyntaxData: Equatable {
     // recursively up to the root.
     if let parent = parent {
       let (root, newParent) = parent.replacingChild(newRaw, at: indexInParent)
-      let newMe = newParent.cachedChild(at: indexInParent)
+      let newMe = newParent.cachedChild(at: indexInParent)!
       return (root: root, newValue: newMe)
     } else {
       // Otherwise, we're already the root, so return the new data as both the
@@ -185,7 +186,7 @@ final class SyntaxData: Equatable {
   /// - Returns: A new SyntaxData for the specific child you're
   ///            creating, whose parent is pointing to self.
   func realizeChild(_ index: Int) -> SyntaxData {
-    return SyntaxData(raw: raw.layout[index],
+    return SyntaxData(raw: raw.layout[index]!,
                       indexInParent: index,
                       parent: self)
   }

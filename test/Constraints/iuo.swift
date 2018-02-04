@@ -16,13 +16,34 @@ struct S {
   var j: Int!
   let k: Int
   var m: Int
+  var n: Int! {
+    get {
+      return m
+    }
+    set {
+      m = newValue
+    }
+  }
+  var o: Int! {
+    willSet {
+      m = newValue
+    }
+    didSet {
+      m = oldValue
+    }
+  }
 
   func fn() -> Int! { return i }
 
   static func static_fn() -> Int! { return 0 }
 
   subscript(i: Int) -> Int! {
-    return i
+    set {
+      m = newValue
+    }
+    get {
+      return i
+    }
   }
 
   init(i: Int!, j: Int!, k: Int, m: Int) {
@@ -80,15 +101,14 @@ func cflow(i: Int!, j: inout Bool!, s: S) {
     if s.i == 7 {
     }
   }
-  let _ = i ? 7 : 0 // expected-error {{optional type 'Int!' cannot be used as a boolean; test for '!= nil' instead}}
+
   let _ = b ? i : k
   let _ = b ? i : m
   let _ = b ? j : b
-  let _ = i ? i : k // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int?'}}
-  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int'}}
-  let _ = s.i ? s.j : s.k // expected-error {{result values in '? :' expression have mismatching types 'Int!' and 'Int'}}
+
   let _ = b ? s.j : s.k
 
+  if b {}
   if j {}
   let _ = j ? 7 : 0
 }
@@ -128,18 +148,6 @@ func overloadedForcedStructResult() -> T! { return T(i: 0.5, j: 1.5) }
 
 let _: S = overloadedForcedStructResult()
 let _: Int = overloadedForcedStructResult().i
-
-let x: Int? = 1
-let y0: Int = x as Int! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let y1: Int = (x as Int!)! // expected-warning {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let z0: Int = x as! Int! // expected-warning {{forced cast from 'Int?' to 'Int!' always succeeds; did you mean to use 'as'?}}
-// expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let z1: Int = (x as! Int!)! // expected-warning {{forced cast from 'Int?' to 'Int!' always succeeds; did you mean to use 'as'?}}
-// expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
-// expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
-let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int!' always succeeds}}
-// expected-warning@-1 {{using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead}}
 
 func id<T>(_ t: T) -> T { return t }
 

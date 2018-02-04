@@ -599,16 +599,7 @@ public:
       return nullptr;
     }
     
-    // If the sequence is an implicitly unwrapped optional, force it.
     Expr *sequence = S->getSequence();
-    if (auto objectTy
-          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
-      sequence = new (TC.Context) ForceValueExpr(sequence,
-                                                 sequence->getEndLoc());
-      sequence->setType(objectTy);
-      sequence->setImplicit();
-      S->setSequence(sequence);
-    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
@@ -839,6 +830,13 @@ public:
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
+
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto node : S->getRawCases()) {
+      if (!node.is<Decl*>()) continue;
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+    }
 
     auto cases = S->getCases();
     CaseStmt *previousBlock = nullptr;
@@ -1090,7 +1088,20 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->hasLValueType()) {
-    diagnose(E->getLoc(), diag::expression_unused_lvalue)
+    // This must stay in sync with diag::expression_unused_lvalue.
+    enum {
+        SK_Variable = 0,
+        SK_Property,
+        SK_Subscript
+    } storageKind = SK_Variable;
+    if (auto declRef = E->getReferencedDecl()) {
+      auto decl = declRef.getDecl();
+      if (isa<SubscriptDecl>(decl))
+        storageKind = SK_Subscript;
+      else if (decl->getDeclContext()->isTypeContext())
+        storageKind = SK_Property;
+    }
+    diagnose(E->getLoc(), diag::expression_unused_lvalue, storageKind)
       .highlight(E->getSourceRange());
     return;
   }

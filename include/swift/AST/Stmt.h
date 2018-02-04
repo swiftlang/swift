@@ -955,8 +955,8 @@ public:
   }
 
 private:
-  struct AsCaseStmtWithSkippingIfConfig {
-    AsCaseStmtWithSkippingIfConfig() {}
+  struct AsCaseStmtWithSkippingNonCaseStmts {
+    AsCaseStmtWithSkippingNonCaseStmts() {}
     Optional<CaseStmt*> operator()(const ASTNode &N) const {
       if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
         return CS;
@@ -966,11 +966,11 @@ private:
 
 public:
   using AsCaseStmtRange = OptionalTransformRange<ArrayRef<ASTNode>,
-                                                AsCaseStmtWithSkippingIfConfig>;
+                            AsCaseStmtWithSkippingNonCaseStmts>;
   
   /// Get the list of case clauses.
   AsCaseStmtRange getCases() const {
-    return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingIfConfig());
+    return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingNonCaseStmts());
   }
   
   static bool classof(const Stmt *S) {

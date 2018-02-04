@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -390,6 +391,7 @@ class CanType : public Type {
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -455,6 +457,10 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+
+  CanType getOptionalObjectType() const {
+    return getOptionalObjectTypeImpl(*this);
+  }
 
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;
@@ -605,6 +611,18 @@ public:
     return Signature;
   }
 };
+
+template <typename T>
+inline T *staticCastHelper(const Type &Ty) {
+  // The constructor of the ArrayRef<Type> must guarantee this invariant.
+  // XXX -- We use reinterpret_cast instead of static_cast so that files
+  // can avoid including Types.h if they want to.
+  return reinterpret_cast<T*>(Ty.getPointer());
+}
+/// TypeArrayView allows arrays of 'Type' to have a static type.
+template <typename T>
+using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
+                                   /*AllowOrigAccess*/true>;
 
 } // end namespace swift
 

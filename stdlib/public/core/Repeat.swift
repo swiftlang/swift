@@ -35,7 +35,7 @@ public struct Repeated<Element> {
 }
 
 extension Repeated: RandomAccessCollection {
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 
   /// A type that represents a valid position in the collection.
   ///

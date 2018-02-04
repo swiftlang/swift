@@ -18,9 +18,9 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DebuggerClient.h"
@@ -2000,6 +2000,8 @@ bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_typealias:
   case tok::kw_var:
   case tok::pound_if:
+  case tok::pound_warning:
+  case tok::pound_error:
   case tok::identifier:
   case tok::pound_sourceLocation:
     return true;
@@ -2325,6 +2327,16 @@ Parser::parseDecl(ParseDeclOptions Flags,
       parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
       continue;
     }
+
+    case tok::pound_warning:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
+      DeclResult = parseDeclPoundDiagnostic();
+      break;
+    case tok::pound_error:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
+      DeclResult = parseDeclPoundDiagnostic();
+      break;
+
     // Context sensitive keywords.
     case tok::identifier: {
       Optional<DeclAttrKind> Kind;
@@ -2373,6 +2385,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // Otherwise this is not a context-sensitive keyword.
       LLVM_FALLTHROUGH;
     }
+
     case tok::pound_if:
     case tok::pound_sourceLocation:
     case tok::pound_line:
@@ -3101,6 +3114,92 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(status, ext);
 }
 
+ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
+  bool isError = Tok.is(tok::pound_error);
+  SyntaxParsingContext LocalContext(SyntaxContext, 
+    isError ? SyntaxKind::PoundErrorDecl : SyntaxKind::PoundWarningDecl);
+  SourceLoc startLoc = 
+    consumeToken(isError ? tok::pound_error : tok::pound_warning);
+
+  SourceLoc lParenLoc = Tok.getLoc();
+  bool hadLParen = consumeIf(tok::l_paren);
+
+  if (!Tok.is(tok::string_literal)) {
+    // Catch #warning(oops, forgot the quotes)
+    SourceLoc wordsStartLoc = Tok.getLoc();
+
+    while (!Tok.isAtStartOfLine() && Tok.isNot(tok::r_paren)) {
+      skipSingle();
+    }
+
+    SourceLoc wordsEndLoc = getEndOfPreviousLoc();
+
+    auto diag = diagnose(wordsStartLoc, 
+                          diag::pound_diagnostic_expected_string, isError);
+    if (wordsEndLoc != wordsStartLoc) {
+      diag.fixItInsert(wordsStartLoc, hadLParen ? "\"" : "(\"")
+          .fixItInsert(wordsEndLoc, Tok.is(tok::r_paren) ? "\"" : "\")");
+    }
+
+    // Consume the right paren to finish the decl, if it's there.
+    consumeIf(tok::r_paren);
+
+    return makeParserError();
+  }
+
+  auto string = parseExprStringLiteral();
+  if (string.isNull())
+    return makeParserError();
+
+  auto messageExpr = string.get();
+
+  SourceLoc rParenLoc = Tok.getLoc();
+  bool hadRParen = consumeIf(tok::r_paren);
+
+  if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
+    diagnose(Tok.getLoc(),
+             diag::extra_tokens_pound_diagnostic_directive, isError);
+    return makeParserError();
+  }
+
+  if (!hadLParen && !hadRParen) {
+    // Catch if the user forgot parentheses around the string, e.g.
+    // #warning "foo"
+    diagnose(lParenLoc, diag::pound_diagnostic_expected_parens, isError)
+      .highlight(messageExpr->getSourceRange())
+      .fixItInsert(messageExpr->getStartLoc(), "(")
+      .fixItInsertAfter(messageExpr->getEndLoc(), ")");
+    return makeParserError();
+  } else if (hadRParen && !hadLParen) {
+    // Catch if the user forgot a left paren before the string, e.g.
+    // #warning "foo")
+    diagnose(messageExpr->getStartLoc(), diag::pound_diagnostic_expected,
+             "(", isError)
+      .fixItInsert(messageExpr->getStartLoc(), "(");
+    return makeParserError();
+  } else if (hadLParen && !hadRParen) {
+    // Catch if the user forgot a right paren after the string, e.g.
+    // #warning("foo"
+    diagnose(messageExpr->getEndLoc(), diag::pound_diagnostic_expected,
+             ")", isError)
+      .fixItInsertAfter(messageExpr->getEndLoc(), ")");
+    return makeParserError();
+  }
+
+  if (messageExpr->getKind() == ExprKind::InterpolatedStringLiteral) {
+    diagnose(messageExpr->getStartLoc(), diag::pound_diagnostic_interpolation,
+             isError)
+      .highlight(messageExpr->getSourceRange());
+    return makeParserError();
+  }
+
+  ParserStatus Status;
+  return makeParserResult(Status,
+    new (Context) PoundDiagnosticDecl(CurDeclContext, isError,
+                                      startLoc, rParenLoc,
+                                      cast<StringLiteralExpr>(messageExpr)));
+}
+
 ParserStatus Parser::parseLineDirective(bool isLine) {
   SourceLoc Loc = consumeToken();
   if (isLine) {
@@ -3547,9 +3646,10 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   return D;
 }
 
-static ParamDecl *
-createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
-                             AccessorKind accessorKind, Parser &P) {
+static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
+                                               Identifier name,
+                                               AccessorKind accessorKind,
+                                               Parser &P, TypeLoc elementType) {
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   bool isNameImplicit = name.empty();
@@ -3568,15 +3668,25 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
 
   // AST Walker shouldn't go into the type recursively.
   result->setIsTypeLocImplicit(true);
+
+  if (auto *repr = elementType.getTypeRepr()) {
+    if (repr->getKind() ==
+        TypeReprKind::ImplicitlyUnwrappedOptional) {
+      result->getAttrs().add(
+          new (P.Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+  }
+
   return result;
 }
 
 /// Parse a "(value)" specifier for "set" or "willSet" if present.  Create a
 /// parameter list to represent the spelled argument or return null if none is
 /// present.
-static ParameterList *
-parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
-                              Parser &P, AccessorKind Kind) {
+static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
+                                                    Parser &P,
+                                                    AccessorKind Kind,
+                                                    TypeLoc ElementTy) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
   if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet &&
@@ -3614,7 +3724,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   }
 
   if (Name.empty()) NameLoc = SpecifierLoc;
-  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P);
+  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P, ElementTy);
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
@@ -3846,8 +3956,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       if (Tok.is(tok::l_paren))
         diagnose(Loc, diag::protocol_setter_name);
 
-      auto *ValueNameParams
-        = parseOptionalAccessorArgument(Loc, *this, Kind);
+      auto *ValueNameParams =
+          parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
 
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNameParams,
@@ -3970,7 +4080,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     //
     //     set-name    ::= '(' identifier ')'
     auto *ValueNamePattern =
-      parseOptionalAccessorArgument(Loc, *this, Kind);
+        parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
 
     SyntaxParsingContext BlockCtx(SyntaxContext, SyntaxKind::CodeBlock);
     if (AccessorKeywordLoc.isInvalid()) {
@@ -4426,8 +4536,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     auto argFunc = (WillSet ? WillSet : DidSet);
     auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
 
-    auto argument = createSetterAccessorArgument(argLoc, Identifier(),
-                                                 AccessorKind::IsSetter, P);
+    auto argument = createSetterAccessorArgument(
+        argLoc, Identifier(), AccessorKind::IsSetter, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
                                  AddressorKind::NotAddressor, argList);
@@ -4448,8 +4558,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   if (MutableAddressor) {
     assert(Get && !Set);
     auto argument =
-      createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
-                                   AccessorKind::IsSetter, P);
+        createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
+                                     AccessorKind::IsSetter, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
     Set = createImplicitAccessor(AccessorKind::IsSetter,
                                  AddressorKind::NotAddressor, argList);

@@ -23,6 +23,7 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -107,6 +108,7 @@ enum class DescriptiveDeclKind : uint8_t {
   EnumCase,
   TopLevelCode,
   IfConfig,
+  PoundDiagnostic,
   PatternBinding,
   Var,
   Param,
@@ -589,6 +591,14 @@ protected:
   SWIFT_INLINE_BITFIELD(IfConfigDecl, Decl, 1,
     /// Whether this decl is missing its closing '#endif'.
     HadMissingEnd : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
+    /// `true` if the diagnostic is an error, `false` if it's a warning.
+    IsError : 1,
+
+    /// Whether this diagnostic has already been emitted.
+    HasBeenEmitted : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -1416,7 +1426,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -1682,6 +1692,20 @@ public:
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
   bool isConstrainedExtension() const;
+  
+  /// Determine whether this extension context is interchangeable with the
+  /// original nominal type context.
+  ///
+  /// False if any of the following properties hold:
+  /// - the extension is defined in a different module from the original
+  ///   nominal type decl,
+  /// - the extension is constrained, or
+  /// - the extension is to a protocol.
+  /// FIXME: In a world where protocol extensions are dynamically dispatched,
+  /// "extension is to a protocol" would no longer be a reason to use the
+  /// extension mangling, because an extension method implementation could be
+  /// resiliently moved into the original protocol itself.
+  bool isEquivalentToExtendedContext() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -2042,6 +2066,52 @@ public:
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::IfConfig;
+  }
+};
+
+class StringLiteralExpr;
+
+class PoundDiagnosticDecl : public Decl {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  StringLiteralExpr *Message;
+
+public:
+  PoundDiagnosticDecl(DeclContext *Parent, bool IsError, SourceLoc StartLoc,
+                      SourceLoc EndLoc, StringLiteralExpr *Message)
+    : Decl(DeclKind::PoundDiagnostic, Parent), StartLoc(StartLoc),
+      EndLoc(EndLoc), Message(Message) {
+      Bits.PoundDiagnosticDecl.IsError = IsError;
+      Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
+    }
+
+  DiagnosticKind getKind() {
+    return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
+  }
+
+  StringLiteralExpr *getMessage() { return Message; }
+
+  bool isError() {
+    return Bits.PoundDiagnosticDecl.IsError;
+  }
+
+  bool hasBeenEmitted() {
+    return Bits.PoundDiagnosticDecl.HasBeenEmitted;
+  }
+
+  void markEmitted() {
+    Bits.PoundDiagnosticDecl.HasBeenEmitted = true;
+  }
+  
+  SourceLoc getEndLoc() const { return EndLoc; };
+  SourceLoc getLoc() const { return StartLoc; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(StartLoc, EndLoc);
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PoundDiagnostic;
   }
 };
 

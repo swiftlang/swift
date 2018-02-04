@@ -1799,7 +1799,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
     llvm::raw_string_ostream OS(SyntaxContent);
     json::Output JsonOut(OS);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
-    JsonOut << Root;
+    JsonOut << *Root;
     Consumer.handleSerializedSyntaxTree(OS.str());
   }
 

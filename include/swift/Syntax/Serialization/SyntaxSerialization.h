@@ -194,28 +194,39 @@ struct ObjectTraits<TokenDescription> {
 /// }
 /// ```
 template<>
-struct ObjectTraits<RC<syntax::RawSyntax>> {
-  static void mapping(Output &out, RC<syntax::RawSyntax> &value) {
-    if (value->isToken()) {
-      auto tokenKind = value->getTokenKind();
-      auto text = value->getTokenText();
+struct ObjectTraits<syntax::RawSyntax> {
+  static void mapping(Output &out, syntax::RawSyntax &value) {
+    if (value.isToken()) {
+      auto tokenKind = value.getTokenKind();
+      auto text = value.getTokenText();
       auto description = TokenDescription { tokenKind, text };
       out.mapRequired("tokenKind", description);
 
-      auto leadingTrivia = value->getLeadingTrivia();
+      auto leadingTrivia = value.getLeadingTrivia();
       out.mapRequired("leadingTrivia", leadingTrivia);
 
-      auto trailingTrivia = value->getTrailingTrivia();
+      auto trailingTrivia = value.getTrailingTrivia();
       out.mapRequired("trailingTrivia", trailingTrivia);
     } else {
-      auto kind = value->getKind();
+      auto kind = value.getKind();
       out.mapRequired("kind", kind);
 
-      auto layout = value->getLayout();
+      auto layout = value.getLayout();
       out.mapRequired("layout", layout);
     }
-    auto presence = value->getPresence();
+    auto presence = value.getPresence();
     out.mapRequired("presence", presence);
+  }
+};
+
+template<>
+struct NullableTraits<RC<syntax::RawSyntax>> {
+  using value_type = syntax::RawSyntax;
+  static bool isNull(RC<syntax::RawSyntax> &value) {
+    return value == nullptr;
+  }
+  static syntax::RawSyntax &get(RC<syntax::RawSyntax> &value) {
+    return *value;
   }
 };
 } // end namespace json

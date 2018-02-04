@@ -61,16 +61,9 @@ SILGenModule::~SILGenModule() {
 
 EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
   auto &ctx = getASTContext();
-  if (elt->getParentEnum()->classifyAsOptionalType()
-        != OTK_ImplicitlyUnwrappedOptional)
-    return elt;
-
-  if (elt == ctx.getImplicitlyUnwrappedOptionalSomeDecl()) {
-    return ctx.getOptionalSomeDecl();
-  } else {
-    assert(elt == ctx.getImplicitlyUnwrappedOptionalNoneDecl());
-    return ctx.getOptionalNoneDecl();
-  }
+  assert(elt->getParentEnum()->classifyAsOptionalType() !=
+         OTK_ImplicitlyUnwrappedOptional);
+  return elt;
 }
 
 static SILDeclRef
@@ -647,7 +640,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
-          if (auto *decl = astNode.get<ValueDecl *>())
+          if (auto *decl = astNode.dyn_cast<ValueDecl *>())
             decl->dump(llvm::dbgs());
           else
             astNode.get<Expr *>()->dump(llvm::dbgs());
@@ -1181,6 +1174,10 @@ void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
   // Nothing to do for these kinds of decls - anything active has been added
   // to the enclosing declaration.
+}
+
+void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+  // Nothing to do for #error/#warning; they've already been emitted.
 }
 
 void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {

@@ -2177,11 +2177,6 @@ public:
                       DeclContext *useDC, ConstraintLocator *locator,
                       OverloadChoice *favored = nullptr);
 
-  /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
-  /// that should transparently look through ImplicitlyUnwrappedOptional types,
-  /// return T.
-  Type lookThroughImplicitlyUnwrappedOptionalType(Type type);
-
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
 
@@ -2441,6 +2436,15 @@ public:
     auto *disjunctionLocator = getConstraintLocator(
         locator, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
     buildDisjunctionForOptionalVsUnderlying(boundTy, type, disjunctionLocator);
+  }
+
+  // Build a disjunction for dynamic lookup results, which are
+  // implicitly unwrapped if needed.
+  void buildDisjunctionForDynamicLookupResult(Type boundTy, Type type,
+                                              ConstraintLocator *locator) {
+    auto *dynamicLocator =
+        getConstraintLocator(locator, ConstraintLocator::DynamicLookupResult);
+    buildDisjunctionForOptionalVsUnderlying(boundTy, type, dynamicLocator);
   }
 
   /// \brief Resolve the given overload set to the given choice.

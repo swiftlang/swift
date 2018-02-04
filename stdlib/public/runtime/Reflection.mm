@@ -172,7 +172,13 @@ static_assert(offsetof(MagicMirror, MirrorWitness) ==
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
-
+// struct _MagicMirrorData {
+//   internal var value: Any {
+//     @_silgen_name("swift_MagicMirrorData_value")get
+//   }
+// }
+//
+// Since this is a method, owner is passed in at +0.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
                                       const OpaqueValue *value,
@@ -186,6 +192,14 @@ AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
 
   return AnyReturn(result);
 }
+
+// struct _MagicMirrorData {
+//   internal var valueType: Any.Type {
+//     @_silgen_name("swift_MagicMirrorData_valueType")get
+//   }
+// }
+//
+// Since this is a method, owner is passed in at +0.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
                                                 const OpaqueValue *value,
@@ -195,6 +209,14 @@ const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
 }
 
 #if SWIFT_OBJC_INTEROP
+
+// struct _MagicMirrorData {
+//   public var objcValue: Any {
+//     @_silgen_name("swift_MagicMirrorData_objcValue")get
+//   }
+// }
+//
+// Since this is a method, owner is at +0.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 AnyReturn swift_MagicMirrorData_objcValue(HeapObject *owner,
                                           const OpaqueValue *value,
@@ -295,6 +317,13 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
   }
 }
 
+// struct _MagicMirrorData {
+//   public var objcValueType: Any.Type {
+//     @_silgen_name("swift_MagicMirrorData_objcValueType")get
+//   }
+// }
+//
+// This is a method, so owner is at +0.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
                                                     const OpaqueValue *value,
@@ -351,17 +380,22 @@ static Mirror reflect(HeapObject *owner,
 
 // -- Tuple destructuring.
 
+// internal func _getTupleCount(_: _MagicMirrorData) -> Int
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_TupleMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   return Tuple->NumElements;
 }
 
+/// internal func _getTupleChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+///
+/// This is a free standing function, not a method.
+///
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -404,9 +438,9 @@ void swift_TupleMirror_subscript(String *outString,
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 
-#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_retain(owner);
-#endif
+  // Since 'owner' is consumed, when we have a +0 convention, we must retain
+  // owner first.
+  SWIFT_CC_PLUSZERO_GUARD(swift_retain(owner));
 
   // 'owner' is consumed by this call.
   new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
@@ -491,17 +525,21 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
 
 // -- Struct destructuring.
 
+// internal func _getStructCount(_: _MagicMirrorData) -> Int
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const OpaqueValue *value,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   return Struct->Description->Struct.NumFields;
 }
 
+// internal func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_StructMirror_subscript(String *outString,
                                   Mirror *outMirror,
@@ -524,8 +562,11 @@ void swift_StructMirror_subscript(String *outString,
   new (outString) String(getFieldName(Struct->Description->Struct.FieldNames, i));
 
   // 'owner' is consumed by this call.
+  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRetain(owner));
+
   assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
 
+  // This only consumed owner if we succeed.
   if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
     return;
 
@@ -578,14 +619,16 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
     *indirectPtr = indirect;
 }
 
+// internal func _swift_EnumMirror_caseName(
+//     _ data: _MagicMirrorData) -> UnsafePointer<CChar>
+//
+// This is a free standing function.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 const char *swift_EnumMirror_caseName(HeapObject *owner,
                                       const OpaqueValue *value,
                                       const Metadata *type) {
   if (!isEnumReflectable(type)) {
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-    swift_release(owner);
-#endif
+    SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
     return nullptr;
   }
 
@@ -595,13 +638,14 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
   unsigned tag;
   getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
 
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
 
   return getFieldName(Description.CaseNames, tag);
 }
 
+// internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   // Build a magic mirror. Unconditionally destroy the value at the end.
@@ -612,12 +656,8 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
   Mirror mirror;
 
-  bool take =
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-    mirrorValue == value;
-#else
-    false;
-#endif
+  bool take = false;
+  SWIFT_CC_PLUSONE_GUARD(take = (mirrorValue == value));
 
   ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
 
@@ -625,34 +665,34 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   MagicMirrorData data = theMirror->Data;
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
 
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   // Destroy the whole original value if we couldn't take it.
   if (!take)
       type->vw_destroy(value);
-#endif
 
   return result;
 }
 
+// internal func _getEnumCount(_: _MagicMirrorData) -> Int
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_EnumMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
   if (!isEnumReflectable(type)) {
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-    swift_release(owner);
-#endif
+    SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
     return 0;
   }
 
   const Metadata *payloadType;
   getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   return (payloadType != nullptr) ? 1 : 0;
 }
 
+// internal func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_EnumMirror_subscript(String *outString,
                                 Mirror *outMirror,
@@ -674,23 +714,21 @@ void swift_EnumMirror_subscript(String *outString,
   BoxPair pair = swift_allocBox(boxType);
 
   type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
-  boxType->vw_initializeWithCopy(pair.second, const_cast<OpaqueValue *>(value));
+  boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
   type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
                                     (int) (tag - Description.getNumPayloadCases()));
 
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
 
-  owner = pair.first;
-  value = pair.second;
+  owner = pair.object;
+  value = pair.buffer;
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
     owner = *reinterpret_cast<HeapObject * const *>(value);
     value = swift_projectBox(const_cast<HeapObject *>(owner));
     swift_retain(owner);
-    swift_release(pair.first);
+    swift_release(pair.object);
   }
 
   new (outString) String(getFieldName(Description.CaseNames, tag));
@@ -703,14 +741,15 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      const OpaqueValue *value,
                                      const Metadata *type);
 
+// internal func _getClassCount(_: _MagicMirrorData) -> Int
+//
+// This is a free standing function, not a method.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_ClassMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   auto count = Clas->getDescription()->Class.NumFields;
 
   // If the class has a superclass, the superclass instance is treated as the
@@ -721,6 +760,10 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
   return count;
 }
 
+/// internal func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+///
+/// This is a free standing function, not a method.
+///
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -857,9 +900,7 @@ id
 swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
   id object = [*reinterpret_cast<const id *>(value) retain];
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_release(owner);
-#endif
+  SWIFT_CC_PLUSONE_GUARD(swift_release(owner));
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
     id quickLookObject = [object debugQuickLookObject];
     [quickLookObject retain];
@@ -955,9 +996,7 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
 
-#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_retain(owner);
-#endif
+  SWIFT_CC_PLUSZERO_GUARD(swift_retain(owner));
 
   result->Self = ClassSuperMirrorMetadata();
   result->MirrorWitness = &ClassSuperMirrorWitnessTable;
@@ -978,9 +1017,7 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
 
-#ifdef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  swift_retain(owner);
-#endif
+  SWIFT_CC_PLUSZERO_GUARD(swift_retain(owner));
 
   result->Self = ObjCSuperMirrorMetadata();
   result->MirrorWitness = &ObjCSuperMirrorWitnessTable;
@@ -1092,12 +1129,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
   BoxPair box = swift_allocBox(T);
 
   if (take)
-    T->vw_initializeWithTake(box.second, value);
+    T->vw_initializeWithTake(box.buffer, value);
   else
-    T->vw_initializeWithCopy(box.second, value);
-  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.second);
+    T->vw_initializeWithCopy(box.buffer, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.buffer);
 
-  Data = {box.first, box.second, T};
+  Data = {box.object, box.buffer, T};
 }
 
 /// MagicMirror ownership-sharing subvalue constructor.
@@ -1130,19 +1167,14 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   Mirror result;
   // Take the value, unless we projected a subvalue from it. We don't want to
   // deal with partial value deinitialization.
-  bool take =
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-    mirrorValue == value;
-#else
-    false;
-#endif
+  bool take = false;
+  SWIFT_CC_PLUSONE_GUARD(take = (mirrorValue == value));
   ::new (&result) MagicMirror(mirrorValue, mirrorType, take);
 
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   // Destroy the whole original value if we couldn't take it.
-  if (!take)
+  if (!take) {
     T->vw_destroy(value);
-#endif
+  }
   return MirrorReturn(result);
 }
 

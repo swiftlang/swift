@@ -69,7 +69,7 @@ public func single_generic<T: P2>(_: T.Type) {
 // CHECK-NEXT:    [[COUNT_PTR:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
 // CHECK-NEXT:    store i64 %2, i64* [[COUNT_PTR]], align 8
 // CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 
@@ -197,7 +197,7 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 // CHECK-NEXT:    [[COUNT_PTR:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
 // CHECK-NEXT:    store i64 %2, i64* [[COUNT_PTR]], align 8
 // CHECK-NEXT:    [[CAST_CONDITIONAL_TABLES:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
+// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWG", %swift.type* %0, i8** [[CAST_CONDITIONAL_TABLES]])
 // CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 
@@ -208,7 +208,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S42conditional_conformance_basic_conformances23double_generic_concreteyyxmAA2P2RzlF"(%swift.type*, %swift.type* %X, i8** %X.P2) #0 {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %conditional.requirement.buffer = alloca [2 x i8**], align 8
-// CHECK-NEXT:    [[Double_TYPE:%.*]] = call %swift.type* @"$S42conditional_conformance_basic_conformances6DoubleVMa"(%swift.type* %X, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i32 }>* }>, <{ i8**, i64, <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i32 }>* }>* @"$S42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 1) to %swift.type*))
+// CHECK-NEXT:    [[Double_TYPE:%.*]] = call %swift.type* @"$S42conditional_conformance_basic_conformances6DoubleVMa"(%swift.type* %X, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$S42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 1) to %swift.type*))
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0

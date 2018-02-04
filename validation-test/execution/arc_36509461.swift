@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import Foundation
 

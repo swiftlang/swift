@@ -1792,7 +1792,7 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
 
   // Create an optional of the object type that can be implicitly
   // unwrapped which subsumes both behaviors.
-  return {ImplicitlyUnwrappedOptionalType::get(setterType), true};
+  return {OptionalType::get(setterType), true};
 }
 
 /// Add an AvailableAttr to the declaration for the given
@@ -4073,7 +4073,7 @@ namespace {
           nullability = translateNullability(*typeNullability);
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
-          resultTy = OptionalType::get(nullability, resultTy);
+          resultTy = OptionalType::get(resultTy);
           isIUO = nullability == OTK_ImplicitlyUnwrappedOptional;
         }
 
@@ -5201,7 +5201,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 
   for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
     if (auto *otherProto = ctx.getProtocol(attr->getProtocolKind()))
-      if (otherProto == proto)
+      if (otherProto == proto || otherProto->inheritsFrom(proto))
         return true;
 
   // Only consider extensions from the original module...or from an overlay
@@ -6115,8 +6115,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Rebuild the function type with the appropriate result type;
   Type resultTy = selfTy;
-  if (failability)
-    resultTy = OptionalType::get(failability, resultTy);
+  if (failability != OTK_None)
+    resultTy = OptionalType::get(resultTy);
 
   type = FunctionType::get(oldFnType->getInput(), resultTy,
                            oldFnType->getExtInfo());
@@ -8585,3 +8585,53 @@ ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
       .getBaseIdentifier();
 }
 
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// clang::Decls, is defined here to avoid too much layering violation / circular
+// linkage dependency.
+
+struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
+      ND->printName(OS);
+    }
+  }
+
+  static inline void printClangShortLoc(raw_ostream &OS,
+                                        clang::SourceManager *CSM,
+                                        clang::SourceLocation L) {
+    if (!L.isValid() || !L.isFileID())
+      return;
+    auto PLoc = CSM->getPresumedLoc(L);
+    OS << llvm::sys::path::filename(PLoc.getFilename()) << ':' << PLoc.getLine()
+       << ':' << PLoc.getColumn();
+  }
+
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    if (CSM) {
+      const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+      auto Range = CD->getSourceRange();
+      printClangShortLoc(OS, CSM, Range.getBegin());
+      OS << '-';
+      printClangShortLoc(OS, CSM, Range.getEnd());
+    }
+  }
+};
+
+static ClangDeclTraceFormatter TF;
+
+UnifiedStatsReporter::FrontendStatsTracer
+UnifiedStatsReporter::getStatsTracer(StringRef EventName,
+                                     const clang::Decl *D) {
+  if (LastTracedFrontendCounters)
+    // Return live tracer object.
+    return FrontendStatsTracer(EventName, D, &TF, this);
+  else
+    // Return inert tracer object.
+    return FrontendStatsTracer();
+}

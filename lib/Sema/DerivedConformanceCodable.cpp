@@ -82,7 +82,7 @@ enum CodableConformanceType {
 /// \param proto The \c ProtocolDecl to check conformance to.
 static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     DeclContext *context,
-                                                    Type target,
+                                                    Type target, bool isIUO,
                                                     ProtocolDecl *proto) {
   // Some generic types need to be introspected to get at their "true" Codable
   // conformance.
@@ -92,21 +92,9 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     target = referenceType->getReferentType();
   }
 
-  if (auto genericType = target->getAs<BoundGenericType>()) {
-    auto *nominalTypeDecl = genericType->getAnyNominal();
-
-    // Implicitly unwrapped optionals need to be unwrapped;
-    // ImplicitlyUnwrappedOptional does not need to conform to Codable directly
-    // -- only its inner type does.
-    if (nominalTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl()) {
-      for (auto paramType : genericType->getGenericArgs()) {
-        if (typeConformsToCodable(tc, context, paramType, proto) != Conforms)
-          return DoesNotConform;
-      }
-
-      return Conforms;
-    }
-  }
+  if (isIUO)
+    return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
+                                 false, proto);
 
   return tc.conformsToProtocol(target, proto, context,
                                ConformanceCheckFlags::Used) ? Conforms
@@ -149,7 +137,9 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   if (!varDecl->hasType())
     return TypeNotValidated;
 
-  return typeConformsToCodable(tc, context, varDecl->getType(), proto);
+  bool isIUO =
+      varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  return typeConformsToCodable(tc, context, varDecl->getType(), isIUO, proto);
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
@@ -633,10 +623,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
       varType = referenceType->getReferentType();
     }
 
-    if (varType->getAnyNominal() == C.getOptionalDecl() ||
-        varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
+    if (varType->getAnyNominal() == C.getOptionalDecl())
       methodName = C.Id_encodeIfPresent;
-    }
 
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
     DeclName name(C, methodName, argNames);
@@ -900,8 +888,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         varType = referenceType->getReferentType();
       }
 
-      if (varType->getAnyNominal() == C.getOptionalDecl() ||
-          varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
+      if (varType->getAnyNominal() == C.getOptionalDecl()) {
         methodName = C.Id_decodeIfPresent;
 
         // The type we request out of decodeIfPresent needs to be unwrapped
