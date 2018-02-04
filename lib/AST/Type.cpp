@@ -3209,7 +3209,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (!curGenericParams)
     return substitutions;
 
-  while (baseTy) {
+  while (baseTy && curGenericParams) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
