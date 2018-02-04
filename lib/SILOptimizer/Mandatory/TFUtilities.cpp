@@ -348,7 +348,8 @@ decodeArrayElements(SILValue value,
     uint64_t index = 0;
     if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
       auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
-      if (!ili) return false;
+      if (!ili)
+        return false;
       index = ili->getValue().getLimitedValue();
       if (auto *iaiUse = iai->getSingleUse())
         user = iaiUse->getUser();
@@ -365,7 +366,8 @@ decodeArrayElements(SILValue value,
     // If we got a store to a valid index, check to see if the stored value is
     // itself a valid constant.
     auto *elt = getAttrOperand(si->getOperand(0));
-    if (!elt) return false;
+    if (!elt)
+      return false;
     elements[index] = elt;
 
     // Track how many elements we see so we can know if we got them all.
@@ -407,6 +409,9 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
       auto callee = fnRef->getReferencedFunction()->getName();
       if (callee == "__tf_tensor_from_units" &&
           toiInfo.decodeTensorFromUnits(applyInst))
+        return toiInfo;
+      if (callee == "__tf_tensor_from_units_1d" &&
+          toiInfo.decodeTensorFromUnits1D(applyInst))
         return toiInfo;
     }
 
@@ -538,27 +543,52 @@ bool SILTensorOpInfo::decodeBuiltin(BuiltinInst *inst) {
 /// to align with what the Const op wants to see.
 ///
 bool SILTensorOpInfo::decodeTensorFromUnits(ApplyInst *inst) {
-  assert(inst->getNumOperands() == 4 &&
+  assert(inst->getNumOperands() == 3 &&
          isTensorHandle(inst->getType().getSwiftRValueType()) &&
          "Unexpected type signature for __tf_tensor_from_units");
 
   // If we can't analyze the operands as arrays of constants, give up.
   auto unitsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
   auto shapeArray = dyn_cast_or_null<StructInst>(getAttrOperand(2));
-  if (!unitsArray || !shapeArray ||
-      !dyn_cast_or_null<MetatypeInst>(getAttrOperand(3)))
+  if (!unitsArray || !shapeArray)
     return false;
 
   // Otherwise, good news everyone!  We can treat this as a Const op.  The first
   // operand is the $tensor value, the second is the $shape for it, and the
-  // third is the dtype for the result.
+  // third is the dtype for the result (which gets added later).
   opName = "Const";
   operandDescriptorStr = "";
   resultDescriptorStr = "t";
   builtinName = "__tfop_Const,:t";
   attributes.push_back({"value", AttributeModifier::Tensor });
   attributes.push_back({"value", AttributeModifier::Shape });
-  attributes.push_back({"dtype", AttributeModifier::Normal });
+  return true;
+}
+
+/// If all the operands to a call to __tf_tensor_from_units_1d are constants,
+/// we can promote this to a 'Const' node with an attached TF_Tensor attribute.
+/// This is a specialized form of __tf_tensor_from_units, because the later is
+/// defined in terms of a shape of "[units.count]" but the performance optimizer
+/// is not reliably constant propagating this.  When we have a reliable
+/// deabstraction pass we can re-evaluate this and hopefully eliminate it in
+/// favor of library code in the TensorFlow module.
+///
+bool SILTensorOpInfo::decodeTensorFromUnits1D(ApplyInst *inst) {
+  assert(inst->getNumOperands() == 2 &&
+         isTensorHandle(inst->getType().getSwiftRValueType()) &&
+         "Unexpected type signature for __tf_tensor_from_units_1d");
+
+  // If we can't analyze the operands as arrays of constants, give up.
+  auto unitsArray = dyn_cast_or_null<StructInst>(getAttrOperand(1));
+  if (!unitsArray)
+    return false;
+
+  // Otherwise, good news everyone!  We can treat this as a Const op.
+  opName = "Const";
+  operandDescriptorStr = "";
+  resultDescriptorStr = "t";
+  builtinName = "__tfop_Const,:t";
+  attributes.push_back({"value", AttributeModifier::Tensor });
   return true;
 }
 
@@ -620,6 +650,12 @@ std::string SILTensorOpInfo::checkAttributeConstants() const {
         if (attrId >= attributes.size() ||
             attr.first != attributes[attrId].first ||
             attributes[attrId].second != AttributeModifier::Shape) {
+          // If we have a call to a well-known C function that will be promoted
+          // to a tensor op, then we don't need a shape, it will be synthesized
+          // later.
+          if (isa<ApplyInst>(inst))
+            break;
+
           return "tensor array attribute '" + attr.first.str() +
                  "' must be followed by a shape";
         }
@@ -761,6 +797,49 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
     changed = true;
   }
   assert(nextOperand == inst->getNumOperands() && "Unexpected operands?");
+
+  // Handle special cases that arise from promoting functions into ops.  We
+  // already know they are going to get rewritten.
+  if (auto *applyInst = dyn_cast<ApplyInst>(inst)) {
+    auto *fnRef = cast<FunctionRefInst>(applyInst->getCallee());
+    auto callee = fnRef->getReferencedFunction()->getName();
+    if (callee == "__tf_tensor_from_units") {
+      // This takes a Tensor and a Shape operand, but needs a DType added.  The
+      // dtype is the type of the Tensor elements, which we conveniently already
+      // have available as the first operand.
+      operands.push_back(operands[0]);
+      name += ",dtype";
+    } else if (callee == "__tf_tensor_from_units_1d") {
+      // This takes a Tensor operand, but needs a Shape and a DType added.  At
+      // this point, the operands list will have a metatype for the tensor as
+      // the first operand then all the elements.
+      uint64_t unitCount = operands.size()-1;
+
+      // The shape needs a metatype to be well formed, but nothing actually
+      // cares what it is.  Just re-push the metatype for the tensor elements,
+      // even though it might be floating point or something else weird.
+      operands.push_back(operands[0]);
+      name += ",shape";
+      name += getAttributeModifierSuffix(AttributeModifier::Shape);
+
+      // The shape of a 1d tensor is just the count of elements.
+      auto &ctx = inst->getFunction()->getASTContext();
+      auto unitCountVal =
+        B.createIntegerLiteral(inst->getLoc(),
+                               SILType::getBuiltinIntegerType(64, ctx),
+                               unitCount);
+      operands.push_back(unitCountVal);
+      name += ",";
+      name += getAttributeModifierSuffix(AttributeModifier::ArrayElement);
+
+      // This needs the dtype of the Tensor.
+      operands.push_back(operands[0]);
+      name += ",dtype";
+    }
+  }
+
+
+
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)

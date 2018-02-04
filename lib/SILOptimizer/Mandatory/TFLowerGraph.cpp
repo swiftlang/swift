@@ -557,10 +557,9 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       SmallVector<SingleValueInstruction*, 4> elements;
       SmallVector<int64_t, 4> shape;
       if (!isa<MetatypeInst>(attrValue)) {
-        // The scalar case is very simple.
+        // The scalar case is very simple, the shape of a scalar is 0d.
         dtype = getTensorFlowDataType(attrValue->getType(), inst->getLoc());
         elements.push_back(cast<LiteralInst>(attrValue));
-        shape.push_back(1);
       } else {
         // Handle the array case by decoding the array itself, then decoding the
         // shape value that follows it.

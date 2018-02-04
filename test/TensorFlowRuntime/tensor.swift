@@ -44,7 +44,7 @@ TensorTests.testCPUAndGPU("FactoryInitializers") {
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
-  let x = Tensor<Int32>.ones(shape: [5, 5]).toDevice()
+  let x = Tensor<Int32>.ones(shape: [5, 5])
   let ints = Tensor<Int>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
@@ -72,7 +72,7 @@ TensorTests.testCPUAndGPU("Convolution") {
   let x = Tensor<Float>(shape: [1, 3, 3, 1], repeating: 0.5)
   let filter = Tensor<Float>(shape: [1, 3, 3, 1],
                              units: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-  // FIXME: Bug "attribute 'strides' requires a constant argument".
+  // FIXME: Dimensions must be equal, but are 1 and 3 for (op: 'Conv2D') with input shapes: [1,3,3,1], [1,3,3,1].
   let y = x.convolved2D(withFilter: filter,
                         strides: [1, 1, 1, 1], padding: .same)
 }
@@ -181,18 +181,24 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
                             [0.4],
                             [0.3],
                             [0.9]]).toDevice()
-    var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
-    var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
+    var b1 = Tensor<Float>.zeros(shape: [1, 4])
+    var b2 = Tensor<Float>.zeros(shape: [1, 1])
 
-    @_versioned
-    @_inlineable
+    @inline(__always)
+    init() {
+      // This initializer must be manually declared, because the initializer
+      // logic for the variables declared above is large, and we need to mark
+      // this as inline(__always).
+    }
+    @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = tanh(x ⊗ w1 + b1)
       return tanh(o1 ⊗ w2 + b2)
     }
   }
+  let predictFor = Tensor<Float>([[1, 0.5]]).toDevice()
   let classifier = MLPClassifier()
-  let _ = classifier.prediction(for: Tensor([[1, 0.5]]))
+  let _ = classifier.prediction(for: predictFor)
   // TODO: Check result.
 }
 
@@ -216,10 +222,10 @@ func testStraightLineXORTraining() {
   let learningRate: Float = 0.2
 
   // Parameters
-  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5).toDevice()
-  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5).toDevice()
-  var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
-  var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
+  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
+  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+  var b1 = Tensor<Float>.zeros(shape: [1, 4])
+  var b2 = Tensor<Float>.zeros(shape: [1, 1])
 
   // Training data
   let inputBatch = Tensor<Float>(
@@ -275,10 +281,10 @@ TensorTests.testCPUAndGPU("StraightLineXORTraining", testStraightLineXORTraining
 func testXORClassifierTraining() {
   struct MLPClassifier {
     // TODO: randomize weights once we have Tensor.random() implemented.
-    var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5).toDevice()
-    var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5).toDevice()
-    var b1 = Tensor<Float>.zeros(shape: [1, 4]).toDevice()
-    var b2 = Tensor<Float>.zeros(shape: [1, 1]).toDevice()
+    var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
+    var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+    var b1 = Tensor<Float>.zeros(shape: [1, 4])
+    var b2 = Tensor<Float>.zeros(shape: [1, 1])
 
     @_versioned
     @inline(__always)
