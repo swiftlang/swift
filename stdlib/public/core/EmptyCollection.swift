@@ -176,5 +176,12 @@ extension EmptyCollection : Equatable {
   }
 }
 
+extension EmptyCollection : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _mixInt(0)
+  }
+}
+
 // @available(*, deprecated, renamed: "EmptyCollection.Iterator")
 public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator
