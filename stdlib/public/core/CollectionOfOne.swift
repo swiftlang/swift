@@ -140,7 +140,7 @@ extension CollectionOfOne : Equatable where Element : Equatable {
   /// Returns a Boolean value indicating whether two collections are equal.
   @_inlineable // FIXME(sil-serialize-all)
   public static func == (lhs: CollectionOfOne, rhs: CollectionOfOne) -> Bool {
-    return lhs[0] == rhs[0]
+    return lhs._element == rhs._element
   }
 }
 
@@ -153,7 +153,7 @@ extension CollectionOfOne : Hashable where Element : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return self[0].hashValue
+    return _element.hashValue
   }
 }
 
