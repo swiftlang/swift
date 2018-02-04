@@ -15,6 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Frontend/InputFile.h"
+#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -43,9 +44,18 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
+  SupplementaryOutputPaths SupplementaryOutputs;
+
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
+
+  const SupplementaryOutputPaths &supplementaryOutputs() const {
+    return SupplementaryOutputs;
+  }
+  SupplementaryOutputPaths &supplementaryOutputs() {
+    return SupplementaryOutputs;
+  }
 
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
@@ -164,7 +174,9 @@ public:
 private:
   friend class ArgsToFrontendOptionsConverter;
 
-  void setMainOutputs(ArrayRef<std::string> outputFiles);
+  void
+  setMainAndSupplementaryOutputs(ArrayRef<std::string> outputFiles,
+                                 SupplementaryOutputPaths supplementaryOutputs);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
@@ -193,8 +205,20 @@ public:
 
   // Supplementary outputs
 
+  unsigned countOfFilesProducingSupplementaryOutput() const;
+
   void forEachInputProducingSupplementaryOutput(
       llvm::function_ref<void(const InputFile &)> fn) const;
+
+  bool hasDependenciesPath() const;
+  bool hasReferenceDependenciesPath() const;
+  bool hasObjCHeaderOutputPath() const;
+  bool hasLoadedModuleTracePath() const;
+  bool hasModuleOutputPath() const;
+  bool hasModuleDocOutputPath() const;
+  bool hasTBDPath() const;
+
+  bool hasDependencyTrackerPath() const;
 };
 
 } // namespace swift

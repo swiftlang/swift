@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/SupplementaryOutputPaths.h"
 #include "swift/Option/Options.h"
 #include "llvm/Option/ArgList.h"
 
@@ -41,7 +42,8 @@ public:
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
         Diags(diags) {}
 
-  Optional<std::vector<std::string>> convert();
+  bool convert(std::vector<std::string> &mainOutputs,
+               SupplementaryOutputPaths &supplementaryOutputs);
 
   /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.
@@ -106,6 +108,52 @@ private:
   std::string determineBaseNameOfOutput(const InputFile &input) const;
 
   std::string deriveOutputFileFromParts(StringRef dir, StringRef base) const;
+};
+
+class SupplementaryOutputPathsComputer {
+  const llvm::opt::ArgList &Args;
+  DiagnosticEngine &Diags;
+  const FrontendInputsAndOutputs &InputsAndOutputs;
+  ArrayRef<std::string> OutputFiles;
+  StringRef ModuleName;
+
+  const FrontendOptions::ActionType RequestedAction;
+
+public:
+  SupplementaryOutputPathsComputer(
+      const llvm::opt::ArgList &args, DiagnosticEngine &diags,
+      const FrontendInputsAndOutputs &inputsAndOutputs,
+      ArrayRef<std::string> outputFiles, StringRef moduleName);
+  Optional<SupplementaryOutputPaths> computeOutputPaths() const;
+
+private:
+  /// \return None if error.
+  Optional<std::vector<SupplementaryOutputPaths>>
+  getSupplementaryOutputPathsFromArguments() const;
+
+  /// Given an ID corresponding to supplementary output argument
+  /// (e.g. -emit-module-path), collect all such paths, and ensure
+  /// there are the right number of them.
+  Optional<std::vector<std::string>>
+  getSupplementaryFilenamesFromArguments(options::ID pathID) const;
+
+  Optional<SupplementaryOutputPaths> computeOutputPathsForOneInput(
+      StringRef outputFilename,
+      const SupplementaryOutputPaths &pathsFromFilelists,
+      const InputFile &) const;
+
+  StringRef deriveDefaultSupplementaryOutputPathExcludingExtension(
+      StringRef outputFilename, const InputFile &) const;
+
+  /// \return empty string if no output file.
+  std::string determineSupplementaryOutputFilename(
+      options::ID emitOpt, std::string pathFromArgumentsOrFilelists,
+      StringRef extension, StringRef mainOutputIfUsable,
+      StringRef defaultSupplementaryOutputPathExcludingExtension) const;
+
+  void deriveModulePathParameters(options::ID &emitOption,
+                                  std::string &extension,
+                                  std::string &mainOutputIfUsable) const;
 };
 
 } // namespace swift
