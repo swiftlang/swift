@@ -184,6 +184,8 @@ PASS(LoopRotate, "loop-rotate",
      "Loop Rotation")
 PASS(LoopUnroll, "loop-unroll",
      "Loop Unrolling")
+PASS(LoopBranchHoist, "loop-branchhoist",
+     "Hoist branches out of loops")
 PASS(LowerAggregateInstrs, "lower-aggregate-instrs",
      "Lower Aggregate SIL Instructions to Multiple Scalar Operations")
 PASS(MandatoryInlining, "mandatory-inlining",

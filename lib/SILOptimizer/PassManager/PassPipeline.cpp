@@ -171,6 +171,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   addSimplifyCFGSILCombinePasses(P);
 
   // Run high-level loop opts.
+  P.addLoopBranchHoist();
   P.addLoopRotate();
 
   // Cleanup.
