@@ -927,6 +927,37 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
       SpecializeAttr(atLoc, range, requirements, exported, kind);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                                       ArrayRef<Argument> arguments,
+                                       DeclName gradFuncName,
+                                       DeclNameLoc gradFuncNameLoc,
+                                       TrailingWhereClause *clause)
+  : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
+    NumArguments(arguments.size()), GradFuncName(gradFuncName),
+    GradFuncNameLoc(gradFuncNameLoc), WhereClause(clause) {
+  std::copy(arguments.begin(), arguments.end(), getArgumentsData());
+}
+
+DifferentiableAttr *DifferentiableAttr::create(ASTContext &context,
+                                               SourceLoc atLoc,
+                                               SourceRange baseRange,
+                                               ArrayRef<Argument> arguments,
+                                               DeclName gradFuncName,
+                                               DeclNameLoc gradFuncNameLoc,
+                                               TrailingWhereClause *clause) {
+  unsigned numArgs = arguments.size();
+  unsigned size = sizeof(DifferentiableAttr) + numArgs * sizeof(Argument);
+  void *mem = context.Allocate(size, alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(atLoc, baseRange, arguments,
+                                      gradFuncName, gradFuncNameLoc,
+                                      clause);
+}
+
+ArrayRef<DifferentiableAttr::Argument>
+DifferentiableAttr::getArguments() const {
+  return const_cast<DifferentiableAttr *>(this)->getArguments();
+}
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
                                TypeLoc ProtocolType,

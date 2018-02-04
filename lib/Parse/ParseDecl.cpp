@@ -508,12 +508,13 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   SourceLoc lParenLoc, rParenLoc;
 
   // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&]() -> ParserStatus {
+  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserStatus {
     Status.setIsParseError();
-    skipUntil(tok::r_paren);
-    if (!consumeIf(tok::r_paren, rParenLoc)) {
-      diagnose(Tok, diag::attr_expected_rparen, AttrName,
-               /*DeclModifier=*/false);
+    for (int i = 0; i < parenDepth; i++) {
+      skipUntil(tok::r_paren);
+      if (!consumeIf(tok::r_paren, rParenLoc))
+        diagnose(Tok, diag::attr_expected_rparen, AttrName,
+                 /*DeclModifier=*/false);
     }
     return Status;
   };
@@ -524,13 +525,69 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     return errorAndSkipToEnd();
   }
 
+  // Parse optional 'withRespectTo:' label.
+  SmallVector<DifferentiableAttr::Argument, 8> args;
+  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+    consumeToken(tok::identifier);
+    if (!consumeIf(tok::colon)) {
+      diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
+               "withRespectTo");
+      return errorAndSkipToEnd();
+    }
+    SourceLoc leftLoc;
+    if (parseToken(tok::l_paren, leftLoc,
+                   diag::attr_differentiable_expected_argument_list)) {
+      return errorAndSkipToEnd();
+    }
+    // Function that parses an argument into `args`. Returns true if error
+    // occurred.
+    auto parseArg = [&]() -> bool {
+      SourceLoc argLoc;
+      switch (Tok.getKind()) {
+      case tok::period_prefix:
+        consumeToken(tok::period_prefix);
+        unsigned index;
+        if (parseUnsignedInteger(index, argLoc,
+                                 diag::attr_differentiable_expected_argument))
+          return true;
+        args.push_back(
+          DifferentiableAttr::Argument::getIndexArgument(argLoc, index));
+        break;
+      case tok::kw_self:
+        argLoc = consumeToken(tok::kw_self);
+        args.push_back(DifferentiableAttr::Argument::getSelfArgument(argLoc));
+        break;
+      default:
+        diagnose(Tok, diag::attr_differentiable_expected_argument);
+        return true;
+      }
+      return false;
+    };
+    // Parse first argument.
+    if (parseArg())
+      return errorAndSkipToEnd(2);
+    // Parse rest arguments until ')'.
+    while (!consumeIf(tok::r_paren)) {
+      if (parseToken(tok::comma, diag::attr_expected_comma,
+                     "differentiable", /*isDeclModifier=*/false) ||
+          parseArg()) {
+        return errorAndSkipToEnd(2);
+      }
+    }
+
+    // Parse comma.
+    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+               /*isDeclModifier=*/false);
+  }
+
   // Parse 'gradient:' label.
   SourceLoc gradientLabelLoc;
   if (parseSpecificIdentifier("gradient", gradientLabelLoc,
                               diag::attr_differentiable_missing_gradient_label))
     return errorAndSkipToEnd();
   if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::attr_differentiable_expected_colon_after_label, "gradient");
+    diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
+             "gradient");
     return errorAndSkipToEnd();
   }
 
@@ -564,9 +621,9 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   return ParserResult<DifferentiableAttr>(
-    new (Context) DifferentiableAttr(atLoc, SourceRange(loc, rParenLoc),
-                                     gradFuncName, gradFuncNameLoc,
-                                     whereClause));
+    DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
+                               args, gradFuncName, gradFuncNameLoc,
+                               whereClause));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,

@@ -1451,7 +1451,7 @@ ERROR(attr_differentiable_expected_argument_list,PointsToFirstBadToken,
       "expected a list of arguments to differentiate with respect to, e.g. [.0, w, b]", ())
 
 ERROR(attr_differentiable_expected_argument,PointsToFirstBadToken,
-      "expected an argument, which can be a dot-index (e.g. '.0') of a function argument, or an identifier that is captured by the function", ())
+      "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
 
 ERROR(attr_differentiable_argument_index_must_be_positive_integer,PointsToFirstBadToken,
       "gradient argument index must be a positive integer", ())

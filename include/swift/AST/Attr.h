@@ -1266,29 +1266,72 @@ public:
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Attribute that marks a function differentiable and specifies the adjoint
-/// of the function.
-/// e.g. @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
+/// of the function. For example:
+///   @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
+///   @differentiable(withRespectTo: (self, .0, .1), gradient: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
 public:
-  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                              DeclName gradFuncName,
-                              DeclNameLoc gradFuncNameLoc,
-                              TrailingWhereClause *whereClause)
-    : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
-      GradFuncName(gradFuncName), GradFuncNameLoc(gradFuncNameLoc),
-      WhereClause(whereClause) {}
+  enum class ArgumentKind { Index, Self };
+  class Argument {
+  private:
+    SourceLoc Loc;
+    ArgumentKind Kind;
+    union Value {
+      struct { unsigned Index; }; // Index
+      struct {};                  // Self
+      // TODO: Other argument kinds, e.g. identifier?
+      Value(unsigned index) : Index(index) {}
+      Value() {}
+    } V;
+  public:
+    Argument(SourceLoc loc, ArgumentKind kind, Value value)
+      : Loc(loc), Kind(kind), V(value) {}
 
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Differentiable;
-  }
+    static Argument getIndexArgument(SourceLoc loc, unsigned index) {
+      return { loc, ArgumentKind::Index, { index } };
+    }
+
+    static Argument getSelfArgument(SourceLoc loc) {
+      return { loc, ArgumentKind::Self, {} };
+    }
+
+    unsigned getIndex() const {
+      assert(Kind == ArgumentKind::Index);
+      return V.Index;
+    }
+
+    ArgumentKind getKind() const {
+      return Kind;
+    }
+
+    SourceLoc getLoc() const {
+      return Loc;
+    }
+  };
 
 private:
-  /// The function which the declared function differentiates.
+  /// The number of arguments specified in 'withRespectTo:'.
+  size_t NumArguments;
+  /// The name of the function which the declared function differentiates.
   DeclName GradFuncName;
   DeclNameLoc GradFuncNameLoc;
+  /// The constraint clauses for generic types.
   TrailingWhereClause *WhereClause;
 
+  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                              ArrayRef<Argument> arguments,
+                              DeclName gradFuncName,
+                              DeclNameLoc gradFuncNameLoc,
+                              TrailingWhereClause *clause);
+
 public:
+  static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
+                                    SourceRange baseRange,
+                                    ArrayRef<Argument> arguments,
+                                    DeclName gradFuncName,
+                                    DeclNameLoc gradFuncNameLoc,
+                                    TrailingWhereClause *clause);
+
   DeclName getGradFuncName() const {
     return GradFuncName;
   }
@@ -1299,6 +1342,22 @@ public:
 
   TrailingWhereClause *getWhereClause() const {
     return WhereClause;
+  }
+
+  Argument *getArgumentsData() {
+    return reinterpret_cast<Argument *>(this+1);
+  }
+
+  /// The list of arguments marking that the function is only differentiable
+  /// with respect to specific arguments.
+  ArrayRef<Argument> getArguments() const;
+
+  MutableArrayRef<Argument> getArguments() {
+    return { getArgumentsData(), NumArguments };
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Differentiable;
   }
 };
 

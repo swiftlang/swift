@@ -673,6 +673,13 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// \brief Parse an unsigned integer and returns it in \p Result. On failure
+  /// emit the specified error diagnostic, and a note at the specified note
+  /// location.
+  bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
+                            const Diagnostic &D);
+
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
