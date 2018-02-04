@@ -933,9 +933,9 @@ private:
                            sizeof(flags)))
       return nullptr;
     
-    unsigned baseSize;
+    unsigned baseSize = 0;
     unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
-    bool hasVTable;
+    bool hasVTable = false;
     switch (auto kind = flags.getKind()) {
     case ContextDescriptorKind::Module:
       baseSize = sizeof(TargetModuleContextDescriptor<Runtime>);
