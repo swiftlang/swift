@@ -62,3 +62,61 @@ public func lowerGraphCrash(x: Tensor<Int>) {
     // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
   } // expected-warning {{value implicitly copied to the accelerator}}
 } // expected-warning {{value implicitly copied to the accelerator}}
+
+
+// This was a prototype runtime test that crashed due to bb arg invalidation
+// problems.
+public func testStraightLineXORTraining() { // expected-note 5 {{value used here}}
+  // Hyper-parameters
+  let iterationCount = 1000
+  let learningRate: Float = 0.2
+
+  // Parameters
+  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
+  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+
+  // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
+  var b1 = Tensor<Float>.zeros(shape: [1, 4]) // expected-warning 5 {{implicitly copied}}
+  var b2 = Tensor<Float>.zeros(shape: [1, 1])
+
+  // Training data
+  let inputBatch = Tensor<Float>(
+    [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+    ).toDevice()
+  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
+
+  // Training loop
+  for _ in 0..<iterationCount {
+    let mmul1 = inputBatch ⊗ w1
+    let l1 = mmul1 + b1
+    let o1 = sigmoid(l1) // expected-warning 2 {{implicitly copied}}
+    let mmul2 = o1 ⊗ w2
+    let l2 = mmul2 + b2
+    let pred = sigmoid(l2) 
+
+    // Loss
+    let sub = outputBatch - pred
+    let sqr = sub * sub
+    let _ = sqr.mean()  // expected-warning 2 {{implicitly copied}}
+
+    // Gradient
+    let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
+    let dSub = 2 * sub * dSqr
+    let dPred = -dSub
+    let dL2 = dPred * pred * (1 - pred)
+    let dMmul2 = dL2
+    let dB2 = dL2
+    let dO1 = dMmul2 ⊗ w2.transposed()  // expected-warning {{implicitly copied}} expected-note {{value used here}}
+    let dW2 = o1.transposed() ⊗ dMmul2  // expected-warning {{implicitly copied}}
+    let dL1 = dO1 * l1 * (1 - l1)
+    let dMmul1 = dL1
+    let dB1 = dL1
+    let dW1 = inputBatch ⊗ dMmul1
+
+    // Descent
+    w1 -= (dW1 * learningRate)
+    b1 -= (dB1 * learningRate)
+    w2 -= (dW2 * learningRate)
+    b2 -= (dB2 * learningRate)
+  }
+}
