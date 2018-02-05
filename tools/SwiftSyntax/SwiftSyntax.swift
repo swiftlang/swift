@@ -16,6 +16,7 @@ import Foundation
 
 #if os(macOS)
 import Darwin
+import SwiftSourceKit
 #elseif os(Linux)
 import Glibc
 #endif
@@ -29,12 +30,21 @@ public enum ParserError: Error {
 
 extension Syntax {
   fileprivate static func encodeSourceFileSyntaxInternal(_ url: URL) throws -> Data {
+#if os(macOS)
+    let Service = SourceKitdService()
+    let Request = SourceKitdRequest(uid: .source_request_editor_open)
+    Request.addParameter(.key_name, value: url.absoluteString)
+    Request.addParameter(.key_enable_syntax_tree, value: 1)
+    let Resp = Service.sendSyn(request: Request)
+    return Resp.value.getString(.key_serialized_syntax_tree).data(using: .utf8)!
+#else
     let swiftcRunner = try SwiftcRunner(sourceFile: url)
     let result = try swiftcRunner.invoke()
     guard result.wasSuccessful else {
       throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
     return result.stdoutData
+#endif
   }
 
   /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
