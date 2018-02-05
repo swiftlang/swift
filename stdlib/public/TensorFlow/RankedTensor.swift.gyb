@@ -1,0 +1,496 @@
+//===-- RankedTensor.swift.gyb --------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Dynamically shaped but statically ranked tensors.
+//
+// Ranked tensors (Tensor1D, Tensor2D, etc) use a tuple of integers to represent
+// a shape with known rank.
+//
+//===----------------------------------------------------------------------===//
+
+infix operator ⊗ : MultiplicationPrecedence
+
+%{
+  ranks = [1, 2, 3, 4]
+
+  def rankName(rank):
+    if rank == 1:
+         return 'one'
+    elif rank == 2:
+         return 'two'
+    elif rank == 3:
+         return 'three'
+    elif rank == 4:
+         return 'four'
+
+  def _elementArrayLiteral(rank):
+    return 'Unit' if rank == 1 else '[' + _elementArrayLiteral(rank - 1) + ']'
+
+}%
+
+% for rank in ranks:
+%   elementRank = rank - 1
+%   liftedRank = rank + 1
+%   Self = 'Tensor{}D'.format(rank)
+%   ElementTensor = 'Tensor{}D<Unit>'.format(elementRank)
+%   LiftedTensor = 'Tensor{}D<Unit>'.format(liftedRank)
+%   elementArrayLiteral = _elementArrayLiteral(rank)
+%   arrayLiteral = '[' + elementArrayLiteral + ']'
+
+/// A ${rankName(rank)}-dimensional tensor.
+public struct ${Self}<Unit : AccelerableTensorUnit> {
+  public var base: Tensor<Unit>
+
+  @_inlineable
+  public static var rank: Int { return ${rank} }
+
+  @_inlineable
+  public var rank: Int { return ${Self}.rank }
+
+  /// TODO(danielzheng): Add an 'array' property, which returns a RankedArray
+  /// (to be implemented in Arrays.swift.gyb).
+  @_inlineable
+  public var units: [Unit] { return base.units }
+
+  @_inlineable
+  public var shape: [Int] {
+    return base.shape
+  }
+
+  @_versioned
+  @_inlineable
+  internal init(base: Tensor<Unit>) {
+    self.base = base
+  }
+
+  @_inlineable
+  public init?(_ other: Tensor<Unit>) {
+    guard other.rank == ${Self}.rank else { return nil }
+    self.init(base: other)
+  }
+
+  @_inlineable
+  public init(identicallyRanked other: Tensor<Unit>) {
+    // Assertion disabled because "x.rank" causes a copy of X
+    // back to the host. TODO(clattner): need a better way of
+    // exposing rank information in our model.
+    // precondition(other.rank == ${Self}.rank, "Rank is not ${rank}")
+    self.init(base: other)
+  }
+}
+
+/// Array literal support.
+extension ${Self} : ExpressibleByArrayLiteral {
+  /// Creates an instance initialized with the given elements.
+  @_inlineable
+  public init(arrayLiteral elements: ${elementArrayLiteral}...) {
+    self.init(elements)
+  }
+}
+
+/// Perform an element-wise type conversion from `${Self}<T>`.
+extension ${Self} where Unit : Numeric {
+  @_inlineable
+  public init<T : Numeric>(_ other: ${Self}<T>) {
+    self.init(base: Tensor<Unit>(other.base))
+  }
+}
+
+/// Initializers
+public extension ${Self} {
+  /// Convert from a ShapedArray. Returns nil when the ShapedArray has the wrong
+  /// rank.
+  @_inlineable
+  init?(_ other: ShapedArray<Unit>) {
+    self.init(Tensor(other))
+  }
+
+  /// Convert from a ShapedArray.
+  /// - Precondition: The ShapedArray must have rank ${rank}.
+  @_inlineable
+  init(identicallyRanked other: ShapedArray<Unit>) {
+    self.init(identicallyRanked: Tensor(other))
+  }
+
+  /// Creates an instance initialized with the given element literals.
+  @_inlineable
+  init(_ units: [${elementArrayLiteral}]) {
+    self.init(base: Tensor<Unit>(units))
+  }
+
+  /// Creates an instance initialized with the given element literals.
+  @_inlineable
+  init(_ units: ${elementArrayLiteral}...) {
+    self.init(units)
+  }
+
+  /// Creates an instance initialized with a unit representing a scalar value.
+  @_inlineable
+  init(_ value: Unit) {
+    base = Tensor(value)
+  }
+}
+
+/// Memory transfer markers
+/// TODO: Remove when send/receive semantics gets revisited.
+public extension ${Self} {
+  /// Indicate that this tensor is being moved to the accelerator.
+  @_inlineable
+  func toDevice() -> ${Self} {
+    return ${Self}(base: base.toDevice())
+  }
+
+  /// Indicate that this tensor is being moved to the host.
+  @_inlineable
+  func toHost() -> ${Self} {
+    return ${Self}(base: base.toHost())
+  }
+}
+
+/// Factories
+public extension ${Self} where Unit : Numeric {
+  /// Returns a ${rank}D tensor with all elements set to zero.
+  ///
+  /// - Parameter shape: the sizes of the tensor along each dimension.
+  @_inlineable
+  static func zeros(shape: [Int]) -> ${Self}<Unit> {
+    // TODO: Uncomment precondition when `.count` is reliably constant folded.
+    // precondition(shape.count == ${Self}.rank,
+    //              "Rank is not ${rank}")
+    return ${Self}(base: Tensor<Unit>.zeros(shape: shape))
+  }
+
+  /// Returns a ${rank}D tensor with all elements set to one.
+  ///
+  /// - Parameter shape: the sizes of the tensor along each dimension.
+  @_inlineable
+  static func ones(shape: [Int]) -> ${Self}<Unit> {
+    // TODO: Uncomment precondition when `.count` is reliably constant folded.
+    // precondition(shape.count == ${Self}.rank,
+    //              "Rank is not ${rank}")
+    return ${Self}(base: Tensor<Unit>.ones(shape: shape))
+  }
+
+  // TODO(danielzheng): these factory methods will be refactored into
+  // improved, Swifty initializers. The initializers will have versions that
+  // accept either an [Int] or ${rank} number of Int arguments for shape.
+}
+
+public extension ${Self} where Unit : FloatingPoint {
+  @_inlineable
+  static func randomNormal(
+    shape: [Int], mean: Double = 0, stddev: Double = 1
+  ) -> ${Self} {
+    return ${Self}(base:
+      Tensor<Unit>.randomNormal(
+        shape: shape,
+        mean: mean,
+        stddev: stddev
+      )
+    )
+  }
+}
+
+% if rank == 1:
+/// Subscripting a 1D tensor produces a scalar.
+public extension ${Self} {
+  @_inlineable
+  subscript(index: Int) -> Unit {
+    @inline(never) get {
+      fatalError("Unimplemented")
+    }
+  }
+}
+% else:
+/// Subscripting a higher order tensor produces an element tensor.
+public extension ${Self} {
+  @_inlineable
+  subscript(index: Int) -> ${ElementTensor} {
+    return ${ElementTensor}(base: base[index])
+  }
+
+  /// TODO: implement subscripts with multiple indices
+}
+% end
+
+/// Slicing
+public extension ${Self} {
+  @_inlineable
+  subscript(bounds: Range<Int>) -> ${Self} {
+    return ${Self}(base: base[bounds])
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Elementwise binary arithmetics
+//===----------------------------------------------------------------------===//
+
+public extension ${Self} where Unit : Numeric {
+% unaryOps = ['-']
+% for op in unaryOps:
+  @_inlineable
+  static prefix func ${op}(rhs: ${Self}) -> ${Self} {
+    return ${Self}(base: ${op}rhs.base)
+  }
+% end
+
+% binaryOps = ['+', '-', '*', '/']
+% for op in binaryOps:
+  @_inlineable
+  static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    return ${Self}(base: lhs.base ${op} rhs.base)
+  }
+
+  @_inlineable
+  static func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
+    lhs = lhs ${op} rhs
+  }
+
+  @_inlineable
+  static func ${op}(lhs: ${Self}, rhs: Unit) -> ${Self} {
+    return ${Self}(base: lhs.base ${op} rhs)
+  }
+
+  @_inlineable
+  static func ${op}(lhs: Unit, rhs: ${Self}) -> ${Self} {
+    return ${Self}(base: lhs ${op} rhs.base)
+  }
+% end
+}
+
+public extension ${Self} where Unit : Numeric {
+  @_inlineable
+  func squared() -> ${Self} {
+    return ${Self}(base: base.squared())
+  }
+
+  @_inlineable
+  func mean() -> Unit {
+    return base.mean()
+  }
+
+  @_inlineable
+  func min() -> Unit {
+    return base.min()
+  }
+
+  @_inlineable
+  func max() -> Unit {
+    return base.max()
+  }
+
+  @_inlineable
+  func argmax() -> Int {
+    return base.argmax()
+  }
+
+  @_inlineable
+  func sum() -> Unit {
+    return base.sum()
+  }
+
+% if rank > 1:
+  @_inlineable
+  func min(alongAxis axis: Int) -> ${ElementTensor} {
+    return ${ElementTensor}(base: base.min(alongAxes: axis))
+  }
+
+  @_inlineable
+  func max(alongAxis axis: Int) -> ${ElementTensor} {
+    return ${ElementTensor}(base: base.max(alongAxes: axis))
+  }
+
+  @_inlineable
+  func sum(alongAxis axis: Int) -> ${ElementTensor} {
+    return ${ElementTensor}(base: base.sum(alongAxes: axis))
+  }
+
+  @_inlineable
+  func mean(alongAxis axis: Int) -> ${ElementTensor} {
+    return ${ElementTensor}(base: base.mean(alongAxes: axis))
+  }
+% end
+}
+
+//===----------------------------------------------------------------------===//
+// Linear algebra
+//===----------------------------------------------------------------------===//
+
+public extension ${Self} where Unit : Numeric {
+  @_inlineable
+  func dot(_ other: ${Self}) -> ${Self} {
+    return ${Self}(base: base.dot(other.base))
+  }
+
+  @_inlineable
+  static func ⊗(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    return lhs.dot(rhs)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Elementwise binary comparison
+//===----------------------------------------------------------------------===//
+
+public extension ${Self} where Unit : Comparable {
+% for op in ['<', '<=', '>', '>=']:
+  @_inlineable
+  static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs.base ${op} rhs.base)
+  }
+
+  @_inlineable
+  static func ${op} (lhs: Unit, rhs: ${Self}) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs ${op} rhs.base)
+  }
+
+  @_inlineable
+  static func ${op} (lhs: ${Self}, rhs: Unit) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs.base ${op} rhs)
+  }
+% end
+}
+
+public extension ${Self} where Unit : Equatable {
+% for op in ['==', '!=']:
+  @_inlineable
+  static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs.base ${op} rhs.base)
+  }
+
+  @_inlineable
+  static func ${op} (lhs: Unit, rhs: ${Self}) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs ${op} rhs.base)
+  }
+
+  @_inlineable
+  static func ${op} (lhs: ${Self}, rhs: Unit) -> ${Self}<Bool> {
+    return ${Self}<Bool>(base: lhs.base ${op} rhs)
+  }
+% end
+}
+
+//===----------------------------------------------------------------------===//
+// Transposition and concatenation
+//===----------------------------------------------------------------------===//
+
+public extension ${Self} {
+  @_inlineable
+  func transposed(withPermutations permutations: [Int]) -> ${Self} {
+    return ${Self}(base: base.transposed(withPermutations: permutations))
+  }
+
+  @_inlineable
+  func transposed(withPermutations permutations: Int...) -> ${Self} {
+    return transposed(withPermutations: permutations)
+  }
+
+  @_inlineable
+  func transposed() -> ${Self} {
+    return ${Self}(base: base.transposed())
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Elementwise basic math functions
+//===----------------------------------------------------------------------===//
+
+% unaryOps = [
+%   ('abs', 'Numeric'),
+%   ('log', 'FloatingPoint'),
+%   ('sin', 'FloatingPoint'),
+%   ('cos', 'FloatingPoint'),
+%   ('tan', 'FloatingPoint'),
+%   ('sinh', 'FloatingPoint'),
+%   ('cosh', 'FloatingPoint'),
+%   ('tanh', 'FloatingPoint'),
+%   ('exp', 'FloatingPoint'),
+%   ('sqrt', 'FloatingPoint'),
+% ]
+% binaryOps = [
+%   ('pow', 'Numeric'),
+%   ('min', 'Numeric & Comparable'),
+%   ('max', 'Numeric & Comparable'),
+% ]
+
+% for (op, unitConstraint) in unaryOps:
+@_inlineable
+public func ${op}<Unit: ${unitConstraint}>(_ x: ${Self}<Unit>) -> ${Self}<Unit> {
+  return ${Self}(base: ${op}(x.base))
+}
+% end
+
+% for (op, unitConstraint) in binaryOps:
+@_inlineable
+public func ${op}<Unit : ${unitConstraint}>(
+  _ lhs: ${Self}<Unit>, _ rhs: ${Self}<Unit>
+) -> ${Self}<Unit> {
+  return ${Self}(base: ${op}(lhs.base, rhs.base))
+}
+
+@_inlineable
+public func ${op}<Unit : ${unitConstraint}>(
+  _ lhs: Unit, _ rhs: ${Self}<Unit>
+) -> ${Self}<Unit> {
+  return ${Self}(base: ${op}(lhs, rhs.base))
+}
+
+@_inlineable
+public func ${op}<Unit : ${unitConstraint}>(
+  _ lhs: ${Self}<Unit>, _ rhs: Unit
+) -> ${Self}<Unit> {
+  return ${Self}(base: ${op}(lhs.base, rhs))
+}
+% end
+
+/// Make "print(some${Self})" print a pretty form of the tensor.
+extension ${Self} : CustomStringConvertible {
+  @_inlineable
+  public var description: String {
+    return base.description
+  }
+}
+
+/// Make ${Self}s show up nicely in the Xcode Playground results sidebar.
+extension ${Self} : CustomPlaygroundQuickLookable {
+  @_inlineable
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
+  }
+}
+
+/// Overloads for broadcasting to various shapes. The current approach we're
+/// taking for broadcasting is that scalars can be mixed with tensors directly,
+/// and that tensor dimensions of 1 are automatically expanded to match wider
+/// tensor dimensions as needed (just like NumPy), but that rank changes need an
+/// explicit broadcast(x) call to make it clear that the rank is changing. If
+/// this is too onerous in practice, we can pick other approaches.
+public extension ${Self} {
+% if rank < ranks[-1]:
+  @_inlineable
+  func rankLifted() -> ${LiftedTensor} {
+    return ${LiftedTensor}(base: base.rankLifted(by: 1))
+  }
+% end
+}
+% end
+
+/// Value-preserving conversion initializer
+public extension Tensor {
+% for rank in ranks:
+%   Self = 'Tensor{}D'.format(rank)
+  @_inlineable
+  init(_ tensor: ${Self}<Unit>) {
+    self = tensor.base
+  }
+% end
+}
