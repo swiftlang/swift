@@ -3297,7 +3297,9 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
-    // FIXME: Handle empty array syntax node.
+    if (SyntaxContext->isEnabled())
+      SyntaxContext->addSyntax(
+          SyntaxFactory::makeBlankArrayElementList(&Context.getSyntaxArena()));
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
@@ -3306,7 +3308,6 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [:] is always an empty dictionary.
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
-    // FIXME: Handle empty dictionary syntax node.
     consumeToken(tok::colon);
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
