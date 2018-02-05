@@ -419,18 +419,63 @@ public extension Tensor where Unit : Equatable {
 }
 
 //===----------------------------------------------------------------------===//
-// Transposition and concatenation
+// Transforms
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
   @_inlineable
-  var transpose: Tensor {
-    return Tensor(#tfop("Transpose", "t:t", handle))
+  @inline(__always)
+  // @differentiable(
+  //   withRespectTo: (self),
+  //   gradient: _adjointTransposed(_:_:primal:seed:)
+  // )
+  func transposed(withPermutations permutations: Tensor<Int>) -> Tensor {
+    return Tensor(#tfop("Transpose", "tt:t", handle, permutations.handle,
+                        Tperm: Int.self))
+  }
+
+  @_inlineable
+  @inline(__always)
+  func transposed(withPermutations permutations: [Int]) -> Tensor {
+    return transposed(withPermutations: Tensor<Int>(permutations))
+  }
+
+  @_inlineable
+  @inline(__always)
+  func transposed(withPermutations permutations: Int...) -> Tensor {
+    return transposed(withPermutations: permutations)
+  }
+
+  @inline(never)
+  func transposed() -> Tensor {
+    // FIXME: Standard transposition needs permutations [n-1, ..., 0], but
+    // there's no op like Swift's `stride`, and the "Range" op can only form
+    // an ascending sequence. Need to find an op for it.
+    fatalError("Unimplemented")
+    // return transposed(withPermutations: defaultPerms)
   }
 
   @inline(never) // make @_inlineable when implemented.
   func concatenated(with other: Tensor) -> Tensor {
     fatalError("FIXME: implement concatenated(with:)")
+  }
+
+  @_inlineable
+  @inline(__always)
+  func reversed(alongAxes axes: Tensor<Int>) -> Tensor {
+    return Tensor(#tfop("Reverse", "tt:t", handle, axes.handle, Tidx: Int.self))
+  }
+
+  @_inlineable
+  @inline(__always)
+  func reversed(alongAxes axes: [Int]) -> Tensor {
+    return reversed(alongAxes: Tensor<Int>(axes))
+  }
+
+  @_inlineable
+  @inline(__always)
+  func reversed(alongAxes axes: Int...) -> Tensor {
+    return reversed(alongAxes: axes)
   }
 }
 
