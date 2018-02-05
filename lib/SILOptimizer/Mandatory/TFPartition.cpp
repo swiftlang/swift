@@ -32,6 +32,7 @@
 #define DEBUG_TYPE "tf-partition"
 using namespace swift;
 using namespace tf;
+using llvm::DenseMap;
 
 
 template<typename...T, typename...U>
@@ -302,7 +303,7 @@ class BlocksReachingTensorCode {
 
   /// This map contains all of the SILBBSubsetNode's that make up the subset
   /// graph.
-  llvm::DenseMap<SILBasicBlock*, SILBBSubsetNode*> nodeMap;
+  DenseMap<SILBasicBlock*, SILBBSubsetNode*> nodeMap;
 
   /// This is the post dominator tree built over our node subset.
   llvm::DominatorTreeBase<SILBBSubsetNode, true> PDI;
@@ -549,23 +550,19 @@ public:
   SmallVector<SILValue, 4> tensorFnArguments;
 
   /// The instructions that are to be run on the accelerator.
-  llvm::DenseMap<SILInstruction*, Marking> markedInstructions;
+  DenseMap<SILInstruction*, Marking> markedInstructions;
 
   /// BB Arguments that are marked as being moved or copied over.  If a marked
   /// argument is moved over, it is deleted from the host program.  If the
   /// host also uses the argument, then a copy will have to be inserted back
   /// from the accelerator to the host.
-  llvm::DenseMap<SILArgument*, Marking> markedBBArguments;
+  DenseMap<SILArgument*, Marking> markedBBArguments;
 
   /// The set of values that must be sent to the accelerator.
   SmallPtrSet<SILValue, 8> valuesToSend;
 
   /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
-
-  /// These are the results of tensor values that should be returned by the
-  /// extracted function.
-  SmallVector<SILValue, 4> resultValues;
 public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule)
@@ -607,7 +604,8 @@ private:
   bool sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   // Rewriting the host function.
-  PartitionedTensorProgram insertTensorComputationStartEndTerminate();
+  PartitionedTensorProgram
+  insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues);
 };
 } // end anonymous namespace
 
@@ -943,8 +941,8 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // Otherwise, if this is a value of TensorHandle type, then we move it to the
   // accelerator.  If it is also used on the host, it will be copied back.
   if (isTensorHandle(arg->getType().getSwiftRValueType())) {
-    // We cannot move over arguments, but they should never be in the dominated
-    // region anyway.
+    // We cannot move over function arguments, but they should never be in the
+    // dominated region anyway.
     assert(!isa<SILFunctionArgument>(arg) &&
            "Cannot move function parameters!");
     markedBBArguments.insert({arg, Marking::Move});
@@ -1239,9 +1237,33 @@ bool TFFunctionPartition::markFunction() {
     }
   }
 
-  // Find the end point by doing the same check using post dominators.
+  // Now that we know the region we're extracting from, mark all of the
+  // operations as being moved over to the graph, and recursively mark their
+  // operands as appropriate.
+  for (auto inst : tensorOps)
+    markInstruction(*inst, Marking::Move);
+
+  // Not that we know all of the instructions we'll be moving over, find the end
+  // point by finding the nearest common post dominating ancestor of the marked
+  // instructions.
   bbOps.clear();
-  auto endBB = findNCAOfTensorOps(tensorOps, bbOps,
+  SmallVector<SILInstruction*, 16> instrsToCheck;
+  for (auto markInfo : markedInstructions) {
+    // Ignore instructions that will be deleted.
+    if (markInfo.second == Marking::Delete) continue;
+    auto *inst = markInfo.first;
+    instrsToCheck.push_back(inst);
+
+    // If the marked instruction is a terminator, then make sure that the first
+    // instruction in each successor is marked as well.  This ensures that we
+    // have an "out of loop" use to put the end point outside of a loop if the
+    // start point is also outside of it.
+    if (auto *ti = dyn_cast<TermInst>(inst))
+      for (auto &succ : ti->getSuccessors())
+        instrsToCheck.push_back(&succ.getBB()->front());
+  }
+
+  auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps,
                                   [&] (SILBasicBlock *B1,
                                          SILBasicBlock *B2) -> SILBasicBlock* {
     return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
@@ -1257,35 +1279,6 @@ bool TFFunctionPartition::markFunction() {
         break;
       tensorEndPoint = &inst;
     }
-  }
-
-  // Now that we know the region we're extracting from, mark all of the
-  // operations as being moved over to the graph, and recursively mark their
-  // operands as appropriate.
-  for (auto inst : tensorOps) {
-    markInstruction(*inst, Marking::Move);
-
-    // If the tensor operation is used by anything after the end point of the
-    // region, then this can be modeled either as a result value of the program
-    // or as a value sent from the accelerator to the host.  We prefer to model
-    // it as an return value, so collect that now.
-    for (auto result : inst->getResults())
-      for (auto *operand : result->getUses()) {
-        auto user = operand->getUser();
-
-        // If the user is to be deleted, then we can safely ignore it.
-        auto it = markedInstructions.find(user);
-        if (it != markedInstructions.end() && it->second == Marking::Delete)
-          continue;
-
-        // If the end point dominates the out-of-model use, then we can
-        // represent it with the return value of the tensor program.  Otherwise
-        // it will turn into a send of data back to the host.
-        if (DI.dominates(tensorEndPoint, user)) {
-          resultValues.push_back(result);
-          break;
-        }
-      }
   }
 
   return true;
@@ -1317,7 +1310,7 @@ public:
     : SILClonerWithScopes(NewFn), FP(FP) {
   }
 
-  void cloneFunction();
+  void cloneFunction(ArrayRef<SILValue> resultValues);
   void finalizeOriginal();
 
   void insertSend(SILInstruction &inst);
@@ -1756,7 +1749,7 @@ void PartitionCloner::cloneBlock(SILBasicBlock *BB) {
   }
 }
 
-void PartitionCloner::cloneFunction() {
+void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
   // Go through and create all the blocks before we start cloning the
   // instructions over.  This allows us to remap instructions when we clone
   // them over.
@@ -1801,11 +1794,11 @@ void PartitionCloner::cloneFunction() {
 
     // Create a return of N values, producing a tuple if necessary.
     SILValue result;
-    if (FP.resultValues.size() == 1)
-      result = remapValue(FP.resultValues[0]);
+    if (resultValues.size() == 1)
+      result = remapValue(resultValues[0]);
     else {
       SmallVector<SILValue, 4> results;
-      for (auto r : FP.resultValues)
+      for (auto r : resultValues)
         results.push_back(remapValue(r));
 
       result = Builder.createTuple(FP.fn.getLocation(), results);
@@ -2036,8 +2029,12 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
 /// Rewrite the host program, inserting a call to _TFCStartTensorComputation at
 /// the start point of the tensor function, passing in the tensor program
 /// itself, input tensor arguments etc.
+///
+/// The resultValues list is the set of values moved to the accelerator program
+/// that should be returned as program results instead of being sent back.
 auto TFFunctionPartition::
-insertTensorComputationStartEndTerminate() -> PartitionedTensorProgram {
+insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
+       -> PartitionedTensorProgram {
   auto &ctx = fn.getASTContext();
   auto loc = fn.getLocation();
 
@@ -2370,8 +2367,56 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   assert(!markedBlocks.empty() &&
          "Shouldn't run on functions with no tensor ops");
 
+  // Start by determining the result values produced by the tensor program.
+  // These will be returned by the tensor end point instead of being sent back
+  // from the accelerator to the host.
+  SmallVector<SILValue, 4> resultValues;
+
+  // TODO: Should also handle Tensor BB Arguments to avoid sends.
+  for (auto markInfo : markedInstructions) {
+    // We only care about values that are being moved to the accelerator.  If
+    // they are being copied over, we can just use the original value computed
+    // on the host.
+    if (markInfo.second != Marking::Move)
+      continue;
+
+    auto inst = markInfo.first;
+
+    // Scan all the users of return values of the instructions moved over.  If
+    // any of the results cannot be handled with a result, then we just send the
+    // whole value.
+    bool hasAnyNonResultUse = false, hasAnyUse = false;
+    for (auto result : inst->getResults())
+      for (auto *operand : result->getUses()) {
+        auto user = operand->getUser();
+
+        // If the user is to be deleted or moved, then we can safely ignore it.
+        auto it = markedInstructions.find(user);
+        if (it != markedInstructions.end() &&
+            (it->second == Marking::Delete || it->second == Marking::Move))
+          continue;
+
+        // Remember if the instruction has any use.  If not, then it never needs
+        // to be sent or returned.
+        hasAnyUse = true;
+
+        // If the end point dominates the out-of-model use, then we can
+        // represent it with the return value of the tensor program.  Otherwise
+        // it will turn into a send of data back to the host.
+        if (!DI.dominates(tensorEndPoint, user)) {
+          hasAnyNonResultUse = true;
+          break;
+        }
+      }
+
+    // If all of the results can be handled with return values, then handle them
+    // that way by appending them to our result list.
+    if (hasAnyUse && !hasAnyNonResultUse)
+      resultValues.append(inst->getResults().begin(), inst->getResults().end());
+  }
+
   // Insert the start/finish and any terminate runtime calls.
-  auto result = insertTensorComputationStartEndTerminate();
+  auto result = insertTensorComputationStartEndTerminate(resultValues);
 
   // If the TensorFlow module is malformed, bail out without breaking the code.
   if (!result.theTensorComputation)
@@ -2410,7 +2455,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   PartitionCloner PC(*this, *result.fn);
 
   // Fill in the cloned function body.
-  PC.cloneFunction();
+  PC.cloneFunction(resultValues);
 
   // Clean up the source function, removing the tensor code.
   PC.finalizeOriginal();
@@ -2467,7 +2512,7 @@ class TypeContainsTensorHandleChecker {
   /// This map memoizes whether the specified type declaration is known to
   /// contain a TensorHandle or not, used to accelerate queries against types
   /// that are frequently referenced like Tensor.
-  llvm::DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
+  DenseMap<NominalTypeDecl*, bool> declContainsTensorHandle;
 public:
   TypeContainsTensorHandleChecker() {}
 
@@ -2696,8 +2741,8 @@ public:
 #endif
 
     // Our partitioning can leave around lots of unconditional branches between
-    // blocks that formerly had control edges.  Go through and merge those to make
-    // later passes simpler.
+    // blocks that formerly had control edges.  Go through and merge those to
+    // make later passes simpler.
     contractUncondBranches(tensorProgram.fn);
 
     if (isTest || shouldDumpIntermediates()) {
