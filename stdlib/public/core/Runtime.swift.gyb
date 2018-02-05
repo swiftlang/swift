@@ -212,7 +212,7 @@ internal func _stdlib_atomicCompareExchangeStrongInt(
 #if arch(i386) || arch(arm)
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
     target._rawValue, expected.pointee._value, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int64(
     target._rawValue, expected.pointee._value, desired._value)
 #endif
@@ -227,7 +227,7 @@ internal func _swift_stdlib_atomicStoreInt(
   desired: Int) {
 #if arch(i386) || arch(arm)
   Builtin.atomicstore_seqcst_Int32(target._rawValue, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
 #endif
 }
@@ -239,7 +239,7 @@ public func _swift_stdlib_atomicLoadInt(
 #if arch(i386) || arch(arm)
   let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
   return Int(value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   let value = Builtin.atomicload_seqcst_Int64(target._rawValue)
   return Int(value)
 #endif
@@ -269,7 +269,7 @@ public func _swift_stdlib_atomicFetch${operation}Int(
   let value = _swift_stdlib_atomicFetch${operation}Int32(
     object: rawTarget.assumingMemoryBound(to: Int32.self),
     operand: Int32(operand))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   let value = _swift_stdlib_atomicFetch${operation}Int64(
     object: rawTarget.assumingMemoryBound(to: Int64.self),
     operand: Int64(operand))

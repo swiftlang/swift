@@ -264,7 +264,7 @@ struct ${Self} {
     let hash: UInt64 = finalizeAndReturnHash()
 #if arch(i386) || arch(arm)
     return Int(truncatingIfNeeded: hash)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
     return Int(Int64(bitPattern: hash))
 #endif
   }
