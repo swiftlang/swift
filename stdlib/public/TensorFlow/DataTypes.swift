@@ -12,6 +12,11 @@
 //
 // This file defines the AccelerableTensorUnit and related helpers.
 //
+// TODO:
+// - Many ops that support int32 and int64 don't support int8 and int16.
+//   Consider removing Int8's and Int16's conformance to
+//   AccelerableTensorUnit.
+//
 //===----------------------------------------------------------------------===//
 
 import CTensorFlow

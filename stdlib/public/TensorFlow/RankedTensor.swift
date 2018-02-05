@@ -206,7 +206,7 @@ public extension RankedTensor where Unit : Numeric {
 
   @_inlineable
   func square() -> Self {
-    return transpose.dot(self)
+    return transposed().dot(self)
   }
 }
 
@@ -227,8 +227,8 @@ public extension RankedTensor where Unit : Equatable {
 /// Transposition and concatenation
 public extension RankedTensor {
   @_inlineable
-  var transpose: Self {
-    return Self(identicallyRanked: underlyingTensor.transpose)
+  func transposed() -> Self {
+    return Self(identicallyRanked: underlyingTensor.transposed())
   }
 }
 

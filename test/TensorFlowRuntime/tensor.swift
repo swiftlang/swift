@@ -67,16 +67,18 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   expectNearlyEqual(array.units[1], 0.833655, byError: 0.0001)
 }
 
-#if false
 TensorTests.testCPUAndGPU("Convolution") {
-  let x = Tensor<Float>(shape: [1, 3, 3, 1], repeating: 0.5)
-  let filter = Tensor<Float>(shape: [1, 3, 3, 1],
+  let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
+  let filter = Tensor<Float>(shape: [1, 1, 3, 3],
                              units: [0, 1, 0, 1, 1, 1, 0, 1, 0])
-  // FIXME: Dimensions must be equal, but are 1 and 3 for (op: 'Conv2D') with input shapes: [1,3,3,1], [1,3,3,1].
   let y = x.convolved2D(withFilter: filter,
                         strides: [1, 1, 1, 1], padding: .same)
+  expectEqual(ShapedArray(shape: [1, 1, 3, 3],
+                          units: [0.5, 1.5, 0.5,
+                                  0.5, 1.5, 0.5,
+                                  0.5, 1.5, 0.5]),
+              y.array)
 }
-#endif
 
 TensorTests.testCPUAndGPU("3Adds") {
   let a = Tensor([1])
@@ -87,7 +89,7 @@ TensorTests.testCPUAndGPU("3Adds") {
   expectEqual(o.array.units[0], 6)
 }
 
-TensorTests.testCPUAndGPU("testMultiOpMath") {
+TensorTests.testCPUAndGPU("MultiOpMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = Tensor<Float>([4.3, 4.3])
   let sum = x + y
@@ -97,7 +99,7 @@ TensorTests.testCPUAndGPU("testMultiOpMath") {
   // TODO: Check result
 }
 
-TensorTests.testCPUAndGPU("testXWPlusB") {
+TensorTests.testCPUAndGPU("XWPlusB") {
   // Shape: 1 x 4
   let x = Tensor([[1.0, 2.0, 2.0, 1.0]]).toDevice()
   // Shape: 2 x 4
@@ -105,8 +107,19 @@ TensorTests.testCPUAndGPU("testXWPlusB") {
   // Shape: 2
   let b = Tensor([0.5, 0.5])
   // Do xW+b!
-  _ = x ⊗ w + b
-  // TODO: Check result
+  let result = x ⊗ w + b
+  // let resultArray = result
+  expectEqual([1, 2], result.shape)
+  expectEqual([12.5, 6.5], result.units)
+}
+
+TensorTests.testCPUAndGPU("Transpose") {
+  // Shape: 3 x 2
+  let xT = Tensor([[1, 2], [3, 4], [5, 6]]).transposed(withPermutations: 1, 0)
+  let xTArray = xT.array
+  expectEqual(2, xTArray.rank)
+  expectEqual([2, 3], xTArray.shape)
+  expectEqual([1, 3, 5, 2, 4, 6], xTArray.units)
 }
 
 // FIXME: The While op doesn't work on the CPU.
@@ -123,7 +136,7 @@ TensorTests.testGPU("simpleCounterLoop") {
     count += 1
   }
   a -= b
-  expectEqual(a.scalar, 8)
+  expectEqual(8, a.scalar)
 }
 
 #if false // FIXME: Exposing partitioning bugs.
@@ -164,10 +177,10 @@ func testXORInference() {
     let y = tanh(o1 ⊗ w2 + b2)
     return y.array.units[0] // TODO: use better scalar getter
   }
-  expectNearlyEqual(xor(0.0, 0.0), 0.0, byError: 0.1)
-  expectNearlyEqual(xor(0.0, 1.0), 1.0, byError: 0.1)
-  expectNearlyEqual(xor(1.0, 0.0), 1.0, byError: 0.1)
-  expectNearlyEqual(xor(1.0, 1.0), 0.0, byError: 0.1)
+  expectNearlyEqual(0.0, xor(0.0, 0.0), byError: 0.1)
+  expectNearlyEqual(1.0, xor(0.0, 1.0), byError: 0.1)
+  expectNearlyEqual(1.0, xor(1.0, 0.0), byError: 0.1)
+  expectNearlyEqual(0.0, xor(1.0, 1.0), byError: 0.1)
 }
 TensorTests.testCPUAndGPU("XORInference", testXORInference)
 
@@ -184,12 +197,13 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
     var b1 = Tensor<Float>.zeros(shape: [1, 4])
     var b2 = Tensor<Float>.zeros(shape: [1, 1])
 
+    /// - NOTE: This initializer must be manually declared, because the initializer
+    /// logic for the variables declared above is large, and we need to mark
+    /// this as inline(__always).
+    /// - TODO: Remove when deabstraction is implemented.
     @inline(__always)
-    init() {
-      // This initializer must be manually declared, because the initializer
-      // logic for the variables declared above is large, and we need to mark
-      // this as inline(__always).
-    }
+    init() {}
+
     @inline(__always)
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
       let o1 = tanh(x ⊗ w1 + b1)
@@ -205,15 +219,15 @@ TensorTests.testCPUAndGPU("MLPClassifierStruct") {
 TensorTests.testCPUAndGPU("Reshape") {
   let x = Tensor([[1], [2], [3]]).toDevice() // Shape 3 x 1
   let y = x.reshaped([1, 3, 1, 1, 1])
-  expectEqual(y.shape, [1, 3, 1, 1, 1])
+  expectEqual([1, 3, 1, 1, 1], y.shape)
 }
 
 TensorTests.testCPUAndGPU("ReshapeScalar") {
   let z = Tensor([[10]]).toDevice().reshaped([])
-  expectEqual(z.shape, [])
+  expectEqual([], z.shape)
 }
 
-// FIXME: Partitioner gives unpredictable errors regarding send/receive.
+// FIXME: Partitioner unreachable: Unmapped value while cloning?
 #if false
 @inline(never)
 func testStraightLineXORTraining() {
@@ -258,8 +272,8 @@ func testStraightLineXORTraining() {
     let dL2 = dPred * pred * (1 - pred)
     let dMmul2 = dL2
     let dB2 = dL2
-    let dO1 = dMmul2 ⊗ w2.transpose
-    let dW2 = o1.transpose ⊗ dMmul2
+    let dO1 = dMmul2 ⊗ w2.transposed()
+    let dW2 = o1.transposed() ⊗ dMmul2
     let dL1 = dO1 * l1 * (1 - l1)
     let dMmul1 = dL1
     let dB1 = dL1
@@ -275,7 +289,7 @@ func testStraightLineXORTraining() {
 TensorTests.testCPUAndGPU("StraightLineXORTraining", testStraightLineXORTraining)
 #endif
 
-// FIXME: Partitioner assertion "Marking instructions out of the tensor region?"
+// FIXME: Partitioner unreachable: Unmapped value while cloning?
 #if false
 @inline(never)
 func testXORClassifierTraining() {
@@ -285,6 +299,10 @@ func testXORClassifierTraining() {
     var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
     var b1 = Tensor<Float>.zeros(shape: [1, 4])
     var b2 = Tensor<Float>.zeros(shape: [1, 1])
+
+    /// - TODO: Remove when deabstraction is implemented.
+    @inline(__always)
+    init() {}
 
     @_versioned
     @inline(__always)
@@ -338,8 +356,8 @@ func testXORClassifierTraining() {
           dL2 = dPred * pred * (1 - pred),
           dMmul2 = dL2,
           dB2 = dL2,
-          dO1 = dMmul2 ⊗ w2.transpose,
-          dW2 = o1.transpose ⊗ dMmul2,
+          dO1 = dMmul2 ⊗ w2.transposed(),
+          dW2 = o1.transposed() ⊗ dMmul2,
           dL1 = dO1 * l1 * (1 - l1),
           dMmul1 = dL1,
           dB1 = dL1,
