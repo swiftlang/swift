@@ -26,6 +26,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
@@ -1314,7 +1315,7 @@ public:
   void finalizeOriginal();
 
   void insertSend(SILInstruction &inst);
-  void insertReceive(SILValue value);
+  void insertReceive(SILValue value, SILLocation loc);
 
   // Handle references to blocks from cloned code.
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
@@ -1661,7 +1662,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   }
 }
 
-void PartitionCloner::insertReceive(SILValue value) {
+void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   assert(isa<SILInstruction>((SILNode*)value) || isa<SILArgument>(value) &&
          "Don't know how to receive this value");
 
@@ -1687,10 +1688,6 @@ void PartitionCloner::insertReceive(SILValue value) {
   for (auto *use : value->getUses()) {
     FP.diagnoseCopyOutIfNotReceive(value, use->getUser());
   }
-
-  auto loc = value.getLoc();
-  if (auto *inst = value->getDefiningInstruction())
-    loc = getUserSourceLocation(inst->getDebugLocation());
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
@@ -1849,6 +1846,19 @@ void PartitionCloner::finalizeOriginal() {
     i->dropAllReferences();
   }
 
+
+  // As we're removing branch arguments, we remove all the bb args for a given
+  // block at a time.  This is important because otherwise we invalidate our our
+  // bb arg -> branch argument mappings.
+  SmallPtrSet<SILBasicBlock*, 4> argsRemovedBlocks;
+
+  // We remove arguments with a two-pass approach, first dropping the insts that
+  // feed them, then removing the arg (potentially inserting a receive).  If we
+  // insert a receive, we need the source location info, which is derived from
+  // the arguments that get removed in the first pass.  Solve this by
+  // remembering the location info in that first pass.
+  SmallVector<std::pair<SILArgument*, SILLocation>, 4> argsToRemove;
+
   // For BBArguments, we remove the uses from the branches first (which breaks
   // interdependent references) and delete the actual arguments later.
   for (auto arg : FP.markedBBArguments) {
@@ -1859,17 +1869,35 @@ void PartitionCloner::finalizeOriginal() {
       continue;
     }
 
-    // Remove it from the block that it lives in.
+    // Check to see if we already processed the block this argument lives in.
     auto *bb = arg.first->getParent();
-    auto argIndex = arg.first->getIndex();
+    if (!argsRemovedBlocks.insert(bb).second)
+      continue;
 
-    // Remove the formal values provided by any branches that jump to that
-    // block.
+    // Ok, this is the first time we're processing this block.  It could have
+    // lots of bb arguments, some of which are being removed.  We will remove
+    // the arguments in a separate loop, but here we want to remove all of the
+    // values passed in by terminators in predecessor blocks.  Start by
+    // constructing a bitvector so we know which args are going to be removed.
+    llvm::BitVector argsToRemoveMask(bb->getNumArguments());
+    unsigned argNo = 0;
+    for (auto arg : bb->getArguments()) {
+      auto it = FP.markedBBArguments.find(arg);
+      if (it != FP.markedBBArguments.end() && it->second == Marking::Move) {
+        argsToRemoveMask[argNo] = true;
+        // Remember the argument and its location.
+        argsToRemove.push_back({ arg, SILValue(arg).getLoc() });
+      }
+      ++argNo;
+    };
+
+    // Now remove the formal values provided by any branches that jump to that
+    // block, as indicated by the BitVector.
     for (auto pi : bb->getPredecessorBlocks()) {
       auto *br = cast<BranchInst>(pi->getTerminator());
       SmallVector<SILValue, 8> operands;
       for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
-        if (i != argIndex)
+        if (!argsToRemoveMask[i])
           operands.push_back(br->getOperand(i));
       SILBuilder(br).createBranch(br->getLoc(), br->getDestBB(), operands);
       br->eraseFromParent();
@@ -1880,11 +1908,9 @@ void PartitionCloner::finalizeOriginal() {
   // uses of values that we moved over to the accelerator, then we must insert
   // a receive from the accelerator of the computed value.  Regardless, we can
   // now delete the defining instruction/argument.
-  for (auto argMarking : FP.markedBBArguments) {
-    // If this is a copy, we don't need to do anything more.
-    if (argMarking.second != Marking::Move)
-      continue;
-    auto arg = argMarking.first;
+  for (auto argToRemove : argsToRemove) {
+    auto arg = argToRemove.first;
+    auto loc = argToRemove.second;
 
     // If the argument has any non-debug-non-retain/release instructions using
     // it, then we need to insert a copy.
@@ -1900,13 +1926,11 @@ void PartitionCloner::finalizeOriginal() {
       break;
     }
 
-    if (needsCopy)
-      // If we leave around a copy we currently leave the retain/release ops
-      // as well.
-      // FIXME: Figure out a proper ownership story for the tensor values
-      // flowing in and out of these runtime calls.
-      insertReceive(arg);
-    else {
+    if (needsCopy) {
+      // If we need the value on the host, then keep the retain/release ops.
+      insertReceive(arg, loc);
+    } else {
+      // Otherwise, drop them.
       for (auto *inst : instToRemove)
         inst->eraseFromParent();
     }
@@ -1917,12 +1941,14 @@ void PartitionCloner::finalizeOriginal() {
 
   // Next, add sends back of values that are used by the host code, and remove
   // the original instructions.
-  for (auto i : instructionsToRemove) {
-    for (auto result : i->getResults())
-      if (!result->use_empty())
-        insertReceive(result);
+  for (auto inst : instructionsToRemove) {
+    for (auto result : inst->getResults())
+      if (!result->use_empty()) {
+        auto loc = getUserSourceLocation(inst->getDebugLocation());
+        insertReceive(result, loc);
+      }
 
-    i->eraseFromParent();
+    inst->eraseFromParent();
   }
 
   // The copy-in/out markers should be removed now.  They are noops which serve

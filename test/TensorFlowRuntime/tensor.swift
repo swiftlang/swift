@@ -227,7 +227,6 @@ TensorTests.testCPUAndGPU("ReshapeScalar") {
   expectEqual([], z.shape)
 }
 
-// FIXME: Partitioner unreachable: Unmapped value while cloning?
 #if false
 @inline(never)
 func testStraightLineXORTraining() {
