@@ -276,8 +276,7 @@ decodeArrayElements(SILValue value,
     return false;
   elementType = bgst->getGenericArgs()[0];
 
-
-  // Handle the standard pattern for array initialization.  'Value' is an
+  // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
   //
   // %39 = alloc_ref [tail_elems $Int * %0 : $Builtin.Word] $_Contiguo....<Int>
@@ -312,6 +311,21 @@ decodeArrayElements(SILValue value,
         elements.push_back(attrElt);
       }
       return true;
+    } else if (auto *rptr = dyn_cast<RawPointerToRefInst>(value)) {
+      // The empty array is specially recognized by the optimizer and
+      // transformed into a well-known global produced by the standard library.
+      // Uses of it look like this:
+      //   %5 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+      //   %6 = address_to_pointer %5 : $*_SwiftEmptyArrayStorage to $RawPointer
+      //   %7 = raw_pointer_to_ref %6 : $RawPointer to $_EmptyArrayStorage
+      //   %8 = unchecked_ref_cast %7 : $_EmptyArrayStorage to $BridgeObject
+      auto a2p = dyn_cast<AddressToPointerInst>(rptr->getOperand());
+      if (!a2p) return false;
+      auto *ga = dyn_cast<GlobalAddrInst>(a2p->getOperand());
+
+      elements.clear();
+      return ga &&
+             ga->getReferencedGlobal()->getName() == "_swiftEmptyArrayStorage";
     } else {
       return false;
     }
