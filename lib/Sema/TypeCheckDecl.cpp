@@ -4522,10 +4522,7 @@ public:
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
-            EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
-            if (auto *RawValueExpr = EED->getRawValueExpr())
-              RawValueExpr->setType(ErrorType::get(TC.Context));
 
             auto PreviousEED = Res.first->second;
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
@@ -4535,10 +4532,10 @@ public:
           }
         }
 
-        if (hasErrors) {
-          ED->setInterfaceType(ErrorType::get(TC.Context));
+        // If one of the cases is invalid, let's mark
+        // whole enum as invalid as well.
+        if (hasErrors)
           ED->setInvalid();
-        }
       }
     }
 
