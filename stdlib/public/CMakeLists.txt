@@ -20,6 +20,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-mcmodel=large")
 endif()
 
+# Build C++ runtime code with -Wall
+check_cxx_compiler_flag("-Wall" CXX_SUPPORTS_ALL_WARNING)
+if(CXX_SUPPORTS_ALL_WARNING)
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wall")
+endif()
+
+# Build C++ runtime code with -Wunreachable-code
+check_cxx_compiler_flag("-Wunreachable-code" CXX_SUPPORTS_UNREACHABLE_WARNING)
+if(CXX_SUPPORTS_UNREACHABLE_WARNING)
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wunreachable-code")
+endif()
+
+# Build C++ runtime code with -Wuninitialized
+check_cxx_compiler_flag("-Wunreachable-code" CXX_SUPPORTS_UNINIT_WARNING)
+if(CXX_SUPPORTS_UNINIT_WARNING)
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wuninitialized")
+endif()
+
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
 check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
