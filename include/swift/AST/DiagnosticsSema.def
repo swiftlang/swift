@@ -2371,6 +2371,14 @@ ERROR(differentiable_attr_gradient_undefined_identifier,none,
       "undefined identifier %0 as gradients function", (DeclName))
 ERROR(differentiable_attr_gradient_overload_not_found,none,
       "%0 does not have an overload with expected type %1", (DeclName, Type))
+ERROR(differentiable_attr_wrt_self_must_be_first,none,
+      "'self' argument must come first in the argument list", ())
+ERROR(differentiable_attr_wrt_indices_must_be_ascending,none,
+      "argument indices must be ascending", ())
+ERROR(differentiable_attr_wrt_index_out_of_bounds,none,
+      "argument index out of bounds", ())
+ERROR(differentiable_attr_wrt_self_instance_method_only,none,
+      "'self' argument is only applicable to instance methods", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

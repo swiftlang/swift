@@ -2104,11 +2104,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   /// '@differentiable' attribute is OnFunc only.
   auto *fn = dyn_cast<FuncDecl>(D);
   assert(fn && "Not a function decl!");
+  auto isInstanceMethod = fn->isInstanceMember();
 
   // If the primal has no arguments, there's nothing to differentiate with
   // respect to.
-  auto &primalParams = *fn->getParameterList(0);
-  if (primalParams.size() == 0) {
+  auto &primalParams = *fn->getParameterList(isInstanceMethod ? 1 : 0);
+  if (!isInstanceMethod && primalParams.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_arguments,
                 fn->getName())
       .highlight(fn->getSourceRange());
@@ -2117,8 +2118,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Look up the module for the specified gradient function name.
   auto lookup = TC.lookupMember(module, module->getInterfaceType(),
-                                attr->getGradFuncName(),
-                                NameLookupFlags::IgnoreAccessControl);
+                                attr->getGradFuncName());
   if (!lookup) {
     TC.diagnose(attr->getGradFuncNameLoc().getStartLoc(),
                 diag::differentiable_attr_gradient_undefined_identifier,
@@ -2139,9 +2139,88 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Compute adjoint function type.
-  // The first few arguments are the same as those of the primal func.
+  // Compute the return type of the adjoint function.
+  auto wrtArgs = attr->getArguments();
+  Type retTy;
+  // When 'withRespectTo:' is not specified, the adjoint's return type is the
+  // type of all of primal's arguments.
+  if (wrtArgs.empty()) {
+    if (primalParams.size() > 1) {
+      // It is a tuple if there is more than 1 argument.
+      SmallVector<TupleTypeElt, 8> retElts;
+      for (auto *param : primalParams)
+        retElts.push_back(param->getType());
+      retTy = TupleType::get(retElts, fn->getASTContext());
+    } else {
+      retTy = primalParams[0]->getType();
+    }
+  }
+  // If 'withRespectTo:' is specified, make sure it's valid and compute the
+  // corresponding adjoint return type.
+  else {
+    SmallVector<TupleTypeElt, 8> retElts;
+    // This helps determine if the argument indices are ascending.
+    int lastIndex = -1;
+    // Verify each argument in 'withRespectTo:' list and collect return types
+    // to `retElts`.
+    for (size_t i = 0; i < wrtArgs.size(); i++) {
+      auto argLoc = wrtArgs[i].getLoc();
+      switch (wrtArgs[i].getKind()) {
+      case DifferentiableAttr::ArgumentKind::Index: {
+        unsigned index = wrtArgs[i].getIndex();
+        if ((int)index <= lastIndex) {
+          TC.diagnose(argLoc,
+                      diag::differentiable_attr_wrt_indices_must_be_ascending);
+          return;
+        }
+        // Argument index cannot exceed bounds.
+        if (index >= primalParams.size()) {
+          TC.diagnose(argLoc,
+                      diag::differentiable_attr_wrt_index_out_of_bounds);
+          return;
+        }
+        lastIndex = index;
+        retElts.push_back(primalParams[index]->getType());
+        break;
+      }
+      case DifferentiableAttr::ArgumentKind::Self: {
+        // 'self' is only applicable to instance methods.
+        if (!isInstanceMethod) {
+          TC.diagnose(argLoc,
+                      diag::differentiable_attr_wrt_self_instance_method_only);
+          return;
+        }
+        // 'self' can only be the first in the list.
+        if (i > 0) {
+          TC.diagnose(argLoc,
+                      diag::differentiable_attr_wrt_self_must_be_first);
+          return;
+        }
+        auto selfTy = fn->getParent()->getSelfTypeInContext();
+        retElts.push_back(selfTy);
+        break;
+      }
+      }
+    }
+    // If collected `retElts` has only 1 element, use that element as adjoint's
+    // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
+    // type.
+    assert(retElts.size() > 0 && "There should be at least one return type");
+    retTy = retElts.size() > 1
+      ? TupleType::get(retElts, fn->getASTContext())
+      : retElts[0].getType();
+  }
+
+  // Compute parameters of the adjoint function.
   SmallVector<FunctionType::Param, 8> argTypes;
+  // If the primal function is an instance method, the type of the first
+  // argument of the adjoint function is the type of 'self'.
+  if (isInstanceMethod) {
+    auto selfTy = fn->getParent()->getSelfTypeInContext();
+    argTypes.push_back(FunctionType::Param(selfTy));
+  }
+  // Other than possible 'self', the first few arguments are the same as those
+  // of the primal function.
   for (auto *param : primalParams)
     argTypes.push_back(FunctionType::Param(param->getType()));
 
@@ -2150,23 +2229,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto seedTy = FunctionType::Param(fn->getResultInterfaceType());
   argTypes.append(2, seedTy);
 
-  // The adjoint's return type is the type of all of primal's arguments.
-  Type retTy;
-  if (primalParams.size() > 1) {
-    // It is a tuple if there is more than 1 argument.
-    SmallVector<TupleTypeElt, 8> retElts;
-    for (auto *param : primalParams)
-      retElts.push_back(param->getType());
-    retTy = TupleType::get(retElts, fn->getASTContext());
-  } else {
-    retTy = primalParams[0]->getType();
-  }
-
   // This is the expected type of the adjoint function.
   auto adjointFnTy =
     FunctionType::get(argTypes, retTy, FunctionType::ExtInfo());
 
   // TODO: Handle generic functions.
+  // TODO: Handle 'where' clause.
   for (auto *candidate : fnDecls)
     if (adjointFnTy->isEqual(
           candidate->getInterfaceType()->

@@ -47,3 +47,52 @@ func foo4(_ x: Float) -> Float {
 func foo5() -> Float {
   return 1
 }
+
+@differentiable(withRespectTo: (self, .0, .1), gradient: dmeow1(_:_:_:_:)) // expected-error {{'self' argument is only applicable to instance methods}}
+func meow1(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+func dmeow1_in_S(_ s: S, _ x: Float, _ primal: Float, _ seed: Float) -> (S, Float) {
+  return (s, x)
+}
+
+struct S {
+  @differentiable(withRespectTo: (self, .0), gradient: dmeow1_in_S(_:_:_:_:)) // ok
+  func meow1(_ x: Float) -> Float {
+    return x + 1
+  }
+
+  @differentiable(withRespectTo: (.1, self, .2), gradient: dmeow1(_:_:_:_:)) // expected-error {{'self' argument must come first in the argument list}}
+  func meow1_not_ok(_ x: Float, _: Float, _: Float) -> Float {
+    return 1 + x
+  }
+
+  @differentiable(withRespectTo: (self, .0), gradient: dmeow1_in_S(_:_:_:_:)) // expected-error {{'self' argument is only applicable to instance methods}}
+  static func meow1(_ x: Float) -> Float {
+    return x + 1
+  }
+}
+
+@differentiable(withRespectTo: (.1, .2), gradient: dmeow2(_:_:_:_:_:)) // ok
+func meow2(_ x: Float, _: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(withRespectTo: (.2, .1), gradient: dmeow1(_:_:_:_:)) // expected-error {{argument indices must be ascending}}
+func meow3(_ x: Float, _: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(withRespectTo: (.2, self, .1), gradient: dmeow1(_:_:_:_:)) // expected-error {{'self' argument is only applicable to instance methods}}
+func meow4(_ x: Float, _: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+func dmeow1(_ x: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
+  return (x, x)
+}
+
+func dmeow2(_ x: Float, _: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
+  return (x, x)
+}
