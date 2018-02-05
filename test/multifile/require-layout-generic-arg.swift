@@ -5,7 +5,7 @@
 
 // The offset of the typemetadata in the class typemetadata must match.
 
-// FILE1-LABEL: define swiftcc void @"$S4test11requestTypeyyAA3SubCyxGlF"(%T4test3SubC*)
+// FILE1-LABEL: define{{.*}} swiftcc void @"$S4test11requestTypeyyAA3SubCyxGlF"(%T4test3SubC*)
 // FILE1:  [[T1:%.*]] = bitcast %T4test3SubC* %0 to %swift.type**
 // FILE1:  [[TYPEMETADATA:%.*]] = load %swift.type*, %swift.type** [[T1]]
 // FILE1:  [[T2:%.*]] = bitcast %swift.type* [[TYPEMETADATA]] to %swift.type**
