@@ -376,3 +376,18 @@ public func testConstantArray() -> TensorHandle<Float> {
 
 
 
+public func testEmptyUnitsArray() {
+  let y = Tensor<Int>(shape: [0, 20, 30], units: [])
+  _ = y+y
+}
+
+/*
+ CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyUnitsArray
+ CHECK: sil private @{{.*}}testEmptyUnitsArray{{.*}} : $@callee_owned () -> () {
+ CHECK: bb0:
+ CHECK: integer_literal $Builtin.Int64, 0
+ CHECK: integer_literal $Builtin.Int64, 20
+ CHECK: integer_literal $Builtin.Int64, 30
+ CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int.Type, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
+ CHECK:  builtin "__tfop_Add,tt:t"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
+ */
