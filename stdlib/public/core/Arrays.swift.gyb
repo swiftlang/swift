@@ -1518,24 +1518,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
 %else:
-  /// Removes and returns the last element of the array.
-  ///
-  /// - Returns: The last element of the array if the array is not empty;
-  ///   otherwise, `nil`.
-  ///
-  /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
-  ///   of the array; otherwise, O(1).
-  @_inlineable
-  public mutating func popLast() -> Element? {
-    let newCount = _getCount() - 1
-    guard !isEmpty else { return nil }
-    return _customRemoveLast().unsafelyUnwrapped
-    let pointer = (_buffer.firstElementAddress + newCount)
-    let element = pointer.move()
-    _buffer.count = newCount
-    return element
-  }
-
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
     let newCount = _getCount() - 1
