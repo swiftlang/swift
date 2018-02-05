@@ -84,7 +84,12 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
   "big"
 };
 
-static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
+static const StringRef SupportedConditionalCompilationPointerBitWidths[] = {
+  "_32",
+  "_64"
+};
+
+static const StringRef SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
 };
@@ -181,6 +186,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::OS:
   case PlatformConditionKind::Arch:
   case PlatformConditionKind::Endianness:
+  case PlatformConditionKind::PointerBitWidth:
   case PlatformConditionKind::Runtime:
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
@@ -403,6 +409,34 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
+  }
+
+  // Set the "_native_word_size" platform condition.
+  switch (Target.getArch()) {
+  case llvm::Triple::ArchType::arm:
+  case llvm::Triple::ArchType::thumb:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
+    break;
+  case llvm::Triple::ArchType::aarch64:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+    break;
+  case llvm::Triple::ArchType::ppc64:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+    break;
+  case llvm::Triple::ArchType::ppc64le:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+    break;
+  case llvm::Triple::ArchType::x86:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
+    break;
+  case llvm::Triple::ArchType::x86_64:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+    break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+    break;
+  default:
+    llvm_unreachable("undefined architecture pointer bit width");
   }
 
   // Set the "runtime" platform condition.
