@@ -8,8 +8,8 @@
 // REQUIRES: OS=macosx
 
 // Verify that the unmangles basenames end up in the accelerator table.
-// CHECK-ACCEL-DAG:	 Name: {{.*}}"Int64"
-// CHECK-ACCEL-DAG:	 Name: {{.*}}"foo"
+// CHECK-ACCEL-DAG:	 String: {{.*}}"Int64"
+// CHECK-ACCEL-DAG:	 String: {{.*}}"foo"
 
 // Verify that the mangled names end up in the debug info.
 // CHECK-DWARF: TAG_module
