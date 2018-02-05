@@ -2533,6 +2533,12 @@ struct TargetContextDescriptor {
   /// context is not generic.
   const TargetGenericContext<Runtime> *getGenericContext() const;
 
+  unsigned getNumGenericParams() const {
+    auto *genericContext = getGenericContext();
+    return genericContext
+              ? genericContext->getGenericContextHeader().NumParams
+              : 0;
+  }
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -3776,7 +3782,7 @@ const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_getFieldAt(
     const Metadata *type, unsigned index,
-    llvm::function_ref<void(llvm::StringRef name, FieldType type)> callback);
+    std::function<void(llvm::StringRef name, FieldType type)> callback);
 
 } // end namespace swift
 

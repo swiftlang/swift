@@ -34,6 +34,7 @@
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
+#include <list>
 
 using namespace swift;
 using namespace Demangle;
@@ -159,7 +160,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
-  
+
   while (context) {
     switch (context->getKind()) {
     case ContextDescriptorKind::Module: {
@@ -204,10 +205,16 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
           if (!(flags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef))
             return false;
           break;
+
         default:
           return false;
         }
-        if (!node->getChild(1)->getText().equals(type->Name.get()))
+
+        auto nameNode = node->getChild(1);
+        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
+          return false;
+
+        if (nameNode->getText() != type->Name.get())
           return false;
         
         node = node->getChild(0);
@@ -389,6 +396,27 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
 
 #pragma mark Type field descriptor cache
 namespace {
+template <typename T> struct FieldDescriptorCacheEntry {
+private:
+  const Metadata *Base;
+  const T *Description;
+
+public:
+  FieldDescriptorCacheEntry(const Metadata *Base, const T *description)
+  : Base(Base), Description(description) {}
+
+  const T *getDescription() { return Description; }
+
+  int compareWithKey(const Metadata *other) const {
+    return Base == other;
+  }
+
+  template <class... Args>
+  static size_t getExtraAllocationSize(Args &&... ignored) {
+    return 0;
+  }
+};
+
 class StaticFieldSection {
   const void *Begin;
   const void *End;
@@ -420,7 +448,7 @@ public:
 };
 
 struct FieldCacheState {
-  ConcurrentMap<DescriptorCacheEntry<FieldDescriptor>> FieldCache;
+  ConcurrentMap<FieldDescriptorCacheEntry<FieldDescriptor>> FieldCache;
 
   Mutex SectionsLock;
   std::vector<StaticFieldSection> StaticSections;
@@ -1023,9 +1051,9 @@ swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
 
 void swift::swift_getFieldAt(
     const Metadata *base, unsigned index,
-    llvm::function_ref<void(llvm::StringRef name, FieldType fieldInfo)>
+    std::function<void(llvm::StringRef name, FieldType fieldInfo)>
         callback) {
-  auto *baseDesc = base->getNominalTypeDescriptor();
+  auto *baseDesc = base->getTypeContextDescriptor();
   if (!baseDesc)
     return;
 
@@ -1037,22 +1065,39 @@ void swift::swift_getFieldAt(
     const Metadata *metadata;
     TypeOwnership ownership;
 
-    const auto &genericParams = baseDesc->GenericParams;
+    std::vector<const ContextDescriptor *> descriptorPath;
+    {
+      const auto *parent = reinterpret_cast<
+                              const ContextDescriptor *>(baseDesc);
+      while (parent) {
+        if (parent->isGeneric())
+          descriptorPath.push_back(parent);
+
+        parent = parent->Parent.get();
+      }
+    }
+
     std::tie(metadata, ownership) = _swift_getTypeByMangledName(
         type, [&](unsigned depth, unsigned index) -> const Metadata * {
-          if (depth >= genericParams.NestingDepth)
+          if (depth >= descriptorPath.size())
             return nullptr;
 
-          auto &context = baseDesc->getGenericContext(depth);
-          if (index >= context.NumPrimaryParams)
-            return nullptr;
-
+          unsigned currentDepth = 0;
           unsigned flatIndex = index;
-          for (unsigned i = 0; i < depth; ++i)
-            flatIndex += baseDesc->getGenericContext(i).NumPrimaryParams;
+          const ContextDescriptor *currentContext = descriptorPath.back();
 
-          // FIXME: Once `getGenericContext(unsigned)` is ready
-          // switch to that instead of using flattened list of substitutions.
+          for (const auto *context : llvm::reverse(descriptorPath)) {
+            if (currentDepth >= depth)
+              break;
+
+            flatIndex += context->getNumGenericParams();
+            currentContext = context;
+            ++currentDepth;
+          }
+
+          if (index >= currentContext->getNumGenericParams())
+            return nullptr;
+
           return base->getGenericArgs()[flatIndex];
         });
 
@@ -1063,37 +1108,42 @@ void swift::swift_getFieldAt(
 
   };
 
-  llvm::StringRef baseTypeName(baseDesc->Name.get());
+  Demangler dem;
   auto &cache = FieldCache.get();
-  auto isRequestedDescriptor = [&](StringRef name,
-                                   const FieldDescriptor &descriptor) {
+  auto isRequestedDescriptor = [&](const FieldDescriptor &descriptor) {
     assert(descriptor.hasMangledTypeName());
-    if (!name.equals(descriptor.getMangledTypeName(0)))
+    auto mangledName = descriptor.getMangledTypeName(0);
+
+    if (!_contextDescriptorMatchesMangling(baseDesc,
+                                           dem.demangleType(mangledName)))
       return false;
 
-    cache.FieldCache.getOrInsert(name, &descriptor);
+    cache.FieldCache.getOrInsert(base, &descriptor);
     getFieldAt(descriptor);
     return true;
   };
 
+
   // Fast path: If we already have field descriptor cached.
-  if (auto Value = cache.FieldCache.find(baseTypeName)) {
+  /*
+  if (auto Value = cache.FieldCache.find(base)) {
     getFieldAt(*Value->getDescription());
     return;
   }
+  */
 
   ScopedLock guard(cache.SectionsLock);
   // Otherwise let's try to find it in one of the sections.
   for (auto &section : cache.DynamicSections) {
     for (const auto *descriptor : section) {
-      if (isRequestedDescriptor(baseTypeName, *descriptor))
+      if (isRequestedDescriptor(*descriptor))
         return;
     }
   }
 
   for (const auto &section : cache.StaticSections) {
     for (auto &descriptor : section) {
-      if (isRequestedDescriptor(baseTypeName, descriptor))
+      if (isRequestedDescriptor(descriptor))
         return;
     }
   }
