@@ -99,7 +99,17 @@ class C <MemberDeclBlock>{<FunctionDecl>
 
   internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl><SubscriptDecl>
   subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl>
-}</MemberDeclBlock></ClassDecl>
+}</MemberDeclBlock></ClassDecl><ProtocolDecl>
+
+protocol PP <MemberDeclBlock>{<AssociatedtypeDecl>
+  associatedtype A</AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype B<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence</SimpleTypeIdentifier></InheritedType></TypeInheritanceClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype C <TypeInitializerClause>= <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeInitializerClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype D<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><TypeInitializerClause>= <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType></TypeInitializerClause></AssociatedtypeDecl><AssociatedtypeDecl>
+  associatedtype E<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><TypeInitializerClause>= <ArrayType>[<ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>] </ArrayType></TypeInitializerClause><GenericWhereClause>where <ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.Element </MemberTypeIdentifier>: <SimpleTypeIdentifier>Sequence</SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause></AssociatedtypeDecl><AssociatedtypeDecl><DeclModifier>
+  private </DeclModifier>associatedtype F</AssociatedtypeDecl><AssociatedtypeDecl><Attribute>
+  @objc </Attribute>associatedtype G</AssociatedtypeDecl>
+}</MemberDeclBlock></ProtocolDecl>
 
 #endif</IfConfigDecl><IfConfigDecl>
 

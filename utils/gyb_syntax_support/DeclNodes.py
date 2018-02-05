@@ -4,7 +4,7 @@ from Node import Node
 
 
 DECL_NODES = [
-    # initializer -> '=' type
+    # type-assignment -> '=' type
     Node('TypeInitializerClause', kind='Syntax',
          children=[
              Child('Equal', kind='EqualToken'),
@@ -13,9 +13,8 @@ DECL_NODES = [
 
     # typealias-declaration -> attributes? access-level-modifier? 'typealias'
     #                            typealias-name generic-parameter-clause?
-    #                            typealias-assignment
+    #                            type-assignment
     # typealias-name -> identifier
-    # typealias-assignment -> = type
     Node('TypealiasDecl', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
@@ -27,7 +26,30 @@ DECL_NODES = [
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Initializer', kind='TypeInitializerClause',
-                   is_optional=True)
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+         ]),
+
+    # associatedtype-declaration -> attributes? access-level-modifier?
+    #                                 'associatedtype' associatedtype-name
+    #                                 inheritance-clause? type-assignment?
+    #                                 generic-where-clause?
+    # associatedtype-name -> identifier
+    Node('AssociatedtypeDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('AssociatedtypeKeyword', kind='AssociatedtypeToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('Initializer', kind='TypeInitializerClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
          ]),
 
     Node('FunctionParameterList', kind='SyntaxCollection',

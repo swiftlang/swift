@@ -101,6 +101,16 @@ class C {
   subscript() -> Int { return 1 }
 }
 
+protocol PP {
+  associatedtype A
+  associatedtype B: Sequence
+  associatedtype C = Int
+  associatedtype D: Sequence = [Int]
+  associatedtype E: Sequence = [[Int]] where A.Element : Sequence
+  private associatedtype F
+  @objc associatedtype G
+}
+
 #endif
 
 #if blah

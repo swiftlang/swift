@@ -2456,6 +2456,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       MayNeedOverrideCompletion = true;
       break;
     case tok::kw_associatedtype:
+      DeclParsingContext.setCreateSyntax(SyntaxKind::AssociatedtypeDecl);
       DeclResult = parseDeclAssociatedType(Flags, Attributes);
       break;
     case tok::kw_enum:
@@ -3498,6 +3499,8 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   
   ParserResult<TypeRepr> UnderlyingTy;
   if (Tok.is(tok::equal)) {
+    SyntaxParsingContext InitContext(SyntaxContext,
+                                     SyntaxKind::TypeInitializerClause);
     consumeToken(tok::equal);
     UnderlyingTy = parseType(diag::expected_type_in_associatedtype);
     Status |= UnderlyingTy;
