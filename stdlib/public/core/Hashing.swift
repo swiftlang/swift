@@ -203,7 +203,13 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 @_transparent
 public // @testable
 func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
-  let magic = 0x9e3779b9 as UInt // Based on the golden ratio.
+  // Use a magic number based on the golden ratio
+  // (0x1.9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95p0).
+#if arch(i386) || arch(arm)
+  let magic = 0x9e3779b9 as UInt
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  let magic = 0x9e3779b97f4a7c15 as UInt
+#endif
   var x = UInt(bitPattern: firstValue)
   x ^= UInt(bitPattern: secondValue) &+ magic &+ (x &<< 6) &+ (x &>> 2)
   return Int(bitPattern: x)
