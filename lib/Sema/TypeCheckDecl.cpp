@@ -4509,6 +4509,7 @@ public:
       {
         // Check for duplicate enum members.
         llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        bool hasErrors = false;
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
@@ -4521,7 +4522,13 @@ public:
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
             TC.diagnose(PreviousEED->getLoc(),
                         diag::previous_decldef, true, EED->getName());
+            hasErrors = true;
           }
+        }
+
+        if (hasErrors) {
+          ED->setInterfaceType(ErrorType::get(TC.Context));
+          ED->setInvalid();
         }
       }
     }
