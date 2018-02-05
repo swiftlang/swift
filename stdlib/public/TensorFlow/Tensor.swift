@@ -233,7 +233,7 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Factory methods for numeric tensors
+// Factory initializers for numeric tensors
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Unit : Numeric {
@@ -270,6 +270,42 @@ public extension Tensor where Unit : Numeric {
     rowCount: Int, columnCount: Int? = nil, batchShape: [Int]? = nil
   ) -> Tensor {
     fatalError("FIXME: implement eye")
+  }
+
+  /// Initialize a 1-D tensor representing a sequence from a starting value to,
+  /// but not including, an end value, stepping by the specified amount.
+  ///
+  /// - Parameters:
+  ///   - start: The starting value to use for the sequence. If the sequence
+  ///     contains any values, the first one is `start`.
+  ///   - end: An end value to limit the sequence. `end` is never an element of
+  ///     the resulting sequence.
+  ///   - stride: The amount to step by with each iteration. `stride` must be
+  ///     positive.
+  /// - Precondition: `start`, `end`, `stride` must be scalar tensors.
+  ///
+  @_inlineable
+  @inline(__always)
+  init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
+    self.init(#tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
+                    Tidx: Unit.self))
+  }
+
+  /// Initialize a 1-D tensor representing a sequence from a starting value to,
+  /// but not including, an end value, stepping by the specified amount.
+  ///
+  /// - Parameters:
+  ///   - start: The starting value to use for the sequence. If the sequence
+  ///     contains any values, the first one is `start`.
+  ///   - end: An end value to limit the sequence. `end` is never an element of
+  ///     the resulting sequence.
+  ///   - stride: The amount to step by with each iteration. `stride` must be
+  ///     positive.
+  ///
+  @_inlineable
+  @inline(__always)
+  init(rangeFrom start: Unit, to end: Unit, stride: Unit) {
+    self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
   }
 }
 

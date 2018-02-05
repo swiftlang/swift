@@ -245,15 +245,15 @@ func _adjointTanh<T : FloatingPoint>(
 func _adjointDot<T : Numeric>(
   _ x: Tensor<T>, _ y: Tensor<T>, primal: Tensor<T>, seed: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
-  return (seed.dot(y.transpose), x.transpose.dot(y))
+  return (seed.dot(y.transposed()), x.transposed().dot(y))
 }
 
 @_inlineable
 @_versioned
-func _adjointTranspose<T : Numeric>(
-  _ x: Tensor<T>, primal: Tensor<T>, seed: Tensor<T>
+func _adjointTransposed<T : Numeric>(
+  _ x: Tensor<T>, _ permutations: Tensor<Int>, primal: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {
-  return seed.transpose
+  return seed.transposed(withPermutations: permutations)
 }
 
 //===----------------------------------------------------------------------===//
