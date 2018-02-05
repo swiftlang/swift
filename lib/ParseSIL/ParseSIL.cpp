@@ -881,6 +881,54 @@ void SILParser::convertRequirements(SILFunction *F,
   }
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
+/// Returns true on error.
+static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
+                                    SILParser &SP) {
+  auto &P = SP.P;
+  auto &Tok = P.Tok;
+  SourceLoc LastLoc = P.getEndOfPreviousLoc();
+  // Parse 'wrt'.
+  if (P.parseSpecificIdentifier(
+        "wrt", diag::sil_attr_differentiable_expected_keyword, "wrt"))
+    return true;
+  // Parse argument index list.
+  SmallVector<unsigned, 8> ArgIndices;
+  // Function that parses an index into `Indices`. Returns true on error.
+  auto parseArg = [&]() -> bool {
+    unsigned Index;
+    if (P.parseUnsignedInteger(Index, LastLoc,
+                               diag::attr_differentiable_expected_argument))
+      return true;
+    ArgIndices.push_back(Index);
+    return false;
+  };
+  // Parse first.
+  if (parseArg())
+    return true;
+  // Parse rest.
+  while (P.consumeIf(tok::comma))
+    if (parseArg())
+      return true;
+  // Parse 'adjoint'.
+  Identifier AdjName;
+  if (P.parseSpecificIdentifier("adjoint", LastLoc,
+        diag::sil_attr_differentiable_expected_adjoint_identifier))
+    return true;
+  /// Parse primal function name, e.g. '@foo'.
+  if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+      P.parseIdentifier(AdjName, LastLoc, diag::expected_sil_function_name))
+    return true;
+  /// Parse ']'.
+  if (P.parseToken(tok::r_square,
+                   diag::sil_attr_differentiable_expected_rsquare))
+    return true;
+  /// Create an AdjointAttr and we are done.
+  DA = SILDifferentiableAttr::create(SP.SILMod, AdjName, ArgIndices);
+  return false;
+}
+
 static bool parseDeclSILOptional(bool *isTransparent,
                                  IsSerialized_t *isSerialized,
                                  bool *isCanonical,
@@ -890,6 +938,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  bool *isLet, bool *isWeakLinked,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
+                                 // SWIFT_ENABLE_TENSORFLOW
+                                 Optional<SILDifferentiableAttr *> *DiffAttr,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -976,6 +1026,13 @@ static bool parseDeclSILOptional(bool *isTransparent,
                           : SILSpecializeAttr::SpecializationKind::Partial;
       SpecAttr.exported = Attr->isExported();
       SpecAttrs->emplace_back(SpecAttr);
+      continue;
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    else if (DiffAttr && SP.P.Tok.getText() == "differentiable") {
+      SP.P.consumeToken(tok::identifier);
+      if (parseDifferentiableAttr(*DiffAttr, SP))
+        return true;
       continue;
     }
     else if (ClangDecl && SP.P.Tok.getText() == "clang") {
@@ -5256,6 +5313,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
+  // SWIFT_ENABLE_TENSORFLOW
+  Optional<SILDifferentiableAttr *> DiffAttr;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5263,6 +5322,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &isThunk, &isGlobalInit,
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &Semantics, &SpecAttrs,
+                           // SWIFT_ENABLE_TENSORFLOW
+                           &DiffAttr,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5292,6 +5353,9 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setWeakLinked(isWeakLinked);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
+    // SWIFT_ENABLE_TENSORFLOW
+    if (DiffAttr)
+      FunctionState.F->setDifferentiableAttr(*DiffAttr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
@@ -5420,9 +5484,10 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   Scope S(&P, ScopeKind::TopLevel);
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
+      // SWIFT_ENABLE_TENSORFLOW
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, &isLet, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, State) ||
+                           nullptr, nullptr, nullptr, State) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5524,9 +5589,10 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   SILParser VTableState(P);
 
   IsSerialized_t Serialized = IsNotSerialized;
+  // SWIFT_ENABLE_TENSORFLOW
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState))
+                           nullptr, nullptr, nullptr, VTableState)
     return true;
 
   // Parse the class name.
@@ -5876,7 +5942,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState))
+                           nullptr, nullptr, nullptr, WitnessState)
     return true;
 
   Scope S(&P, ScopeKind::TopLevel);
