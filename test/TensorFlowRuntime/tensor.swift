@@ -33,6 +33,18 @@ func expectNearlyEqual<T : FloatingPoint & ExpressibleByFloatLiteral>(
   expectLT(abs(lhs - rhs), error)
 }
 
+/// Determines if two collections of floating point numbers are very nearly
+/// equal.
+func expectPointwiseNearlyEqual<T, C1, C2>(
+  _ lhs: C1, _ rhs: C2, byError error: T = 0.000001
+) where T : FloatingPoint & ExpressibleByFloatLiteral,
+  C1 : Collection, C2 : Collection, C1.Element == T, C1.Element == C2.Element {
+  precondition(lhs.count == rhs.count, "Unit count mismatch.")
+  for (l, r) in zip(lhs, rhs) {
+    expectNearlyEqual(l, r, byError: error)
+  }
+}
+
 TensorTests.testCPUAndGPU("Initializers") {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
   expectEqual(x.units, [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
@@ -63,8 +75,7 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
-  expectNearlyEqual(array.units[0], 0.833655, byError: 0.0001)
-  expectNearlyEqual(array.units[1], 0.833655, byError: 0.0001)
+  expectPointwiseNearlyEqual(array.units, [0.833655, 0.833655], byError: 0.0001)
 }
 
 TensorTests.testCPUAndGPU("Convolution") {
@@ -163,12 +174,15 @@ func testXORInference() {
   func xor(_ x: Double, _ y: Double) -> Double {
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4
-    let w1 = Tensor([[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
-                     [-1.83523219, -0.51167348, 0.15490439, 1.91018065]]).toDevice()
+    let w1 = Tensor(
+      [[-1.83586664, -0.20809225, 0.47667537, 1.90780607],
+       [-1.83523219, -0.51167348, 0.15490439, 1.91018065]]).toDevice()
     // 1 x 4
-    let b1 = Tensor([[2.54353216, 0.25132703, -0.16503136, -0.85754058]]).toDevice()
+    let b1 = Tensor(
+      [[2.54353216, 0.25132703, -0.16503136, -0.85754058]]).toDevice()
     // 4 x 1
-    let w2 = Tensor([[ 3.04350065], [ 0.35590511], [-0.3252157 ], [ 3.49349223]]).toDevice()
+    let w2 = Tensor(
+      [[3.04350065], [0.35590511], [-0.3252157], [3.49349223]]).toDevice()
     // 1 x 1
     let b2 = Tensor([[-0.74635993]]).toDevice()
 
@@ -285,7 +299,8 @@ func testStraightLineXORTraining() {
     b2 -= (dB2 * learningRate)
   }
 }
-TensorTests.testCPUAndGPU("StraightLineXORTraining", testStraightLineXORTraining)
+TensorTests.testCPUAndGPU("StraightLineXORTraining",
+                          testStraightLineXORTraining)
 #endif
 
 // FIXME: Partitioner unreachable: Unmapped value while cloning?

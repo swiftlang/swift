@@ -144,28 +144,115 @@ public extension Tensor {
   /// - Precondition: The number of elements in each sub-dimensional array in
   ///   the array must be equal.
   @_inlineable
-  init(_ matrix: [[Unit]]) {
-    /// Sanity check
-    guard let firstRow = matrix.first else {
-      preconditionFailure("The first dimension is empty. Cannot infer shape.")
+  init(_ literal: [[Unit]]) {
+    /// Sanity checks.
+    let dim0 = literal.count
+    let dim1 = literal.first?.count ?? 0
+    for subArray in literal {
+      precondition(subArray.count == dim1, """
+        Each dimension must have an equal number of subdimensions.
+        """)
     }
-    /// Now we make assumption about the shape.
-    let rowCount = matrix.count, columnCount = firstRow.count
-    /// Check rest dimensions.
-    for row in matrix.dropFirst() {
-      precondition(row.count == columnCount,
-                   "Each dimension must have equal number of subdimensions.")
-    }
-    /// We don't want to delegate initialization to `init(shape:units:)`
-    /// because flattening `matrix` to an array is unnecessary cost.
+    // We don't want to delegate initialization to `init(shape:units:)`
+    // because flattening `matrix` to an array is an unnecessary cost.
     let tensorHandle = TensorHandle<Unit>(
-      shape: [rowCount, columnCount],
+      shape: [dim0, dim1],
       unitsInitializer: { addr in
         // Copy to TF_Tensor memory, one row at a time.
-        for (i, row) in matrix.enumerated() {
-          row.withUnsafeBufferPointer { ptr in
-            addr.advanced(by: i * columnCount).assign(from: ptr.baseAddress!,
-              count: columnCount)
+        for (i, subArray) in literal.enumerated() {
+          subArray.withUnsafeBufferPointer { ptr in
+            addr.advanced(by: i * dim1)
+              .assign(from: ptr.baseAddress!, count: dim1)
+          }
+        }
+      }
+    )
+    self.init(tensorHandle)
+  }
+
+  /// Initialize a tensor with an array of arrays of arrays representing a
+  /// 3D tensor.
+  ///
+  /// - Precondition: The number of elements in each sub-dimensional array in
+  ///   the array must be equal.
+  /// - TODO: improve description
+  @_inlineable
+  init(_ literal: [[[Unit]]]) {
+    /// Sanity checks.
+    let dim0 = literal.count
+    let dim1 = literal.first?.count ?? 0
+    let dim2 = literal.first?.first?.count ?? 0
+    for subArray in literal {
+      precondition(subArray.count == dim1, """
+        Each dimension must have an equal number of subdimensions.
+        """)
+      for subSubArray in subArray {
+        precondition(subSubArray.count == dim2, """
+          Each dimension must have an equal number of subdimensions.
+          """)
+      }
+    }
+    // We don't want to delegate initialization to `init(shape:units:)`
+    // because flattening `literal` to an array is an unnecessary cost.
+    let tensorHandle = TensorHandle<Unit>(
+      shape: [dim0, dim1, dim2],
+      unitsInitializer: { addr in
+        // Copy to TF_Tensor memory, one innermost array at a time.
+        for (i, subArray) in literal.enumerated() {
+          for (j, subSubArray) in subArray.enumerated() {
+            subSubArray.withUnsafeBufferPointer { ptr in
+                addr.advanced(by: i * dim1 + j * dim2)
+                  .assign(from: ptr.baseAddress!, count: dim2)
+            }
+          }
+        }
+      }
+    )
+    self.init(tensorHandle)
+  }
+
+  /// Initialize a tensor with an array of array of arrays of arrays
+  /// representing a 4D tensor.
+  ///
+  /// - Precondition: The number of elements in each sub-dimensional array in
+  ///   the array must be equal.
+  /// - TODO: improve description
+  @_inlineable
+  init(_ literal: [[[[Unit]]]]) {
+    /// Sanity checks.
+    let dim0 = literal.count
+    let dim1 = literal.first?.count ?? 0
+    let dim2 = literal.first?.first?.count ?? 0
+    let dim3 = literal.first?.first?.first?.count ?? 0
+    for subArray in literal {
+      precondition(subArray.count == dim1, """
+        Each dimension must have an equal number of subdimensions.
+        """)
+      for subSubArray in subArray {
+        precondition(subSubArray.count == dim2, """
+          Each dimension must have an equal number of subdimensions.
+          """)
+        for subSubSubArray in subSubArray {
+          precondition(subSubSubArray.count == dim3, """
+            Each dimension must have an equal number of subdimensions.
+            """)
+        }
+      }
+    }
+    // We don't want to delegate initialization to `init(shape:units:)`
+    // because flattening `literal` to an array is an unnecessary cost.
+    let tensorHandle = TensorHandle<Unit>(
+      shape: [dim0, dim1, dim2, dim3],
+      unitsInitializer: { addr in
+        // Copy to TF_Tensor memory, one innermost array at a time.
+        for (i, subArray) in literal.enumerated() {
+          for (j, subSubArray) in subArray.enumerated() {
+            for (k, subSubSubArray) in subSubArray.enumerated() {
+              subSubSubArray.withUnsafeBufferPointer { ptr in
+                addr.advanced(by: i * dim1 + j * dim2 + k * dim3)
+                  .assign(from: ptr.baseAddress!, count: dim3)
+              }
+            }
           }
         }
       }
@@ -175,7 +262,7 @@ public extension Tensor {
 
   /// Initialize a tensor with arbitrary shape.
   /// - Precondition: The number of units should be the same as the
-  /// product of all of shape's dimensions.
+  ///   product of all of shape's dimensions.
   @_inlineable
   init(shape: [Int], units: [Unit]) {
     self.init(_TFTensorFromUnits(units, shape: shape))
@@ -338,9 +425,10 @@ public extension AccelerableTensorUnit {
 }
 
 public extension Tensor {
-  @inline(never) // make @_inlineable when implemented.
+  @_inlineable
   func rankLifted(by dimensionCount: Int) -> Tensor {
-    fatalError("FIXME: implement broadcast")
+    return Tensor(#tfop("ExpandDims", "tt:t", handle,
+                        Tensor<Int>(dimensionCount).handle, Tdim: Int.self))
   }
 
   /// Broadcast the specified Tensor to a rank >= its current size, filling in
@@ -460,7 +548,7 @@ public extension Tensor {
   var array: ShapedArray<Unit> {
     debugLog("Returning a host copy of array.")
     // This is considered to be a well known way to produce a copy to the host,
-    // so we never way to produce an "implicit copy to host" warning.
+    // so we never want to produce an "implicit copy to host" warning.
     return toHost().handle.makeHostCopy()
   }
 

@@ -197,22 +197,6 @@ public extension Tensor where Unit : Numeric {
 
 public extension Tensor {
   @_inlineable
-  func mean() -> Unit {
-    let result = Tensor<Unit>(#tfop("Mean", "tt:t", handle,
-                                    Tensor<Int>(emptyWithRank: 1).handle))
-    return result.scalar!
-  }
-
-  @_inlineable
-  func mean(
-    alongAxes axes: Int...,
-    keepingDimensions: Bool = false
-  ) -> Tensor {
-    return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
-                              keep_dims: keepingDimensions, Tidx: Int.self))
-  }
-
-  @_inlineable
   func min() -> Unit {
     let result = Tensor<Unit>(#tfop("Min", "tt:t", handle,
                                     Tensor<Int>(emptyWithRank: 1).handle))
@@ -260,6 +244,22 @@ public extension Tensor {
                               keep_dims: keepingDimensions, Tidx: Int.self))
   }
 
+  @_inlineable
+  func mean() -> Unit {
+    let result = Tensor<Unit>(#tfop("Mean", "tt:t", handle,
+                                    Tensor<Int>(emptyWithRank: 1).handle))
+    return result.scalar!
+  }
+
+  @_inlineable
+  func mean(
+    alongAxes axes: Int...,
+    keepingDimensions: Bool = false
+  ) -> Tensor {
+    return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
+                              keep_dims: keepingDimensions, Tidx: Int.self))
+  }
+
   @inline(never) // make @_inlineable when implemented.
   func argmax() -> Int {
     fatalError("FIXME: implement argmax")
@@ -288,32 +288,6 @@ public extension Tensor where Unit : Numeric {
 
   @_inlineable
   static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return lhs.dot(rhs)
-  }
-
-  @_inlineable
-  static func ⊗ (lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) ⊗ rhs
-  }
-
-  @_inlineable
-  static func ⊗ (lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs ⊗ Tensor(rhs)
-  }
-}
-
-public extension Tensor1D where Unit : Numeric {
-  @_inlineable
-  func dot(_ other: Tensor2D<Unit>) -> Tensor1D<Unit> {
-    return Tensor1D(underlying: underlyingTensor.dot(other.underlyingTensor))
-  }
-}
-
-public extension Tensor2D where Unit : Numeric {
-  @_inlineable
-  static func ⊗ (
-    lhs: Tensor1D<Unit>, rhs: Tensor2D<Unit>
-  ) -> Tensor1D<Unit> {
     return lhs.dot(rhs)
   }
 }
@@ -554,6 +528,13 @@ public func exp<Unit: FloatingPoint>(
 }
 
 @_inlineable
+public func sqrt<Unit: FloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
+  return Tensor(#tfop("Sqrt", "t:t", x.handle))
+}
+
+@_inlineable
 // @differentiable(gradient: _adjointPow(_:_:primal:seed:))
 public func pow<Unit : Numeric>(
   _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
@@ -637,37 +618,6 @@ public extension Tensor where Unit == Bool {
   @_inlineable
   public func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
     return selecting(left, Tensor<T>(right))
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Reduction
-//===----------------------------------------------------------------------===//
-
-public extension Tensor2D where Unit : Numeric {
-  // Sum tensor along one axis, producing a Tensor1D.
-  @_inlineable
-  func sum(alongAxis axis: Int) -> Tensor1D<Unit> {
-    return Tensor1D<Unit>(underlying:
-      underlyingTensor.sum(alongAxes: axis))
-  }
-
-  @_inlineable
-  func max(alongAxis axis: Int) -> Tensor1D<Unit> {
-    return Tensor1D<Unit>(underlying:
-      underlyingTensor.max(alongAxes: axis))
-  }
-
-  @_inlineable
-  func min(alongAxis axis: Int) -> Tensor1D<Unit> {
-    return Tensor1D<Unit>(underlying:
-      underlyingTensor.min(alongAxes: axis))
-  }
-
-  @_inlineable
-  func mean(alongAxis axis: Int) -> Tensor1D<Unit> {
-    return Tensor1D<Unit>(underlying:
-      underlyingTensor.mean(alongAxes: axis))
   }
 }
 
