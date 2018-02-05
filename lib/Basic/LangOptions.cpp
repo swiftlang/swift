@@ -56,6 +56,11 @@ static const StringRef SupportedConditionalCompilationEndianness[] = {
   "big"
 };
 
+static const StringRef SupportedConditionalCompilationNativeWordSizes[] = {
+  "32",
+  "64"
+};
+
 static const StringRef SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
@@ -100,6 +105,9 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
                     suggestions);
   case PlatformConditionKind::Endianness:
     return contains(SupportedConditionalCompilationEndianness, Value,
+                    suggestions);
+  case PlatformConditionKind::NativeWordSize:
+    return contains(SupportedConditionalCompilationNativeWordSizes, Value,
                     suggestions);
   case PlatformConditionKind::Runtime:
     return contains(SupportedConditionalCompilationRuntimes, Value,
@@ -254,6 +262,34 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   default:
     llvm_unreachable("undefined architecture endianness");
+  }
+
+  // Set the "_native_word_size" platform condition.
+  switch (Target.getArch()) {
+  case llvm::Triple::ArchType::arm:
+  case llvm::Triple::ArchType::thumb:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "32");
+    break;
+  case llvm::Triple::ArchType::aarch64:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "64");
+    break;
+  case llvm::Triple::ArchType::ppc64:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "64");
+    break;
+  case llvm::Triple::ArchType::ppc64le:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "64");
+    break;
+  case llvm::Triple::ArchType::x86:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "32");
+    break;
+  case llvm::Triple::ArchType::x86_64:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "64");
+    break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue(PlatformConditionKind::NativeWordSize, "64");
+    break;
+  default:
+    llvm_unreachable("undefined architecture native word size");
   }
 
   // Set the "runtime" platform condition.

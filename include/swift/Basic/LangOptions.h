@@ -43,11 +43,13 @@ namespace swift {
     Arch,
     /// The active endianness target (big or little)
     Endianness,
+    /// The active native word size target (32 or 64)
+    NativeWordSize,
     /// Runtime support (_ObjC or _Native)
     Runtime,
     /// Conditional import of module
     CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
+    /// Target environment (currently just 'simulator' or absent)
     TargetEnvironment,
   };
 
@@ -360,7 +362,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

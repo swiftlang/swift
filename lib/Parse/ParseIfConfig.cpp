@@ -40,6 +40,7 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Case("os", PlatformConditionKind::OS)
     .Case("arch", PlatformConditionKind::Arch)
     .Case("_endian", PlatformConditionKind::Endianness)
+    .Case("_native_word_size", PlatformConditionKind::NativeWordSize)
     .Case("_runtime", PlatformConditionKind::Runtime)
     .Case("canImport", PlatformConditionKind::CanImport)
     .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
@@ -296,7 +297,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_runtime' | 'canImport') '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_native_word_size' | '_runtime' | 'canImport') '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -329,6 +330,8 @@ public:
         DiagName = "architecture"; break;
       case PlatformConditionKind::Endianness:
         DiagName = "endianness"; break;
+      case PlatformConditionKind::NativeWordSize:
+        DiagName = "native word size"; break;
       case PlatformConditionKind::CanImport:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
