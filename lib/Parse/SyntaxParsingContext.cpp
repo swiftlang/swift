@@ -186,6 +186,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::IdentifierExpr:
+  case SyntaxKind::SpecializeExpr:
   case SyntaxKind::MemberAccessExpr:
   case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:

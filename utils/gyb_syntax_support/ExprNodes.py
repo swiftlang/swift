@@ -433,6 +433,13 @@ EXPR_NODES = [
              Child('OperatorToken', kind='PostfixOperatorToken'),
          ]),
 
+    # specialize-expr -> expr generic-argument-clause?
+    Node('SpecializeExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('GenericArgumentClause', kind='GenericArgumentClause'),
+         ]),
+
     # string literal segment in a string interpolation expression.
     Node('StringSegment', kind='Syntax',
          children=[

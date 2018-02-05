@@ -250,8 +250,12 @@ func postfix() {
   foo[1][2,x:3]
   foo?++.bar!(baz).self
   foo().0
+  foo<Int>.bar
+  foo<Int>()
+  foo.bar<Int>()
 
   foo(x:y:)()
+  foo(x:)<Int> { }
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
   _ = foo(&d)

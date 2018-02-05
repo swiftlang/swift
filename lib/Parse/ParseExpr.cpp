@@ -1224,6 +1224,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
           locArgs.push_back(ty);
+        SyntaxContext->createNodeInPlace(SyntaxKind::SpecializeExpr);
         Result = makeParserResult(UnresolvedSpecializeExpr::create(Context,
                                   Result.get(), LAngleLoc, locArgs, RAngleLoc));
       }
@@ -2238,6 +2239,8 @@ Expr *Parser::parseExprIdentifier() {
   ///     period_following comma semicolon
   ///
   if (canParseAsGenericArgumentList()) {
+    SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
+    SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
