@@ -136,21 +136,22 @@ public protocol _ShapedArrayProtocol
   /// Initialize an array using specific shape and contiguous units in
   /// row-major order.
   /// - Precondition: The number of `units` must be equal to the product of
-  /// all dimensions of the shape.
+  ///   all dimensions of the shape.
   init(shape: Shape, units: [Unit])
 
   /// Initialize an array using specific shape and a sequence of units in
   /// row-major order.
   /// - Precondition: The number of `units` must be equal to the product of
-  /// all dimensions of the shape.
+  ///   all dimensions of the shape.
   init<S : Sequence>(shape: Shape, units: S) where S.Element == Unit
 
   /// Calls a closure with a pointer to the array’s contiguous storage.
   /// - Parameter body: A closure with an UnsafeBufferPointer parameter that
-  /// points to the contiguous storage for the array. If no such storage exists,
-  /// it is created. If body has a return value, that value is also used as the
-  /// return value for the withUnsafeBufferPointer(_:) method. The pointer
-  /// argument is valid only for the duration of the method’s execution.
+  ///   points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the withUnsafeBufferPointer(_:) method. The
+  ///   pointer argument is valid only for the duration of the method’s
+  ///   execution.
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Unit>) throws -> R
   ) rethrows -> R
@@ -158,10 +159,11 @@ public protocol _ShapedArrayProtocol
   /// Calls the given closure with a pointer to the array’s mutable contiguous
   /// storage.
   /// - Parameter body: A closure with an UnsafeMutableBufferPointer parameter
-  /// that points to the contiguous storage for the array. If no such storage
-  /// exists, it is created. If body has a return value, that value is also used
-  /// as the return value for the withUnsafeMutableBufferPointer(_:) method. The
-  /// pointer argument is valid only for the duration of the method’s execution.
+  ///   that points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the withUnsafeMutableBufferPointer(_:)
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method’s execution.
   mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Unit>) throws -> R
   ) rethrows -> R
@@ -489,7 +491,7 @@ extension ShapedArray where Unit : AccelerableTensorUnit {
 
   func makeTensorHandle() -> TensorHandle<Unit> {
     // This initializer is designed to optimize conversion from TF-allocated
-    // `ShapedArray`s.
+    // `ShapedArray` instances.
     switch buffer.allocation {
     case let .native(bufAddr):
       return TensorHandle<Unit>(
@@ -520,6 +522,7 @@ extension ShapedArray : Equatable where Unit : Equatable {
 }
 
 extension ShapedArray : CustomStringConvertible {
+  /// A textual representation of this shaped array.
   public var description: String {
     return _description
   }
@@ -798,7 +801,7 @@ extension ShapedArraySlice : Equatable where Unit : Equatable {
 
 /// String conversion
 extension ShapedArraySlice : CustomStringConvertible {
-  /// A textual implementation of this shaped array.
+  /// A textual representation of this shaped array.
   public var description: String {
     return _description
   }
