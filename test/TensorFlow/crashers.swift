@@ -42,3 +42,23 @@ public func sinking_crash(w1: Tensor<Float>) {
     let _ = 1.0 / Tensor<Float>(pred.unitCountTensor)
   }
 }
+
+// This crashed the partitioning pass because the end point of the program was
+// calculated to be inside the loop, but the startpoint was outside.
+public func endpointComputationCrash() {
+  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
+
+  for _ in 0..<1000 {
+    w1 -= w1
+  }
+}
+
+// This crashed lower graph because it produced an error about not being able
+// to lower a send and there wasn't enough error recovery to handle it well.
+public func lowerGraphCrash(x: Tensor<Int>) {
+  _ = x*x  // expected-note {{value used here}}
+  for _ in 0..<1000 {
+    _ = x+someGlobal // expected-note {{value used here}}
+    // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
+  } // expected-warning {{value implicitly copied to the accelerator}}
+} // expected-warning {{value implicitly copied to the accelerator}}

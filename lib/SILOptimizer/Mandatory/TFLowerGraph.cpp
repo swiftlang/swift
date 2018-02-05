@@ -807,6 +807,8 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // arguments, which we will handle specially later.  They provide the passed
   // values to the loop function that we will create.
   lowerBasicBlock(r->getPreheader(), /*skipTerminator:*/ true);
+  if (errorOccurred) return;
+
   auto phBranch = cast<BranchInst>(r->getPreheader()->getTerminator());
 
   // Get all the values that the preheader passes in for the SILArguments in
@@ -869,6 +871,7 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // lowering code.
     lowerRegion(r->getBody());
   });
+  if (errorOccurred) return;
 
   // Okay, at this point, the loop body should have all of the SILArguments
   // installed as inputs and outputs (in guaranteed matching order) and will
@@ -919,9 +922,7 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 
     // The result of the function is our condition value.
     graphFn.outputs.push_back({ /*SILArgument*/nullptr, condValue });
-
   });
-
   if (errorOccurred) return;
 
 
@@ -1006,17 +1007,15 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     if (auto trueRegion = r->getTrue())
       lowerRegion(trueRegion);
   });
+  if (errorOccurred) return;
 
-  if (errorOccurred)
-    return;
   auto falseCodeFn = lowerToFunction([&]() {
     // Lower all of the code inside the region (which can of course recursively
     // create functions and call them as ops.
     if (auto falseRegion = r->getFalse())
       lowerRegion(falseRegion);
   });
-  if (errorOccurred)
-    return;
+  if (errorOccurred) return;
 
   // We are generating the "If" TensorFlow node, which takes an input
   // condition as a bool, and functions to run for the true/false branch that
