@@ -91,6 +91,38 @@ private:
   }
 };
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Differentiable attribute - @differentiable attribute lowered to SIL.
+/// This attribute is used by the automatic differentiation pass to find the
+/// defined adjoint of a function.
+class SILDifferentiableAttr final {
+  friend SILFunction;
+
+private:
+  /// Name of the function to differentiate.
+  Identifier AdjointName;
+  /// Arguments of the primal to differentiate with respect to.
+  unsigned NumArgIndices;
+  /// Constructor, copying argument indices to the trailing buffer.
+  SILDifferentiableAttr(Identifier adjointName, ArrayRef<unsigned> argIndices);
+
+public:
+  static SILDifferentiableAttr *create(SILModule &M, Identifier adjointName,
+                                       ArrayRef<unsigned> argIndices);
+
+  Identifier getAdjointName() const {
+    return AdjointName;
+  }
+
+  ArrayRef<unsigned> getArgIndices() const;
+
+  unsigned *getArgIndicesData() {
+    return reinterpret_cast<unsigned *>(this+1);
+  }
+
+  void print(llvm::raw_ostream &OS) const;
+};
+
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -190,6 +222,10 @@ private:
 
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// The function's differentiable attribute.
+  SILDifferentiableAttr *DifferentiableAttr = nullptr;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -518,6 +554,16 @@ public:
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// \returns the 'differentiable' attribute, or nullptr if it doesn't exist.
+  SILDifferentiableAttr *getDifferentiableAttr() const {
+    return DifferentiableAttr;
+  }
+
+  /// Set the 'differentiable' attribute.
+  void setDifferentiableAttr(SILDifferentiableAttr *attr) {
+    DifferentiableAttr = attr;
+  }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.

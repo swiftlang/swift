@@ -1477,6 +1477,22 @@ ERROR(attr_differentiable_duplicate_config_option,PointsToFirstBadToken,
 ERROR(attr_differentiable_missing_gradient_label,PointsToFirstBadToken,
       "missing label 'gradient:' in '@differentiable' attribute", ())
 
+// [differentiable ...] (sil-decl attr)
+ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
+      "expected '%0' in 'differentiable' attribute", (StringRef))
+
+ERROR(sil_attr_differentiable_expected_adjoint_identifier,PointsToFirstBadToken,
+      "expected the identifier of an adjoint function", ())
+
+ERROR(sil_attr_differentiable_expected_argument_list,PointsToFirstBadToken,
+      "expected an comma-separated list of argument indices, e.g. (0, 1)", ())
+
+ERROR(sil_attr_differentiable_expected_argument_index,PointsToFirstBadToken,
+      "expected an index of argument to differentiate with respect to", ())
+
+ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to end 'differentiable' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

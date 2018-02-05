@@ -2334,6 +2334,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (auto *Attr = getDifferentiableAttr()) {
+    OS << "[differentiable "; Attr->print(OS); OS << "] ";
+  }
+
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
     OS << "[clang ";
@@ -3008,6 +3013,15 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                },
                [&] { OS << ", "; });
   }
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
+  OS << "wrt ";
+  interleave(getArgIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ", "; });
+  OS << " adjoint @" << getAdjointName();
 }
 
 //===----------------------------------------------------------------------===//
