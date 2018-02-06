@@ -1359,9 +1359,8 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     CompilerInstance &ParseCI, std::string &Error) {
   CompilerInvocation Invocation;
 
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       ParseCI.getDiags(),
-                                                       StringRef(), Error);
+  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+      Invocation, Args, ParseCI.getDiags(), Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
     return nullptr;
@@ -1415,14 +1414,14 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
   CompilerInvocation Invocation;
   std::string Error;
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       CI.getDiags(),
-                                                       StringRef(),
-                                                       Error);
+  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+      Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
+
   if (Failed) {
     Consumer.failed(Error);
     return;
   }
+
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
 
   if (!ModuleName.empty()) {
@@ -1451,8 +1450,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   CI.addDiagnosticConsumer(&PrintDiags);
   std::vector<StringRef> Groups;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+                                                     CI.getDiags(), Error)) {
     Receiver(Groups, Error);
     return;
   }

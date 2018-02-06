@@ -1194,10 +1194,14 @@ void SwiftLangSupport::codeCompleteOpen(
 
   // Add any codecomplete.open specific flags.
   std::vector<const char *> extendedArgs(args.begin(), args.end());
-  if (CCOpts.addInitsToTopLevel)
+  if (CCOpts.addInitsToTopLevel) {
+    extendedArgs.push_back("-Xfrontend");
     extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
-  if (CCOpts.callPatternHeuristics)
+  }
+  if (CCOpts.callPatternHeuristics) {
+    extendedArgs.push_back("-Xfrontend");
     extendedArgs.push_back("-code-complete-call-pattern-heuristics");
+  }
 
   // Invoke completion.
   std::string error;
