@@ -91,7 +91,7 @@ public final class _ExecutionContext {
   private init() {
     debugLog("Initializing global context.")
 
-    // Initialize the TF runtime exactly one.
+    // Initialize the TF runtime exactly once.
     InitTensorFlowRuntime()
 
     let opts = TFE_NewContextOptions()

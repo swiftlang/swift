@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains core Tensor op definitions.
+// This file contains definitions of tensor operations common to TensorProtocol.
 //
 //===----------------------------------------------------------------------===//
 
@@ -56,141 +56,159 @@
 infix operator ⊗ : MultiplicationPrecedence
 
 // TODO:
-// - Unify Tensor and RankedTensor ops with protocol mechanism.
 // - Consider explicit broadcasting for elementwise binary ops when
 //   scalarization and rank getter are implemented.
-//
+
+extension Tensor : TensorProtocol {
+  public typealias BoolTensor = Tensor<Bool>
+}
+
+extension Tensor1D : TensorProtocol {
+  public typealias BoolTensor = Tensor1D<Bool>
+}
+
+extension Tensor2D : TensorProtocol {
+  public typealias BoolTensor = Tensor2D<Bool>
+}
+
+extension Tensor3D : TensorProtocol {
+  public typealias BoolTensor = Tensor3D<Bool>
+}
+
+extension Tensor4D : TensorProtocol {
+  public typealias BoolTensor = Tensor4D<Bool>
+}
 
 //===----------------------------------------------------------------------===//
 // Elementwise binary arithmetics
 //===----------------------------------------------------------------------===//
 
-extension Tensor /*: Numeric*/ where Unit : Numeric {
+extension TensorProtocol /*: Numeric*/ where Unit : Numeric {
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
-  public static func +(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Add", "tt:t", lhs.handle, rhs.handle))
+  public static func +(lhs: Self, rhs: Self) -> Self {
+    return Self(#tfop("Add", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointSubtract(_:_:primal:seed:))
-  public static func -(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Sub", "tt:t", lhs.handle, rhs.handle))
+  public static func -(lhs: Self, rhs: Self) -> Self {
+    return Self(#tfop("Sub", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointMultiply(_:_:primal:seed:))
-  public static func *(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Mul", "tt:t", lhs.handle, rhs.handle))
+  public static func *(lhs: Self, rhs: Self) -> Self {
+    return Self(#tfop("Mul", "tt:t", lhs.handle, rhs.handle))
   }
 }
 
-public extension Tensor where Unit : Numeric {
+public extension TensorProtocol where Unit : Numeric {
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
-  static func +(lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs + Tensor(rhs)
+  static func +(lhs: Self, rhs: Unit) -> Self {
+    return lhs + Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointAdd(_:_:primal:seed:))
-  static func +(lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) + rhs
+  static func +(lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) + rhs
   }
 
   @_inlineable @inline(__always)
-  static func +=(lhs: inout Tensor, rhs: Tensor) {
+  static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
   @_inlineable @inline(__always)
-  static func +=(lhs: inout Tensor, rhs: Unit) {
-    lhs = lhs + Tensor(rhs)
+  static func +=(lhs: inout Self, rhs: Unit) {
+    lhs = lhs + Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
   // @differentiable(gradient: _adjointNegate(_:primal:seed:))
-  static prefix func -(rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Neg", "t:t", rhs.handle))
+  static prefix func -(rhs: Self) -> Self {
+    return Self(#tfop("Neg", "t:t", rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs - Tensor(rhs)
+  static func -(lhs: Self, rhs: Unit) -> Self {
+    return lhs - Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func -(lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) - rhs
+  static func -(lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) - rhs
   }
 
   @_inlineable @inline(__always)
-  static func -=(lhs: inout Tensor, rhs: Tensor) {
+  static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
 
   @_inlineable @inline(__always)
-  static func -=(lhs: inout Tensor, rhs: Unit) {
+  static func -=(lhs: inout Self, rhs: Unit) {
     lhs = lhs - rhs
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) * rhs
+  static func *(lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) * rhs
   }
 
   @_inlineable @inline(__always)
-  static func *(lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs * Tensor(rhs)
+  static func *(lhs: Self, rhs: Unit) -> Self {
+    return lhs * Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Div", "tt:t", lhs.handle, rhs.handle))
+  static func /(lhs: Self, rhs: Self) -> Self {
+    return Self(#tfop("Div", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs / Tensor(rhs)
+  static func /(lhs: Self, rhs: Unit) -> Self {
+    return lhs / Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func /(lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) / rhs
+  static func /(lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) / rhs
   }
 
   @_inlineable @inline(__always)
-  static func /=(lhs: inout Tensor, rhs: Tensor) {
+  static func /=(lhs: inout Self, rhs: Self) {
     lhs = lhs / rhs
   }
 
   @_inlineable @inline(__always)
-  static func /=(lhs: inout Tensor, rhs: Unit) {
+  static func /=(lhs: inout Self, rhs: Unit) {
     lhs = lhs / rhs
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Tensor(#tfop("Mod", "tt:t", lhs.handle, rhs.handle))
+  static func %(lhs: Self, rhs: Self) -> Self {
+    return Self(#tfop("Mod", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs % Tensor(rhs)
+  static func %(lhs: Self, rhs: Unit) -> Self {
+    return lhs % Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func %(lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) % rhs
+  static func %(lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) % rhs
   }
 
   @_inlineable @inline(__always)
-  static func %=(lhs: inout Tensor, rhs: Tensor) {
+  static func %=(lhs: inout Self, rhs: Self) {
     lhs = lhs % rhs
   }
 
   @_inlineable @inline(__always)
-  static func %=(lhs: inout Tensor, rhs: Unit) {
+  static func %=(lhs: inout Self, rhs: Unit) {
     lhs = lhs % rhs
   }
 }
@@ -199,25 +217,25 @@ public extension Tensor where Unit : Numeric {
 // Linear algebra
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit : Numeric {
+public extension TensorProtocol where Unit : Numeric {
   @_inlineable @inline(__always)
-  func dot(_ other: Tensor) -> Tensor {
-    return Tensor(#tfop("MatMul", "tt:t", self.handle, other.handle))
+  func dot(_ other: Self) -> Self {
+    return Self(#tfop("MatMul", "tt:t", self.handle, other.handle))
   }
 
   @_inlineable @inline(__always)
-  static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
+  static func ⊗ (lhs: Self, rhs: Self) -> Self {
     return lhs.dot(rhs)
   }
 
   @_inlineable @inline(__always)
-  static func ⊗ (lhs: Unit, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) ⊗ rhs
+  static func ⊗ (lhs: Unit, rhs: Self) -> Self {
+    return Self(_TFMakeScalarTensor(lhs)) ⊗ rhs
   }
 
   @_inlineable @inline(__always)
-  static func ⊗ (lhs: Tensor, rhs: Unit) -> Tensor {
-    return lhs ⊗ Tensor(rhs)
+  static func ⊗ (lhs: Self, rhs: Unit) -> Self {
+    return lhs ⊗ Self(_TFMakeScalarTensor(rhs))
   }
 }
 
@@ -225,99 +243,97 @@ public extension Tensor where Unit : Numeric {
 // Elementwise binary comparison
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit : Comparable {
+public extension TensorProtocol where Unit : Comparable {
   @_inlineable @inline(__always)
-  static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Less", "tt:t", lhs.handle, rhs.handle))
+  static func < (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("Less", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func < (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs < Tensor(rhs)
+  static func < (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs < Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func < (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) < rhs
+  static func < (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) < rhs
   }
 
   @_inlineable @inline(__always)
-  static func <= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("LessEqual", "tt:t",
-                        lhs.handle, rhs.handle))
+  static func <= (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("LessEqual", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func <= (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs <= Tensor(rhs)
+  static func <= (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs <= Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func <= (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) <= rhs
+  static func <= (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) <= rhs
   }
 
   @_inlineable @inline(__always)
-  static func > (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Greater", "tt:t", lhs.handle, rhs.handle))
+  static func > (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("Greater", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func > (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs > Tensor(rhs)
+  static func > (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs > Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func > (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) > rhs
+  static func > (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) > rhs
   }
 
   @_inlineable @inline(__always)
-  static func >= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("GreaterEqual", "tt:t",
-                       lhs.handle, rhs.handle))
+  static func >= (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("GreaterEqual", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func >= (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs >= Tensor(rhs)
+  static func >= (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs >= Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func >= (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) >= rhs
+  static func >= (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) >= rhs
   }
 }
 
-public extension Tensor where Unit : Equatable {
+public extension TensorProtocol where Unit : Equatable {
   @_inlineable @inline(__always)
-  static func == (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("Equal", "tt:t", lhs.handle, rhs.handle))
+  static func == (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("Equal", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func == (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs == Tensor(rhs)
+  static func == (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs == Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func == (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) == rhs
+  static func == (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) == rhs
   }
 
   @_inlineable @inline(__always)
-  static func != (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor<Bool>(#tfop("NotEqual", "tt:t", lhs.handle, rhs.handle))
+  static func != (lhs: Self, rhs: Self) -> BoolTensor {
+    return BoolTensor(#tfop("NotEqual", "tt:t", lhs.handle, rhs.handle))
   }
 
   @_inlineable @inline(__always)
-  static func != (lhs: Tensor, rhs: Unit) -> Tensor<Bool> {
-    return lhs != Tensor(rhs)
+  static func != (lhs: Self, rhs: Unit) -> BoolTensor {
+    return lhs != Self(_TFMakeScalarTensor(rhs))
   }
 
   @_inlineable @inline(__always)
-  static func != (lhs: Unit, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) != rhs
+  static func != (lhs: Unit, rhs: Self) -> BoolTensor {
+    return Self(_TFMakeScalarTensor(lhs)) != rhs
   }
 }
 
@@ -325,29 +341,29 @@ public extension Tensor where Unit : Equatable {
 // Transforms
 //===----------------------------------------------------------------------===//
 
-public extension Tensor {
+public extension TensorProtocol {
   @_inlineable @inline(__always)
   // @differentiable(
   //   withRespectTo: (self),
   //   gradient: _adjointTransposed(_:_:primal:seed:)
   // )
-  func transposed(withPermutations permutations: Tensor<Int>) -> Tensor {
-    return Tensor(#tfop("Transpose", "tt:t", handle, permutations.handle,
-                        Tperm: Int.self))
+  func transposed(withPermutations permutations: Tensor<Int>) -> Self {
+    return Self(#tfop("Transpose", "tt:t", handle, permutations.handle,
+                      Tperm: Int.self))
   }
 
   @_inlineable @inline(__always)
-  func transposed(withPermutations permutations: [Int]) -> Tensor {
+  func transposed(withPermutations permutations: [Int]) -> Self {
     return transposed(withPermutations: Tensor<Int>(permutations))
   }
 
   @_inlineable @inline(__always)
-  func transposed(withPermutations permutations: Int...) -> Tensor {
+  func transposed(withPermutations permutations: Int...) -> Self {
     return transposed(withPermutations: permutations)
   }
 
   @inline(never)
-  func transposed() -> Tensor {
+  func transposed() -> Self {
     // FIXME: Standard transposition needs permutations [n-1, ..., 0], but
     // there's no op like Swift's `stride`, and the "Range" op can only form
     // an ascending sequence. Need to find an op for it.
@@ -355,23 +371,18 @@ public extension Tensor {
     // return transposed(withPermutations: defaultPerms)
   }
 
-  @inline(never) // make @_inlineable when implemented.
-  func concatenated(with other: Tensor) -> Tensor {
-    fatalError("FIXME: implement concatenated(with:)")
+  @_inlineable @inline(__always)
+  func reversed(alongAxes axes: Tensor<Int>) -> Self {
+    return Self(#tfop("Reverse", "tt:t", handle, axes.handle, Tidx: Int.self))
   }
 
   @_inlineable @inline(__always)
-  func reversed(alongAxes axes: Tensor<Int>) -> Tensor {
-    return Tensor(#tfop("Reverse", "tt:t", handle, axes.handle, Tidx: Int.self))
-  }
-
-  @_inlineable @inline(__always)
-  func reversed(alongAxes axes: [Int]) -> Tensor {
+  func reversed(alongAxes axes: [Int]) -> Self {
     return reversed(alongAxes: Tensor<Int>(axes))
   }
 
   @_inlineable @inline(__always)
-  func reversed(alongAxes axes: Int...) -> Tensor {
+  func reversed(alongAxes axes: Int...) -> Self {
     return reversed(alongAxes: axes)
   }
 }
@@ -381,152 +392,152 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 @_inlineable @inline(__always)
-public func abs<Unit: Numeric>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Abs", "t:t", x.handle))
+public func abs<Unit: Numeric, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Abs", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointLog(_:primal:seed:))
-public func log<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Log", "t:t", x.handle))
+public func log<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Log", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointSin(_:primal:seed:))
-public func sin<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Sin", "t:t", x.handle))
+public func sin<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Sin", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointCos(_:primal:seed:))
-public func cos<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Cos", "t:t", x.handle))
+public func cos<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Cos", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointTan(_:primal:seed:))
-public func tan<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Tan", "t:t", x.handle))
+public func tan<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Tan", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointSinh(_:primal:seed:))
-public func sinh<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Sinh", "t:t", x.handle))
+public func sinh<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Sinh", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointCosh(_:primal:seed:))
-public func cosh<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Cosh", "t:t", x.handle))
+public func cosh<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Cosh", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointTanh(_:primal:seed:))
-public func tanh<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Tanh", "t:t", x.handle))
+public func tanh<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Tanh", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
-public func sqrt<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Sqrt", "t:t", x.handle))
+public func sqrt<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Sqrt", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
-public func exp<Unit: FloatingPoint>(
-  _ x: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Exp", "t:t", x.handle))
+public func exp<Unit: FloatingPoint, T : TensorProtocol>(
+  _ x: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Exp", "t:t", x.handle))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointPow(_:_:primal:seed:))
-public func pow<Unit : Numeric>(
-  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Pow", "tt:t", lhs.handle, rhs.handle))
+public func pow<Unit : Numeric, T : TensorProtocol>(
+  _ lhs: T, _ rhs: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Pow", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable @inline(__always)
-public func pow<Unit : Numeric>(
-  _ lhs: Unit, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return pow(Tensor(lhs), rhs)
+public func pow<Unit : Numeric, T : TensorProtocol>(
+  _ lhs: Unit, _ rhs: T
+) -> T where T.Unit == Unit {
+  return pow(T(_TFMakeScalarTensor(lhs)), rhs)
 }
 
 @_inlineable @inline(__always)
-public func pow<Unit : Numeric>(
-  _ lhs: Tensor<Unit>, _ rhs: Unit
-) -> Tensor<Unit> {
-  return pow(lhs, Tensor(rhs))
+public func pow<Unit : Numeric, T : TensorProtocol>(
+  _ lhs: T, _ rhs: Unit
+) -> T where T.Unit == Unit {
+  return pow(lhs, T(_TFMakeScalarTensor(rhs)))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointMin(_:_:primal:seed:))
-public func min<Unit : Numeric & Comparable>(
-  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Min", "tt:t", lhs.handle, rhs.handle))
+public func min<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Min", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable @inline(__always)
-public func min<Unit : Numeric & Comparable>(
-  _ lhs: Unit, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return min(Tensor(lhs), rhs)
+public func min<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: Unit, _ rhs: T
+) -> T where T.Unit == Unit {
+  return min(T(_TFMakeScalarTensor(lhs)), rhs)
 }
 
 @_inlineable @inline(__always)
-public func min<Unit : Numeric & Comparable>(
-  _ lhs: Tensor<Unit>, _ rhs: Unit
-) -> Tensor<Unit> {
-  return min(lhs, Tensor(rhs))
+public func min<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: Unit
+) -> T where T.Unit == Unit {
+  return min(lhs, T(_TFMakeScalarTensor(rhs)))
 }
 
 @_inlineable @inline(__always)
 // @differentiable(gradient: _adjointMax(_:_:primal:seed:))
-public func max<Unit : Numeric & Comparable>(
-  _ lhs: Tensor<Unit>, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return Tensor(#tfop("Max", "tt:t", lhs.handle, rhs.handle))
+public func max<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: T
+) -> T where T.Unit == Unit {
+  return T(#tfop("Max", "tt:t", lhs.handle, rhs.handle))
 }
 
 @_inlineable @inline(__always)
-public func max<Unit : Numeric & Comparable>(
-  _ lhs: Unit, _ rhs: Tensor<Unit>
-) -> Tensor<Unit> {
-  return max(Tensor(lhs), rhs)
+public func max<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: Unit, _ rhs: T
+) -> T where T.Unit == Unit {
+  return max(T(_TFMakeScalarTensor(lhs)), rhs)
 }
 
 @_inlineable @inline(__always)
-public func max<Unit : Numeric & Comparable>(
-  _ lhs: Tensor<Unit>, _ rhs: Unit
-) -> Tensor<Unit> {
-  return max(lhs, Tensor(rhs))
+public func max<Unit : Numeric & Comparable, T : TensorProtocol>(
+  _ lhs: T, _ rhs: Unit
+) -> T where T.Unit == Unit {
+  return max(lhs, T(_TFMakeScalarTensor(rhs)))
 }
 
-public extension Tensor {
+public extension TensorProtocol {
   @_inlineable @inline(__always)
-  func squared() -> Tensor {
-    return Tensor(#tfop("Square", "t:t", handle))
+  func squared() -> Self {
+    return Self(#tfop("Square", "t:t", handle))
   }
 }
 
@@ -534,20 +545,25 @@ public extension Tensor {
 // Selection
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Unit == Bool {
+public extension TensorProtocol where Unit == Bool {
   @_inlineable @inline(__always)
-  public func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
-    return Tensor<T>(#tfop("Select", "ttt:t", handle, left.handle, right.handle))
+  public func selecting<U, T : TensorProtocol>(_ left: T, _ right: T) -> T
+    where T.Unit == U {
+    return T(#tfop("Select", "ttt:t", handle, left.handle, right.handle))
   }
 
   @_inlineable @inline(__always)
-  public func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
-    return selecting(Tensor<T>(left), right)
+  public func selecting<U, T : TensorProtocol>(_ left: U, _ right: T) -> T
+  where T.Unit == U {
+    return T(#tfop("Select", "ttt:t", handle, _TFMakeScalarTensor(left),
+                   right.handle))
   }
 
   @_inlineable @inline(__always)
-  public func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
-    return selecting(left, Tensor<T>(right))
+  public func selecting<U, T : TensorProtocol>(_ left: T, _ right: U) -> T
+    where T.Unit == U {
+    return T(#tfop("Select", "ttt:t", handle, left.handle,
+                    _TFMakeScalarTensor(right)))
   }
 }
 
@@ -555,7 +571,7 @@ public extension Tensor where Unit == Bool {
 // Reduction
 //===----------------------------------------------------------------------===//
 
-public extension Tensor {
+public extension TensorProtocol {
   @_inlineable @inline(__always)
   func mean() -> Unit {
     let result = Tensor<Unit>(#tfop("Mean", "tt:t", handle,
@@ -564,19 +580,45 @@ public extension Tensor {
   }
 
   @_inlineable @inline(__always)
+  func min() -> Unit {
+    let result = Tensor<Unit>(#tfop("Min", "tt:t", handle,
+                                    Tensor<Int>([] as [Int]).handle))
+    return result.scalar!
+  }
+
+  @_inlineable @inline(__always)
+  func max() -> Unit {
+    let result = Tensor<Unit>(#tfop("Max", "tt:t", handle,
+                                    Tensor<Int>([] as [Int]).handle))
+    return result.scalar!
+  }
+
+  @_inlineable @inline(__always)
+  func sum() -> Unit {
+    let result = Tensor<Unit>(#tfop("Sum", "tt:t", handle,
+                                    Tensor<Int>([] as [Int]).handle))
+    return result.scalar!
+  }
+
+  @inline(never) // make @_inlineable when implemented.
+  func argmax() -> Int {
+    fatalError("FIXME: implement argmax")
+  }
+
+  @inline(never) // make @_inlineable when implemented.
+  func argmin() -> Int {
+    fatalError("FIXME: implement argmin")
+  }
+}
+
+public extension Tensor {
+  @_inlineable @inline(__always)
   func mean(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Mean", "tt:t", handle, Tensor<Int>(axes).handle,
                               keep_dims: keepingDimensions, Tidx: Int.self))
-  }
-
-  @_inlineable @inline(__always)
-  func min() -> Unit {
-    let result = Tensor<Unit>(#tfop("Min", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
   }
 
   @_inlineable @inline(__always)
@@ -589,13 +631,6 @@ public extension Tensor {
   }
 
   @_inlineable @inline(__always)
-  func max() -> Unit {
-    let result = Tensor<Unit>(#tfop("Max", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
-  }
-
-  @_inlineable @inline(__always)
   func max(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
@@ -605,29 +640,12 @@ public extension Tensor {
   }
 
   @_inlineable @inline(__always)
-  func sum() -> Unit {
-    let result = Tensor<Unit>(#tfop("Sum", "tt:t", handle,
-                                    Tensor<Int>([] as [Int]).handle))
-    return result.scalar!
-  }
-
-  @_inlineable @inline(__always)
   func sum(
     alongAxes axes: Int...,
     keepingDimensions: Bool = false
   ) -> Tensor {
     return Tensor<Unit>(#tfop("Sum", "tt:t", handle, Tensor<Int>(axes).handle,
                               keep_dims: keepingDimensions, Tidx: Int.self))
-  }
-
-  @inline(never) // make @_inlineable when implemented.
-  func argmax() -> Int {
-    fatalError("FIXME: implement argmax")
-  }
-
-  @inline(never) // make @_inlineable when implemented.
-  func argmin() -> Int {
-    fatalError("FIXME: implement argmin")
   }
 }
 
@@ -692,32 +710,81 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Slicing and shape transformations
+// Indexing and slicing
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  /// Returns a subdimensional tensor at the specified list of indices.
-  /// - Todo: If possible, this should be defined as an op, to be run on the
-  /// accelerator.
-  subscript(indices: Int...) -> Tensor {
-    fatalError("FIXME: implement subscript to tensor")
+  /// Returns the number of elements in a Tensor (equivalent to the first
+  /// dimension).
+  /// - Note: `count` is distinct from `unitCount`, which represents the total
+  ///   number of units.
+  @_inlineable
+  var count: Int {
+    @inline(__always)
+    get {
+      return shape.first ?? 0
+    }
   }
 
-  // Slicing out a range of subdimensional tensors.
+  @_inlineable
+  var indices: CountableRange<Int> {
+    @inline(__always)
+    get {
+      return 0..<count
+    }
+  }
+
+  @_inlineable
+  var startIndex: Int {
+    @inline(__always)
+    get {
+      return 0
+    }
+  }
+
+  @_inlineable
+  var endIndex: Int {
+    @inline(__always)
+    get {
+      return count
+    }
+  }
+
+  /// Access the element tensor specified by an index in the leading dimension.
+  /// - Parameter index: index of the element tensor
+  subscript(index: Int) -> Tensor {
+    get {
+      fatalError("FIXME: implement subscript to tensor")
+    }
+    set {
+      fatalError("FIXME: implement subscript to tensor")
+    }
+  }
+
+  /// Returns the subdimensional tensor at the specified list of indices.
+  /// - Parameter indices: list of indices
+  /// - TODO: If possible, this should be defined as an op, to be run on the
+  /// accelerator.
+  subscript(indices: Int...) -> Tensor {
+    get {
+      fatalError("FIXME: implement subscript to tensor")
+    }
+    set {
+      fatalError("FIXME: implement subscript to tensor")
+    }
+  }
+
+  /// Returns the subtensor defined by the specified bounds.
+  /// - Parameter bounds: contiguous range of indices
   // TODO: begin/end are vectors in general.
   // tfop_slice(tensor, begin, end) -> tensor
   subscript(bounds: Range<Int>) -> Tensor {
-    fatalError("FIXME: implement subscript to tensor")
-  }
-
-  @_inlineable @inline(__always)
-  func reshaped(_ newShape: Tensor<Int>) -> Tensor {
-    return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
-  }
-
-  @_inlineable @inline(__always)
-  func squeezed() -> Tensor {
-    return Tensor(#tfop("Squeeze", "t:t", handle))
+    get {
+      fatalError("FIXME: implement subscript to tensor")
+    }
+    set {
+      fatalError("FIXME: implement subscript to tensor")
+    }
   }
 }
 
