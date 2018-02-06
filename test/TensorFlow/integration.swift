@@ -402,8 +402,11 @@ public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, T
 }
 
 // Likewise, mean and max shouldn't cause send/receive errors.
+// FIXME: Remove #if when fixed.
+#if false
 public func testMeanMax(x: Tensor<Float>) -> Float {
   let a = x.mean()
   let b = x.max()
   return a+b
 }
+#endif
