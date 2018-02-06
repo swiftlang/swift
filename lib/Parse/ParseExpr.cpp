@@ -3580,27 +3580,38 @@ Parser::parsePlatformVersionConstraintSpec() {
 ///     'type' '(' 'of:' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprTypeOf() {
+  // In libSyntax parsing, we parse 'type(of: <expr>)' as a normal function call
+  // expression. The semantic AST builder should treat this as a
+  // DynamicTypeExpr.
+  SyntaxParsingContext CallCtxt(SyntaxContext, SyntaxKind::FunctionCallExpr);
+
   // Consume 'type'
   SourceLoc keywordLoc = consumeToken();
 
   // Parse the leading '('.
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-  // Parse `of` label.
-  if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
-    // Consume the label.
-    consumeToken();
-    consumeToken(tok::colon);
-  } else {
-    // There cannot be a richer diagnostic here because the user may have
-    // defined a function `type(...)` that conflicts with the magic expr.
-    diagnose(Tok, diag::expr_typeof_expected_label_of);
-  }
+  ParserResult<Expr> subExpr;
+  {
+    SyntaxParsingContext ArgCtxt(SyntaxContext,
+                                 SyntaxKind::FunctionCallArgument);
+    // Parse `of` label.
+    if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
+      // Consume the label.
+      consumeToken();
+      consumeToken(tok::colon);
+    } else {
+      // There cannot be a richer diagnostic here because the user may have
+      // defined a function `type(...)` that conflicts with the magic expr.
+      diagnose(Tok, diag::expr_typeof_expected_label_of);
+    }
 
-  // Parse the subexpression.
-  ParserResult<Expr> subExpr = parseExpr(diag::expr_typeof_expected_expr);
-  if (subExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
+    // Parse the subexpression.
+    subExpr = parseExpr(diag::expr_typeof_expected_expr);
+    if (subExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+  }
+  CallCtxt.collectNodesInPlace(SyntaxKind::FunctionCallArgumentList);
 
   // Parse the closing ')'
   SourceLoc rParenLoc;
