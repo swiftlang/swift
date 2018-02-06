@@ -17,9 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 @_inlineable
-public func sigmoid<Unit : FloatingPoint>(_ x: Tensor<Unit>) -> Tensor<Unit> {
+public func sigmoid<Unit : BinaryFloatingPoint>(_ x: Tensor<Unit>) -> Tensor<Unit> {
   let expx = exp(-x)
-  return 1 / (1 + expx)
+  return 1.0 / (1.0 + expx)
 }
 
 @_inlineable
