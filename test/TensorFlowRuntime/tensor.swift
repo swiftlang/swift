@@ -47,12 +47,13 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 
 TensorTests.testCPUAndGPU("Initializers") {
   let x = Tensor([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0]])
-  expectEqual(x.units, [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
+  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.units)
 }
 
 TensorTests.testCPUAndGPU("FactoryInitializers") {
   let x = Tensor<Float>.ones(shape: [1, 10])
-  expectEqual(x.units, Array(repeating: 1, count: 10))
+  expectEqual([1, 10], x.shape)
+  expectEqual(Array(repeating: 1, count: 10), x.units)
 }
 
 TensorTests.testCPUAndGPU("DataTypeCast") {
@@ -60,9 +61,9 @@ TensorTests.testCPUAndGPU("DataTypeCast") {
   let ints = Tensor<Int>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
-  expectEqual(ints.array, ShapedArray(shape: [5, 5], repeating: 1))
-  expectEqual(floats.array, ShapedArray(shape: [5, 5], repeating: 1))
-  expectEqual(i8s.array, ShapedArray(shape: [5, 5], repeating: 1))
+  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), ints.array)
+  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), floats.array)
+  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), i8s.array)
 }
 
 TensorTests.testCPUAndGPU("Reduction") {
@@ -75,7 +76,7 @@ TensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
   let array = y.array
-  expectPointwiseNearlyEqual(array.units, [0.833655, 0.833655], byError: 0.0001)
+  expectPointwiseNearlyEqual([0.833655, 0.833655], array.units, byError: 0.0001)
 }
 
 TensorTests.testCPUAndGPU("Convolution") {
@@ -97,23 +98,28 @@ TensorTests.testCPUAndGPU("3Adds") {
   let c = Tensor([3])
 
   let o = a + b + c
-  expectEqual(o.array.units[0], 6)
+  expectEqual([6], o.units)
 }
 
 TensorTests.testCPUAndGPU("MultiOpMath") {
   let x = Tensor<Float>([1.2, 1.2])
-  let y = Tensor<Float>([4.3, 4.3])
+  let y = Tensor<Float>([2.4, 2.4])
   let sum = x + y
   let squared = sum * sum
-  let expsqr = exp(squared)
-  _ = expsqr
-  // TODO: Check result
+  let squareRooted = sqrt(squared)
+
+  // expectEqual([2], sum.shape)
+  // expectEqual([2], squared.shape)
+  // expectEqual([2], squareRooted.shape)
+  expectPointwiseNearlyEqual([3.6, 3.6], sum.units)
+  expectPointwiseNearlyEqual([12.96, 12.96], squared.units)
+  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.units)
 }
 
 TensorTests.testCPUAndGPU("XWPlusB") {
   // Shape: 1 x 4
   let x = Tensor([[1.0, 2.0, 2.0, 1.0]]).toDevice()
-  // Shape: 2 x 4
+  // Shape: 4 x 2
   let w = Tensor([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]]).toDevice()
   // Shape: 2
   let b = Tensor([0.5, 0.5])
@@ -138,10 +144,9 @@ TensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
   var a = Tensor<Int>(0)
   let b = Tensor<Int>(1)
+  var count = 0
 
   a -= b
-
-  var count = 0
   while count < maxCount {
     a += b
     count += 1
@@ -162,8 +167,7 @@ TensorTests.testGPU("loopsAndConditions") {
     }
     count += 1
   }
-
-  expectEqual(count.scalar, 8)
+  expectEqual(8, count.scalar)
 }
 
 @inline(never)
@@ -401,7 +405,7 @@ TensorTests.testCPUAndGPU("XORClassifierTraining", testXORClassifierTraining)
 @inline(never)
 func testRankGetter() {
   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-  expectEqual(x.rank, 2)
+  expectEqual(2, x.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 
@@ -410,21 +414,21 @@ TensorTests.testCPUAndGPU("RankGetter", testRankGetter)
 @inline(never)
 func testRankGetter2() {
   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
-  expectEqual(y.rank, 7)
+  expectEqual(7, y.rank)
 }
 TensorTests.testCPUAndGPU("RankGetter2", testRankGetter2)
 
 @inline(never)
 func testShapeGetter() {
   let x = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-  expectEqual(x.shape, [2, 3])
+  expectEqual([2, 3], x.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter", testShapeGetter)
 
 @inline(never)
 func testShapeGetter2() {
   let y: Tensor<Int> = .ones(shape: [1, 2, 2, 2, 2, 2, 1])
-  expectEqual(y.shape, [1, 2, 2, 2, 2, 2, 1])
+  expectEqual([1, 2, 2, 2, 2, 2, 1], y.shape)
 }
 TensorTests.testCPUAndGPU("ShapeGetter2", testShapeGetter2)
 
