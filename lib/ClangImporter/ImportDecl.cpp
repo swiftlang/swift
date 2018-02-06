@@ -3091,11 +3091,13 @@ namespace {
 
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
+        bool isBitField = false;
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
           if (field->isBitField()) {
             // We can't represent this struct completely in SIL anymore,
             // but we're still able to define a memberwise initializer.
             hasUnreferenceableStorage = true;
+            isBitField = true;
 
             makeBitFieldAccessors(Impl,
                                   const_cast<clang::RecordDecl *>(decl),
@@ -3109,7 +3111,7 @@ namespace {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
           makeIndirectFieldAccessors(Impl, ind, members, result, VD);
-        } else if (decl->isUnion()) {
+        } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
