@@ -143,7 +143,7 @@ public // @testable
 func _mixUInt(_ value: UInt) -> UInt {
 #if arch(i386) || arch(arm)
   return UInt(_mixUInt32(UInt32(value)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   return UInt(_mixUInt64(UInt64(value)))
 #endif
 }
@@ -154,7 +154,7 @@ public // @testable
 func _mixInt(_ value: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(_mixInt32(Int32(value)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   return Int(_mixInt64(Int64(value)))
 #endif
 }
@@ -207,7 +207,7 @@ func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
   // (0x1.9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95p0).
 #if arch(i386) || arch(arm)
   let magic = 0x9e3779b9 as UInt
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#else
   let magic = 0x9e3779b97f4a7c15 as UInt
 #endif
   var x = UInt(bitPattern: firstValue)
