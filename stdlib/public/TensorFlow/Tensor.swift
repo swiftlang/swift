@@ -102,12 +102,12 @@ func _TFTensorFromUnits1D<Unit>(_ units: [Unit]) -> TensorHandle<Unit> {
 
 /// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
-  @_inlineable
+  @_inlineable @inline(__always)
   func toDevice() -> Tensor {
     return Tensor(_TFSend(handle))
   }
 
-  @_inlineable
+  @_inlineable @inline(__always)
   func toHost() -> Tensor {
     return Tensor(_TFReceive(handle))
   }
@@ -119,8 +119,7 @@ public extension Tensor {
 
 extension Tensor where Unit : Numeric {
   /// Perform an element conversion from Tensor<U> to Tensor<T>.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   public init<FromType : Numeric>(_ other: Tensor<FromType>) {
     self.init(#tfop("Cast", "t:t", other.handle, DstT: Unit.self))
   }
@@ -128,15 +127,13 @@ extension Tensor where Unit : Numeric {
 
 public extension Tensor {
   /// Initialize a tensor with a unit representing a scalar value.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   init(_ value: Unit) {
     self.init(#tfop("tfc.scalarToTensor", "s:t", value))
   }
 
   /// Initialize a tensor with an array representing a vector.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   init(_ vector: [Unit]) {
     self.init(_TFTensorFromUnits1D(vector))
   }
@@ -265,26 +262,17 @@ public extension Tensor {
   /// Initialize a tensor with arbitrary shape.
   /// - Precondition: The number of units should be the same as the
   ///   product of all of shape's dimensions.
-  @_inlineable
+  @_inlineable @inline(__always)
   init(shape: [Int], units: [Unit]) {
     self.init(_TFTensorFromUnits(units, shape: shape))
   }
 
   /// Initialize a tensor of a specified shape, filled with a single value.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   init(shape: [Int], repeating repeatedValue: Unit) {
     let valueTensor = Tensor(repeatedValue).handle
     let shapeTensor = Tensor<Int32>(Tensor<Int>(shape)).handle
     self.init(#tfop("Fill", "tt:t", shapeTensor, valueTensor))
-  }
-
-  /// Initialize a degenerate tensor with no elements with the specified rank.
-  ///
-  /// - Precondition: Rank must be greater than 0.
-  @_inlineable
-  init(emptyWithRank rank: Int) {
-    self.init(shape: Array(repeating: 0, count: rank), units: [])
   }
 }
 
@@ -327,29 +315,25 @@ public extension Tensor {
 
 public extension Tensor where Unit : Numeric {
   /// Zero initializer, takes a list of dimensions.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   static func zeros(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 0)
   }
 
   /// Zero initializer, takes variadic dimensions.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   static func zeros(shape: Int...) -> Tensor {
     return zeros(shape: shape)
   }
 
   /// Ones initializer, takes a list of dimensions.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   static func ones(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 1)
   }
 
   /// Ones initializer, takes variadic dimensions.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   static func ones(shape: Int...) -> Tensor {
     return ones(shape: shape)
   }
@@ -373,8 +357,7 @@ public extension Tensor where Unit : Numeric {
   ///     positive.
   /// - Precondition: `start`, `end`, `stride` must be scalar tensors.
   ///
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   init(rangeFrom start: Tensor, to end: Tensor, stride: Tensor) {
     self.init(#tfop("Range", "ttt:t", start.handle, end.handle, stride.handle,
                     Tidx: Unit.self))
@@ -391,8 +374,7 @@ public extension Tensor where Unit : Numeric {
   ///   - stride: The amount to step by with each iteration. `stride` must be
   ///     positive.
   ///
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   init(rangeFrom start: Unit, to end: Unit, stride: Unit) {
     self.init(rangeFrom: Tensor(start), to: Tensor(end), stride: Tensor(stride))
   }
@@ -427,7 +409,7 @@ public extension AccelerableTensorUnit {
 }
 
 public extension Tensor {
-  @_inlineable
+  @_inlineable @inline(__always)
   func rankLifted(by dimensionCount: Int) -> Tensor {
     return Tensor(#tfop("ExpandDims", "tt:t", handle,
                         Tensor<Int>(dimensionCount).handle, Tdim: Int.self))
@@ -448,16 +430,14 @@ public extension Tensor {
 
   /// Reshape to the specified shape.
   /// - Precondition: The number of units matches the new shape.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   func reshaped(_ newShape: [Int]) -> Tensor {
     return reshaped(Tensor<Int>(newShape))
   }
 
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one unit.
-  @_inlineable
-  @inline(__always)
+  @_inlineable @inline(__always)
   func scalarized() -> Unit {
 #if false // FIXME: The partitioner needs to promote array literals.
     guard let scalar = reshaped([]).scalar else {
@@ -473,14 +453,6 @@ public extension Tensor {
     }
 #endif
     return scalar
-  }
-
-  /// Reshape by removing 1-dimensions. If axes are specified, remove the
-  /// specified dimensions, assuming they are 1.
-  @_inlineable
-  func squeezed(alongAxes axes: Int...) -> Tensor {
-    let axesTensor = Tensor<Int>(axes)
-    return squeezed(alongAxes: axesTensor)
   }
 }
 
@@ -502,19 +474,25 @@ public extension Tensor where Unit : Numeric {
 public extension Tensor {
   @_inlineable
   var isScalar: Bool {
-    return rank == 0
+    @inline(__always)
+    get {
+      return rank == 0
+    }
   }
 
   /// Returns the underlying scalar from a 0-ranked Tensor.
   /// - precondition: Tensor is 0-ranked.
   @_inlineable
   var scalar: Unit? {
-    return Unit(self)
+    @inline(__always)
+    get {
+      return Unit(self)
+    }
   }
 }
 
 public extension AccelerableTensorUnit {
-  @_inlineable
+  @_inlineable @inline(__always)
   init?(_ tensor: Tensor<Self>) {
     guard let scalar = _TFScalarize(tensor.handle) else {
       return nil
@@ -548,10 +526,13 @@ extension Tensor : CustomPlaygroundQuickLookable {
 public extension Tensor {
   @_inlineable
   var array: ShapedArray<Unit> {
-    debugLog("Returning a host copy of array.")
-    // This is considered to be a well known way to produce a copy to the host,
-    // so we never want to produce an "implicit copy to host" warning.
-    return toHost().handle.makeHostCopy()
+    @inline(__always)
+    get {
+      debugLog("Returning a host copy of array.")
+      // This is considered to be a well known way to produce a copy to the host,
+      // so we never want to produce an "implicit copy to host" warning.
+      return toHost().handle.makeHostCopy()
+    }
   }
 
   @_inlineable
