@@ -1809,11 +1809,15 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
+  /// Request nominal layout for any types that could be sources of typemetadata
+  /// or conformances.
+  void requestRequiredNominalTypeLayoutForParameters(ParameterList *PL);
+
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
-  
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
