@@ -24,7 +24,7 @@ public let singleClosure: () -> () = {
 
 public struct PatternStruct {
   public var singlePattern: Int = ({
-    // CHECK-DAG: @"$S11local_types13PatternStructV06singleC0SivpfiSiycfU_06SinglecD0L_VWV" = internal constant
+    // CHECK-DAG: @"$S11local_types13PatternStructV06singleC0SivpfiSiyXEfU_06SinglecD0L_VWV" = internal constant
     struct SinglePatternStruct {
       let i: Int
     }

@@ -301,11 +301,11 @@ func createInt(_ fn: () -> Int) throws {}
 func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
-// CHECK-LABEL: sil hidden @$S6errors12testForceTryyySiycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> ()
+// CHECK-LABEL: sil hidden @$S6errors12testForceTryyySiyXEF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> ()
 // CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_guaranteed () -> Int):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK: [[FUNC:%.*]] = function_ref @$S6errors9createIntyySiycKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$S6errors9createIntyySiyXEKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> @error Error
 // CHECK: try_apply [[FUNC]]([[ARG_COPY]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: destroy_value [[ARG]]

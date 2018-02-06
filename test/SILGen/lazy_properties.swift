@@ -25,7 +25,7 @@ func test21057425() {
 
 // CHECK-LABEL: sil hidden @$S15lazy_properties22HasAnonymousParametersV1xSivg : $@convention(method) (@inout HasAnonymousParameters) -> Int
 
-// CHECK-LABEL: sil private @$S15lazy_properties22HasAnonymousParametersV1xSivgS2icfU_ : $@convention(thin) (Int) -> Int
+// CHECK-LABEL: sil private @$S15lazy_properties22HasAnonymousParametersV1xSivgS2iXEfU_ : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil hidden @$S15lazy_properties22HasAnonymousParametersV1xSivs : $@convention(method) (Int, @inout HasAnonymousParameters) -> ()
 

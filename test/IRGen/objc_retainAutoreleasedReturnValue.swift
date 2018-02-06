@@ -24,13 +24,13 @@ public func test(_ dict: NSDictionary) {
 // popq   %rbp  ;<== Blocks the handshake from objc_autoreleaseReturnValue
 // jmp    0x01ec20 ; symbol stub for: objc_retainAutoreleasedReturnValue
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$S34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADcfU_"(%TSo12NSDictionaryC*)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$S34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADXEfU_"(%TSo12NSDictionaryC*)
 // CHECK: entry:
 // CHECK:   call {{.*}}@objc_msgSend
 // CHECK:   notail call i8* @objc_retainAutoreleasedReturnValue
 // CHECK:   ret void
 
-// OPT-LABEL: define {{.*}}swiftcc void @"$S34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADcfU_"(%TSo12NSDictionaryC*)
+// OPT-LABEL: define {{.*}}swiftcc void @"$S34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADXEfU_"(%TSo12NSDictionaryC*)
 // OPT: entry:
 // OPT:   call {{.*}}@objc_msgSend
 // OPT:   notail call i8* @objc_retainAutoreleasedReturnValue

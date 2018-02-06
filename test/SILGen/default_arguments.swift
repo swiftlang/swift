@@ -92,7 +92,7 @@ func autoclosure(_: @autoclosure () -> ()) {}
 // CHECK-LABEL: sil hidden @$S17default_arguments25testCallWithMagicLiteralsyyF
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil private @$S17default_arguments25testCallWithMagicLiteralsyyFyycfU_
+// CHECK-LABEL: sil private @$S17default_arguments25testCallWithMagicLiteralsyyFyyXEfU_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK-LABEL: sil private [transparent] @$S17default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
@@ -273,7 +273,7 @@ func localFunctionWithDefaultArg() {
 // CHECK-LABEL: sil private @$S17default_arguments27localFunctionWithDefaultArgyyF3barL_yySiSgFfA_
 // CHECK-SAME: $@convention(thin) () -> Optional<Int>
 
-// CHECK-LABEL: sil hidden @$S17default_arguments15throwingDefault7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden @$S17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 func throwingDefault(closure: () throws -> Bool  = {  return true }) throws {
   try _ = closure()
 }
@@ -283,7 +283,7 @@ func throwingAutoclosureDefault(closure: @autoclosure () throws -> Bool  = true 
   try _ = closure()
 }
 
-// CHECK-LABEL: sil hidden @$S17default_arguments0A3Arg7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
+// CHECK-LABEL: sil hidden @$S17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 func defaultArg(closure: () -> Bool  = {  return true }) {
   _ = closure()
 }
@@ -298,7 +298,7 @@ func throwingDefaultEscaping(closure: @escaping () throws -> Bool  = {  return t
   try _ = closure()
 }
 
-// CHECK-LABEL: sil hidden @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 func throwingAutoclosureDefaultEscaping(closure: @escaping @autoclosure () throws -> Bool  = true ) throws {
   try _ = closure()
 }
@@ -308,17 +308,17 @@ func defaultEscaping(closure: @escaping () -> Bool  = {  return true }) {
   _ = closure()
 }
 
-// CHECK-LABEL: sil hidden @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool {
+// CHECK-LABEL: sil hidden @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool {
 func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = true ) {
   _ = closure()
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}callThem{{.*}} : $@convention(thin) () -> @error Error
 
-// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = convert_function [[C]] : $@callee_guaranteed () -> (Bool, @error Error) to $@noescape @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKc_tKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
@@ -327,10 +327,10 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
 // CHECK:  try_apply [[R]]([[E]])
 
-// CHECK:   [[F:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
+// CHECK:   [[F:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[E:%.*]] = convert_function [[C]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
-// CHECK:   [[R:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyc_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Bool) -> ()
+// CHECK:   [[R:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyXE_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Bool) -> ()
 // CHECK:   apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments21autoclosureDefaultArg7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Boo
@@ -344,9 +344,9 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@owned @callee_guaranteed () -> (Bool, @error Error)) -> @error Erro
 // CHECK:  try_apply [[R]]([[E]])
 
-// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXK_tKF : $@convention(thin) (@owned @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@owned @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments0A8Escaping7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
@@ -354,9 +354,9 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments0A8Escaping7closureySbyc_tF : $@convention(thin) (@owned @callee_guaranteed () -> Bool) -> ()
 // CHECK:  apply [[R]]([[E]])
 
-// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
+// CHECK:  [[F:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXK_tF : $@convention(thin) (@owned @callee_guaranteed () -> Bool) -> ()
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tF : $@convention(thin) (@owned @callee_guaranteed () -> Bool) -> ()
 // CHECK:  apply [[R]]([[E]])
 
 func callThem() throws {

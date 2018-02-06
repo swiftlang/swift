@@ -43,7 +43,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil private @$S9let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
+// CHECK: sil private @$S9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK:  return %0 : $Int
 

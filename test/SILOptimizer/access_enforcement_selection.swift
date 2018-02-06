@@ -31,7 +31,7 @@ public func captureStack() -> Int {
 // is sufficient here.
 // CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
-// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection12captureStackSiyFSiycfU_
+// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection12captureStackSiyFSiyXEfU_
 // CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 
@@ -45,7 +45,7 @@ public func nocaptureStack() -> Int {
 // Static access for `return x`.
 // CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 //
-// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection14nocaptureStackSiyFSiycfU_
+// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection14nocaptureStackSiyFSiyXEfU_
 
 // Generate an alloc_stack that escapes into a closure while an access is
 // in progress.
@@ -61,7 +61,7 @@ public func captureStackWithInoutInProgress() -> Int {
 // Static access for `return x`.
 // CHECK-DAG: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 //
-// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection31captureStackWithInoutInProgressSiyFSiycfU_
+// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection31captureStackWithInoutInProgressSiyFSiyXEfU_
 // CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 // Generate an alloc_box that escapes into a closure.
@@ -89,7 +89,7 @@ public func recaptureStack() -> Int {
 // Static access for `return x`.
 // CHECK: Static Access:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
-// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection14recaptureStackSiyFSiycfU_
+// CHECK-LABEL: Access Enforcement Selection in $S28access_enforcement_selection14recaptureStackSiyFSiyXEfU_
 //
 // The first [modify] access inside the closure is static. It enforces the
 // @inout argument.

@@ -57,7 +57,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL: sil hidden @$Ss7project2fns1CCs6HolderVyc_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C {
+// CHECK-LABEL: sil hidden @$Ss7project2fns1CCs6HolderVyXE_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C {
 // CHECK: bb0([[FN:%.*]] : @owned $@noescape @callee_guaranteed () -> Holder):
 // CHECK:      [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
 // CHECK-NEXT: [[BORROWED_FN_COPY:%.*]] = copy_value [[BORROWED_FN]]

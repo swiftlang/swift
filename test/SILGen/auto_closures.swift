@@ -65,7 +65,7 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil private [transparent] @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_A2DXEfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {
