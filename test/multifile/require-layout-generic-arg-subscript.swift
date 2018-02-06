@@ -5,7 +5,7 @@
 
 // The offset of the typemetadata in the class typemetadata must match.
 
-// FILE1: define hidden swiftcc i64 @{{.*}}S4test12AccessorTestCySiAA3Sub{{.*}}(%T4test3SubC*, %T4test12AccessorTestC* swiftself)
+// FILE1: define hidden swiftcc i64 @{{.*}}4test12AccessorTestCySiAA3Sub{{.*}}(%T4test3SubC*, %T4test12AccessorTestC* swiftself)
 // FILE1:   [[T1:%.*]] = bitcast %T4test3SubC* %0 to %swift.type**
 // FILE1:   [[TYPEMETADATA:%.*]] = load %swift.type*, %swift.type** [[T1]]
 // FILE1:   [[T2:%.*]] = bitcast %swift.type* [[TYPEMETADATA]] to %swift.type**

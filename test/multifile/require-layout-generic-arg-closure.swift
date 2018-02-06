@@ -5,7 +5,7 @@
 
 // The offset of the typemetadata in the class typemetadata must match.
 
-// FILE1-LABEL: define internal swiftcc void @{{.*}}S4test12requestType{{.*}}(%T4test3SubC*)
+// FILE1-LABEL: define internal swiftcc void @{{.*}}4test12requestType{{.*}}(%T4test3SubC*)
 // FILE1: entry:
 // FILE1:   [[T1:%.*]] = bitcast %T4test3SubC* %0 to %swift.type**
 // FILE1:   [[TYPEMETADATA:%.*]] = load %swift.type*, %swift.type** [[T1]]
@@ -13,7 +13,7 @@
 // This offset of T needs to be the same as the offset below.
 // FILE1:   [[T_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T2]], i64 16
 // FILE1:   [[T:%.*]] = load %swift.type*, %swift.type** [[T_PTR]]
-// FILE1:   call %swift.type* @{{.*}}S4test3SubCMa{{.*}}(%swift.type* [[T]])
+// FILE1:   call %swift.type* @{{.*}}4test3SubCMa{{.*}}(%swift.type* [[T]])
 
 public func requestType2<T>(x: T) {
   requestTypeThrough(closure: { x in print(x) }, arg: x)
