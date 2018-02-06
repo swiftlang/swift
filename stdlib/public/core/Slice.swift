@@ -260,6 +260,42 @@ extension Slice: MutableCollection where Base: MutableCollection {
   }
 }
 
+extension Slice : Equatable where Base.Element : Equatable {
+    public static func == (lhs: Slice<Base>, rhs: Slice<Base>) -> Bool {
+        let lhsCount = lhs.count
+        if lhsCount != rhs.count {
+            return false
+        }
+        // We know that lhs.count == rhs.count, compare element wise.
+
+        for idx in 0..<lhsCount {
+            let lidx = lhs._base.index(lhs._base.startIndex, offsetBy: idx)
+            let ridx = rhs._base.index(rhs._base.startIndex, offsetBy: idx)
+            if lhs[lidx] != rhs[ridx] {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+extension Slice : Hashable where Base.Element : Hashable {
+    /// The hash value for the slice.
+    ///
+    /// Two slices that are equal will always have equal hash values.
+    ///
+    /// Hash values are not guaranteed to be equal across different executions of
+    /// your program. Do not save hash values to use during a future execution.
+    @_inlineable // FIXME(sil-serialize-all)
+    public var hashValue: Int {
+        // FIXME(ABI)#177: <rdar://problem/18915294> Issue applies to DictionaryLiteral too
+        var result: Int = 0
+        for element in self {
+            result = _combineHashValues(result, element.hashValue)
+        }
+        return result
+    }
+}
 
 extension Slice: RandomAccessCollection where Base: RandomAccessCollection { }
 
