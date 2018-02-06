@@ -70,6 +70,24 @@ ios
 ios
 """
 
+IGNORED_SECTION = """
+[section_name]
+
+random-options=1
+"""
+
+MIXIN_ORDER_PRESETS = """
+[preset: test_mixin]
+first-opt=0
+second-opt=1
+
+
+[preset: test]
+first-opt=1
+mixin-preset=test_mixin
+second-opt=2
+"""
+
 
 # -----------------------------------------------------------------------------
 
@@ -152,6 +170,31 @@ class TestPresetParser(TestCase):
             (u'--verbose-build', None),
             (u'--build-ninja', None),
             (u'--install-symroot', u'/tmp')
+        ])
+
+    def test_parser_ignores_non_preset_sections(self):
+        parser = PresetParser()
+
+        parser.read_string(IGNORED_SECTION)
+        self.assertEqual(len(parser._presets), 0)
+
+    def test_mixin_expansion_preserves_argument_order(self):
+        """Mixins should be expanded in-place.
+        """
+
+        parser = PresetParser()
+
+        parser.read_string(MIXIN_ORDER_PRESETS)
+
+        preset = parser.get_preset('test')
+        self.assertListEqual(preset.format_args(), [
+            '--first-opt=1',
+
+            # Mixin arguments
+            '--first-opt=0',
+            '--second-opt=1',
+
+            '--second-opt=2',
         ])
 
     def test_duplicate_option_error(self):

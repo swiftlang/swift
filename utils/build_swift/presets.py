@@ -13,7 +13,6 @@ Swift preset parsing and handling functionality.
 
 
 from collections import namedtuple
-from copy import copy
 
 try:
     # Python 3
@@ -37,7 +36,9 @@ __all__ = [
 
 # -----------------------------------------------------------------------------
 
-_RawPreset = namedtuple('_RawPreset', ['name', 'mixins', 'args'])
+_Mixin = namedtuple('_Mixin', ['name'])
+_Argument = namedtuple('_Argument', ['name', 'value'])
+_RawPreset = namedtuple('_RawPreset', ['name', 'options'])
 
 
 def _interpolate_string(string, values):
@@ -128,7 +129,7 @@ class PresetParser(object):
         except configparser.InterpolationMissingOptionError as e:
             raise MissingOptionError(e)
 
-        args, mixins = [], []
+        args = []
         for (name, value) in section_items:
             # Ignore the '--' separator, it's no longer necessary
             if name == 'dash-dash':
@@ -136,17 +137,21 @@ class PresetParser(object):
 
             # Parse out mixin names
             if name == 'mixin-preset':
-                mixins = list(map(lambda name: name.strip(),
-                                  value.strip().splitlines()))
+                lines = value.strip().splitlines()
+                args += [_Mixin(name.strip()) for name in lines]
                 continue
 
             name = '--' + name  # Format as an option name
-            args.append((name, value))
+            args.append(_Argument(name, value))
 
-        return _RawPreset(preset_name, mixins, args)
+        return _RawPreset(preset_name, args)
 
     def _parse_raw_presets(self):
         for section in self._parser.sections():
+            # Skip all non-preset sections
+            if not section.startswith(PresetParser._PRESET_PREFIX):
+                continue
+
             raw_preset = self._parse_raw_preset(section)
             self._presets[raw_preset.name] = raw_preset
 
@@ -203,11 +208,14 @@ class PresetParser(object):
         assert isinstance(raw_preset, _RawPreset)
 
         # Expand mixin arguments
-        args = copy(raw_preset.args)
-        for mixin_name in raw_preset.mixins:
-            mixin = self._get_preset(mixin_name)
-
-            args += mixin.args
+        args = []
+        for option in raw_preset.options:
+            if isinstance(option, _Mixin):
+                args += self._get_preset(option.name).args
+            elif isinstance(option, _Argument):
+                args.append((option.name, option.value))
+            else:
+                raise ValueError('invalid argument type: {}', option.__class__)
 
         return Preset(raw_preset.name, args)
 
