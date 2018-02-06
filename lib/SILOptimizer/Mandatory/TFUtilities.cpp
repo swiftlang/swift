@@ -865,6 +865,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
                     B.getASTContext().getIdentifier(name),
                     inst->getResults()[0]->getType(), /*no substitions*/{},
                     operands);
+  newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
 
@@ -908,5 +909,32 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
     return SILDebugLocation(ds->Loc, ds);
 
   return loc;
+}
+
+SILLocation tf::getUserSourceLocation(SILValue value) {
+  if (auto *inst = dyn_cast<SILInstruction>((SILNode*)value))
+    return getUserSourceLocation(inst);
+  return getUserSourceLocation(value.getDebugLocation());
+}
+
+/// Get the user's source location for the specified instruction.  Because it
+/// is an instruction, we can apply various heuristics to improve the
+/// precision of the returned location information.
+SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
+  // If we have a struct extract from a type like Int, Float, or Tensor of an
+  // internal type like Builtin.i64 or TensorHandle, look through it to the
+  // higher level type, which will have better source location information.
+  //
+  // The struct-extract came from the implementation of some operator in the
+  // standard library like "+", and we want the source of the parameter.
+  if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
+    auto outerType = sei->getType().getSwiftRValueType();
+    if (outerType->is<BuiltinType>() ||
+        isTensorHandle(outerType)) {
+      return getUserSourceLocation(sei->getOperand());
+    }
+  }
+
+  return getUserSourceLocation(inst->getDebugLocation());
 }
 

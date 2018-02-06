@@ -150,9 +150,8 @@ TensorTests.testGPU("simpleCounterLoop") {
   expectEqual(8, a.scalar)
 }
 
-#if false // FIXME: Exposing partitioning bugs.
-@inline(never)
-func testLoopsAndConditions() {
+// This is derived from a TF Eager testcase.
+TensorTests.testGPU("loopsAndConditions") {
   var a = Tensor<Int>(6)
   var count = Tensor<Int>(0)
   while (a != 1).scalar! {
@@ -166,8 +165,6 @@ func testLoopsAndConditions() {
 
   expectEqual(count.scalar, 8)
 }
-TensorTests.testCPUAndGPU("testLoopsAndConditions", testLoopsAndConditions)
-#endif
 
 @inline(never)
 func testXORInference() {
@@ -241,7 +238,7 @@ TensorTests.testCPUAndGPU("ReshapeScalar") {
   expectEqual([], z.shape)
 }
 
-#if false // FIXME: Fix sigmoid issue.
+#if false // FIXME: Fix transpose/zeros issue.
 TensorTests.testCPUAndGPU("StraightLineXORTraining") {
   // Hyper-parameters
   let iterationCount = 1000
@@ -264,7 +261,7 @@ TensorTests.testCPUAndGPU("StraightLineXORTraining") {
   )
 
   // Training loop
-  for i in 0..<iterationCount {
+  for _ in 0..<iterationCount {
     let mmul1 = inputBatch ⊗ w1
     let l1 = mmul1 + b1
     // FIXME: "GraphGen cannot lower a 'receive' from the host yet"
