@@ -175,63 +175,15 @@ public class SourceKitdResponse: CustomStringConvertible {
       return Dictionary(dict: val)
     }
 
-    public func asAnyObject() -> AnyObject? {
-      switch sourcekitd_variant_get_type(val) {
-      case SOURCEKITD_VARIANT_TYPE_NULL:
-        return NSNull()
-      case SOURCEKITD_VARIANT_TYPE_DICTIONARY:
-        let dict = NSMutableDictionary()
-        _ = sourcekitd_variant_dictionary_apply(val) { (k, v) in
-          if let val = Variant(val: v).asAnyObject() {
-            dict.setValue(val, forKey: SourceKitdUID(uid: k!).asString)
-          }
-          return true
-        }
-        return dict
-      case SOURCEKITD_VARIANT_TYPE_ARRAY:
-        let arr = NSMutableArray()
-        _ = sourcekitd_variant_array_apply(val) { (_, v) in
-          arr.add(Variant(val: v).asAnyObject()!)
-          return true
-        }
-        return arr
-      case SOURCEKITD_VARIANT_TYPE_INT64:
-        return getInt() as NSNumber
-      case SOURCEKITD_VARIANT_TYPE_STRING:
-        return getString() as NSString
-      case SOURCEKITD_VARIANT_TYPE_UID:
-        return getUID().asString as NSString
-      case SOURCEKITD_VARIANT_TYPE_BOOL:
-        return getBool() as NSNumber
-      default:
-        assert(false, "unknown sourcekitd variant")
-        return nil
-      }
-    }
-
     public var description: String {
       return val.description
     }
-
   }
 
   private let resp: sourcekitd_response_t
 
   public var value: Dictionary {
     return Dictionary(dict: sourcekitd_response_get_value(resp))
-  }
-
-  /// An NSDictionary representing the response
-  public var nsdictionary: NSDictionary {
-    let dict = NSMutableDictionary()
-    _ = sourcekitd_variant_dictionary_apply(sourcekitd_response_get_value(resp))
-    { (k, v) in
-      if let val = Variant(val: v).asAnyObject() {
-        dict.setValue(val, forKey: SourceKitdUID(uid: k!).asString)
-      }
-      return true
-    }
-    return dict
   }
 
   /// Copies the raw bytes of the JSON description of this documentation item.
