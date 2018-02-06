@@ -14,7 +14,7 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
 
 public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
@@ -83,7 +83,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.refcounted*)
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV

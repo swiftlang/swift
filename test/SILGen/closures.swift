@@ -262,24 +262,24 @@ class SomeClass {
 class SomeGenericClass<T> {
   deinit {
     var i: Int = zero
-    // CHECK: [[C1REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdSiycfU_ : $@convention(thin) (@inout_aliasable Int) -> Int
+    // CHECK: [[C1REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int
     // CHECK: apply [[C1REF]]([[IBOX:%[0-9]+]]) : $@convention(thin) (@inout_aliasable Int) -> Int
     var x = { i + zero } ()
 
-    // CHECK: [[C2REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdSiycfU0_ : $@convention(thin) () -> Int
+    // CHECK: [[C2REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdSiyXEfU0_ : $@convention(thin) () -> Int
     // CHECK: apply [[C2REF]]() : $@convention(thin) () -> Int
     var y = { zero } ()
 
-    // CHECK: [[C3REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdyycfU1_ : $@convention(thin) <τ_0_0> () -> ()
+    // CHECK: [[C3REF:%[0-9]+]] = function_ref @$S8closures16SomeGenericClassCfdyyXEfU1_ : $@convention(thin) <τ_0_0> () -> ()
     // CHECK: apply [[C3REF]]<T>() : $@convention(thin) <τ_0_0> () -> ()
     var z = { _ = T.self } ()
   }
 
-  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdSiycfU_ : $@convention(thin) (@inout_aliasable Int) -> Int
+  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int
 
-  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdSiycfU0_ : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdSiyXEfU0_ : $@convention(thin) () -> Int
 
-  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdyycfU1_ : $@convention(thin) <T> () -> ()
+  // CHECK-LABEL: sil private @$S8closures16SomeGenericClassCfdyyXEfU1_ : $@convention(thin) <T> () -> ()
 }
 
 // This is basically testing that the constraint system ranking
@@ -291,13 +291,13 @@ func generateWithConstant(_ x : SomeSpecificClass) {
   takesSomeClassGenerator({ x })
 }
 
-// CHECK-LABEL: sil private @$S8closures20generateWithConstantyyAA17SomeSpecificClassCFAA0eG0CycfU_ : $@convention(thin) (@guaranteed SomeSpecificClass) -> @owned SomeClass {
+// CHECK-LABEL: sil private @$S8closures20generateWithConstantyyAA17SomeSpecificClassCFAA0eG0CyXEfU_ : $@convention(thin) (@guaranteed SomeSpecificClass) -> @owned SomeClass {
 // CHECK: bb0([[T0:%.*]] : @guaranteed $SomeSpecificClass):
 // CHECK:   debug_value [[T0]] : $SomeSpecificClass, let, name "x", argno 1
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK:   [[T0_COPY_CASTED:%.*]] = upcast [[T0_COPY]] : $SomeSpecificClass to $SomeClass
 // CHECK:   return [[T0_COPY_CASTED]]
-// CHECK: } // end sil function '$S8closures20generateWithConstantyyAA17SomeSpecificClassCFAA0eG0CycfU_'
+// CHECK: } // end sil function '$S8closures20generateWithConstantyyAA17SomeSpecificClassCFAA0eG0CyXEfU_'
 
 
 // Check the annoying case of capturing 'self' in a derived class 'init'
@@ -374,7 +374,7 @@ func closeOverLetLValue() {
 
 // The let property needs to be captured into a temporary stack slot so that it
 // is loadable even though we capture the value.
-// CHECK-LABEL: sil private @$S8closures18closeOverLetLValueyyFSiycfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
+// CHECK-LABEL: sil private @$S8closures18closeOverLetLValueyyFSiyXEfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassWithIntProperty):
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
@@ -389,9 +389,9 @@ func closeOverLetLValue() {
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
 // CHECK:   return [[INT_IN_CLASS]]
-// CHECK: } // end sil function '$S8closures18closeOverLetLValueyyFSiycfU_'
+// CHECK: } // end sil function '$S8closures18closeOverLetLValueyyFSiyXEfU_'
 
-// GUARANTEED-LABEL: sil private @$S8closures18closeOverLetLValueyyFSiycfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
+// GUARANTEED-LABEL: sil private @$S8closures18closeOverLetLValueyyFSiyXEfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
 // GUARANTEED: bb0(%0 : @guaranteed $ClassWithIntProperty):
 // GUARANTEED:   [[TMP:%.*]] = alloc_stack $ClassWithIntProperty
 // GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
@@ -401,7 +401,7 @@ func closeOverLetLValue() {
 // GUARANTEED:   end_borrow [[BORROWED]] from [[LOADED_COPY]]
 // GUARANTEED:   destroy_value [[LOADED_COPY]]
 // GUARANTEED:   destroy_addr [[TMP]]
-// GUARANTEED: } // end sil function '$S8closures18closeOverLetLValueyyFSiycfU_'
+// GUARANTEED: } // end sil function '$S8closures18closeOverLetLValueyyFSiyXEfU_'
 
 
 // Use an external function so inout deshadowing cannot see its body.
@@ -711,7 +711,7 @@ class SuperSub : SuperBase {
 
 // -- outer closure
 // -- strong +0, unowned +1
-// CHECK: sil private @[[OUTER_CLOSURE_FUN:\$S8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycycfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned @callee_guaranteed () -> @owned UnownedSelfNestedCapture {
+// CHECK: sil private @[[OUTER_CLOSURE_FUN:\$S8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycyXEfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned @callee_guaranteed () -> @owned UnownedSelfNestedCapture {
 // CHECK: bb0([[CAPTURED_SELF:%.*]] : @guaranteed $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +0, unowned +2
 // CHECK:         [[CAPTURED_SELF_COPY:%.*]] = copy_value [[CAPTURED_SELF]] :
@@ -723,7 +723,7 @@ class SuperSub : SuperBase {
 
 // -- inner closure
 // -- strong +0, unowned +1
-// CHECK: sil private @[[INNER_CLOSURE_FUN:\$S8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycycfU_ACycfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned UnownedSelfNestedCapture {
+// CHECK: sil private @[[INNER_CLOSURE_FUN:\$S8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycyXEfU_ACycfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned UnownedSelfNestedCapture {
 // CHECK: bb0([[CAPTURED_SELF:%.*]] : @guaranteed $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +1, unowned +1
 // CHECK:         [[SELF:%.*]] = copy_unowned_value [[CAPTURED_SELF:%.*]] :
@@ -743,7 +743,7 @@ class ConcreteBase {
   func swim() {}
 }
 
-// CHECK-LABEL: sil private @$S8closures14GenericDerivedC4swimyyFyycfU_ : $@convention(thin) <Ocean> (@guaranteed GenericDerived<Ocean>) -> ()
+// CHECK-LABEL: sil private @$S8closures14GenericDerivedC4swimyyFyyXEfU_ : $@convention(thin) <Ocean> (@guaranteed GenericDerived<Ocean>) -> ()
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $GenericDerived<Ocean>):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $GenericDerived<Ocean> to $ConcreteBase
@@ -751,7 +751,7 @@ class ConcreteBase {
 // CHECK:   [[METHOD:%.*]] = function_ref @$S8closures12ConcreteBaseC4swimyyF
 // CHECK:   apply [[METHOD]]([[BORROWED_ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed ConcreteBase) -> ()
 // CHECK:   destroy_value [[ARG_COPY_SUPER]]
-// CHECK: } // end sil function '$S8closures14GenericDerivedC4swimyyFyycfU_'
+// CHECK: } // end sil function '$S8closures14GenericDerivedC4swimyyFyyXEfU_'
 
 class GenericDerived<Ocean> : ConcreteBase {
   override func swim() {
@@ -790,4 +790,4 @@ struct r29810997 {
 }
 
 //   DI will turn this into a direct capture of the specific stored property.
-// CHECK-LABEL: sil hidden @$S8closures16r29810997_helperyS3icF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int) -> Int
+// CHECK-LABEL: sil hidden @$S8closures16r29810997_helperyS3iXEF : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int) -> Int

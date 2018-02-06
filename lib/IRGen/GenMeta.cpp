@@ -722,9 +722,11 @@ namespace {
 
       // Map the convention to a runtime metadata value.
       FunctionMetadataConvention metadataConvention;
+      bool isEscaping = false;
       switch (type->getRepresentation()) {
       case FunctionTypeRepresentation::Swift:
         metadataConvention = FunctionMetadataConvention::Swift;
+        isEscaping = !type->isNoEscape();
         break;
       case FunctionTypeRepresentation::Thin:
         metadataConvention = FunctionMetadataConvention::Thin;
@@ -741,7 +743,8 @@ namespace {
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
-                          .withParameterFlags(hasFlags);
+                          .withParameterFlags(hasFlags)
+                          .withEscaping(isEscaping);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());

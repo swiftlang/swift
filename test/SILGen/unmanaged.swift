@@ -46,7 +46,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL:sil hidden @$S9unmanaged7project2fnAA1CCAA6HolderVyc_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C
+// CHECK-LABEL:sil hidden @$S9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Holder) -> @owned C
 // CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
 // CHECK:        strong_retain [[FN]]
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()

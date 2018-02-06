@@ -201,11 +201,11 @@ public func resilientSwitchTest(_ m: Medium) -> Int {
 
 public func reabstraction<T>(_ f: (Medium) -> T) {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOcF"(i8*, %swift.refcounted*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOXEF"(i8*, %swift.refcounted*)
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject
-// CHECK:     call swiftcc void @"$S15enum_resilience13reabstractionyyx010resilient_A06MediumOclF"(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @"$S14resilient_enum6MediumOSiIgid_ACSiIgir_TRTA" to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @"$SSiN")
+// CHECK:     call swiftcc void @"$S15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @"$S14resilient_enum6MediumOSiIgid_ACSiIgir_TRTA" to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @"$SSiN")
   reabstraction(f)
 
 // CHECK:     ret void
