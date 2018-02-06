@@ -108,6 +108,7 @@ class CMake(object):
         else:
             define("CMAKE_C_COMPILER:PATH", toolchain.cc)
             define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
+            define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
 
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",
