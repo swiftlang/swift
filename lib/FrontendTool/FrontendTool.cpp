@@ -299,9 +299,12 @@ static bool writeSIL(SILModule &SM, CompilerInstance &Instance,
                   opts.EmitSortedSIL);
 }
 
-static bool printAsObjC(const std::string &outputPath, ModuleDecl *M,
-                        StringRef bridgingHeader, bool moduleIsPublic) {
+static bool printAsObjCIfNeeded(const std::string &outputPath, ModuleDecl *M,
+                                StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
+
+  if (outputPath.empty())
+    return false;
 
   clang::CompilerInstance Clang;
 
@@ -908,13 +911,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    if (!opts.ObjCHeaderOutputPath.empty())
-      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                         opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        printAsObjCIfNeeded(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
-    return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
-                                 Instance) ||
-           Context.hadError();
+    const bool hadEmitIndexDataError = emitIndexDataIfNeeded(
+        Instance.getPrimarySourceFile(), Invocation, Instance);
+    return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
 
   if (writeTBDIfNeeded(Invocation, Instance))
@@ -1236,10 +1239,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
-  if (!opts.ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                      opts.ImplicitObjCHeaderPath, moduleIsPublic);
-  }
+  (void)printAsObjCIfNeeded(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIBIfNeeded(Invocation.getFrontendOptions(), SM.get(),
