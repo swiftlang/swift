@@ -282,6 +282,9 @@ public:
   /// Indicates whether the action will immediately run code.
   static bool isActionImmediate(ActionType);
 
+  /// \return true if action only parses without doing other compilation steps.
+  static bool shouldActionOnlyParse(ActionType);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

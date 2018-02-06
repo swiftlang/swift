@@ -104,6 +104,8 @@ public:
 
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
+  bool hasMultiplePrimaryInputs() const { return primaryInputCount() > 1; }
+
   /// Fails an assertion if there is more than one primary input.
   /// Used in situations where only one primary input can be handled
   /// and where batch mode has not been implemented yet.
