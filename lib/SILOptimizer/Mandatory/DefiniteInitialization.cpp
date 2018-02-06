@@ -1636,7 +1636,14 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                            bool SuperInitDone,
                                            bool FailedSelfUse) {
   SILInstruction *Inst = Use.Inst;
-  
+
+  // Stores back to the 'self' box are OK.
+  if (auto store = dyn_cast<StoreInst>(Inst)) {
+    if (store->getDest() == TheMemory.MemoryInst
+        && TheMemory.isClassInitSelf())
+      return;
+  }
+
   if (FailedSelfUse) {
     emitSelfConsumedDiagnostic(Inst);
     return;
