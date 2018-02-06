@@ -62,11 +62,15 @@
   * FuncDecl
   * ProtocolDecl
   * ImportDecl
+  * AssociatedTypeDecl
   * TypeAliasDecl
   * IfConfigDecl
   * PatternBindingDecl
   * VarDecl
   * ExtensionDecl
+  * SubscriptDecl
+  * ConstructorDecl
+  * DestructorDecl
 
 ### In-progress (UnknownDecl):
 
@@ -76,11 +80,7 @@
   * InfixOperatorDecl
   * PrefixOperatorDecl
   * PostfixOperatorDecl
-  * AssociatedTypeDecl
   * EnumDecl
-  * SubscriptDecl
-  * ConstructorDecl
-  * DestructorDecl
   * EnumElementDecl
 
 ## Statement

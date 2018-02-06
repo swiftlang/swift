@@ -106,7 +106,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto TypeInit = SyntaxFactory::makeTypeInitializerClause(Assignment,
                                                              Array_Int);
     SyntaxFactory::makeTypealiasDecl(None, None, Typealias,
-                                     Subsequence, GenericParams, TypeInit)
+                                     Subsequence, GenericParams, TypeInit, None)
       .print(OS);
     ASSERT_EQ(OS.str().str(),
               "typealias MyCollection<Element> = Array<Element>");
