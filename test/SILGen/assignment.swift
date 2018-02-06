@@ -43,11 +43,11 @@ protocol P {
 // CHECK-LABEL: sil hidden @_T010assignment15copyRightToLeftyAA1P_pz1p_tF : $@convention(thin) (@inout P) -> () {
 func copyRightToLeft(p: inout P) {
   // CHECK: bb0(%0 : @trivial $*P):
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*P
+  // CHECK:   [[WRITE_OPEN:%.*]] = open_existential_addr mutable_access [[WRITE]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] %0 : $*P
   // CHECK:   [[READ_OPEN:%.*]] = open_existential_addr immutable_access [[READ]]
   // CHECK:   end_access [[READ]] : $*P
-  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*P
-  // CHECK:   [[WRITE_OPEN:%.*]] = open_existential_addr mutable_access [[WRITE]]
   // CHECK:   end_access [[WRITE]] : $*P
   p.left = p.right
 }
