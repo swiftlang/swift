@@ -1298,8 +1298,7 @@ private:
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
-    case TypeKind::Optional:
-    case TypeKind::ImplicitlyUnwrappedOptional: {
+    case TypeKind::Optional: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
       auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
       return getOrCreateDesugaredType(CanTy, DbgTy);

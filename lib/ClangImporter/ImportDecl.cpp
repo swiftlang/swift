@@ -1779,9 +1779,9 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
     return {nullptr, false};
 
   // Unwrap one level of optionality from each.
-  if (Type getterObjectType = getterType->getAnyOptionalObjectType())
+  if (Type getterObjectType = getterType->getOptionalObjectType())
     getterType = getterObjectType;
-  if (Type setterObjectType = setterType->getAnyOptionalObjectType())
+  if (Type setterObjectType = setterType->getOptionalObjectType())
     setterType = setterObjectType;
 
   // If they are still different, fail.
@@ -2043,7 +2043,7 @@ static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
   Type ty = prop->getInterfaceType();
-  if (auto innerTy = ty->getAnyOptionalObjectType())
+  if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
   if (!ty->is<GenericTypeParamType>() && !ty->isAnyClassReferenceType())
     return;
@@ -4065,7 +4065,7 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
                                         Impl.SwiftContext);
-        assert(!dc->getSelfInterfaceType()->getAnyOptionalObjectType());
+        assert(!dc->getSelfInterfaceType()->getOptionalObjectType());
         isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
@@ -5268,7 +5268,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!storedUnderlyingType)
     return nullptr;
 
-  if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = storedUnderlyingType->getOptionalObjectType())
     storedUnderlyingType = objTy;
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
@@ -5285,7 +5285,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
       Bridgeability::Full, OTK_None);
-  if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
+  if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
     computedPropertyUnderlyingType = objTy;
 
   bool isBridged =
@@ -5571,7 +5571,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   // Update the failability appropriately based on the imported method type.
   OptionalTypeKind initOptionality = OTK_None;
   if (importedType.isImplicitlyUnwrapped()) {
-    assert(importedType.getType()->getAnyOptionalObjectType());
+    assert(importedType.getType()->getOptionalObjectType());
     initOptionality = OTK_ImplicitlyUnwrappedOptional;
   } else if (importedType.getType()->getOptionalObjectType()) {
     initOptionality = OTK_Optional;
@@ -6107,7 +6107,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
   OptionalTypeKind failability;
-  (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
+  (void)oldFnType->getResult()->getOptionalObjectType(failability);
 
   // Update the failability appropriately based on the imported method type.
   if (importedType.isImplicitlyUnwrapped()) {

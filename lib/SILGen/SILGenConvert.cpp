@@ -41,7 +41,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
                                    SGFContext ctxt,
                       llvm::function_ref<ManagedValue(SGFContext)> generator) {
   SILType optTy = optTL.getLoweredType();
-  SILType objectTy = optTy.getAnyOptionalObjectType();
+  SILType objectTy = optTy.getOptionalObjectType();
   assert(objectTy && "expected type was not optional");
 
   auto someDecl = getASTContext().getOptionalSomeDecl();
@@ -81,7 +81,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                                  const TypeLowering &optTL) {
   SILType optType = optTL.getLoweredType();
   assert(dest->getType() == optType.getAddressType());
-  auto loweredPayloadTy = optType.getAnyOptionalObjectType();
+  auto loweredPayloadTy = optType.getOptionalObjectType();
   assert(loweredPayloadTy);
 
   // Project out the payload area.
@@ -101,8 +101,8 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
 void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
-  assert(optTL.getLoweredType().getAnyOptionalObjectType());
-  
+  assert(optTL.getLoweredType().getOptionalObjectType());
+
   B.createInjectEnumAddr(loc, dest, getASTContext().getOptionalNoneDecl());
 }
       
@@ -112,7 +112,7 @@ SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
                                               const TypeLowering &optTL) {
   assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
          "Address-only optionals cannot use this");
-  assert(optTL.getLoweredType().getAnyOptionalObjectType());
+  assert(optTL.getLoweredType().getOptionalObjectType());
 
   return B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
                       optTL.getLoweredType());
@@ -129,7 +129,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   CanType formalOptType = optType.getSwiftRValueType();
   (void)formalOptType;
 
-  assert(formalOptType.getAnyOptionalObjectType());
+  assert(formalOptType.getOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
   
   SILValue result =
@@ -228,7 +228,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   B.emitBlock(contBB);
 
   ManagedValue result;
-  SILType payloadType = optional.getType().getAnyOptionalObjectType();
+  SILType payloadType = optional.getType().getOptionalObjectType();
 
   if (payloadType.isObject()) {
     result = B.createOwnedPHIArgument(payloadType);
@@ -273,8 +273,7 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
     SILLocation loc, ManagedValue addrOrValue, const TypeLowering &optTL,
     SGFContext C) {
-  SILType origPayloadTy =
-    addrOrValue.getType().getAnyOptionalObjectType();
+  SILType origPayloadTy = addrOrValue.getType().getOptionalObjectType();
 
   auto someDecl = getASTContext().getOptionalSomeDecl();
 
@@ -310,7 +309,7 @@ SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
     const auto &optConversion = optInit->getConversion();
     if (optConversion.isBridging()) {
       auto sourceValueType =
-        optConversion.getBridgingSourceType().getAnyOptionalObjectType();
+          optConversion.getBridgingSourceType().getOptionalObjectType();
       assert(sourceValueType);
       if (auto valueConversion =
             optConversion.adjustForInitialOptionalConversions(sourceValueType)){
@@ -337,7 +336,7 @@ SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
 
   auto someDecl = getASTContext().getOptionalSomeDecl();
 
-  auto valueTy = optTy.getAnyOptionalObjectType();  
+  auto valueTy = optTy.getOptionalObjectType();
   auto &valueTL = getTypeLowering(valueTy);
 
   // Project the value buffer within the address.
@@ -374,7 +373,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   auto isPresentBB = createBasicBlock();
 
   SwitchEnumBuilder SEBuilder(B, loc, input);
-  SILType noOptResultTy = resultTy.getAnyOptionalObjectType();
+  SILType noOptResultTy = resultTy.getOptionalObjectType();
   assert(noOptResultTy);
 
   // Create a temporary for the output optional.
@@ -403,7 +402,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
             silConv.useLoweredAddresses()) {
           auto *someDecl = B.getASTContext().getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
-              loc, input, someDecl, input.getType().getAnyOptionalObjectType());
+              loc, input, someDecl, input.getType().getOptionalObjectType());
         }
 
         ManagedValue result = transformValue(*this, loc, input, noOptResultTy,
@@ -630,7 +629,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // Receive the error value.  It's typed as an 'AnyObject' for
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
-          potentialNSError.getType().getAnyOptionalObjectType();
+            potentialNSError.getType().getOptionalObjectType();
         ManagedValue nsError = B.createOwnedPHIArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
@@ -1085,7 +1084,7 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
 
   case ForceAndBridgeToObjC: {
     auto &tl = SGF.getTypeLowering(value.getType());
-    auto sourceValueType = getBridgingSourceType().getAnyOptionalObjectType();
+    auto sourceValueType = getBridgingSourceType().getOptionalObjectType();
     value = SGF.emitCheckedGetOptionalValueFrom(loc, value, tl, SGFContext());
     return SGF.emitNativeToBridgedValue(loc, value, sourceValueType,
                                         getBridgingResultType(),
@@ -1212,9 +1211,9 @@ static bool areRelatedTypesForBridgingPeephole(CanType sourceType,
   if (sourceType == resultType)
     return true;
 
-  if (auto resultObjType = resultType.getAnyOptionalObjectType()) {
+  if (auto resultObjType = resultType.getOptionalObjectType()) {
     // Optional-to-optional.
-    if (auto sourceObjType = sourceType.getAnyOptionalObjectType()) {
+    if (auto sourceObjType = sourceType.getOptionalObjectType()) {
       return areRelatedTypesForBridgingPeephole(sourceObjType, resultObjType);
     }
 
@@ -1252,9 +1251,9 @@ static bool areRelatedTypesForBridgingPeephole(CanType sourceType,
 /// Does the given conversion turn a non-class type into Any, taking into
 /// account optional-to-optional conversions?
 static bool isValueToAnyConversion(CanType from, CanType to) {
-  while (auto toObj = to.getAnyOptionalObjectType()) {
+  while (auto toObj = to.getOptionalObjectType()) {
     to = toObj;
-    if (auto fromObj = from.getAnyOptionalObjectType()) {
+    if (auto fromObj = from.getOptionalObjectType()) {
       from = fromObj;
     }
   }
@@ -1273,15 +1272,15 @@ static bool isValueToAnyConversion(CanType from, CanType to) {
 /// Check whether this conversion is Any??? to AnyObject???.  If the result
 /// type is less optional, it doesn't count.
 static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
-  while (auto fromObject = from.getAnyOptionalObjectType()) {
-    auto toObject = to.getAnyOptionalObjectType();
+  while (auto fromObject = from.getOptionalObjectType()) {
+    auto toObject = to.getOptionalObjectType();
     if (!toObject) return false;
     from = fromObject;
     to = toObject;
   }
 
   if (from->isAny()) {
-    assert(to->lookThroughAllAnyOptionalTypes()->isAnyObject());
+    assert(to->lookThroughAllOptionalTypes()->isAnyObject());
     return true;
   }
   return false;
@@ -1331,9 +1330,9 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       bool forced =
         outerConversion.getKind() == Conversion::ForceAndBridgeToObjC;
       if (forced) {
-        sourceType = sourceType.getAnyOptionalObjectType();
+        sourceType = sourceType.getOptionalObjectType();
         if (!sourceType) return None;
-        intermediateType = intermediateType.getAnyOptionalObjectType();
+        intermediateType = intermediateType.getOptionalObjectType();
         assert(intermediateType);
       }
 
@@ -1388,8 +1387,8 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       // value type, this is just an implicit force.
       if (!forced &&
           innerConversion.getKind() == Conversion::BridgeResultFromObjC) {
-        if (auto sourceValueType = sourceType.getAnyOptionalObjectType()) {
-          if (!intermediateType.getAnyOptionalObjectType() &&
+        if (auto sourceValueType = sourceType.getOptionalObjectType()) {
+          if (!intermediateType.getOptionalObjectType() &&
               areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
             forced = true;
             return applyPeephole(ConversionPeepholeHint::Subtype);
@@ -1427,7 +1426,7 @@ Lowering::emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
   auto getBridgingSourceType = [&] {
     CanType sourceType = innerConversion.getBridgingSourceType();
     if (hint.isForced())
-      sourceType = sourceType.getAnyOptionalObjectType();
+      sourceType = sourceType.getOptionalObjectType();
     return sourceType;
   };
   auto getBridgingResultType = [&] {

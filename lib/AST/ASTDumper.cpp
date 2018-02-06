@@ -3222,13 +3222,6 @@ namespace {
       OS << ")";
     }
 
-    void visitImplicitlyUnwrappedOptionalType(
-           ImplicitlyUnwrappedOptionalType *T, StringRef label) {
-      printCommon(label, "implicitly_unwrapped_optional_type");
-      printRec(T->getBaseType());
-      OS << ")";
-    }
-
     void visitDictionaryType(DictionaryType *T, StringRef label) {
       printCommon(label, "dictionary_type");
       printRec("key", T->getKeyType());

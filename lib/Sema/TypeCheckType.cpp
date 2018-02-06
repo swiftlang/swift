@@ -424,7 +424,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   // In SIL mode, Optional<T> interprets T as a SIL type.
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nominal->classifyAsOptionalType()) {
+      if (nominal->isOptionalDecl()) {
         // Validate the generic argument.
         TypeLoc arg = genericArgs[0];
         if (validateType(arg, dc, withoutContext(options, true), resolver))
@@ -1741,7 +1741,7 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
     return MetatypeType::get(
         rebuildWithDynamicSelf(Context, metatypeTy->getInstanceType()),
         metatypeTy->getRepresentation());
-  } else if (auto optionalTy = ty->getAnyOptionalObjectType(OTK)) {
+  } else if (auto optionalTy = ty->getOptionalObjectType(OTK)) {
     return OptionalType::get(
         OTK, rebuildWithDynamicSelf(Context, optionalTy));
   } else {
@@ -2106,7 +2106,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
         if (((attrs.has(TAK_sil_weak) || attrs.has(TAK_sil_unmanaged)) &&
-             ty->getAnyOptionalObjectType()) ||
+             ty->getOptionalObjectType()) ||
             (!attrs.has(TAK_sil_weak) && ty->hasReferenceSemantics())) {
           ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
           attrs.clearOwnership();
@@ -3608,12 +3608,12 @@ bool TypeChecker::isRepresentableInObjC(
       }
 
       errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
-    } else if (!resultType->getAnyOptionalObjectType() &&
+    } else if (!resultType->getOptionalObjectType() &&
                isBridgedToObjectiveCClass(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
       // can be throwing; they indicate failure with a nil result.
       kind = ForeignErrorConvention::NilResult;
-    } else if ((optOptionalType = resultType->getAnyOptionalObjectType()) &&
+    } else if ((optOptionalType = resultType->getOptionalObjectType()) &&
                isBridgedToObjectiveCClass(dc, optOptionalType)) {
       // Cannot return an optional bridged type, because 'nil' is reserved
       // to indicate failure. Call this out in a separate diagnostic.
@@ -3705,7 +3705,7 @@ bool TypeChecker::isRepresentableInObjC(
         type = type->getRValueType();
         
         // Look through one level of optionality.
-        if (auto objectType = type->getAnyOptionalObjectType())
+        if (auto objectType = type->getOptionalObjectType())
           type = objectType;
         
         // Is it a function type?

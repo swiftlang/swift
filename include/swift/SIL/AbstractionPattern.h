@@ -1019,7 +1019,7 @@ public:
 
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
-  AbstractionPattern getAnyOptionalObjectType() const;
+  AbstractionPattern getOptionalObjectType() const;
 
   /// If this pattern refers to a reference storage type, look through
   /// it.

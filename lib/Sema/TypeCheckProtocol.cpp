@@ -143,12 +143,11 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   OptionalAdjustmentKind optAdjustment = OptionalAdjustmentKind::None;
   if (reqt->isObjC()) {
     OptionalTypeKind reqtOptKind;
-    if (Type reqtValueType
-          = reqtType->getAnyOptionalObjectType(reqtOptKind))
+    if (Type reqtValueType = reqtType->getOptionalObjectType(reqtOptKind))
       reqtType = reqtValueType;
     OptionalTypeKind witnessOptKind;
-    if (Type witnessValueType 
-          = witnessType->getAnyOptionalObjectType(witnessOptKind))
+    if (Type witnessValueType =
+            witnessType->getOptionalObjectType(witnessOptKind))
       witnessType = witnessValueType;
 
     switch (reqtOptKind) {

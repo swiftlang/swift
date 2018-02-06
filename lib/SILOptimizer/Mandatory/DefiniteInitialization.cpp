@@ -1350,7 +1350,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   // Only allow enums forming an optional.
-  if (!EI->getType().getAnyOptionalObjectType())
+  if (!EI->getType().getOptionalObjectType())
     return false;
 
   if (!EI->hasOneUse()) return false;

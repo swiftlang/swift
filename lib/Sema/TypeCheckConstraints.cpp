@@ -2357,7 +2357,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Look through one level of optional; this improves recovery but doesn't
       // change the result.
-      if (auto sequenceObjectType = sequenceType->getAnyOptionalObjectType())
+      if (auto sequenceObjectType = sequenceType->getOptionalObjectType())
         sequenceType = sequenceObjectType;
 
       // If the sequence type is an existential, we should not attempt to
@@ -2855,7 +2855,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
     auto sub = coerceToRValue(FVE->getSubExpr(), getType, setType);
     FVE->setSubExpr(sub);
-    setType(FVE, getType(sub)->getAnyOptionalObjectType());
+    setType(FVE, getType(sub)->getOptionalObjectType());
     return FVE;
   }
 
@@ -3351,11 +3351,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // Strip optional wrappers off of the destination type in sync with
   // stripping them off the origin type.
-  while (auto toValueType = toType->getAnyOptionalObjectType()) {
+  while (auto toValueType = toType->getOptionalObjectType()) {
     // Complain if we're trying to increase optionality, e.g.
     // casting an NSObject? to an NSString??.  That's not a subtype
     // relationship.
-    auto fromValueType = fromType->getAnyOptionalObjectType();
+    auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
       if (!suppressDiagnostics) {
         diagnose(diagLoc, diag::downcast_to_more_optional,
@@ -3373,7 +3373,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   // On the other hand, casts can decrease optionality monadically.
   unsigned extraFromOptionals = 0;
-  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
+  while (auto fromValueType = fromType->getOptionalObjectType()) {
     fromType = fromValueType;
     ++extraFromOptionals;
   }

@@ -47,7 +47,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
   // If the pointer itself is optional, we need to branch based on
   // whether it's really there.
   if (SILType errorPtrObjectTy =
-        foreignErrorSlot->getType().getAnyOptionalObjectType()) {
+          foreignErrorSlot->getType().getOptionalObjectType()) {
     SILBasicBlock *contBB = SGF.createBasicBlock();
     SILBasicBlock *noSlotBB = SGF.createBasicBlock();
     SILBasicBlock *hasSlotBB = SGF.createBasicBlock();
@@ -221,10 +221,9 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
   // If an error is signalled by a nil result, inject a non-nil result.
   case ForeignErrorConvention::NilResult: {
-    ManagedValue bridgedResult =
-      emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               formalNativeType, formalBridgedType,
-                               bridgedType.getAnyOptionalObjectType());
+    ManagedValue bridgedResult = emitNativeToBridgedValue(
+        loc, emitManagedRValueWithCleanup(result), formalNativeType,
+        formalBridgedType, bridgedType.getOptionalObjectType());
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), bridgedType);
@@ -350,8 +349,7 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // Take local ownership of the optional result value.
   SILValue optionalResult = origResult.forward(SGF);
 
-  SILType resultObjectType =
-    optionalResult->getType().getAnyOptionalObjectType();
+  SILType resultObjectType = optionalResult->getType().getOptionalObjectType();
 
   ASTContext &ctx = SGF.getASTContext();
 

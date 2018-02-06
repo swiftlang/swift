@@ -196,7 +196,7 @@ static CanSILFunctionType getInnerFunctionType(SILType storageType) {
   if (auto currSILFunctionType = storageType.getAs<SILFunctionType>()) {
     return currSILFunctionType;
   }
-  if (auto optionalType = storageType.getAnyOptionalObjectType()) {
+  if (auto optionalType = storageType.getOptionalObjectType()) {
     if (auto currSILFunctionType = optionalType.getAs<SILFunctionType>()) {
       return currSILFunctionType;
     }
@@ -208,7 +208,7 @@ static SILType getNewOptionalFunctionType(GenericEnvironment *GenericEnv,
                                           SILType storageType,
                                           irgen::IRGenModule &Mod) {
   SILType newSILType = storageType;
-  if (auto objectType = storageType.getAnyOptionalObjectType()) {
+  if (auto objectType = storageType.getOptionalObjectType()) {
     if (auto fnType = objectType.getAs<SILFunctionType>()) {
       if (shouldTransformFunctionType(GenericEnv, fnType, Mod)) {
         auto newFnType = getNewSILFunctionType(GenericEnv, fnType, Mod);        
@@ -1242,7 +1242,7 @@ void LoadableStorageAllocation::convertApplyResults() {
         // Make sure it is a function type
         if (!resultStorageType.is<SILFunctionType>()) {
           // Check if it is an optional function type
-          auto optionalType = resultStorageType.getAnyOptionalObjectType();
+          auto optionalType = resultStorageType.getOptionalObjectType();
           assert(optionalType &&
                  "Expected SILFunctionType or Optional for the result type");
           assert(optionalType.is<SILFunctionType>() &&

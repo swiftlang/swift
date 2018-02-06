@@ -210,7 +210,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    OptionalTy.getAnyOptionalObjectType(OTK);
+    OptionalTy.getOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
     InOutOptionalParam = Tmp;

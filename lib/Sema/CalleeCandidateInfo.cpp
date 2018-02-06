@@ -827,7 +827,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
         // Look through optional or IUO to get the underlying type the decl was
         // found in.
-        substType = substType->getAnyOptionalObjectType();
+        substType = substType->getOptionalObjectType();
       } else if (cand.getKind() != OverloadChoiceKind::Decl) {
         // Otherwise, if it is a remapping we can't handle, don't try to compute
         // a substitution.

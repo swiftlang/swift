@@ -805,7 +805,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(sourceType.isObject());
   assert(targetType.isObject());
 
-  if (auto sourceOptObjectType = sourceType.getAnyOptionalObjectType()) {
+  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
 
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe

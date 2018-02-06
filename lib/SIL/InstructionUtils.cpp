@@ -490,7 +490,7 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
 /// Return the partial_apply and a flag set to true if the closure is
 /// indirectly captured by a reabstraction thunk.
 FindClosureResult swift::findClosureForAppliedArg(SILValue V) {
-  if (auto optionalObjTy = V->getType().getAnyOptionalObjectType())
+  if (auto optionalObjTy = V->getType().getOptionalObjectType())
     V = cast<EnumInst>(V)->getOperand();
 
   auto fnType = V->getType().getAs<SILFunctionType>();

@@ -3738,11 +3738,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       switch (kind) {
       case KeyPathExpr::Component::Kind::OptionalChain:
         loweredKind = KeyPathPatternComponent::Kind::OptionalChain;
-        baseTy = baseTy->getAnyOptionalObjectType()->getCanonicalType();
+        baseTy = baseTy->getOptionalObjectType()->getCanonicalType();
         break;
       case KeyPathExpr::Component::Kind::OptionalForce:
         loweredKind = KeyPathPatternComponent::Kind::OptionalForce;
-        baseTy = baseTy->getAnyOptionalObjectType()->getCanonicalType();
+        baseTy = baseTy->getOptionalObjectType()->getCanonicalType();
         break;
       case KeyPathExpr::Component::Kind::OptionalWrap:
         loweredKind = KeyPathPatternComponent::Kind::OptionalWrap;
@@ -3993,9 +3993,9 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   auto isNotPresentBB = SGF.createBasicBlock();
   auto isPresentBB = SGF.createBasicBlock();
 
-  SILType resultTy = optVal.getType().getAnyOptionalObjectType();
+  SILType resultTy = optVal.getType().getOptionalObjectType();
   auto &resultTL = SGF.getTypeLowering(resultTy);
-  assert(resultTy.getSwiftRValueType().getAnyOptionalObjectType() &&
+  assert(resultTy.getSwiftRValueType().getOptionalObjectType() &&
          "input was not a nested optional value");
 
   // If the result is address-only, we need to return something in memory,
@@ -4075,13 +4075,13 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   
   auto newSelfTy = E->getSubExpr()->getType();
   OptionalTypeKind failability;
-  if (auto objTy = newSelfTy->getAnyOptionalObjectType(failability))
+  if (auto objTy = newSelfTy->getOptionalObjectType(failability))
     newSelfTy = objTy;
 
   // "try? self.init()" can give us two levels of optional if the initializer
   // we delegate to is failable.
   OptionalTypeKind extraFailability;
-  if (auto objTy = newSelfTy->getAnyOptionalObjectType(extraFailability))
+  if (auto objTy = newSelfTy->getOptionalObjectType(extraFailability))
     newSelfTy = objTy;
 
   // The subexpression consumes the current 'self' binding.
@@ -4871,7 +4871,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
     SILValue value = result.forward(*this);
 
     // If it's not already an optional type, make it optional.
-    if (!resultTy.getAnyOptionalObjectType()) {
+    if (!resultTy.getOptionalObjectType()) {
       resultTy = SILType::getOptionalType(resultTy);
       value = B.createOptionalSome(loc, value, resultTy);
       result = ManagedValue::forUnmanaged(value);
@@ -4993,7 +4993,7 @@ RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
 RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
                                      unsigned numOptionalEvaluations,
                                      SGFContext C) {
-  auto valueType = E->getType()->getAnyOptionalObjectType();
+  auto valueType = E->getType()->getOptionalObjectType();
   assert(valueType);
   E = E->getSemanticsProvidingExpr();
 

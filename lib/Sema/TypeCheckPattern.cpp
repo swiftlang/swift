@@ -1067,7 +1067,7 @@ recur:
     // case, they probably didn't mean to bind to a variable, or there is some
     // other bug.  We always tell them that they can silence the warning with an
     // explicit type annotation (and provide a fixit) as a note.
-    Type diagTy = type->getAnyOptionalObjectType();
+    Type diagTy = type->getOptionalObjectType();
     if (!diagTy) diagTy = type;
     
     bool shouldRequireType = false;
@@ -1191,7 +1191,7 @@ recur:
 
     // case nil is equivalent to .none when switching on Optionals.
     OptionalTypeKind Kind;
-    if (type->getAnyOptionalObjectType(Kind)) {
+    if (type->getOptionalObjectType(Kind)) {
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl(Kind);
@@ -1221,9 +1221,9 @@ recur:
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
-    type->lookThroughAllAnyOptionalTypes(inputTypeOptionals);
+    type->lookThroughAllOptionalTypes(inputTypeOptionals);
     SmallVector<Type, 2> castTypeOptionals;
-    castType->lookThroughAllAnyOptionalTypes(castTypeOptionals);
+    castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
     // If we have extra optionals on the input type. Create ".Some" patterns
     // wrapping the isa pattern to balance out the optionals.
@@ -1483,7 +1483,7 @@ recur:
   case PatternKind::OptionalSome: {
     auto *OP = cast<OptionalSomePattern>(P);
     OptionalTypeKind optionalKind;
-    Type elementType = type->getAnyOptionalObjectType(optionalKind);
+    Type elementType = type->getOptionalObjectType(optionalKind);
 
     if (elementType.isNull()) {
       auto diagID = diag::optional_element_pattern_not_valid_type;

@@ -502,8 +502,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   }
 
   // Check if src and dest types are optional.
-  auto OptionalSrcTy = SrcTy.getAnyOptionalObjectType();
-  auto OptionalDestTy = DestTy.getAnyOptionalObjectType();
+  auto OptionalSrcTy = SrcTy.getOptionalObjectType();
+  auto OptionalDestTy = DestTy.getOptionalObjectType();
 
   // Both types are optional.
   if (OptionalDestTy && OptionalSrcTy) {
