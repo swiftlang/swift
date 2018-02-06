@@ -8,8 +8,9 @@ var someGlobal = Tensor<Int>(1)
 
 public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<Int> {
   // expected-warning @-1 {{'c' implicitly copied to the accelerator}}
+  // expected-warning @-2 {{'z' implicitly copied to the accelerator}}
 
-  var a = z  // expected-warning {{value implicitly copied to the accelerator}}
+  var a = z
   if c { // expected-note {{value used here}}
     if d { fatalError() }
     a = a + a // expected-note {{value used here}}
@@ -28,17 +29,20 @@ public func iftest(z: Tensor<Int>, y: Tensor<Int>, c: Bool, d: Bool) -> Tensor<I
 // the return site, and this prevented the return block from being included in
 // the post dom set for the partitioning pass.
 public func postdom_crash1(w1: Tensor<Float>, inputBatch: Tensor<Float>) {
+  // expected-warning @-1 {{'w1' implicitly copied to the accelerator}}
+  // expected-warning @-2 {{'inputBatch' implicitly copied to the accelerator}}
   let iterationCount = 1000
   for _ in 0..<iterationCount {
     _ = inputBatch ⊗ w1  // expected-note 2 {{value used here}}
-  }  // expected-warning 2 {{value implicitly copied to the accelerator}}
+  }
 }
 
 // This crashed the partitioning pass because the 1.0 scalar was hoisted out of
 // the loop.  The partitioning pass tried to sink it back in, but failed.
 public func sinking_crash(w1: Tensor<Float>) {
+  // expected-warning @-1 {{'w1' implicitly copied to the accelerator}}
   for _ in 0..<1000 {
-    let pred = w1+w1 // expected-warning {{value implicitly copied to the accelerator}}
+    let pred = w1+w1  // expected-note {{value used here}}
     let _ = 1.0 / Tensor<Float>(pred.unitCountTensor)
   }
 }
@@ -56,12 +60,14 @@ public func endpointComputationCrash() {
 // This crashed lower graph because it produced an error about not being able
 // to lower a send and there wasn't enough error recovery to handle it well.
 public func lowerGraphCrash(x: Tensor<Int>) {
+  // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
+
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
     _ = x+someGlobal // expected-note {{value used here}}
     // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
   } // expected-warning {{value implicitly copied to the accelerator}}
-} // expected-warning {{value implicitly copied to the accelerator}}
+}
 
 
 // This was a prototype runtime test that crashed due to bb arg invalidation

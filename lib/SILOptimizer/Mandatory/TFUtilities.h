@@ -122,6 +122,14 @@ namespace tf {
     return skipInternalLocations(loc).getLocation();
   }
 
+  /// Get the user's source location for the specified value.  If it is an
+  /// instruction, we can apply various heuristics to improve the precision of
+  /// the returned location information.
+  SILLocation getUserSourceLocation(SILValue value);
+  SILLocation getUserSourceLocation(SILInstruction *inst);
+
+
+
   /// Lower the specified SIL function (which was formed by the partitioner)
   /// into a TensorFlow graph, and encode into a vector of bytes.
   ///

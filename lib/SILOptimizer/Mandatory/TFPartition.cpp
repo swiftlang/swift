@@ -82,7 +82,7 @@ static bool isOverflowCheckingIntegerOp(SILInstruction *inst) {
 /// overflow result is already dead, because it is extracted but the extract
 /// isn't used, or if the result is only used by code that provably won't make
 /// it into the tensor program.
-static bool canMoveOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
+static bool canPromoteOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
   // Annoyingly, these builtins are modeled as returning a tuple, which then
   // has tuple extracts hanging off of it.
   for (auto *use : BI->getUses()) {
@@ -145,7 +145,7 @@ static std::string getPartitionedScalarOpName(SILInstruction *I) {
   // Given an overflowing operation, return true if the overflow result will be
   // dead in the tensor program.
   auto overflowDead = [&]() -> bool {
-    return canMoveOverflowCheckingInstToTensorProgram(BI);
+    return canPromoteOverflowCheckingInstToTensorProgram(BI);
   };
 
   switch (BI->getBuiltinInfo().ID) {
@@ -625,17 +625,8 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
         return;
       }
 
-  // If we have a struct extract from a type like Int or Float, look through it
-  // to the Int or Float value itself, which will have better source location
-  // information.  The struct-extract came from the implementation of some
-  // operator in the standard library like "+", and we want the source of the
-  // parameter.
-  if (auto *sei = dyn_cast<StructExtractInst>((SILNode*)value))
-    if (sei->getType().getSwiftRValueType()->is<BuiltinType>())
-      value = sei->getOperand();
-
   // Try to determine a good source location to report.
-  auto loc = getUserSourceLocation(value.getDebugLocation());
+  auto loc = getUserSourceLocation(value);
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -658,7 +649,7 @@ void TFFunctionPartition::diagnoseCopyInIfNotSend(SILValue value,
     .highlight(loc.getSourceRange());
 
   // If the use is on a different line, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user->getDebugLocation());
+  auto userLoc = getUserSourceLocation(user);
   auto &SM = fn.getModule().getASTContext().SourceMgr;
 
   if (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
@@ -690,14 +681,14 @@ diagnoseCopyOutIfNotReceive(SILValue value, SILInstruction *user) {
   auto &ctx = fn.getModule().getASTContext();
 
   // Try to determine a good source location to report.
-  auto loc = getUserSourceLocation(value.getDebugLocation());
+  auto loc = getUserSourceLocation(value);
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
     .highlight(loc.getSourceRange());
 
   // If the use is at a different position, emit a note showing where it is.
-  auto userLoc = getUserSourceLocation(user->getDebugLocation());
+  auto userLoc = getUserSourceLocation(user);
   if (loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
@@ -1234,7 +1225,7 @@ bool TFFunctionPartition::markFunction() {
         // TODO: improve the diagnostic to talk about the parameter label in the
         // user code, not the internal op attribute.  The bookkeeping for this
         // isn't obvious though.
-        auto loc = getUserSourceLocation(inst->getDebugLocation());
+        auto loc = getUserSourceLocation(inst);
         diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
                  diag::tf_op_misuse, error)
           .highlight(loc.getSourceRange());
@@ -1669,6 +1660,7 @@ static SILValue createReceive(SILBuilder &B, SILLocation loc,
   auto &ctx = B.getASTContext();
 
   auto name = ctx.getIdentifier("tensorflowReceive_"+ llvm::utostr(idNumber));
+
   return // tensorflowReceive has type <T> () -> T
     B.createBuiltin(loc, name, valueTy,
                     Substitution(valueTy.getSwiftRValueType(), {}), {});
@@ -1694,7 +1686,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   SILBuilder BH(++SILBasicBlock::iterator(&inst)); // Builder for host.
   auto BA = getBuilder();        // Builder for accelerator.
 
-  auto loc = getUserSourceLocation(inst.getDebugLocation());
+  auto loc = getUserSourceLocation(&inst);
 
   for (auto result : inst.getResults()) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
@@ -1932,7 +1924,7 @@ void PartitionCloner::finalizeOriginal() {
       if (it != FP.markedBBArguments.end() && it->second == Marking::Move) {
         argsToRemoveMask[argNo] = true;
         // Remember the argument and its location.
-        argsToRemove.push_back({ arg, SILValue(arg).getLoc() });
+        argsToRemove.push_back({ arg, getUserSourceLocation(arg) });
       }
       ++argNo;
     };
@@ -1990,8 +1982,7 @@ void PartitionCloner::finalizeOriginal() {
   for (auto inst : instructionsToRemove) {
     for (auto result : inst->getResults())
       if (!result->use_empty()) {
-        auto loc = getUserSourceLocation(inst->getDebugLocation());
-        insertReceive(result, loc);
+        insertReceive(result, getUserSourceLocation(inst));
       }
 
     inst->eraseFromParent();

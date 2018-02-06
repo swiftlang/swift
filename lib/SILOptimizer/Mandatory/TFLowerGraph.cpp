@@ -182,6 +182,7 @@ public:
     errorOccurred = true;
   }
 
+
   /// Given a GraphFunctionBody, which encapsulates all the information
   /// necessary to represent a tensorflow TF_Function, perform the final steps
   /// to generate the TF_Function itself and put it into the resultGraph.
@@ -304,7 +305,8 @@ public:  // Lowering functionality.
   // visitSILInstruction is the bottom level of the instruction visitor, where
   // unhandled instructions bottom out in.
   void visitSILInstruction(SILInstruction *inst) {
-    internalError(inst->getLoc(), "GraphGen cannot lower this instruction yet");
+    internalError(inst->getLoc(),
+                  "GraphGen cannot lower this instruction yet");
     llvm::errs() << "Unhandled SIL instruction in TFGraphLowering:\n";
     inst->dump();
   }

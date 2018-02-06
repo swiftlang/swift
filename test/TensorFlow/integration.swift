@@ -3,7 +3,8 @@
 import TensorFlow
 
 public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
-  var x = a  // expected-warning {{value implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  // expected-warning @-1 {{'a' implicitly copied to the accelerator}}
+  var x = a
   x += x  // expected-note {{value used here}}
 
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
@@ -43,7 +44,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied to the accelerator}}
-  var x = Tensor<Float>(f)
+  var x = Tensor<Float>(f) // expected-note {{value used here}}
           +
           Tensor<Float>(1.0)
   x += x
@@ -277,6 +278,8 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // host.
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
   // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+
+  // expected-note @+1 {{value used here}}
   let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}} expected-error {{GraphGen cannot lower a 'send' to the host yet}}
   let y = x.scalar! + 2.0    // expected-note {{value used here}}
   // expected-warning @-1 {{value implicitly copied to the accelerator}}
@@ -324,8 +327,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
 // CHECK-NEXT:}
 
 public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
+  // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
   return Tensor<Int32>(x+x)  // expected-note {{value used here}}
-} // expected-warning {{value implicitly copied to the accelerator}}
+}
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
 // CHECK: sil private @{{.*}}testCast{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Int32> {
