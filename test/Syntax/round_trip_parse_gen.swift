@@ -87,6 +87,28 @@ class C {
     _ = .foo[12]
     _ = .foo.bar
   }
+
+  init() {}
+  @objc private init(a: Int)
+  init!(a: Int) {}
+  init?(a: Int) {}
+  public init(a: Int) throws {}
+
+  @objc deinit {}
+  private deinit {}
+
+  internal subscript(x: Int) -> Int { get {} set {} }
+  subscript() -> Int { return 1 }
+}
+
+protocol PP {
+  associatedtype A
+  associatedtype B: Sequence
+  associatedtype C = Int
+  associatedtype D: Sequence = [Int]
+  associatedtype E: Sequence = [[Int]] where A.Element : Sequence
+  private associatedtype F
+  @objc associatedtype G
 }
 
 #endif

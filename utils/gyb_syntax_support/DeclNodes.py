@@ -4,7 +4,7 @@ from Node import Node
 
 
 DECL_NODES = [
-    # initializer -> '=' type
+    # type-assignment -> '=' type
     Node('TypeInitializerClause', kind='Syntax',
          children=[
              Child('Equal', kind='EqualToken'),
@@ -13,9 +13,8 @@ DECL_NODES = [
 
     # typealias-declaration -> attributes? access-level-modifier? 'typealias'
     #                            typealias-name generic-parameter-clause?
-    #                            typealias-assignment
+    #                            type-assignment
     # typealias-name -> identifier
-    # typealias-assignment -> = type
     Node('TypealiasDecl', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
@@ -27,7 +26,30 @@ DECL_NODES = [
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Initializer', kind='TypeInitializerClause',
-                   is_optional=True)
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+         ]),
+
+    # associatedtype-declaration -> attributes? access-level-modifier?
+    #                                 'associatedtype' associatedtype-name
+    #                                 inheritance-clause? type-assignment?
+    #                                 generic-where-clause?
+    # associatedtype-name -> identifier
+    Node('AssociatedtypeDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('AssociatedtypeKeyword', kind='AssociatedtypeToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('Initializer', kind='TypeInitializerClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
          ]),
 
     Node('FunctionParameterList', kind='SyntaxCollection',
@@ -319,6 +341,62 @@ DECL_NODES = [
                    is_optional=True),
              # the body is not necessary inside a protocol definition
              Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('InitializerDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('InitKeyword', kind='InitToken'),
+             Child('OptionalMark', kind='Token',
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'InfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ],
+                   is_optional=True),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('Parameters', kind='ParameterClause'),
+             Child('ThrowsOrRethrowsKeyword', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'ThrowsToken',
+                       'RethrowsToken',
+                   ]),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             # the body is not necessary inside a protocol definition
+             Child('Body', kind='CodeBlock', is_optional=True),
+         ]),
+
+    Node('DeinitializerDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('DeinitKeyword', kind='DeinitToken'),
+             Child('Body', kind='CodeBlock'),
+         ]),
+
+    Node('SubscriptDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
+             Child('SubscriptKeyword', kind='SubscriptToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('Indices', kind='ParameterClause'),
+             Child('Result', kind='ReturnClause'),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             # the body is not necessary inside a protocol definition
+             Child('Accessor', kind='AccessorBlock', is_optional=True),
          ]),
 
     # else-if-directive-clause-list -> else-if-directive-clause
