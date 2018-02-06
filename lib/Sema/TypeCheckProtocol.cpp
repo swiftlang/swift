@@ -4703,6 +4703,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return nullptr;
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
+  if (Decl->isInvalid())
+    return nullptr;
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
