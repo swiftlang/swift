@@ -971,6 +971,20 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   }
 }
 
+/// Determine whether we are able to move the specified instruction across
+/// arbitrary other instructions.  This is basically "side effect free" in the
+/// most liberal sense.
+static bool canMoveInstruction(SILInstruction *inst) {
+  if (inst->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
+    return false;
+  if (isa<TermInst>(inst))
+    return false;
+  // Can't hoist allocation and dealloc stacks.
+  if (isa<AllocationInst>(inst) || isa<DeallocStackInst>(inst))
+    return false;
+  return true;
+}
+
 /// The specified instruction is in the region dominated by the start point of
 /// the tensor computation and needs to be copied into it.  Try to hoist above
 /// the start point, since we prefer arguments to the tensor program rather than
@@ -986,12 +1000,7 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
-  //
-  // For now though, our implementation is extremely simple: we just check for
-  // a couple of simple instructions that have come up so far.
-  //
-  // We can extend this in the future when there is a need.
-  if (isa<StructExtractInst>(inst) || isa<LiteralInst>(inst)) {
+  if (canMoveInstruction(inst)) {
     // We can hoist one of these instructions if all of their operands are
     // hoistable.
     for (auto &op : inst->getAllOperands()) {
@@ -1005,6 +1014,43 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
     // If all of the operands are hoisted above the start point, then this
     // instruction can be too.
     inst->moveBefore(tensorStartPoint);
+    return true;
+  }
+
+  // Otherwise, we can't handle this instruction.
+  return false;
+}
+
+/// The specified instruction is using a value defined in the tensor program.
+/// Try to sink it below the end point of the program, since we prefer result
+/// values from the tensor program rather than send and receives.  This returns
+/// true if it successfully sinks the computation or if the value is already
+/// below the end point.
+static bool sinkValueAfterEndPoint(SILInstruction *inst,
+                                   SILInstruction *tensorEndPoint,
+                                   DominanceInfo &DI) {
+  // If this instruction already dominated by the end point, then we're good to
+  // go.  Don't move anything.
+  if (DI.dominates(tensorEndPoint, inst))
+    return true;
+
+  // In general, we need to check to see if we have a chain of side-effect free
+  // instructions whose ultimate results can all be sunk after the endpoint.
+  if (canMoveInstruction(inst)) {
+    for (auto result : inst->getResults())
+      for (auto use : result->getUses())
+        if (!sinkValueAfterEndPoint(use->getUser(), tensorEndPoint, DI))
+          return false;
+
+    // If all of the uses are sunk after the end point, then this
+    // instruction can be too.
+
+    // We can't insert after a terminator, but they shouldn't be end points
+    // anyway.
+    if (isa<TermInst>(tensorEndPoint)) return false;
+
+    // There is no "moveAfter" helper, so we do it the hard way.
+    inst->moveBefore(&*++SILBasicBlock::iterator(tensorEndPoint));
     return true;
   }
 
@@ -2429,7 +2475,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
         // If the end point dominates the out-of-model use, then we can
         // represent it with the return value of the tensor program.  Otherwise
         // it will turn into a send of data back to the host.
-        if (!DI.dominates(tensorEndPoint, user)) {
+        if (!sinkValueAfterEndPoint(user, tensorEndPoint, DI)) {
           hasAnyNonResultUse = true;
           break;
         }
