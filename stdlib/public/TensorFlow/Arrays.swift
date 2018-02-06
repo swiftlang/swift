@@ -376,8 +376,8 @@ public extension ShapedArray {
   }
 
   /// Allocate and initialize a tensor to a repeated value.
-  /// - parameter shape: tensor shape
-  /// - parameter repeating: repeated value
+  /// - Parameter shape: tensor shape
+  /// - Parameter repeating: repeated value
   init(shape: Shape, repeating repeatedValue: Unit) {
     let unitCount = shape.reduce(1, *)
     let buffer = TensorBuffer<Unit>.createUninitialized(count: unitCount)
@@ -406,7 +406,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
   }
 
   /// Access the element tensor specified by an index in the leading dimension.
-  /// - parameter index: index of the element tensor
+  /// - Parameter index: index of the element tensor
   public subscript(index: Int) -> Element {
     get {
       precondition(!isScalar,
@@ -435,7 +435,7 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
   }
 
   /// Access the subtensor specified by a contiguous range of indices.
-  /// - parameter bounds: contiguous range of indices
+  /// - Parameter bounds: contiguous range of indices
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
       precondition(!isScalar,
@@ -645,8 +645,8 @@ public extension ShapedArraySlice {
   }
 
   /// Allocate and initialize a tensor to a repeated value.
-  /// - parameter shape: tensor shape
-  /// - parameter repeating: repeated value
+  /// - Parameter shape: tensor shape
+  /// - Parameter repeating: repeated value
   init(shape: Shape, repeating repeatedValue: Unit) {
     self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
   }
@@ -723,7 +723,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   }
 
   /// Access the element tensor specified by an index in the leading dimension.
-  /// - parameter index: index of the element tensor
+  /// - Parameter index: index of the element tensor
   public subscript(index: Int) -> Element {
     get {
       precondition(!isScalar,
@@ -754,7 +754,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   }
 
   /// Access the subtensor specified by a contiguous range of indices.
-  /// - parameter bounds: contiguous range of indices
+  /// - Parameter bounds: contiguous range of indices
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
       precondition(!isScalar,

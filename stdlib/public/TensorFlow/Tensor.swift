@@ -90,6 +90,12 @@ func _TFTensorFromUnits<Unit>(_ units: [Unit], shape: [Int])
     })
 }
 
+@_versioned
+@_inlineable @inline(__always)
+func _TFMakeScalarTensor<Unit>(_ scalar: Unit) -> TensorHandle<Unit> {
+  return #tfop("tfc.scalarToTensor", "s:t", scalar)
+}
+
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_units_1d")
 func _TFTensorFromUnits1D<Unit>(_ units: [Unit]) -> TensorHandle<Unit> {
@@ -129,7 +135,7 @@ public extension Tensor {
   /// Initialize a tensor with a unit representing a scalar value.
   @_inlineable @inline(__always)
   init(_ value: Unit) {
-    self.init(#tfop("tfc.scalarToTensor", "s:t", value))
+    self.init(_TFMakeScalarTensor(value))
   }
 
   /// Initialize a tensor with an array representing a vector.
@@ -314,25 +320,33 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Unit : Numeric {
-  /// Zero initializer, takes a list of dimensions.
+  /// Returns a tensor with all elements set to zero.
+  ///
+  /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
   static func zeros(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 0)
   }
 
-  /// Zero initializer, takes variadic dimensions.
+  /// Returns a tensor with all elements set to zero.
+  ///
+  /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
   static func zeros(shape: Int...) -> Tensor {
     return zeros(shape: shape)
   }
 
-  /// Ones initializer, takes a list of dimensions.
+  /// Returns a tensor with all elements set to one.
+  ///
+  /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
   static func ones(shape: [Int]) -> Tensor {
     return Tensor(shape: shape, repeating: 1)
   }
 
-  /// Ones initializer, takes variadic dimensions.
+  /// Returns a tensor with all elements set to one.
+  ///
+  /// - Parameter shape: the dimensions of the tensor.
   @_inlineable @inline(__always)
   static func ones(shape: Int...) -> Tensor {
     return ones(shape: shape)
@@ -409,20 +423,31 @@ public extension AccelerableTensorUnit {
 }
 
 public extension Tensor {
+  /// Returns a rank-lifted Tensor with a leading dimension of 1.
   @_inlineable @inline(__always)
-  func rankLifted(by dimensionCount: Int) -> Tensor {
-    return Tensor(#tfop("ExpandDims", "tt:t", handle,
-                        Tensor<Int>(dimensionCount).handle, Tdim: Int.self))
+  func rankLifted() -> Tensor {
+    return shapePadded(atIndex: 0)
   }
 
-  /// Broadcast the specified Tensor to a rank >= its current size, filling in
-  /// the new dimensions with rank = 1.
+  /// Returns a shape-padded Tensor, inserting a dimension of 1 at a given
+  /// index.
+  @_inlineable @inline(__always)
+  func shapePadded(atIndex index: Int) -> Tensor {
+    return Tensor(#tfop("ExpandDims", "tt:t", handle,
+                        Tensor<Int>(index).handle, Tdim: Int.self))
+  }
+
+  /// Broadcast the specified Tensor to a rank greater than or equal to its
+  /// one, filling in the new dimensions with size 1.
+  // FIXME: this function is ambiguous about how dimensions are filled in. Is
+  // it the leading or the trailing dimensions that are filled with 1? Consider
+  // removing.
   @inline(never)
   func broadcast(toRank rank: Int) -> Tensor {
     fatalError("FIXME: implement broadcast")
   }
 
-  /// Broadcast self tensor to the same shape as the specified one.
+  /// Broadcast to the same shape as the specified Tensor.
   @inline(never) // make @_inlineable when implemented.
   func broadcast(to other: Tensor) -> Tensor {
     fatalError("FIXME: implement broadcast")
@@ -433,6 +458,26 @@ public extension Tensor {
   @_inlineable @inline(__always)
   func reshaped(_ newShape: [Int]) -> Tensor {
     return reshaped(Tensor<Int>(newShape))
+  }
+
+  /// Reshape to the specified Tensor representing a shape.
+  /// - Precondition: The number of units matches the new shape.
+  @_inlineable @inline(__always)
+  func reshaped(_ newShape: Tensor<Int>) -> Tensor {
+    return Tensor(#tfop("Reshape", "tt:t", handle, newShape.handle))
+  }
+
+  /// Remove dimensions of size 1 from the shape of a tensor.
+  @_inlineable @inline(__always)
+  func squeezed() -> Tensor {
+    return Tensor(#tfop("Squeeze", "t:t", handle))
+  }
+
+  /// Concatenates tensors along a dimension.
+  // TODO: improve description when implemented.
+  @inline(never) // make @_inlineable when implemented.
+  func concatenated(with other: Tensor) -> Tensor {
+    fatalError("FIXME: implement concatenated(with:)")
   }
 
   /// Reshape to scalar.
