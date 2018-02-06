@@ -66,7 +66,7 @@ public func lowerGraphCrash(x: Tensor<Int>) {
 
 // This was a prototype runtime test that crashed due to bb arg invalidation
 // problems.
-public func testStraightLineXORTraining() { // expected-note 5 {{value used here}}
+public func testStraightLineXORTraining() { // expected-note 4 {{value used here}}
   // Hyper-parameters
   let iterationCount = 1000
   let learningRate: Float = 0.2
@@ -89,7 +89,7 @@ public func testStraightLineXORTraining() { // expected-note 5 {{value used here
   for _ in 0..<iterationCount {
     let mmul1 = inputBatch ⊗ w1
     let l1 = mmul1 + b1
-    let o1 = sigmoid(l1) // expected-warning 2 {{implicitly copied}}
+    let o1 = sigmoid(l1)  // expected-warning {{value implicitly copied to the host}}
     let mmul2 = o1 ⊗ w2
     let l2 = mmul2 + b2
     let pred = sigmoid(l2) 

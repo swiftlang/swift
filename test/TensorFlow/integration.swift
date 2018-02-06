@@ -391,3 +391,13 @@ public func testEmptyUnitsArray() {
  CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int.Type, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
  CHECK:  builtin "__tfop_Add,tt:t"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
  */
+
+
+// Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
+public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
+  let y2 = y.toDevice()
+  let a = sigmoid(x.toDevice())
+  let b = sigmoid(y2)
+  return (a.toHost(), b.toHost())
+}
+
