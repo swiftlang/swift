@@ -293,7 +293,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
     llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -2120,7 +2119,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
-    llvm::capacity_in_bytes(ImplicitlyUnwrappedOptionalTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
@@ -3440,7 +3438,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
     return entry = new (C, arena) UnownedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
   case Ownership::Weak:
-    assert(T->getAnyOptionalObjectType() &&
+    assert(T->getOptionalObjectType() &&
            "object of weak storage type is not optional");
     return entry = new (C, arena)
                WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);
@@ -4033,7 +4031,8 @@ Type OptionalType::get(OptionalTypeKind which, Type valueType) {
   // OTK_None if we made code more convenient to write.
   case OTK_None: llvm_unreachable("building a non-optional type!");
   case OTK_Optional: return OptionalType::get(valueType);
-  case OTK_ImplicitlyUnwrappedOptional: return ImplicitlyUnwrappedOptionalType::get(valueType);
+  case OTK_ImplicitlyUnwrappedOptional:
+    llvm_unreachable("Should no longer have IUOs");
   }
   llvm_unreachable("bad optional type kind");
 }
@@ -4048,18 +4047,6 @@ OptionalType *OptionalType::get(Type base) {
   if (entry) return entry;
 
   return entry = new (C, arena) OptionalType(C, base, properties);
-}
-
-ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base) {
-  auto properties = base->getRecursiveProperties();
-  auto arena = getArena(properties);
-
-  const ASTContext &C = base->getASTContext();
-
-  auto *&entry = C.Impl.getArena(arena).ImplicitlyUnwrappedOptionalTypes[base];
-  if (entry) return entry;
-
-  return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,

@@ -979,7 +979,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
         auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
-        if (!fnTy->getResult()->getAnyOptionalObjectType())
+        if (!fnTy->getResult()->getOptionalObjectType())
           return false;
 
         // Check that the standard library hasn't added another overload of
@@ -987,11 +987,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
         auto inputTypes = inputTupleTy->getElementTypes();
         assert(inputTypes.size() == 2);
-        assert(inputTypes[0]->getAnyOptionalObjectType());
+        assert(inputTypes[0]->getOptionalObjectType());
         auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
         assert(autoclosure->isAutoClosure());
         auto secondParamTy = autoclosure->getResult();
-        assert(secondParamTy->getAnyOptionalObjectType());
+        assert(secondParamTy->getOptionalObjectType());
         (void)secondParamTy;
 
         return true;

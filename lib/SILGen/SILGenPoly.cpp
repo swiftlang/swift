@@ -378,18 +378,18 @@ ManagedValue Transform::transform(ManagedValue v,
     return v;
 
   OptionalTypeKind outputOTK, inputOTK;
-  CanType inputObjectType = inputSubstType.getAnyOptionalObjectType(inputOTK);
-  CanType outputObjectType = outputSubstType.getAnyOptionalObjectType(outputOTK);
+  CanType inputObjectType = inputSubstType.getOptionalObjectType(inputOTK);
+  CanType outputObjectType = outputSubstType.getOptionalObjectType(outputOTK);
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
   if (outputOTK != OTK_None && inputOTK == OTK_None) {
-    return SGF.emitInjectOptional(Loc, expectedTL, ctxt,
-                                  [&](SGFContext objectCtxt) {
-      return transform(v, inputOrigType, inputSubstType,
-                       outputOrigType.getAnyOptionalObjectType(),
-                       outputObjectType, objectCtxt);
-    });
+    return SGF.emitInjectOptional(
+        Loc, expectedTL, ctxt, [&](SGFContext objectCtxt) {
+          return transform(v, inputOrigType, inputSubstType,
+                           outputOrigType.getOptionalObjectType(),
+                           outputObjectType, objectCtxt);
+        });
   }
 
   // If the value is an optional, but the desired formal type isn't an
@@ -420,17 +420,12 @@ ManagedValue Transform::transform(ManagedValue v,
       return ManagedValue(result, v.getCleanup());
     }
 
-    auto transformOptionalPayload = [&](SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        ManagedValue input,
-                                        SILType loweredResultTy,
-                                        SGFContext context) -> ManagedValue {
-      return transform(input,
-                       inputOrigType.getAnyOptionalObjectType(),
-                       inputObjectType,
-                       outputOrigType.getAnyOptionalObjectType(),
-                       outputObjectType,
-                       context);
+    auto transformOptionalPayload =
+        [&](SILGenFunction &SGF, SILLocation loc, ManagedValue input,
+            SILType loweredResultTy, SGFContext context) -> ManagedValue {
+      return transform(input, inputOrigType.getOptionalObjectType(),
+                       inputObjectType, outputOrigType.getOptionalObjectType(),
+                       outputObjectType, context);
     };
 
     return SGF.emitOptionalToOptional(Loc, v, loweredResultTy,
@@ -930,9 +925,8 @@ namespace {
         }
 
         // Tuple types are subtypes of their optionals
-        if (auto outputObjectType =
-              outputSubstType.getAnyOptionalObjectType()) {
-          auto outputOrigObjectType = outputOrigType.getAnyOptionalObjectType();
+        if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
+          auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
 
           if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
             // The input is exploded and the output is an optional tuple.
@@ -1870,10 +1864,10 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
                          CanType outerSubstType,
                          PlanData &planData) {
   // The substituted types must match up in tuple-ness and arity.
-  assert(isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
-         (isa<TupleType>(innerSubstType) &&
-          (outerSubstType->isAny() ||
-           outerSubstType->getAnyOptionalObjectType())));
+  assert(
+      isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
+      (isa<TupleType>(innerSubstType) &&
+       (outerSubstType->isAny() || outerSubstType->getOptionalObjectType())));
   assert(!isa<TupleType>(outerSubstType) ||
          cast<TupleType>(innerSubstType)->getNumElements() ==
            cast<TupleType>(outerSubstType)->getNumElements());
@@ -2005,23 +1999,21 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
     // Figure out what kind of optional it is.
-    CanType outerSubstObjectType =
-      outerSubstType.getAnyOptionalObjectType();
+    CanType outerSubstObjectType = outerSubstType.getOptionalObjectType();
     if (outerSubstObjectType) {
       auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
 
       // Prepare the value slot in the optional value.
       SILType outerObjectType =
-        outerResultAddr->getType().getAnyOptionalObjectType();
+          outerResultAddr->getType().getOptionalObjectType();
       SILValue outerObjectResultAddr
         = SGF.B.createInitEnumDataAddr(Loc, outerResultAddr, someDecl,
                                        outerObjectType);
 
       // Emit into that address.
-      planTupleIntoIndirectResult(innerOrigType, innerSubstType,
-                                  outerOrigType.getAnyOptionalObjectType(),
-                                  outerSubstObjectType,
-                                  planData, outerObjectResultAddr);
+      planTupleIntoIndirectResult(
+          innerOrigType, innerSubstType, outerOrigType.getOptionalObjectType(),
+          outerSubstObjectType, planData, outerObjectResultAddr);
 
       // Add an operation to finish the enum initialization.
       addInjectOptionalIndirect(someDecl, outerResultAddr);
@@ -2104,21 +2096,19 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
   // If the outer type is not a tuple, it must be optional or we are under
   // opaque value mode
   if (!outerSubstTupleType) {
-    CanType outerSubstObjectType =
-      outerSubstType.getAnyOptionalObjectType();
+    CanType outerSubstObjectType = outerSubstType.getOptionalObjectType();
 
     if (outerSubstObjectType) {
       auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
       SILType outerObjectType =
-          SGF.getSILType(outerResult).getAnyOptionalObjectType();
+          SGF.getSILType(outerResult).getOptionalObjectType();
       SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
                                       outerResult.getConvention());
 
       // Plan to leave the tuple elements as a single direct outer result.
-      planTupleIntoDirectResult(innerOrigType, innerSubstType,
-                                outerOrigType.getAnyOptionalObjectType(),
-                                outerSubstObjectType, planData,
-                                outerObjectResult);
+      planTupleIntoDirectResult(
+          innerOrigType, innerSubstType, outerOrigType.getOptionalObjectType(),
+          outerSubstObjectType, planData, outerObjectResult);
 
       // Take that result and inject it into an optional.
       addInjectOptionalDirect(someDecl, outerResult);

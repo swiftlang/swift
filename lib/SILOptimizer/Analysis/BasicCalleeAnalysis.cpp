@@ -249,7 +249,7 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
   assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
          "A deallocation instruction expected");
   auto Ty = I->getOperand(0)->getType();
-  while (auto payloadTy = Ty.getAnyOptionalObjectType())
+  while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
   if (!Class || Class->hasClangNode() || !Class->hasDestructor())

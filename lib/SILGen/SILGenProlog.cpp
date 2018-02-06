@@ -144,7 +144,7 @@ public:
     // as a heap object. Escape analysis can eliminate this copy if it's
     // unneeded during optimization.
     CanType objectType = t;
-    if (auto theObjTy = t.getAnyOptionalObjectType())
+    if (auto theObjTy = t.getOptionalObjectType())
       objectType = theObjTy;
     if (functionArgs
         && isa<FunctionType>(objectType)

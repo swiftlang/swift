@@ -122,9 +122,9 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
 
     // Look through optional types.
     OptionalTypeKind optKind;
-    if (auto valueTy = t->getAnyOptionalObjectType(optKind)) {
+    if (auto valueTy = t->getOptionalObjectType(optKind)) {
       pattern = pattern.transformType([](CanType patternTy) {
-        return CanType(patternTy->getAnyOptionalObjectType());
+        return CanType(patternTy->getOptionalObjectType());
       });
       auto ty = getLoweredCBridgedType(pattern, valueTy, canBridgeBool, false);
       return ty ? OptionalType::get(optKind, ty) : ty;

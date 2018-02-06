@@ -3820,7 +3820,7 @@ void IRGenSILFunction::visitStoreUnownedInst(swift::StoreUnownedInst *i) {
 static bool hasReferenceSemantics(IRGenSILFunction &IGF,
                                   SILType silType) {
   auto operType = silType.getSwiftRValueType();
-  auto valueType = operType->getAnyOptionalObjectType();
+  auto valueType = operType->getOptionalObjectType();
   auto objType = valueType ? valueType : operType;
   return (objType->mayHaveSuperclass()
           || objType->isClassExistentialType()

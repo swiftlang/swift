@@ -2986,10 +2986,9 @@ public:
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  /// classifyAsOptionalType - Decide whether this declaration is one
-  /// of the library-intrinsic Optional<T> or ImplicitlyUnwrappedOptional<T> types.
-  OptionalTypeKind classifyAsOptionalType() const;
-  
+  /// Is this the decl for Optional<T>?
+  bool isOptionalDecl() const;
+
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {

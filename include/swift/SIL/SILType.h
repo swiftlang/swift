@@ -382,7 +382,7 @@ public:
   bool isBlockPointerCompatible() const {
     // Look through one level of optionality.
     SILType ty = *this;
-    if (auto optPayload = ty.getAnyOptionalObjectType()) {
+    if (auto optPayload = ty.getOptionalObjectType()) {
       ty = optPayload;
     }
       
@@ -481,7 +481,7 @@ public:
 
   /// Returns the lowered type for T if this type is Optional<T>;
   /// otherwise, return the null type.
-  SILType getAnyOptionalObjectType() const;
+  SILType getOptionalObjectType() const;
 
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.

@@ -448,7 +448,7 @@ private:
     if (clangTy->isPointerType()
         && clangTy->getPointeeType().isConstQualified()) {
       // Peek through optionals.
-      if (auto substObjTy = substTy.getAnyOptionalObjectType())
+      if (auto substObjTy = substTy.getOptionalObjectType())
         substTy = substObjTy;
 
       // Void pointers aren't usefully indirectable.
@@ -780,7 +780,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 
   // These conventions wrap the result type in a level of optionality.
   case ForeignErrorConvention::NilResult:
-    assert(!substFormalResultType->getAnyOptionalObjectType());
+    assert(!substFormalResultType->getOptionalObjectType());
     substFormalResultType =
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
@@ -2146,11 +2146,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
   bool derivedWasOptional = false;
-  if (auto object = derived.getAnyOptionalObjectType()) {
+  if (auto object = derived.getOptionalObjectType()) {
     derivedWasOptional = true;
     derived = object;
   }
-  if (auto object = base.getAnyOptionalObjectType()) {
+  if (auto object = base.getOptionalObjectType()) {
     base = object;
   }
 
@@ -2405,7 +2405,7 @@ public:
   /// Optionals need to have their object types substituted by these rules.
   CanType visitBoundGenericEnumType(CanBoundGenericEnumType origType) {
     // Only use a special rule if it's Optional.
-    if (!origType->getDecl()->classifyAsOptionalType()) {
+    if (!origType->getDecl()->isOptionalDecl()) {
       return visitType(origType);
     }
 
@@ -2778,8 +2778,8 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
       continue;
 
     // Optional and IUO are interchangeable if their elements are.
-    auto aObject = aa.getAnyOptionalObjectType();
-    auto bObject = bb.getAnyOptionalObjectType();
+    auto aObject = aa.getOptionalObjectType();
+    auto bObject = bb.getOptionalObjectType();
     if (aObject && bObject && areABICompatibleParamsOrReturns(aObject, bObject))
       continue;
     // Optional objects are ABI-interchangeable with non-optionals;

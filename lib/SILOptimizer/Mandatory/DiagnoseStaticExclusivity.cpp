@@ -919,7 +919,7 @@ static void checkForViolationWithCall(
 static CanSILFunctionType getSILFunctionTypeForValue(SILValue arg) {
   SILType argTy = arg->getType();
   // Handle `Optional<@convention(block) @noescape (_)->(_)>`
-  if (auto optionalObjTy = argTy.getAnyOptionalObjectType())
+  if (auto optionalObjTy = argTy.getOptionalObjectType())
     argTy = optionalObjTy;
 
   return argTy.getAs<SILFunctionType>();

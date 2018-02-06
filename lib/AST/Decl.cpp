@@ -1240,7 +1240,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
       if (const auto *varDecl = typedPattern->getSingleVar())
         // Lazy storage is never user accessible.
         if (!varDecl->isUserAccessible())
-          if (typedPattern->getTypeLoc().getType()->getAnyOptionalObjectType())
+          if (typedPattern->getTypeLoc().getType()->getOptionalObjectType())
             return true;
     }
   }
@@ -1741,10 +1741,10 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     if (isInitializer) {
       if (auto inOutTy = type->getAs<InOutType>()) {
         if (auto objectType =
-                inOutTy->getObjectType()->getAnyOptionalObjectType()) {
+                inOutTy->getObjectType()->getOptionalObjectType()) {
           type = InOutType::get(objectType);
         }
-      } else if (auto objectType = type->getAnyOptionalObjectType()) {
+      } else if (auto objectType = type->getOptionalObjectType()) {
         type = objectType;
       }
     }
@@ -2478,13 +2478,8 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension = extension;
 }
 
-OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
-  const ASTContext &ctx = getASTContext();
-  if (this == ctx.getOptionalDecl()) {
-    return OTK_Optional;
-  } else {
-    return OTK_None;
-  }
+bool NominalTypeDecl::isOptionalDecl() const {
+  return this == getASTContext().getOptionalDecl();
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -3273,7 +3268,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // Optionals preserve variance.
-  if (auto optType = type->getAnyOptionalObjectType()) {
+  if (auto optType = type->getOptionalObjectType()) {
     return findProtocolSelfReferences(proto, optType,
                                       skipAssocTypes);
   }
@@ -4559,7 +4554,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
 
   // If the index type is an object type in Objective-C, we have a
   // keyed subscript.
-  if (Type objectTy = indexTy->getAnyOptionalObjectType())
+  if (Type objectTy = indexTy->getOptionalObjectType())
     indexTy = objectTy;
 
   return ObjCSubscriptKind::Keyed;

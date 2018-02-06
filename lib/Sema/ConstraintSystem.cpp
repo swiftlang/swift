@@ -199,7 +199,7 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
   type = getFixedTypeRecursive(type, /*wantRValue=*/false);
-  type = type->lookThroughAllAnyOptionalTypes();
+  type = type->lookThroughAllOptionalTypes();
 
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
@@ -1298,10 +1298,8 @@ ConstraintSystem::getTypeOfMemberReference(
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if ((isa<FuncDecl>(func) &&
-           cast<FuncDecl>(func)->hasDynamicSelf()) ||
-          (isa<ConstructorDecl>(func) &&
-           !baseObjTy->getAnyOptionalObjectType())) {
+      if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
+          (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
         openedType = openedType->replaceCovariantResultType(
           baseObjTy,
             func->getNumParameterLists());
@@ -1618,8 +1616,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
           auto resultTy = fnTy->getResult();
           // We expect the element type to be a double-optional.
-          auto optTy = resultTy->getAnyOptionalObjectType();
-          assert(optTy->getAnyOptionalObjectType());
+          auto optTy = resultTy->getOptionalObjectType();
+          assert(optTy->getOptionalObjectType());
 
           // For our original type T -> U?? we will generate:
           // A disjunction V = { U?, U }

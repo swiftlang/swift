@@ -1670,7 +1670,7 @@ private:
     bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
     for (auto expectedType : ExpectedTypes) {
       if (expectedType &&
-          expectedType->lookThroughAllAnyOptionalTypes()
+          expectedType->lookThroughAllOptionalTypes()
               ->is<AnyFunctionType>() &&
           calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
                                        /*UseFuncResultType=*/false) >=
@@ -1945,8 +1945,7 @@ public:
       suffix = "!";
     }
 
-    Type ObjectType =
-        T->getReferenceStorageReferent()->getAnyOptionalObjectType();
+    Type ObjectType = T->getReferenceStorageReferent()->getOptionalObjectType();
 
     if (ObjectType->isVoid())
       Builder.addTypeAnnotation("Void" + suffix);
@@ -2018,9 +2017,9 @@ public:
         // For optional protocol requirements and dynamic dispatch,
         // strip off optionality from the base type, but only if
         // we're not actually completing a member of Optional.
-        if (!ContextTy->getAnyOptionalObjectType() &&
-            MaybeNominalType->getAnyOptionalObjectType())
-          MaybeNominalType = MaybeNominalType->getAnyOptionalObjectType();
+        if (!ContextTy->getOptionalObjectType() &&
+            MaybeNominalType->getOptionalObjectType())
+          MaybeNominalType = MaybeNominalType->getOptionalObjectType();
 
         // For dynamic lookup don't substitute in the base type.
         if (MaybeNominalType->isAnyObject())
@@ -2548,7 +2547,7 @@ public:
           // As we did with parameters in addParamPatternFromFunction,
           // for regular methods we'll print '!' after implicitly
           // unwrapped optional results.
-          auto ObjectType = ResultType->getAnyOptionalObjectType();
+          auto ObjectType = ResultType->getOptionalObjectType();
           OS << ObjectType->getStringAsComponent();
           OS << "!";
         } else {
@@ -3162,7 +3161,7 @@ public:
     // FIXME: We don't always pass down whether a type is from an
     // unforced IUO.
     if (isIUO) {
-      if (Type Unwrapped = ExprType->getAnyOptionalObjectType()) {
+      if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                  TypeResolver.get(), IncludeInstanceMembers);
       } else {
@@ -3434,7 +3433,7 @@ public:
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
                                      expr)) {
 
-      if (!LHS->getType()->getRValueType()->getAnyOptionalObjectType()) {
+      if (!LHS->getType()->getRValueType()->getOptionalObjectType()) {
         // Don't complete optional operators on non-optional types.
         // FIXME: can we get the type-checker to disallow these for us?
         if (op->getName().str() == "??")
@@ -3572,7 +3571,7 @@ public:
         // Convert through optional types unless we're looking for a protocol
         // that Optional itself conforms to.
         if (kind != CodeCompletionLiteralKind::NilLiteral) {
-          if (auto optionalObjT = T->getAnyOptionalObjectType()) {
+          if (auto optionalObjT = T->getOptionalObjectType()) {
             T = optionalObjT;
             typeRelation = CodeCompletionResult::Convertible;
           }
@@ -3747,7 +3746,7 @@ public:
       bool addedSelector = false;
       bool addedKeyPath = false;
       for (auto T : ExpectedTypes) {
-        T = T->lookThroughAllAnyOptionalTypes();
+        T = T->lookThroughAllOptionalTypes();
         if (auto structDecl = T->getStructOrBoundGenericStruct()) {
           if (!addedSelector &&
               structDecl->getName() == Ctx.Id_Selector &&

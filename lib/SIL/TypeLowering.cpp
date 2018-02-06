@@ -465,8 +465,8 @@ namespace {
       // We have to look through optionals here without grabbing the
       // type lowering because the way that optionals are reabstracted
       // can trip recursion checks if we try to build a lowered type.
-      if (D->classifyAsOptionalType()) {
-        return visit(type.getAnyOptionalObjectType());
+      if (D->isOptionalDecl()) {
+        return visit(type.getOptionalObjectType());
       }
 
       // Consult the type lowering.
@@ -1469,11 +1469,11 @@ static CanType getLoweredOptionalType(TypeConverter &tc,
                                       CanType substType,
                                       CanType substObjectType,
                                       OptionalTypeKind optKind) {
-  assert(substType.getAnyOptionalObjectType() == substObjectType);
+  assert(substType.getOptionalObjectType() == substObjectType);
 
   CanType loweredObjectType =
-    tc.getLoweredType(origType.getAnyOptionalObjectType(), substObjectType)
-      .getSwiftRValueType();
+      tc.getLoweredType(origType.getOptionalObjectType(), substObjectType)
+          .getSwiftRValueType();
 
   // If the object type didn't change, we don't have to rebuild anything.
   if (loweredObjectType == substObjectType && optKind == OTK_Optional) {
@@ -1652,7 +1652,7 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
 
   // Lower the object type of optional types.
   OptionalTypeKind optKind;
-  if (auto substObjectType = substType.getAnyOptionalObjectType(optKind)) {
+  if (auto substObjectType = substType.getOptionalObjectType(optKind)) {
     return getLoweredOptionalType(*this, origType, substType,
                                   substObjectType, optKind);
   }
@@ -2253,11 +2253,11 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
   // Unwrap optionals, but remember that we did.
   bool type1WasOptional = false;
   bool type2WasOptional = false;
-  if (auto object = type1.getAnyOptionalObjectType()) {
+  if (auto object = type1.getOptionalObjectType()) {
     type1WasOptional = true;
     type1 = object;
   }
-  if (auto object = type2.getAnyOptionalObjectType()) {
+  if (auto object = type2.getOptionalObjectType()) {
     type2WasOptional = true;
     type2 = object;
   }

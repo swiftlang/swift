@@ -3843,10 +3843,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::ImplicitlyUnwrappedOptional:
-    llvm_unreachable("Should not have IUOs.");
-    break;
-
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
