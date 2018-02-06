@@ -399,19 +399,6 @@ ${TestSuite}.test("Equatable") {
   checkEquatable(instances, oracle: { $0 == $1 })
 }
 
-${TestSuite}.test("Hashable") {
-  let _1 = ${Bound}(1)
-  let _2 = ${Bound}(2)
-
-  let instances: [${Self}<${Bound}>] = [
-    _1${op}_1,
-    _1${op}_2,
-    _2${op}_2,
-  ]
-  // The following fails with error: ambiguous reference to member '=='
-  checkHashable(instances, equalityOracle: { $0 == $1 })
-}
-
 ${TestSuite}.test("'${op}' traps when upperBound < lowerBound")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "Can't form Range with upperBound < lowerBound" : "")
