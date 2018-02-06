@@ -53,12 +53,14 @@ public struct Tensor<Unit : AccelerableTensorUnit> {
 
 @_versioned @inline(never)
 @_silgen_name("__tf_send")
+@effects(readnone)
 func _TFSend<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
   return handle
 }
 
 @_versioned @inline(never)
 @_silgen_name("__tf_receive")
+@effects(readnone)
 func _TFReceive<Unit>(_ handle: TensorHandle<Unit>) -> TensorHandle<Unit> {
   return handle
 }
