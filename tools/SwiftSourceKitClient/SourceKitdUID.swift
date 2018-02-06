@@ -45,6 +45,7 @@ extension SourceKitdUID {
   public static let key_name = SourceKitdUID(string: "key.name")
   public static let key_enable_syntax_tree = SourceKitdUID(string: "key.enablesyntaxtree")
   public static let key_serialized_syntax_tree = SourceKitdUID(string: "key.serialized_syntax_tree")
+  public static let key_sourcefile = SourceKitdUID(string: "key.sourcefile")
   public static let compilerCrashedNotification = SourceKitdUID(string: "notification.toolchain-compiler-crashed")
   public static let source_request_editor_open = SourceKitdUID(string: "source.request.editor.open")
   public static let source_notification_editor_documentupdate = SourceKitdUID(string: "source.notification.editor.documentupdate")
