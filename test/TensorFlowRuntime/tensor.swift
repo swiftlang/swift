@@ -241,9 +241,8 @@ TensorTests.testCPUAndGPU("ReshapeScalar") {
   expectEqual([], z.shape)
 }
 
-#if false
-@inline(never)
-func testStraightLineXORTraining() {
+#if false // FIXME: Fix sigmoid issue.
+TensorTests.testCPUAndGPU("StraightLineXORTraining") {
   // Hyper-parameters
   let iterationCount = 1000
   let learningRate: Float = 0.2
@@ -251,14 +250,18 @@ func testStraightLineXORTraining() {
   // Parameters
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
   var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
-  var b1 = Tensor<Float>.zeros(shape: [1, 4])
-  var b2 = Tensor<Float>.zeros(shape: [1, 1])
+  var b1 = Tensor<Float>(shape: [1, 4], repeating: 0.0)
+  var b2 = Tensor<Float>(shape: [1, 1], repeating: 0.0)
 
   // Training data
   let inputBatch = Tensor<Float>(
-    [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-  ).toDevice()
-  let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
+    shape: [4, 2],
+    units: [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+  )
+  let outputBatch = Tensor<Float>(
+    shape: [4, 1],
+    units: [0.0, 1.0, 1.0, 0.0]
+  )
 
   // Training loop
   for i in 0..<iterationCount {
@@ -276,7 +279,6 @@ func testStraightLineXORTraining() {
     // Loss
     let sub = outputBatch - pred
     let sqr = sub * sub
-    let mean = sqr.mean()
 
     // Gradient
     let dSqr = 1 / Tensor<Float>(pred.unitCountTensor)
@@ -299,8 +301,6 @@ func testStraightLineXORTraining() {
     b2 -= (dB2 * learningRate)
   }
 }
-TensorTests.testCPUAndGPU("StraightLineXORTraining",
-                          testStraightLineXORTraining)
 #endif
 
 // FIXME: Partitioner unreachable: Unmapped value while cloning?
@@ -360,7 +360,6 @@ func testXORClassifierTraining() {
         let
           sub = expected - pred,
           sqr = pow(sub, 2)
-          // mean = sqr.mean()   <- unused.
 
         // Gradient
         let
