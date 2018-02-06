@@ -46,14 +46,14 @@ func expectPointwiseNearlyEqual<T, C1, C2>(
 }
 
 RankedTensorTests.testCPUAndGPU("Initializers") {
-  let vector = Tensor1D([1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
-  expectEqual(vector.units, [1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
+  let x = Tensor1D([1.0, 2.0, 3.0, 2.0, 4.0, 6.0])
+  expectEqual([1.0, 2.0, 3.0, 2.0, 4.0, 6.0], x.units)
 }
 
 RankedTensorTests.testCPUAndGPU("FactoryInitializers") {
   let x = Tensor2D<Float>.ones(shape: [1, 10])
-  // expectEqual(x.shape, (1, 10))
-  expectEqual(x.units, Array(repeating: 1, count: 10))
+  expectEqual([1, 10], x.shape)
+  expectEqual(Array(repeating: 1, count: 10), x.units)
 }
 
 RankedTensorTests.testCPUAndGPU("DataTypeCast") {
@@ -62,27 +62,26 @@ RankedTensorTests.testCPUAndGPU("DataTypeCast") {
   let floats = Tensor2D<Float>(x)
   let i8s = Tensor2D<Int8>(floats)
   /// TODO(danielzheng): compare `.array` instead after it is implemented.
-  // expectEqual(ints.shape, (5, 5))
-  // expectEqual(floats.shape, (5, 5))
-  // expectEqual(i8s.shape, (5, 5))
-  expectEqual(ints.units, Array(repeating: 1, count: 25))
-  expectEqual(floats.units, Array(repeating: 1, count: 25))
-  expectEqual(i8s.units, Array(repeating: 1, count: 25))
+  // expectEqual([5, 5], ints.shape)
+  // expectEqual([5, 5], floats.shape)
+  // expectEqual([5, 5], i8s.shape)
+  expectEqual(Array(repeating: 1, count: 25), ints.units)
+  expectEqual(Array(repeating: 1, count: 25), floats.units)
+  expectEqual(Array(repeating: 1, count: 25), i8s.units)
 }
 
 RankedTensorTests.testCPUAndGPU("Reduction") {
   let x = Tensor2D<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   let sum = x.sum(alongAxis: 0)
-  // expectEqual(sum.shape, 5)
-  expectEqual(sum.units, [2, 4, 6, 8, 10])
+  expectEqual([5], sum.shape)
+  expectEqual([2, 4, 6, 8, 10], sum.units)
 }
 
 RankedTensorTests.testCPUAndGPU("SimpleMath") {
   let x = Tensor1D<Float>([1.2, 1.2])
   let y = tanh(x)
-  // expectEqual(y.shape, 2)
-  let units = y.units
-  expectPointwiseNearlyEqual(units, [0.833655, 0.833655], byError: 0.0001)
+  expectEqual([2], y.shape)
+  expectPointwiseNearlyEqual([0.833655, 0.833655], y.units, byError: 0.0001)
 }
 
 #if false
@@ -105,8 +104,8 @@ RankedTensorTests.testCPUAndGPU("3Adds") {
   let c = Tensor1D([3])
   let o = a + b + c
 
-  // expectEqual(o.shape, 1)
-  expectEqual(o.units, [6])
+  expectEqual([1], o.shape)
+  expectEqual([6], o.units)
 }
 
 RankedTensorTests.testCPUAndGPU("testMultiOpMath") {
@@ -116,28 +115,25 @@ RankedTensorTests.testCPUAndGPU("testMultiOpMath") {
   let squared = sum * sum
   let squareRooted = sqrt(squared)
 
-  // expectEqual(sum.shape, 2)
-  // expectEqual(squared.shape, 2)
-  // expectEqual(expsqrt.shape, 2)
-  let sumUnits = sum.units
-  let squaredUnits = squared.units
-  let squareRootedUnits = squareRooted.units
-  expectPointwiseNearlyEqual(sumUnits, [3.6, 3.6])
-  expectPointwiseNearlyEqual(squaredUnits, [12.96, 12.96])
-  expectPointwiseNearlyEqual(squareRootedUnits, [3.6, 3.6])
+  // expectEqual([2], sum.shape)
+  // expectEqual([2], squared.shape)
+  // expectEqual([2], squareRooted.shape)
+  expectPointwiseNearlyEqual([3.6, 3.6], sum.units)
+  expectPointwiseNearlyEqual([12.96, 12.96], squared.units)
+  expectPointwiseNearlyEqual([3.6, 3.6], squareRooted.units)
 }
 
 RankedTensorTests.testCPUAndGPU("testXWPlusB") {
-  // Shape: 4
-  let x = Tensor1D([1.0, 2.0, 2.0, 1.0])
-  // Shape: 2 x 4
+  // Shape: 1 x 4
+  let x = Tensor2D([[1.0, 2.0, 2.0, 1.0]])
+  // Shape: 4 x 2
   let w = Tensor2D([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
   // Shape: 2
   let b = Tensor1D([0.5, 0.5])
   // Do xW+b!
-  // TODO: fix `transposed()`/`transposed(withPermutations:)`
-  // let result = x.rankLifted() ⊗ w.transposed() + b.rankLifted()
-  // expectPointwiseNearlyEqual(result.units, [12.5, 6.5])
+  let result = x ⊗ w + b.rankLifted()
+  expectEqual([1, 2], result.shape)
+  expectPointwiseNearlyEqual([12.5, 6.5], result.units)
 }
 
 // FIXME: The While op doesn't work on the CPU.
@@ -145,17 +141,15 @@ RankedTensorTests.testGPU("simpleCounterLoop") {
   let maxCount = 100
   var a = Tensor1D<Int>(0)
   let b = Tensor1D<Int>(1)
+  var count = 0
 
   a -= b
-
-  var count = 0
   while count < maxCount {
     a += b
     count += 1
   }
   a -= b
-  expectEqual(a.units, [8])
-  expectEqual(a.units, [8])
+  expectEqual([8], a.units)
 }
 
 @inline(never)
@@ -180,10 +174,10 @@ func testXORInference() {
     let y = tanh(o1 ⊗ w2 + b2)
     return y.units[0]
   }
-  expectNearlyEqual(xor(0.0, 0.0), 0.0, byError: 0.1)
-  expectNearlyEqual(xor(0.0, 1.0), 1.0, byError: 0.1)
-  expectNearlyEqual(xor(1.0, 0.0), 1.0, byError: 0.1)
-  expectNearlyEqual(xor(1.0, 1.0), 0.0, byError: 0.1)
+  expectNearlyEqual(0.0, xor(0.0, 0.0), byError: 0.1)
+  expectNearlyEqual(1.0, xor(0.0, 1.0), byError: 0.1)
+  expectNearlyEqual(1.0, xor(1.0, 0.0), byError: 0.1)
+  expectNearlyEqual(0.0, xor(1.0, 1.0), byError: 0.1)
 }
 RankedTensorTests.testCPUAndGPU("XORInference", testXORInference)
 
