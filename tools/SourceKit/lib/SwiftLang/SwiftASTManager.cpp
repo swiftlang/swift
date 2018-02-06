@@ -21,6 +21,7 @@
 #include "SourceKit/Support/Tracing.h"
 
 #include "swift/Basic/Cache.h"
+#include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Strings.h"
@@ -370,49 +371,6 @@ SwiftASTManager::getMemoryBuffer(StringRef Filename, std::string &Error) {
   return Impl.getMemoryBuffer(Filename, Error);
 }
 
-static void setModuleName(CompilerInvocation &Invocation) {
-  if (!Invocation.getModuleName().empty())
-    return;
-
-  StringRef Filename = Invocation.getOutputFilename();
-  if (Filename.empty()) {
-    if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-      Invocation.setModuleName("__main__");
-      return;
-    }
-    Filename = Invocation.getFrontendOptions()
-                   .InputsAndOutputs.getFilenameOfFirstInput();
-  }
-  Filename = llvm::sys::path::filename(Filename);
-  StringRef ModuleName = llvm::sys::path::stem(Filename);
-  if (ModuleName.empty() || !Lexer::isIdentifier(ModuleName)) {
-    Invocation.setModuleName("__main__");
-    return;
-  }
-  Invocation.setModuleName(ModuleName);
-}
-
-static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
-                                 SmallVectorImpl<const char *> &NewArgs) {
-  for (const char *CArg : Args) {
-    StringRef Arg = CArg;
-    if (Arg.startswith("-j"))
-      continue;
-    if (Arg == "-c")
-      continue;
-    if (Arg == "-v")
-      continue;
-    if (Arg == "-Xfrontend")
-      continue;
-    if (Arg == "-embed-bitcode")
-      continue;
-    if (Arg == "-enable-bridging-pch" ||
-        Arg == "-disable-bridging-pch")
-      continue;
-    NewArgs.push_back(CArg);
-  }
-}
-
 static FrontendInputsAndOutputs
 convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
   FrontendInputsAndOutputs inputsAndOutputs;
@@ -456,19 +414,20 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> OrigArgs,
+                                             ArrayRef<const char *> Args,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
-  SmallVector<const char *, 16> Args;
-  sanitizeCompilerArgs(OrigArgs, Args);
-
-  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
-  if (Invocation.parseArgs(Args, Diags)) {
+  if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
+    Invocation = *driverInvocation;
+  } else {
     // FIXME: Get the actual diagnostic.
     Error = "error when parsing the compiler arguments";
     return true;
   }
+
+  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
+
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
@@ -479,7 +438,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
 
-  setModuleName(Invocation);
+  assert(!Invocation.getModuleName().empty());
   Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
@@ -496,6 +455,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // Disable the index-store functionality for the sourcekitd requests.
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
+
+  // Force the action type to be -typecheck. This affects importing the
+  // SwiftONoneSupport module.
+  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
 
   return false;
 }
@@ -517,6 +480,27 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
       Error = ErrOS.str();
     return true;
   }
+  return false;
+}
+
+bool SwiftASTManager::initCompilerInvocationNoInputs(
+    swift::CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    swift::DiagnosticEngine &Diags, std::string &Error, bool AllowInputs) {
+
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  // Use stdin as a .swift input to satisfy the driver.
+  Args.push_back("-");
+  if (initCompilerInvocation(Invocation, Args, Diags, "", Error))
+    return true;
+
+  if (!AllowInputs &&
+      Invocation.getFrontendOptions().InputsAndOutputs.inputCount() > 1) {
+    Error = "unexpected input in compiler arguments";
+    return true;
+  }
+
+  // Clear the inputs.
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   return false;
 }
 

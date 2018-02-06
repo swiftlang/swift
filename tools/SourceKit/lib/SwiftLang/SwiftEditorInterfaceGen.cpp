@@ -700,8 +700,8 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+                                                     CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -814,8 +814,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager().initCompilerInvocation(Invocation, SwiftArgs, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, SwiftArgs,
+                                                     CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
