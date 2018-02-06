@@ -102,7 +102,9 @@ extension _StringObject {
   internal
   init(taggedRawBits: _RawBitPattern) {
 #if arch(i386) || arch(arm)
-    self.init(Builtin.reinterpretCast(taggedRawBits), taggedRawBits &>> 32)
+    self.init(
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: taggedRawBits)),
+      UInt(truncatingIfNeeded: taggedRawBits &>> 32))
 #else
     self.init(_bridgeObject(fromTagged: taggedRawBits))
     _sanityCheck(self.isValue)
@@ -117,7 +119,8 @@ extension _StringObject {
   init(nonTaggedRawBits: _RawBitPattern) {
 #if arch(i386) || arch(arm)
     self.init(
-      Builtin.reinterpretCast(nonTaggedRawBits), nonTaggedRawBits &>> 32)
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: nonTaggedRawBits)),
+      UInt(truncatingIfNeeded: nonTaggedRawBits &>> 32))
 #else
     self.init(Builtin.reinterpretCast(nonTaggedRawBits))
     _sanityCheck(!self.isValue)
@@ -136,7 +139,8 @@ extension _StringObject {
   init(noReallyHereAreTheRawBits bits: _RawBitPattern) {
 #if arch(i386) || arch(arm)
     self.init(
-      Builtin.reinterpretCast(bits), bits &>> 32)
+      Builtin.reinterpretCast(UInt(truncatingIfNeeded: bits)),
+      UInt(truncatingIfNeeded: bits &>> 32))
 #else
     self.init(Builtin.reinterpretCast(bits))
 #endif
