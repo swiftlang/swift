@@ -525,6 +525,9 @@ private:
   /// Lookup dependent member types.
   LookupDependentMemberFn lookupDependentMember;
 
+  /// Ownership information related to the metadata we are trying to lookup.
+  TypeOwnership Ownership;
+
 public:
   DecodedMetadataBuilder(Demangler &demangler,
                          SubstGenericParameterFn substGenericParameter
@@ -805,32 +808,34 @@ public:
     return BuiltType();
   }
 
-  BuiltType createUnownedStorageType(BuiltType base) const {
-    // FIXME: Implement.
-    return BuiltType();
+  BuiltType createUnownedStorageType(BuiltType base) {
+    Ownership.setUnowned();
+    return base;
   }
 
-  BuiltType createUnmanagedStorageType(BuiltType base) const {
-    // FIXME: Implement.
-    return BuiltType();
+  BuiltType createUnmanagedStorageType(BuiltType base) {
+    Ownership.setUnmanaged();
+    return base;
   }
 
-  BuiltType createWeakStorageType(BuiltType base) const {
-    // FIXME: Implement.
-    return BuiltType();
+  BuiltType createWeakStorageType(BuiltType base) {
+    Ownership.setWeak();
+    return base;
   }
 
   BuiltType createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
     return BuiltType();
   }
+
+  TypeOwnership getOwnership() const { return Ownership; }
 };
 
 }
 
-const Metadata *swift::_getTypeByMangledName(
-                          StringRef typeName,
-                          SubstGenericParameterFn substGenericParam) {
+TypeInfo
+swift::_getTypeByMangledName(StringRef typeName,
+                             SubstGenericParameterFn substGenericParam) {
 
   Demangler demangler;
   NodePointer node;
@@ -852,7 +857,8 @@ const Metadata *swift::_getTypeByMangledName(
   } else {
     // Demangle the type name.
     node = demangler.demangleType(typeName);
-    if (!node) return nullptr;
+    if (!node)
+      return TypeInfo();
   }
 
   DecodedMetadataBuilder builder(demangler, substGenericParam,
@@ -873,7 +879,8 @@ const Metadata *swift::_getTypeByMangledName(
                 (base, witnessTable);
     });
 
-  return Demangle::decodeMangledType(builder, node);
+  auto type = Demangle::decodeMangledType(builder, node);
+  return {type, builder.getOwnership()};
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
