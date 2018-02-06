@@ -850,27 +850,25 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Parse)
     return Instance.getASTContext().hadError();
 
-  if (observer) {
+  if (observer)
     observer->performedSemanticAnalysis(Instance);
-  }
 
-  if (Stats) {
+  if (Stats)
     countStatsPostSema(*Stats, Instance);
-  }
 
-  FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
-  if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
-    debugFailWithAssertion();
-  else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
-    debugFailWithCrash();
+  {
+    FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
+    if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
+      debugFailWithAssertion();
+    else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
+      debugFailWithCrash();
+  }
 
   ASTContext &Context = Instance.getASTContext();
 
   verifyGenericSignaturesIfNeeded(Invocation, Context);
 
-  if (Invocation.getMigratorOptions().shouldRunMigrator()) {
-    migrator::updateCodeAndEmitRemap(&Instance, Invocation);
-  }
+  (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance, Invocation);
 
   if (Action == FrontendOptions::ActionType::REPL) {
     runREPL(Instance, ProcessCmdLine(Args.begin(), Args.end()),
@@ -913,6 +911,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
+
     return emitIndexDataIfNeeded(Instance.getPrimarySourceFile(), Invocation,
                                  Instance) ||
            Context.hadError();
@@ -1037,8 +1036,8 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
-static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
-                         ASTContext &Context, ModuleOrSourceFile MSF) {
+static bool serializeSIBIfNeeded(FrontendOptions &opts, SILModule *SM,
+                                 ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath = opts.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
 
@@ -1046,6 +1045,7 @@ static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
   serializationOpts.OutputPath = moduleOutputPath.c_str();
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
+
   serialize(MSF, serializationOpts, SM);
   return Context.hadError();
 }
@@ -1166,12 +1166,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  if (observer) {
+  if (observer)
     observer->performedSILGeneration(*SM);
-  }
-  if (Stats) {
+
+  if (Stats)
     countStatsPostSILGen(*Stats, *SM);
-  }
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
@@ -1181,8 +1180,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                 Instance.getASTContext(), MSF);
+    serializeSIBIfNeeded(Invocation.getFrontendOptions(), SM.get(),
+                         Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1222,22 +1221,18 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   performSILOptimizations(Invocation, SM.get());
 
-  if (observer) {
+  if (observer)
     observer->performedSILOptimization(*SM);
-  }
-  if (Stats) {
+
+  if (Stats)
     countStatsPostSILOpt(*Stats, *SM);
-  }
 
   {
     SharedTimer timer("SIL verification, post-optimization");
     SM->verify();
   }
 
-  // Gather instruction counts if we are asked to do so.
-  if (SM->getOptions().PrintInstCounts) {
-    performSILInstCount(&*SM);
-  }
+  performSILInstCountIfNeeded(&*SM);
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
@@ -1247,8 +1242,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
-                        Instance.getASTContext(), MSF);
+    return serializeSIBIfNeeded(Invocation.getFrontendOptions(), SM.get(),
+                                Instance.getASTContext(), MSF);
 
   const bool haveModulePath =
       !opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty();
@@ -1280,7 +1275,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (Context.hadError())
     return true;
 
-  // Convert SIL to a lowered form suitable for IRGen.
   runSILLoweringPasses(*SM);
 
   // TODO: remove once the frontend understands what action it should perform
@@ -1307,9 +1301,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // If the AST Context has no errors but no IRModule is available,
   // parallelIRGen happened correctly, since parallel IRGen produces multiple
   // modules.
-  if (!IRModule) {
+  if (!IRModule)
     return HadError;
-  }
 
   if (validateTBDIfNeeded(Invocation, MSF, astGuaranteedToCorrespondToSIL,
                           *IRModule))
