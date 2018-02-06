@@ -755,6 +755,25 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   return hadError;
 }
 
+/// Request nominal layout for any types that could be sources of typemetadata
+/// or conformances.
+void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
+    ParameterList *PL) {
+  for (auto param : *PL) {
+    if (!param->hasType())
+      continue;
+
+    // Generic types are sources for typemetadata and conformances. If a
+    // parameter is of dependent type then the body of a function with said
+    // parameter could potentially require the generic type's layout to
+    // recover them.
+    if (auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
+            param->getType()->getAnyGeneric())) {
+      requestNominalLayout(nominalDecl);
+    }
+  }
+}
+
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
                                          TypeResolutionOptions options,
