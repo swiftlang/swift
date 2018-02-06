@@ -5,7 +5,7 @@
 func f2(
   FOO: Int,
   swift: Int, _compiler_version: Int,
-  os: Int, arch: Int, _endian: Int, _native_word_size: Int, _runtime: Int,
+  os: Int, arch: Int, _endian: Int, _pointer_bit_width: Int, _runtime: Int,
   targetEnvironment: Int,
   arm: Int, i386: Int, macOS: Int, OSX: Int, Linux: Int,
   big: Int, little: Int,
@@ -21,8 +21,8 @@ func f2(
   _ = arch + i386 + arm
 #elseif _endian(big) && _endian(little)
   _ = _endian + big + little
-#elseif _native_word_size(32) && _native_word_size(64)
-  _ = _native_word_size
+#elseif _pointer_bit_width(32) && _pointer_bit_width(64)
+  _ = _pointer_bit_width
 #elseif _runtime(_ObjC) && _runtime(_Native)
   _ = _runtime + _ObjC + _Native
 #elseif swift(>=1.0) && _compiler_version("3.*.0")
@@ -36,7 +36,7 @@ func f2(
 func f2() {
   let
     FOO = 1, swift = 1, _compiler_version = 1,
-    os = 1, arch = 1, _endian = 1, _native_word_size = 1, _runtime = 1,
+    os = 1, arch = 1, _endian = 1, _pointer_bit_width = 1, _runtime = 1,
     targetEnvironment = 1,
     arm = 1, i386 = 1, macOS = 1, OSX = 1, Linux = 1,
     big = 1, little = 1,
@@ -51,8 +51,8 @@ func f2() {
   _ = arch + i386 + arm
 #elseif _endian(big) && _endian(little)
   _ = _endian + big + little
-#elseif _native_word_size(32) && _native_word_size(64)
-  _ = _native_word_size
+#elseif _pointer_bit_width(32) && _pointer_bit_width(64)
+  _ = _pointer_bit_width
 #elseif _runtime(_ObjC) && _runtime(_Native)
   _ = _runtime + _ObjC + _Native
 #elseif swift(>=1.0) && _compiler_version("3.*.0")
@@ -66,7 +66,7 @@ func f2() {
 struct S {
   let
     FOO = 1, swift = 1, _compiler_version = 1,
-    os = 1, arch = 1, _endian = 1, _native_word_size = 1, _runtime = 1,
+    os = 1, arch = 1, _endian = 1, _pointer_bit_width = 1, _runtime = 1,
     targetEnvironment = 1,
     arm = 1, i386 = 1, macOS = 1, OSX = 1, Linux = 1,
     big = 1, little = 1,
@@ -77,7 +77,7 @@ struct S {
 #elseif os(macOS) && os(OSX) && os(Linux)
 #elseif arch(i386) && arch(arm)
 #elseif _endian(big) && _endian(little)
-#elseif _native_word_size(32) && _native_word_size(64)
+#elseif _pointer_bit_width(32) && _pointer_bit_width(64)
 #elseif _runtime(_ObjC) && _runtime(_Native)
 #elseif swift(>=1.0) && _compiler_version("3.*.0")
 #elseif targetEnvironment(simulator)

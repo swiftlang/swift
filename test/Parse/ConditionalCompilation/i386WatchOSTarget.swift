@@ -7,7 +7,7 @@
 let i: Int = "Hello"
 #endif
 
-#if arch(i386) && os(watchOS) && _runtime(_ObjC) && _endian(little) && _native_word_size(32)
+#if arch(i386) && os(watchOS) && _runtime(_ObjC) && _endian(little) && _pointer_bit_width(32)
 class C {}
 var x = C()
 #endif

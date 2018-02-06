@@ -41,10 +41,10 @@ namespace swift {
     OS,
     /// The active arch target (x86_64, i386, arm, arm64, etc.)
     Arch,
-    /// The active endianness target (big or little)
+    /// The active arch target endianness (big or little)
     Endianness,
-    /// The active native word size target (32 or 64)
-    NativeWordSize,
+    /// The active arch target pointer bit width (32 or 64)
+    PointerBitWidth,
     /// Runtime support (_ObjC or _Native)
     Runtime,
     /// Conditional import of module
