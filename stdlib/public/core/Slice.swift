@@ -262,20 +262,11 @@ extension Slice: MutableCollection where Base: MutableCollection {
 
 extension Slice : Equatable where Base.Element : Equatable {
     public static func == (lhs: Slice<Base>, rhs: Slice<Base>) -> Bool {
-        let lhsCount = lhs.count
-        if lhsCount != rhs.count {
+        if lhs.count != rhs.count {
             return false
         }
         // We know that lhs.count == rhs.count, compare element wise.
-
-        for idx in 0..<lhsCount {
-            let lidx = lhs._base.index(lhs._base.startIndex, offsetBy: idx)
-            let ridx = rhs._base.index(rhs._base.startIndex, offsetBy: idx)
-            if lhs[lidx] != rhs[ridx] {
-                return false
-            }
-        }
-        return true
+        return lhs.elementsEqual(rhs)
     }
 }
 
