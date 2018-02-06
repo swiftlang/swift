@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
@@ -54,9 +54,9 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:   %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%1 : $Builtin.Int32, %2 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:   %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%2 : $Builtin.Int32, %1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:   %4 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %3 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %5 : $TensorHandle<Float>
@@ -96,9 +96,9 @@ public func testExitBranch1(i: Int) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
 // CHECK: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:   %2 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:   %2 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%1 : $Builtin.Int32, %0 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:   %3 = builtin "__tfop_Add,tt:t"(%2 : $TensorHandle<Builtin.FPIEEE32>, %2 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %3 : $TensorHandle<Float>
 // CHECK-NEXT: }
@@ -242,8 +242,8 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>, %3 : $TensorHandle<Builtin.Int64>):
-// CHECK-NEXT: integer_literal $Builtin.Int32, 9
 // CHECK-NEXT: integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: integer_literal $Builtin.Int32, 9
 // CHECK-NEXT: builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(
 // CHECK-NEXT: builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
 // CHECK-NEXT: builtin "tf_tensor_to_i1"(
@@ -291,14 +291,14 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}scalar_manipulation{{.*}}
 // CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:  %1 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
-// CHECK-NEXT:  %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%1 : $Builtin.Int32, %2 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+// CHECK-NEXT:  %2 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %3 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%2 : $Builtin.Int32, %1 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:  %4 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %3 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
 // CHECK-NEXT:  %5 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%4 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  %7 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
-// CHECK-NEXT:  %8 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%6 : $Builtin.Int32, %7 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %6 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
+// CHECK-NEXT:  %7 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %8 = builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(%7 : $Builtin.Int32, %6 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:  %9 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:  %10 = builtin "__tfop_Add,tt:t"(%9 : $TensorHandle<Builtin.FPIEEE32>, %8 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
 // CHECK-NEXT:  %11 = builtin "__tfop_Add,tt:t"(%10 : $TensorHandle<Builtin.FPIEEE32>, %10 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Float>
@@ -306,25 +306,6 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:}
 
 
-public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float>)
-  -> Tensor<Float> {
-  let conds = conds1.toDevice()
-  let x = x1.toDevice()
-  let y = y1.toDevice()
-
-  let result = conds.selecting(x+x, y)*y
-
-  return result.toHost()
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
-// CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
-// CHECK-NEXT:  %3 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  %4 = builtin "__tfop_Select,ttt:t"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT: %5 = builtin "__tfop_Mul,tt:t"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:  return %5 : $TensorHandle<Float>
-// CHECK-NEXT:}
 
 public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
   // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
@@ -341,76 +322,3 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 
 
 
-// This tests the attributes necessary to get arrays of integers and strings going.
-public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
-  return x.toDevice().convolved2D(withFilter: filter.toDevice(),
-                       strides: [1, 2, 3, 4], padding: .same)
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
-// CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK-NEXT:  %2 = metatype $@thin Int.Type
-// CHECK-NEXT:  %3 = integer_literal $Builtin.Int64, 1
-// CHECK-NEXT:  %4 = integer_literal $Builtin.Int64, 2
-// CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 3
-// CHECK-NEXT:  %6 = integer_literal $Builtin.Int64, 4
-// CHECK-NEXT:  %7 = string_literal utf8 "SAME"
-// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,tt:t,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int.Type, %3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK-NEXT:  return %8 : $TensorHandle<Float>
-// CHECK-NEXT:}
-
-
-
-// Testcase for an op that uses the $tensor and $shape modifiers.
-public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", ":t", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
-// CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
-// CHECK: bb0:
-// CHECK-NEXT:  %0 = metatype $@thin Float.Type
-// CHECK-NEXT:  %1 = metatype $@thin Double.Type
-// CHECK-NEXT:  %2 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
-// CHECK-NEXT:  %3 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
-// CHECK-NEXT:  %4 = metatype $@thin Int.Type
-// CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
-// CHECK-NEXT:  %6 = builtin "__tfop_Const,:t,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
-// CHECK-NEXT:  return %6 : $TensorHandle<Float>
-
-
-
-public func testEmptyUnitsArray() {
-  let y = Tensor<Int>(shape: [0, 20, 30], units: [])
-  _ = y+y
-}
-
-/*
- CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyUnitsArray
- CHECK: sil private @{{.*}}testEmptyUnitsArray{{.*}} : $@callee_owned () -> () {
- CHECK: bb0:
- CHECK: integer_literal $Builtin.Int64, 0
- CHECK: integer_literal $Builtin.Int64, 20
- CHECK: integer_literal $Builtin.Int64, 30
- CHECK:  builtin "__tfop_Const,:t,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int.Type, {{.*}} : $@thin Int.Type, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $Builtin.Int64, {{.*}} : $@thin Int.Type) : $TensorHandle<Int>
- CHECK:  builtin "__tfop_Add,tt:t"({{.*}} : $TensorHandle<Int>, {{.*}} : $TensorHandle<Int>) : $TensorHandle<Int>
- */
-
-
-// Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
-public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-  let a = sigmoid(x.toDevice()).toHost()
-  let b = sigmoid(y.toDevice()).toHost()
-  return (a, b)
-}
-
-// Likewise, mean and max shouldn't cause send/receive errors.
-// FIXME: Remove #if when fixed.
-#if false
-public func testMeanMax(x: Tensor<Float>) -> Float {
-  let a = x.mean()
-  let b = x.max()
-  return a+b
-}
-#endif
