@@ -660,9 +660,8 @@ static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
   scope.print(llvm::errs());
 }
 
-static SourceFile *
-getSourceFileOfCodeToBeGenerated(CompilerInvocation &Invocation,
-                                 CompilerInstance &Instance) {
+static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
   SourceFile *SF = Instance.getPrimarySourceFile();
   if (!SF) {
     SourceFileKind Kind = Invocation.getSourceFileKind();
@@ -686,36 +685,35 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
     return None;
 
   case FrontendOptions::ActionType::PrintAST:
-    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+    getPrimaryOrMainSourceFile(Invocation, Instance)
         ->print(llvm::outs(), PrintOptions::printEverything());
     break;
 
   case FrontendOptions::ActionType::DumpScopeMaps:
-    dumpAndPrintScopeMap(
-        Invocation, Instance,
-        getSourceFileOfCodeToBeGenerated(Invocation, Instance));
+    dumpAndPrintScopeMap(Invocation, Instance,
+                         getPrimaryOrMainSourceFile(Invocation, Instance));
     break;
 
   case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+    getPrimaryOrMainSourceFile(Invocation, Instance)
         ->getTypeRefinementContext()
         ->dump(llvm::errs(), Context.SourceMgr);
     break;
 
   case FrontendOptions::ActionType::DumpInterfaceHash:
-    getSourceFileOfCodeToBeGenerated(Invocation, Instance)
+    getPrimaryOrMainSourceFile(Invocation, Instance)
         ->dumpInterfaceHash(llvm::errs());
     break;
 
   case FrontendOptions::ActionType::EmitSyntax:
-    emitSyntax(getSourceFileOfCodeToBeGenerated(Invocation, Instance),
+    emitSyntax(getPrimaryOrMainSourceFile(Invocation, Instance),
                Invocation.getLangOptions(), Instance.getSourceMgr(),
                opts.InputsAndOutputs.getSingleOutputFilename());
     break;
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    getSourceFileOfCodeToBeGenerated(Invocation, Instance)->dump();
+    getPrimaryOrMainSourceFile(Invocation, Instance)->dump();
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:
@@ -1039,8 +1037,8 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
 }
 
-static bool serializeSIBIfNeeded(FrontendOptions &opts, SILModule *SM,
-                                 ASTContext &Context, ModuleOrSourceFile MSF) {
+static bool serializeSIB(FrontendOptions &opts, SILModule *SM,
+                         ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath = opts.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
 
@@ -1177,8 +1175,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     linkAllIfNeeded(Invocation, SM.get());
-    serializeSIBIfNeeded(Invocation.getFrontendOptions(), SM.get(),
-                         Instance.getASTContext(), MSF);
+    serializeSIB(Invocation.getFrontendOptions(), SM.get(),
+                 Instance.getASTContext(), MSF);
     return Context.hadError();
   }
 
@@ -1237,8 +1235,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                             opts.ImplicitObjCHeaderPath, moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIBIfNeeded(Invocation.getFrontendOptions(), SM.get(),
-                                Instance.getASTContext(), MSF);
+    return serializeSIB(Invocation.getFrontendOptions(), SM.get(),
+                        Instance.getASTContext(), MSF);
 
   const bool haveModulePath =
       !opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty();
