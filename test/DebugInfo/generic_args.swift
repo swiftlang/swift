@@ -45,7 +45,7 @@ struct Wrapper<T: AProtocol> {
   }
 }
 
-// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "$S12generic_args5apply_1fq_x_q_xctr0_lFQq_AaB_ACq_x_q_xctr0_lFQq0_Igir_D"
+// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "$S12generic_args5apply_1fq_x_q_xXEtr0_lFQq_AaB_ACq_x_q_xXEtr0_lFQq0_Igir_D"
 // CHECK-DAG: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: ![[FNTY]])
 func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)

@@ -652,6 +652,11 @@ SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
+// The @escaping () -> () table can be used for arbitrary escaping function types.
+SWIFT_RUNTIME_EXPORT
+const ExtraInhabitantsValueWitnessTable
+  VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()
+
 // The @convention(thin) () -> () table can be used for arbitrary thin function types.
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable
@@ -1645,6 +1650,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   }
   bool throws() const { return Flags.throws(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
+  bool isEscaping() const { return Flags.isEscaping(); }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 

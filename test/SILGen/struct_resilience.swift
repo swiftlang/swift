@@ -6,7 +6,7 @@ import resilient_struct
 
 // Resilient structs are always address-only
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF : $@convention(thin) (@in Size, @owned @noescape @callee_guaranteed (@in Size) -> @out Size) -> @out Size
+// CHECK-LABEL: sil hidden @$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in Size, @owned @noescape @callee_guaranteed (@in Size) -> @out Size) -> @out Size
 // CHECK:       bb0(%0 : @trivial $*Size, %1 : @trivial $*Size, %2 : @owned $@noescape @callee_guaranteed (@in Size) -> @out Size):
 func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
@@ -57,7 +57,7 @@ func resilientInOutTest(_ s: inout Size) {
 
 // Fixed-layout structs may be trivial or loadable
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FctF : $@convention(thin) (Point, @owned @noescape @callee_guaranteed (Point) -> Point) -> Point
+// CHECK-LABEL: sil hidden @$S17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FXEtF : $@convention(thin) (Point, @owned @noescape @callee_guaranteed (Point) -> Point) -> Point
 // CHECK:       bb0(%0 : @trivial $Point, %1 : @owned $@noescape @callee_guaranteed (Point) -> Point):
 func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
@@ -82,7 +82,7 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
 // Fixed-layout struct with resilient stored properties is still address-only
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FctF : $@convention(thin) (@in Rectangle, @owned @noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle) -> @out Rectangle
+// CHECK-LABEL: sil hidden @$S17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FXEtF : $@convention(thin) (@in Rectangle, @owned @noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle) -> @out Rectangle
 // CHECK:        bb0(%0 : @trivial $*Rectangle, %1 : @trivial $*Rectangle, %2 : @owned $@noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle):
 func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: (Rectangle) -> Rectangle) -> Rectangle {
   return f(r)
@@ -133,7 +133,7 @@ public struct MySize {
   public static var copyright: Int = 0
 }
 
-// CHECK-LABEL: sil @$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF : $@convention(thin) (@in MySize, @owned @noescape @callee_guaranteed (@in MySize) -> @out MySize) -> @out MySize
+// CHECK-LABEL: sil @$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF : $@convention(thin) (@in MySize, @owned @noescape @callee_guaranteed (@in MySize) -> @out MySize) -> @out MySize
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
