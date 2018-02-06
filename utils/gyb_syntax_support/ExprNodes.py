@@ -156,9 +156,19 @@ EXPR_NODES = [
          ]),
 
     # An operator like + or -.
+    # NOTE: This appears only in SequenceExpr.
     Node('BinaryOperatorExpr', kind='Expr',
          children=[
              Child('OperatorToken', kind='BinaryOperatorToken'),
+         ]),
+
+    # arrow-expr -> 'throws'? '->'
+    # NOTE: This appears only in SequenceExpr.
+    Node('ArrowExpr', kind='Expr',
+         children=[
+             Child('ThrowsToken', kind='ThrowsToken',
+                   is_optional=True),
+             Child('ArrowToken', kind='ArrowToken'),
          ]),
 
     # A floating-point literal
@@ -431,6 +441,13 @@ EXPR_NODES = [
          children=[
              Child('Expression', kind='Expr'),
              Child('OperatorToken', kind='PostfixOperatorToken'),
+         ]),
+
+    # specialize-expr -> expr generic-argument-clause?
+    Node('SpecializeExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('GenericArgumentClause', kind='GenericArgumentClause'),
          ]),
 
     # string literal segment in a string interpolation expression.
