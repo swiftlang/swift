@@ -521,9 +521,10 @@ private:
                                 Optional<unsigned> BufferID);
 
 public:
-  /// Frees up the ASTContext and SILModule objects that this instance is
-  /// holding on.
-  void freeContextAndSIL();
+  void freeASTContext();
+
+  /// Frees up the SILModule that this instance is holding on to.
+  void freeSILModule();
 
 private:
   /// Load stdlib & return true if should continue, i.e. no error

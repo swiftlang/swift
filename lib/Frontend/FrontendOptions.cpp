@@ -94,6 +94,19 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
+  switch (action) {
+  case FrontendOptions::ActionType::Parse:
+  case FrontendOptions::ActionType::DumpParse:
+  case FrontendOptions::ActionType::EmitSyntax:
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+  case FrontendOptions::ActionType::EmitImportedModules:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void FrontendOptions::forAllOutputPaths(
     const InputFile &input, std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
