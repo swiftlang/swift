@@ -65,8 +65,8 @@ namespace swift {
   /// \brief Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
 
-  /// \brief Perform SIL Inst Count on M.
-  void performSILInstCount(SILModule *M);
+  /// \brief Perform SIL Inst Count on M if needed.
+  void performSILInstCountIfNeeded(SILModule *M);
 
   /// \brief Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.
