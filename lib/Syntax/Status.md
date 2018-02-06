@@ -40,17 +40,11 @@
   * MagicIdentifierLiteralExpr
   * SpecializeExpr
   * UnresolvedPatternExpr
+  * IsExpr
+  * AsExpr
+  * ArrowExpr
 
 ### Not-started (UnknownExpr):
-  * KeyPathApplicationExpr
-  * CaptureListExpr
-  * AutoClosureExpr
-  * DynamicTypeExpr
-  * ForcedCheckedCastExpr
-  * ConditionalCheckedCastExpr
-  * IsExpr
-  * CoerceExpr
-  * ArrowExpr
   * ObjCSelectorExpr
 
 ## Declaration
