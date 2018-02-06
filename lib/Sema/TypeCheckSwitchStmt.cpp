@@ -86,7 +86,7 @@ namespace {
     // DowngradeToWarning condition is the std::min of its spaces'.
     enum class DowngradeToWarning {
       No,
-      ForSwift4Frozen,
+      ForUnknownCase,
       ForSwift3Case,
 
       LAST = ForSwift3Case
@@ -192,8 +192,8 @@ namespace {
         : Kind(SpaceKind::Type), TypeAndVal(T),
           Head(NameForPrinting), Spaces({}){}
       explicit Space(Type T, UnknownCase_t)
-        : Kind(SpaceKind::UnknownCase), TypeAndVal(T, false),
-          Head(Identifier()), Spaces({}) {}
+        : Kind(SpaceKind::UnknownCase), TypeAndVal(T), Head(Identifier()),
+          Spaces({}) {}
       explicit Space(Type T, Identifier H, bool downgrade,
                      ArrayRef<Space> SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
@@ -1045,7 +1045,7 @@ namespace {
         case SpaceKind::Empty:
           return DowngradeToWarning::No;
         case SpaceKind::UnknownCase:
-          return DowngradeToWarning::ForSwift4Frozen;
+          return DowngradeToWarning::ForUnknownCase;
         case SpaceKind::Constructor: {
           auto result = DowngradeToWarning::No;
           if (canDowngradeToWarning())
@@ -1286,11 +1286,18 @@ namespace {
         if (!sawDowngradablePattern)
           mainDiagType = diag::non_exhaustive_switch_warn;
         break;
-      case DowngradeToWarning::ForSwift4Frozen:
-        if (!TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
+      case DowngradeToWarning::ForUnknownCase:
+        if (TC.Context.LangOpts.DebuggerSupport ||
+            TC.Context.LangOpts.Playground ||
+            !TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics) {
+          // Don't require covering unknown cases in the debugger or in
+          // playgrounds.
           return;
-        if (!TC.getLangOpts().isSwiftVersionAtLeast(5))
+        }
+        if (!TC.Context.isSwiftVersionAtLeast(5)) {
+          // Downgrade missing '@unknown' to a warning in Swift 4 and below.
           mainDiagType = diag::non_exhaustive_switch_warn;
+        }
         break;
       }
 
