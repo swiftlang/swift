@@ -40,11 +40,15 @@ class C {
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
     _ = [:]
+    _ = []
     _ = [1, 2, 3, 4]
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
+    _ = type(of: a).self
+    _ = A -> B.C<Int>
+    _ = [(A) throws -> B]()
   }
   func boolAnd() -> Bool { return true && false }
   func boolOr() -> Bool { return true || false }
@@ -249,8 +253,12 @@ func postfix() {
   foo[1][2,x:3]
   foo?++.bar!(baz).self
   foo().0
+  foo<Int>.bar
+  foo<Int>()
+  foo.bar<Int>()
 
   foo(x:y:)()
+  foo(x:)<Int> { }
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
   _ = foo(&d)
