@@ -700,8 +700,10 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
           isSelfDerivedProtocolRequirementInProtocol(
                                                source,
                                                requirementSignatureSelfProto,
-                                               builder))
+                                               builder)) {
+        redundantSubpath = { source->getRoot(), source->parent };
         return true;
+      }
 
       // No redundancy thus far.
       return false;
@@ -4961,9 +4963,7 @@ namespace {
             // original source is self-derived.
             ++NumSelfDerived;
 
-            // FIXME: "proto" check means we don't do this for same-type
-            // constraints, where we still seem to get minimization wrong.
-            if (minimalSource && proto) {
+            if (minimalSource) {
               // Record a constraint with a minimized source.
               minimalSources.push_back(
                            {constraint.subject,
