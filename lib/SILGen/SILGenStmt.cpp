@@ -847,7 +847,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           }
 
           if (!inputValue.isInContext())
-            RValue(SGF, S, optTy.getAnyOptionalObjectType(), inputValue)
+            RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
                 .forwardInto(SGF, S, initLoopVars.get());
 
           // Now that the pattern has been initialized, check any where

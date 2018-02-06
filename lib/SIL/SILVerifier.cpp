@@ -573,7 +573,7 @@ public:
 
     // Optionals should have had their objects lowered.
     OptionalTypeKind optKind;
-    if (auto objectType = rvalueType.getAnyOptionalObjectType(optKind)) {
+    if (auto objectType = rvalueType.getOptionalObjectType(optKind)) {
       require(optKind == OTK_Optional,
               "ImplicitlyUnwrappedOptional is not legal in SIL values");
       return checkLegalSILType(F, objectType, I);
@@ -1338,7 +1338,7 @@ public:
 
   void checkLoadWeakInst(LoadWeakInst *LWI) {
     require(LWI->getType().isObject(), "Result of load must be an object");
-    require(LWI->getType().getAnyOptionalObjectType(),
+    require(LWI->getType().getOptionalObjectType(),
             "Result of weak load must be an optional");
     auto PointerType = LWI->getOperand()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
@@ -1353,7 +1353,7 @@ public:
   void checkStoreWeakInst(StoreWeakInst *SWI) {
     require(SWI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SWI->getSrc()->getType().getAnyOptionalObjectType(),
+    require(SWI->getSrc()->getType().getOptionalObjectType(),
             "store_weak must be of an optional value");
     auto PointerType = SWI->getDest()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
@@ -3026,12 +3026,12 @@ public:
 
     // Upcast from Optional<B> to Optional<A> is legal as long as B is a
     // subclass of A.
-    if (ToTy.getSwiftRValueType().getAnyOptionalObjectType() &&
-        FromTy.getSwiftRValueType().getAnyOptionalObjectType()) {
+    if (ToTy.getSwiftRValueType().getOptionalObjectType() &&
+        FromTy.getSwiftRValueType().getOptionalObjectType()) {
       ToTy = SILType::getPrimitiveObjectType(
-          ToTy.getSwiftRValueType().getAnyOptionalObjectType());
+          ToTy.getSwiftRValueType().getOptionalObjectType());
       FromTy = SILType::getPrimitiveObjectType(
-          FromTy.getSwiftRValueType().getAnyOptionalObjectType());
+          FromTy.getSwiftRValueType().getOptionalObjectType());
     }
 
     auto ToClass = ToTy.getClassOrBoundGenericClass();
@@ -3967,20 +3967,20 @@ public:
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalChain: {
-          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
+          require(baseTy->getOptionalObjectType()->isEqual(componentTy),
                   "chaining component should unwrap optional");
-          require(leafTy->getAnyOptionalObjectType(),
+          require(leafTy->getOptionalObjectType(),
                   "key path with chaining component should have optional "
                   "result");
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalForce: {
-          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
+          require(baseTy->getOptionalObjectType()->isEqual(componentTy),
                   "forcing component should unwrap optional");
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalWrap: {
-          require(componentTy->getAnyOptionalObjectType()->isEqual(baseTy),
+          require(componentTy->getOptionalObjectType()->isEqual(baseTy),
                   "wrapping component should wrap optional");
           break;
         }

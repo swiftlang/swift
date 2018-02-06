@@ -1057,7 +1057,7 @@ namespace {
             auto *forceValue =
                 new (context) ForceValueExpr(ref, ref->getEndLoc());
             auto optTy = cs.getType(forceValue->getSubExpr());
-            cs.setType(forceValue, optTy->getAnyOptionalObjectType());
+            cs.setType(forceValue, optTy->getOptionalObjectType());
             ref = forceValue;
           }
         }
@@ -1413,7 +1413,7 @@ namespace {
           auto *forceValue = new (cs.getASTContext())
               ForceValueExpr(newSubscript, newSubscript->getEndLoc());
           auto optTy = cs.getType(forceValue->getSubExpr());
-          cs.setType(forceValue, optTy->getAnyOptionalObjectType());
+          cs.setType(forceValue, optTy->getOptionalObjectType());
           newSubscript = forceValue;
         }
       }
@@ -2355,7 +2355,7 @@ namespace {
       if (type->is<UnresolvedType>()) return expr;
 
       Type conformingType = type;
-      if (auto baseType = conformingType->getAnyOptionalObjectType()) {
+      if (auto baseType = conformingType->getOptionalObjectType()) {
         // The type may be optional due to a failable initializer in the
         // protocol.
         conformingType = baseType;
@@ -2407,7 +2407,7 @@ namespace {
             expr, underlyingType));
       } else {
         return coerceImplicitlyUnwrappedOptionalToValue(
-            expr, ty->getWithoutSpecifierType()->getAnyOptionalObjectType());
+            expr, ty->getWithoutSpecifierType()->getOptionalObjectType());
       }
     }
 
@@ -2539,7 +2539,7 @@ namespace {
       // If the member came by optional unwrapping, then unwrap the base type.
       if (selected.choice.getKind()
                               == OverloadChoiceKind::DeclViaUnwrappedOptional) {
-        baseTy = baseTy->getAnyOptionalObjectType();
+        baseTy = baseTy->getOptionalObjectType();
         assert(baseTy
                && "got unwrapped optional decl from non-optional base?!");
       }
@@ -3036,8 +3036,8 @@ namespace {
       // initializer.
       OptionalTypeKind calledOTK;
       Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
-      Type valueTy
-        = cs.getType(unwrappedSubExpr)->getAnyOptionalObjectType(calledOTK);
+      Type valueTy =
+          cs.getType(unwrappedSubExpr)->getOptionalObjectType(calledOTK);
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
       if (calledOTK != OTK_None && inCtor->getFailability() == OTK_None) {
         bool isChaining;
@@ -3176,9 +3176,9 @@ namespace {
 
       // Dig through the optionals in the from/to types.
       SmallVector<Type, 2> fromOptionals;
-      fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
+      fromType->lookThroughAllOptionalTypes(fromOptionals);
       SmallVector<Type, 2> toOptionals;
-      toType->lookThroughAllAnyOptionalTypes(toOptionals);
+      toType->lookThroughAllOptionalTypes(toOptionals);
 
       // If we have an imbalance of optionals or a collection
       // downcast, handle this as a checked cast followed by a
@@ -3230,7 +3230,7 @@ namespace {
         // Complain about conditional casts to CF class types; they can't
         // actually be conditionally checked.
         if (castKind == OptionalBindingsCastKind::Conditional) {
-          Type destValueType = resultType->getAnyOptionalObjectType();
+          Type destValueType = resultType->getOptionalObjectType();
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
@@ -3293,11 +3293,11 @@ namespace {
       Type srcType = cs.getType(subExpr);
 
       SmallVector<Type, 4> srcOptionals;
-      srcType = srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
+      srcType = srcType->lookThroughAllOptionalTypes(srcOptionals);
 
       SmallVector<Type, 4> destOptionals;
       auto destValueType
-        = finalResultType->lookThroughAllAnyOptionalTypes(destOptionals);
+        = finalResultType->lookThroughAllOptionalTypes(destOptionals);
 
       // When performing a bridging operation, if the destination value type
       // is 'AnyObject', leave any extra optionals on the source in place.
@@ -3455,7 +3455,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
+            coerced, cs.getType(coerced)->getOptionalObjectType());
       }
 
       return visitCoerceExpr(expr, None);
@@ -3540,7 +3540,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
+            coerced, cs.getType(coerced)->getOptionalObjectType());
       }
 
       return handleForcedCheckedCastExpr(expr);
@@ -3620,7 +3620,7 @@ namespace {
           return nullptr;
 
         return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getAnyOptionalObjectType());
+            coerced, cs.getType(coerced)->getOptionalObjectType());
       }
 
       return handleConditionalCheckedCastExpr(expr);
@@ -3770,7 +3770,7 @@ namespace {
       
       // Coerce the object type, if necessary.
       auto subExpr = expr->getSubExpr();
-      if (auto objectTy = cs.getType(subExpr)->getAnyOptionalObjectType()) {
+      if (auto objectTy = cs.getType(subExpr)->getOptionalObjectType()) {
         if (objectTy && !objectTy->isEqual(valueType)) {
           auto coercedSubExpr = coerceToType(subExpr,
                                              OptionalType::get(valueType),
@@ -4157,13 +4157,13 @@ namespace {
         auto getObjectType = [](Type optionalTy) -> Type {
           Type objectTy;
           if (auto lvalue = optionalTy->getAs<LValueType>()) {
-            objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
+            objectTy = lvalue->getObjectType()->getOptionalObjectType();
             if (optionalTy->hasUnresolvedType() && !objectTy) {
               objectTy = optionalTy;
             }
             objectTy = LValueType::get(objectTy);
           } else {
-            objectTy = optionalTy->getAnyOptionalObjectType();
+            objectTy = optionalTy->getOptionalObjectType();
             if (optionalTy->hasUnresolvedType() && !objectTy) {
               objectTy = optionalTy;
             }
@@ -4304,8 +4304,8 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
-          auto objectTy = baseTy->getWithoutSpecifierType()
-            ->getAnyOptionalObjectType();
+          auto objectTy =
+              baseTy->getWithoutSpecifierType()->getOptionalObjectType();
           if (baseTy->hasUnresolvedType() && !objectTy) {
             objectTy = baseTy;
           }
@@ -4346,8 +4346,8 @@ namespace {
           baseTy &&
           !baseTy->hasUnresolvedType() &&
           !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
-        assert(leafTy->getAnyOptionalObjectType()
-                     ->isEqual(baseTy->getWithoutSpecifierType()));
+        assert(leafTy->getOptionalObjectType()->isEqual(
+            baseTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
@@ -4425,9 +4425,9 @@ namespace {
         tc.diagnose(injection->getLoc(), diag::inject_forced_downcast,
                     cs.getType(injection->getSubExpr())->getRValueType());
         auto exclaimLoc = cast->getExclaimLoc();
-        tc.diagnose(exclaimLoc, diag::forced_to_conditional_downcast, 
-                    cs.getType(injection)->getAnyOptionalObjectType())
-          .fixItReplace(exclaimLoc, "?");
+        tc.diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
+                    cs.getType(injection)->getOptionalObjectType())
+            .fixItReplace(exclaimLoc, "?");
         tc.diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
           .fixItInsert(cast->getStartLoc(), "(")
           .fixItInsertAfter(cast->getEndLoc(), ")");
@@ -5359,10 +5359,10 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   tc.requireOptionalIntrinsics(expr->getLoc());
 
   SmallVector<Type, 4> fromOptionals;
-  (void)fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
+  (void)fromType->lookThroughAllOptionalTypes(fromOptionals);
 
   SmallVector<Type, 4> toOptionals;
-  (void)toType->lookThroughAllAnyOptionalTypes(toOptionals);
+  (void)toType->lookThroughAllOptionalTypes(toOptionals);
 
   assert(!toOptionals.empty());
   assert(!fromOptionals.empty());
@@ -5384,8 +5384,8 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
     return expr;
   }
 
-  Type fromValueType = fromType->getAnyOptionalObjectType();
-  Type toValueType = toType->getAnyOptionalObjectType();
+  Type fromValueType = fromType->getOptionalObjectType();
+  Type toValueType = toType->getOptionalObjectType();
 
   // The depth we use here will get patched after we apply the coercion.
   auto bindOptional =
@@ -6153,8 +6153,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // foo(bar) // This expression should compile in Swift 3 mode
       // ```
       if (tc.getLangOpts().isSwiftVersion3()) {
-        auto obj1 = fromType->getAnyOptionalObjectType();
-        auto obj2 = toType->getAnyOptionalObjectType();
+        auto obj1 = fromType->getOptionalObjectType();
+        auto obj2 = toType->getOptionalObjectType();
 
         if (obj1 && obj2) {
           auto *fn1 = obj1->getAs<AnyFunctionType>();
@@ -6191,8 +6191,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         auto *newForceValue = new (tc.Context)
             ForceValueExpr(loadExpr, forceExpr->getLoc(),
                            forceExpr->isForceOfImplicitlyUnwrappedOptional());
-        cs.setType(newForceValue,
-                   loadExpr->getType()->getAnyOptionalObjectType());
+        cs.setType(newForceValue, loadExpr->getType()->getOptionalObjectType());
         expr = newForceValue;
       } else {
         expr = cs.cacheType(new (tc.Context)
@@ -6229,7 +6228,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         
     case ConversionRestrictionKind::ValueToOptional: {
       auto toGenericType = toType->castTo<BoundGenericType>();
-      assert(toGenericType->getDecl()->classifyAsOptionalType());
+      assert(toGenericType->getDecl()->isOptionalDecl());
       tc.requireOptionalIntrinsics(expr->getLoc());
 
       Type valueType = toGenericType->getGenericArgs()[0];
@@ -6287,7 +6286,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::InoutToPointer: {
       OptionalTypeKind optionalKind;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+      if (Type unwrapped = toType->getOptionalObjectType(optionalKind))
         unwrappedTy = unwrapped;
       PointerTypeKind pointerKind;
       auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
@@ -6312,7 +6311,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ArrayToPointer: {
       OptionalTypeKind optionalKind;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+      if (Type unwrapped = toType->getOptionalObjectType(optionalKind))
         unwrappedTy = unwrapped;
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
@@ -6327,7 +6326,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::StringToPointer: {
       OptionalTypeKind optionalKind;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+      if (Type unwrapped = toType->getOptionalObjectType(optionalKind))
         unwrappedTy = unwrapped;
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
@@ -6341,10 +6340,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     
     case ConversionRestrictionKind::PointerToPointer: {
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      Type unwrappedToTy = toType->getAnyOptionalObjectType();
+      Type unwrappedToTy = toType->getOptionalObjectType();
 
       // Optional to optional.
-      if (Type unwrappedFromTy = cs.getType(expr)->getAnyOptionalObjectType()) {
+      if (Type unwrappedFromTy = cs.getType(expr)->getOptionalObjectType()) {
         assert(unwrappedToTy && "converting optional to non-optional");
         Expr *boundOptional = cs.cacheType(
             new (tc.Context) BindOptionalExpr(expr, SourceLoc(),
@@ -6560,14 +6559,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceExistential(expr, toType, locator);
   }
 
-  if (toType->getAnyOptionalObjectType() &&
-      cs.getType(expr)->getAnyOptionalObjectType()) {
+  if (toType->getOptionalObjectType() &&
+      cs.getType(expr)->getOptionalObjectType()) {
     return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
   }
 
   // Coercion to Optional<T>.
   if (auto toGenericType = toType->getAs<BoundGenericType>()) {
-    if (toGenericType->getDecl()->classifyAsOptionalType()) {
+    if (toGenericType->getDecl()->isOptionalDecl()) {
       tc.requireOptionalIntrinsics(expr->getLoc());
 
       Type valueType = toGenericType->getGenericArgs()[0];

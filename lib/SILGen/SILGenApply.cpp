@@ -1383,9 +1383,9 @@ public:
       // class type of the 'Self' parameter with AnyObject.
       auto member = SILDeclRef(fd).asForeign();
 
-      auto substFormalType =
-        cast<FunctionType>(dynamicMemberRef->getType()->getCanonicalType()
-                                            .getAnyOptionalObjectType());
+      auto substFormalType = cast<FunctionType>(dynamicMemberRef->getType()
+                                                    ->getCanonicalType()
+                                                    .getOptionalObjectType());
       substFormalType = CanFunctionType::get(
         dynamicMemberRef->getBase()->getType()->getCanonicalType(),
         substFormalType, AnyFunctionType::ExtInfo());
@@ -5336,8 +5336,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILBasicBlock *hasMemberBB = createBasicBlock();
 
   // The continuation block
-  auto memberMethodTy = e->getType()->getAnyOptionalObjectType();
-  
+  auto memberMethodTy = e->getType()->getOptionalObjectType();
+
   const TypeLowering &optTL = getTypeLowering(e->getType());
   auto loweredOptTy = optTL.getLoweredType();
 
@@ -5362,7 +5362,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
-    auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
+    auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
     CanFunctionType methodTy;
 
     // For a computed variable, we want the getter.
@@ -5470,7 +5470,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
     // The argument to the has-member block is the uncurried method.
     // Build the substituted getter type from the AST nodes.
-    auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
+    auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
     auto indexTy = e->getIndex()->getType()->getCanonicalType();
     auto methodTy = CanFunctionType::get(indexTy,
                                          valueTy);

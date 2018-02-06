@@ -294,10 +294,10 @@ public:
       : type(ty), isIUO(implicitlyUnwrap) {
 #if !defined(NDEBUG)
     if (implicitlyUnwrap) {
-      assert(ty->getAnyOptionalObjectType() || ty->getAs<AnyFunctionType>());
-      if (!ty->getAnyOptionalObjectType()) {
+      assert(ty->getOptionalObjectType() || ty->getAs<AnyFunctionType>());
+      if (!ty->getOptionalObjectType()) {
         auto fnTy = ty->castTo<AnyFunctionType>();
-        assert(fnTy->getResult()->getAnyOptionalObjectType());
+        assert(fnTy->getResult()->getOptionalObjectType());
       }
     }
 #endif

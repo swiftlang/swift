@@ -1193,7 +1193,7 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
       return Type();
 
-    auto elementObj = elementType->getAnyOptionalObjectType();
+    auto elementObj = elementType->getOptionalObjectType();
     if (!elementObj)
       return Type();
 
@@ -1240,7 +1240,7 @@ static ImportedType adjustTypeForConcreteImport(
       return Type();
 
     OptionalTypeKind OTK;
-    auto insideOptionalType = elementType->getAnyOptionalObjectType(OTK);
+    auto insideOptionalType = elementType->getOptionalObjectType(OTK);
     if (!insideOptionalType)
       insideOptionalType = elementType;
 
@@ -1511,7 +1511,7 @@ ImportedType ClangImporter::Implementation::importPropertyType(
 static Type applyNoEscape(Type type) {
   // Recurse into optional types.
   OptionalTypeKind optKind;
-  if (Type objectType = type->getAnyOptionalObjectType(optKind)) {
+  if (Type objectType = type->getOptionalObjectType(optKind)) {
     return OptionalType::get(applyNoEscape(objectType));
   }
 
@@ -1806,7 +1806,7 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
             false};
 
   case ForeignErrorConvention::NilResult:
-    if (Type unwrappedTy = importedType.getType()->getAnyOptionalObjectType())
+    if (Type unwrappedTy = importedType.getType()->getOptionalObjectType())
       return {unwrappedTy, false};
     // Check for a bad override.
     if (importedType.getType()->isVoid())
@@ -1953,7 +1953,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     // performSelector methods that return 'id' should be imported into Swift
     // as returning Unmanaged<AnyObject>.
     Type nonOptionalTy =
-        swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
+        swiftResultTy->getOptionalObjectType(OptionalityOfReturn);
     if (!nonOptionalTy)
       nonOptionalTy = swiftResultTy;
 

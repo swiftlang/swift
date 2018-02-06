@@ -1874,7 +1874,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
-          (elt->getParentEnum()->classifyAsOptionalType()
+          (elt->getParentEnum()->isOptionalDecl()
                ? AbstractionPattern(substEltTy)
                : SGF.SGM.M.Types.getAbstractionPattern(elt));
 
@@ -2174,9 +2174,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
-        (elt->getParentEnum()->classifyAsOptionalType()
-           ? AbstractionPattern(substEltTy)
-           : SGF.SGM.M.Types.getAbstractionPattern(elt));
+          (elt->getParentEnum()->isOptionalDecl()
+               ? AbstractionPattern(substEltTy)
+               : SGF.SGM.M.Types.getAbstractionPattern(elt));
 
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
                                          origEltTy, substEltTy);

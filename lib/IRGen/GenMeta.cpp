@@ -1626,7 +1626,7 @@ namespace {
 
     llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type) {
       // Optionals have a lowered payload type, so we recurse here.
-      if (auto objectTy = CanType(type).getAnyOptionalObjectType()) {
+      if (auto objectTy = CanType(type).getOptionalObjectType()) {
         auto payloadMetadata = visit(objectTy);
         llvm::Value *args[] = { payloadMetadata };
         llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
@@ -2022,7 +2022,7 @@ namespace {
       case Ownership::Strong:
         llvm_unreachable("shouldn't be a ReferenceStorageType");
       case Ownership::Weak:
-        referent = type.getReferentType().getAnyOptionalObjectType();
+        referent = type.getReferentType().getOptionalObjectType();
         break;
       case Ownership::Unmanaged:
       case Ownership::Unowned:
@@ -2668,13 +2668,6 @@ namespace {
                          NominalTypeDecl *type,
                          ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<FieldTypeInfo, 4> types;
-
-    // This is a terrible special case, but otherwise the archetypes
-    // aren't mapped correctly because the EnumImplStrategy ends up
-    // using the lowered cases, i.e. the cases for Optional<>.
-    if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
-      llvm_unreachable("Should not have IUOs.");
-    }
 
     for (auto &elt : enumElements) {
       auto caseType = elt.decl->getParentEnum()->mapTypeIntoContext(
@@ -5149,9 +5142,8 @@ namespace {
     }
 
     void addMetadataFlags() {
-      auto kind = Target->classifyAsOptionalType()
-                    ? MetadataKind::Optional
-                    : MetadataKind::Enum;
+      auto kind = Target->isOptionalDecl() ? MetadataKind::Optional
+                                           : MetadataKind::Enum;
       B.addInt(IGM.MetadataKindTy, unsigned(kind));
     }
 

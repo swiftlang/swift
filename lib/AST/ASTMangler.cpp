@@ -754,10 +754,6 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Dictionary:
       return appendSugaredType<SyntaxSugarType>(type);
 
-    case TypeKind::ImplicitlyUnwrappedOptional: {
-      llvm_unreachable("Should no longer have IUOs");
-    }
-
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
       appendType(EMT->getInstanceType());

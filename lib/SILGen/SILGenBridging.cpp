@@ -724,8 +724,8 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
   if (loweredNativeTy.getObjectType() == loweredBridgedTy.getObjectType())
     return v;
 
-  CanType bridgedObjectType = bridgedType.getAnyOptionalObjectType();
-  CanType nativeObjectType = nativeType.getAnyOptionalObjectType();
+  CanType bridgedObjectType = bridgedType.getOptionalObjectType();
+  CanType nativeObjectType = nativeType.getOptionalObjectType();
 
   // Check for optional-to-optional conversions.
   if (bridgedObjectType && nativeObjectType) {
@@ -742,7 +742,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
   // Check if we need to wrap the bridged result in an optional.
   if (bridgedObjectType) {
     auto helper = [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
-      auto loweredBridgedObjectTy = loweredBridgedTy.getAnyOptionalObjectType();
+      auto loweredBridgedObjectTy = loweredBridgedTy.getOptionalObjectType();
       return emitNativeToCBridgedValue(SGF, loc, v, nativeType,
                                        bridgedObjectType,
                                        loweredBridgedObjectTy, C);
@@ -929,13 +929,13 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
   if (loweredNativeTy == loweredBridgedTy.getObjectType())
     return v;
 
-  if (auto nativeObjectType = nativeType.getAnyOptionalObjectType()) {
-    auto bridgedObjectType = bridgedType.getAnyOptionalObjectType();
+  if (auto nativeObjectType = nativeType.getOptionalObjectType()) {
+    auto bridgedObjectType = bridgedType.getOptionalObjectType();
 
     // Optional injection.
     if (!bridgedObjectType) {
       auto helper = [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
-        auto loweredNativeObjectTy = loweredNativeTy.getAnyOptionalObjectType();
+        auto loweredNativeObjectTy = loweredNativeTy.getOptionalObjectType();
         return emitCBridgedToNativeValue(SGF, loc, v, bridgedType,
                                          nativeObjectType,
                                          loweredNativeObjectTy,
@@ -1068,7 +1068,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
   // If the incoming error is non-optional, just do an existential erasure.
   CanType bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
-  if (!bridgedErrorTy.getAnyOptionalObjectType()) {
+  if (!bridgedErrorTy.getOptionalObjectType()) {
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
@@ -1108,18 +1108,18 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
                                                       CanType nativeType,
                                                       CanType bridgedErrorType){
   // Handle injections into optional.
-  if (auto bridgedObjectType = bridgedErrorType.getAnyOptionalObjectType()) {
+  if (auto bridgedObjectType = bridgedErrorType.getOptionalObjectType()) {
     auto loweredBridgedOptionalTy =
       SILType::getPrimitiveObjectType(bridgedErrorType);
-    return emitOptionalSome(loc, loweredBridgedOptionalTy,
-                            [&](SILGenFunction &SGF, SILLocation loc,
-                                SGFContext C) {
-      SILType loweredBridgedObjectTy =
-        loweredBridgedOptionalTy.getAnyOptionalObjectType();
-      return emitNativeToBridgedValue(loc, nativeError, nativeType,
-                                      bridgedObjectType,
-                                      loweredBridgedObjectTy);
-    });
+    return emitOptionalSome(
+        loc, loweredBridgedOptionalTy,
+        [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+          SILType loweredBridgedObjectTy =
+              loweredBridgedOptionalTy.getOptionalObjectType();
+          return emitNativeToBridgedValue(loc, nativeError, nativeType,
+                                          bridgedObjectType,
+                                          loweredBridgedObjectTy);
+        });
   }
 
   assert(bridgedErrorType == SGM.Types.getNSErrorType() &&

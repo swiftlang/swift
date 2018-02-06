@@ -2011,7 +2011,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 
     auto normalizeType = [](Type ty) -> Type {
       ty = ty->getInOutObjectType();
-      if (Type unwrappedTy = ty->getAnyOptionalObjectType())
+      if (Type unwrappedTy = ty->getOptionalObjectType())
         ty = unwrappedTy;
       return ty;
     };
@@ -2048,9 +2048,9 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 
     // Preserve optionality if we're dealing with a simple type.
     OptionalTypeKind OTK;
-    if (Type unwrappedTy = newOverrideTy->getAnyOptionalObjectType())
+    if (Type unwrappedTy = newOverrideTy->getOptionalObjectType())
       newOverrideTy = unwrappedTy;
-    if (overrideTy->getAnyOptionalObjectType(OTK))
+    if (overrideTy->getOptionalObjectType(OTK))
       newOverrideTy = OptionalType::get(OTK, newOverrideTy);
 
     SmallString<32> baseTypeBuf;
@@ -3417,7 +3417,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
     // If the subexpression was actually optional, then the pattern must be
     // checking for a type, which forced it to be promoted to a double optional
     // type.
-    if (auto ooType = subExpr->getType()->getAnyOptionalObjectType()) {
+    if (auto ooType = subExpr->getType()->getOptionalObjectType()) {
       if (auto TP = dyn_cast<TypedPattern>(p))
         // Check for 'if let' to produce a tuned diagnostic.
         if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
@@ -3477,13 +3477,13 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
                                  size_t &difference) {
       SmallVector<Type, 4> destOptionals;
       auto destValueType =
-        destType->lookThroughAllAnyOptionalTypes(destOptionals);
+        destType->lookThroughAllOptionalTypes(destOptionals);
 
       if (!destValueType->isAny())
         return false;
 
       SmallVector<Type, 4> srcOptionals;
-      srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
+      srcType->lookThroughAllOptionalTypes(srcOptionals);
 
       if (srcOptionals.size() > destOptionals.size()) {
         difference = srcOptionals.size() - destOptionals.size();
@@ -3844,7 +3844,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     type = type->getWithoutParens();
 
     // Look through optionals.
-    if (auto optObjectTy = type->getAnyOptionalObjectType()) {
+    if (auto optObjectTy = type->getOptionalObjectType()) {
       type = optObjectTy;
       continue;
     }
@@ -4008,7 +4008,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
                 ->getWithoutSpecifierType();
-  while (auto optObjectTy = type->getAnyOptionalObjectType())
+  while (auto optObjectTy = type->getOptionalObjectType())
     type = optObjectTy;
 
   // Omit needless words.

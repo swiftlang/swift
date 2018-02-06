@@ -328,7 +328,7 @@ public:
     // of optional.
     errorPtrType = errorParameter.getType();
     unwrappedPtrType = errorPtrType;
-    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+    if (Type unwrapped = errorPtrType->getOptionalObjectType(optKind))
       unwrappedPtrType = unwrapped->getCanonicalType();
 
     auto errorType =
@@ -420,7 +420,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   // need to make our own make SILResultInfo array.
   case ForeignErrorConvention::NilResult: {
     assert(allResults.size() == 1);
-    CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+    CanType objectType = allResults[0].getType().getOptionalObjectType();
     SILResultInfo optResult = allResults[0].getWithType(objectType);
     allResults.clear();
     allResults.push_back(optResult);

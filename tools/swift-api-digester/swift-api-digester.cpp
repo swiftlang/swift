@@ -1059,7 +1059,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   }
   if (Ty->getAnyNominal()) {
     if (IsImplicitlyUnwrappedOptional) {
-      assert(Ty->getAnyOptionalObjectType());
+      assert(Ty->getOptionalObjectType());
       return StringRef("ImplicitlyUnwrappedOptional");
     }
     return Ty->getAnyNominal()->getNameStr();

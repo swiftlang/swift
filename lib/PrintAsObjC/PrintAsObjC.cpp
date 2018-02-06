@@ -309,7 +309,7 @@ private:
   getObjectTypeAndOptionality(const Decl *D, Type ty) {
     OptionalTypeKind kind;
     if (auto objTy =
-            ty->getReferenceStorageReferent()->getAnyOptionalObjectType(kind)) {
+            ty->getReferenceStorageReferent()->getOptionalObjectType(kind)) {
       if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         kind = OTK_ImplicitlyUnwrappedOptional;
 
@@ -962,7 +962,7 @@ private:
   }
 
   bool maybePrintIBOutletCollection(Type ty) {
-    if (auto unwrapped = ty->getAnyOptionalObjectType())
+    if (auto unwrapped = ty->getOptionalObjectType())
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
@@ -1022,7 +1022,7 @@ private:
     // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
-      auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
+      auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
       if ((innerClass &&
            innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
@@ -1036,7 +1036,7 @@ private:
     } else {
       Type copyTy = ty;
       OptionalTypeKind optionalType;
-      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
+      if (auto unwrappedTy = copyTy->getOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
@@ -1671,7 +1671,7 @@ private:
       return;
 
     OptionalTypeKind innerOptionalKind;
-    if (auto underlying = BGT->getAnyOptionalObjectType(innerOptionalKind)) {
+    if (auto underlying = BGT->getOptionalObjectType(innerOptionalKind)) {
       visitPart(underlying, innerOptionalKind);
     } else
       visitType(BGT, optionalKind);
@@ -1911,7 +1911,7 @@ public:
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
     if (isFuncParam)
-      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+      if (auto fnTy = ty->lookThroughAllOptionalTypes()
                         ->getAs<AnyFunctionType>())
         if (fnTy->isNoEscape())
           os << "SWIFT_NOESCAPE ";
