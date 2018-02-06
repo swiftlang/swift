@@ -1032,6 +1032,10 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(copy->getUses().begin(), copy->getUses().end());
       continue;
     }
+    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
+       uses.append(cvt->getUses().begin(), cvt->getUses().end());
+      continue;
+    }
     // @noescape block storage can be passed as an Optional (Nullable).
     if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
