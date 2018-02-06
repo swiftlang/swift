@@ -43,7 +43,7 @@ namespace swift {
     Arch,
     /// The active arch target endianness (big or little)
     Endianness,
-    /// The active arch target pointer bit width (32 or 64)
+    /// The active arch target pointer bit width (_32 or _64)
     PointerBitWidth,
     /// Runtime support (_ObjC or _Native)
     Runtime,
