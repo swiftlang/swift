@@ -213,8 +213,7 @@ namespace {
     BaseIterator baseEnd;
 
     void advance() {
-      while (base != baseEnd && base->value != node.second)
-        ++base;
+      ++base;
     }
 
   public:
