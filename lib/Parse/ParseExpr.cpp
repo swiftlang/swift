@@ -338,6 +338,7 @@ parse_operator:
 
     case tok::arrow:
     case tok::kw_throws: {
+      SyntaxParsingContext ArrowContext(SyntaxContext, SyntaxKind::ArrowExpr);
       ParserResult<Expr> arrow = parseExprArrow();
       if (arrow.isNull() || arrow.hasCodeCompletion())
         return arrow;
