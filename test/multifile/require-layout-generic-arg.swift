@@ -22,6 +22,6 @@ public func requestType<T>(_ c: Sub<T>) {
 // FILE2:   [[CLASSMETADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata
 // FILE2:   [[ADDR:%.*]] = bitcast %swift.type* [[CLASSMETADATA]] to i8**
 // This offset must match the offset above.
-// FILE2:   [[T_IN_CLASSMETADATA:%.*]] = getelementptr inbounds i8*, i8** [[ADDR]], i64 16
+// FILE2:   [[T_IN_CLASSMETADATA:%.*]] = getelementptr inbounds i8*, i8** [[ADDR]], i32 16
 // FILE2:   [[T2:%.*]] = bitcast %swift.type* [[T]] to i8*
 // FILE2:   store i8* [[T2]], i8** [[T_IN_CLASSMETADATA]]
