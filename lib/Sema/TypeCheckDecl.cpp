@@ -4509,20 +4509,24 @@ public:
       {
         // Check for duplicate enum members.
         llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        bool hasErrors = false;
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
-            EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
-            if (auto *RawValueExpr = EED->getRawValueExpr())
-              RawValueExpr->setType(ErrorType::get(TC.Context));
 
             auto PreviousEED = Res.first->second;
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
             TC.diagnose(PreviousEED->getLoc(),
                         diag::previous_decldef, true, EED->getName());
+            hasErrors = true;
           }
         }
+
+        // If one of the cases is invalid, let's mark
+        // whole enum as invalid as well.
+        if (hasErrors)
+          ED->setInvalid();
       }
     }
 
