@@ -16,20 +16,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable
-public func sigmoid<Unit : BinaryFloatingPoint>(_ x: Tensor<Unit>) -> Tensor<Unit> {
+@_inlineable @inline(__always)
+public func sigmoid<Unit : BinaryFloatingPoint>(
+  _ x: Tensor<Unit>
+) -> Tensor<Unit> {
   let expx = exp(-x)
   return 1.0 / (1.0 + expx)
 }
 
-@_inlineable
+@_inlineable @inline(__always)
 public func relu<Unit : Numeric & Comparable>(
   _ x: Tensor<Unit>
 ) -> Tensor<Unit> {
   return max(0, x)
 }
 
-@_inlineable
+@_inlineable @inline(__always)
 public func softmax<Unit : FloatingPoint>(_ x: Tensor<Unit>) -> Tensor<Unit> {
   let expx = exp(x)
   return expx / expx.sum()
