@@ -1053,12 +1053,6 @@ static bool serializeSIBIfNeeded(FrontendOptions &opts, SILModule *SM,
   return Context.hadError();
 }
 
-/// Serialize the SILModule if it was not serialized yet.
-static void ensureSILModuleIsSerialized(SILModule *SM) {
-  if (!SM->isSerialized())
-    SM->serialize();
-}
-
 static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
@@ -1248,8 +1242,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   const bool haveModulePath =
       !opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty();
-  if (haveModulePath)
-    ensureSILModuleIsSerialized(SM.get());
+  if (haveModulePath && !SM->isSerialized())
+    SM->serialize();
 
   if (haveModulePath) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
