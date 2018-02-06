@@ -16,13 +16,12 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
-// CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK-NEXT:   %1 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %2 = builtin "__tfop_Sub,tt:t"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
-// CHECK-NEXT:   %3 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%2 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:   %4 = builtin "tensorflowReceive_0"<TensorHandle<Float>>() : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// CHECK-NEXT:   %2 = builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %3 = builtin "__tfop_Sub,tt:t"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:   %4 = builtin "tensorflowSend_0"<TensorHandle<Float>>(%3 : $TensorHandle<Float>) : $()
+// CHECK-NEXT:   %5 = builtin "__tfop_Add,tt:t"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:   return %5 : $TensorHandle<Float>
 
 
@@ -35,9 +34,9 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NOT: = apply
 
 // We're passing one TensorHandle in.
-// CHECK: [[ALLOC:%.*]] = alloc_stack $OpaquePointer
+// CHECK: [[ALLOC:%.*]] = alloc_stack $(OpaquePointer, OpaquePointer)
 // CHECK: ref_element_addr
-// CHECK: begin_access [read] [static] [[ALLOC]] : $*OpaquePointer
+// CHECK: begin_access [read] [static] [[ALLOC]] : $*(OpaquePointer, OpaquePointer)
 // CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
@@ -123,10 +122,11 @@ public func testExitBranch1(i: Int) {
 
 
 
-public func testExitBranch2(i: Int) {  // expected-warning {{'i' implicitly copied to the accelerator}}
+public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
-  if i == 0 {  // expected-note {{value used here}}
+  // expected-warning @+1 {{implicitly copied to the accelerator}}
+  if i == 0 { 
     return
   }
 
@@ -136,8 +136,9 @@ public func testExitBranch2(i: Int) {  // expected-warning {{'i' implicitly copi
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
-// CHECK: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int64>) -> () {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.Int64>):
+// CHECK: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>) -> () {
+// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>):
+// CHECK:  builtin "__tfop_Const,:t
 // CHECK:  cond_br {{.*}}, bb2, bb1
 
 // CHECK:      bb1:
@@ -228,6 +229,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
   a += b
 
   var count = 0
+  // expected-warning @+1 {{implicitly copied to the accelerator}}
   while count < maxCount { // expected-note {{value used here}}
     a -= b
     count += 1
@@ -238,12 +240,11 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
-// CHECK-NEXT: builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>, %3 : $TensorHandle<Builtin.Int64>):
 // CHECK-NEXT: integer_literal $Builtin.Int32, 9
 // CHECK-NEXT: integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: builtin "__tfop_Const,:t,dtype$dtype,value$tensor"(
-// CHECK-NEXT: builtin "__tfop_Less,tt:t"(
+// CHECK-NEXT: builtin "__tfop_Add,tt:t"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>)
 // CHECK-NEXT: builtin "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
 
@@ -395,9 +396,14 @@ public func testEmptyUnitsArray() {
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-  let y2 = y.toDevice()
-  let a = sigmoid(x.toDevice())
-  let b = sigmoid(y2)
-  return (a.toHost(), b.toHost())
+  let a = sigmoid(x.toDevice()).toHost()
+  let b = sigmoid(y.toDevice()).toHost()
+  return (a, b)
 }
 
+// Likewise, mean and max shouldn't cause send/receive errors.
+public func testMeanMax(x: Tensor<Float>) -> Float {
+  let a = x.mean()
+  let b = x.max()
+  return a+b
+}

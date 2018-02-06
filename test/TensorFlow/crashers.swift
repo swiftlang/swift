@@ -75,14 +75,13 @@ public func testStraightLineXORTraining() { // expected-note 4 {{value used here
   var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
   var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
 
-  // expected-error @+1 {{GraphGen cannot lower a 'receive' from the host yet}}
   var b1 = Tensor<Float>.zeros(shape: [1, 4]) // expected-warning 5 {{implicitly copied}}
   var b2 = Tensor<Float>.zeros(shape: [1, 1])
 
   // Training data
   let inputBatch = Tensor<Float>(
     [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-    ).toDevice()
+    ).toDevice() // expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
   let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]]).toDevice()
 
   // Training loop
