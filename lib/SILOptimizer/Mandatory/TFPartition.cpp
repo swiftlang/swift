@@ -109,69 +109,97 @@ static bool canPromoteOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
 }
 
 
+/// When classifying a builtin operation as a scalar to be promoted to a tensor,
+/// this returns the kind of operation it is.
+enum class PromotedScalarKind {
+  Invalid,
+  Literal,
+  Conversion,
+  Binary,
+  OverflowingBinary,
+};
+
+
 /// If the specified scalar operation can be partitioned and run on the
 /// accelerator, return the name of the op to use to implement it.
-static std::string getPartitionedScalarOpName(SILInstruction *I) {
+static std::pair<const char*, PromotedScalarKind>
+classifyPromotedScalarOp(SILInstruction *I) {
   // We can turn integer and FP literals into constant nodes if their type is
   // compatible.
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
     auto resultTy = I->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
-      return "__tfop_Const";
+      return { "Const", PromotedScalarKind::Literal };
   }
 
   auto *BI = dyn_cast<BuiltinInst>(I);
-  if (!BI) return std::string();
+  if (!BI) return { nullptr, PromotedScalarKind::Invalid };
 
-  // These are true if the first operand is int, fp, etc, not counting vectors
-  // or other exotic types.  It is also only true if it is a type we can
-  // represent in Tensor elements.
-  bool isInt = false, isFP = false;
+  // Verify that the instruction is processing dtypes that are supported by
+  // TensorFlow nodes - we don't want to handle SIMD vectors or other exotic
+  // types.
   if (BI->getNumOperands() != 0) {
     auto opTy = BI->getOperand(0)->getType();
-    if (isValidTensorFlowElementType(opTy.getSwiftRValueType())) {
-      isInt = opTy.is<BuiltinIntegerType>();
-      isFP = opTy.is<BuiltinFloatType>();
-    }
+    if (!isValidTensorFlowElementType(opTy.getSwiftRValueType()))
+      return { nullptr, PromotedScalarKind::Invalid };
   }
+  // Verify the result is a valid tensorflow type, or a 2-element tuple that
+  // starts with one (used by the overflowing ops).
+  if (!isValidTensorFlowElementType(BI->getType().getSwiftRValueType())) {
+    auto *tt = BI->getType().getSwiftRValueType()->getAs<TupleType>();
+    if (!tt || tt->getNumElements() != 2 ||
+        !isValidTensorFlowElementType(tt->getElementType(0)))
+      return { nullptr, PromotedScalarKind::Invalid };
+  }
+
 
   // Perform a final boolean validity check and add the "(t,t)->t" signature
   // for a tensor op.
-  auto check = [&](bool cond, StringRef result) -> std::string {
-    if (!cond) return std::string();
-    return "__tfop_" + result.str() + ",tt:t";
+  auto binary = [&](const char *name)
+       -> std::pair<const char*, PromotedScalarKind> {
+    return { name, PromotedScalarKind::Binary };
   };
 
-  // Given an overflowing operation, return true if the overflow result will be
-  // dead in the tensor program.
-  auto overflowDead = [&]() -> bool {
-    return canPromoteOverflowCheckingInstToTensorProgram(BI);
+  auto overflowingBinary = [&](const char *name)
+       -> std::pair<const char*, PromotedScalarKind> {
+    if (!canPromoteOverflowCheckingInstToTensorProgram(BI))
+      return { nullptr, PromotedScalarKind::Invalid };
+    return { name, PromotedScalarKind::OverflowingBinary };
+  };
+
+  auto conversion = [&]() -> std::pair<const char*, PromotedScalarKind> {
+    return { "Cast", PromotedScalarKind::Conversion };
   };
 
   switch (BI->getBuiltinInfo().ID) {
-  default: return StringRef();
-  // TODO: FP Comparisons.  Unsigned ops, which need int->uint casts.
-  case BuiltinValueKind::ICMP_EQ: return check(isInt, "Equal");
-  case BuiltinValueKind::ICMP_NE: return check(isInt, "NotEqual");
-  case BuiltinValueKind::ICMP_SLT: return check(isInt, "Less");
-  case BuiltinValueKind::ICMP_SGT: return check(isInt, "Greater");
-//case BuiltinValueKind::ICMP_UGT: return check(isInt, "Greater");
-  case BuiltinValueKind::ICMP_SLE: return check(isInt, "LessEqual");
-//case BuiltinValueKind::ICMP_ULE: return check(isInt, "LessEqual");
-  case BuiltinValueKind::ICMP_SGE: return check(isInt, "GreaterEqual");
-//case BuiltinValueKind::ICMP_UGE: return check(isInt, "GreaterEqual");
-  case BuiltinValueKind::Add: return check(isInt, "Add");
-  case BuiltinValueKind::Sub: return check(isInt, "Sub");
-  case BuiltinValueKind::Mul: return check(isInt, "Mul");
-  case BuiltinValueKind::FAdd: return check(isFP, "Add");
-  case BuiltinValueKind::FSub: return check(isFP, "Sub");
-  case BuiltinValueKind::FMul: return check(isFP, "Mul");
-  //case BuiltinValueKind::UAddOver:
-  //case BuiltinValueKind::USubOver:
-  //case BuiltinValueKind::UMulOver:
-  case BuiltinValueKind::SAddOver: return check(isInt&overflowDead(), "Add");
-  case BuiltinValueKind::SSubOver: return check(isInt&overflowDead(), "Sub");
-  case BuiltinValueKind::SMulOver: return check(isInt&overflowDead(), "Mul");
+  default: return { nullptr, PromotedScalarKind::Invalid };
+  // TODO: Unsigned comparisons: ICMP_UGT, ICMP_ULE, ICMP_UGE
+  // TODO: FP Comparisons.
+  case BuiltinValueKind::ICMP_EQ:  return binary("Equal");
+  case BuiltinValueKind::ICMP_NE:  return binary("NotEqual");
+  case BuiltinValueKind::ICMP_SLT: return binary("Less");
+  case BuiltinValueKind::ICMP_SGT: return binary("Greater");
+  case BuiltinValueKind::ICMP_SLE: return binary("LessEqual");
+  case BuiltinValueKind::ICMP_SGE: return binary("GreaterEqual");
+  case BuiltinValueKind::Add:      return binary("Add");
+  case BuiltinValueKind::Sub:      return binary("Sub");
+  case BuiltinValueKind::Mul:      return binary("Mul");
+  case BuiltinValueKind::FAdd:     return binary("Add");
+  case BuiltinValueKind::FSub:     return binary("Sub");
+  case BuiltinValueKind::FMul:     return binary("Mul");
+  // TODO: UAddOver, USubOver, UMulOver:
+  case BuiltinValueKind::SAddOver: return overflowingBinary("Add");
+  case BuiltinValueKind::SSubOver: return overflowingBinary("Sub");
+  case BuiltinValueKind::SMulOver: return overflowingBinary("Mul");
+
+  // TODO: Unsigned conversions.
+  case BuiltinValueKind::SIToFP:
+  case BuiltinValueKind::FPToSI:
+  case BuiltinValueKind::Trunc:
+  case BuiltinValueKind::TruncOrBitCast:
+  case BuiltinValueKind::SExt:
+  case BuiltinValueKind::SExtOrBitCast:
+     return conversion();
   }
 }
 
@@ -822,7 +850,8 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
 
   // Check to see if we know how to promote this to a tensor operation.  If not,
   // we reject it.
-  if (getPartitionedScalarOpName(inst).empty())
+  auto scalarClass = classifyPromotedScalarOp(inst).second;
+  if (scalarClass == PromotedScalarKind::Invalid)
     return ScalarPromoteClass::NeverPromote;
 
   // TODO: We should do a bit more cost model analysis on this.  It doesn't make
@@ -838,6 +867,13 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst) {
   // sinkValueIntoRegionForPromotion.
   if (isa<LiteralInst>(inst))
     return ScalarPromoteClass::ShouldPromote;
+
+  // If this is a conversion from an instruction that should be promoted (like
+  // a literal), then try hard to promote it too.
+  if (scalarClass == PromotedScalarKind::Conversion)
+    if (auto *op = dyn_cast<SILInstruction>((SILNode*)inst->getOperand(0)))
+      if (shouldPromoteToTensorOp(op) == ScalarPromoteClass::ShouldPromote)
+        return ScalarPromoteClass::ShouldPromote;
 
   // Otherwise, we can promote this if desired.
   return ScalarPromoteClass::CanPromote;
@@ -1057,16 +1093,12 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
 /// we generalize it later it can, so we return a bool to indicate success.
 bool TFFunctionPartition::
 sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
-  // If this is too complex, don't try to sink it.
-  // Right now, we just handle floating point and integer literals.
-  assert(isa<LiteralInst>(inst) &&
-         "can only handle 'ShouldPromote' cases identified by"
-         " shouldPromoteToTensorOp");
-
-  // We can't generally sink this beyond other users, so we clone the
-  // instruction instead.
+  // This instruction may have other users, so instead of moving it, we clone
+  // it.
+  // TODO: Move it if we can to avoid duplications.
   auto oldInst = inst;
   inst = inst->clone(tensorStartPoint);
+  inst->setDebugLocation(oldInst->getDebugLocation());
   tensorStartPoint = inst;
 
   // Replace uses of the original instruction with the new one, if they are
@@ -1384,14 +1416,26 @@ public:
   }
 
   void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
-  void visitBuiltinInst(BuiltinInst *inst);
-  void visitApplyInst(ApplyInst *inst);
-  void visitLiteralInst(LiteralInst *inst);
+  void visitScalarPromotionInst(SingleValueInstruction *inst);
+
+  void visitBuiltinInst(BuiltinInst *inst) {
+    // Check to see if this is an op.
+    if (auto tfopInfo = SILTensorOpInfo::decode(inst))
+      return visitOpInst(inst, tfopInfo.getValue());
+
+    // Otherwise it is a scalar to promote.
+    visitScalarPromotionInst(inst);
+  }
+  void visitApplyInst(ApplyInst *inst) {
+    // We know that this is an op, otherwise it won't have been marked.
+    auto tfOpInfo = SILTensorOpInfo::decode(inst).getValue();
+    return visitOpInst(inst, tfOpInfo);
+  }
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
-    visitLiteralInst(inst);
+    visitScalarPromotionInst(inst);
   }
   void visitFloatLiteralInst(FloatLiteralInst *inst) {
-    visitLiteralInst(inst);
+    visitScalarPromotionInst(inst);
   }
 
   void visitTupleExtractInst(TupleExtractInst *inst);
@@ -1561,30 +1605,34 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   ValueMap[inst] = result;
 }
 
-// If we're copying over a builtin instruction, it is due to a scalar operation
-// that corresponds to an LLVM IR instruction.
-void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
-  // Check to see if this is an op.
-  if (auto tfopInfo = SILTensorOpInfo::decode(inst))
-    return visitOpInst(inst, tfopInfo.getValue());
 
-  // Otherwise, this is some other builtin we're partitioning, like an LLVM IR
-  // instruction.
-  auto opName = getPartitionedScalarOpName(inst);
-  assert(!opName.empty() && "Should correspond to an op");
-  auto &B = getBuilder();
-  auto name = B.getASTContext().getIdentifier(opName);
+/// Given a primitive scalar instruction like a literal or an LLVM IR
+/// instruction (represented as a builtin), promote it to a tensor op in the
+/// graph function.
+void PartitionCloner::visitScalarPromotionInst(SingleValueInstruction *inst) {
+  auto loc = remapLocation(inst->getLoc());
 
-  // Overflow checking integer instructions get special treatment.
-  bool isOverflowCheckingInst = isOverflowCheckingIntegerOp(inst);
+  auto opInfo = classifyPromotedScalarOp(inst);
+  assert(opInfo.first != nullptr && "Invalid scalar operation to promote");
+  std::string opName = "__tfop_" + std::string(opInfo.first);
+
+  auto opKind = opInfo.second;
+  switch (opKind) {
+  case PromotedScalarKind::Invalid:
+    llvm_unreachable("Invalid scalar operation to promote");
+  case PromotedScalarKind::Literal:           opName += ",:t"; break;
+  case PromotedScalarKind::Conversion:        opName += ",t:t"; break;
+  case PromotedScalarKind::Binary:            opName += ",tt:t"; break;
+  case PromotedScalarKind::OverflowingBinary: opName += ",tt:t"; break;
+  }
 
 
-  // These are all simple things, just remap the operands directly.
+  // Start remapping the operand list.
   auto operandRange = inst->getAllOperands();
 
   // Overflow-checking integer ops have a "should check" bit as their last
-  // parameter, which we don't remap.
-  if (isOverflowCheckingInst)
+  // parameter, which we drop.
+  if (opKind == PromotedScalarKind::OverflowingBinary)
     operandRange = operandRange.drop_back();
 
   SmallVector<SILValue, 4> operands;
@@ -1594,59 +1642,47 @@ void PartitionCloner::visitBuiltinInst(BuiltinInst *inst) {
   // The type of the new builtin is usually the same as the input type, but
   // "remapped", which turns Float into TensorHandle<Float>.
   auto resultType = inst->getType();
-  if (isOverflowCheckingInst) {
+  if (opKind == PromotedScalarKind::OverflowingBinary) {
     // In the input program, cverflow checking instructions return something
     // like (Int64, i1).  During the marking process, we've determined that the
     // overflow bit is dead, so we only produce the normal result.
     resultType = resultType.getTupleElementType(0);
   }
 
+  auto &B = getBuilder();
+  auto &ctx = B.getASTContext();
+
+  // Literals take attributes specifying the dtype and value.
+  if (opKind == PromotedScalarKind::Literal) {
+    opName += ",dtype$dtype,value$tensor";
+
+    auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
+    auto dtypeCst =
+      B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
+                             dtype);
+    operands.push_back(dtypeCst);
+
+    // The value attribute is specified by a clone of the literal itself.
+    auto ourCst = inst->clone(dtypeCst);
+    ourCst->setDebugLocation(B.getSILDebugLocation(loc));
+    operands.push_back(ourCst);
+  }
+
+  // Conversions get an attribute specifying the result dtype, named "DstT".
+  if (opKind == PromotedScalarKind::Conversion) {
+    opName += ",DstT$dtype";
+    auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
+    auto dtypeCst =
+      B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
+                             dtype);
+    operands.push_back(dtypeCst);
+  }
+
   auto result =
-    B.createBuiltin(remapLocation(inst->getLoc()), name,
+    B.createBuiltin(loc, B.getASTContext().getIdentifier(opName),
                     remapType(resultType), /*substitutionlist*/{}, operands);
   ValueMap[inst] = result;
 }
-
-// If we're copying over an apply instruction, it is a function that we're
-// promoting to a builtin in the graph.
-void PartitionCloner::visitApplyInst(ApplyInst *inst) {
-  // We know that this is an op, otherwise it won't have been marked.
-  auto tfOpInfo = SILTensorOpInfo::decode(inst).getValue();
-  return visitOpInst(inst, tfOpInfo);
-}
-
-
-/// We clone over simple literals like:
-///
-///    %X = integer_literal $Builtin.Int32, 0
-/// into:
-///    %Y = integer_literal $Builtin.Int32, 0
-///    %X = builtin "tfop_Const"(%Y)
-///
-void PartitionCloner::visitLiteralInst(LiteralInst *inst) {
-  auto loc = remapLocation(inst->getLoc());
-  auto &B = getBuilder();
-
-  auto &ctx = B.getASTContext();
-  auto opName = "__tfop_Const,:t,dtype$dtype,value$tensor";
-  auto name = ctx.getIdentifier(opName);
-
-  // Emit the dtype value to use as an integer.
-  auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
-  auto dtypeCst =
-    B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx), dtype);
-
-  // Emit the constant we're going to use.
-  auto ourCst = inst->clone();
-  ourCst->setDebugLocation(B.getSILDebugLocation(loc));
-  B.getInsertionBB()->push_back(ourCst);
-
-  auto result =
-    B.createBuiltin(loc, name, remapType(inst->getType()), /*substitutions*/{},
-                    { SILValue(dtypeCst), SILValue(ourCst) });
-  ValueMap[inst] = result;
-}
-
 
 /// We clone over tuple_extract(x, 0) into x's value.  The only time
 /// tuple_extract instructions get marked is when this is safe.
